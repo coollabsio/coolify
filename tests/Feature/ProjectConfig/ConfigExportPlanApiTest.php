@@ -51,7 +51,7 @@ it('exports an environment whose first plan only adopts', function () {
     $file = $this->withHeaders(configApiHeaders($this->token))->getJson("/api/v1/environments/{$uuid}/config/export")->assertOk()->json();
 
     expect($file['version'])->toBe(1)
-        ->and($file['project'])->toBe('acme')
+        ->and($file)->not->toHaveKey('project')
         ->and($file['resources'])->toHaveKey('my-api')
         ->and($file['environments']['production']['import'])->toBe([['to' => 'my-api', 'uuid' => $this->application->uuid]]);
 

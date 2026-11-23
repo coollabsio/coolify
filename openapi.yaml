@@ -10369,6 +10369,12 @@ paths:
                   enum: [api, git]
                 auto_apply:
                   type: boolean
+                server_uuid:
+                  description: 'Required for git. Reads the file, and resources that name no server go to it.'
+                  type: string
+                destination_uuid:
+                  description: 'The destination on that server. Needed when the server has more than one.'
+                  type: string
               type: object
       responses:
         '201':
@@ -10442,12 +10448,20 @@ paths:
               properties:
                 auto_apply:
                   type: boolean
+                server_uuid:
+                  description: 'Another server for the link. Plans the file again; resources that move wait for approval. Needs the deploy ability.'
+                  type: string
+                destination_uuid:
+                  description: 'The destination on that server. Needed when the server has more than one.'
+                  type: string
               type: object
       responses:
         '200':
           description: 'The link.'
         '403':
-          description: 'Team admins only.'
+          description: 'Team admins only, and the deploy ability for a server change.'
+        '422':
+          description: 'Validation failed.'
       security:
         -
           bearerAuth: []

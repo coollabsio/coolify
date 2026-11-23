@@ -158,13 +158,13 @@ it('creates a git link with team sources only, and plans the branch head', funct
     ]);
     $this->files['head'] = planJobFile(['api' => planJobApp()]);
     $staging = $this->fx['project']->environments()->create(['name' => 'staging']);
-    $body = fn (array $extra) => array_merge(['project' => 'acme', 'environment' => 'staging', 'mode' => 'git', 'repository' => 'https://github.com/acme/api', 'branch' => 'main', 'read_server_uuid' => $this->fx['server']->uuid, 'source_type' => 'public'], $extra);
+    $body = fn (array $extra) => array_merge(['project' => 'acme', 'environment' => 'staging', 'mode' => 'git', 'repository' => 'https://github.com/acme/api', 'branch' => 'main', 'server_uuid' => $this->fx['server']->uuid, 'source_type' => 'public'], $extra);
     $headers = ['Authorization' => "Bearer {$token}", 'Accept' => 'application/json'];
 
     app('auth')->forgetGuards();
     $this->withHeaders($headers)->postJson('/api/v1/config/links', $body(['source_type' => 'github_app', 'source_uuid' => $foreignApp->uuid]))->assertStatus(422);
     app('auth')->forgetGuards();
-    $this->withHeaders($headers)->postJson('/api/v1/config/links', $body(['read_server_uuid' => $other['server']->uuid]))->assertStatus(422);
+    $this->withHeaders($headers)->postJson('/api/v1/config/links', $body(['server_uuid' => $other['server']->uuid]))->assertStatus(422);
     foreach ([['repository' => 'file:///srv/git/api.git'], ['repository' => 'http://127.0.0.1/api.git'], ['file_path' => '../coolify.json']] as $invalid) {
         app('auth')->forgetGuards();
         $this->withHeaders($headers)->postJson('/api/v1/config/links', $body($invalid))->assertStatus(422);

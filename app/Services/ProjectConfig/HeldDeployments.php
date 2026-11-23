@@ -2,15 +2,19 @@
 
 namespace App\Services\ProjectConfig;
 
+use App\Actions\Application\StopApplicationOneServer;
 use App\Actions\Database\RestartDatabase;
 use App\Actions\Database\StartDatabase;
+use App\Actions\Database\StopDatabase;
 use App\Actions\Service\RestartService;
 use App\Actions\Service\StartService;
+use App\Actions\Service\StopService;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\EnvironmentConfigLink;
 use App\Models\EnvironmentConfigRevision;
+use App\Models\Service;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -32,6 +36,22 @@ class HeldDeployments
         if (data_get($result, 'status') === 'queue_full') {
             $this->recordFailedDeployment($application, $commit, 'The deployment after the coolify.json apply was not queued: '.data_get($result, 'message'));
         }
+    }
+
+    /**
+     * Stops a resource that moved to another destination on the destination that it left. The copy keeps the
+     * old destination, because the stop actions stop the containers on the destination of the model.
+     */
+    public function stopOnOldDestination(Model $resource, Model $oldDestination): void
+    {
+        if ($resource instanceof Application) {
+            StopApplicationOneServer::run($resource, $oldDestination->server);
+
+            return;
+        }
+        $copy = $resource->fresh();
+        $copy->setRelation('destination', $oldDestination);
+        $resource instanceof Service ? StopService::run($copy) : StopDatabase::run($copy);
     }
 
     /**

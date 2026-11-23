@@ -35,6 +35,8 @@ class EnvironmentConfigLink extends BaseModel
         'branch',
         'file_path',
         'read_server_id',
+        'destination_type',
+        'destination_id',
         'webhook_secret',
         'auto_apply',
         'suspended_at',
@@ -77,6 +79,35 @@ class EnvironmentConfigLink extends BaseModel
     public function readServer(): BelongsTo
     {
         return $this->belongsTo(Server::class, 'read_server_id');
+    }
+
+    /**
+     * The default destination, on the server of the link. Needed only when that server has more than one destination.
+     */
+    public function destination(): MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    /**
+     * Where a resource goes when the file names no server: the server of the link, and the destination of the link
+     * when that server has more than one destination.
+     *
+     * @return array{server?: string, destination?: string}
+     */
+    public function defaultPlacement(): array
+    {
+        $server = $this->readServer;
+        if ($server === null) {
+            return [];
+        }
+        $placement = ['server' => $server->name];
+        $destination = $this->destination;
+        if ($destination !== null && (int) $destination->server_id === (int) $server->id && $server->destinations()->count() > 1) {
+            $placement['destination'] = $destination->network;
+        }
+
+        return $placement;
     }
 
     public function revisions(): HasMany

@@ -143,7 +143,7 @@ class ConfigPlanner
         return new ConfigPlan(
             changes: $changes,
             errors: $errors,
-            warnings: $this->unmanagedWarnings($ctx, $importedIds),
+            warnings: [...$this->moveWarnings($changes), ...$this->unmanagedWarnings($ctx, $importedIds)],
             stateHash: $stateHash,
             missingRequired: $missingRequired,
             removesAll: $env->resources === [],
@@ -234,6 +234,21 @@ class ConfigPlanner
     }
 
     /**
+     * A resource that changes its server or network starts again on the new one. Its data does not move.
+     *
+     * @param  list<Change>  $changes
+     * @return list<string>
+     */
+    private function moveWarnings(array $changes): array
+    {
+        return collect($changes)
+            ->filter(fn (Change $change) => $change->kind === ChangeKind::Update && in_array($change->path, ['server', 'destination'], true))
+            ->pluck('key')->unique()
+            ->map(fn (string $key) => "\"{$key}\" moves to another server or network. Coolify stops it on the old one and starts it on the new one. Volumes and their data stay on the old server.")
+            ->values()->all();
+    }
+
+    /**
      * @return list<ConfigError>
      */
     private function checkServer(string $key, array $desired, ApplyContext $ctx): array
@@ -241,7 +256,7 @@ class ConfigPlanner
         $path = "resources.{$key}.server";
         $name = $desired['server'] ?? null;
         if (! is_string($name) || $name === '') {
-            return [new ConfigError($path, 'Add the name of the server.')];
+            return [new ConfigError($path, 'Add the name of the server, or choose a server for the link.')];
         }
 
         $servers = $this->serversNamed($name, $ctx);

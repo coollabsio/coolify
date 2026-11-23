@@ -45,7 +45,7 @@ function connectForm(object $test, User $user)
         ->set('connectRepository', 'https://github.com/acme/infra')
         ->set('connectBranch', 'main')
         ->set('connectFilePath', 'coolify.json')
-        ->set('connectServerUuid', $test->fx['server']->uuid);
+        ->set('connectDestinationUuid', $test->fx['destination']->uuid);
 }
 
 it('previews the file before connecting', function () {
@@ -94,7 +94,7 @@ it('offers only team servers and sources', function () {
     $this->actingAs($this->fx['user']);
 
     $component = Livewire::test(EnvironmentConfiguration::class, $this->params);
-    $servers = collect($component->viewData('connectServers'))->pluck('uuid');
+    $servers = collect($component->viewData('connectServers'))->pluck('server_uuid');
 
     expect($servers)->toContain($this->fx['server']->uuid)->not->toContain($other['server']->uuid);
 });

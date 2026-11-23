@@ -48,6 +48,8 @@ return new class extends Migration
             $table->string('branch')->nullable();
             $table->string('file_path')->default('coolify.json');
             $table->foreignId('read_server_id')->nullable()->constrained('servers')->nullOnDelete();
+            // The default destination of resources that name no server in the file.
+            $table->nullableMorphs('destination');
             $table->text('webhook_secret')->nullable();
             $table->boolean('auto_apply')->default(true);
             $table->timestamp('suspended_at')->nullable();

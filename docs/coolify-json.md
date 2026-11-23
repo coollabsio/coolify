@@ -6,7 +6,7 @@ A `coolify.json` file in a git repository defines the resources of a project env
 
 1. Export the environment: `Config as code` > `Export`, or `GET /api/v1/environments/{uuid}/config/export`. The export has no secret values.
 2. Commit the file as `coolify.json` to the branch of the environment.
-3. Link the environment: `Config as code` > `Connect repository` (repository, branch, file path, git source, and the server that reads the file). Only a team admin can link.
+3. Link the environment: `Config as code` > `Connect repository` (repository, branch, file path, git source, and the server). Only a team admin can link. The server reads the file, and resources that name no server run on it.
 4. Push. Coolify plans the file. The first plan of an export only adopts the existing resources (`import`), so nothing changes.
 
 When you add a new repository that has a `coolify.json`, the add form offers `From coolify.json` (the default) or `Configure manually`. `From coolify.json` creates the resources from the file and links the environment in one step.
@@ -17,11 +17,9 @@ When you add a new repository that has a `coolify.json`, the add form offers `Fr
 {
     "$schema": "https://coolify.io/schemas/coolify.v1.json",
     "version": 1,
-    "project": "acme",
     "resources": {
         "api": {
             "type": "application",
-            "server": "prod-1",
             "source": { "repository": "https://github.com/acme/api", "branch": "main" },
             "build": { "pack": "dockerfile" },
             "ports": { "exposes": "3000" },
@@ -34,7 +32,7 @@ When you add a new repository that has a `coolify.json`, the add form offers `Fr
                 "SENDGRID_KEY": { "ref": "team.SENDGRID_KEY" }
             }
         },
-        "db": { "type": "postgresql", "server": "prod-1", "backups": [{ "frequency": "daily" }] }
+        "db": { "type": "postgresql", "server": "db-1", "backups": [{ "frequency": "daily" }] }
     },
     "environments": {
         "production": { "branch": "main" },
@@ -45,7 +43,8 @@ When you add a new repository that has a `coolify.json`, the add form offers `Fr
 
 - `version` must be `1`. Unknown keys fail the plan, except keys that start with `x-`. `minimum_coolify_version` stops older instances.
 - `resources` is keyed by a stable key (lowercase, `a-z0-9-`). Coolify stores the key on the resource, so renaming the resource name does not lose data. `type` is `application`, `service`, or a database type (`postgresql`, `mysql`, `mariadb`, `mongodb`, `redis`, `keydb`, `dragonfly`, `clickhouse`, `sqlite`).
-- `server` names an existing server of the team. The name must match exactly one server. The file never creates or configures servers.
+- The link decides the project, the environment, and the default server. So one file works in any project, team, or instance. `project` is an optional label, and Coolify does not compare it with the linked project.
+- `server` is optional. Without it, the resource runs on the server of the link (and on its destination when that server has more than one). With it, the name must match exactly one server of the team. A per-environment override can set it too. The file never creates or configures servers.
 - `environments` lists the environments and their branches. Each environment tracks its own branch, and a push changes only the environment of that branch. Per-environment `resources` override the shared ones: objects merge by key, lists replace, and `null` removes.
 - The full schema is `public/schemas/coolify.v1.json` (`php artisan project-config:schema` writes it).
 
@@ -82,6 +81,7 @@ Same-repository pull requests get a plan comment. Forks get nothing. Roll back w
 
 - Settings that the file manages are read-only in Coolify and in the API. Deploy, logs, terminal, and setting `required` values still work.
 - A team admin can pause the sync (`Pause sync`). Paused resources can be edited again. `Resume sync` shows a plan first.
+- `Change server` in the `Source` section (team admin) sets another default server. Coolify plans the file again. Resources without `server` that move wait for approval. After the approval, Coolify stops them on the old server and starts or deploys them on the new one. Volumes and their data stay on the old server. The API does the same with `PATCH /config/links/{uuid}` and `server_uuid`, which needs the `deploy` ability.
 - `Disconnect` removes the link. The resources stay and can be edited again.
 - Pages show the state: a sync dot on the project page, a badge and a banner on the environment page, a `coolify.json` chip in the top bar of a managed resource, and tags in the variables list.
 
@@ -97,7 +97,7 @@ Same-repository pull requests get a plan comment. Forks get nothing. Roll back w
 | --- | --- |
 | `GET /environments/{uuid}/config/export` | `read` + `read:sensitive` |
 | `POST /environments/{uuid}/config/plan` | `read` |
-| `POST /config/links`, `PATCH /config/links/{uuid}` | `write` |
+| `POST /config/links`, `PATCH /config/links/{uuid}` | `write` (`server_uuid` in `PATCH` also needs `deploy`) |
 | `GET /config/links/{uuid}`, `GET /config/links/{uuid}/revisions` | `read` |
 | `DELETE /config/links/{uuid}` | `write` + `delete` |
 | `POST /config/links/{uuid}/apply` | `write` + `deploy` |

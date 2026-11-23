@@ -44,6 +44,8 @@ class EnvironmentConfiguration extends Component
 
     public ?array $resumePlan = null;
 
+    public bool $resumeModalOpen = false;
+
     public bool $autoApply = true;
 
     public string $connectSourceType = 'public';
@@ -56,7 +58,17 @@ class EnvironmentConfiguration extends Component
 
     public string $connectFilePath = 'coolify.json';
 
-    public ?string $connectServerUuid = null;
+    /** The destination uuid. The form lists destinations, so a server with several networks needs no second field. */
+    public ?string $connectDestinationUuid = null;
+
+    /** The destination uuid of the server that the link should use. */
+    public ?string $serverDestinationUuid = null;
+
+    #[Locked]
+    public ?array $serverPlan = null;
+
+    #[Locked]
+    public ?string $serverError = null;
 
     #[Locked]
     public ?array $connectPlan = null;
@@ -127,7 +139,7 @@ class EnvironmentConfiguration extends Component
     }
 
     /**
-     * @return array{project: string, environment: string, mode: string, repository: string, branch: string, file_path: string, source_type: string, source_uuid: ?string, read_server_uuid: ?string}
+     * @return array{project: string, environment: string, mode: string, repository: string, branch: string, file_path: string, source_type: string, source_uuid: ?string, server_uuid: string, destination_uuid: string}
      */
     private function connectData(): array
     {
@@ -138,17 +150,24 @@ class EnvironmentConfiguration extends Component
             'file_path' => ltrim(trim($this->connectFilePath), '/') ?: 'coolify.json',
             'source_type' => $this->connectSourceType,
             'source_uuid' => $this->connectSourceType === 'public' ? null : $this->connectSourceUuid,
-            'read_server_uuid' => $this->connectServerUuid,
+            'destination_uuid' => $this->connectDestinationUuid,
         ], [
             'repository' => 'required|string|max:500',
             'branch' => ['required', 'string', new ValidGitBranch],
             'file_path' => ['required', 'string', 'max:255', 'regex:#^[A-Za-z0-9._/-]+\z#', 'not_regex:#(^|/)\.\.(/|\z)#'],
             'source_type' => 'required|in:public,github_app,gitea_app,deploy_key',
             'source_uuid' => 'required_unless:source_type,public|nullable|string',
-            'read_server_uuid' => 'required|string',
+            'destination_uuid' => 'required|string',
         ])->validate();
+        $destination = collect($this->connectServers((int) $environment->project->team_id))->firstWhere('uuid', $data['destination_uuid'])
+            ?? throw ValidationException::withMessages(['destination_uuid' => ['Use a server of this team that you can place resources on.']]);
 
-        return $data + ['project' => $environment->project->name, 'environment' => $environment->name, 'mode' => EnvironmentConfigLink::MODE_GIT];
+        return $data + [
+            'server_uuid' => $destination['server_uuid'],
+            'project' => $environment->project->name,
+            'environment' => $environment->name,
+            'mode' => EnvironmentConfigLink::MODE_GIT,
+        ];
     }
 
     public function previewConnect(): void
@@ -181,6 +200,44 @@ class EnvironmentConfiguration extends Component
             $this->reset('connectPlan', 'connectError');
             $this->dispatch('close-modal');
             $this->dispatch('success', 'Connected. Coolify reads the file now.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /**
+     * @return array{server_uuid: string, destination_uuid: string}
+     */
+    private function serverData(): array
+    {
+        $destination = collect($this->connectServers((int) $this->environment()->project->team_id))->firstWhere('uuid', $this->serverDestinationUuid)
+            ?? throw ValidationException::withMessages(['serverDestinationUuid' => ['Choose a server.']]);
+
+        return ['server_uuid' => $destination['server_uuid'], 'destination_uuid' => $destination['uuid']];
+    }
+
+    public function previewServerChange(): void
+    {
+        $this->serverPlan = null;
+        $this->serverError = null;
+        try {
+            $link = $this->link() ?? abort(404);
+            ['plan' => $this->serverPlan, 'error' => $this->serverError] = app(ConfigLinks::class)->previewServerChange($link, auth()->user(), $this->serverData());
+        } catch (ValidationException $e) {
+            $this->serverError = collect($e->errors())->flatten()->first();
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function changeServer(): void
+    {
+        try {
+            $link = $this->link() ?? abort(404);
+            app(ConfigLinks::class)->changeServer($link, auth()->user(), $this->serverData());
+            $this->reset('serverPlan', 'serverError', 'serverDestinationUuid');
+            $this->dispatch('close-modal');
+            $this->dispatch('success', 'Server changed. Coolify plans the file again. Resources that move wait for approval.');
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -231,6 +288,7 @@ class EnvironmentConfiguration extends Component
             $this->authorizeTeamAdmin($link);
             $plan = app(ConfigLinks::class)->resume($link, auth()->user(), false);
             $this->resumePlan = $plan instanceof ConfigPlan ? $plan->toArray() : ['changes' => []];
+            $this->resumeModalOpen = true;
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -243,6 +301,7 @@ class EnvironmentConfiguration extends Component
             $this->authorizeTeamAdmin($link);
             app(ConfigLinks::class)->resume($link, auth()->user(), true);
             $this->resumePlan = null;
+            $this->resumeModalOpen = false;
             $this->dispatch('success', 'Link resumed. coolify.json manages this environment again.');
         } catch (\Throwable $e) {
             handleError($e, $this);
@@ -307,19 +366,29 @@ class EnvironmentConfiguration extends Component
             'isTeamAdmin' => $isTeamAdmin,
             'canApprove' => $user->can('delete', $environment),
             'webhook' => $link?->isGit() && $isTeamAdmin ? ProjectConfigController::webhookDetails($link) : null,
-            'connectServers' => $isTeamAdmin && ! $link ? $this->connectServers($teamId) : [],
+            'connectServers' => $isTeamAdmin ? $this->connectServers($teamId) : [],
             'connectSources' => $isTeamAdmin && ! $link ? $this->connectSources($teamId) : [],
         ]);
     }
 
     /**
-     * @return list<array{uuid: string, name: string}>
+     * One entry per destination. The label is the server name, with the network when the server has more than one.
+     *
+     * @return list<array{uuid: string, server_uuid: string, name: string}>
      */
     private function connectServers(int $teamId): array
     {
         return Server::query()->where('team_id', $teamId)->orderBy('name')->get()
             ->filter(fn (Server $server) => ! $server->isTransferredAway() && Gate::allows('placeResource', $server))
-            ->map(fn (Server $server) => ['uuid' => $server->uuid, 'name' => $server->name])
+            ->flatMap(function (Server $server) {
+                $destinations = $server->destinations();
+
+                return $destinations->map(fn ($destination) => [
+                    'uuid' => $destination->uuid,
+                    'server_uuid' => $server->uuid,
+                    'name' => $destinations->count() > 1 ? "{$server->name} ({$destination->network})" : $server->name,
+                ]);
+            })
             ->values()->all();
     }
 

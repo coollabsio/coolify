@@ -1332,6 +1332,7 @@ class ServerTransferExporter
                 'mount_path' => $volume->mount_path,
                 'host_path' => $volume->host_path,
                 'is_preview_suffix_enabled' => (bool) ($volume->is_preview_suffix_enabled ?? false),
+                'is_external' => (bool) $volume->is_external,
                 'ignores_compose_driver_options' => (bool) $volume->ignores_compose_driver_options,
                 'standalone_sqlite_uuid' => $volume->standaloneSqlite?->uuid,
             ];

@@ -98,12 +98,12 @@ class ConfigRevisions
 
     public function resolve(EnvironmentConfigLink $link, string $raw): ResolvedEnvironment
     {
-        $environment = $link->environment;
-        $document = $this->parser->parse($raw, $environment->project->name);
-
-        return $link->isGit()
+        $document = $this->parser->parse($raw);
+        $resolved = $link->isGit()
             ? $this->resolver->forBranch($document, (string) $link->branch)
-            : $this->resolver->forEnvironment($document, $environment->name);
+            : $this->resolver->forEnvironment($document, $link->environment->name);
+
+        return $resolved->withDefaultPlacement($link->defaultPlacement());
     }
 
     /**

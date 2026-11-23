@@ -177,7 +177,9 @@ trait HasRepositoryDetection
                 $link->setRelation('source', $source);
             }
             $link->setRelation('environment', $environment);
+            $link->forceFill(['read_server_id' => $destination->server->id, 'destination_type' => $destination->getMorphClass(), 'destination_id' => $destination->id]);
             $link->setRelation('readServer', $destination->server);
+            $link->setRelation('destination', $destination);
 
             ['plan' => $plan, 'error' => $this->configPlanError] = app(ConfigLinkPreview::class)->plan($link, auth()->user());
             $this->configPlan = $plan === null ? null
@@ -203,7 +205,8 @@ trait HasRepositoryDetection
                 'project' => $environment->project->name,
                 'environment' => $environment->name,
                 'mode' => EnvironmentConfigLink::MODE_GIT,
-                'read_server_uuid' => $destination->server->uuid,
+                'server_uuid' => $destination->server->uuid,
+                'destination_uuid' => $destination->uuid,
             ]);
             PlanEnvironmentConfigJob::dispatch($link, 'link');
 

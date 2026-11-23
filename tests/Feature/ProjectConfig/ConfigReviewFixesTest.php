@@ -118,7 +118,7 @@ it('shows the webhook secret and URL when a git link is created', function () {
 
     $response = $this->withHeaders(['Authorization' => "Bearer {$token}", 'Accept' => 'application/json'])->postJson('/api/v1/config/links', [
         'project' => 'acme', 'environment' => 'staging', 'mode' => 'git', 'repository' => 'https://github.com/acme/api', 'branch' => 'main',
-        'source_type' => 'public', 'read_server_uuid' => $this->fx['server']->uuid,
+        'source_type' => 'public', 'server_uuid' => $this->fx['server']->uuid,
     ])->assertCreated();
 
     expect($response->json('webhook_secret'))->toHaveLength(40)

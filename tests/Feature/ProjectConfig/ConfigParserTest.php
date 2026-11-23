@@ -21,10 +21,10 @@ function parserTestFile(array $overrides = []): string
 /**
  * @return list<array{path: string, message: string}>
  */
-function parserTestErrors(string $raw, ?string $linkedProject = null): array
+function parserTestErrors(string $raw): array
 {
     try {
-        app(ConfigParser::class)->parse($raw, $linkedProject);
+        app(ConfigParser::class)->parse($raw);
     } catch (ConfigException $e) {
         return array_map(fn ($error) => ['path' => $error->path, 'message' => $error->message], $e->errors());
     }
@@ -43,11 +43,10 @@ beforeEach(function () {
 
 it('parses a valid file into a document', function () {
     $raw = parserTestFile(['project' => 'acme', 'moved' => [['from' => 'web', 'to' => 'api']], 'unmanage' => ['old']]);
-    $doc = app(ConfigParser::class)->parse($raw, 'acme');
+    $doc = app(ConfigParser::class)->parse($raw);
 
     expect($doc)->toBeInstanceOf(ConfigDocument::class)
         ->and($doc->version)->toBe(1)
-        ->and($doc->project)->toBe('acme')
         ->and(array_keys($doc->resources))->toBe(['api'])
         ->and($doc->moved)->toBe([['from' => 'web', 'to' => 'api']])
         ->and($doc->unmanage)->toBe(['old'])
@@ -107,9 +106,9 @@ it('fails when minimum_coolify_version is newer than this instance', function ()
         ->and(parserTestErrors(parserTestFile(['minimum_coolify_version' => '4.7.0'])))->toBe([]);
 });
 
-it('fails when project differs from the linked project', function () {
+it('accepts any project name as a label, but only as text', function () {
     expect(parserTestPaths(parserTestFile(['project' => 'other'])))->toBe([])
-        ->and(parserTestErrors(parserTestFile(['project' => 'other']), 'acme'))->toBe([['path' => 'project', 'message' => 'This file is for project "other", but it is linked to project "acme".']]);
+        ->and(parserTestPaths(parserTestFile(['project' => 5])))->toBe(['project']);
 });
 
 it('fails when two environments use one branch', function () {

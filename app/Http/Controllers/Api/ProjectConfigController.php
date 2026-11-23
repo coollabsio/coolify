@@ -13,11 +13,10 @@ use App\Services\ProjectConfig\ApplyContext;
 use App\Services\ProjectConfig\ConfigException;
 use App\Services\ProjectConfig\ConfigExporter;
 use App\Services\ProjectConfig\ConfigLinks;
-use App\Services\ProjectConfig\ConfigParser;
 use App\Services\ProjectConfig\ConfigPlan;
 use App\Services\ProjectConfig\ConfigPlanner;
 use App\Services\ProjectConfig\ConfigPlanView;
-use App\Services\ProjectConfig\ConfigResolver;
+use App\Services\ProjectConfig\ConfigRevisions;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -76,7 +75,7 @@ class ProjectConfigController extends Controller
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
-    public function plan(Request $request, string $uuid, ConfigParser $parser, ConfigResolver $resolver, ConfigPlanner $planner): JsonResponse
+    public function plan(Request $request, string $uuid, ConfigRevisions $revisions, ConfigPlanner $planner): JsonResponse
     {
         $environment = $this->environment($uuid);
         if ($environment instanceof JsonResponse) {
@@ -90,10 +89,7 @@ class ProjectConfigController extends Controller
 
         $link = ConfigExporter::linkFor($environment);
         try {
-            $document = $parser->parse($request->input('file'), $environment->project->name);
-            $resolved = $link->isGit()
-                ? $resolver->forBranch($document, $link->branch)
-                : $resolver->forEnvironment($document, $environment->name);
+            $resolved = $revisions->resolve($link, $request->input('file'));
         } catch (ConfigException $e) {
             return response()->json([
                 'message' => 'The file is not valid.',
@@ -112,6 +108,8 @@ class ProjectConfigController extends Controller
             new OA\Property(property: 'environment', type: 'string'),
             new OA\Property(property: 'mode', type: 'string', enum: ['api', 'git']),
             new OA\Property(property: 'auto_apply', type: 'boolean'),
+            new OA\Property(property: 'server_uuid', type: 'string', description: 'Required for git. Reads the file, and resources that name no server go to it.'),
+            new OA\Property(property: 'destination_uuid', type: 'string', description: 'The destination on that server. Needed when the server has more than one.'),
         ], type: 'object')),
         responses: [new OA\Response(response: 201, description: 'The link.'), new OA\Response(response: 403, description: 'Not allowed.'), new OA\Response(response: 409, description: 'The environment already has a link.')]
     )]
@@ -131,7 +129,8 @@ class ProjectConfigController extends Controller
             'file_path' => ['nullable', 'string', 'max:255', 'regex:#^[A-Za-z0-9._/-]+\z#', 'not_regex:#(^|/)\.\.(/|\z)#'],
             'source_type' => 'required_if:mode,git|in:public,github_app,gitea_app,deploy_key',
             'source_uuid' => 'required_if:source_type,github_app,gitea_app,deploy_key|nullable|string',
-            'read_server_uuid' => 'required_if:mode,git|string',
+            'server_uuid' => 'required_if:mode,git|nullable|string',
+            'destination_uuid' => 'nullable|string',
         ]);
         if ($validator->fails()) {
             return response()->json(['message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
@@ -169,8 +168,12 @@ class ProjectConfigController extends Controller
 
     #[OA\Patch(summary: 'Update a coolify.json link', path: '/config/links/{uuid}', operationId: 'update-config-link', security: [['bearerAuth' => []]], tags: ['Project config'],
         parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
-        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(properties: [new OA\Property(property: 'auto_apply', type: 'boolean')], type: 'object')),
-        responses: [new OA\Response(response: 200, description: 'The link.'), new OA\Response(response: 403, description: 'Team admins only.')]
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(properties: [
+            new OA\Property(property: 'auto_apply', type: 'boolean'),
+            new OA\Property(property: 'server_uuid', type: 'string', description: 'Another server for the link. Plans the file again; resources that move wait for approval. Needs the deploy ability.'),
+            new OA\Property(property: 'destination_uuid', type: 'string', description: 'The destination on that server. Needed when the server has more than one.'),
+        ], type: 'object')),
+        responses: [new OA\Response(response: 200, description: 'The link.'), new OA\Response(response: 403, description: 'Team admins only, and the deploy ability for a server change.'), new OA\Response(response: 422, description: 'Validation failed.')]
     )]
     public function updateLink(Request $request, string $uuid, ConfigLinks $links): JsonResponse
     {
@@ -178,14 +181,30 @@ class ProjectConfigController extends Controller
         if ($link instanceof JsonResponse) {
             return $link;
         }
-        $validator = Validator::make($request->all(), ['auto_apply' => 'required|boolean']);
+        $validator = Validator::make($request->all(), [
+            'auto_apply' => 'required_without:server_uuid|boolean',
+            'server_uuid' => 'nullable|string',
+            'destination_uuid' => 'nullable|string',
+        ]);
         if ($validator->fails()) {
             return response()->json(['message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
         }
+        $changesServer = $request->filled('server_uuid');
+        // A server change plans the file again and can apply safe changes, like /apply.
+        if ($changesServer && ! $request->user()->tokenCan('root') && ! $request->user()->tokenCan('deploy')) {
+            return response()->json(['message' => 'Changing the server needs the deploy ability.'], 403);
+        }
         try {
-            $links->setAutoApply($link, $request->user(), $request->boolean('auto_apply'));
+            if ($request->has('auto_apply')) {
+                $links->setAutoApply($link, $request->user(), $request->boolean('auto_apply'));
+            }
+            if ($changesServer) {
+                $links->changeServer($link, $request->user(), $request->only(['server_uuid', 'destination_uuid']));
+            }
         } catch (AuthorizationException $e) {
             return response()->json(['message' => $e->getMessage()], 403);
+        } catch (ValidationException $e) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => $e->errors()], 422);
         }
 
         return response()->json(self::serializeLink($link->fresh()));
@@ -378,6 +397,8 @@ class ProjectConfigController extends Controller
             'repository' => $link->repository,
             'branch' => $link->branch,
             'file_path' => $link->file_path,
+            'server_uuid' => $link->readServer?->uuid,
+            'destination_uuid' => $link->destination?->uuid,
             'auto_apply' => $link->auto_apply,
             'suspended_at' => $link->suspended_at,
             'last_applied_revision_uuid' => $link->lastAppliedRevision?->uuid,

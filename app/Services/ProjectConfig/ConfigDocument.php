@@ -15,7 +15,6 @@ final readonly class ConfigDocument
      */
     public function __construct(
         public int $version,
-        public ?string $project,
         public array $resources,
         public array $environments,
         public array $moved,

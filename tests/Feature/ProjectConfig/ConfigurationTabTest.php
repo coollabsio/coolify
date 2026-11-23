@@ -97,7 +97,9 @@ it('lets an admin suspend and resume', function () {
     $component = Livewire::test(EnvironmentConfiguration::class, $this->params)->call('suspend');
     expect($this->link->fresh()->isSuspended())->toBeTrue();
 
-    $component->call('confirmResume');
+    $component->call('previewResume')->assertSet('resumeModalOpen', true)->assertSee('Resume and apply');
+
+    $component->call('confirmResume')->assertSet('resumeModalOpen', false);
     expect($this->link->fresh()->isSuspended())->toBeFalse();
 });
 

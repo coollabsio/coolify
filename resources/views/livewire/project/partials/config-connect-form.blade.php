@@ -15,7 +15,7 @@
     <div class="grid gap-4 sm:grid-cols-3">
         <x-forms.input id="connectBranch" label="Branch" required />
         <x-forms.input id="connectFilePath" label="File" helper="Path in the repository." />
-        <x-forms.listbox id="connectServerUuid" label="Read on server" helper="Coolify clones the repository on this server to read the file."
+        <x-forms.listbox id="connectDestinationUuid" label="Server" helper="Coolify reads the file on this server. Resources that name no server in the file run on it."
             :options="collect($connectServers)->map(fn ($server) => ['value' => $server['uuid'], 'label' => $server['name']])->all()" />
     </div>
 

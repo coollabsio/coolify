@@ -5,6 +5,7 @@ namespace App\Services\ProjectConfig;
 use App\Enums\AccessLevel;
 use App\Enums\ConfigRevisionStatus;
 use App\Jobs\ApplyEnvironmentConfigJob;
+use App\Jobs\PlanEnvironmentConfigJob;
 use App\Models\Environment;
 use App\Models\EnvironmentConfigLink;
 use App\Models\EnvironmentConfigRevision;
@@ -33,7 +34,7 @@ class ConfigLinks
     public function __construct(private readonly ConfigRevisions $revisions) {}
 
     /**
-     * @param  array{project: string, environment: string, mode: string}  $data
+     * @param  array{project: string, environment: string, mode: string, server_uuid?: ?string, destination_uuid?: ?string}  $data
      *
      * @throws AuthorizationException
      * @throws RuntimeException with code 409 when the environment already has a link
@@ -59,16 +60,16 @@ class ConfigLinks
                 'auto_apply' => $data['auto_apply'] ?? true,
                 'created_by' => $user->id,
             ];
-            if ($data['mode'] === EnvironmentConfigLink::MODE_GIT) {
-                $attributes += $this->gitAttributes($user, $teamId, $data);
-            }
+            $attributes += $data['mode'] === EnvironmentConfigLink::MODE_GIT
+                ? $this->gitAttributes($user, $teamId, $data)
+                : $this->placementAttributes($user, $teamId, $data);
 
             return EnvironmentConfigLink::create($attributes);
         });
     }
 
     /**
-     * Source, repository, and read server of a git link. Every record must belong to the team.
+     * Source, repository, and server of a git link. Every record must belong to the team.
      *
      * @throws ValidationException
      */
@@ -78,18 +79,16 @@ class ConfigLinks
             'repository' => ['required', 'string', 'max:500', new ValidGitRepositoryUrl(allowRepositoryPath: true)],
             'file_path' => ['nullable', 'string', 'max:255', 'regex:#^[A-Za-z0-9._/-]+\z#', 'not_regex:#(^|/)\.\.(/|\z)#'],
         ])->validate();
-        $server = Server::query()->where('team_id', $teamId)->where('uuid', $data['read_server_uuid'] ?? '')->first();
-        if ($server === null || ! Gate::forUser($user)->allows('placeResource', $server)) {
-            throw ValidationException::withMessages(['read_server_uuid' => ['Use a server of this team that you can place resources on.']]);
+        if (blank($data['server_uuid'] ?? null)) {
+            throw ValidationException::withMessages(['server_uuid' => ['A git link needs a server to read the repository.']]);
         }
 
         $attributes = [
             'repository' => $data['repository'],
             'branch' => $data['branch'],
             'file_path' => $data['file_path'] ?? 'coolify.json',
-            'read_server_id' => $server->id,
             'webhook_secret' => Str::random(40),
-        ];
+        ] + $this->placementAttributes($user, $teamId, $data);
         $kind = $data['source_type'];
         if ($kind === 'public') {
             return $attributes;
@@ -108,6 +107,33 @@ class ConfigLinks
             ->first() ?? throw ValidationException::withMessages(['source_uuid' => ['No git source with this UUID is available to this team.']]);
 
         return $attributes + ['source_type' => $source::class, 'source_id' => $source->id];
+    }
+
+    /**
+     * The server of the link reads the file, and resources that name no server go to it. The destination is
+     * needed only when that server has more than one. Both are optional for an api link.
+     *
+     * @return array{read_server_id?: int, destination_type?: string, destination_id?: int}
+     *
+     * @throws ValidationException
+     */
+    public function placementAttributes(User $user, int $teamId, array $data): array
+    {
+        if (blank($data['server_uuid'] ?? null)) {
+            return [];
+        }
+        $server = Server::query()->where('team_id', $teamId)->where('uuid', $data['server_uuid'])->first();
+        if ($server === null || $server->isTransferredAway() || ! Gate::forUser($user)->allows('placeResource', $server)) {
+            throw ValidationException::withMessages(['server_uuid' => ['Use a server of this team that you can place resources on.']]);
+        }
+        $attributes = ['read_server_id' => $server->id];
+        if (filled($data['destination_uuid'] ?? null)) {
+            $destination = $server->destinations()->first(fn ($destination) => $destination->uuid === $data['destination_uuid'])
+                ?? throw ValidationException::withMessages(['destination_uuid' => ['Use a destination of the selected server.']]);
+            $attributes += ['destination_type' => $destination->getMorphClass(), 'destination_id' => $destination->id];
+        }
+
+        return $attributes;
     }
 
     private function findOrCreateEnvironment(User $user, int $teamId, string $projectName, string $environmentName): Environment
@@ -193,6 +219,81 @@ class ConfigLinks
     {
         $this->authorizeTeamAdmin($link, $user);
         $link->update(['auto_apply' => $autoApply]);
+    }
+
+    /**
+     * The plan of the newest file when the link uses another server: resources without "server" in the file move.
+     * Nothing is saved.
+     *
+     * @param  array{server_uuid?: ?string, destination_uuid?: ?string}  $data
+     * @return array{plan: ?array, error: ?string}
+     *
+     * @throws AuthorizationException
+     * @throws ValidationException
+     */
+    public function previewServerChange(EnvironmentConfigLink $link, User $user, array $data): array
+    {
+        $this->authorizeTeamAdmin($link, $user);
+        $preview = $link->replicate()->unsetRelation('readServer')->unsetRelation('destination');
+        $preview->forceFill(['destination_type' => null, 'destination_id' => null] + $this->requiredPlacement($user, $link, $data));
+        $preview->setRelation('environment', $link->environment);
+        if ($link->isGit()) {
+            return app(ConfigLinkPreview::class)->plan($preview, $user);
+        }
+        $raw = $this->latestFile($link);
+        if ($raw === null) {
+            return ['plan' => null, 'error' => 'No file was applied yet.'];
+        }
+        try {
+            return ['plan' => app(ConfigPlanner::class)->plan($this->revisions->resolve($preview, $raw), ApplyContext::for($preview, $user))->toArray(), 'error' => null];
+        } catch (ConfigException $e) {
+            return ['plan' => null, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Saves another server for the link and plans the newest file again. A resource that moves is a destructive
+     * change, so that plan waits for approval.
+     *
+     * @param  array{server_uuid?: ?string, destination_uuid?: ?string}  $data
+     *
+     * @throws AuthorizationException
+     * @throws ValidationException
+     */
+    public function changeServer(EnvironmentConfigLink $link, User $user, array $data): void
+    {
+        $this->authorizeTeamAdmin($link, $user);
+        $link->update(['destination_type' => null, 'destination_id' => null] + $this->requiredPlacement($user, $link, $data));
+        auditLog('system.project_config.server_changed', [
+            'team_id' => $link->teamId(),
+            'environment_uuid' => $link->environment->uuid,
+            'server_uuid' => $link->fresh()->readServer?->uuid,
+            'actor_id' => $user->id,
+        ]);
+        if ($link->isGit()) {
+            PlanEnvironmentConfigJob::dispatch($link->fresh(), 'link');
+
+            return;
+        }
+        $raw = $this->latestFile($link);
+        if ($raw !== null) {
+            $revision = $this->revisions->record($link->fresh(), $raw, 'retry', creator: $user);
+            $this->revisions->supersedeOlder($revision);
+            $this->dispatchWhenPlanned($revision->refresh());
+        }
+    }
+
+    /**
+     * @return array{read_server_id: int, destination_type?: string, destination_id?: int}
+     */
+    private function requiredPlacement(User $user, EnvironmentConfigLink $link, array $data): array
+    {
+        $attributes = $this->placementAttributes($user, $link->teamId(), $data);
+        if (! isset($attributes['read_server_id'])) {
+            throw ValidationException::withMessages(['server_uuid' => ['Choose a server.']]);
+        }
+
+        return $attributes;
     }
 
     /**

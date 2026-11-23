@@ -15,7 +15,9 @@ class ConfigExporter
 
     public function export(Environment $environment): array
     {
-        $ctx = ApplyContext::for(self::linkFor($environment));
+        $link = self::linkFor($environment);
+        $ctx = ApplyContext::for($link);
+        $defaultPlacement = $link->defaultPlacement();
         $resources = [];
         $imports = [];
 
@@ -39,11 +41,15 @@ class ConfigExporter
             if (($entry['name'] ?? null) === $key) {
                 unset($entry['name']);
             }
+            // The link places resources that name no server, so the file stays portable.
+            if (isset($defaultPlacement['server']) && ($entry['server'] ?? null) === $defaultPlacement['server']
+                && ($entry['destination'] ?? null) === ($defaultPlacement['destination'] ?? null)) {
+                unset($entry['server'], $entry['destination']);
+            }
             $resources[$key] = $entry;
         }
 
-        $link = $environment->configLink;
-        $environmentEntry = ['branch' => $link?->isGit() ? $link->branch : 'main'];
+        $environmentEntry = ['branch' => $link->isGit() ? $link->branch : 'main'];
         if ($imports !== []) {
             $environmentEntry['import'] = $imports;
         }
@@ -51,7 +57,6 @@ class ConfigExporter
         return [
             '$schema' => 'https://coolify.io/schemas/coolify.v1.json',
             'version' => ConfigParser::FORMAT_VERSION,
-            'project' => $environment->project->name,
             'resources' => $resources === [] ? new \stdClass : $resources,
             'environments' => [$environment->name => $environmentEntry],
         ];

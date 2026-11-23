@@ -30,6 +30,7 @@ class PersistentStorages implements ChildRecords
             Field::managed('mount_path', 'storages.*.mount'),
             Field::managed('host_path', 'storages.*.host_path'),
             Field::managed('is_preview_suffix_enabled', 'storages.*.preview_suffix', true, 'boolean'),
+            Field::managed('is_external', 'storages.*.external', false, 'boolean'),
             Field::derived('container_id', 'Coolify sets it for Compose volumes.'),
             Field::derived('ignores_compose_driver_options', 'Coolify sets it from the Compose file.'),
         ], ['local_persistent_volumes' => ['resource_type', 'resource_id', 'standalone_sqlite_id']]);
@@ -50,6 +51,9 @@ class PersistentStorages implements ChildRecords
             if (! $volume->is_preview_suffix_enabled) {
                 $entry['preview_suffix'] = false;
             }
+            if ($volume->is_external) {
+                $entry['external'] = true;
+            }
             if ($key === $volume->name) {
                 $entry['volume_name'] = $volume->name;
             }
@@ -69,6 +73,9 @@ class PersistentStorages implements ChildRecords
         foreach ($desired as $key => $entry) {
             if (($entry['preview_suffix'] ?? true) === true) {
                 unset($entry['preview_suffix']);
+            }
+            if (($entry['external'] ?? false) === false) {
+                unset($entry['external']);
             }
             if (($entry['host_path'] ?? null) === null) {
                 unset($entry['host_path']);
@@ -94,6 +101,7 @@ class PersistentStorages implements ChildRecords
                     'host_path' => ['type' => ['string', 'null']],
                     'preview_suffix' => ['type' => 'boolean'],
                     'volume_name' => ['type' => 'string'],
+                    'external' => ['type' => 'boolean', 'description' => 'Mount an existing Docker volume. Coolify never creates or deletes it.'],
                 ],
             ],
         ];
@@ -116,6 +124,7 @@ class PersistentStorages implements ChildRecords
             $volume->mount_path = $entry['mount'];
             $volume->host_path = $entry['host_path'] ?? null;
             $volume->is_preview_suffix_enabled = $entry['preview_suffix'] ?? true;
+            $volume->is_external = $entry['external'] ?? false;
             $volume->save();
             unset($existing[$key]);
         }

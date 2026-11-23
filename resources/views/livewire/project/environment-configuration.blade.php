@@ -34,7 +34,18 @@
                 @endif
                 @if ($link && $isTeamAdmin)
                     @if ($link->isSuspended())
-                        <x-forms.button wire:click="previewResume">Resume sync</x-forms.button>
+                        <x-modal-input title="Resume the sync" wireOpen="resumeModalOpen" :wireIgnore="false" :contentClicks="false" isLarge>
+                            <x-slot:content>
+                                <x-forms.button wire:click="previewResume" wire:target="previewResume">Resume sync</x-forms.button>
+                            </x-slot:content>
+                            <div class="flex flex-col gap-4">
+                                <x-project-config.plan-groups :changes="$resumePlan['changes'] ?? []" :values="$isTeamAdmin" />
+                                <div class="flex justify-end gap-2">
+                                    <x-forms.button @click="modalOpen = false">Cancel</x-forms.button>
+                                    <x-forms.button isHighlighted wire:click="confirmResume" wire:target="confirmResume">Resume and apply</x-forms.button>
+                                </div>
+                            </div>
+                        </x-modal-input>
                     @else
                         <x-forms.button wire:click="suspend" title="Edits in Coolify work again while the sync is paused.">
                             Pause sync
@@ -82,17 +93,6 @@
                     </x-callout>
                 @endif
 
-                @if ($resumePlan !== null)
-                    <x-application.settings-section title="Resume the sync" flush
-                        helper="These settings change back to the file when the sync resumes.">
-                        <x-slot:actions>
-                            <x-forms.button wire:click="$set('resumePlan', null)">Cancel</x-forms.button>
-                            <x-forms.button isHighlighted wire:click="confirmResume">Resume and apply</x-forms.button>
-                        </x-slot:actions>
-                        <x-project-config.plan-groups :changes="$resumePlan['changes'] ?? []" :values="$isTeamAdmin" />
-                    </x-application.settings-section>
-                @endif
-
                 @if ($status['state'] === 'failed' && $latest)
                     <x-callout type="danger" title="The last sync failed">
                         {{ $latest->error }}
@@ -138,10 +138,13 @@
                             <div class="min-w-0"><dt class="text-[11px] text-neutral-500 dark:text-fg-faint">Repository</dt><dd class="truncate" title="{{ $link->repository }}">{{ $link->repository }}</dd></div>
                             <div><dt class="text-[11px] text-neutral-500 dark:text-fg-faint">Branch</dt><dd>{{ $link->branch }}</dd></div>
                             <div><dt class="text-[11px] text-neutral-500 dark:text-fg-faint">File</dt><dd>{{ $link->file_path }}</dd></div>
-                            <div><dt class="text-[11px] text-neutral-500 dark:text-fg-faint">Read on</dt><dd>{{ $link->readServer?->name ?? 'No server' }}</dd></div>
                         @else
                             <div><dt class="text-[11px] text-neutral-500 dark:text-fg-faint">Mode</dt><dd>Applied through the API</dd></div>
                         @endif
+                        <div>
+                            <dt class="text-[11px] text-neutral-500 dark:text-fg-faint">Server</dt>
+                            <dd>{{ $link->readServer?->name ?? 'No server' }} @if ($link->destination && $link->readServer && $link->readServer->destinations()->count() > 1) <span class="text-neutral-500 dark:text-fg-dim">({{ $link->destination->network }})</span>@endif</dd>
+                        </div>
                         <div>
                             <dt class="text-[11px] text-neutral-500 dark:text-fg-faint">Last applied</dt>
                             <dd>
@@ -154,6 +157,43 @@
                             </dd>
                         </div>
                     </dl>
+                    @if ($isTeamAdmin)
+                        <div class="mt-4">
+                            <x-modal-input title="Change server" buttonTitle="Change server" :wireIgnore="false" isLarge>
+                                <div class="flex flex-col gap-4">
+                                    <p class="text-[13px] text-neutral-500 dark:text-fg-dim">
+                                        Resources that name no server in the file run on this server. When they move, the plan waits for approval. Volumes and their data stay on the old server.
+                                    </p>
+                                    <x-forms.listbox id="serverDestinationUuid" label="Server" helper="{{ $link->isGit() ? 'Coolify also reads the file on this server.' : '' }}"
+                                        :options="collect($connectServers)->map(fn ($server) => ['value' => $server['uuid'], 'label' => $server['name']])->all()" />
+                                    @if ($serverError)
+                                        <p class="text-[13px] text-red-600 dark:text-red-400">{{ $serverError }}</p>
+                                    @endif
+                                    @if ($serverPlan)
+                                        <div class="overflow-hidden rounded-lg border border-neutral-200 dark:border-white/[0.08]">
+                                            @foreach ($serverPlan['errors'] ?? [] as $error)
+                                                <p class="px-3 pt-2 text-[12px] text-red-600 dark:text-red-400"><code>{{ $error['path'] }}</code>: {{ $error['message'] }}</p>
+                                            @endforeach
+                                            @foreach ($serverPlan['warnings'] ?? [] as $warning)
+                                                <p class="px-3 pt-2 text-[12px] text-amber-700 dark:text-amber-300">{{ $warning }}</p>
+                                            @endforeach
+                                            @if (empty($serverPlan['changes']))
+                                                <p class="px-3 py-2 text-[12px] text-neutral-500 dark:text-fg-dim">No resource moves.</p>
+                                            @else
+                                                <x-project-config.plan-groups :changes="$serverPlan['changes']" compact values />
+                                            @endif
+                                        </div>
+                                    @endif
+                                    <div class="flex justify-end gap-2">
+                                        <x-forms.button wire:click="previewServerChange" wire:target="previewServerChange">Show plan</x-forms.button>
+                                        @if ($serverPlan && empty($serverPlan['errors']))
+                                            <x-forms.button isHighlighted wire:click="changeServer" wire:target="changeServer">Change server</x-forms.button>
+                                        @endif
+                                    </div>
+                                </div>
+                            </x-modal-input>
+                        </div>
+                    @endif
                     <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.06]">
                         <x-forms.checkbox id="autoApply" instantSave="saveAutoApply" :disabled="! $isTeamAdmin"
                             label="Apply safe changes automatically"

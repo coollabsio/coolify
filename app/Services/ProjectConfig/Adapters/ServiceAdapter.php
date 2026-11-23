@@ -107,6 +107,8 @@ class ServiceAdapter implements ResourceAdapter
             Field::derived('docker_compose', 'Coolify generates it from the Compose file.'),
             Field::derived('compose_parsing_version', 'Coolify sets the parser version when it creates the service.'),
             Field::state('config_hash', 'Coolify stores the hash of the last started configuration.'),
+            Field::state('template_reference_hash', 'Coolify stores the hash of the one-click template that the service was made from.'),
+            Field::state('template_dismissed_hash', 'Coolify stores the template hash of a dismissed template update notice.'),
             Field::derived('config_meta', 'Coolify stores which Compose services get their domains from coolify.json.'),
         ], ['services' => ['environment_id']]);
     }

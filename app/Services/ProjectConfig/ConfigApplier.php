@@ -21,6 +21,9 @@ class ConfigApplier
     /** @var list<array{0: Model, 1: bool}> */
     private array $restarts = [];
 
+    /** @var list<array{0: Model, 1: Model}> resources that changed destination, with the old destination */
+    private array $moves = [];
+
     public function __construct(
         private readonly AdapterRegistry $registry,
         private readonly ConfigPlanner $planner,
@@ -130,6 +133,10 @@ class ConfigApplier
             // Released during the apply: its held deploys were failed.
             $skip = [...$skip, ...array_column($revision->held_deployments ?? [], 'application_uuid')];
         }
+        // Stop moved resources on their old destination before they deploy or start on the new one.
+        foreach ($this->moves as [$model, $oldDestination]) {
+            $this->held->stopOnOldDestination($model, $oldDestination);
+        }
         $this->held->release($revision->fresh(), $changed, $skip);
         foreach ($this->restarts as [$model, $created]) {
             if (! in_array($model->uuid, $skip, true)) {
@@ -167,6 +174,7 @@ class ConfigApplier
 
         $deploy = [];
         $this->restarts = [];
+        $this->moves = [];
         foreach ($resolved->resources as $key => $desired) {
             $adapter = $this->registry->for($desired['type']);
             $model = $adapter->find($environment, $key);
@@ -174,7 +182,13 @@ class ConfigApplier
             if ($created) {
                 $model = $adapter->create($key, $desired, $ctx);
             } elseif (isset($writeKeys[$key])) {
+                $oldDestination = $model->destination;
                 $adapter->update($model, $desired, $ctx);
+                $model->refresh();
+                if ($oldDestination !== null && ($model->destination_type !== $oldDestination->getMorphClass() || (int) $model->destination_id !== (int) $oldDestination->id)) {
+                    $this->moves[] = [$model, $oldDestination];
+                    $changedKeys[$key] = true;
+                }
             } elseif ($this->hasStaleRefs($model, $desired, $ctx)) {
                 $adapter->update($model, $desired, $ctx);
                 $changedKeys[$key] = true;

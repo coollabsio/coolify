@@ -34,7 +34,7 @@ class ConfigParser
     /** @var list<ConfigError> */
     private array $errors = [];
 
-    public function parse(string $raw, ?string $linkedProjectName = null): ConfigDocument
+    public function parse(string $raw): ConfigDocument
     {
         $this->errors = [];
 
@@ -59,7 +59,7 @@ class ConfigParser
 
         $this->checkKeys($data, self::TOP_LEVEL_KEYS, '');
         $this->checkVersion($data);
-        $this->checkProject($data, $linkedProjectName);
+        $this->checkProject($data);
 
         $resources = $this->checkResources($data['resources'] ?? null, 'resources', isOverride: false, required: true);
         $environments = $this->checkEnvironments($data['environments'] ?? null);
@@ -72,7 +72,6 @@ class ConfigParser
 
         return new ConfigDocument(
             version: $data['version'],
-            project: $data['project'] ?? null,
             resources: $resources,
             environments: $environments,
             moved: $moved,
@@ -150,18 +149,13 @@ class ConfigParser
         }
     }
 
-    private function checkProject(array $data, ?string $linkedProjectName): void
+    /**
+     * "project" is an optional label for people. The link decides the project, so it is never compared with it.
+     */
+    private function checkProject(array $data): void
     {
-        if (! array_key_exists('project', $data)) {
-            return;
-        }
-        if (! is_string($data['project']) || $data['project'] === '') {
+        if (array_key_exists('project', $data) && (! is_string($data['project']) || $data['project'] === '')) {
             $this->error('project', 'Use the project name as text.');
-
-            return;
-        }
-        if ($linkedProjectName !== null && $data['project'] !== $linkedProjectName) {
-            $this->error('project', "This file is for project \"{$data['project']}\", but it is linked to project \"{$linkedProjectName}\".");
         }
     }
 

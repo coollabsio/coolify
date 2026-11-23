@@ -1114,6 +1114,10 @@
                             },
                             "volume_name": {
                                 "type": "string"
+                            },
+                            "external": {
+                                "type": "boolean",
+                                "description": "Mount an existing Docker volume. Coolify never creates or deletes it."
                             }
                         }
                     }
@@ -1808,6 +1812,10 @@
                             },
                             "volume_name": {
                                 "type": "string"
+                            },
+                            "external": {
+                                "type": "boolean",
+                                "description": "Mount an existing Docker volume. Coolify never creates or deletes it."
                             }
                         }
                     }
@@ -2210,6 +2218,10 @@
                             },
                             "volume_name": {
                                 "type": "string"
+                            },
+                            "external": {
+                                "type": "boolean",
+                                "description": "Mount an existing Docker volume. Coolify never creates or deletes it."
                             }
                         }
                     }
@@ -2600,6 +2612,10 @@
                             },
                             "volume_name": {
                                 "type": "string"
+                            },
+                            "external": {
+                                "type": "boolean",
+                                "description": "Mount an existing Docker volume. Coolify never creates or deletes it."
                             }
                         }
                     }
@@ -3002,6 +3018,10 @@
                             },
                             "volume_name": {
                                 "type": "string"
+                            },
+                            "external": {
+                                "type": "boolean",
+                                "description": "Mount an existing Docker volume. Coolify never creates or deletes it."
                             }
                         }
                     }
@@ -3380,6 +3400,10 @@
                             },
                             "volume_name": {
                                 "type": "string"
+                            },
+                            "external": {
+                                "type": "boolean",
+                                "description": "Mount an existing Docker volume. Coolify never creates or deletes it."
                             }
                         }
                     }
@@ -3758,6 +3782,10 @@
                             },
                             "volume_name": {
                                 "type": "string"
+                            },
+                            "external": {
+                                "type": "boolean",
+                                "description": "Mount an existing Docker volume. Coolify never creates or deletes it."
                             }
                         }
                     }
@@ -4124,6 +4152,10 @@
                             },
                             "volume_name": {
                                 "type": "string"
+                            },
+                            "external": {
+                                "type": "boolean",
+                                "description": "Mount an existing Docker volume. Coolify never creates or deletes it."
                             }
                         }
                     }
@@ -4496,6 +4528,10 @@
                             },
                             "volume_name": {
                                 "type": "string"
+                            },
+                            "external": {
+                                "type": "boolean",
+                                "description": "Mount an existing Docker volume. Coolify never creates or deletes it."
                             }
                         }
                     }
@@ -4838,6 +4874,10 @@
                             },
                             "volume_name": {
                                 "type": "string"
+                            },
+                            "external": {
+                                "type": "boolean",
+                                "description": "Mount an existing Docker volume. Coolify never creates or deletes it."
                             }
                         }
                     }

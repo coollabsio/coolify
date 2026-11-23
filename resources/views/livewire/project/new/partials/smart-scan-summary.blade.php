@@ -69,7 +69,7 @@
 
         <div wire:loading.remove wire:target="detectRepository, previewConfigFile, configSource">
             @if ($configPlanError)
-                <x-checkpoint-item status="error" title="Could not plan the file" description="{{ $configPlanError }}" />
+                <x-checkpoint-item status="error" title="Could not plan the file" :description="$configPlanError" />
             @elseif ($configPlan && ! empty($configPlan['errors']))
                 <x-checkpoint-item status="error" title="The file has {{ count($configPlan['errors']) }} {{ Str::plural('error', count($configPlan['errors'])) }}"
                     description="Fix the file on the branch, then scan again." />

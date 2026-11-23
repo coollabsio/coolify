@@ -1614,6 +1614,8 @@ class ServerTransferImporter
                 'mount_path' => data_get($volume, 'mount_path'),
                 'host_path' => data_get($volume, 'host_path'),
                 'is_preview_suffix_enabled' => (bool) data_get($volume, 'is_preview_suffix_enabled', false),
+                // An existing Docker volume that Coolify mounts. It stays on the server, so the target must not create or delete it.
+                'is_external' => (bool) data_get($volume, 'is_external', false),
                 // The server keeps its Docker volumes. A bundle without the flag is from a Coolify version that created them without driver options.
                 'ignores_compose_driver_options' => (bool) data_get($volume, 'ignores_compose_driver_options', true),
                 'resource_type' => $resource->getMorphClass(),
