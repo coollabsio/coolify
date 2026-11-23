@@ -25,15 +25,18 @@
         </x-slot:actions>
 
         @if ($customHealthcheckFound)
+            @php
+                $healthcheckSource = data_get($resource, 'build_pack') === 'dockerimage' ? 'image' : 'Dockerfile';
+            @endphp
             <div class="mb-4">
                 @if ($healthCheckEnabled)
-                    <x-callout type="warning" title="Dockerfile HEALTHCHECK replaced">
-                        This healthcheck replaces the HEALTHCHECK from the Dockerfile. Disable it to use the
-                        Dockerfile HEALTHCHECK again.
+                    <x-callout type="warning" title="{{ ucfirst($healthcheckSource) }} HEALTHCHECK replaced">
+                        This healthcheck replaces the HEALTHCHECK from the {{ $healthcheckSource }}. Disable it to use the
+                        {{ $healthcheckSource }} HEALTHCHECK again.
                     </x-callout>
                 @else
-                    <x-callout type="info" title="Dockerfile HEALTHCHECK in use">
-                        The application uses the HEALTHCHECK from its Dockerfile. Enabling this healthcheck replaces it.
+                    <x-callout type="info" title="{{ ucfirst($healthcheckSource) }} HEALTHCHECK in use">
+                        The application uses the HEALTHCHECK from its {{ $healthcheckSource }}. Enabling this healthcheck replaces it.
                     </x-callout>
                 @endif
             </div>
