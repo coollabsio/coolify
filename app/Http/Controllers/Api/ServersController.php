@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Server\AuthorizedKeys;
 use App\Actions\Server\DeleteServer;
 use App\Actions\Server\ValidateServer;
+use App\Enums\AccessLevel;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Enums\ServerRole;
@@ -22,6 +23,7 @@ use App\Models\Server as ModelsServer;
 use App\Models\ServerSetting;
 use App\Models\Team;
 use App\Rules\ValidServerIp;
+use App\Services\Access\AccessResolver;
 use App\Services\LogDrain\LegacyLogDrainFields;
 use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Support\ValidationPatterns;
@@ -153,12 +155,15 @@ class ServersController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $servers = ModelsServer::whereTeamId($teamId)->select('id', 'name', 'uuid', 'ip', 'user', 'port', 'description')->get()->load(['settings'])->map(function ($server) {
-            $server['is_reachable'] = $server->settings->is_reachable;
-            $server['is_usable'] = $server->settings->is_usable;
+        $scopedServerUuids = app(AccessResolver::class)->scopedServerUuids($request->user(), (int) $teamId);
+        $servers = ModelsServer::whereTeamId($teamId)
+            ->when($scopedServerUuids !== null, fn ($query) => $query->whereIn('uuid', $scopedServerUuids))
+            ->select('id', 'name', 'uuid', 'ip', 'user', 'port', 'description')->get()->load(['settings'])->map(function ($server) {
+                $server['is_reachable'] = $server->settings->is_reachable;
+                $server['is_usable'] = $server->settings->is_usable;
 
-            return $server;
-        });
+                return $server;
+            });
         $servers = $servers->map(function ($server) {
             $settings = $this->removeSensitiveDataFromSettings($server->settings);
             $server = $this->removeSensitiveData($server);
@@ -830,6 +835,11 @@ class ServersController extends Controller
         $newPort = $request->filled('port') ? (int) $request->input('port') : (int) $server->port;
         $endpointChanged = ModelsServer::normalizeIp($newIp) !== ModelsServer::normalizeIp($server->getRawOriginal('ip'))
             || $newPort !== (int) $server->port;
+        $privateKeyChanged = $request->filled('private_key_uuid') && $request->input('private_key_uuid') !== $server->privateKey?->uuid;
+        if (($endpointChanged || $privateKeyChanged)
+            && ! app(AccessResolver::class)->allowsTeamWide($request->user(), AccessLevel::Write, $teamId)) {
+            return response()->json(['message' => 'Changing the IP address, SSH port, or private key of a server needs write access on the whole team.'], 403);
+        }
         if ($endpointChanged && ModelsServer::sshEndpointInUse($newIp, $newPort, $server->id)) {
             return response()->json(['message' => 'A server with this IP/Domain and SSH port is already in use.'], 400);
         }

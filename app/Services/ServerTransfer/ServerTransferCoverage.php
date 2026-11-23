@@ -57,12 +57,14 @@ use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\ServiceTemplateRevision;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\SlackNotificationSettings;
 use App\Models\SslCertificate;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -169,6 +171,7 @@ final class ServerTransferCoverage
         StandaloneKeydb::class => ['projects.*.environments.*.databases.*'],
         StandaloneDragonfly::class => ['projects.*.environments.*.databases.*'],
         StandaloneClickhouse::class => ['projects.*.environments.*.databases.*'],
+        StandaloneInfluxdb::class => ['projects.*.environments.*.databases.*'],
         StandaloneSqlite::class => ['projects.*.environments.*.databases.*'],
     ];
 
@@ -328,6 +331,10 @@ final class ServerTransferCoverage
             'destination_type' => self::LINKED, 'destination_id' => self::LINKED, 'environment_id' => self::LINKED,
             'config_hash' => 'Calculated again when the target starts the database.',
         ],
+        StandaloneInfluxdb::class => [
+            'destination_type' => self::LINKED, 'destination_id' => self::LINKED, 'environment_id' => self::LINKED,
+            'config_hash' => 'Calculated again when the target starts the database.',
+        ],
         StandaloneSqlite::class => [
             'destination_type' => self::LINKED, 'destination_id' => self::LINKED, 'environment_id' => self::LINKED,
             'config_hash' => 'Calculated again when the target starts the database.',
@@ -357,6 +364,7 @@ final class ServerTransferCoverage
         OauthIdentity::class => 'User login data of the source instance.',
         PersonalAccessToken::class => 'API tokens of the source instance.',
         UserChangelogRead::class => 'User data of the source instance.',
+        ServiceTemplateRevision::class => 'Undo history of template changes on the source instance; the current compose moves with the service.',
         Star::class => 'User data of the source instance: users are not moved with a server.',
         AuditEvent::class => 'Audit log of the source instance.',
         NotificationThrottle::class => 'Runtime state of the source instance.',

@@ -4,7 +4,7 @@
   import Dropdown from './Dropdown.svelte';
   import Edges from './Edges.svelte';
   import Icon from './Icon.svelte';
-  import BetaBadge from '../BetaBadge.svelte';
+  import ExperimentalBadge from '../ExperimentalBadge.svelte';
   import Node from './Node.svelte';
   import PaletteItem from './PaletteItem.svelte';
   import RunPanel from './RunPanel.svelte';
@@ -83,7 +83,7 @@
       <!-- Opened from an environment's New resource page: back to that environment. -->
       <a class="cv-back button px-2!" href="/project/{cv.target.project}/environment/{cv.target.environment}" title="Back to the environment" aria-label="Back to the environment"><Icon name="back" cls="size-4" /></a>
     {/if}
-    <BetaBadge />
+    <ExperimentalBadge />
   </div>
   <button type="button" class="button shrink-0" title="Start again with an empty canvas" onclick={askReset}>Reset</button>
 {/snippet}

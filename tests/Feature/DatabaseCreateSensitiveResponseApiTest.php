@@ -53,7 +53,7 @@ function createDatabaseViaApi(object $test, string $engine, array $abilities)
         ]);
 }
 
-$engines = ['postgresql', 'mariadb', 'mysql', 'redis', 'keydb', 'clickhouse', 'mongodb'];
+$engines = ['postgresql', 'mariadb', 'mysql', 'redis', 'keydb', 'clickhouse', 'influxdb', 'mongodb'];
 
 test('create response hides database urls from a token without sensitive read access', function (string $engine) {
     $response = createDatabaseViaApi($this, $engine, ['write'])->assertCreated();

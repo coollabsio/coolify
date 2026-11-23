@@ -140,6 +140,11 @@ class Project extends BaseModel
         return $this->hasManyThrough(StandaloneClickhouse::class, Environment::class);
     }
 
+    public function influxdbs()
+    {
+        return $this->hasManyThrough(StandaloneInfluxdb::class, Environment::class);
+    }
+
     public function sqlites()
     {
         return $this->hasManyThrough(StandaloneSqlite::class, Environment::class);
@@ -169,6 +174,7 @@ class Project extends BaseModel
             $this->keydbs()->count() == 0 &&
             $this->dragonflies()->count() == 0 &&
             $this->clickhouses()->count() == 0 &&
+            $this->influxdbs()->count() == 0 &&
             $this->mariadbs()->count() == 0 &&
             $this->mongodbs()->count() == 0 &&
             $this->sqlites()->count() == 0 &&
@@ -185,6 +191,7 @@ class Project extends BaseModel
             ->concat($this->keydbs()->with($with)->get())
             ->concat($this->dragonflies()->with($with)->get())
             ->concat($this->clickhouses()->with($with)->get())
+            ->concat($this->influxdbs()->with($with)->get())
             ->concat($this->sqlites()->with($with)->get());
     }
 

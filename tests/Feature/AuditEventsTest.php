@@ -19,6 +19,7 @@ use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -744,6 +745,7 @@ test('team resource models opt in to automatic auditing', function (string $mode
     StandaloneKeydb::class,
     StandaloneDragonfly::class,
     StandaloneClickhouse::class,
+    StandaloneInfluxdb::class,
     StandaloneSqlite::class,
 ]);
 
@@ -776,7 +778,7 @@ test('status-only database updates do not record last online audit changes', fun
     $project = Project::factory()->create(['team_id' => $this->team->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
 
-    foreach ([StandaloneClickhouse::class, StandaloneRedis::class] as $model) {
+    foreach ([StandaloneClickhouse::class, StandaloneInfluxdb::class, StandaloneRedis::class] as $model) {
         $attributes = [
             'uuid' => fake()->uuid(),
             'name' => 'Status test database',
@@ -787,6 +789,10 @@ test('status-only database updates do not record last online audit changes', fun
         ];
         if ($model === StandaloneClickhouse::class) {
             $attributes['clickhouse_admin_password'] = 'password';
+        }
+        if ($model === StandaloneInfluxdb::class) {
+            $attributes['influxdb_admin_password'] = 'password';
+            $attributes['influxdb_admin_token'] = 'token';
         }
 
         $database = $model::create($attributes);

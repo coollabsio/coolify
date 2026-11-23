@@ -55,11 +55,17 @@ class DeleteService
         $volumeNames = [];
         foreach ($service->applications()->get() as $application) {
             foreach ($application->persistentStorages()->get() as $storage) {
+                if ($storage->is_external) {
+                    continue;
+                }
                 $volumeNames[] = $storage->name;
             }
         }
         foreach ($service->databases()->get() as $database) {
             foreach ($database->persistentStorages()->get() as $storage) {
+                if ($storage->is_external) {
+                    continue;
+                }
                 $volumeNames[] = $storage->name;
             }
         }

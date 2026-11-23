@@ -661,6 +661,62 @@ describe('Bitbucket Manual Webhook HMAC', function () {
         expect($content)->not->toContain('No matching application or invalid signature.');
         expect($content)->not->toContain('Webhook secret not configured');
     });
+
+    test('matches a bitbucket data center push by project key and slug', function (string $gitRepository) {
+        $app = createApplicationWithWebhook(branch: 'master', overrides: ['git_repository' => $gitRepository]);
+
+        // Shape of the documented repo:refs_changed payload: the repository has no links.
+        $payload = json_encode([
+            'eventKey' => 'repo:refs_changed',
+            'repository' => ['slug' => 'repo', 'project' => ['key' => '~USER']],
+            'changes' => [[
+                'ref' => ['id' => 'refs/heads/master', 'displayId' => 'master', 'type' => 'BRANCH'],
+                'refId' => 'refs/heads/master',
+                'fromHash' => 'ecddabb624f6f5ba43816f5926e580a5f680a932',
+                'toHash' => '2502c69be7e8570a0fb7a7e2ef1df150433c9549',
+                'type' => 'UPDATE',
+            ]],
+            'commits' => [['message' => 'Fix the build']],
+        ]);
+        $hmac = hash_hmac('sha256', $payload, $app->manual_webhook_secret_bitbucket);
+
+        $response = $this->call('POST', '/webhooks/source/bitbucket/events/manual', [], [], [], [
+            'HTTP_X-Event-Key' => 'repo:refs_changed',
+            'HTTP_X-Hub-Signature' => "sha256={$hmac}",
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        expect($response->getContent())->toContain('Server is not functional');
+    })->with([
+        'ssh' => 'ssh://git@bitbucket.example.com:7999/~user/repo.git',
+        'https' => 'https://bitbucket.example.com/scm/~user/repo.git',
+        'https with context path' => 'https://example.com/bitbucket/scm/~user/repo.git',
+    ]);
+
+    test('returns 429 when the deployment queue is full', function () {
+        $app = createApplicationWithWebhook();
+        $server = $app->destination->server;
+        $server->update(['ip' => '10.0.0.10']);
+        $server->settings->update(['is_reachable' => true, 'is_usable' => true, 'force_disabled' => false, 'deployment_queue_limit' => 0]);
+        $app->settings->update(['is_auto_deploy_enabled' => true]);
+
+        $payload = json_encode([
+            'repository' => ['full_name' => 'test-org/test-repo'],
+            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => str_repeat('a', 40)]]]]],
+        ]);
+        $hmac = hash_hmac('sha256', $payload, $app->manual_webhook_secret_bitbucket);
+
+        $response = $this->call('POST', '/webhooks/source/bitbucket/events/manual', [], [], [], [
+            'HTTP_X-Event-Key' => 'repo:push',
+            'HTTP_X-Hub-Signature' => "sha256={$hmac}",
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertStatus(429)
+            ->assertHeader('Retry-After', 60)
+            ->assertSee('Deployment queue is full.');
+    });
 });
 
 describe('Gitea Manual Webhook HMAC', function () {

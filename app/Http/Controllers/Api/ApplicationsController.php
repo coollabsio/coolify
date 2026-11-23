@@ -6525,6 +6525,14 @@ class ApplicationsController extends Controller
         }
         $this->authorize('placeResource', $destination->server);
 
+        try {
+            foreach ($application->persistentStorages()->get() as $volume) {
+                $volume->ensureCloneTargetIsAvailable($application->destination->server, $destination->server);
+            }
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
         $overrides = ['uuid' => new_public_id()];
         if ($request->filled('name')) {
             $overrides['name'] = $request->string('name')->toString();
