@@ -166,3 +166,11 @@ it('shows the containers of a scoped variable in the variable list', function ()
         ->call('loadEnvironmentVariables')
         ->assertSeeHtml('title="Only these containers get this variable: db">db</span>');
 });
+
+it('quotes the container name in the checkbox value', function () {
+    $application = ($this->createApplication)(['docker_compose_raw' => "services:\n  'web onfocus=alert(1) autofocus':\n    image: nginx:alpine\n"]);
+    $environmentVariable = ($this->createVariable)(['compose_services' => ['web onfocus=alert(1) autofocus']], $application);
+
+    ($this->row)($environmentVariable)
+        ->assertSeeHtml('value="web onfocus=alert(1) autofocus"');
+});
