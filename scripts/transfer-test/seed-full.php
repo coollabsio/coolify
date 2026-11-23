@@ -177,6 +177,12 @@ DB::table('shared_environment_variables')->where('id', $legacyShared->id)->updat
 $preview = new ApplicationPreview;
 $preview->forceFill(['application_id' => $app->id, 'pull_request_id' => 42, 'pull_request_html_url' => 'https://github.com/acme/shop/pull/42',
     'fqdn' => "http://pr-42.whoami2.{$ip}.sslip.io", 'max_restart_count' => 3, 'docker_registry_image_tag' => 'pr-42'])->save();
+// A fork PR preview with an approved commit and a newer commit that waits. whoami2 keeps the default "approval required";
+// the git apps above get "approval not required" from the fuzzer.
+$forkPreview = new ApplicationPreview;
+$forkPreview->forceFill(['application_id' => $app->id, 'pull_request_id' => 43, 'pull_request_html_url' => 'https://github.com/acme/shop/pull/43',
+    'fqdn' => "http://pr-43.whoami2.{$ip}.sslip.io", 'is_fork_pull_request' => true, 'approved_commit' => str_repeat('a', 40),
+    'approved_at' => now()->subDay(), 'pending_approval_commit' => str_repeat('b', 40)])->save();
 foreach (['StandaloneMysql', 'StandaloneMongodb', 'StandaloneKeydb', 'StandaloneDragonfly', 'StandaloneClickhouse', 'StandaloneRedis', 'StandaloneSqlite'] as $type) {
     foreach (("App\\Models\\{$type}")::where('name', 'like', 'idle-%')->get() as $database) {
         // ssl_mode has a check constraint; pg-ssl covers it.
