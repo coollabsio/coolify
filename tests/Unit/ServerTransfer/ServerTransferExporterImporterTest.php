@@ -2441,3 +2441,22 @@ test('the image scanner limits move with the server', function () {
         ->and($settings->image_scan_cpus)->toBe(2.0)
         ->and($settings->image_scan_memory_mb)->toBe(4096);
 });
+
+test('an imported server keeps the status for unknown hosts, and a bundle without it gets the legacy status', function (?array $proxy, int $expected) {
+    $bundle = $this->exporter->export($this->server);
+    $bundle['server']['proxy'] = $proxy;
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    expect(Server::where('uuid', $result['server_uuid'])->first()->proxy->get('unknown_host_status'))->toBe($expected);
+})->with([
+    'no proxy' => [null, Server::LEGACY_UNKNOWN_HOST_STATUS],
+    'empty proxy' => [[], Server::LEGACY_UNKNOWN_HOST_STATUS],
+    'proxy without the status' => [['type' => 'TRAEFIK'], Server::LEGACY_UNKNOWN_HOST_STATUS],
+    'explicit 404' => [['type' => 'TRAEFIK', 'unknown_host_status' => 404], 404],
+    'explicit 503' => [['type' => 'TRAEFIK', 'unknown_host_status' => 503], 503],
+]);
