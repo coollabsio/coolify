@@ -12,6 +12,7 @@ use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Services\Dns\ResourceDnsRecords;
+use App\Services\ProjectConfig\ManagedResources;
 use App\Support\ValidationPatterns;
 use App\Traits\AuditsApplicationSettings;
 use Exception;
@@ -336,7 +337,7 @@ class General extends Component
             // Still sync data even on error, so form fields are populated
             $this->syncData();
         }
-        if (isset($this->parsedServices) && ! auth()->user()?->can('update', $this->application)) {
+        if (isset($this->parsedServices) && ! ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->application)) {
             $this->parsedServices = collect([
                 'services' => collect(data_get($this->parsedServices, 'services', []))->map(fn () => []),
             ]);
@@ -465,7 +466,7 @@ class General extends Component
             $this->saveApplicationSettingsWithAudit($this->application);
         } else {
             // From model to properties. Commands, configuration, and secrets can embed credentials, so only users who can update the application get them.
-            $canViewSecrets = auth()->user()?->can('update', $this->application) ?? false;
+            $canViewSecrets = ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->application);
             $this->name = $this->application->name;
             $this->description = $this->application->description;
             $this->fqdn = $this->application->fqdn;

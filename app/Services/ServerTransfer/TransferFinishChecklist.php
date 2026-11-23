@@ -5,6 +5,7 @@ namespace App\Services\ServerTransfer;
 use App\Events\TransferFinishChanged;
 use App\Jobs\CheckTransferFinishStepsJob;
 use App\Models\Application;
+use App\Models\EnvironmentConfigLink;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\ManagedDnsRecord;
@@ -51,7 +52,7 @@ class TransferFinishChecklist
     private const GROUP_OF_TYPE = [
         'server_connection' => 'server', 'sentinel' => 'server', 'previous_ssh_key' => 'server', 's3_storage' => 'server',
         'github_app_webhook' => 'git', 'github_app_urls' => 'git', 'gitlab_webhook' => 'git', 'manual_webhook' => 'git',
-        'git_source' => 'git', 'github_runners' => 'git',
+        'git_source' => 'git', 'github_runners' => 'git', 'project_config' => 'git',
         'dns_record' => 'dns', 'domain' => 'dns',
     ];
 
@@ -277,6 +278,19 @@ class TransferFinishChecklist
             }
         }
 
+        // A coolify.json link belongs to the environment on the previous instance, so it does not move.
+        $configEnvironments = $applications->concat($server->services()->get())->concat($server->databases())
+            ->filter(fn ($resource) => filled($resource->config_key))
+            ->map(fn ($resource) => $resource->environment)
+            ->filter()
+            ->unique('id');
+        foreach ($configEnvironments as $environment) {
+            $items[] = $this->item('project_config', $environment->uuid, "coolify.json of environment {$environment->name}",
+                'Resources of this environment were managed by coolify.json. Link the environment again on this instance.', [],
+                $environment->project ? route('project.environment.configuration', ['project_uuid' => $environment->project->uuid, 'environment_uuid' => $environment->uuid], false) : null,
+                'Open coolify.json');
+        }
+
         foreach ($this->dnsRecords($applications, $serviceApplications) as $record) {
             $items[] = $this->item('dns_record', $record->uuid, "DNS record {$record->name}");
         }
@@ -337,6 +351,9 @@ class TransferFinishChecklist
             'domain' => $this->checkDomain($server, $item['subject']),
             's3_storage' => $this->checkS3Storage($item['subject']),
             'git_source' => $this->checkGitSource($item['subject']),
+            'project_config' => EnvironmentConfigLink::query()->whereHas('environment', fn ($query) => $query->where('uuid', $item['subject']))->exists()
+                ? ['ok', 'The environment is linked to coolify.json.', null]
+                : ['action', 'The environment is not linked to coolify.json on this instance.', null],
             'github_runners' => $server->githubRunnerConfig()->value('is_enabled')
                 ? ['ok', 'GitHub runners are enabled.', null]
                 : ['action', 'Disabled after the transfer. Enable them when the GitHub App sends its webhooks here.', null],

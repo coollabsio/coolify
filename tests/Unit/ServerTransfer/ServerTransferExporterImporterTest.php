@@ -1259,6 +1259,25 @@ test('transfer keeps whether a volume ignores the Compose driver options', funct
     'bundle without the flag' => [null, true],
 ]);
 
+test('transfer keeps whether a volume is an existing Docker volume', function () {
+    LocalPersistentVolume::query()->where('resource_id', $this->application->id)->update(['is_external' => true]);
+    $bundle = $this->exporter->export($this->server);
+    $originalAppUuid = $this->application->uuid;
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    Tag::query()->delete();
+    ScheduledDatabaseBackup::query()->delete();
+    ScheduledTask::query()->delete();
+    $this->privateKey->delete();
+
+    $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: true, adoptMode: true);
+
+    expect(Application::where('uuid', $originalAppUuid)->sole()->persistentStorages()->sole()->is_external)->toBeTrue();
+});
+
 test('transfer keeps the link between an application volume and its sqlite database', function () {
     $sqlite = StandaloneSqlite::create([
         'name' => 'app-sqlite',
@@ -2014,6 +2033,14 @@ test('the checklist asks to move manual webhooks of git applications without a p
 
     expect($checklist)->toContain('If a repository of these applications has a manual webhook to Coolify, change its URL to the target: my-app.')
         ->toContain('{target_url}/webhooks/source/gitea/events/manual');
+});
+
+test('the checklist asks to link the environment again when only a database or service is managed by coolify.json', function () {
+    $this->service->forceFill(['config_key' => 'cache'])->saveQuietly();
+
+    $checklist = implode("\n", $this->exporter->export($this->server)['post_transfer_checklist']);
+
+    expect($checklist)->toContain('Some resources were managed by coolify.json.');
 });
 
 test('the checklist does not ask about manual webhooks for an application that deploys through a private GitHub App', function () {

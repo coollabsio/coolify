@@ -6,6 +6,7 @@ use App\Enums\AccessLevel;
 use App\Models\Environment;
 use App\Models\User;
 use App\Services\Access\AccessResolver;
+use App\Services\ProjectConfig\ManagedResources;
 use Illuminate\Auth\Access\Response;
 
 class DatabasePolicy
@@ -43,6 +44,9 @@ class DatabasePolicy
      */
     public function update(User $user, $database): Response
     {
+        if (ManagedResources::isManaged($database)) {
+            return Response::deny(ManagedResources::denyReason($database));
+        }
         if ($this->allows($user, AccessLevel::Write, $database)) {
             return Response::allow();
         }

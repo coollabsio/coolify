@@ -157,6 +157,11 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public function submit()
     {
+        if ($this->usesConfigFile()) {
+            $this->previewConfigFile();
+
+            return;
+        }
         $privateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($this->private_key_id);
 
         $this->base_directory = ValidationPatterns::normalizeDirectoryPath($this->base_directory);
