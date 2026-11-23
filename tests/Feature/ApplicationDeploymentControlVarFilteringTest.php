@@ -2396,6 +2396,7 @@ it('hides the build secret values of the helper container from commands that sta
 it('leaves commands unchanged when the helper container has no build secret values', function () {
     [$application, $server] = makeDeploymentControlVarFixture(['build_pack' => 'dockercompose']);
     createApplicationEnvironmentVariable($application, ['key' => 'DATABASE_URL', 'value' => 'value']);
+    $application->settings()->update(['use_build_secrets' => false]);
 
     [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, ['build_pack' => 'dockercompose']);
     expect(invokeDeploymentJobMethod($job, $reflection, 'generate_docker_env_flags_for_secrets'))->toBe('');
