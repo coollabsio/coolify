@@ -192,11 +192,12 @@ class ApplicationPreview extends BaseModel
 
     /**
      * A fork pull request runs code that the repository owner did not review. Each of its commits
-     * waits for an admin, unless the admin turned on public previews without approval.
+     * waits for an admin, unless the admin turned on public previews without approval. A pull
+     * request with an unknown origin (null) counts as a fork.
      */
     public function forkCommitNeedsApproval(string $commit): bool
     {
-        if (! $this->is_fork_pull_request) {
+        if ($this->is_fork_pull_request === false) {
             return false;
         }
 

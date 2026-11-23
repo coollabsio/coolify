@@ -123,6 +123,15 @@ it('needs a new approval when a push changes the commit after an approval', func
         ->and($preview->fresh()->approved_commit)->toBe(FORK_GATE_OLD_COMMIT);
 });
 
+it('needs an approval when the origin of the pull request is unknown', function () {
+    [$job, $preview, $queue] = forkGateJob(['is_fork_pull_request' => null]);
+
+    expect(fn () => runForkGate($job))->toThrow(PreviewApprovalRequiredException::class);
+
+    expect($preview->fresh()->pending_approval_commit)->toBe(FORK_GATE_COMMIT)
+        ->and($queue->fresh()->logs)->toContain('unknown origin');
+});
+
 it('does not check pull requests from the same repository', function () {
     [$job, $preview] = forkGateJob(['is_fork_pull_request' => false]);
 

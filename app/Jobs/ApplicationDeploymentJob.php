@@ -4025,7 +4025,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function ensureForkPreviewCommitIsApproved(): void
     {
-        if ($this->pull_request_id === 0 || ! $this->preview?->refresh()->is_fork_pull_request) {
+        if ($this->pull_request_id === 0 || ! $this->preview || $this->preview->refresh()->is_fork_pull_request === false) {
             return;
         }
 
@@ -4050,7 +4050,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->preview->markWaitingForApproval($commit);
         $this->commit = $commit;
         $this->application_deployment_queue->update(['commit' => $commit]);
-        $this->application_deployment_queue->addLogEntry("Commit {$commit} of this pull request comes from a fork. An admin must approve it on the Preview Deployments page before Coolify deploys it.", 'stderr');
+        $origin = $this->preview->is_fork_pull_request
+            ? 'comes from a fork'
+            : 'has an unknown origin (Coolify got no webhook event of it yet), so Coolify handles it as a fork';
+        $this->application_deployment_queue->addLogEntry("Commit {$commit} of this pull request {$origin}. An admin must approve it on the Preview Deployments page before Coolify deploys it.", 'stderr');
 
         try {
             $this->application->environment->project->team?->notify(new PreviewApprovalRequired($this->application, $this->preview, $this->deployment_uuid));

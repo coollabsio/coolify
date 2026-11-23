@@ -331,7 +331,13 @@
                                 @endif
                             </div>
                             <p class="text-xs text-neutral-500 dark:text-fg-dim">
-                                This pull request comes from a fork. An admin must review and approve this commit before Coolify deploys it.
+                                @if ($preview->is_fork_pull_request === false)
+                                    An admin must review and approve this commit before Coolify deploys it.
+                                @elseif ($preview->is_fork_pull_request)
+                                    This pull request comes from a fork. An admin must review and approve this commit before Coolify deploys it.
+                                @else
+                                    Coolify does not know yet if this pull request comes from a fork, so it handles it as a fork. An admin must review and approve this commit before Coolify deploys it.
+                                @endif
                             </p>
                         </div>
                         @can('approve', $preview)
