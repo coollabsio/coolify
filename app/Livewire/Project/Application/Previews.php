@@ -66,14 +66,27 @@ class Previews extends Component
         $this->validate([
             'isPreviewDeploymentsEnabled' => 'boolean',
             'isPrDeploymentsPublicEnabled' => 'boolean',
-            'isPrDeploymentsPublicApprovalRequired' => 'boolean',
             'useProductionValuesInPreviews' => 'boolean',
         ]);
 
         $this->application->settings->is_preview_deployments_enabled = $this->isPreviewDeploymentsEnabled;
         $this->application->settings->is_pr_deployments_public_enabled = $this->isPrDeploymentsPublicEnabled;
-        $this->application->settings->is_pr_deployments_public_approval_required = $this->isPrDeploymentsPublicApprovalRequired;
         $this->application->settings->use_production_values_in_previews = $this->useProductionValuesInPreviews;
+        $this->saveApplicationSettingsWithAudit($this->application);
+
+        $this->dispatch('success', 'Settings saved.');
+        $this->dispatch('configurationChanged');
+    }
+
+    /**
+     * Saves only the fork approval policy, so that a stale value in another save cannot turn approval off.
+     */
+    public function saveForkApprovalSetting(): void
+    {
+        $this->authorize('update', $this->application);
+        $this->validate(['isPrDeploymentsPublicApprovalRequired' => 'boolean']);
+
+        $this->application->settings->is_pr_deployments_public_approval_required = $this->isPrDeploymentsPublicApprovalRequired;
         $this->saveApplicationSettingsWithAudit($this->application);
 
         $this->dispatch('success', 'Settings saved.');
@@ -271,7 +284,7 @@ class Previews extends Component
     /**
      * An admin approves the reviewed commit of a fork pull request and deploys it.
      */
-    public function approveForkCommit(int $previewId, string $commit)
+    public function approveForkCommit(int $previewId, string $commit): void
     {
         $preview = $this->application->previews()->whereKey($previewId)->firstOrFail();
         $this->authorize('approve', $preview);
@@ -290,14 +303,14 @@ class Previews extends Component
                 return;
             }
 
-            return redirect()->route('project.application.deployment.show', [
+            $this->redirectRoute('project.application.deployment.show', [
                 'project_uuid' => $this->application->environment->project->uuid,
                 'application_uuid' => $this->application->uuid,
                 'deployment_uuid' => $result['deployment_uuid'],
                 'environment_uuid' => $this->application->environment->uuid,
             ]);
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            handleError($e, $this);
         }
     }
 
