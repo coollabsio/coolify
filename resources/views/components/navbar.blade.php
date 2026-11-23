@@ -124,6 +124,7 @@
                             // Members limited to some projects see the resources they have access to.
                             ['label' => 'Security', 'icon' => 'shield-alert', 'href' => route('vulnerabilities'), 'active' => request()->is('vulnerabilities')],
                         ]],
+                        ['label' => 'Deployments', 'icon' => 'time-back', 'href' => route('deployments.index'), 'active' => request()->is('deployments'), 'visible' => $teamWide],
                         ['label' => 'Terminal', 'icon' => 'browser-terminal', 'href' => route('terminal'), 'active' => request()->is('terminal*'), 'navigate' => false, 'visible' => $teamWide && auth()->user()?->can('canAccessTerminal')],
                     ],
                     'Infrastructure' => [

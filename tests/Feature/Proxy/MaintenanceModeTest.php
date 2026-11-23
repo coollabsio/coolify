@@ -160,6 +160,13 @@ it('skips domains that could inject proxy configuration', function () {
     expect($application->maintenanceRoutes()->pluck('host')->all())->toBe(['ok.example.com']);
 });
 
+it('keeps the host of a domain whose path cannot be a maintenance route', function () {
+    $application = maintenanceApplication(['fqdn' => 'https://App.example.com/v1+beta,https://evil.example.com`)']);
+
+    expect($application->maintenanceRoutes()->all())->toBe([])
+        ->and($application->maintenanceHosts()->all())->toBe(['app.example.com']);
+});
+
 it('collects the domains of Docker Compose applications and services', function () {
     $compose = maintenanceApplication([
         'build_pack' => 'dockercompose',
@@ -232,6 +239,18 @@ it('keeps the page container for maintenance when a redirect URL replaces the ca
     $server->setupProxyErrorPageContainer();
 
     expect(collect(maintenanceScriptLines())->contains(fn ($line) => str_contains($line, 'docker run -d --name coolify-proxy-error-pages')))->toBeTrue();
+});
+
+it('writes no catch-all for resource domains on Swarm servers with the 404 status', function () {
+    maintenanceApplication();
+    $this->server->settings->update(['is_swarm_manager' => true]);
+    $server = maintenanceServer();
+
+    expect($server->unknownHostStatus())->toBe(404)
+        ->and($server->defaultRedirectConfiguration())->toBeNull();
+
+    $server->proxy->unknown_host_status = 503;
+    expect(Yaml::parse($server->defaultRedirectConfiguration())['http']['routers'])->toHaveKeys(['catchall'])->not->toHaveKey('catchall-resources');
 });
 
 it('does not touch Swarm servers', function () {

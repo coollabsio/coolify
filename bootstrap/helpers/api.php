@@ -16,8 +16,11 @@ use App\Models\SwarmDocker;
 use App\Rules\ManualWebhookSecret;
 use App\Rules\ValidGitBranch;
 use App\Support\ValidationPatterns;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection as SupportCollection;
@@ -41,6 +44,46 @@ function getTeamIdFromToken()
 function invalidTokenResponse()
 {
     return response()->json(['message' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api-reference/authorization'], 400);
+}
+
+/**
+ * Validation rules of the page and per_page query parameters of a paginated list endpoint.
+ *
+ * @return array<string, list<string>>
+ */
+function apiPaginationRules(int $maxPerPage = 100): array
+{
+    return [
+        'page' => ['nullable', 'integer', 'min:1', 'max:'.(intdiv(PHP_INT_MAX, $maxPerPage) + 1)],
+        'per_page' => ['nullable', 'integer', 'min:1', 'max:'.$maxPerPage],
+    ];
+}
+
+/**
+ * Page a list query in the standard API style: the body stays a plain array, and the X-Total-Count header gives the total.
+ * Without page or per_page in the request, the full list is returned without the header, unless $alwaysPaginate is set.
+ *
+ * @return array{0: SupportCollection, 1: array<string, int>} the items and the response headers
+ */
+function apiPaginate(EloquentBuilder|QueryBuilder|Relation $query, Request $request, int $defaultPerPage = 50, bool $alwaysPaginate = false): array
+{
+    if (! $alwaysPaginate && ! $request->filled('page') && ! $request->filled('per_page')) {
+        return [$query->get(), []];
+    }
+
+    $total = (clone $query)->count();
+    $items = $query->forPage((int) ($request->query('page') ?: 1), (int) ($request->query('per_page') ?: $defaultPerPage))->get();
+
+    return [$items, ['X-Total-Count' => $total]];
+}
+
+/**
+ * Filter a list query by a case-insensitive literal substring of a column.
+ * Both operands are lowercased, and the LIKE wildcards in $value (%, _, \) match only themselves.
+ */
+function apiWhereContains(EloquentBuilder $query, string $column, string $value): EloquentBuilder
+{
+    return $query->whereRaw("LOWER({$column}) LIKE ? ESCAPE '\\'", ['%'.addcslashes(mb_strtolower($value), '%_\\').'%']);
 }
 
 function serializeApiResponse($data)
@@ -115,6 +158,35 @@ function apiEnvironmentVariableDisplayValue(mixed $data): mixed
     }
 
     return [...$data->toArray(), 'real_value' => $data->displayRealValue()];
+}
+
+/**
+ * Validation rules for the `compose_services` field of an environment variable of the resource.
+ * Null or an empty list means all Compose services; a list must only name services of the resource.
+ *
+ * @return array<string, mixed>
+ */
+function composeServicesValidationRules(mixed $resource): array
+{
+    return [
+        'compose_services' => ['nullable', 'array', function (string $attribute, mixed $value, Closure $fail) use ($resource): void {
+            $requested = is_array($value) ? array_values(array_filter($value, 'is_string')) : [];
+            if ($requested === []) {
+                return;
+            }
+            $available = composeServiceNamesForEnvironmentScope($resource);
+            if ($available === []) {
+                $fail('Only Docker Compose resources with a loaded Compose file can limit a variable to services. For a new Compose application, deploy it once or reload its Compose file first.');
+
+                return;
+            }
+            $unknown = array_values(array_diff($requested, $available));
+            if ($unknown !== []) {
+                $fail('Unknown Compose services: '.implode(', ', $unknown).'. Available services: '.implode(', ', $available).'.');
+            }
+        }],
+        'compose_services.*' => 'string',
+    ];
 }
 
 /**

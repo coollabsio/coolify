@@ -75,6 +75,7 @@ class Danger extends Component
             'standalone-keydb',
             'standalone-dragonfly',
             'standalone-clickhouse',
+            'standalone-influxdb',
             'standalone-sqlite' => $this->resource->name ?? 'Database',
             'service' => $this->resource->name ?? 'Service',
             'service-application' => $this->resource->name ?? 'Service Application',

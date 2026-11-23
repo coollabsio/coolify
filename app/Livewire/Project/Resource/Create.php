@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Resource;
 
 use App\Models\Service;
+use App\Services\TemplateFingerprint;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -111,6 +112,8 @@ class Create extends Component
                 $database = create_standalone_dragonfly($environment->id, $destination);
             } elseif ($type->value() === 'clickhouse') {
                 $database = create_standalone_clickhouse($environment->id, $destination);
+            } elseif ($type->value() === 'influxdb') {
+                $database = create_standalone_influxdb($environment->id, $destination);
             } elseif ($type->value() === 'sqlite') {
                 $database = create_standalone_sqlite($environment->id, $destination);
             }
@@ -138,6 +141,7 @@ class Create extends Component
             'docker_compose_raw' => base64_decode($oneClickService),
             'environment_id' => $environment->id,
             'service_type' => $oneClickServiceName,
+            'template_reference_hash' => TemplateFingerprint::forTemplate(data_get($services, $oneClickServiceName, [])),
             'server_id' => $destination->server_id,
             'destination_id' => $destination->id,
             'destination_type' => $destination->getMorphClass(),

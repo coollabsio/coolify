@@ -292,7 +292,7 @@
                                     <x-reicon :name="$menuIcons[$menuItem['label']] ?? 'settings'" class="menu-item-icon" />
                                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                                     @if ($menuItem['label'] === 'Files')
-                                        <x-beta-badge class="ml-auto shrink-0" />
+                                        <x-experimental-icon class="ml-auto shrink-0" />
                                     @endif
                                     @if (filled($menuItem['recommendations'] ?? null))
                                         <x-attention-mark :label="$menuItem['recommendations']->count().' '.str('recommendation')->plural($menuItem['recommendations']->count())" />

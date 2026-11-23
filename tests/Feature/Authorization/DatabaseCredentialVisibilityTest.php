@@ -4,6 +4,8 @@ use App\Livewire\Project\Database\Clickhouse\General as ClickhouseGeneral;
 use App\Livewire\Project\Database\Clickhouse\StatusInfo as ClickhouseStatusInfo;
 use App\Livewire\Project\Database\Dragonfly\General as DragonflyGeneral;
 use App\Livewire\Project\Database\Dragonfly\StatusInfo as DragonflyStatusInfo;
+use App\Livewire\Project\Database\Influxdb\General as InfluxdbGeneral;
+use App\Livewire\Project\Database\Influxdb\StatusInfo as InfluxdbStatusInfo;
 use App\Livewire\Project\Database\Keydb\General as KeydbGeneral;
 use App\Livewire\Project\Database\Keydb\StatusInfo as KeydbStatusInfo;
 use App\Livewire\Project\Database\Mariadb\General as MariadbGeneral;
@@ -52,6 +54,7 @@ dataset('database-credential-components', [
     'keydb' => ['create_standalone_keydb', KeydbGeneral::class, KeydbStatusInfo::class, ['keydb_password' => 'stored-db-credential'], ['keydbPassword']],
     'dragonfly' => ['create_standalone_dragonfly', DragonflyGeneral::class, DragonflyStatusInfo::class, ['dragonfly_password' => 'stored-db-credential'], ['dragonflyPassword']],
     'clickhouse' => ['create_standalone_clickhouse', ClickhouseGeneral::class, ClickhouseStatusInfo::class, ['clickhouse_admin_password' => 'stored-db-credential'], ['clickhouseAdminPassword']],
+    'influxdb' => ['create_standalone_influxdb', InfluxdbGeneral::class, InfluxdbStatusInfo::class, ['influxdb_admin_password' => 'stored-db-credential', 'influxdb_admin_token' => 'stored-db-credential'], ['influxdbAdminPassword', 'influxdbAdminToken']],
 ]);
 
 function createDatabaseWithCredential(string $createDatabase, array $credentials): mixed

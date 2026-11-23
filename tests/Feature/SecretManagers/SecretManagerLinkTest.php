@@ -16,6 +16,7 @@ use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -299,6 +300,7 @@ test('all deployable environment-variable resources support secret managers', fu
     StandaloneKeydb::class,
     StandaloneDragonfly::class,
     StandaloneClickhouse::class,
+    StandaloneInfluxdb::class,
     StandaloneSqlite::class,
 ]);
 

@@ -7,6 +7,7 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
@@ -138,6 +139,34 @@ describe('POST /api/v1/databases/{uuid}/backups', function () {
 
         expect($backup->databases_to_backup)->toBe('analytics')
             ->and($backup->database_type)->toBe(StandaloneClickhouse::class);
+    });
+
+    test('defaults influxdb backups to its configured bucket', function () {
+        $database = StandaloneInfluxdb::create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'InfluxDB DB',
+            'influxdb_admin_user' => 'influx',
+            'influxdb_admin_password' => 'password',
+            'influxdb_admin_token' => 'token',
+            'influxdb_org' => 'coolify',
+            'influxdb_bucket' => 'metrics',
+            'status' => 'running',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $response = $this->withHeaders(backupHeaders())
+            ->postJson("/api/v1/databases/{$database->uuid}/backups", [
+                'frequency' => 'daily',
+            ]);
+
+        $response->assertCreated();
+
+        $backup = ScheduledDatabaseBackup::where('uuid', $response->json('uuid'))->firstOrFail();
+
+        expect($backup->databases_to_backup)->toBe('metrics')
+            ->and($backup->database_type)->toBe(StandaloneInfluxdb::class);
     });
 
     test('leaves sqlite backup files unset so every configured file is backed up at run time', function () {

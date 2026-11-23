@@ -27,6 +27,7 @@ use App\Traits\HasStars;
 use App\Traits\ReleasesManagedDnsRecords;
 use App\Traits\ScopedByAccessGrants;
 use Database\Factories\ApplicationFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -560,6 +561,81 @@ class Application extends BaseModel
     }
 
     /**
+     * Filter the applications of a team (API and MCP listings).
+     * A project, environment, or server UUID that the team does not own matches no application.
+     * Status and name are case-insensitive substring matches. Status matches the aggregated status of multi-server applications.
+     *
+     * @param  array{tag?: ?string, project_uuid?: ?string, environment_uuid?: ?string, server_uuid?: ?string, status?: ?string, name?: ?string}  $filters
+     */
+    public function scopeApplyListFilters(Builder $query, int $teamId, array $filters): Builder
+    {
+        $tag = $filters['tag'] ?? null;
+        $projectUuid = $filters['project_uuid'] ?? null;
+        $environmentUuid = $filters['environment_uuid'] ?? null;
+        $serverUuid = $filters['server_uuid'] ?? null;
+        $status = $filters['status'] ?? null;
+        $name = $filters['name'] ?? null;
+
+        return $query
+            ->when($tag !== null, fn (Builder $query) => $query->whereHas('tags', fn (Builder $q) => $q->where('name', $tag)))
+            ->when($projectUuid !== null, function (Builder $query) use ($projectUuid, $teamId) {
+                $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
+                if (! $project) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $query->whereHas('environment', fn (Builder $q) => $q->where('project_id', $project->id));
+            })
+            ->when($environmentUuid !== null, function (Builder $query) use ($environmentUuid, $teamId) {
+                $environment = Environment::ownedByCurrentTeamAPI($teamId)->where('uuid', $environmentUuid)->first();
+                if (! $environment) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $query->where('environment_id', $environment->id);
+            })
+            ->when($serverUuid !== null, function (Builder $query) use ($serverUuid, $teamId) {
+                $server = Server::whereTeamId($teamId)->where('uuid', $serverUuid)->first();
+                if (! $server) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $standaloneDockerIds = $server->standaloneDockers()->pluck('id');
+                $swarmDockerIds = $server->swarmDockers()->pluck('id');
+                $query->where(function (Builder $q) use ($standaloneDockerIds, $swarmDockerIds, $server) {
+                    $q->where(fn (Builder $inner) => $inner->where('destination_type', StandaloneDocker::class)->whereIn('destination_id', $standaloneDockerIds))
+                        ->orWhere(fn (Builder $inner) => $inner->where('destination_type', SwarmDocker::class)->whereIn('destination_id', $swarmDockerIds))
+                        ->orWhereHas('additional_servers', fn (Builder $inner) => $inner->where('servers.id', $server->id));
+                });
+            })
+            ->when($name !== null, fn (Builder $query) => apiWhereContains($query, 'name', $name))
+            ->when($status !== null, fn (Builder $query) => $query->whereStatusContains($status));
+    }
+
+    /**
+     * Match the status that the application returns: the stored status for one server,
+     * and the status aggregated with the additional servers (for example `degraded:unhealthy`) for more servers.
+     */
+    public function scopeWhereStatusContains(Builder $query, string $status): Builder
+    {
+        $needle = mb_strtolower($status);
+        $multiServerIds = (clone $query)
+            ->setEagerLoads([])
+            ->with('additional_servers')
+            ->has('additional_servers')
+            ->get(['applications.id', 'applications.status'])
+            ->filter(fn (Application $application) => str_contains(mb_strtolower($application->status), $needle))
+            ->modelKeys();
+
+        return $query->where(fn (Builder $q) => $q
+            ->where(fn (Builder $single) => apiWhereContains($single->doesntHave('additional_servers'), 'status', $status))
+            ->orWhereIn('id', $multiServerIds));
+    }
+
+    /**
      * Get query builder for applications owned by current team.
      * If you need all applications without further query chaining, use ownedByCurrentTeamCached() instead.
      */
@@ -607,7 +683,7 @@ class Application extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
-            if ($storage->isSharedWithAnotherResource()) {
+            if ($storage->is_external || $storage->isSharedWithAnotherResource()) {
                 continue;
             }
             instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
@@ -3166,13 +3242,7 @@ class Application extends BaseModel
 
         // Always check if healthcheck was removed, regardless of health_check_enabled setting
         if (! $hasHealthcheck && $this->custom_healthcheck_found) {
-            // HEALTHCHECK was removed from Dockerfile, reset to defaults
-            $this->custom_healthcheck_found = false;
-            $this->health_check_interval = 5;
-            $this->health_check_timeout = 5;
-            $this->health_check_retries = 10;
-            $this->health_check_start_period = 5;
-            $this->save();
+            $this->resetCustomHealthcheck();
 
             return;
         }
@@ -3187,6 +3257,47 @@ class Application extends BaseModel
             $this->custom_healthcheck_found = true;
             $this->save();
         }
+    }
+
+    /**
+     * Read the HEALTHCHECK of a pulled Docker image from the output of
+     * `docker inspect --format '{{json .Config.Healthcheck}}'`. Docker gives the durations in
+     * nanoseconds and leaves out zero values, which mean the Docker defaults (30s, 30s, 0s, 3 retries).
+     */
+    public function parseHealthcheckFromImage(?string $inspectOutput): void
+    {
+        $healthcheck = json_decode(trim((string) $inspectOutput), true);
+        $test = is_array($healthcheck) ? ($healthcheck['Test'] ?? null) : null;
+        $hasHealthcheck = is_array($test) && $test !== [] && strtoupper((string) $test[0]) !== 'NONE';
+
+        if (! $hasHealthcheck) {
+            if ($this->custom_healthcheck_found) {
+                $this->resetCustomHealthcheck();
+            }
+
+            return;
+        }
+
+        $seconds = fn (string $key, int $default): int => isset($healthcheck[$key]) && $healthcheck[$key] > 0
+            ? max(1, intdiv((int) $healthcheck[$key], 1_000_000_000))
+            : $default;
+
+        $this->health_check_interval = $seconds('Interval', 30);
+        $this->health_check_timeout = $seconds('Timeout', 30);
+        $this->health_check_start_period = $seconds('StartPeriod', 0);
+        $this->health_check_retries = isset($healthcheck['Retries']) && $healthcheck['Retries'] > 0 ? (int) $healthcheck['Retries'] : 3;
+        $this->custom_healthcheck_found = true;
+        $this->save();
+    }
+
+    private function resetCustomHealthcheck(): void
+    {
+        $this->custom_healthcheck_found = false;
+        $this->health_check_interval = 5;
+        $this->health_check_timeout = 5;
+        $this->health_check_retries = 10;
+        $this->health_check_start_period = 5;
+        $this->save();
     }
 
     public function getLimits(): array

@@ -17,6 +17,7 @@ class WebhookNotificationSettings extends Model
 
         'webhook_enabled',
         'webhook_url',
+        'webhook_authorization_header',
 
         'deployment_success_webhook_notifications',
         'deployment_failure_webhook_notifications',
@@ -39,6 +40,7 @@ class WebhookNotificationSettings extends Model
 
     protected $hidden = [
         'webhook_url',
+        'webhook_authorization_header',
     ];
 
     protected function casts(): array
@@ -46,6 +48,7 @@ class WebhookNotificationSettings extends Model
         return [
             'webhook_enabled' => 'boolean',
             'webhook_url' => 'encrypted',
+            'webhook_authorization_header' => 'encrypted',
 
             'deployment_success_webhook_notifications' => 'boolean',
             'deployment_failure_webhook_notifications' => 'boolean',

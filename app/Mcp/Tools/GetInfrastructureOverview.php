@@ -73,6 +73,7 @@ class GetInfrastructureOverview extends Tool
                 'keydbs',
                 'dragonflies',
                 'clickhouses',
+                'influxdbs',
                 'sqlites',
             ])
             ->get();
@@ -94,6 +95,7 @@ class GetInfrastructureOverview extends Tool
                 + $project->keydbs_count
                 + $project->dragonflies_count
                 + $project->clickhouses_count
+                + $project->influxdbs_count
                 + $project->sqlites_count
             );
 

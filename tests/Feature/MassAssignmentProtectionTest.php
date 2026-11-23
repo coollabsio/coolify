@@ -5,6 +5,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -32,6 +33,7 @@ describe('mass assignment protection', function () {
             StandaloneKeydb::class,
             StandaloneDragonfly::class,
             StandaloneClickhouse::class,
+            StandaloneInfluxdb::class,
             StandaloneSqlite::class,
         ];
 
@@ -103,6 +105,7 @@ describe('mass assignment protection', function () {
             StandaloneKeydb::class,
             StandaloneDragonfly::class,
             StandaloneClickhouse::class,
+            StandaloneInfluxdb::class,
             StandaloneSqlite::class,
         ];
 

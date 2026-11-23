@@ -12,6 +12,7 @@ use App\Models\Server;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -127,8 +128,12 @@ class ResourceOperations extends Component
                 $this->resource->getMorphClass() === StandaloneKeydb::class ||
                 $this->resource->getMorphClass() === StandaloneDragonfly::class ||
                 $this->resource->getMorphClass() === StandaloneClickhouse::class ||
+                $this->resource->getMorphClass() === StandaloneInfluxdb::class ||
                 $this->resource->getMorphClass() === StandaloneSqlite::class
             ) {
+                foreach ($this->resource->persistentStorages()->get() as $volume) {
+                    $volume->ensureCloneTargetIsAvailable($this->resource->destination->server, $server);
+                }
                 $uuid = new_public_id();
                 $new_resource = $this->resource->replicate([
                     'id',
@@ -157,7 +162,9 @@ class ResourceOperations extends Component
                     $originalName = $volume->name;
                     $newName = '';
 
-                    if (str_starts_with($originalName, 'postgres-data-')) {
+                    if ($volume->is_external) {
+                        $newName = $originalName;
+                    } elseif (str_starts_with($originalName, 'postgres-data-')) {
                         $newName = 'postgres-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'mysql-data-')) {
                         $newName = 'mysql-data-'.$new_resource->uuid;
@@ -165,6 +172,10 @@ class ResourceOperations extends Component
                         $newName = 'redis-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'clickhouse-data-')) {
                         $newName = 'clickhouse-data-'.$new_resource->uuid;
+                    } elseif (str_starts_with($originalName, 'influxdb-data-')) {
+                        $newName = 'influxdb-data-'.$new_resource->uuid;
+                    } elseif (str_starts_with($originalName, 'influxdb-config-')) {
+                        $newName = 'influxdb-config-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'mariadb-data-')) {
                         $newName = 'mariadb-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'mongodb-data-')) {
@@ -194,7 +205,7 @@ class ResourceOperations extends Component
                     ]);
                     $newPersistentVolume->save();
 
-                    if ($this->cloneVolumeData) {
+                    if ($volume->shouldCopyDataWhenCloning($this->cloneVolumeData)) {
                         $pendingVolumeClones[] = new VolumeCloneJob(
                             $volume->name,
                             $newPersistentVolume->name,

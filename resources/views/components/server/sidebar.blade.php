@@ -163,7 +163,7 @@
             'icon' => 'play-circle',
             'group' => 'Operations',
             'visible' => ! $server->isLocalhost(),
-            'beta' => true,
+            'experimental' => true,
             'disabled' => ! $server->isFunctional(),
         ],
         [
@@ -205,7 +205,7 @@
             'route' => 'server.transfer',
             'active' => $activeMenu === 'transfer',
             'icon' => 'arrow-right',
-            'beta' => true,
+            'experimental' => true,
             'group' => 'Operations',
             'visible' => ! $server->isLocalhost() && auth()->user()?->can('update', $server),
             'disabled' => ! $server->isFunctional(),
@@ -334,8 +334,8 @@
                             <x-attention-mark label="Sentinel is out of sync" x-cloak x-show="sentinelOutOfSync" />
                         @elseif ($menuItem['warning'] ?? false)
                             <x-attention-mark :label="$menuItem['warning_label'] ?? 'Needs attention'" />
-                        @elseif ($menuItem['beta'] ?? false)
-                            <x-beta-badge class="ml-auto shrink-0" />
+                        @elseif ($menuItem['experimental'] ?? false)
+                            <x-experimental-icon class="ml-auto shrink-0" />
                         @endif
                     </a>
                     <x-starred-menu.toggle menu="server" :page="$menuItem['route']" :label="$menuItem['label']" />
@@ -349,8 +349,8 @@
                                     href="{{ route($child['route'], $serverRouteParameters) }}">
                                     <x-reicon :name="$child['icon']" class="menu-item-icon" />
                                     <span class="menu-item-label">{{ $child['label'] }}</span>
-                                    @if ($child['beta'] ?? false)
-                                        <x-beta-badge class="ml-auto shrink-0" />
+                                    @if ($child['experimental'] ?? false)
+                                        <x-experimental-icon class="ml-auto shrink-0" />
                                     @endif
                                 </a>
                             @endforeach
