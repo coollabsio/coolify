@@ -185,6 +185,9 @@ class CloneMe extends Component
         }
 
         foreach ($databases as $database) {
+            foreach ($database->persistentStorages()->get() as $volume) {
+                $volume->ensureCloneTargetIsAvailable($database->destination->server, $selectedDestination->server);
+            }
             $uuid = new_public_id();
             // A clone is not managed by coolify.json.
             $newDatabase = $database->replicate([
@@ -214,7 +217,9 @@ class CloneMe extends Component
                 $originalName = $volume->name;
                 $newName = '';
 
-                if (str_starts_with($originalName, 'postgres-data-')) {
+                if ($volume->is_external) {
+                    $newName = $originalName;
+                } elseif (str_starts_with($originalName, 'postgres-data-')) {
                     $newName = 'postgres-data-'.$newDatabase->uuid;
                 } elseif (str_starts_with($originalName, 'mysql-data-')) {
                     $newName = 'mysql-data-'.$newDatabase->uuid;
@@ -255,7 +260,7 @@ class CloneMe extends Component
                 ]);
                 $newPersistentVolume->save();
 
-                if ($this->cloneVolumeData) {
+                if ($volume->shouldCopyDataWhenCloning($this->cloneVolumeData)) {
                     $pendingVolumeClones[] = new VolumeCloneJob(
                         $volume->name,
                         $newPersistentVolume->name,

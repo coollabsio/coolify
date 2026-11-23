@@ -211,6 +211,9 @@
                                         x-text="item.name"></a>
                                     <span x-show="item.managed" x-cloak title="Managed by coolify.json" class="relative inline-flex shrink-0 text-neutral-400 dark:text-fg-faint"><x-reicon name="file-content" class="size-3.5" /></span>
                                     <x-image-scan.marker bind="item.security" class="relative" />
+                                    <template x-if="item.type === 'service' && item.updateAvailable">
+                                        <span class="size-2 shrink-0 rounded-full bg-coollabs dark:bg-warning" title="Template update available"></span>
+                                    </template>
                                 </div>
                                 <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint"
                                     x-show="item.description?.trim()"
@@ -309,6 +312,9 @@
                                             x-text="item.name"></h2>
                                         <span x-show="item.managed" x-cloak title="Managed by coolify.json" class="relative inline-flex shrink-0 text-neutral-400 dark:text-fg-faint"><x-reicon name="file-content" class="size-3.5" /></span>
                                         <x-image-scan.marker bind="item.security" class="relative" />
+                                        <template x-if="item.type === 'service' && item.updateAvailable">
+                                            <span class="size-2 shrink-0 rounded-full bg-coollabs dark:bg-warning" title="Template update available"></span>
+                                        </template>
                                     </div>
                                     <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint"
                                         x-text="item.typeLabel"></p>

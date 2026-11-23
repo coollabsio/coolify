@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Services\TemplateFingerprint;
 
 /**
  * Creates a service from a Compose file or a one-click template, and parses it.
@@ -32,6 +33,7 @@ class CreateServiceFromCompose
             'docker_compose_raw' => $dockerComposeRaw,
             'environment_id' => $environment->id,
             'service_type' => $templateKey,
+            'template_reference_hash' => $templateKey !== null ? TemplateFingerprint::forTemplate(data_get(get_service_templates(), $templateKey, [])) : null,
             'server_id' => $server->id,
             'destination_id' => $destination->id,
             'destination_type' => $destination->getMorphClass(),

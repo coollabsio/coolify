@@ -121,9 +121,9 @@
         <div class="hidden w-full items-center xl:flex xl:w-auto">
             <div
                 class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-1 overflow-visible">
-                <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
+                <div class="resource-heading-actions flex shrink-0 items-center gap-1">
                     @if ($isDeploymentProgress)
-                        <x-deploying-indicator label="Working" class="mr-1" />
+                        <x-deploying-indicator label="Working" size="md" />
                     @endif
                     @if ($database->destination->server->isFunctional())
                         @can('manage', $database)
