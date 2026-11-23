@@ -180,11 +180,29 @@ it('saves the fork approval setting for an admin', function () {
         ->assertSee('Require approval for fork pull requests')
         ->assertSet('isPrDeploymentsPublicApprovalRequired', true)
         ->set('isPrDeploymentsPublicApprovalRequired', false)
-        ->call('savePreviewSettings')
+        ->call('saveForkApprovalSetting')
         ->assertHasNoErrors()
         ->assertDispatched('success');
 
     expect($this->application->fresh()->settings->is_pr_deployments_public_approval_required)->toBeFalse();
+});
+
+it('keeps the fork approval setting when other preview settings are saved from a stale tab', function () {
+    forkApprovalActAs($this->team, 'admin');
+    $this->application->settings()->update(['is_pr_deployments_public_approval_required' => false]);
+
+    $component = Livewire::test(Previews::class, ['application' => $this->application->fresh()])
+        ->assertSet('isPrDeploymentsPublicApprovalRequired', false);
+
+    $this->application->settings()->update(['is_pr_deployments_public_approval_required' => true]);
+
+    $component->set('useProductionValuesInPreviews', false)
+        ->call('savePreviewSettings')
+        ->assertHasNoErrors();
+
+    $settings = $this->application->fresh()->settings;
+    expect($settings->is_pr_deployments_public_approval_required)->toBeTrue()
+        ->and($settings->use_production_values_in_previews)->toBeFalse();
 });
 
 it('hides the fork approval setting when public PR deployments are off', function () {

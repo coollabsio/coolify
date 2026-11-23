@@ -105,7 +105,7 @@
             @if ($isPrDeploymentsPublicEnabled)
                 <div class="w-full">
                     <x-forms.listbox id="isPrDeploymentsPublicApprovalRequired"
-                        label="Require approval for fork pull requests" onChange="savePreviewSettings"
+                        label="Require approval for fork pull requests" onChange="saveForkApprovalSetting"
                         helper="When on, each new commit of a fork pull request waits until an admin approves it.<br><br><span class='font-bold'>Warning:</span> when off, Coolify deploys every fork commit automatically, and the code of a fork can take control of the server."
                         :options="[
                             ['value' => true, 'label' => 'Required for each commit'],
