@@ -98,6 +98,9 @@
             return color;
         };
         window.customThemeKeys = ['sidebar', 'selected', 'accent', 'background'];
+        // The default Custom theme of the instance (Settings > Advanced), normalized on the server. Users
+        // who never chose a theme (no "theme" key in localStorage) see it.
+        window.instanceCustomTheme = @js(rescue(fn () => \App\Rules\ValidCustomTheme::normalize(instanceSettings()->custom_theme), null, false));
         window.serializeCustomTheme = (theme) => window.customThemeKeys.map((key) => theme[key]).join(',');
         // A theme from a share code, or null when the text is not four hex colors.
         window.parseCustomTheme = (code) => {
@@ -170,17 +173,23 @@
             }
             document.querySelector('meta[name=theme-color]')?.setAttribute('content', theme.background);
         };
+        window.instanceTheme = () => window.parseCustomTheme(window.instanceCustomTheme);
+        window.usesInstanceTheme = () => !localStorage.getItem('theme') && window.instanceTheme() !== null;
+        // The theme in use: the user's own choice, else the instance theme as "custom", else "dark".
+        window.selectedTheme = () => {
+            if (localStorage.getItem('theme') === 'purple') localStorage.setItem('theme', 'custom');
+            return localStorage.getItem('theme') || (window.instanceTheme() ? 'custom' : 'dark');
+        };
         window.storedUiScale = () => ['80', '90', '100'].includes(localStorage.uiScale) ? localStorage.uiScale : '100';
         window.applyStoredTheme = () => {
             const root = document.documentElement;
-            const theme = localStorage.theme === 'purple' ? 'custom' : (localStorage.theme || 'dark');
+            const theme = window.selectedTheme();
             root.dataset.navStyle = localStorage.navStyle === 'floating' ? 'floating' : 'default';
             root.dataset.navItems = localStorage.navItems === 'flat' ? 'flat' : '3d';
             root.dataset.uiScale = window.storedUiScale();
-            localStorage.theme = theme;
             if (localStorage.themeColor) localStorage.themeColor = window.normalizeThemeColor(localStorage.themeColor);
             if (theme === 'custom') {
-                window.applyCustomTheme(window.storedCustomTheme());
+                window.applyCustomTheme(window.usesInstanceTheme() ? window.instanceTheme() : window.storedCustomTheme());
                 return;
             }
 
@@ -258,17 +267,11 @@
                 source.el.addEventListener('mouseleave', () => peers(source).forEach(hide));
             });
         };
-        // Alpine state for the theme controls on the Appearance page (x-data="themeControls()").
-        window.themeControls = () => ({
-            theme: localStorage.getItem('theme') === 'purple' ? 'custom' : (localStorage.getItem('theme') || 'dark'),
-            customTheme: window.storedCustomTheme(),
-            pageWidth: localStorage.getItem('pageWidth') || 'centered',
-            navStyle: localStorage.getItem('navStyle') === 'floating' ? 'floating' : 'default',
-            navItems: localStorage.getItem('navItems') === 'flat' ? 'flat' : '3d',
-            chartTimes: localStorage.getItem('chartTimes') === 'utc' ? 'utc' : 'local',
-            uiScale: window.storedUiScale(),
+        // Alpine state of the Custom theme dialog (components/theme-controls/custom-dialog.blade.php): presets, four
+        // colors, the share code, and the iTerm2 import. It edits a draft; a null draft is the built-in Dark theme.
+        // The page state adds saveCustomTheme(). Returned as property descriptors, so the draftColors getter survives.
+        window.customThemeEditor = (state) => Object.defineProperties(state, Object.getOwnPropertyDescriptors({
             presets: window.customThemePresets,
-            // The custom theme dialog edits a draft; Save applies it. A null draft is the built-in Dark theme.
             dialogOpen: false,
             draft: null,
             get draftColors() {
@@ -277,13 +280,8 @@
             shareCode: '',
             shareCodeInvalid: false,
             shareCodeCopied: false,
-            setTheme(type) {
-                this.theme = type;
-                localStorage.setItem('theme', type);
-                window.applyStoredTheme();
-            },
-            openCustomDialog() {
-                this.setDraft(this.theme === 'custom' ? { ...this.customTheme } : null);
+            openDialogWith(theme) {
+                this.setDraft(theme && { ...theme });
                 this.dialogOpen = true;
             },
             setDraft(theme) {
@@ -336,6 +334,35 @@
             accentTextOn(color) {
                 return window.themeAccentForeground(color);
             },
+        }));
+        // Alpine state for the theme controls on the Appearance page (x-data="themeControls()").
+        window.themeControls = () => window.customThemeEditor({
+            theme: window.selectedTheme(),
+            customTheme: window.usesInstanceTheme() ? window.instanceTheme() : window.storedCustomTheme(),
+            instanceTheme: window.instanceTheme(),
+            usesInstanceTheme: window.usesInstanceTheme(),
+            pageWidth: localStorage.getItem('pageWidth') || 'centered',
+            navStyle: localStorage.getItem('navStyle') === 'floating' ? 'floating' : 'default',
+            navItems: localStorage.getItem('navItems') === 'flat' ? 'flat' : '3d',
+            chartTimes: localStorage.getItem('chartTimes') === 'utc' ? 'utc' : 'local',
+            uiScale: window.storedUiScale(),
+            setTheme(type) {
+                this.theme = type;
+                this.usesInstanceTheme = false;
+                localStorage.setItem('theme', type);
+                window.applyStoredTheme();
+            },
+            // Forgets the user's own theme choice, so the instance theme applies again.
+            useInstanceTheme() {
+                localStorage.removeItem('theme');
+                this.theme = 'custom';
+                this.customTheme = window.instanceTheme();
+                this.usesInstanceTheme = true;
+                window.applyStoredTheme();
+            },
+            openCustomDialog() {
+                this.openDialogWith(this.theme === 'custom' ? this.customTheme : null);
+            },
             saveCustomTheme() {
                 this.dialogOpen = false;
                 if (this.draft === null) {
@@ -371,6 +398,23 @@
             setChartTimes(value) {
                 this.chartTimes = value;
                 localStorage.setItem('chartTimes', value);
+            },
+        });
+        // Alpine state of the instance theme on Settings > Advanced (livewire/settings/custom-theme.blade.php).
+        // Save stores the draft on the server; the "Coolify" preset removes the instance theme.
+        window.instanceThemeControls = (wire) => window.customThemeEditor({
+            customTheme: window.instanceTheme(),
+            openCustomDialog() {
+                this.openDialogWith(this.customTheme);
+            },
+            async saveCustomTheme() {
+                const code = this.draft && window.serializeCustomTheme(this.draft);
+                const saved = await wire.saveCustomTheme(code);
+                if (saved === undefined || saved !== code) return;
+                this.dialogOpen = false;
+                window.instanceCustomTheme = saved;
+                this.customTheme = window.instanceTheme();
+                window.applyStoredTheme();
             },
         });
 
@@ -524,12 +568,7 @@
             return DOMPurify.sanitize(html, config);
         };
 
-        // Initialize theme if not set
-        if (!('theme' in localStorage)) {
-            localStorage.theme = 'dark';
-        }
-
-        let theme = localStorage.theme
+        let theme = window.selectedTheme()
         let cpuColor = '#1e90ff'
         let ramColor = '#00ced1'
         // Chart text follows the CSS text color, so it stays readable after a theme change without a re-render
@@ -539,7 +578,7 @@
         let editorTheme = 'blackboard'
 
         function checkTheme() {
-            theme = localStorage.theme
+            theme = window.selectedTheme()
             if (theme == 'system') {
                 theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
             }
