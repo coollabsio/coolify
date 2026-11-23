@@ -873,7 +873,8 @@ class Server extends BaseModel
 }";
             }
             $respond = fn (int $status) => $usesErrorPage
-                ? 'reverse_proxy '.self::PROXY_ERROR_PAGE_CONTAINER.":80 {\n            rewrite /cgi-bin/$status\n        }"
+                // busybox httpd answers 400 to PUT, DELETE, PATCH, and OPTIONS, so every request goes as GET.
+                ? 'reverse_proxy '.self::PROXY_ERROR_PAGE_CONTAINER.":80 {\n            method GET\n            rewrite /cgi-bin/$status\n        }"
                 : "respond $status";
             $resources = $hosts->isEmpty() ? '' : '    @resources host '.$hosts->implode(' ')."\n    handle @resources {\n        {$respond(503)}\n    }\n";
 
@@ -914,8 +915,20 @@ class Server extends BaseModel
                     : "HostRegexp(`$pattern`)";
                 $catchAlls['catchall-resources'] = [$rule, -999, 503, []];
             }
+            // busybox httpd answers 400 to PUT, DELETE, PATCH, and OPTIONS, so older Traefik versions
+            // answer them with 400 instead of 404.
+            $rewritesErrorStatus = version_compare(ltrim((string) $this->detected_traefik_version, 'v'), '3.4', '>=');
             foreach ($catchAlls as $name => [$rule, $priority, $status, $tls]) {
-                if ($usesErrorPage) {
+                if ($usesErrorPage && ($status === 503 || $rewritesErrorStatus)) {
+                    // The noop service answers 503 to every method; the errors middleware replaces the body
+                    // and, for 404, the status (statusRewrites needs Traefik 3.4).
+                    $routers[$name] = $router($rule, 'noop', $tls, $priority, ["error-page-$status"]);
+                    $middlewares["error-page-$status"] = ['errors' => ['status' => ['503'], 'service' => 'error-pages', 'query' => "/$status.html"]
+                        // A range key: YAML would write the key 503 as a number, and Traefik reads only string keys.
+                        + ($status === 503 ? [] : ['statusRewrites' => ['500-599' => $status]])];
+                    $services['noop'] = ['loadBalancer' => ['servers' => []]];
+                    $services['error-pages'] = ['loadBalancer' => ['servers' => [['url' => 'http://'.self::PROXY_ERROR_PAGE_CONTAINER.':80']]]];
+                } elseif ($usesErrorPage) {
                     $routers[$name] = $router($rule, 'error-pages', $tls, $priority, ["error-page-$status"]);
                     $middlewares["error-page-$status"] = ['replacePath' => ['path' => "/cgi-bin/$status"]];
                     $services['error-pages'] = ['loadBalancer' => ['servers' => [['url' => 'http://'.self::PROXY_ERROR_PAGE_CONTAINER.':80']]]];
@@ -1008,7 +1021,7 @@ class Server extends BaseModel
         $mount = devHostDockerPath($this, $path);
         $restart = RESTART_MODE;
 
-        instant_remote_process(["mkdir -p $path/cgi-bin"], $this);
+        instant_remote_process(["mkdir -p $path", "mkdir -p $path/cgi-bin"], $this);
         // busybox httpd answers 200 for a file (501 for POST), so a CGI script sends each page with its status.
         foreach (self::PROXY_ERROR_PAGE_STATUSES as $status => $reason) {
             $this->uploadProxyFile("$path/$status.html", $this->proxyErrorPageHtml($status));
