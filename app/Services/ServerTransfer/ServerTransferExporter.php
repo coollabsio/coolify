@@ -165,6 +165,9 @@ class ServerTransferExporter
         if (ImageScanIgnore::query()->where('team_id', $server->team_id)->whereNull('resource_type')->exists()) {
             $warnings[] = 'Team-wide vulnerability ignores stay on this instance.';
         }
+        if ($server->proxyConfigurationVersions()->exists()) {
+            $warnings[] = 'The proxy configuration history stays on this instance. The current proxy configuration is transferred.';
+        }
         if ($leftOutLinks > 0) {
             $warnings[] = $leftOutLinks.' '.Str::plural('link', $leftOutLinks).' between resources on the environment canvas '
                 .($leftOutLinks === 1 ? 'is' : 'are').' not transferred, because one of the linked resources stays on this instance.';
