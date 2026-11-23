@@ -187,6 +187,7 @@ class NotificationsController extends Controller
                 'rules' => [
                     'webhook_enabled' => 'sometimes|boolean',
                     'webhook_url' => ['sometimes', 'nullable', 'string', new SafeWebhookUrl],
+                    'webhook_authorization_header' => ['sometimes', 'nullable', 'string', 'max:4096', 'not_regex:/[\r\n]/'],
                     'deployment_success_webhook_notifications' => 'sometimes|boolean',
                     'deployment_failure_webhook_notifications' => 'sometimes|boolean',
                     'status_change_webhook_notifications' => 'sometimes|boolean',

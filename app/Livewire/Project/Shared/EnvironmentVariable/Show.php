@@ -29,6 +29,8 @@ class Show extends Component
 {
     public bool $showEnvironmentType = true;
 
+    public bool $selectable = false;
+
     /** @var array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
     public ?array $composeInfo = null;
 

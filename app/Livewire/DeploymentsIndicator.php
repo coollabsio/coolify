@@ -28,7 +28,7 @@ class DeploymentsIndicator extends Component
     #[Computed]
     public function deployments()
     {
-        return ApplicationDeploymentQueue::with(['application.environment.project'])
+        return ApplicationDeploymentQueue::with('application')
             ->ownedByTeam(currentTeam()->id)
             ->whereIn('status', ['in_progress', 'queued'])
             ->visibleToCurrentActor()

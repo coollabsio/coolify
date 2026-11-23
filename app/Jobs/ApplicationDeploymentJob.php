@@ -5211,10 +5211,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $name = addPreviewDeploymentSuffix($name, $this->pull_request_id);
             }
 
-            $local_persistent_volumes_names[$name] = [
-                'name' => $name,
-                'external' => false,
-            ];
+            $local_persistent_volumes_names[$name] = $persistentStorage->dockerComposeVolumeDefinition($name);
         }
 
         return $local_persistent_volumes_names;
