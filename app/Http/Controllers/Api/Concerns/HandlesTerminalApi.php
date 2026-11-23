@@ -13,7 +13,7 @@ use Symfony\Component\Process\Process as SymfonyProcess;
 
 trait HandlesTerminalApi
 {
-    private const TERMINAL_SERVER_RATE_LIMIT = 20;
+    private const TERMINAL_SERVER_RATE_LIMIT = 60;
 
     private const TERMINAL_SERVER_CONCURRENCY_LIMIT = 3;
 
@@ -23,11 +23,20 @@ trait HandlesTerminalApi
 
     private const TERMINAL_COMMAND_OUTPUT_LIMIT = 65536;
 
+    /**
+     * The web terminal uses the same checks (Project\Shared\Terminal::sendTerminalCommand).
+     */
+    private function isTerminalDisabledOn(Server $server): bool
+    {
+        return ! $server->isTerminalEnabled() || $server->isForceDisabled() || $server->isTransferredAway();
+    }
+
     private function enforceTerminalServerRateLimit(Server $server, int $teamId): ?JsonResponse
     {
         $key = "terminal-api-exec:server:{$teamId}:{$server->uuid}";
 
-        if (RateLimiter::tooManyAttempts($key, self::TERMINAL_SERVER_RATE_LIMIT)) {
+        // Count first: hit() increments atomically, so parallel requests cannot all pass the check.
+        if (RateLimiter::hit($key, 60) > self::TERMINAL_SERVER_RATE_LIMIT) {
             $retryAfter = RateLimiter::availableIn($key);
 
             return response()->json([
@@ -36,9 +45,20 @@ trait HandlesTerminalApi
             ], 429, ['Retry-After' => $retryAfter]);
         }
 
-        RateLimiter::hit($key, 60);
-
         return null;
+    }
+
+    /**
+     * The command can contain secrets, so the audit log keeps only its hash.
+     *
+     * @return array{command_sha256: string, command_length: int}
+     */
+    private function terminalCommandAuditContext(string $command): array
+    {
+        return [
+            'command_sha256' => hash('sha256', $command),
+            'command_length' => strlen($command),
+        ];
     }
 
     private function terminalProcessTimeout(int $commandTimeout): int

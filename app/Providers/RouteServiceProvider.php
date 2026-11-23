@@ -57,7 +57,7 @@ class RouteServiceProvider extends ServiceProvider
             $teamId = data_get($token, 'team_id', 'unknown');
             $tokenId = $token?->getKey() ?: $request->user()?->id ?: $request->ip();
 
-            return Limit::perMinute(10)
+            return Limit::perMinute(30)
                 ->by("terminal-api-exec:team:{$teamId}:token:{$tokenId}")
                 ->response(fn (Request $request, array $headers) => response()->json([
                     'message' => 'Too many terminal command requests. Please retry in '.($headers['Retry-After'] ?? 60).' seconds.',

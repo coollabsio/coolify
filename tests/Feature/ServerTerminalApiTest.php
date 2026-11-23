@@ -258,10 +258,10 @@ describe('POST /api/v1/servers/{uuid}/exec', function () {
             '*' => Process::result(output: 'ok', exitCode: 0),
         ]);
 
-        $tokens = collect(range(1, 21))
+        $tokens = collect(range(1, 61))
             ->map(fn () => createServerTerminalApiToken($this->user, $this->team, ['terminal']));
 
-        foreach ($tokens->take(20) as $token) {
+        foreach ($tokens->take(60) as $token) {
             $this->withHeaders(serverTerminalAuthHeaders($token))
                 ->postJson("/api/v1/servers/{$this->server->uuid}/exec", [
                     'command' => 'whoami',
@@ -284,31 +284,16 @@ describe('POST /api/v1/servers/{uuid}/exec', function () {
             '*' => Process::result(output: 'ok', exitCode: 0),
         ]);
 
-        $servers = collect([$this->server]);
-        for ($i = 0; $i < 10; $i++) {
-            $server = Server::factory()->create([
-                'team_id' => $this->team->id,
-                'private_key_id' => $this->privateKey->id,
-                'ip' => "coolify-testing-host-{$i}",
-                'user' => 'root',
-            ]);
-            $server->settings()->update([
-                'is_terminal_enabled' => true,
-                'force_disabled' => false,
-            ]);
-            $servers->push($server);
-        }
-
-        foreach ($servers->take(10) as $server) {
+        foreach (range(1, 30) as $attempt) {
             $this->withHeaders(serverTerminalAuthHeaders($this->bearerToken))
-                ->postJson("/api/v1/servers/{$server->uuid}/exec", [
+                ->postJson("/api/v1/servers/{$this->server->uuid}/exec", [
                     'command' => 'whoami',
                 ])
                 ->assertOk();
         }
 
         $this->withHeaders(serverTerminalAuthHeaders($this->bearerToken))
-            ->postJson("/api/v1/servers/{$servers->last()->uuid}/exec", [
+            ->postJson("/api/v1/servers/{$this->server->uuid}/exec", [
                 'command' => 'whoami',
             ])
             ->assertStatus(429)
