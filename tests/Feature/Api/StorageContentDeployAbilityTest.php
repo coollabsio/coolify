@@ -108,8 +108,15 @@ test('write and deploy token creates a file storage with content', function (str
         ->postJson($url, [...$payload, 'type' => 'file', 'mount_path' => '/etc/app.conf', 'content' => 'listen 8080;'])
         ->assertCreated();
 
-    expect($resource->fileStorages()->where('mount_path', '/etc/app.conf')->value('content'))->toBe('listen 8080;');
-    Queue::assertPushed(ServerStorageSaveJob::class);
+    $storage = $resource->fileStorages()->where('mount_path', '/etc/app.conf')->firstOrFail();
+    expect($storage->content)->toBe('listen 8080;');
+    if ($type === 'services') {
+        // A Compose storage is written before the next start of the service.
+        expect($storage->pending_initialization)->toBeTrue();
+        Queue::assertNotPushed(ServerStorageSaveJob::class);
+    } else {
+        Queue::assertPushed(ServerStorageSaveJob::class);
+    }
 })->with(['applications', 'services', 'databases']);
 
 function createSavedFileStorage(mixed $resource): LocalFileVolume

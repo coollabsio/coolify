@@ -69,9 +69,20 @@ class ComposeBindPathResolver
             .($projectName === null ? '' : ' --project-name '.escapeshellarg($projectName))
             .' -f '.escapeshellarg($composeFile)
             .' --env-file '.escapeshellarg($envFile)
-            .' config --format json'
-            .($projectDirectory === $workdir ? '' : ' --no-env-resolution');
-        $output = instant_remote_process([$command], $server);
+            .' config --format json';
+        if ($projectDirectory === $workdir) {
+            $output = instant_remote_process([$command], $server);
+        } else {
+            try {
+                $output = instant_remote_process([$command.' --no-env-resolution'], $server);
+            } catch (RuntimeException $e) {
+                /** Docker Compose before v2.35.0 does not know the flag. */
+                if (! str_contains($e->getMessage(), 'unknown flag')) {
+                    throw $e;
+                }
+                $output = instant_remote_process([$command], $server);
+            }
+        }
         $config = json_decode((string) $output, true);
         if (! is_array($config)) {
             $config = Yaml::parse((string) $output);

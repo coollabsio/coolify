@@ -97,10 +97,10 @@ function fakeContentFilesServer(array $states): void
     ContentFilesUpRecorder::$commands = [];
 
     Process::fake(function ($process) use ($states) {
-        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
+        $command = remoteProcessScript($process);
         ContentFilesUpRecorder::$commands[] = ['ssh', $command];
 
-        if (str_contains($process->command, 'config --format json')) {
+        if (str_contains(remoteProcessScript($process), 'config --format json')) {
             $services = [];
             foreach (LocalFileVolume::query()->get() as $volume) {
                 $owner = $volume->resource;
@@ -356,6 +356,50 @@ test('a pull request deployment writes the preview content file path', function 
         ->and($volume->fresh()->fs_path)->toBe($this->application->workdir().'/config/app.conf');
 });
 
+test('a pull request deployment keeps a preview file that is on the server', function () {
+    $volume = contentFilesVolume($this->application, 'config/app.conf');
+    $previewPath = $volume->fs_path.'-pr-7';
+    fakeContentFilesServer([$volume->fs_path => 'file', $previewPath => 'file']);
+
+    runComposeStart($this, [
+        'pull_request_id' => 7,
+        'generated_docker_compose' => "services:\n  app:\n    image: nginx:alpine\n",
+    ]);
+
+    expect(ContentFilesUpRecorder::indexOf('ssh', 'tee '.escapeshellarg($previewPath)))->toBeNull();
+});
+
+test('a preserve-repository deployment writes file storages again after the repository copy', function () {
+    $this->application->settings()->update(['is_preserve_repository_enabled' => true]);
+    $volume = contentFilesVolume($this->application, 'config/app.conf');
+    fakeContentFilesServer([$volume->fs_path => 'file']);
+    $job = new ContentFilesUpDeploymentJob;
+    $queue = Mockery::mock(ApplicationDeploymentQueue::class)->makePartial();
+    $queue->shouldReceive('addLogEntry');
+    foreach ([
+        'application' => $this->application->fresh(),
+        'application_deployment_queue' => $queue,
+        'server' => $this->server->fresh(),
+        'mainServer' => $this->server->fresh(),
+        'deployment_uuid' => 'deployment-uuid',
+        'workdir' => '/artifacts/deployment-uuid',
+        'configuration_dir' => $this->application->workdir(),
+        'pull_request_id' => 0,
+        'preserveRepository' => true,
+        'use_build_server' => false,
+    ] as $property => $value) {
+        (new ReflectionProperty(ApplicationDeploymentJob::class, $property))->setValue($job, $value);
+    }
+
+    (new ReflectionMethod(ApplicationDeploymentJob::class, 'write_deployment_configurations'))->invoke($job);
+
+    $copy = ContentFilesUpRecorder::indexOf('deployment', 'docker cp');
+    $write = ContentFilesUpRecorder::indexOf('ssh', 'tee '.escapeshellarg($volume->fs_path));
+    expect($copy)->not->toBeNull()
+        ->and($write)->not->toBeNull()
+        ->and($write)->toBeGreaterThan($copy);
+});
+
 test('a pull request deployment of the legacy compose parser writes the content file path of the application', function () {
     $this->application->update(['compose_parsing_version' => '2']);
     $volume = contentFilesVolume($this->application, 'config/app.conf');
@@ -461,7 +505,6 @@ test('the content file check and write are safe for non-root servers', function 
 
     runComposeStart($this, ['server' => $this->server->fresh(), 'mainServer' => $this->server->fresh()]);
 
-    fwrite(STDERR, implode("\n", ContentFilesUpRecorder::ssh())."\n".json_encode($this->logEntries)."\n");
     $escapedPath = escapeshellarg($volume->fs_path);
     expect(contentFilesStateChecks())->not->toBeEmpty()
         ->and(contentFilesStateChecks()[0])->toContain("sudo bash -c 'sh -c ");
@@ -580,7 +623,6 @@ test('the storage save job replaces an empty directory with the content file', f
 
     (new ServerStorageSaveJob($volume))->handle();
 
-    fwrite(STDERR, implode("\n", ContentFilesUpRecorder::ssh())."\n".json_encode($this->logEntries)."\n");
     $escapedPath = escapeshellarg($volume->fs_path);
     Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "rmdir {$escapedPath}")
         && str_contains(remoteProcessScript($process), base64_encode(CONTENT_FILES_UP_CONTENT))
@@ -633,7 +675,9 @@ test('the server file sync checks all file storages with one server command', fu
 
     getFilesystemVolumesFromServer($this->application->fresh());
 
-    expect(ContentFilesUpRecorder::ssh())->toHaveCount(1)
+    $serverCommands = collect(ContentFilesUpRecorder::ssh())
+        ->reject(fn (string $command) => str_contains($command, 'StrictHostKeyChecking=accept-new'));
+    expect($serverCommands)->toHaveCount(1)
         ->and(contentFilesStateChecks())->toHaveCount(1)
         ->and($directory->fresh()->is_directory)->toBeTruthy()
         ->and($first->fresh()->is_directory)->toBeFalsy();
@@ -678,7 +722,6 @@ test('a preserve-repository deployment keeps a Git file that a new storage mount
         'saved_outputs' => collect(['file_stat_'.$volume->id => 'regular file']),
     ]);
 
-    fwrite(STDERR, implode("\n", ContentFilesUpRecorder::ssh())."\n".json_encode($this->logEntries)."\n");
     $escapedPath = escapeshellarg($volume->fs_path);
     $changesGitFile = fn (string $command) => str_contains($command, "rm -rf {$escapedPath}")
         || str_contains($command, "touch {$escapedPath}")

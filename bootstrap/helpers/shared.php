@@ -3386,7 +3386,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         } elseif (is_array($volume)) {
                             $type = data_get_str($volume, 'type');
                             $source = data_get_str($volume, 'source');
-                            validateComposeBindSource($source->value());
+                            if ($source->isNotEmpty()) {
+                                validateComposeBindSource($source->value());
+                            }
                             $target = data_get_str($volume, 'target');
                             validateShellSafePath($target->value(), 'volume target');
                             $content = data_get($volume, 'content');

@@ -878,15 +878,17 @@ function validateComposeBindSource(string $source): void
     if (str_contains($source, '$(')) {
         throw new Exception('Invalid Docker volume definition: volume source contains command substitution.');
     }
-    if ($source === '' || preg_match('/[\x00-\x1F\x7F]|[\x60;|&<>]/', $source)) {
-        throw new Exception('Invalid Docker volume definition: volume source contains a forbidden character.');
+    if ($source === '') {
+        throw new Exception('Invalid Docker volume definition: volume source is empty.');
+    }
+    if (preg_match('/[\x00-\x1F\x7F]|[\x60;|&<>]/', $source, $matches)) {
+        $character = ctype_print($matches[0]) ? "'{$matches[0]}'" : sprintf('0x%02X', ord($matches[0]));
+        throw new Exception("Invalid Docker volume definition: volume source contains the forbidden character {$character}.");
     }
 
     $length = strlen($source);
     for ($i = 0; $i < $length; $i++) {
-        if ($source[$i] === '}' || ($source[$i] === '{' && ($i === 0 || $source[$i - 1] !== '$'))) {
-            throw new Exception('Invalid Docker volume source: malformed interpolation.');
-        }
+        /** Docker Compose keeps `{` and `}` outside of `${...}` as literal path characters. */
         if ($source[$i] !== '$') {
             continue;
         }
@@ -942,228 +944,42 @@ function validateComposeBindSource(string $source): void
 function parseDockerVolumeString(string $volumeString): array
 {
     $volumeString = trim($volumeString);
-    $source = null;
-    $target = null;
-    $mode = null;
+    $parts = [];
+    $start = 0;
+    $depth = 0;
+    $length = strlen($volumeString);
+    for ($i = 0; $i < $length; $i++) {
+        if ($volumeString[$i] === '$' && ($volumeString[$i + 1] ?? '') === '{') {
+            $depth++;
+            $i++;
 
-    // First, check if the source contains an environment variable with default value
-    // This needs to be done before counting colons because ${VAR:-value} contains a colon
-    $envVarPattern = '/^\$\{[^}]+:-[^}]*\}/';
-    $hasEnvVarWithDefault = false;
-    $envVarEndPos = 0;
-
-    if (preg_match($envVarPattern, $volumeString, $matches)) {
-        $hasEnvVarWithDefault = true;
-        $envVarEndPos = strlen($matches[0]);
-    }
-
-    // Count colons, but exclude those inside environment variables
-    $effectiveVolumeString = $volumeString;
-    if ($hasEnvVarWithDefault) {
-        // Temporarily replace the env var to count colons correctly
-        $effectiveVolumeString = substr($volumeString, $envVarEndPos);
-        $colonCount = substr_count($effectiveVolumeString, ':');
-    } else {
-        $colonCount = substr_count($volumeString, ':');
-    }
-
-    if ($colonCount === 0) {
-        // Named volume without target (unusual but valid)
-        // Example: "myvolume"
-        $source = $volumeString;
-        $target = $volumeString;
-    } elseif ($colonCount === 1) {
-        // Simple volume mapping
-        // Examples: "gitea:/data" or "./data:/app/data" or "${VAR:-default}:/data"
-        if ($hasEnvVarWithDefault) {
-            $source = substr($volumeString, 0, $envVarEndPos);
-            $remaining = substr($volumeString, $envVarEndPos);
-            if (strlen($remaining) > 0 && $remaining[0] === ':') {
-                $target = substr($remaining, 1);
-            } else {
-                $target = $remaining;
-            }
-        } else {
-            $parts = explode(':', $volumeString);
-            $source = $parts[0];
-            $target = $parts[1];
+            continue;
         }
-    } elseif ($colonCount === 2) {
-        // Volume with mode OR Windows path OR env var with mode
-        // Handle env var with mode first
-        if ($hasEnvVarWithDefault) {
-            // ${VAR:-default}:/path:mode
-            $source = substr($volumeString, 0, $envVarEndPos);
-            $remaining = substr($volumeString, $envVarEndPos);
+        if ($volumeString[$i] === '}' && $depth > 0) {
+            $depth--;
 
-            if (strlen($remaining) > 0 && $remaining[0] === ':') {
-                $remaining = substr($remaining, 1);
-                $lastColon = strrpos($remaining, ':');
-
-                if ($lastColon !== false) {
-                    $possibleMode = substr($remaining, $lastColon + 1);
-                    $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
-
-                    if (in_array($possibleMode, $validModes)) {
-                        $mode = $possibleMode;
-                        $target = substr($remaining, 0, $lastColon);
-                    } else {
-                        $target = $remaining;
-                    }
-                } else {
-                    $target = $remaining;
-                }
-            }
-        } elseif (preg_match('/^[A-Za-z]:/', $volumeString)) {
-            // Windows path as source (C:/, D:/, etc.)
-            // Find the second colon which is the real separator
-            $secondColon = strpos($volumeString, ':', 2);
-            if ($secondColon !== false) {
-                $source = substr($volumeString, 0, $secondColon);
-                $target = substr($volumeString, $secondColon + 1);
-            } else {
-                // Malformed, treat as is
-                $source = $volumeString;
-                $target = $volumeString;
-            }
-        } else {
-            // Not a Windows path, check for mode
-            $lastColon = strrpos($volumeString, ':');
-            $possibleMode = substr($volumeString, $lastColon + 1);
-
-            // Check if the last part is a valid Docker volume mode
-            $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
-
-            if (in_array($possibleMode, $validModes)) {
-                // It's a mode
-                // Examples: "gitea:/data:ro" or "./data:/app/data:rw"
-                $mode = $possibleMode;
-                $volumeWithoutMode = substr($volumeString, 0, $lastColon);
-                $colonPos = strpos($volumeWithoutMode, ':');
-
-                if ($colonPos !== false) {
-                    $source = substr($volumeWithoutMode, 0, $colonPos);
-                    $target = substr($volumeWithoutMode, $colonPos + 1);
-                } else {
-                    // Shouldn't happen for valid volume strings
-                    $source = $volumeWithoutMode;
-                    $target = $volumeWithoutMode;
-                }
-            } else {
-                // The last colon is part of the path
-                // For now, treat the first occurrence of : as the separator
-                $firstColon = strpos($volumeString, ':');
-                $source = substr($volumeString, 0, $firstColon);
-                $target = substr($volumeString, $firstColon + 1);
-            }
+            continue;
         }
-    } else {
-        // More than 2 colons - likely Windows paths or complex cases
-        // Use a heuristic: find the most likely separator colon
-        // Look for patterns like "C:" at the beginning (Windows drive)
-        if (preg_match('/^[A-Za-z]:/', $volumeString)) {
-            // Windows path as source
-            // Find the next colon after the drive letter
-            $secondColon = strpos($volumeString, ':', 2);
-            if ($secondColon !== false) {
-                $source = substr($volumeString, 0, $secondColon);
-                $remaining = substr($volumeString, $secondColon + 1);
-
-                // Check if there's a mode at the end
-                $lastColon = strrpos($remaining, ':');
-                if ($lastColon !== false) {
-                    $possibleMode = substr($remaining, $lastColon + 1);
-                    $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
-
-                    if (in_array($possibleMode, $validModes)) {
-                        $mode = $possibleMode;
-                        $target = substr($remaining, 0, $lastColon);
-                    } else {
-                        $target = $remaining;
-                    }
-                } else {
-                    $target = $remaining;
-                }
-            } else {
-                // Malformed, treat as is
-                $source = $volumeString;
-                $target = $volumeString;
-            }
-        } else {
-            // Try to parse normally, treating first : as separator
-            $firstColon = strpos($volumeString, ':');
-            $source = substr($volumeString, 0, $firstColon);
-            $remaining = substr($volumeString, $firstColon + 1);
-
-            // Check for mode at the end
-            $lastColon = strrpos($remaining, ':');
-            if ($lastColon !== false) {
-                $possibleMode = substr($remaining, $lastColon + 1);
-                $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
-
-                if (in_array($possibleMode, $validModes)) {
-                    $mode = $possibleMode;
-                    $target = substr($remaining, 0, $lastColon);
-                } else {
-                    $target = $remaining;
-                }
-            } else {
-                $target = $remaining;
-            }
+        if ($volumeString[$i] === ':' && $depth === 0 && ! ($i === 1 && preg_match('/^[A-Za-z]:/', $volumeString))) {
+            $parts[] = substr($volumeString, $start, $i - $start);
+            $start = $i + 1;
         }
     }
-
-    if ($source) {
-        $source = resolveComposeVolumeSourceDefault((string) $source);
+    $parts[] = substr($volumeString, $start);
+    if (count($parts) > 3 || in_array('', $parts, true)) {
+        throw new Exception('Invalid Docker volume definition.');
+    }
+    $source = $parts[0];
+    $target = $parts[1] ?? $source;
+    $mode = $parts[2] ?? null;
+    validateComposeBindSource($source);
+    validateShellSafePath($target, 'volume target');
+    /** Compose accepts options such as `ro`, `z`, and `nocopy`, and ignores unknown ones. */
+    if ($mode !== null && preg_match('/^[A-Za-z]+(?:,[A-Za-z]+)*$/', $mode) !== 1) {
+        throw new Exception('Invalid Docker volume mode.');
     }
 
-    // Validate source path for command injection attempts
-    // We validate the final source value after environment variable processing
-    if ($source !== null) {
-        // Allow environment variables like ${VAR_NAME} or ${VAR}
-        // Also allow env vars followed by safe path concatenation (e.g., ${VAR}/path)
-        $sourceStr = is_string($source) ? $source : $source;
-
-        // Skip validation for simple environment variable references
-        // Pattern 1: ${WORD_CHARS} with no special characters inside
-        // Pattern 2: ${WORD_CHARS}/path/to/file (env var with path concatenation)
-        $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $sourceStr);
-        $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}[\/\w\.\-]*$/', $sourceStr);
-
-        if (! $isSimpleEnvVar && ! $isEnvVarWithPath) {
-            try {
-                validateShellSafePath($sourceStr, 'volume source');
-            } catch (Exception $e) {
-                // Re-throw with more context about the volume string
-                throw new Exception(
-                    'Invalid Docker volume definition: '.$e->getMessage().
-                    ' Please use safe path names without shell metacharacters.'
-                );
-            }
-        }
-    }
-
-    // Also validate target path
-    if ($target !== null) {
-        $targetStr = is_string($target) ? $target : $target;
-        // Target paths in containers are typically absolute paths, so we validate them too
-        // but they're less likely to be dangerous since they're not used in host commands
-        // Still, defense in depth is important
-        try {
-            validateShellSafePath($targetStr, 'volume target');
-        } catch (Exception $e) {
-            throw new Exception(
-                'Invalid Docker volume definition: '.$e->getMessage().
-                ' Please use safe path names without shell metacharacters.'
-            );
-        }
-    }
-
-    return [
-        'source' => $source !== null ? str($source) : null,
-        'target' => $target !== null ? str($target) : null,
-        'mode' => $mode !== null ? str($mode) : null,
-    ];
+    return ['source' => str($source), 'target' => str($target), 'mode' => $mode === null ? null : str($mode)];
 }
 
 function addTraefikDockerNetworkLabel(Collection $labels, string $network): Collection

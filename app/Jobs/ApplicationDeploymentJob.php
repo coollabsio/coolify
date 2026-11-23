@@ -1684,6 +1684,19 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     ],
                 );
             }
+            /** The copy can replace file storages with repository files. Before `up`, the storage initialization below writes them. */
+            if (! $initializeStorage) {
+                foreach ($this->application->fileStorages as $fileStorage) {
+                    if ($fileStorage->is_host_file || $fileStorage->is_based_on_git || $fileStorage->is_directory) {
+                        continue;
+                    }
+                    try {
+                        $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->saveStorageOnServer($this->mainServer);
+                    } catch (Throwable $e) {
+                        $this->logStorageWarning($fileStorage, $e->getMessage());
+                    }
+                }
+            }
             if ($this->use_build_server) {
                 $this->server = $this->build_server;
             }
@@ -1732,7 +1745,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     if ($fileStorage->is_host_file || (! $fileStorage->pending_initialization && $this->pull_request_id === 0 && (! $this->preserveRepository || $fileStorage->is_based_on_git || $fileStorage->is_directory))) {
                         continue;
                     }
-                    $error = $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->initializeOnServer($composeFileName, $projectDirectory, $envFile, $this->mainServer);
+                    $error = $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->initializeOnServer(
+                        $composeFileName,
+                        $projectDirectory,
+                        $envFile,
+                        $this->mainServer,
+                        onlyWhenMissing: $this->pull_request_id !== 0 && ! $this->preserveRepository,
+                    );
                     if ($error !== null) {
                         $this->logStorageWarning($fileStorage, $error);
                     }

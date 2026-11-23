@@ -4,6 +4,7 @@ use App\Actions\Shared\MigrateResourceToDestination;
 use App\Jobs\ServerFilesFromServerJob;
 use App\Jobs\ServerStorageSaveJob;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
@@ -17,6 +18,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Services\ComposeBindPathResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
@@ -63,12 +65,17 @@ function regressionComposeService(string $compose): array
 function fakeComposeConfig(array $volumes): void
 {
     Process::fake(function ($process) use ($volumes) {
-        if (str_contains($process->command, 'config --format json')) {
+        if (str_contains(remoteProcessScript($process), 'config --format json')) {
             return Process::result(output: json_encode(['services' => $volumes]));
         }
 
-        return Process::result(output: 'NOK');
+        return Process::result(output: isRemoteFileStateCheck($process) ? remoteFileStatesOutput('missing') : 'NOK');
     });
+}
+
+function isRemoteFileStateCheck(PendingProcess $process): bool
+{
+    return str_contains(remoteProcessScript($process), 'state=missing');
 }
 
 test('Compose expression sources are host paths only when they contain a slash', function (string $source, bool $isLocal) {
@@ -170,7 +177,7 @@ YAML);
         ->and($application->fileStorages()->count())->toBe(0);
 });
 
-test('the parser queues one filesystem sync per resource', function () {
+test('the parser does not queue a filesystem sync', function () {
     $application = regressionComposeApplication(<<<'YAML'
 services:
   app:
@@ -183,7 +190,7 @@ YAML);
 
     applicationParser($application);
 
-    Bus::assertDispatchedTimes(ServerFilesFromServerJob::class, 1);
+    Bus::assertNotDispatched(ServerFilesFromServerJob::class);
 });
 
 test('one bind source mounted by several services resolves once', function () {
@@ -213,7 +220,7 @@ test('the resolver supports custom start commands and applications without a fin
 
     expect(ComposeBindPathResolver::resolve($volume))->toBe('/srv/data');
     $workdir = escapeshellarg($application->workdir());
-    Process::assertRan(fn ($process) => str_contains($process->command, "--project-directory {$workdir}") && ! str_contains($process->command, '--no-env-resolution'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "--project-directory {$workdir}") && ! str_contains(remoteProcessScript($process), '--no-env-resolution'));
 });
 
 test('a storage without a variable source keeps its stored host path without docker compose config', function () {
@@ -225,12 +232,12 @@ test('a storage without a variable source keeps its stored host path without doc
         'resource_id' => $application->id,
         'resource_type' => $application->getMorphClass(),
     ]);
-    Process::fake(fn () => Process::result(output: 'NOK'));
+    Process::fake(fn ($process) => Process::result(output: isRemoteFileStateCheck($process) ? remoteFileStatesOutput('missing') : 'NOK'));
 
     expect($volume->fresh()->initializeOnServer())->toBeNull();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'mkdir -p '.escapeshellarg($application->workdir().'/data')));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'config --format json'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'mkdir -p '.escapeshellarg($application->workdir().'/data')));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'config --format json'));
 });
 
 test('failed initialization returns the error and keeps the storage pending', function () {
@@ -294,7 +301,7 @@ test('the confinement check runs through sudo on non-root servers', function () 
     $this->server->update(['user' => 'ubuntu']);
     $base = '/data/coolify/applications/app';
     Process::fake(fn ($process) => Process::result(
-        output: str_contains($process->command, 'sudo bash -c') && str_contains($process->command, 'readlink -f') ? 'OK' : ''
+        output: str_contains(remoteProcessScript($process), 'sudo bash -c') && str_contains(remoteProcessScript($process), 'readlink -f') ? 'OK' : ''
     ));
 
     LocalFileVolume::assertRemotePathIsConfined($base, "{$base}/data", $this->server->fresh());
@@ -329,12 +336,13 @@ test('a new storage adopts an existing host file instead of failing', function (
     ]);
     Process::fake(function ($process) {
         return match (true) {
-            str_contains($process->command, 'config --format json') => Process::result(output: json_encode(['services' => ['app' => ['volumes' => [
+            str_contains(remoteProcessScript($process), 'config --format json') => Process::result(output: json_encode(['services' => ['app' => ['volumes' => [
                 ['type' => 'bind', 'source' => '/etc/localtime', 'target' => '/etc/localtime'],
             ]]]])),
-            str_contains($process->command, 'test -f') => Process::result(output: 'OK'),
-            str_contains($process->command, 'stat -c%s') => Process::result(output: '100'),
-            str_contains($process->command, 'head -c') => Process::result(output: "TZif2\0\0binary"),
+            isRemoteFileStateCheck($process) => Process::result(output: remoteFileStatesOutput('file')),
+            str_contains(remoteProcessScript($process), 'test -f') => Process::result(output: 'OK'),
+            str_contains(remoteProcessScript($process), 'stat -c%s') => Process::result(output: '100'),
+            str_contains(remoteProcessScript($process), 'head -c') => Process::result(output: "TZif2\0\0binary"),
             default => Process::result(output: 'NOK'),
         };
     });
@@ -345,7 +353,7 @@ test('a new storage adopts an existing host file instead of failing', function (
     expect($volume->pending_initialization)->toBeFalse()
         ->and($volume->is_directory)->toBeFalse()
         ->and($volume->content)->toBe(LocalFileVolume::BINARY_PLACEHOLDER);
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'tee') || str_contains($process->command, 'chmod'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'tee') || str_contains(remoteProcessScript($process), 'chmod'));
 });
 
 test('placeholder content is never written over a server file', function (string $placeholder) {
@@ -360,14 +368,84 @@ test('placeholder content is never written over a server file', function (string
     ]);
     Process::fake(function ($process) {
         return match (true) {
-            str_contains($process->command, 'config --format json') => Process::result(output: json_encode(['services' => ['app' => ['volumes' => [
+            str_contains(remoteProcessScript($process), 'config --format json') => Process::result(output: json_encode(['services' => ['app' => ['volumes' => [
                 ['type' => 'bind', 'source' => '/srv/large.bin', 'target' => '/large.bin'],
             ]]]])),
-            str_contains($process->command, 'test -f') => Process::result(output: 'OK'),
+            isRemoteFileStateCheck($process) => Process::result(output: remoteFileStatesOutput('file')),
+            str_contains(remoteProcessScript($process), 'test -f') => Process::result(output: 'OK'),
             default => Process::result(output: 'NOK'),
         };
     });
 
     expect($volume->fresh()->initializeOnServer())->toBeNull();
-    Process::assertNotRan(fn ($process) => str_contains($process->command, 'tee'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'tee'));
 })->with([LocalFileVolume::BINARY_PLACEHOLDER, LocalFileVolume::TOO_LARGE_PLACEHOLDER]);
+
+test('Compose bind sources keep literal braces outside of interpolation', function (string $source) {
+    validateComposeBindSource($source);
+
+    expect(true)->toBeTrue();
+})->with(['/data/{x}', '/data/a}b', '${DATA:-/data/{x}}']);
+
+test('a Compose mount outside the resource directory waits for the next start', function () {
+    $application = regressionComposeApplication("services:\n  app:\n    image: alpine\n    volumes:\n      - /srv/outside/app.conf:/etc/app.conf\n");
+    $volume = LocalFileVolume::create([
+        'fs_path' => '/srv/outside/app.conf',
+        'mount_path' => '/etc/app.conf',
+        'content' => 'value',
+        'is_directory' => false,
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+    ]);
+
+    expect($volume->fresh()->pending_initialization)->toBeTrue();
+    Bus::assertNotDispatched(ServerStorageSaveJob::class);
+});
+
+test('the resolver retries without --no-env-resolution on older Docker Compose', function () {
+    $application = regressionComposeApplication("services:\n  app:\n    image: alpine\n");
+    ApplicationDeploymentQueue::create([
+        'application_id' => $application->id,
+        'deployment_uuid' => 'old-compose',
+        'status' => 'finished',
+        'pull_request_id' => 0,
+        'restart_only' => false,
+        'server_id' => $this->server->id,
+    ]);
+    $volume = LocalFileVolume::create([
+        'fs_path' => '${DATA:-/data/coolify/applications/'.$application->uuid.'/data}',
+        'mount_path' => '/data',
+        'is_directory' => true,
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+    ]);
+    Process::fake(function ($process) {
+        $script = remoteProcessScript($process);
+
+        return match (true) {
+            str_contains($script, '--no-env-resolution') => Process::result(errorOutput: 'unknown flag: --no-env-resolution', exitCode: 1),
+            str_contains($script, 'config --format json') => Process::result(output: json_encode(['services' => ['app' => ['volumes' => [
+                ['type' => 'bind', 'source' => '/srv/data', 'target' => '/data'],
+            ]]]])),
+            default => Process::result(output: 'OK'),
+        };
+    });
+
+    expect(ComposeBindPathResolver::resolve($volume))->toBe('/srv/data');
+});
+
+test('empty file content does not truncate the file on the server', function () {
+    $application = regressionComposeApplication("services:\n  app:\n    image: alpine\n    volumes:\n      - ./app.conf:/etc/app.conf\n");
+    $volume = LocalFileVolume::create([
+        'fs_path' => $application->workdir().'/app.conf',
+        'mount_path' => '/etc/app.conf',
+        'content' => '',
+        'is_directory' => false,
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+    ]);
+    Process::fake(fn ($process) => Process::result(output: isRemoteFileStateCheck($process) ? remoteFileStatesOutput('file') : 'OK'));
+
+    expect($volume->fresh()->initializeOnServer())->toBeNull();
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'base64 -d'));
+});

@@ -114,16 +114,15 @@ class LocalFileVolume extends BaseModel
             if ($fileVolume->is_host_file) {
                 return;
             }
-            // A token with only the write permission can save a Compose file. A mount outside the resource
-            // directory is written when the resource is deployed or started, not when it is saved.
-            if ($fileVolume->isOutsideResourceDirectory()) {
-                return;
-            }
-
+            // A token with only the write permission can save a Compose file. A Compose mount is written when
+            // the resource is deployed or started, not when it is saved.
             if ($fileVolume->usesComposeBindSource()) {
                 $fileVolume->pending_initialization = true;
                 $fileVolume->saveQuietly();
 
+                return;
+            }
+            if ($fileVolume->isOutsideResourceDirectory()) {
                 return;
             }
 
@@ -356,7 +355,7 @@ class LocalFileVolume extends BaseModel
                 if (! $isFile) {
                     $commands->push("touch {$escapedPath}");
                 }
-            } elseif (! is_null($content)) {
+            } elseif (! is_null($content) && $content !== '') {
                 $content = base64_encode($content);
                 $commands->push("echo '$content' | base64 -d | tee {$escapedPath} > /dev/null");
             } else {
@@ -625,11 +624,18 @@ class LocalFileVolume extends BaseModel
     /**
      * Write the storage to the server and clear the pending flag.
      *
+     * @param  bool  $onlyWhenMissing  With a server, do not change a file or directory that is on it already.
      * @return string|null The error message when the storage could not be written.
      */
-    public function initializeOnServer(?string $composeFile = null, ?string $projectDirectory = null, ?string $envFile = null, ?Server $server = null): ?string
+    public function initializeOnServer(?string $composeFile = null, ?string $projectDirectory = null, ?string $envFile = null, ?Server $server = null, bool $onlyWhenMissing = false): ?string
     {
         try {
+            if ($onlyWhenMissing && $server !== null) {
+                $path = $this->resolvedStoragePath($this->ownerResource()->workdir(), $server, $composeFile, $projectDirectory, $envFile);
+                if (self::remoteFileStates([$path], $server)[0] !== 'missing') {
+                    return null;
+                }
+            }
             $this->saveStorageOnServer($server, $composeFile, $projectDirectory, $envFile);
         } catch (\Throwable $e) {
             return $e->getMessage();
@@ -752,57 +758,6 @@ class LocalFileVolume extends BaseModel
         return $resource instanceof ServiceApplication || $resource instanceof ServiceDatabase
             ? $resource->service
             : $resource;
-    }
-
-    /**
-     * Raw Compose bind mounts keep administrator-selected host path semantics.
-     */
-    protected function isAdminControlledComposeMount(): bool
-    {
-        $compose = data_get($this->resource, 'docker_compose_raw')
-            ?? data_get($this->resource, 'service.docker_compose_raw');
-
-        if (! is_string($compose) || $compose === '') {
-            return false;
-        }
-
-        try {
-            $services = data_get(parseDockerComposeYaml($compose), 'services', []);
-            foreach ($services as $service) {
-                foreach (data_get($service, 'volumes', []) as $volume) {
-                    if (is_string($volume)) {
-                        $parsed = parseDockerVolumeString($volume);
-                        $source = data_get($parsed, 'source');
-                        $target = data_get($parsed, 'target');
-                    } else {
-                        $source = data_get($volume, 'source');
-                        $target = data_get($volume, 'target');
-                    }
-
-                    if ((string) $target !== $this->mount_path || ! sourceIsLocal(str((string) $source))) {
-                        continue;
-                    }
-
-                    $sourceDirectory = str($this->composeSourceDirectory());
-                    $fsPath = normalizeUnixPath($this->fs_path);
-                    if (normalizeUnixPath(legacyReplaceLocalSource(str((string) $source), $sourceDirectory)->value()) === $fsPath) {
-                        return true;
-                    }
-                    try {
-                        $resolvedSource = replaceLocalSource(str((string) $source), $sourceDirectory)->value();
-                    } catch (\Throwable) {
-                        continue;
-                    }
-                    if (normalizeUnixPath($resolvedSource) === $fsPath) {
-                        return true;
-                    }
-                }
-            }
-        } catch (\Throwable) {
-            return false;
-        }
-
-        return false;
     }
 
     // Accessor for convenient access

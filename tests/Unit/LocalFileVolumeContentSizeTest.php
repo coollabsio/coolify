@@ -75,7 +75,7 @@ it('does not read regular bind-mounted file contents while loading service setti
 
     $volume = Mockery::mock(LocalFileVolume::class)->makePartial();
     $volume->fs_path = '/data/application/large.bin';
-    $volume->shouldReceive('resolvedStoragePath')->once()->andReturn('/data/application/large.bin');
+    $volume->shouldReceive('contentPathOnServer')->once()->andReturn('/data/application/large.bin');
     $volume->is_based_on_git = false;
     $volume->shouldReceive('save')->once();
     $volume->shouldNotReceive('loadStorageOnServer');
@@ -139,17 +139,17 @@ it('quotes resolved file-storage paths in remote commands', function () {
     ]);
 
     $directory = Mockery::mock(LocalFileVolume::class)->makePartial();
-    $directory->shouldReceive('resolvedStoragePath')->once()->andReturn('/data/my files/config.yaml');
+    $directory->shouldReceive('contentPathOnServer')->once()->andReturn('/data/my files/config.yaml');
     $directory->is_directory = true;
     $directory->shouldReceive('save')->once();
     $file = Mockery::mock(LocalFileVolume::class)->makePartial();
-    $file->shouldReceive('resolvedStoragePath')->once()->andReturn('/data/my files/settings.json');
+    $file->shouldReceive('contentPathOnServer')->once()->andReturn('/data/my files/settings.json');
     $file->content = '{}';
     $file->is_directory = false;
     $file->shouldReceive('save')->once();
     $expression = Mockery::mock(LocalFileVolume::class)->makePartial();
     $expression->fs_path = '${DATA_PATH:-/srv/app/config.yaml}';
-    $expression->shouldReceive('resolvedStoragePath')->once()->andReturn('/srv/app/config.yaml');
+    $expression->shouldReceive('contentPathOnServer')->once()->andReturn('/srv/app/config.yaml');
     $expression->is_directory = true;
     $expression->shouldReceive('save')->once();
 
@@ -231,11 +231,11 @@ it('skips pending and unresolved storages and still syncs the others', function 
 
     $pending = Mockery::mock(LocalFileVolume::class)->makePartial();
     $pending->pending_initialization = true;
-    $pending->shouldNotReceive('resolvedStoragePath');
+    $pending->shouldNotReceive('contentPathOnServer');
     $unresolved = Mockery::mock(LocalFileVolume::class)->makePartial();
-    $unresolved->shouldReceive('resolvedStoragePath')->once()->andThrow(new RuntimeException('compose file is missing'));
+    $unresolved->shouldReceive('contentPathOnServer')->once()->andThrow(new RuntimeException('compose file is missing'));
     $resolved = Mockery::mock(LocalFileVolume::class)->makePartial();
-    $resolved->shouldReceive('resolvedStoragePath')->once()->andReturn('/data/application/data');
+    $resolved->shouldReceive('contentPathOnServer')->once()->andReturn('/data/application/data');
     $resolved->is_directory = true;
     $resolved->shouldReceive('save')->once();
 
@@ -243,12 +243,13 @@ it('skips pending and unresolved storages and still syncs the others', function 
     $fileStorages->shouldReceive('get')->once()->andReturn(collect([$pending, $unresolved, $resolved]));
     $application = Mockery::mock(Application::class)->makePartial();
     $application->shouldReceive('getMorphClass')->andReturn(Application::class);
-    $application->shouldReceive('workdir')->once()->andReturn('/data/application');
+    $application->shouldReceive('workdir')->andReturn('/data/application');
     $application->shouldReceive('fileStorages')->once()->andReturn($fileStorages);
     $application->setRelation('destination', (object) ['server' => $server]);
+    $resolved->setRelation('resource', $application);
 
-    Process::fake(fn ($process) => Process::result(output: str_contains($process->command, 'test -') ? 'NOK' : ''));
+    Process::fake(fn ($process) => Process::result(output: str_contains(remoteProcessScript($process), 'empty-directory') ? remoteFileStatesOutput('missing') : ''));
     getFilesystemVolumesFromServer($application, true);
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p -- '/data/application/data'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "mkdir -p -- '/data/application/data'"));
 });

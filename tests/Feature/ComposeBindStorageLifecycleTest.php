@@ -50,26 +50,29 @@ test('file storage resolves its bind path again for each operation', function ()
     $fileExists = false;
     $yamlOutput = false;
     Process::fake(function ($process) use (&$source, &$fileExists, &$yamlOutput) {
-        if (str_contains($process->command, 'docker compose') && str_contains($process->command, 'config --format json')) {
+        if (str_contains(remoteProcessScript($process), 'docker compose') && str_contains(remoteProcessScript($process), 'config --format json')) {
             $config = ['services' => ['app' => ['volumes' => [[
                 'type' => 'bind', 'source' => $source, 'target' => '/data/file',
             ]]]]];
 
             return Process::result(output: $yamlOutput ? Yaml::dump($config, 5) : json_encode($config));
         }
-        if (str_contains($process->command, '.env-main') && str_contains($process->command, 'test -f')) {
+        if (str_contains(remoteProcessScript($process), '.env-main') && str_contains(remoteProcessScript($process), 'test -f')) {
             return Process::result(output: 'OK');
         }
-        if (str_contains($process->command, 'test -f')) {
+        if (str_contains(remoteProcessScript($process), 'state=missing')) {
+            return Process::result(output: remoteFileStatesOutput($fileExists ? 'file' : 'missing'));
+        }
+        if (str_contains(remoteProcessScript($process), 'test -f')) {
             return Process::result(output: $fileExists ? 'OK' : 'NOK');
         }
-        if (str_contains($process->command, 'test -d')) {
+        if (str_contains(remoteProcessScript($process), 'test -d')) {
             return Process::result(output: 'NOK');
         }
-        if (str_contains($process->command, 'stat -c%s')) {
+        if (str_contains(remoteProcessScript($process), 'stat -c%s')) {
             return Process::result(output: '14');
         }
-        if (str_contains($process->command, 'head -c')) {
+        if (str_contains(remoteProcessScript($process), 'head -c')) {
             return Process::result(output: 'remote content');
         }
 
@@ -88,20 +91,20 @@ test('file storage resolves its bind path again for each operation', function ()
     $yamlOutput = true;
     expect($volume->resolvedStoragePath($application->workdir(), $server))->toBe('/srv/second file');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, 'config --format json') && str_contains($process->command, '.env-main') && str_contains($process->command, '/artifacts/bind-path-test') && str_contains($process->command, '--no-env-resolution'));
-    Process::assertRan(fn ($process) => str_contains($process->command, '/srv/first file') && str_contains($process->command, 'tee'));
-    Process::assertRan(fn ($process) => str_contains($process->command, '/srv/second file') && str_contains($process->command, 'test -f'));
-    Process::assertNotRan(fn ($process) => str_contains($process->command, '/srv/second file') && str_contains($process->command, 'rm -rf'));
-    Process::assertNotRan(fn ($process) => ! str_contains($process->command, 'docker compose') && str_contains($process->command, '${DATA_PATH'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'config --format json') && str_contains(remoteProcessScript($process), '.env-main') && str_contains(remoteProcessScript($process), '/artifacts/bind-path-test') && str_contains(remoteProcessScript($process), '--no-env-resolution'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), '/srv/first file') && str_contains(remoteProcessScript($process), 'tee'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), '/srv/second file') && str_contains(remoteProcessScript($process), 'test -f'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), '/srv/second file') && str_contains(remoteProcessScript($process), 'rm -rf'));
+    Process::assertNotRan(fn ($process) => ! str_contains(remoteProcessScript($process), 'docker compose') && str_contains(remoteProcessScript($process), '${DATA_PATH'));
 
     $source = '/tmp/x;id';
     expect(fn () => $volume->deleteStorageOnServer())->toThrow(Exception::class);
-    Process::assertNotRan(fn ($process) => ! str_contains($process->command, 'docker compose') && str_contains($process->command, '/tmp/x;id'));
+    Process::assertNotRan(fn ($process) => ! str_contains(remoteProcessScript($process), 'docker compose') && str_contains(remoteProcessScript($process), '/tmp/x;id'));
 
     $source = '/srv/safe';
     $volume->fs_path = '/tmp/$(id)';
     expect(fn () => $volume->saveStorageOnServer())->toThrow(Exception::class);
-    Process::assertNotRan(fn ($process) => str_contains($process->command, '/tmp/$(id)'));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), '/tmp/$(id)'));
 
     $otherServer = Server::factory()->create([
         'team_id' => $team->id,
@@ -112,7 +115,7 @@ test('file storage resolves its bind path again for each operation', function ()
     expect($volume->contentPathOnServer($otherServer))->toBe('/srv/safe');
     expect($volume->initializeOnServer(server: $otherServer))->toBeNull();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "@'192.0.2.123'") && str_contains($process->command, 'config --format json'));
-    Process::assertRan(fn ($process) => str_contains($process->command, "@'192.0.2.123'") && str_contains($process->command, "tee '/srv/safe'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "@'192.0.2.123'") && str_contains(remoteProcessScript($process), 'config --format json'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "@'192.0.2.123'") && str_contains(remoteProcessScript($process), "tee '/srv/safe'"));
 
 });

@@ -119,7 +119,7 @@ it('does not write compose content outside the resource directory before a deplo
     Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), base64_encode('outside-content')));
 });
 
-it('writes compose content inside the resource directory immediately', function () {
+it('writes compose content inside the resource directory at the next start, not on save', function () {
     $this->application->update([
         'build_pack' => 'dockercompose',
         'docker_compose_raw' => "services:\n  app:\n    image: nginx\n    volumes:\n      - type: bind\n        source: ./config.env\n        target: /app/config.env\n        content: 'inside-content'\n",
@@ -134,8 +134,9 @@ it('writes compose content inside the resource directory immediately', function 
         'resource_type' => $this->application->getMorphClass(),
     ]);
 
-    expect($this->processedSaves)->toBe(1);
-    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), base64_encode('inside-content')));
+    expect($this->processedSaves)->toBe(0)
+        ->and(LocalFileVolume::query()->where('mount_path', '/app/config.env')->value('pending_initialization'))->toBeTrue();
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), base64_encode('inside-content')));
 });
 
 it('does not write a mount outside the resource directory before a deployment', function () {

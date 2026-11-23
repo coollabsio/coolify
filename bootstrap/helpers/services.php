@@ -284,12 +284,13 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
         // Pending storages are written by the next deployment or start. A storage that cannot be
         // resolved yet, for example before its Compose file exists, is skipped.
         $fileLocations = [];
-        $fileVolumes = $fileVolumes->reject(function (LocalFileVolume $fileVolume) use ($workdir, $server, &$fileLocations): bool {
+        $fileVolumes = $fileVolumes->reject(function (LocalFileVolume $fileVolume) use ($server, &$fileLocations): bool {
             if ($fileVolume->is_host_file || $fileVolume->pending_initialization) {
                 return true;
             }
             try {
-                $fileLocations[] = $fileVolume->resolvedStoragePath($workdir, $server);
+                // No remote check for each path: the batched state check below is the only server command.
+                $fileLocations[] = $fileVolume->contentPathOnServer($server);
             } catch (Throwable) {
                 return true;
             }

@@ -1364,6 +1364,7 @@ class ServerTransferExporter
                 'chmod' => $storage->chmod,
                 'is_based_on_git' => (bool) ($storage->is_based_on_git ?? false),
                 'is_preview_suffix_enabled' => (bool) ($storage->is_preview_suffix_enabled ?? false),
+                'pending_initialization' => (bool) ($storage->pending_initialization ?? false),
             ];
         }
 

@@ -268,10 +268,13 @@ it('writes a new service mount before start after final Compose files exist', fu
     $service->server->update(['private_key_id' => $privateKey->id]);
     $hostPath = '/data/coolify/services/'.$service->uuid.'/data';
     Process::fake(function ($process) use ($hostPath) {
-        if (str_contains($process->command, 'config --format json')) {
+        if (str_contains(remoteProcessScript($process), 'config --format json')) {
             return Process::result(output: json_encode(['services' => ['app' => ['volumes' => [
                 ['type' => 'bind', 'source' => $hostPath, 'target' => '/app/data'],
             ]]]]));
+        }
+        if (str_contains(remoteProcessScript($process), 'state=missing')) {
+            return Process::result(output: remoteFileStatesOutput('missing'));
         }
 
         return Process::result(output: 'NOK');
@@ -280,7 +283,7 @@ it('writes a new service mount before start after final Compose files exist', fu
     $service->saveComposeConfigs();
 
     Bus::assertNotDispatched(ServerStorageSaveJob::class);
-    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p '{$hostPath}'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "mkdir -p '{$hostPath}'"));
     expect($storage->fresh()->pending_initialization)->toBeFalse();
 });
 
@@ -289,7 +292,7 @@ it('keeps a service mount pending when Compose cannot resolve it', function () {
     serviceParser($service);
     $privateKey = PrivateKey::factory()->create(['team_id' => $service->server->team_id]);
     $service->server->update(['private_key_id' => $privateKey->id]);
-    Process::fake(fn ($process) => Process::result(output: str_contains($process->command, 'config --format json') ? '{"services":{}}' : 'NOK'));
+    Process::fake(fn ($process) => Process::result(output: str_contains(remoteProcessScript($process), 'config --format json') ? '{"services":{}}' : 'NOK'));
 
     $service->saveComposeConfigs();
 
@@ -348,6 +351,27 @@ YAML);
 
     $volumes = Yaml::parse($application->fresh()->docker_compose)['services']['app']['volumes'];
     expect($volumes[0])->toContain('${DATA_ROOT:-${FALLBACK_ROOT:-/data/coolify/applications/'.$application->uuid.'/data}}/file:/app/file');
+});
+
+it('parses a legacy service with a tmpfs volume that has no source', function () {
+    [$service, $serviceApplication] = makeComposeService(<<<'YAML'
+services:
+  app:
+    image: alpine
+    volumes:
+      - type: tmpfs
+        target: /tmp/cache
+YAML);
+    $service->compose_parsing_version = '1';
+    $service->save();
+    $privateKey = PrivateKey::factory()->create(['team_id' => $service->server->team_id]);
+    $service->server->update(['private_key_id' => $privateKey->id]);
+    Process::fake();
+
+    $service->parse();
+
+    expect($service->fresh()->docker_compose)->toContain('/tmp/cache')
+        ->and($serviceApplication->fileStorages()->count())->toBe(0);
 });
 
 it('creates a legacy service bind row without splitting its nested default', function () {
