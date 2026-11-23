@@ -2304,6 +2304,8 @@ $siteAddress {
         return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_axiom_enabled || $this->settings->is_logdrain_custom_enabled;
     }
 
+    public const UNSUPPORTED_OS_MESSAGE = 'Server OS type is not supported. See the <a target="_blank" class="underline" href="https://coolify.io/docs/start-with-self-hosted#2-supported-operating-systems">supported operating systems</a>. Amazon Linux 2 reached its end of life: use Amazon Linux 2023.';
+
     public function validateOS(): bool|Stringable
     {
         $os_release = instant_remote_process(['cat /etc/os-release'], $this);
@@ -2313,6 +2315,7 @@ $siteAddress {
 
     /**
      * Match /etc/os-release against SUPPORTED_OS: ID first, then each ID_LIKE token (e.g. Manjaro: ID=manjaro, ID_LIKE=arch).
+     * Amazon Linux 2 is rejected: it reached its end of life on 2026-06-30 and has yum instead of dnf.
      */
     public static function supportedOsFromOsRelease(?string $osRelease): bool|Stringable
     {
@@ -2322,6 +2325,10 @@ $siteAddress {
 
                 return [$item->before('=')->value() => $item->after('=')->lower()->replace(['"', "'"], '')->value()];
             });
+
+        if (data_get($collectedData, 'ID') === 'amzn' && data_get($collectedData, 'VERSION_ID') === '2') {
+            return false;
+        }
 
         $candidates = collect([data_get($collectedData, 'ID')])
             ->merge(explode(' ', (string) data_get($collectedData, 'ID_LIKE')))

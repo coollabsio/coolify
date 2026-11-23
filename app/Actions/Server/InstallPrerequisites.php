@@ -36,6 +36,8 @@ class InstallPrerequisites
                 'command -v wget >/dev/null || dnf install -y wget',
                 'command -v git >/dev/null || dnf install -y git',
                 'command -v jq >/dev/null || dnf install -y jq',
+                // Minimal Amazon Linux images have no xargs.
+                'command -v xargs >/dev/null || dnf install -y findutils',
             ]);
         } elseif ($supported_os_type->contains('sles')) {
             $command = $command->merge([

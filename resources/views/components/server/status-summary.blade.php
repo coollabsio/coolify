@@ -59,7 +59,8 @@
                 </button>
             @endif
         </div>
-        <div class="listbox-option cursor-default! gap-2.5!">
+        <a href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
+            class="listbox-option gap-2.5!" @click="open = false" role="menuitem">
             <span @class([
                 'size-1.5 shrink-0 rounded-full',
                 'bg-success' => $serverReady,
@@ -67,7 +68,7 @@
             ])></span>
             <span class="flex-1">Server</span>
             <span>{{ $serverReady ? 'Ready' : 'Unavailable' }}</span>
-        </div>
+        </a>
         @if ($server->proxySet())
             <a href="{{ route('server.proxy', ['server_uuid' => $server->uuid]) }}" {{ wireNavigate() }}
                 class="listbox-option gap-2.5!" @click="open = false" role="menuitem">

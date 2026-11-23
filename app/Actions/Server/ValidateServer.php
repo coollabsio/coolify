@@ -103,7 +103,7 @@ class ValidateServer
         }
         $this->supported_os_type = $server->validateOS();
         if (! $this->supported_os_type) {
-            $this->error = 'Server OS type is not supported. Please install Docker manually before continuing: <a target="_blank" class="text-black underline dark:text-white" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+            $this->error = Server::UNSUPPORTED_OS_MESSAGE;
             $server->update([
                 'validation_logs' => $this->error,
             ]);

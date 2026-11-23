@@ -439,7 +439,7 @@
                 }
                 if (github_runners && organization) {
                     default_permissions.organization_self_hosted_runners = 'write';
-                    default_permissions.actions = 'read';
+                    default_permissions.actions = 'write';
                     default_events.push('workflow_job');
                 }
 

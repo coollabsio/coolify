@@ -537,6 +537,11 @@ else
     OS_VERSION=$(grep -w "VERSION_ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
 fi
 
+if [ "$OS_TYPE" = 'amzn' ] && [ "$OS_VERSION" = '2' ]; then
+    echo "Amazon Linux 2 reached its end of life and is not supported. Use Amazon Linux 2023."
+    exit 1
+fi
+
 # Install xargs on Amazon Linux 2023 - lol
 if [ "$OS_TYPE" = 'amzn' ]; then
     dnf install -y findutils >/dev/null

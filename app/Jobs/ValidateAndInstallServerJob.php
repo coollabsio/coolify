@@ -75,7 +75,7 @@ class ValidateAndInstallServerJob implements ShouldBeEncrypted, ShouldQueue
             // Validate OS
             $supportedOsType = $this->server->validateOS();
             if (! $supportedOsType) {
-                $errorMessage = 'Server OS type is not supported. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                $errorMessage = Server::UNSUPPORTED_OS_MESSAGE;
                 $this->server->update([
                     'validation_logs' => $errorMessage,
                     'is_validating' => false,

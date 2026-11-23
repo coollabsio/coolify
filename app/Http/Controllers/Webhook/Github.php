@@ -343,7 +343,8 @@ class Github extends Controller
         if ($action === 'completed') {
             if ($execution) {
                 $execution->update([...$jobDetails, 'conclusion' => $this->limitRunnerColumn(data_get($payload, 'workflow_job.conclusion'))]);
-                if ($execution->isActive() || $execution->status === GithubRunnerStatus::Failed) {
+                // A run that Coolify cancelled after the runner container failed stays failed.
+                if ($execution->isActive() || ($execution->status === GithubRunnerStatus::Failed && $execution->conclusion !== 'cancelled')) {
                     $execution->finish(GithubRunnerStatus::Completed);
                     CleanupGithubRunnerJob::dispatch($execution->id);
                 }
