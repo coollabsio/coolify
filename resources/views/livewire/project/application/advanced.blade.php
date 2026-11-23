@@ -11,6 +11,7 @@
     @endphp
 
     <div class="flex flex-col gap-6">
+        @unless ($application->is_archive_source)
         <x-application.settings-section id="advanced-build-section" title="Build & deploy"
             helper="How images are built, how deployments start, and how the repository is cloned.">
             <div class="grid w-full gap-4 sm:grid-cols-2">
@@ -110,6 +111,7 @@
                 </x-application.settings-subsection>
             @endif
         </x-application.settings-section>
+        @endunless
 
         <x-application.settings-section id="advanced-container-section" title="Container"
             helper="Naming, shutdown, logs, and GPU access for the deployed container.">

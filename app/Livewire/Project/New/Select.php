@@ -218,6 +218,12 @@ class Select extends Component
                 'documentation' => 'https://coolify.io/docs/applications',
                 'logo' => resource_logo_url('docker-image'),
             ],
+            [
+                'id' => 'static-archive',
+                'name' => 'Static Site (Upload)',
+                'description' => 'Deploy a static site from an uploaded .tar, .tar.gz, or .tgz archive, without a Git repository.',
+                'logo' => resource_logo_url('static-archive'),
+            ],
         ];
         $databases = [
             [
