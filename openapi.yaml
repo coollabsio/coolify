@@ -17628,6 +17628,7 @@ paths:
                 properties:
                   uuid: { type: string }
                   domains: { type: string, nullable: true }
+                  link: { type: string, nullable: true, description: 'The page of the application in the Coolify UI.' }
                   deployment_uuid: { type: string, description: 'Set when a deployment was queued.' }
                   message: { type: string, description: 'Set when the deployment could not be queued.' }
                 type: object
@@ -17684,6 +17685,7 @@ paths:
                   deployment_uuid: { type: string }
                   sha: { type: string, description: 'The site version.' }
                   domains: { type: string, nullable: true }
+                  link: { type: string, nullable: true, description: 'The page of the application in the Coolify UI.' }
                 type: object
         '400':
           $ref: '#/components/responses/400'

@@ -119,6 +119,7 @@ class StaticSiteArchivesController extends Controller
                     properties: [
                         'uuid' => ['type' => 'string'],
                         'domains' => ['type' => 'string', 'nullable' => true],
+                        'link' => ['type' => 'string', 'nullable' => true, 'description' => 'The page of the application in the Coolify UI.'],
                         'deployment_uuid' => ['type' => 'string', 'description' => 'Set when a deployment was queued.'],
                         'message' => ['type' => 'string', 'description' => 'Set when the deployment could not be queued.'],
                     ],
@@ -246,7 +247,7 @@ class StaticSiteArchivesController extends Controller
             'instant_deploy' => $deploy,
         ]);
 
-        $response = ['uuid' => $application->uuid, 'domains' => $application->fqdn];
+        $response = ['uuid' => $application->uuid, 'domains' => $application->fqdn, 'link' => $application->link()];
         if (filled($result['deployment_uuid'] ?? null)) {
             $response['deployment_uuid'] = $result['deployment_uuid'];
         } elseif ($deploy) {
@@ -286,6 +287,7 @@ class StaticSiteArchivesController extends Controller
                         'deployment_uuid' => ['type' => 'string'],
                         'sha' => ['type' => 'string', 'description' => 'The site version.'],
                         'domains' => ['type' => 'string', 'nullable' => true],
+                        'link' => ['type' => 'string', 'nullable' => true, 'description' => 'The page of the application in the Coolify UI.'],
                     ],
                 ),
             ),
@@ -349,6 +351,7 @@ class StaticSiteArchivesController extends Controller
             'deployment_uuid' => $result['deployment_uuid'],
             'sha' => $result['sha'],
             'domains' => $application->fqdn,
+            'link' => $application->link(),
         ], 201);
     }
 

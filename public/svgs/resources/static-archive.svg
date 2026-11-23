@@ -1,8 +1,13 @@
 <svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
 <rect width="200" height="200" rx="55.2101" fill="#F59E0B" fill-opacity="0.16"/>
 <g stroke="#F59E0B" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
-<path d="M44 62h112v20H44z"/>
-<path d="M52 82v52c0 9 4 14 14 14h68c10 0 14-5 14-14V82"/>
-<path d="M86 104h28"/>
+<rect x="42" y="50" width="116" height="100" rx="16"/>
+<path d="M42 78h116"/>
+<path d="M100 132V100"/>
+<path d="M86 114l14-14 14 14"/>
+</g>
+<g fill="#F59E0B">
+<circle cx="60" cy="64" r="5"/>
+<circle cx="76" cy="64" r="5"/>
 </g>
 </svg>

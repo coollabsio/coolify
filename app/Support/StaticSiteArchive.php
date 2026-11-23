@@ -325,6 +325,7 @@ final class StaticSiteArchive
             'build_pack' => 'static',
             'static_image' => 'nginx:alpine',
             'ports_exposes' => '80',
+            'custom_nginx_configuration' => defaultNginxConfiguration($isSpa ? 'spa' : 'static'),
             'is_archive_source' => true,
             'environment_id' => $environment->id,
             'destination_id' => $destination->id,

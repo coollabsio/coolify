@@ -28021,6 +28021,11 @@
                                             "type": "string",
                                             "nullable": true
                                         },
+                                        "link": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "description": "The page of the application in the Coolify UI."
+                                        },
                                         "deployment_uuid": {
                                             "type": "string",
                                             "description": "Set when a deployment was queued."
@@ -28117,6 +28122,11 @@
                                         "domains": {
                                             "type": "string",
                                             "nullable": true
+                                        },
+                                        "link": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "description": "The page of the application in the Coolify UI."
                                         }
                                     },
                                     "type": "object"
