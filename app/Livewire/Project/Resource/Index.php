@@ -7,6 +7,7 @@ use App\Models\Environment;
 use App\Models\Project;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\VulnerabilityMarkers;
+use App\Services\TemplateUpdateChecker;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Blade;
 use Livewire\Component;
@@ -218,6 +219,7 @@ class Index extends Component
             'name' => $item->name,
             'type' => $type,
             'typeLabel' => $typeLabel,
+            'updateAvailable' => $type === 'service' ? TemplateUpdateChecker::showBadge($item) : false,
             'fqdn' => $item->fqdn ?? null,
             'description' => $item->description ?? null,
             'status' => $item->status ?? '',

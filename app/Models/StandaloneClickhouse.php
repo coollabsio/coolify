@@ -261,6 +261,9 @@ class StandaloneClickhouse extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
+            if ($storage->is_external) {
+                continue;
+            }
             instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
         }
     }

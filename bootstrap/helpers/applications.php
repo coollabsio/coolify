@@ -510,6 +510,10 @@ function clone_application(Application $source, $destination, array $overrides =
         throw new RuntimeException('The application, the target environment, and the destination must belong to the same team.');
     }
 
+    foreach ($source->persistentStorages()->get() as $volume) {
+        $volume->ensureCloneTargetIsAvailable($source->destination->server, $server);
+    }
+
     // Prepare name and URL
     $name = $overrides['name'] ?? 'clone-of-'.str($source->name)->limit(20).'-'.$uuid;
     $applicationSettings = $source->settings;
@@ -585,7 +589,9 @@ function clone_application(Application $source, $destination, array $overrides =
     $persistentVolumes = $source->persistentStorages()->get();
     foreach ($persistentVolumes as $volume) {
         $newName = '';
-        if ($volume->standalone_sqlite_id !== null) {
+        if ($volume->is_external) {
+            $newName = $volume->name;
+        } elseif ($volume->standalone_sqlite_id !== null) {
             // A mounted SQLite database volume stays connected to the source only; the clone gets its own volume.
             $newName = $newApplication->uuid.'-'.$volume->name;
         } elseif (str_starts_with($volume->name, $source->uuid)) {
@@ -606,7 +612,7 @@ function clone_application(Application $source, $destination, array $overrides =
         ]);
         $newPersistentVolume->save();
 
-        if ($cloneVolumeData) {
+        if ($volume->shouldCopyDataWhenCloning($cloneVolumeData)) {
             $pendingVolumeClones[] = new VolumeCloneJob(
                 $volume->name,
                 $newPersistentVolume->name,
