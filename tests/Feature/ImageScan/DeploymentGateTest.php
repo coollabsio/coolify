@@ -14,6 +14,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\AuditEvent;
 use App\Models\Environment;
+use App\Models\EnvironmentVariable;
 use App\Models\ImageScan;
 use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
@@ -1636,5 +1637,93 @@ describe('scanned build of a security update', function () {
 
         expect(collect($job->commands)->contains(fn (string $command) => str_contains($command, "docker tag 'docker.io/library/nginx@".GATE_REPO_DIGEST."' 'nginx:1.27'")))->toBeTrue()
             ->and(ImageStartPin::take($this->application, $this->server->id))->toBe([]);
+    });
+});
+
+describe('Compose images set with a variable', function () {
+    beforeEach(function () {
+        $this->application->update(['build_pack' => 'dockercompose']);
+        $this->variableCompose = Yaml::dump(['services' => [
+            'app' => ['image' => '${APP_IMAGE:-ghcr.io/example/app:1.0}'],
+            'db' => ['image' => '${DB_IMAGE:-mariadb:13}'],
+            'cache' => ['image' => 'redis:${CACHE_VERSION}'],
+        ]], 10);
+    });
+
+    function deployGateVariable(string $key, string $value): void
+    {
+        EnvironmentVariable::create([
+            'key' => $key,
+            'value' => $value,
+            'resourceable_type' => test()->application->getMorphClass(),
+            'resourceable_id' => test()->application->id,
+        ]);
+    }
+
+    it('scans the images that the variables of the application start after the deploy', function () {
+        Queue::fake();
+        deployGateVariable('APP_IMAGE', 'ghcr.io/example/app:2.0@sha256:'.str_repeat('a', 64));
+        deployGateVariable('CACHE_VERSION', '7');
+        $job = deployGateJob(['generated_docker_compose' => $this->variableCompose]);
+
+        deployGateImageScan($job)->dispatchScanAfterStart();
+
+        Queue::assertPushed(ScanResourceImagesJob::class, fn (ScanResourceImagesJob $scanJob) => $scanJob->imageRefs === [
+            'ghcr.io/example/app:2.0@sha256:'.str_repeat('a', 64),
+            'mariadb:13',
+            'redis:7',
+        ]);
+    });
+
+    it('scans the preview value of a variable in a preview deployment', function () {
+        Queue::fake();
+        deployGateVariable('DB_IMAGE', 'mariadb:11');
+        // A new variable of the application gets a preview copy with the same value.
+        EnvironmentVariable::query()->where('key', 'DB_IMAGE')->where('is_preview', true)->firstOrFail()->update(['value' => 'mariadb:12']);
+        $job = deployGateJob(['generated_docker_compose' => Yaml::dump(['services' => ['db' => ['image' => '${DB_IMAGE:-mariadb:13}']]], 10), 'pull_request_id' => 1]);
+
+        deployGateImageScan($job)->dispatchScanAfterStart();
+
+        Queue::assertPushed(ScanResourceImagesJob::class, fn (ScanResourceImagesJob $scanJob) => $scanJob->imageRefs === ['mariadb:12']);
+    });
+
+    it('gates the resolved images and stops Compose from pulling them', function () {
+        deployGatePolicy();
+        deployGateVariable('CACHE_VERSION', '7');
+        $scanned = [];
+        ScanImage::shouldRun()->times(3)
+            ->withArgs(function ($server, $resource, $ref) use (&$scanned) {
+                $scanned[] = $ref;
+
+                return true;
+            })
+            ->andReturn(deployGateReturnedScan([]));
+        $job = deployGateJob(['generated_docker_compose' => $this->variableCompose]);
+
+        deployGateImageScan($job)->checkComposeGate();
+
+        $services = Yaml::parse((new ReflectionProperty(ApplicationDeploymentJob::class, 'generated_docker_compose'))->getValue($job))['services'];
+        expect($scanned)->toBe(['ghcr.io/example/app:1.0', 'mariadb:13', 'redis:7'])
+            ->and(collect($services)->pluck('pull_policy')->all())->toBe(['never', 'never', 'never'])
+            ->and($services['app']['image'])->toBe('${APP_IMAGE:-ghcr.io/example/app:1.0}')
+            ->and(test()->queue->fresh()->scan_gate_result)->toMatchArray(['blocked' => false]);
+    });
+
+    it('cannot gate an image with a variable that Coolify cannot resolve', function () {
+        deployGatePolicy(onScanError: 'deploy');
+        ScanImage::shouldRun()->never();
+        $job = deployGateJob(['generated_docker_compose' => Yaml::dump(['services' => ['app' => ['image' => '${REGISTRY}/app:${TAG}']]], 10)]);
+
+        deployGateImageScan($job)->checkComposeGate();
+
+        expect(test()->queue->fresh()->scan_gate_result)->toMatchArray(['error' => ImageScanErrorCode::Unknown->value]);
+    });
+
+    it('lists every Compose service with its resolved image', function () {
+        deployGateVariable('APP_IMAGE', 'ghcr.io/example/app:2.0');
+        $this->application->update(['docker_compose' => $this->variableCompose]);
+
+        expect(ResourceScans::composeServiceNames($this->application->fresh()))
+            ->toBe(['ghcr.io/example/app' => 'app', 'mariadb' => 'db']);
     });
 });
