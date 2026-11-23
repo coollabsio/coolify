@@ -602,9 +602,10 @@ class Application extends BaseModel
                 }
                 $standaloneDockerIds = $server->standaloneDockers()->pluck('id');
                 $swarmDockerIds = $server->swarmDockers()->pluck('id');
-                $query->where(function (Builder $q) use ($standaloneDockerIds, $swarmDockerIds) {
+                $query->where(function (Builder $q) use ($standaloneDockerIds, $swarmDockerIds, $server) {
                     $q->where(fn (Builder $inner) => $inner->where('destination_type', StandaloneDocker::class)->whereIn('destination_id', $standaloneDockerIds))
-                        ->orWhere(fn (Builder $inner) => $inner->where('destination_type', SwarmDocker::class)->whereIn('destination_id', $swarmDockerIds));
+                        ->orWhere(fn (Builder $inner) => $inner->where('destination_type', SwarmDocker::class)->whereIn('destination_id', $swarmDockerIds))
+                        ->orWhereHas('additional_servers', fn (Builder $inner) => $inner->where('servers.id', $server->id));
                 });
             })
             ->when($status !== null, fn (Builder $query) => $query->whereRaw('LOWER(status) LIKE ?', ['%'.strtolower($status).'%']))

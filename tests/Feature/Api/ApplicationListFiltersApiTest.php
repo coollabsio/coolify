@@ -90,6 +90,13 @@ test('it filters by server uuid', function () {
         ->toBe(['Worker']);
 });
 
+test('the server uuid filter includes applications with the server as an additional destination', function () {
+    $this->api->additional_servers()->attach($this->otherServer->id, ['standalone_docker_id' => $this->otherDestination->id]);
+
+    expect(listedNames(listApplications(['server_uuid' => $this->otherServer->uuid])->assertOk()))
+        ->toBe(['Api Backend', 'Worker']);
+});
+
 test('it filters by status and name case-insensitively', function () {
     expect(listedNames(listApplications(['status' => 'RUNNING'])->assertOk()))->toBe(['Api Backend', 'Worker'])
         ->and(listedNames(listApplications(['name' => 'front'])->assertOk()))->toBe(['Web Frontend'])
