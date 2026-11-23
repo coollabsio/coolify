@@ -7,7 +7,7 @@ use App\Models\S3Storage;
 use App\Rules\ValidDnsServers;
 use App\Rules\ValidIpOrCidr;
 use App\Services\FileDownloadStorageService;
-use App\Support\DatabaseImport\DatabaseImportS3Upload;
+use App\Services\UploadStorageService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -67,7 +67,7 @@ class Advanced extends Component
 
     public string $file_download_storage = 'stream';
 
-    public string $database_import_storage = 'local';
+    public string $upload_storage = 'local';
 
     public int $server_validation_rate_limit_seconds = 600;
 
@@ -145,8 +145,8 @@ class Advanced extends Component
         $this->file_download_storage = $this->settings->file_download_s3_storage_id
             ? 's3:'.$this->settings->file_download_s3_storage_id
             : 'stream';
-        $this->database_import_storage = $this->settings->database_import_s3_storage_id
-            ? 's3:'.$this->settings->database_import_s3_storage_id
+        $this->upload_storage = $this->settings->upload_s3_storage_id
+            ? 's3:'.$this->settings->upload_s3_storage_id
             : 'local';
     }
 
@@ -260,7 +260,7 @@ class Advanced extends Component
             $this->settings->image_cdn_url = filled($this->image_cdn_url) ? rtrim($this->image_cdn_url, '/') : null;
             $this->saveAvatarStorageSetting();
             $this->saveFileDownloadStorageSetting();
-            $bucketProblems = $this->saveDatabaseImportStorageSetting();
+            $bucketProblems = $this->saveUploadStorageSetting();
             $this->saveAndAudit();
             $this->dispatch('success', 'Settings updated!');
             foreach ($bucketProblems as $problem) {
@@ -340,20 +340,20 @@ class Advanced extends Component
 
     /**
      * Selecting a storage adds the CORS rule for browser uploads and an auto-delete lifecycle rule to its bucket.
-     * The setting is refused when the bucket is listable by anonymous users, because it holds database backups.
+     * The setting is refused when the bucket is listable by anonymous users, because it holds uploaded files such as database backups.
      *
      * @return list<string> Bucket rules that Coolify could not add; the admin must add them.
      */
-    private function saveDatabaseImportStorageSetting(): array
+    private function saveUploadStorageSetting(): array
     {
-        if ($this->database_import_storage === 'local') {
-            $this->settings->database_import_s3_storage_id = null;
+        if ($this->upload_storage === 'local') {
+            $this->settings->upload_s3_storage_id = null;
 
             return [];
         }
 
-        $storageId = (int) str($this->database_import_storage)->after('s3:')->value();
-        if ($storageId === $this->settings->database_import_s3_storage_id) {
+        $storageId = (int) str($this->upload_storage)->after('s3:')->value();
+        if ($storageId === $this->settings->upload_s3_storage_id) {
             return [];
         }
 
@@ -363,22 +363,22 @@ class Advanced extends Component
             ->where('is_usable', true)
             ->find($storageId);
 
-        $previous = $this->settings->database_import_s3_storage_id ? 's3:'.$this->settings->database_import_s3_storage_id : 'local';
-        if (! $storage || $this->database_import_storage !== 's3:'.$storage->id) {
-            $this->database_import_storage = $previous;
-            throw new \InvalidArgumentException('The selected database import storage is not available.');
+        $previous = $this->settings->upload_s3_storage_id ? 's3:'.$this->settings->upload_s3_storage_id : 'local';
+        if (! $storage || $this->upload_storage !== 's3:'.$storage->id) {
+            $this->upload_storage = $previous;
+            throw new \InvalidArgumentException('The selected upload storage is not available.');
         }
 
         try {
             app(FileDownloadStorageService::class)->ensureBucketIsPrivate($storage);
         } catch (\RuntimeException $e) {
-            $this->database_import_storage = $previous;
+            $this->upload_storage = $previous;
             throw $e;
         }
 
-        $this->settings->database_import_s3_storage_id = $storage->id;
+        $this->settings->upload_s3_storage_id = $storage->id;
 
-        return DatabaseImportS3Upload::prepareBucket($storage);
+        return app(UploadStorageService::class)->prepareBucket($storage);
     }
 
     public function clearDomainConnectPrivateKey(): void

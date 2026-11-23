@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('instance_settings', function (Blueprint $table) {
-            $table->foreignId('database_import_s3_storage_id')->nullable()->constrained('s3_storages')->nullOnDelete();
+            $table->foreignId('upload_s3_storage_id')->nullable()->constrained('s3_storages')->nullOnDelete();
         });
     }
 
@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('instance_settings', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('database_import_s3_storage_id');
+            $table->dropConstrainedForeignId('upload_s3_storage_id');
         });
     }
 };

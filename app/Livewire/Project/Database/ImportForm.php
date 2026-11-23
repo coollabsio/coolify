@@ -11,6 +11,7 @@ use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
+use App\Services\UploadStorageService;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 use App\Support\DatabaseImport\DatabaseImportException;
 use App\Support\DatabaseImport\DatabaseImportS3Upload;
@@ -220,7 +221,7 @@ class ImportForm extends Component
     #[Computed]
     public function uploadsToS3(): bool
     {
-        return DatabaseImportS3Upload::configuredStorage() !== null;
+        return UploadStorageService::configuredStorage() !== null;
     }
 
     /**

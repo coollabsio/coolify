@@ -205,10 +205,10 @@
                         storage must be reachable from your servers, and the S3 provider must support lifecycle rules.
                     </x-callout>
                 </x-application.settings-subsection>
-                <x-application.settings-subsection id="database-import-storage-section" title="Database import uploads"
-                    helper="Choose where backup files go that users upload in the Import Backups form of a database. With S3, the browser uploads the file directly to the bucket, so it does not use disk space on this instance, and the server of the database downloads it from S3. Coolify deletes the file after the import, or after one day when it is not imported. Uploads through the API still go to this instance.">
+                <x-application.settings-subsection id="upload-storage-section" title="Uploads"
+                    helper="Choose where files go that users upload in the browser (database imports and static site archives). With S3, the browser uploads each file straight to the bucket, so it does not use disk space on this instance, and the servers download it from S3. Coolify deletes each file when it no longer needs it. Uploads through the API still go to this instance.">
                     <div class="flex max-w-md flex-col gap-4">
-                        <x-forms.listbox id="database_import_storage" label="Upload storage" onChange="instantSave"
+                        <x-forms.listbox id="upload_storage" label="Upload storage" onChange="instantSave"
                             :options="[
                                 ['value' => 'local', 'label' => 'Upload to Coolify'],
                                 ...array_values(array_filter($avatar_storage_options, fn ($option) => $option['value'] !== 'local')),
@@ -217,7 +217,7 @@
                     <x-callout type="info" title="Bucket rules" class="mt-4">
                         When you select an S3 storage, Coolify adds a CORS rule that allows <span class="font-mono">PUT</span>
                         from <span class="font-mono">{{ rtrim(base_url(), '/') }}</span>, and a lifecycle rule that deletes objects under
-                        <span class="font-mono">coolify-uploads/database-imports/</span> after 2 days. If your S3 provider does not
+                        <span class="font-mono">coolify-uploads/</span> after 1 day, as a safety net. If your S3 provider does not
                         accept these API calls, add the CORS rule yourself. The bucket must be reachable from the browsers of your users
                         and from your servers.
                     </x-callout>
