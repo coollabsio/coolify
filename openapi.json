@@ -5032,8 +5032,7 @@
                                     },
                                     "is_pr_deployments_public_approval_required": {
                                         "type": "boolean",
-                                        "default": true,
-                                        "description": "With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval."
+                                        "description": "With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval. If you omit it, the current value stays."
                                     },
                                     "use_production_values_in_previews": {
                                         "type": "boolean",
@@ -29458,7 +29457,8 @@
                         ],
                         "enum": [
                             "waiting_for_approval",
-                            "approved"
+                            "approved",
+                            null
                         ]
                     },
                     "pending_approval_commit": {

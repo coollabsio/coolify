@@ -79,7 +79,7 @@ class ApplicationPreviewPolicy
 
     /**
      * Determine whether the user can approve a commit of a fork pull request. Approving lets
-     * untrusted code run on the server, so it needs admin or owner permissions.
+     * untrusted code run on the server, so it needs write access to the application.
      */
     public function approve(User $user, ApplicationPreview $applicationPreview): Response
     {
@@ -87,7 +87,7 @@ class ApplicationPreviewPolicy
             return Response::allow();
         }
 
-        return Response::deny('You need at least admin or owner permissions to approve a fork pull request.');
+        return Response::deny('You need write access to this application to approve a fork pull request.');
     }
 
     private function allows(User $user, AccessLevel $level, ApplicationPreview $applicationPreview): bool

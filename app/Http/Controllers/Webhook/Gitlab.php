@@ -312,7 +312,7 @@ class Gitlab extends Controller
                         ($found ?? $pr_app)->markForkPullRequest($this->isForkPreviewRepository(
                             data_get($payload, 'object_attributes.source_project_id'),
                             data_get($payload, 'object_attributes.target_project_id'),
-                        ));
+                        ), $commit ?? null);
 
                         $result = queue_application_deployment(
                             application: $application,
@@ -613,7 +613,7 @@ class Gitlab extends Controller
                             ($found ?? $pr_app)->markForkPullRequest($this->isForkPreviewRepository(
                                 data_get($payload, 'object_attributes.source_project_id'),
                                 data_get($payload, 'object_attributes.target_project_id'),
-                            ));
+                            ), $commit ?? null);
 
                             $result = queue_application_deployment(
                                 application: $application,

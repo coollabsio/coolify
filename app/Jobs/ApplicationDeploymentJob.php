@@ -44,6 +44,7 @@ use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -540,7 +541,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             try {
                 if ($this->use_build_server) {
                     $this->server = $this->build_server;
-                } else {
+                } elseif (! $waitsForApproval) {
+                    // An unapproved checkout must not reach the configuration directory.
                     $this->write_deployment_configurations();
                 }
             } catch (Exception $e) {
@@ -4040,16 +4042,20 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         if (! $this->preview->forkCommitNeedsApproval($commit)) {
-            if (filled($this->preview->approved_commit)) {
+            if (filled($this->preview->approved_commit) && hash_equals($this->preview->approved_commit, $commit)) {
                 $this->application_deployment_queue->addLogEntry("An admin approved commit {$commit} of this fork pull request.");
             }
 
             return;
         }
 
-        $this->preview->markWaitingForApproval($commit);
+        // One transaction: an approval that sees the pending commit also sees that this
+        // deployment stops, so admission queues a new deployment instead of reusing this one.
+        DB::transaction(function () use ($commit): void {
+            $this->preview->markWaitingForApproval($commit);
+            $this->application_deployment_queue->update(['commit' => $commit, 'finished_at' => Carbon::now()->toImmutable()]);
+        });
         $this->commit = $commit;
-        $this->application_deployment_queue->update(['commit' => $commit]);
         $origin = $this->preview->is_fork_pull_request
             ? 'comes from a fork'
             : 'has an unknown origin (Coolify got no webhook event of it yet), so Coolify handles it as a fork';
@@ -4061,7 +4067,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->logStatusTransitionSideEffectFailure('Sending the approval notification failed', $e);
         }
         if ($this->application->isGithubAppSource()) {
-            ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::WAITING_FOR_APPROVAL);
+            try {
+                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::WAITING_FOR_APPROVAL);
+            } catch (Throwable $e) {
+                $this->logStatusTransitionSideEffectFailure('Queueing the GitHub approval status failed', $e);
+            }
         }
 
         throw new PreviewApprovalRequiredException('The commit of this fork pull request waits for an admin approval.');

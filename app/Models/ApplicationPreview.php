@@ -182,11 +182,26 @@ class ApplicationPreview extends BaseModel
 
     /**
      * Store if the pull request comes from a fork. Each webhook event of the pull request sets it.
+     *
+     * The webhook also reports the head commit. A pending approval of an older commit becomes
+     * invalid at once, so that an admin cannot approve it before the new deployment runs. An
+     * unknown head (null or `HEAD`) also clears it; the deployment job records it again.
      */
-    public function markForkPullRequest(bool $isFork): void
+    public function markForkPullRequest(bool $isFork, ?string $headCommit): void
     {
         if ($this->is_fork_pull_request !== $isFork) {
             $this->forceFill(['is_fork_pull_request' => $isFork])->save();
+        }
+
+        $headCommit = strtolower((string) $headCommit);
+        $cleared = static::query()
+            ->whereKey($this->getKey())
+            ->whereNotNull('pending_approval_commit')
+            ->where('pending_approval_commit', '!=', $headCommit)
+            ->update(['pending_approval_commit' => null]);
+        if ($cleared > 0) {
+            $this->pending_approval_commit = null;
+            $this->syncOriginalAttribute('pending_approval_commit');
         }
     }
 
@@ -197,16 +212,29 @@ class ApplicationPreview extends BaseModel
      */
     public function forkCommitNeedsApproval(string $commit): bool
     {
-        if ($this->is_fork_pull_request === false) {
-            return false;
-        }
-
-        $settings = $this->application?->settings;
-        if ($settings?->is_pr_deployments_public_enabled && ! $settings->is_pr_deployments_public_approval_required) {
+        if ($this->is_fork_pull_request === false || ! $this->forkApprovalIsRequired()) {
             return false;
         }
 
         return blank($this->approved_commit) || ! hash_equals($this->approved_commit, $commit);
+    }
+
+    /**
+     * Approval is off only when the admin turned on public previews without approval.
+     */
+    public function forkApprovalIsRequired(): bool
+    {
+        $settings = $this->application?->settings;
+
+        return ! ($settings?->is_pr_deployments_public_enabled && ! $settings->is_pr_deployments_public_approval_required);
+    }
+
+    /**
+     * A saved pending commit blocks the deployment only while approval is required.
+     */
+    public function isWaitingForApproval(): bool
+    {
+        return filled($this->pending_approval_commit) && $this->forkApprovalIsRequired();
     }
 
     public function markWaitingForApproval(string $commit): void
@@ -224,11 +252,35 @@ class ApplicationPreview extends BaseModel
     }
 
     /**
+     * Link to the pending commit inside the pull request, so that a reviewer sees the commit
+     * that an approval deploys, also when the pull request got newer commits. Falls back to
+     * the pull request link for providers without a known commit link (Bitbucket).
+     */
+    public function pendingApprovalCommitUrl(): ?string
+    {
+        $url = rtrim((string) $this->pull_request_html_url, '/');
+        $commit = (string) $this->pending_approval_commit;
+        if ($url === '' || ! preg_match('/^[0-9a-f]{40}([0-9a-f]{24})?$/i', $commit)) {
+            return $url === '' ? null : $url;
+        }
+
+        if (preg_match('#/-/merge_requests/\d+$#', $url)) {
+            return "{$url}/diffs?commit_id={$commit}";
+        }
+
+        if (preg_match('#/(pull|pulls)/\d+$#', $url)) {
+            return "{$url}/commits/{$commit}";
+        }
+
+        return $url;
+    }
+
+    /**
      * @return 'waiting_for_approval'|'approved'|null
      */
     public function approvalStatus(): ?string
     {
-        if (filled($this->pending_approval_commit)) {
+        if ($this->isWaitingForApproval()) {
             return 'waiting_for_approval';
         }
 

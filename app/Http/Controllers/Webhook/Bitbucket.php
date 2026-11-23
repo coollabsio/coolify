@@ -298,7 +298,7 @@ class Bitbucket extends Controller
         ($found ?? $pr_app)->markForkPullRequest($this->isForkPreviewRepository(
             $context->sourceRepository,
             $context->targetRepository,
-        ));
+        ), $context->commit);
 
         $result = queue_application_deployment(
             application: $application,

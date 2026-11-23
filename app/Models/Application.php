@@ -1905,7 +1905,9 @@ class Application extends BaseModel
                     $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && echo 'Fetching the commit.' && {$sshCommand} {$gitCommand} fetch --depth=1 origin {$escapedCommit} && {$checkoutCommand}";
                 }
             } else {
-                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} {$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
+                // A commit that no branch contains (a fork pull request commit) is fetched by its SHA.
+                $checkoutCommand = "{$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
+                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && ({$checkoutCommand} || ({$sshCommand} {$gitCommand} fetch origin {$escapedCommit} && {$checkoutCommand}))";
             }
         }
         // A checkout that only reads files (the Compose file) needs neither submodules nor LFS objects.
@@ -2303,6 +2305,9 @@ class Application extends BaseModel
         }
         if ($pull_request_id !== 0) {
             $pr_branch_name = "pr-{$pull_request_id}-coolify";
+            // A deployment of a specific pull request commit (for example an approved fork commit) stays on that commit
+            // when the pull request gets new commits before the clone.
+            $pr_checkout_target = $commit !== 'HEAD' ? $commit : $pr_branch_name;
         }
         if ($this->deploymentType() === 'source') {
             $source_html_url = data_get($this, 'source.html_url');
@@ -2350,7 +2355,7 @@ class Application extends BaseModel
                 if ($pull_request_id !== 0) {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
 
-                    $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitSshCommand($deployment_uuid), $gitConfigOption ?? null);
+                    $git_checkout_command = $this->buildGitCheckoutCommand($pr_checkout_target, gitSshCommand($deployment_uuid), $gitConfigOption ?? null);
                     $escapedPrBranch = escapeshellarg($branch);
                     $git_pr_command = "{$this->gitLfsSkipSmudgePrefix($only_checkout)}cd {$escapedBaseDir} && git fetch origin {$escapedPrBranch} && $git_checkout_command";
                     if ($exec_in_docker) {
@@ -2396,7 +2401,7 @@ class Application extends BaseModel
                         } else {
                             $commands->push("echo 'Checking out {$branch}'");
                         }
-                        $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitSshCommand($deployment_uuid), $gitConfigOption);
+                        $git_checkout_command = $this->buildGitCheckoutCommand($pr_checkout_target, gitSshCommand($deployment_uuid), $gitConfigOption);
                         $escapedPrBranch = escapeshellarg($branch);
                         $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && git {$gitConfigOption} fetch origin {$escapedPrBranch} && {$git_checkout_command}";
                     }
@@ -2435,7 +2440,7 @@ class Application extends BaseModel
                         } else {
                             $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                         }
-                        $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$gitlabGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $gitlabSshCommand);
+                        $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$gitlabGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_checkout_target, $gitlabSshCommand);
                     }
 
                     if ($exec_in_docker) {
@@ -2492,7 +2497,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$deployKeyGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $deployKeySshCommand);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$deployKeyGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_checkout_target, $deployKeySshCommand);
                 } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -2500,7 +2505,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$deployKeyGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $deployKeySshCommand);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$deployKeyGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_checkout_target, $deployKeySshCommand);
                 } elseif ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push($this->gitCommand(executeInDocker($deployment_uuid, "echo 'Checking out $branch'")));
@@ -2542,7 +2547,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" {$gitCommand} fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $otherSshCommand, $gitConfigOption);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" {$gitCommand} fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_checkout_target, $otherSshCommand, $gitConfigOption);
                 } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -2550,7 +2555,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" {$gitCommand} fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $otherSshCommand, $gitConfigOption);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" {$gitCommand} fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_checkout_target, $otherSshCommand, $gitConfigOption);
                 } elseif ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push($this->gitCommand(executeInDocker($deployment_uuid, "echo 'Checking out $branch'")));

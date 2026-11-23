@@ -50,7 +50,7 @@ class ApplicationPreviewsController extends Controller
             return invalidTokenResponse();
         }
 
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
@@ -88,7 +88,7 @@ class ApplicationPreviewsController extends Controller
             return invalidTokenResponse();
         }
 
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
@@ -160,7 +160,7 @@ class ApplicationPreviewsController extends Controller
             new OA\Property(property: 'docker_registry_image_tag', type: 'string', nullable: true),
             new OA\Property(property: 'last_online_at', type: 'string', nullable: true),
             new OA\Property(property: 'is_fork_pull_request', type: 'boolean', nullable: true, description: 'The pull request comes from a fork. null: Coolify does not know the origin yet (no webhook event of the pull request), and each commit needs an approval as for a fork.'),
-            new OA\Property(property: 'approval_status', type: 'string', nullable: true, enum: ['waiting_for_approval', 'approved'], description: 'Approval state of a fork pull request. waiting_for_approval: pending_approval_commit waits for an admin. approved: approved_commit was approved. null: no commit needed approval.'),
+            new OA\Property(property: 'approval_status', type: 'string', nullable: true, enum: ['waiting_for_approval', 'approved', null], description: 'Approval state of a fork pull request. waiting_for_approval: pending_approval_commit waits for an admin. approved: approved_commit was approved. null: no commit needed approval.'),
             new OA\Property(property: 'pending_approval_commit', type: 'string', nullable: true, description: 'Commit that waits for approval before it deploys.'),
             new OA\Property(property: 'approved_commit', type: 'string', nullable: true, description: 'Last approved commit.'),
             new OA\Property(property: 'approved_at', type: 'string', format: 'date-time', nullable: true),
@@ -184,7 +184,7 @@ class ApplicationPreviewsController extends Controller
             return invalidTokenResponse();
         }
 
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
@@ -364,7 +364,7 @@ class ApplicationPreviewsController extends Controller
             return invalidTokenResponse();
         }
 
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }

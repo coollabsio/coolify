@@ -42,6 +42,17 @@ class PreviewApprovalRequired extends CustomEmailNotification
         return $notifiable->getEnabledChannels('deployment_failure');
     }
 
+    /**
+     * The queue delivers the notification later. Skip it when an admin approved the commit,
+     * or a new commit replaced it, before the delivery.
+     */
+    public function shouldSend(object $notifiable, string $channel): bool
+    {
+        $pendingCommit = $this->preview->fresh()?->pending_approval_commit;
+
+        return filled($pendingCommit) && hash_equals($pendingCommit, $this->commit);
+    }
+
     public function toMail(?object $notifiable = null): MailMessage
     {
         return (new MailMessage)
@@ -70,6 +81,9 @@ class PreviewApprovalRequired extends CustomEmailNotification
         return $message;
     }
 
+    /**
+     * @return array{message: string, buttons: list<array{text: string, url: string}>}
+     */
     public function toTelegram(): array
     {
         return [
@@ -106,6 +120,22 @@ class PreviewApprovalRequired extends CustomEmailNotification
         );
     }
 
+    /**
+     * @return array{
+     *     success: false,
+     *     message: string,
+     *     event: 'preview_approval_required',
+     *     application_name: string,
+     *     application_uuid: string,
+     *     pull_request_id: int,
+     *     pull_request_url: string,
+     *     commit: string,
+     *     approve_url: string,
+     *     deployment_url: string,
+     *     project: ?string,
+     *     environment: ?string,
+     * }
+     */
     public function toWebhook(): array
     {
         return [

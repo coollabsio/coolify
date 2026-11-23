@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ApplicationDeploymentStatus;
 use App\Exceptions\DeploymentException;
 use App\Exceptions\PreviewApprovalRequiredException;
 use App\Jobs\ApplicationDeploymentJob;
@@ -9,11 +10,15 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Project;
+use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Notifications\Application\PreviewApprovalRequired;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
@@ -101,7 +106,8 @@ it('stops an unapproved fork commit, marks it as waiting, and notifies the team'
 
     expect($preview->fresh()->pending_approval_commit)->toBe(FORK_GATE_COMMIT)
         ->and($preview->fresh()->approvalStatus())->toBe('waiting_for_approval')
-        ->and($queue->fresh()->commit)->toBe(FORK_GATE_COMMIT);
+        ->and($queue->fresh()->commit)->toBe(FORK_GATE_COMMIT)
+        ->and($queue->fresh()->finished_at)->not->toBeNull();
     Notification::assertSentTo($team, PreviewApprovalRequired::class, fn (PreviewApprovalRequired $notification) => $notification->commit === FORK_GATE_COMMIT);
 });
 
@@ -216,4 +222,59 @@ it('skips the queued approval request when the commit is no longer pending at de
 
     $preview->approveCommit(FORK_GATE_OLD_COMMIT);
     expect($notification->shouldSend($team, 'mail'))->toBeFalse();
+});
+
+it('stops the worker at an unapproved fork commit without a build or a configuration copy', function () {
+    Process::fake();
+    $team = Team::factory()->create();
+    $team->emailNotificationSettings->update(['smtp_enabled' => true, 'deployment_failure_email_notifications' => true]);
+    $server = Server::factory()->create(['team_id' => $team->id, 'private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id]);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true, 'force_disabled' => false]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $application = Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'build_pack' => 'dockercompose',
+    ]);
+    $application->settings()->update(['is_preview_deployments_enabled' => true, 'is_preserve_repository_enabled' => true]);
+    ApplicationPreview::create(['application_id' => $application->id, 'pull_request_id' => 7, 'pull_request_html_url' => 'https://github.com/acme/app/pull/7'])
+        ->forceFill(['is_fork_pull_request' => true])->save();
+    $queue = ApplicationDeploymentQueue::create([
+        'application_id' => (string) $application->id,
+        'deployment_uuid' => 'fork-gate-handle',
+        'pull_request_id' => 7,
+        'commit' => 'HEAD',
+        'status' => ApplicationDeploymentStatus::QUEUED->value,
+        'server_id' => $server->id,
+        'destination_id' => $destination->id,
+    ]);
+
+    $job = new class($queue->id) extends ApplicationDeploymentJob
+    {
+        /** @var array<int, string> */
+        public array $remoteCommands = [];
+
+        public function execute_remote_command(...$commands)
+        {
+            $outputs = (new ReflectionProperty(ApplicationDeploymentJob::class, 'saved_outputs'))->getValue($this);
+            foreach ($commands as $command) {
+                $this->remoteCommands[] = $command['command'] ?? $command[0];
+                if (($command['save'] ?? null) === 'checked_out_commit') {
+                    $outputs->put('checked_out_commit', str(FORK_GATE_COMMIT."\n"));
+                }
+            }
+        }
+    };
+
+    $job->handle();
+
+    $commands = collect($job->remoteCommands);
+    expect($queue->fresh()->status)->toBe(ApplicationDeploymentStatus::CANCELLED_BY_USER->value)
+        ->and($queue->fresh()->commit)->toBe(FORK_GATE_COMMIT)
+        ->and($commands->contains(fn (string $command) => str_contains($command, 'docker stop') && str_contains($command, 'fork-gate-handle')))->toBeTrue()
+        ->and($commands->contains(fn (string $command) => str_contains($command, 'docker cp') || (str_contains($command, 'compose') && str_contains($command, ' build'))))->toBeFalse();
+    Notification::assertSentTo($team, PreviewApprovalRequired::class);
 });

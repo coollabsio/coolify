@@ -218,6 +218,23 @@ it('updates the fork flag of an existing preview', function (string $provider, b
         ->and(forkFlagDeploymentQueued($application))->toBeTrue();
 })->with('fork flag providers')->with(['fork' => true, 'same repository' => false]);
 
+it('clears a pending approval of an older commit when a webhook reports a new head', function (string $provider, string $pending, ?string $expected) {
+    [$application, $send] = forkFlagProvider($provider);
+    $preview = ApplicationPreview::create([
+        'application_id' => $application->id,
+        'pull_request_id' => 7,
+        'pull_request_html_url' => 'https://example.com/pull/7',
+    ]);
+    $preview->forceFill(['is_fork_pull_request' => true, 'pending_approval_commit' => $pending])->save();
+
+    $send(true);
+
+    expect($preview->refresh()->pending_approval_commit)->toBe($expected);
+})->with('fork flag providers')->with([
+    'older commit' => ['1111111111111111111111111111111111111111', null],
+    'same commit' => ['e83c5163316f89bfbde7d9ab23ca2e25604af290', 'e83c5163316f89bfbde7d9ab23ca2e25604af290'],
+]);
+
 it('hands the fork flag of a signed GitHub webhook to the pull request job', function (int $headRepositoryId, bool $fork) {
     Queue::fake([ProcessGithubPullRequestWebhook::class]);
     $application = forkFlagApplication(Team::factory()->create(), ['git_repository' => 'https://github.com/example/repo']);

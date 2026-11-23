@@ -312,23 +312,25 @@
                     </div>
                 </div>
 
-                @if (filled($preview->pending_approval_commit))
+                @if ($preview->isWaitingForApproval())
                     @php
                         $pendingCommit = $preview->pending_approval_commit;
                         $pendingCommitShort = substr($pendingCommit, 0, 7);
+                        $pendingCommitUrl = $preview->pendingApprovalCommitUrl();
                     @endphp
                     <div class="mt-4 flex flex-col gap-3 rounded-lg border border-neutral-200 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.07]"
                         wire:key="preview-approval-{{ $preview->id }}-{{ $pendingCommit }}">
                         <div class="flex min-w-0 flex-col gap-1.5">
                             <div class="flex flex-wrap items-center gap-2">
                                 <x-status-badge type="warning" label="Waiting for approval" />
-                                @if (filled($preview->pull_request_html_url))
-                                    <a target="_blank" title="Open pull request in a new tab"
+                                @if (filled($pendingCommitUrl))
+                                    <a target="_blank" title="Open commit {{ $pendingCommit }} in a new tab"
                                         class="font-mono text-xs text-neutral-600 hover:text-coollabs dark:text-fg-dim dark:hover:text-brand-light"
-                                        href="{{ $preview->pull_request_html_url }}">{{ $pendingCommitShort }}</a>
+                                        href="{{ $pendingCommitUrl }}">{{ $pendingCommitShort }}</a>
                                 @else
                                     <span class="font-mono text-xs text-neutral-600 dark:text-fg-dim">{{ $pendingCommitShort }}</span>
                                 @endif
+                                <x-copy-button :value="$pendingCommit" label="Copy full commit SHA" />
                             </div>
                             <p class="text-xs text-neutral-500 dark:text-fg-dim">
                                 @if ($preview->is_fork_pull_request === false)
@@ -345,13 +347,17 @@
                                 isHighlightedButton
                                 submitAction="approveForkCommit({{ $preview->id }}, '{{ $pendingCommit }}')"
                                 :actions="[
-                                    'Commit ' . $pendingCommitShort . ' of this fork pull request will be deployed.',
+                                    'Commit ' . $pendingCommit . ' of this fork pull request will be deployed. Make sure that this is the commit that you reviewed.',
                                     'The code of the fork runs on your server and can read the environment variables of this preview.',
                                 ]"
                                 :confirmWithText="false" :confirmWithPassword="false"
                                 step2ButtonText="Approve and deploy" />
                         @endcan
                     </div>
+                @elseif (filled($preview->pending_approval_commit))
+                    <p class="mt-3 text-xs text-neutral-500 dark:text-fg-dim">
+                        Commit <span class="font-mono">{{ substr($preview->pending_approval_commit, 0, 7) }}</span> waited for approval. Approval is now off, so redeploy the preview to deploy it.
+                    </p>
                 @elseif (filled($preview->approved_commit))
                     <p class="mt-3 text-xs text-neutral-500 dark:text-fg-dim">
                         Approved commit <span class="font-mono">{{ substr($preview->approved_commit, 0, 7) }}</span>

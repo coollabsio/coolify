@@ -317,7 +317,7 @@ class Gitea extends Controller
                         ($found ?? $pr_app)->markForkPullRequest($this->isForkPreviewRepository(
                             data_get($payload, 'pull_request.head.repo.id'),
                             data_get($payload, 'pull_request.base.repo.id'),
-                        ));
+                        ), $commit ?? null);
 
                         $result = queue_application_deployment(
                             application: $application,
@@ -588,7 +588,7 @@ class Gitea extends Controller
                             ($found ?? $pr_app)->markForkPullRequest($this->isForkPreviewRepository(
                                 data_get($payload, 'pull_request.head.repo.id'),
                                 data_get($payload, 'pull_request.base.repo.id'),
-                            ));
+                            ), $commit ?? null);
 
                             $result = queue_application_deployment(
                                 application: $application,

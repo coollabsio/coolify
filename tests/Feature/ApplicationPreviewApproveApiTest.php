@@ -3,6 +3,7 @@
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Models\AuditEvent;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -27,10 +28,10 @@ beforeEach(function () {
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
     $this->bearerToken = approveApiToken($this->user, $this->team, ['*']);
 
-    $server = Server::factory()->create(['team_id' => $this->team->id]);
-    $destination = StandaloneDocker::where('server_id', $server->id)->first();
-    $project = Project::factory()->create(['team_id' => $this->team->id]);
-    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $this->server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $this->server->id)->first();
+    $this->project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $this->project->id]);
 
     $this->application = Application::factory()->create([
         'environment_id' => $environment->id,
@@ -53,7 +54,10 @@ beforeEach(function () {
     ])->save();
 });
 
-function approveApiToken(User $user, Team $team, array $abilities): string
+/**
+ * @param  list<array{scope: string, uuid: string}>|null  $scopes
+ */
+function approveApiToken(User $user, Team $team, array $abilities, ?array $scopes = null): string
 {
     $plainTextToken = Str::random(40);
     $token = $user->tokens()->create([
@@ -62,6 +66,7 @@ function approveApiToken(User $user, Team $team, array $abilities): string
         'abilities' => $abilities,
         'team_id' => $team->id,
     ]);
+    $token->forceFill(['scopes' => $scopes])->save();
 
     return $token->getKey().'|'.$plainTextToken;
 }
@@ -120,16 +125,32 @@ test('a token without write and deploy abilities cannot approve', function (arra
     'deploy only' => [['deploy']],
 ]);
 
-test('a team member cannot approve', function () {
+test('a team member without a write grant cannot approve', function () {
     $member = User::factory()->create();
     $this->team->members()->attach($member->id, ['role' => 'member']);
 
-    $this->withHeaders(approveApiHeaders(approveApiToken($member, $this->team, ['*'])))
+    $this->withHeaders(approveApiHeaders(approveApiToken($member, $this->team, ['write', 'deploy'])))
         ->postJson("/api/v1/applications/{$this->application->uuid}/previews/42/approve", ['commit' => $this->pendingCommit])
         ->assertForbidden();
 
     expect($this->preview->fresh()->pending_approval_commit)->toBe($this->pendingCommit);
     Queue::assertNotPushed(ApplicationDeploymentJob::class);
+});
+
+test('a team member with a write grant on the project can approve', function () {
+    $member = User::factory()->create();
+    $this->team->members()->attach($member->id, [
+        'role' => 'member',
+        'access' => json_encode([['scope' => 'project', 'uuid' => $this->project->uuid, 'levels' => ['write']]]),
+    ]);
+    $token = approveApiToken($member, $this->team, ['write', 'deploy'], [['scope' => 'project', 'uuid' => $this->project->uuid]]);
+
+    $this->withHeaders(approveApiHeaders($token))
+        ->postJson("/api/v1/applications/{$this->application->uuid}/previews/42/approve", ['commit' => $this->pendingCommit])
+        ->assertOk();
+
+    expect($this->preview->fresh()->approved_commit)->toBe($this->pendingCommit);
+    Queue::assertPushed(ApplicationDeploymentJob::class);
 });
 
 test('the application of another team is not found', function () {
@@ -160,6 +181,38 @@ test('a stale commit returns 409 and changes nothing', function () {
     expect($preview->pending_approval_commit)->toBe($this->pendingCommit)
         ->and($preview->approved_commit)->toBeNull();
     Queue::assertNotPushed(ApplicationDeploymentJob::class);
+});
+
+test('the same request queues the approved commit after the queue was full', function () {
+    $this->server->settings->update(['deployment_queue_limit' => 0]);
+    $url = "/api/v1/applications/{$this->application->uuid}/previews/42/approve";
+
+    $this->withHeaders(approveApiHeaders($this->bearerToken))
+        ->postJson($url, ['commit' => $this->pendingCommit])
+        ->assertStatus(429);
+    expect($this->preview->fresh()->approved_commit)->toBe($this->pendingCommit)
+        ->and($this->application->deployment_queue()->count())->toBe(0);
+
+    $this->server->settings->update(['deployment_queue_limit' => 25]);
+    $this->withHeaders(approveApiHeaders($this->bearerToken))
+        ->postJson($url, ['commit' => $this->pendingCommit])
+        ->assertOk();
+
+    $deployment = $this->application->deployment_queue()->sole();
+    expect($deployment->commit)->toBe($this->pendingCommit)
+        ->and(AuditEvent::query()->where('event', 'api.application.preview_commit_approved')->count())->toBe(1);
+    Queue::assertPushed(ApplicationDeploymentJob::class);
+});
+
+test('a retry of an approved commit returns 409 when a newer commit waits for approval', function () {
+    $this->preview->forceFill(['approved_commit' => $this->pendingCommit, 'pending_approval_commit' => str_repeat('c', 40)])->save();
+
+    $this->withHeaders(approveApiHeaders($this->bearerToken))
+        ->postJson("/api/v1/applications/{$this->application->uuid}/previews/42/approve", ['commit' => $this->pendingCommit])
+        ->assertStatus(409);
+
+    expect($this->preview->fresh()->pending_approval_commit)->toBe(str_repeat('c', 40))
+        ->and($this->application->deployment_queue()->count())->toBe(0);
 });
 
 test('the commit must be a full SHA', function (mixed $commit) {
