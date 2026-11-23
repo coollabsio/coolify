@@ -4559,6 +4559,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '409':
+          description: 'A deployment of this application is already queued or in progress on the server of this destination.'
         '422':
           $ref: '#/components/responses/422'
       security:

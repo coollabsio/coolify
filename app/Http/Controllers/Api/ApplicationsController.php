@@ -6,12 +6,14 @@ use App\Actions\Application\CleanupPreviewDeployment;
 use App\Actions\Application\GetRollbackImages;
 use App\Actions\Application\LoadComposeFile;
 use App\Actions\Application\StopApplication;
+use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\BuildPackTypes;
 use App\Enums\HttpBasicAuthHashAlgorithm;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Jobs\ServerStorageSaveJob;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\ApplicationSetting;
 use App\Models\EnvironmentVariable;
@@ -6959,6 +6961,7 @@ class ApplicationsController extends Controller
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 409, description: 'A deployment of this application is already queued or in progress on the server of this destination.'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
@@ -6990,6 +6993,20 @@ class ApplicationsController extends Controller
 
         if ($application->additional_servers()->exists() && str($application->docker_registry_image_name)->isEmpty()) {
             return response()->json(['message' => 'A Docker registry image is required to deploy to multiple destinations.'], 422);
+        }
+
+        if (! $destination->server?->canHostResources()) {
+            return response()->json(['message' => 'The server of this destination cannot host resources.'], 422);
+        }
+
+        $deploymentRunsOnServer = ApplicationDeploymentQueue::query()
+            ->where('application_id', $application->id)
+            ->where('pull_request_id', 0)
+            ->where('server_id', $destination->server_id)
+            ->whereIn('status', [ApplicationDeploymentStatus::QUEUED->value, ApplicationDeploymentStatus::IN_PROGRESS->value])
+            ->exists();
+        if ($deploymentRunsOnServer) {
+            return response()->json(['message' => 'A deployment of this application is already queued or in progress on the server of this destination.'], 409);
         }
 
         $deploymentUuid = new_public_id();

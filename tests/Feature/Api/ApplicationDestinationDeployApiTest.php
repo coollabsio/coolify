@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Enums\ServerRole;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -115,6 +116,43 @@ test('deploys to the attached destination while a primary deployment is in progr
         ->and($deployment->status)->toBe(ApplicationDeploymentStatus::IN_PROGRESS->value);
 
     Bus::assertDispatched(ApplicationDeploymentJob::class);
+});
+
+test('returns 409 when the application already deploys on the server of the destination', function (string $status) {
+    ApplicationDeploymentQueue::create([
+        'application_id' => $this->application->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'deployment_uuid' => 'primary-busy',
+        'commit' => 'HEAD',
+        'pull_request_id' => 0,
+        'status' => $status,
+    ]);
+
+    $response = $this->withHeaders(destinationDeployHeaders($this->token))
+        ->postJson("/api/v1/applications/{$this->application->uuid}/destinations/{$this->destination->uuid}/deploy");
+
+    $response->assertStatus(409)
+        ->assertJson(['message' => 'A deployment of this application is already queued or in progress on the server of this destination.']);
+
+    expect(ApplicationDeploymentQueue::query()->count())->toBe(1);
+    Bus::assertNotDispatched(ApplicationDeploymentJob::class);
+})->with([
+    'in progress' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+    'queued' => ApplicationDeploymentStatus::QUEUED->value,
+]);
+
+test('returns 422 when the server of the destination cannot host resources', function () {
+    attachAdditionalDestination($this->application, $this->additionalDestination);
+    $this->additionalServer->settings->update(['server_role' => ServerRole::BUILD]);
+
+    $response = $this->withHeaders(destinationDeployHeaders($this->token))
+        ->postJson("/api/v1/applications/{$this->application->uuid}/destinations/{$this->additionalDestination->uuid}/deploy");
+
+    $response->assertStatus(422)
+        ->assertJson(['message' => 'The server of this destination cannot host resources.']);
+
+    expect(ApplicationDeploymentQueue::query()->count())->toBe(0);
 });
 
 test('queues a deployment to the primary destination', function () {
