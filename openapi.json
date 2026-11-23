@@ -28,11 +28,22 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/Page"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/PerPage"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "List of preview deployments.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -49,6 +60,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -430,11 +444,67 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "project_uuid",
+                        "in": "query",
+                        "description": "Filter applications by project UUID.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "environment_uuid",
+                        "in": "query",
+                        "description": "Filter applications by environment UUID.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "server_uuid",
+                        "in": "query",
+                        "description": "Filter applications by the UUID of the server they are deployed to.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter applications by status (case-insensitive substring, for example running or exited).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "name",
+                        "in": "query",
+                        "description": "Filter applications by name (case-insensitive substring).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/Page"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/PerPage"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Get all applications.",
+                        "description": "Get all applications. An unknown project, environment, or server UUID gives an empty list.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -451,6 +521,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -7057,84 +7130,88 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "A page of audit events, newest first.",
+                        "description": "A page of audit events, newest first. The X-Total-Count header gives the total.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
-                                    "properties": {
-                                        "current_page": {
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "team_id": {
-                                                        "type": "integer",
-                                                        "nullable": true
-                                                    },
-                                                    "event": {
-                                                        "type": "string"
-                                                    },
-                                                    "source": {
-                                                        "type": "string"
-                                                    },
-                                                    "action": {
-                                                        "type": "string"
-                                                    },
-                                                    "level": {
-                                                        "type": "string"
-                                                    },
-                                                    "actor_type": {
-                                                        "type": "string",
-                                                        "nullable": true
-                                                    },
-                                                    "actor_id": {
-                                                        "type": "integer",
-                                                        "nullable": true
-                                                    },
-                                                    "actor_name": {
-                                                        "type": "string",
-                                                        "nullable": true
-                                                    },
-                                                    "resource_type": {
-                                                        "type": "string",
-                                                        "nullable": true
-                                                    },
-                                                    "resource_uuid": {
-                                                        "type": "string",
-                                                        "nullable": true
-                                                    },
-                                                    "resource_name": {
-                                                        "type": "string",
-                                                        "nullable": true
-                                                    },
-                                                    "description": {
-                                                        "type": "string",
-                                                        "nullable": true
-                                                    },
-                                                    "created_at": {
-                                                        "type": "string",
-                                                        "format": "date-time"
-                                                    }
-                                                }
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer"
+                                            },
+                                            "team_id": {
+                                                "type": [
+                                                    "integer",
+                                                    "null"
+                                                ]
+                                            },
+                                            "event": {
+                                                "type": "string"
+                                            },
+                                            "source": {
+                                                "type": "string"
+                                            },
+                                            "action": {
+                                                "type": "string"
+                                            },
+                                            "level": {
+                                                "type": "string"
+                                            },
+                                            "actor_type": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "actor_id": {
+                                                "type": [
+                                                    "integer",
+                                                    "null"
+                                                ]
+                                            },
+                                            "actor_name": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "resource_type": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "resource_uuid": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "resource_name": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "description": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "created_at": {
+                                                "type": "string",
+                                                "format": "date-time"
                                             }
                                         },
-                                        "per_page": {
-                                            "type": "integer"
-                                        },
-                                        "last_page": {
-                                            "type": "integer"
-                                        },
-                                        "total": {
-                                            "type": "integer"
-                                        }
-                                    },
-                                    "type": "object"
+                                        "type": "object"
+                                    }
                                 }
                             }
                         }
@@ -7908,9 +7985,67 @@
                 "summary": "List",
                 "description": "List all databases.",
                 "operationId": "list-databases",
+                "parameters": [
+                    {
+                        "name": "project_uuid",
+                        "in": "query",
+                        "description": "Filter databases by project UUID.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "environment_uuid",
+                        "in": "query",
+                        "description": "Filter databases by environment UUID.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "server_uuid",
+                        "in": "query",
+                        "description": "Filter databases by the UUID of the server they are deployed to.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter databases by status (case-insensitive substring, for example running or exited).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "name",
+                        "in": "query",
+                        "description": "Filter databases by name (case-insensitive substring).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/Page"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/PerPage"
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "Get all databases",
+                        "description": "Get all databases. An unknown project, environment, or server UUID gives an empty list.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -7927,6 +8062,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -10389,53 +10527,62 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/Page"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/PerPage"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "List of backup executions",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
-                                    "properties": {
-                                        "executions": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "uuid": {
-                                                        "type": "string"
-                                                    },
-                                                    "filename": {
-                                                        "type": "string"
-                                                    },
-                                                    "size": {
-                                                        "type": "integer"
-                                                    },
-                                                    "created_at": {
-                                                        "type": "string"
-                                                    },
-                                                    "message": {
-                                                        "description": "Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.",
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "status": {
-                                                        "type": "string"
-                                                    }
-                                                },
-                                                "type": "object"
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "uuid": {
+                                                "type": "string"
+                                            },
+                                            "filename": {
+                                                "type": "string"
+                                            },
+                                            "size": {
+                                                "type": "integer"
+                                            },
+                                            "created_at": {
+                                                "type": "string"
+                                            },
+                                            "message": {
+                                                "description": "Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.",
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "status": {
+                                                "type": "string"
                                             }
-                                        }
-                                    },
-                                    "type": "object"
+                                        },
+                                        "type": "object"
+                                    }
                                 }
                             }
                         }
                     },
                     "404": {
                         "description": "Backup configuration not found."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -12039,10 +12186,34 @@
                         }
                     },
                     {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number. page and per_page take precedence over skip and take.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Items per page.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10,
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    },
+                    {
                         "name": "skip",
                         "in": "query",
-                        "description": "Number of records to skip.",
+                        "description": "Number of records to skip. Deprecated: use page and per_page.",
                         "required": false,
+                        "deprecated": true,
                         "schema": {
                             "type": "integer",
                             "default": 0,
@@ -12052,8 +12223,9 @@
                     {
                         "name": "take",
                         "in": "query",
-                        "description": "Number of records to take.",
+                        "description": "Number of records to take. Deprecated: use page and per_page.",
                         "required": false,
+                        "deprecated": true,
                         "schema": {
                             "type": "integer",
                             "default": 10,
@@ -18014,11 +18186,22 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/Page"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/PerPage"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "Get all executions for a scheduled task.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -18035,6 +18218,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -18378,11 +18564,22 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/Page"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/PerPage"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "Get all executions for a scheduled task.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -18399,6 +18596,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -19744,11 +19944,39 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Items per page.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 20,
+                            "maximum": 100,
+                            "minimum": 1
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "Recent Docker cleanup executions.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -19794,6 +20022,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -23770,9 +24001,67 @@
                 "summary": "List",
                 "description": "List all services.",
                 "operationId": "list-services",
+                "parameters": [
+                    {
+                        "name": "project_uuid",
+                        "in": "query",
+                        "description": "Filter services by project UUID.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "environment_uuid",
+                        "in": "query",
+                        "description": "Filter services by environment UUID.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "server_uuid",
+                        "in": "query",
+                        "description": "Filter services by the UUID of the server they are deployed to.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter services by status (case-insensitive substring, for example running or exited).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "name",
+                        "in": "query",
+                        "description": "Filter services by name (case-insensitive substring).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/Page"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/PerPage"
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "Get all services",
+                        "description": "Get all services. An unknown project, environment, or server UUID gives an empty list.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -23789,6 +24078,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -27616,71 +27908,77 @@
                             "type": "string",
                             "example": "update_now,update_available"
                         }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/Page"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/PerPage"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "Resources with their security status, worst first.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
-                                    "properties": {
-                                        "resources": {
-                                            "type": "array",
-                                            "items": {
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "uuid": {
+                                                "type": "string"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            },
+                                            "type": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "application",
+                                                    "service",
+                                                    "database"
+                                                ]
+                                            },
+                                            "project_uuid": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "environment_uuid": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "server_uuid": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "images": {
                                                 "properties": {
-                                                    "uuid": {
-                                                        "type": "string"
+                                                    "update": {
+                                                        "type": "integer"
                                                     },
-                                                    "name": {
-                                                        "type": "string"
-                                                    },
-                                                    "type": {
-                                                        "type": "string",
-                                                        "enum": [
-                                                            "application",
-                                                            "service",
-                                                            "database"
-                                                        ]
-                                                    },
-                                                    "project_uuid": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "environment_uuid": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "server_uuid": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "images": {
-                                                        "properties": {
-                                                            "update": {
-                                                                "type": "integer"
-                                                            },
-                                                            "total": {
-                                                                "type": "integer"
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    },
-                                                    "security": {
-                                                        "$ref": "#\/components\/schemas\/SecurityStatus"
+                                                    "total": {
+                                                        "type": "integer"
                                                     }
                                                 },
                                                 "type": "object"
+                                            },
+                                            "security": {
+                                                "$ref": "#\/components\/schemas\/SecurityStatus"
                                             }
-                                        }
-                                    },
-                                    "type": "object"
+                                        },
+                                        "type": "object"
+                                    }
                                 }
                             }
                         }
@@ -27690,6 +27988,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -27738,7 +28039,12 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Scan results.",
+                        "description": "Scan results. The X-Total-Count header gives the total number of matching findings.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -27806,7 +28112,12 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Scan results.",
+                        "description": "Scan results. The X-Total-Count header gives the total number of matching findings.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -27874,7 +28185,12 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Scan results.",
+                        "description": "Scan results. The X-Total-Count header gives the total number of matching findings.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -28921,20 +29237,6 @@
                             },
                             "type": "object"
                         }
-                    },
-                    "pagination": {
-                        "properties": {
-                            "page": {
-                                "type": "integer"
-                            },
-                            "per_page": {
-                                "type": "integer"
-                            },
-                            "total": {
-                                "type": "integer"
-                            }
-                        },
-                        "type": "object"
                     }
                 },
                 "type": "object"
@@ -31531,6 +31833,29 @@
             }
         },
         "parameters": {
+            "Page": {
+                "name": "page",
+                "in": "query",
+                "description": "Page number. With page or per_page, the list is paginated and the X-Total-Count header gives the total.",
+                "required": false,
+                "schema": {
+                    "type": "integer",
+                    "default": 1,
+                    "minimum": 1
+                }
+            },
+            "PerPage": {
+                "name": "per_page",
+                "in": "query",
+                "description": "Items per page. With page or per_page, the list is paginated and the X-Total-Count header gives the total.",
+                "required": false,
+                "schema": {
+                    "type": "integer",
+                    "default": 50,
+                    "maximum": 100,
+                    "minimum": 1
+                }
+            },
             "MetricsMinutes": {
                 "name": "minutes",
                 "in": "query",
@@ -31619,6 +31944,14 @@
                     "default": 50,
                     "maximum": 200,
                     "minimum": 1
+                }
+            }
+        },
+        "headers": {
+            "X-Total-Count": {
+                "description": "Total number of items that match the filters, on all pages. Sent when the list is paginated.",
+                "schema": {
+                    "type": "integer"
                 }
             }
         },

@@ -34,6 +34,7 @@ use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
@@ -305,20 +306,20 @@ class ApplicationsController extends Controller
         ],
         tags: ['Applications'],
         parameters: [
-            new OA\Parameter(
-                name: 'tag',
-                in: 'query',
-                description: 'Filter applications by tag name.',
-                required: false,
-                schema: new OA\Schema(
-                    type: 'string',
-                )
-            ),
+            new OA\Parameter(name: 'tag', in: 'query', description: 'Filter applications by tag name.', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'project_uuid', in: 'query', description: 'Filter applications by project UUID.', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'environment_uuid', in: 'query', description: 'Filter applications by environment UUID.', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'server_uuid', in: 'query', description: 'Filter applications by the UUID of the server they are deployed to.', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'status', in: 'query', description: 'Filter applications by status (case-insensitive substring, for example running or exited).', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'name', in: 'query', description: 'Filter applications by name (case-insensitive substring).', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(ref: '#/components/parameters/Page'),
+            new OA\Parameter(ref: '#/components/parameters/PerPage'),
         ],
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Get all applications.',
+                description: 'Get all applications. An unknown project, environment, or server UUID gives an empty list.',
+                headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')],
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',
@@ -337,33 +338,44 @@ class ApplicationsController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
-    public function applications(Request $request)
+    public function applications(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
 
-        $tagName = $request->query('tag');
+        $validator = Validator::make($request->query(), [
+            'tag' => ['nullable', 'string', 'max:255'],
+            'project_uuid' => ['nullable', 'string', 'max:255'],
+            'environment_uuid' => ['nullable', 'string', 'max:255'],
+            'server_uuid' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', 'string', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'],
+        ] + apiPaginationRules());
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+        $validated = $validator->validated();
+
         $applicationRelations = canReadServerSecretsFromApi()
             ? ['destination.server.settings']
             : [];
 
-        $applications = Application::ownedByCurrentTeamAPI($teamId)
+        $query = Application::ownedByCurrentTeamAPI($teamId)
             ->with($applicationRelations)
-            ->when($tagName, function ($query, $tagName) {
-                $query->whereHas('tags', function ($query) use ($tagName) {
-                    $query->where('name', $tagName);
-                });
-            })
-            ->get()
-            ->map(function ($application) {
-                return $this->removeSensitiveData($application);
-            });
+            ->applyListFilters($teamId, Arr::only($validated, ['tag', 'project_uuid', 'environment_uuid', 'server_uuid', 'status', 'name']))
+            ->orderBy('id');
 
-        return response()->json($applications);
+        [$applications, $headers] = apiPaginate($query, $request);
+
+        return response()->json($applications->map(fn ($application) => $this->removeSensitiveData($application)), 200, $headers);
     }
 
     #[OA\Post(

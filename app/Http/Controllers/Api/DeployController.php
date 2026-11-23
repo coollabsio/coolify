@@ -685,11 +685,14 @@ class DeployController extends Controller
                     type: 'string',
                 )
             ),
+            new OA\Parameter(name: 'page', in: 'query', description: 'Page number. page and per_page take precedence over skip and take.', required: false, schema: new OA\Schema(type: 'integer', default: 1, minimum: 1)),
+            new OA\Parameter(name: 'per_page', in: 'query', description: 'Items per page.', required: false, schema: new OA\Schema(type: 'integer', default: 10, minimum: 1, maximum: 100)),
             new OA\Parameter(
                 name: 'skip',
                 in: 'query',
-                description: 'Number of records to skip.',
+                description: 'Number of records to skip. Deprecated: use page and per_page.',
                 required: false,
+                deprecated: true,
                 schema: new OA\Schema(
                     type: 'integer',
                     minimum: 0,
@@ -699,8 +702,9 @@ class DeployController extends Controller
             new OA\Parameter(
                 name: 'take',
                 in: 'query',
-                description: 'Number of records to take.',
+                description: 'Number of records to take. Deprecated: use page and per_page.',
                 required: false,
+                deprecated: true,
                 schema: new OA\Schema(
                     type: 'integer',
                     minimum: 1,
@@ -734,14 +738,21 @@ class DeployController extends Controller
     )]
     public function get_application_deployments(Request $request)
     {
-        $request->validate([
+        // page and per_page take precedence, so skip and take are validated only when neither is given.
+        $usesPages = $request->filled('page') || $request->filled('per_page');
+        $request->validate($usesPages ? apiPaginationRules() : [
             'skip' => ['nullable', 'integer', 'min:0'],
             'take' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $app_uuid = $request->route('uuid', null);
-        $skip = $request->get('skip', 0);
-        $take = $request->get('take', 10);
+        if ($usesPages) {
+            $take = (int) ($request->query('per_page') ?: 10);
+            $skip = ((int) ($request->query('page') ?: 1) - 1) * $take;
+        } else {
+            $skip = (int) ($request->query('skip') ?: 0);
+            $take = (int) ($request->query('take') ?: 10);
+        }
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {

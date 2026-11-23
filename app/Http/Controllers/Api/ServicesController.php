@@ -236,10 +236,20 @@ class ServicesController extends Controller
             ['bearerAuth' => []],
         ],
         tags: ['Services'],
+        parameters: [
+            new OA\Parameter(name: 'project_uuid', in: 'query', description: 'Filter services by project UUID.', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'environment_uuid', in: 'query', description: 'Filter services by environment UUID.', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'server_uuid', in: 'query', description: 'Filter services by the UUID of the server they are deployed to.', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'status', in: 'query', description: 'Filter services by status (case-insensitive substring, for example running or exited).', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'name', in: 'query', description: 'Filter services by name (case-insensitive substring).', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(ref: '#/components/parameters/Page'),
+            new OA\Parameter(ref: '#/components/parameters/PerPage'),
+        ],
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Get all services',
+                description: 'Get all services. An unknown project, environment, or server UUID gives an empty list.',
+                headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')],
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',
@@ -258,28 +268,55 @@ class ServicesController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
-    public function services(Request $request)
+    public function services(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $projects = Project::where('team_id', $teamId)->get();
-        $services = collect();
+
+        $validator = Validator::make($request->query(), [
+            'project_uuid' => ['nullable', 'string', 'max:255'],
+            'environment_uuid' => ['nullable', 'string', 'max:255'],
+            'server_uuid' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', 'string', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'],
+        ] + apiPaginationRules());
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+        $validated = $validator->validated();
+
         $serviceRelations = canReadServerSecretsFromApi()
             ? ['destination.server.settings']
             : [];
 
-        foreach ($projects as $project) {
-            $services = $services->merge(
-                $project->services()->with($serviceRelations)->get()
-                    ->map(fn (Service $service) => $this->removeSensitiveData($service))
-            );
+        $query = Service::whereRelation('environment.project', 'team_id', $teamId)
+            ->with($serviceRelations)
+            ->applyListFilters($teamId, Arr::only($validated, ['project_uuid', 'environment_uuid', 'server_uuid', 'name']));
+
+        $paginate = isset($validated['page']) || isset($validated['per_page']);
+        $perPage = $paginate ? (int) ($validated['per_page'] ?? 50) : null;
+        $offset = $paginate ? ((int) ($validated['page'] ?? 1) - 1) * $perPage : 0;
+
+        if (isset($validated['status'])) {
+            [$total, $services] = Service::pageByStatus($query, $validated['status'], $offset, $perPage);
+            $services->load(['applications', 'databases']);
+        } else {
+            $query->orderBy('name')->orderBy('id');
+            $total = $paginate ? (clone $query)->count() : null;
+            $services = $paginate ? $query->skip($offset)->take($perPage)->get() : $query->get();
         }
 
-        return response()->json($services->values());
+        $services = $services->map(fn (Service $service) => $this->removeSensitiveData($service))->values();
+
+        return response()->json($services, 200, $paginate ? ['X-Total-Count' => $total] : []);
     }
 
     #[OA\Post(
