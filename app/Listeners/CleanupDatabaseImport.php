@@ -5,6 +5,7 @@ namespace App\Listeners;
 use App\Events\DatabaseImportFinished;
 use App\Models\Server;
 use App\Support\DatabaseImport\DatabaseImportCleanup;
+use App\Support\DatabaseImport\DatabaseImportS3Upload;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -110,6 +111,11 @@ SH;
 
             if ($server && $commands !== []) {
                 instant_remote_process($commands, $server);
+            }
+
+            // After the remote cleanup: the restore helper no longer reads the uploaded file.
+            if (is_int($event->data['uploadStorageId'] ?? null) && is_string($event->data['uploadKey'] ?? null)) {
+                DatabaseImportS3Upload::discardImported($event->data['uploadStorageId'], $event->data['uploadKey']);
             }
 
             // A failed import task keeps blocking the database until its restore is stopped.

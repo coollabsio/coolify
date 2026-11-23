@@ -14,7 +14,7 @@ use Throwable;
 
 /**
  * Cleanup of a database import: helper containers and temporary files on the server
- * and in the database container.
+ * and in the database container, and a backup that the browser uploaded to an S3 storage for the import.
  *
  * The normal path sends the cleanup data through the encrypted CoolifyTask payload.
  * The import also stores the same data on its activity, so Coolify can stop and clean up
@@ -61,6 +61,8 @@ class DatabaseImportCleanup
         'containerName',
         'serverTmpPath',
         'credentialTmpPath',
+        'uploadStorageId',
+        'uploadKey',
     ];
 
     /**

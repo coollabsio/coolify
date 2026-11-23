@@ -13,6 +13,7 @@ use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 use App\Support\DatabaseImport\DatabaseImportException;
+use App\Support\DatabaseImport\DatabaseImportS3Upload;
 use App\Support\DatabaseImport\DatabaseImportSource;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
@@ -178,13 +179,25 @@ class ImportForm extends Component
     public string $customLocation = '';
 
     /**
-     * The file source the user selected: 'upload' after a completed upload, 'server' after a checked server path.
+     * The file source the user selected: 'upload' after a completed upload, 's3-upload' after a completed upload to an
+     * S3 storage, 'server' after a checked server path.
      * Only the server sets it, so an import never falls back to an older upload.
      */
     #[Locked]
     public ?string $fileSource = null;
 
     public ?int $activityId = null;
+
+    /**
+     * The S3 storage that the browser uploads the backup to. 0 uploads it to the Coolify instance.
+     */
+    public int $s3UploadStorageId = 0;
+
+    /**
+     * The upload to an S3 storage that this form started. Only the server sets it.
+     */
+    #[Locked]
+    public ?string $s3UploadId = null;
 
     // S3 Restore properties
     public array $availableS3Storages = [];
@@ -203,6 +216,25 @@ class ImportForm extends Component
         }
 
         return $this->resourceType::find($this->resourceId);
+    }
+
+    /**
+     * The S3 storages of the database's team that the browser can upload a backup to.
+     *
+     * @return list<array{id: int, name: string}>
+     */
+    #[Computed]
+    public function s3UploadStorages(): array
+    {
+        $teamId = $this->resourceTeamId();
+        if ($teamId === null) {
+            return [];
+        }
+
+        return S3Storage::query()->where('team_id', $teamId)->s3Only()->where('is_usable', true)
+            ->orderBy('name')->get(['id', 'name'])
+            ->map(fn (S3Storage $storage) => ['id' => $storage->id, 'name' => $storage->name])
+            ->all();
     }
 
     /**
@@ -414,6 +446,7 @@ class ImportForm extends Component
                 $this->filename = $this->customLocation;
                 $this->fileSource = 'server';
                 $this->discardStagedUpload();
+                $this->discardS3Upload();
                 $this->selectSqliteDatabaseFor($this->customLocation);
                 $this->dispatch('success', 'The file exists.');
             } catch (\Throwable $e) {
@@ -445,7 +478,109 @@ class ImportForm extends Component
 
         $this->fileSource = 'upload';
         $this->customLocation = '';
+        $this->discardS3Upload();
         $this->selectSqliteDatabaseFor($name);
+    }
+
+    /**
+     * Starts an upload from the browser to an S3 storage of the database's team and returns the presigned URLs
+     * of its parts. The browser PUTs the parts, then calls completeS3Upload().
+     *
+     * @return array{partSize: int, parts: list<array{number: int, url: string}>}|false
+     */
+    public function startS3Upload(int $storageId, string $filename, int $size): array|false
+    {
+        $this->authorizeS3Upload();
+        $this->discardS3Upload();
+        $this->fileSource = null;
+
+        $storage = S3Storage::query()->where('team_id', $this->resourceTeamId())->s3Only()->where('is_usable', true)->find($storageId);
+        if (! $storage) {
+            $this->dispatch('error', 'The S3 storage was not found or is not usable.');
+
+            return false;
+        }
+
+        try {
+            $started = DatabaseImportS3Upload::start($storage, $this->resource, (int) $this->resourceTeamId(), $filename, $size);
+            $this->s3UploadId = $started['upload']->marker['upload_id'];
+
+            return ['partSize' => $started['partSize'], 'parts' => $started['parts']];
+        } catch (DatabaseImportException $e) {
+            $this->dispatch('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+
+        return false;
+    }
+
+    /**
+     * Completes the upload to the S3 storage after the browser uploaded all parts, and selects it for the import.
+     */
+    public function completeS3Upload(): bool
+    {
+        $this->authorizeS3Upload();
+
+        $upload = $this->currentS3Upload();
+        if (! $upload) {
+            $this->dispatch('error', 'The upload was not found. Please upload the file again.');
+
+            return false;
+        }
+
+        try {
+            $upload->complete();
+        } catch (\Throwable $e) {
+            $this->discardS3Upload();
+            $e instanceof DatabaseImportException ? $this->dispatch('error', $e->getMessage()) : handleError($e, $this);
+
+            return false;
+        }
+
+        $this->fileSource = 's3-upload';
+        $this->filename = $upload->marker['name'];
+        $this->filesize = formatBytes($upload->marker['size']);
+        $this->error = false;
+        $this->customLocation = '';
+        $this->discardStagedUpload();
+        $this->selectSqliteDatabaseFor($upload->marker['name']);
+
+        return true;
+    }
+
+    /**
+     * Called by the browser when an upload to an S3 storage fails or the user cancels it.
+     */
+    public function abortS3Upload(): void
+    {
+        $this->authorizeS3Upload();
+        $this->discardS3Upload();
+        if ($this->fileSource === 's3-upload') {
+            $this->fileSource = null;
+        }
+    }
+
+    private function authorizeS3Upload(): void
+    {
+        $this->authorize('uploadBackup', $this->resource);
+        $this->authorize('update', $this->resource);
+    }
+
+    private function currentS3Upload(): ?DatabaseImportS3Upload
+    {
+        $upload = DatabaseImportS3Upload::find((int) $this->resourceTeamId(), $this->s3UploadId);
+
+        return $upload?->belongsTo($this->resource) ? $upload : null;
+    }
+
+    /**
+     * Delete the upload to an S3 storage that was not imported, when the user selects another source or file.
+     */
+    private function discardS3Upload(): void
+    {
+        $this->currentS3Upload()?->discard();
+        $this->s3UploadId = null;
     }
 
     private function stagedUploadPath(): string
@@ -492,7 +627,7 @@ class ImportForm extends Component
             return true;
         }
 
-        if (! in_array($this->fileSource, ['upload', 'server'], true)) {
+        if (! in_array($this->fileSource, ['upload', 's3-upload', 'server'], true)) {
             $this->dispatch('error', 'Please select a file to import.');
 
             return true;
@@ -506,13 +641,30 @@ class ImportForm extends Component
 
         try {
             $this->importRunning = true;
-            if ($this->fileSource === 'server') {
+            if ($this->fileSource !== 'upload') {
                 $this->discardStagedUpload();
             }
-            $source = $this->fileSource === 'upload'
-                ? new DatabaseImportSource('upload', dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers)
-                : new DatabaseImportSource('server', path: $this->customLocation, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers);
+            $s3Upload = null;
+            if ($this->fileSource === 's3-upload') {
+                $s3Upload = $this->currentS3Upload();
+                $storage = $s3Upload?->storage();
+                if (! $storage || filled($s3Upload->marker['multipart_upload_id'])) {
+                    throw new DatabaseImportException('The uploaded file was not found. Please upload it again.');
+                }
+            } else {
+                $this->discardS3Upload();
+            }
+            $source = match ($this->fileSource) {
+                'upload' => new DatabaseImportSource('upload', dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers),
+                's3-upload' => new DatabaseImportSource('s3', path: $s3Upload->marker['key'], s3StorageUuid: $storage->uuid, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers),
+                default => new DatabaseImportSource('server', path: $this->customLocation, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers),
+            };
             $activity = StartDatabaseImport::run($this->resource, $source, (int) $this->resourceTeamId());
+            if ($s3Upload) {
+                // The import cleanup deletes the file now; the marker stays as a fallback for the cleanup command.
+                $s3Upload->touch();
+                $this->s3UploadId = null;
+            }
             $this->activityId = $activity->id;
             $this->dispatch('activityMonitor', $activity->id);
             $this->dispatch('databaserestore');
@@ -520,7 +672,7 @@ class ImportForm extends Component
                 'team_id' => $this->resource->team()?->id,
                 'database_uuid' => $this->resource->uuid,
                 'database_name' => $this->resource->name,
-                'source' => 'file',
+                'source' => $this->fileSource === 's3-upload' ? 's3_upload' : 'file',
                 'replace_existing' => $this->replaceExisting,
             ]);
         } catch (DatabaseImportException $e) {
@@ -670,6 +822,7 @@ class ImportForm extends Component
         try {
             $this->importRunning = true;
             $this->discardStagedUpload();
+            $this->discardS3Upload();
             $source = new DatabaseImportSource('s3', path: $this->s3Path, s3StorageUuid: (string) $this->s3StorageId, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers);
             $activity = StartDatabaseImport::run($this->resource, $source, (int) $this->resourceTeamId());
             $this->activityId = $activity->id;

@@ -14,6 +14,7 @@ use App\Support\DatabaseBackupFileValidator;
 use App\Support\DatabaseImport\DatabaseImportCleanup;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 use App\Support\DatabaseImport\DatabaseImportException;
+use App\Support\DatabaseImport\DatabaseImportS3Upload;
 use App\Support\DatabaseImport\DatabaseImportSource;
 use App\Support\DatabaseOperationReservation;
 use App\Support\ResourceStartActivity;
@@ -65,11 +66,12 @@ class StartDatabaseImport
 
     /**
      * True when the server path or S3 key can be imported into the database. Without write access on the whole
-     * team, a user can import only the backups of this database, not the files of other resources.
+     * team, a user can import only the backups of this database and the files uploaded for it, not the files of
+     * other resources.
      */
     public static function allowsSourcePath(Model $resource, string $path): bool
     {
-        if (Gate::allows('useTeamCredentials', $resource)) {
+        if (Gate::allows('useTeamCredentials', $resource) || DatabaseImportS3Upload::isUploadKeyFor($resource, $path)) {
             return true;
         }
 
@@ -215,6 +217,11 @@ class StartDatabaseImport
                 'docker rm -f '.escapeshellarg($helper).' 2>/dev/null || true',
             ];
             $cleanup['containerName'] = $helper;
+            // A file that the browser uploaded for this import is temporary: the cleanup deletes it after the import.
+            if (str_starts_with($key, DatabaseImportS3Upload::KEY_PREFIX)) {
+                $cleanup['uploadStorageId'] = $storage->id;
+                $cleanup['uploadKey'] = $key;
+            }
         }
 
         if ($safety = $this->commands->buildPostgresSafetyCommand($resource, $container, $containerPath)) {
