@@ -28,6 +28,8 @@
                         <livewire:project.database.dragonfly.general :database="$database" />
                     @elseif ($database->type() === 'standalone-clickhouse')
                         <livewire:project.database.clickhouse.general :database="$database" />
+                    @elseif ($database->type() === 'standalone-influxdb')
+                        <livewire:project.database.influxdb.general :database="$database" />
                     @elseif ($database->type() === 'standalone-sqlite')
                         <livewire:project.database.sqlite.general :database="$database" />
                     @endif

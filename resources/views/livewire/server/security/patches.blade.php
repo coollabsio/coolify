@@ -61,7 +61,7 @@
                     @endif
                 </x-slot:badges>
                 <x-slot:actions>
-                    <x-beta-badge />
+                    <x-experimental-badge />
                     @can('update', $server)
                         <x-split-action id="server-patching-actions">
                             <x-slot:main @click="open = ! open" aria-haspopup="menu">

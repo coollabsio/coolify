@@ -18,11 +18,15 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\Server;
+use App\Models\ServerSetting;
+use App\Models\Service;
 use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
 use App\Models\User;
 use App\Services\SentinelMetricsClient;
+use App\Services\SentinelTrafficClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
@@ -73,6 +77,29 @@ class McpSrvStubMetricsClient extends SentinelMetricsClient
         self::$calls++;
 
         return ['rx' => [[now()->subMinutes(5)->getTimestampMs(), 5.0]], 'tx' => [[now()->subMinutes(5)->getTimestampMs(), 1.0]]];
+    }
+}
+
+class McpSrvFakeTrafficClient extends SentinelTrafficClient
+{
+    public static int $calls = 0;
+
+    protected function raw(string $url): string
+    {
+        self::$calls++;
+        $responses = [
+            '/traffic/overview' => ['requests' => 200, 'bytes_in' => 5000, 'bytes_out' => 25000, 'status' => ['s2xx' => 180, 's3xx' => 5, 's4xx' => 10, 's5xx' => 5], 'latency' => ['p50' => 12.5, 'p95' => 45.2, 'p99' => 90.1], 'unique_visitors' => 32],
+            '/traffic/breakdown/country' => [['value' => 'US', 'requests' => 120, 'bytes_out' => 15000]],
+            '/traffic/breakdown/ip' => [['value' => '198.51.100.42', 'requests' => 60, 'bytes_out' => 1200]],
+            '/traffic/breakdown/useragent' => [['value' => 'Mozilla/5.0 PerAppAgent/2.0', 'requests' => 55, 'bytes_out' => 1100]],
+        ];
+        foreach ($responses as $needle => $response) {
+            if (str_contains($url, $needle)) {
+                return json_encode($response);
+            }
+        }
+
+        return '[]';
     }
 }
 
@@ -893,6 +920,155 @@ test('get_server_metrics explains when metrics are disabled', function () {
 
     expect(mcpSrvIsError($response))->toBeTrue()
         ->and(mcpSrvText($response))->toContain('Metrics are not enabled');
+});
+
+// ---------------------------------------------------------------- get_resource_metrics and get_traffic_analytics
+
+/**
+ * An application, a Postgres database, and a service on the server of the token team.
+ *
+ * @return array{application: Application, database: StandalonePostgresql, service: Service}
+ */
+function mcpSrvResources(Server $server, Team $team): array
+{
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $environment = Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $team->id])->id]);
+    $placement = [
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ];
+
+    return [
+        'application' => Application::factory()->create($placement),
+        'database' => StandalonePostgresql::create($placement + ['name' => 'db', 'postgres_user' => 'postgres', 'postgres_password' => 'password', 'postgres_db' => 'app', 'image' => 'postgres:16']),
+        'service' => Service::factory()->create($placement + ['server_id' => $server->id]),
+    ];
+}
+
+function mcpSrvEnableMetrics(Server $server): void
+{
+    ServerSetting::withoutEvents(fn () => $server->settings->update([
+        'is_metrics_enabled' => true,
+        'sentinel_token' => 'mcp-resource-metrics-token',
+        'sentinel_metrics_history_days' => 7,
+    ]));
+    Server::flushIdentityMap();
+}
+
+function mcpSrvEnableTraffic(Server $server): void
+{
+    $server->settings->update(['is_traffic_analytics_enabled' => true]);
+    Server::flushIdentityMap();
+    McpSrvFakeTrafficClient::$calls = 0;
+    app()->bind(SentinelTrafficClient::class, fn ($app, array $parameters) => new McpSrvFakeTrafficClient($parameters['server']));
+}
+
+test('get_resource_metrics returns container cpu and memory capped at the retention of the server', function (string $type) {
+    mcpSrvEnableMetrics($this->server);
+    $resource = mcpSrvResources($this->server, $this->team)[$type];
+    fakeRemoteProcesses([
+        "*container/{$resource->uuid}/cpu/history*" => Process::result(output: json_encode([['time' => 1787259000000, 'percent' => 2.5]])),
+        "*container/{$resource->uuid}/memory/history*" => Process::result(output: json_encode([['time' => 1787259000000, 'used' => 52428800]])),
+    ]);
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read']), 'get_resource_metrics', ['resource' => $type, 'uuid' => $resource->uuid, 'minutes' => 999999]);
+
+    expect(mcpSrvIsError($response))->toBeFalse(mcpSrvText($response));
+    $data = mcpSrvData($response);
+    expect($data['minutes'])->toBe(10080)
+        ->and($data['retention_days'])->toBe(7)
+        ->and($data['series'])->toBe(['cpu_percent' => [[1787259000000, 2.5]], 'memory_mb' => [[1787259000000, 50]]])
+        ->and(mcpSrvText($response))->not->toContain('mcp-resource-metrics-token');
+})->with(['application', 'database']);
+
+test('get_resource_metrics does not read metrics of a resource of another team', function () {
+    mcpSrvEnableMetrics($this->otherServer);
+    $foreign = mcpSrvResources($this->otherServer, $this->otherTeam)['application'];
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read']), 'get_resource_metrics', ['resource' => 'application', 'uuid' => $foreign->uuid]);
+
+    expect(mcpSrvIsError($response))->toBeTrue()
+        ->and(mcpSrvText($response))->toBe("Application [{$foreign->uuid}] not found.");
+    Process::assertNothingRan();
+});
+
+test('get_resource_metrics explains when metrics are disabled', function () {
+    $database = mcpSrvResources($this->server, $this->team)['database'];
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read']), 'get_resource_metrics', ['resource' => 'database', 'uuid' => $database->uuid]);
+
+    expect(mcpSrvIsError($response))->toBeTrue()
+        ->and(mcpSrvText($response))->toBe('Metrics are not enabled for the server of this resource. Enable Sentinel metrics in the server settings first.');
+});
+
+test('get_resource_metrics and get_traffic_analytics need the read ability', function (string $tool) {
+    mcpSrvEnableMetrics($this->server);
+    mcpSrvEnableTraffic($this->server);
+    $application = mcpSrvResources($this->server, $this->team)['application'];
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['deploy']), $tool, ['resource' => 'application', 'uuid' => $application->uuid]);
+
+    expect(mcpSrvIsError($response))->toBeTrue()
+        ->and(mcpSrvText($response))->toContain('Missing required permissions: read')
+        ->and(McpSrvFakeTrafficClient::$calls)->toBe(0);
+    Process::assertNothingRan();
+})->with(['get_resource_metrics', 'get_traffic_analytics']);
+
+test('get_traffic_analytics returns the traffic of an application or service without visitor data', function (string $type) {
+    mcpSrvEnableTraffic($this->server);
+    $resource = mcpSrvResources($this->server, $this->team)[$type];
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read']), 'get_traffic_analytics', ['resource' => $type, 'uuid' => $resource->uuid, 'range' => '7d']);
+
+    expect(mcpSrvIsError($response))->toBeFalse(mcpSrvText($response));
+    $data = mcpSrvData($response);
+    expect($data['uuid'])->toBe($resource->uuid)
+        ->and($data['enabled'])->toBeTrue()
+        ->and($data['range'])->toBe('7d')
+        ->and($data['overview'])->toBe([
+            'requests' => 200,
+            'unique_visitors' => 32,
+            'bytes_in' => 5000,
+            'bytes_out' => 25000,
+            'error_rate' => 7.5,
+            'latency' => ['p50' => 12.5, 'p95' => 45.2, 'p99' => 90.1],
+            'status' => ['s2xx' => 180, 's3xx' => 5, 's4xx' => 10, 's5xx' => 5],
+        ])
+        ->and($data['breakdowns']['country'])->toBe([['value' => 'US', 'requests' => 120, 'bytes_out' => 15000]])
+        ->and($data['breakdowns'])->not->toHaveKeys(['ip', 'useragent'])
+        ->and(mcpSrvText($response))->not->toContain('198.51.100.42');
+})->with(['application', 'service']);
+
+test('get_traffic_analytics returns visitor ip and user agent breakdowns with read:sensitive', function () {
+    mcpSrvEnableTraffic($this->server);
+    $application = mcpSrvResources($this->server, $this->team)['application'];
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'read:sensitive']), 'get_traffic_analytics', ['resource' => 'application', 'uuid' => $application->uuid]);
+
+    $breakdowns = mcpSrvData($response)['breakdowns'];
+    expect($breakdowns['ip'])->toBe([['value' => '198.51.100.42', 'requests' => 60, 'bytes_out' => 1200]])
+        ->and($breakdowns['useragent'])->toBe([['value' => 'Mozilla/5.0 PerAppAgent/2.0', 'requests' => 55, 'bytes_out' => 1100]]);
+});
+
+test('get_traffic_analytics does not read traffic of a service of another team', function () {
+    mcpSrvEnableTraffic($this->otherServer);
+    $foreign = mcpSrvResources($this->otherServer, $this->otherTeam)['service'];
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read']), 'get_traffic_analytics', ['resource' => 'service', 'uuid' => $foreign->uuid]);
+
+    expect(mcpSrvIsError($response))->toBeTrue()
+        ->and(mcpSrvText($response))->toBe("Service [{$foreign->uuid}] not found.")
+        ->and(McpSrvFakeTrafficClient::$calls)->toBe(0);
+});
+
+test('get_traffic_analytics explains when traffic analytics is disabled', function () {
+    $application = mcpSrvResources($this->server, $this->team)['application'];
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read']), 'get_traffic_analytics', ['resource' => 'application', 'uuid' => $application->uuid]);
+
+    expect(mcpSrvIsError($response))->toBeTrue()
+        ->and(mcpSrvText($response))->toBe('Traffic analytics is not enabled for the server of this resource. Enable traffic analytics in the server settings first.');
 });
 
 // ---------------------------------------------------------------- manage_integration_tokens and manage_dns

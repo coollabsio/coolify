@@ -134,7 +134,7 @@
                                                 {{-- The modal is wire:ignore, so a new key re-renders it when the scopes change. --}}
                                                 <x-modal-input title="Access of {{ $token->name }}"
                                                     wire:key="api-token-scopes-{{ $token->id }}-{{ md5(json_encode($token->scopes)) }}"
-                                                    subtitle="This token can use only these projects, environments, and resources.">
+                                                    subtitle="This token can use only these projects, environments, resources, and servers.">
                                                     <x-slot:content>
                                                         <button type="button"
                                                             class="max-w-full truncate underline decoration-dotted underline-offset-2 hover:text-black dark:hover:text-fg">

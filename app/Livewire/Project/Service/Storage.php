@@ -15,6 +15,7 @@ use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -31,6 +32,13 @@ class Storage extends Component
     public $isSwarm = false;
 
     public string $name = '';
+
+    public ?string $existing_volume = null;
+
+    /** @var array<int, string> */
+    public array $existingVolumes = [];
+
+    public bool $existingVolumesLoaded = false;
 
     public string $mount_path = '';
 
@@ -278,10 +286,22 @@ class Storage extends Component
         try {
             $this->authorize('update', $this->resource);
 
+            if (filled($this->existing_volume)) {
+                $this->existingVolumes = $this->existingVolumesOnServer();
+                $this->existingVolumesLoaded = true;
+            }
+
             $this->validate([
-                'name' => ValidationPatterns::volumeNameRules(),
+                'name' => ValidationPatterns::volumeNameRules(required: blank($this->existing_volume)),
+                'existing_volume' => [
+                    ...ValidationPatterns::volumeNameRules(required: false),
+                    Rule::in($this->existingVolumes),
+                ],
                 'mount_path' => 'required|string',
-            ], ValidationPatterns::volumeNameMessages());
+            ], array_merge(ValidationPatterns::volumeNameMessages(), [
+                'existing_volume.in' => 'The selected volume is not available on this server.',
+                'existing_volume.regex' => 'The selected volume has an invalid Docker volume name.',
+            ]));
 
             if ($reason = $this->volumeUnavailableReason) {
                 $this->dispatch('error', 'Failed to add volume.', $reason);
@@ -289,7 +309,9 @@ class Storage extends Component
                 return;
             }
 
-            $name = $this->resource->uuid.'-'.$this->name;
+            $name = filled($this->existing_volume)
+                ? $this->existing_volume
+                : $this->resource->uuid.'-'.$this->name;
 
             $volume = LocalPersistentVolume::create([
                 'name' => $name,
@@ -297,8 +319,11 @@ class Storage extends Component
                 'host_path' => null,
                 'resource_id' => $this->resource->id,
                 'resource_type' => $this->resource->getMorphClass(),
+                'is_external' => filled($this->existing_volume),
+                'is_preview_suffix_enabled' => blank($this->existing_volume),
             ]);
             $this->auditStorageChange($this->resource, 'created', $volume);
+            $this->existingVolumes = array_values(array_diff($this->existingVolumes, [$name]));
             $this->clearForm();
             $this->activeTab = 'volumes';
             $this->refreshStorages();
@@ -307,6 +332,19 @@ class Storage extends Component
             $this->dispatch('closeStorageModal', 'volume');
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    public function loadExistingVolumes(): void
+    {
+        try {
+            $this->authorize('update', $this->resource);
+
+            $this->existingVolumes = $this->existingVolumesOnServer();
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        } finally {
+            $this->existingVolumesLoaded = true;
         }
     }
 
@@ -430,6 +468,7 @@ class Storage extends Component
     public function clearForm()
     {
         $this->name = $this->generateDefaultVolumeName();
+        $this->existing_volume = null;
         $this->mount_path = '';
         $this->file_storage_path = '';
         $this->file_storage_source = '';
@@ -443,6 +482,36 @@ class Storage extends Component
         } else {
             $this->file_storage_directory_source = application_configuration_dir()."/{$this->resource->uuid}";
         }
+    }
+
+    /**
+     * The Docker volumes of the resource server that a resource can mount. The volumes of Coolify
+     * itself (for example coolify-db and coolify-redis) and the volumes that this resource already
+     * mounts are not in the list.
+     *
+     * @return array<int, string>
+     */
+    private function existingVolumesOnServer(): array
+    {
+        $output = instant_remote_process(
+            ["docker volume ls --format '{{.Name}}'"],
+            $this->storageServer(),
+            throwError: false,
+        );
+
+        if ($output === null) {
+            throw new \Exception('Could not load Docker volumes from the server.');
+        }
+
+        return collect(preg_split('/\r\n|\r|\n/', $output))
+            ->map(fn (string $volume): string => trim($volume))
+            ->filter(fn (string $volume): bool => preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $volume) === 1)
+            ->reject(fn (string $volume): bool => preg_match('/^coolify(?:[-_.]|$)/i', $volume) === 1)
+            ->diff($this->resource->persistentStorages()->pluck('name'))
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
     }
 
     public function fileStorageHostPath(): string

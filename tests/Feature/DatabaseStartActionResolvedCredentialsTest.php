@@ -3,6 +3,7 @@
 use App\Actions\Database\StartClickhouse;
 use App\Actions\Database\StartDatabase;
 use App\Actions\Database\StartDragonfly;
+use App\Actions\Database\StartInfluxdb;
 use App\Actions\Database\StartKeydb;
 use App\Actions\Database\StartMariadb;
 use App\Actions\Database\StartMongodb;
@@ -90,6 +91,7 @@ it('runs database start commands without persisting them through remote process'
 })->with([
     'clickhouse' => [StartClickhouse::class, fn (...$arguments) => create_standalone_clickhouse(...$arguments), 'clickhouse_admin_password'],
     'dragonfly' => [StartDragonfly::class, fn (...$arguments) => create_standalone_dragonfly(...$arguments), 'dragonfly_password'],
+    'influxdb' => [StartInfluxdb::class, fn (...$arguments) => create_standalone_influxdb(...$arguments), 'influxdb_admin_password'],
     'keydb' => [StartKeydb::class, fn (...$arguments) => create_standalone_keydb(...$arguments), 'keydb_password'],
     'mariadb' => [StartMariadb::class, fn (...$arguments) => create_standalone_mariadb(...$arguments), 'mariadb_root_password'],
     'mongodb' => [StartMongodb::class, fn (...$arguments) => create_standalone_mongodb(...$arguments), 'mongo_initdb_root_password'],

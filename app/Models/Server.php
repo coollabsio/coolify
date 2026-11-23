@@ -2005,6 +2005,7 @@ $siteAddress {
         $keydbs = StandaloneKeydb::where($destinationCondition)->get();
         $dragonflies = StandaloneDragonfly::where($destinationCondition)->get();
         $clickhouses = StandaloneClickhouse::where($destinationCondition)->get();
+        $influxdbs = StandaloneInfluxdb::where($destinationCondition)->get();
         $sqlites = StandaloneSqlite::where($destinationCondition)->get();
 
         return $postgresqls
@@ -2015,6 +2016,7 @@ $siteAddress {
             ->concat($keydbs)
             ->concat($dragonflies)
             ->concat($clickhouses)
+            ->concat($influxdbs)
             ->concat($sqlites)
             ->reject(fn ($item) => $item instanceof StandalonePostgresql && $item->isInstanceDatabase());
     }

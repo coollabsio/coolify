@@ -195,6 +195,9 @@
                                         class="relative block truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
                                         x-text="item.name"></a>
                                     <x-image-scan.marker bind="item.security" class="relative" />
+                                    <template x-if="item.type === 'service' && item.updateAvailable">
+                                        <span class="size-2 shrink-0 rounded-full bg-coollabs dark:bg-warning" title="Template update available"></span>
+                                    </template>
                                 </div>
                                 <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint"
                                     x-show="item.description?.trim()"
@@ -292,6 +295,9 @@
                                             class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg"
                                             x-text="item.name"></h2>
                                         <x-image-scan.marker bind="item.security" class="relative" />
+                                        <template x-if="item.type === 'service' && item.updateAvailable">
+                                            <span class="size-2 shrink-0 rounded-full bg-coollabs dark:bg-warning" title="Template update available"></span>
+                                        </template>
                                     </div>
                                     <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint"
                                         x-text="item.typeLabel"></p>
@@ -357,6 +363,7 @@
                 ...@js($keydbsJs),
                 ...@js($dragonfliesJs),
                 ...@js($clickhousesJs),
+                ...@js($influxdbsJs),
                 ...@js($sqlitesJs),
                 ...@js($servicesJs),
             ],

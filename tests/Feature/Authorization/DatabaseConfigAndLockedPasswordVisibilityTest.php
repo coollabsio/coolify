@@ -3,6 +3,7 @@
 use App\Livewire\Project\Database\Clickhouse\General as ClickhouseGeneral;
 use App\Livewire\Project\Database\Dragonfly\General as DragonflyGeneral;
 use App\Livewire\Project\Database\Dragonfly\StatusInfo as DragonflyStatusInfo;
+use App\Livewire\Project\Database\Influxdb\General as InfluxdbGeneral;
 use App\Livewire\Project\Database\Keydb\General as KeydbGeneral;
 use App\Livewire\Project\Database\Keydb\StatusInfo as KeydbStatusInfo;
 use App\Livewire\Project\Database\Mariadb\General as MariadbGeneral;
@@ -264,6 +265,7 @@ dataset('database-api-config', [
     'keydb' => ['create_standalone_keydb', null, ['keydb_conf' => 'masterauth secret-config-value']],
     'dragonfly' => ['create_standalone_dragonfly', null, []],
     'clickhouse' => ['create_standalone_clickhouse', null, []],
+    'influxdb' => ['create_standalone_influxdb', null, []],
 ]);
 
 function apiTokenHeaders(User $user, Team $team, array $abilities): array
@@ -335,6 +337,7 @@ dataset('database-docker-options-components', [
     'keydb' => ['create_standalone_keydb', KeydbGeneral::class],
     'dragonfly' => ['create_standalone_dragonfly', DragonflyGeneral::class],
     'clickhouse' => ['create_standalone_clickhouse', ClickhouseGeneral::class],
+    'influxdb' => ['create_standalone_influxdb', InfluxdbGeneral::class],
     'sqlite' => ['create_standalone_sqlite', SqliteGeneral::class],
 ]);
 

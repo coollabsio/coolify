@@ -20,7 +20,9 @@ use App\Http\Controllers\Api\IntegrationTokensController;
 use App\Http\Controllers\Api\NotificationsController;
 use App\Http\Controllers\Api\OtherController;
 use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\Api\ResourceMetricsController;
 use App\Http\Controllers\Api\ResourcesController;
+use App\Http\Controllers\Api\ResourceTrafficController;
 use App\Http\Controllers\Api\S3StoragesController;
 use App\Http\Controllers\Api\ScheduledTasksController;
 use App\Http\Controllers\Api\SecretManagerController;
@@ -31,6 +33,7 @@ use App\Http\Controllers\Api\ServerDockerCleanupController;
 use App\Http\Controllers\Api\ServerDockerRegistriesController;
 use App\Http\Controllers\Api\ServerImageScanningController;
 use App\Http\Controllers\Api\ServerLogDrainsController;
+use App\Http\Controllers\Api\ServerMetricsController;
 use App\Http\Controllers\Api\ServerProxyController;
 use App\Http\Controllers\Api\ServersController;
 use App\Http\Controllers\Api\ServerSentinelController;
@@ -183,6 +186,7 @@ Route::group([
     Route::get('/servers/{uuid}/log-drains', [ServerLogDrainsController::class, 'show'])->middleware(['api.ability:read']);
     Route::patch('/servers/{uuid}/log-drains', [ServerLogDrainsController::class, 'update'])->middleware(['api.ability:write', 'api.ability:deploy']);
 
+    Route::get('/servers/{uuid}/metrics', [ServerMetricsController::class, 'show'])->middleware(['api.ability:read']);
     Route::get('/servers/{uuid}/sentinel', [ServerSentinelController::class, 'show'])->middleware(['api.ability:read']);
     Route::patch('/servers/{uuid}/sentinel', [ServerSentinelController::class, 'update'])->middleware(['api.ability:write', 'api.ability:deploy']);
 
@@ -293,6 +297,8 @@ Route::group([
     Route::patch('/applications/{uuid}/envs', [ApplicationsController::class, 'update_env_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/envs/{env_uuid}', [ApplicationsController::class, 'delete_env_by_uuid'])->middleware(['api.ability:delete']);
     Route::get('/applications/{uuid}/logs', [ApplicationsController::class, 'logs_by_uuid'])->middleware(['api.ability:read:sensitive']);
+    Route::get('/applications/{uuid}/metrics', [ResourceMetricsController::class, 'application'])->middleware(['api.ability:read']);
+    Route::get('/applications/{uuid}/traffic', [ResourceTrafficController::class, 'application'])->middleware(['api.ability:read']);
     Route::get('/applications/{uuid}/previews/{pull_request_id}/logs', [ApplicationsController::class, 'logs_by_uuid'])->middleware(['api.ability:read:sensitive']);
     Route::get('/applications/{uuid}/storages', [ApplicationsController::class, 'storages'])->middleware(['api.ability:read']);
     Route::post('/applications/{uuid}/storages', [ApplicationsController::class, 'create_storage'])->middleware(['api.ability:write']);
@@ -354,6 +360,7 @@ Route::group([
     Route::post('/databases/mongodb', [DatabasesController::class, 'create_database_mongodb'])->middleware(['api.ability:write']);
     Route::post('/databases/redis', [DatabasesController::class, 'create_database_redis'])->middleware(['api.ability:write']);
     Route::post('/databases/clickhouse', [DatabasesController::class, 'create_database_clickhouse'])->middleware(['api.ability:write']);
+    Route::post('/databases/influxdb', [DatabasesController::class, 'create_database_influxdb'])->middleware(['api.ability:write']);
     Route::post('/databases/dragonfly', [DatabasesController::class, 'create_database_dragonfly'])->middleware(['api.ability:write']);
     Route::post('/databases/keydb', [DatabasesController::class, 'create_database_keydb'])->middleware(['api.ability:write']);
     Route::post('/databases/sqlite', [DatabasesController::class, 'create_database_sqlite'])->middleware(['api.ability:write']);
@@ -364,6 +371,7 @@ Route::group([
     Route::post('/databases/{uuid}/imports', [DatabasesController::class, 'create_import'])->middleware(['api.ability:write'])->name('api.databases.imports.store');
     Route::get('/databases/{uuid}/imports/{activity_id}', [DatabasesController::class, 'show_import'])->middleware(['api.ability:read'])->whereNumber('activity_id')->name('api.databases.imports.show');
     Route::get('/databases/{uuid}/backups', [DatabasesController::class, 'database_backup_details_uuid'])->middleware(['api.ability:read']);
+    Route::get('/databases/{uuid}/metrics', [ResourceMetricsController::class, 'database'])->middleware(['api.ability:read']);
     Route::get('/databases/{uuid}/backups/{scheduled_backup_uuid}/executions', [DatabasesController::class, 'list_backup_executions'])->middleware(['api.ability:read']);
     Route::patch('/databases/{uuid}', [DatabasesController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
     Route::post('/databases/{uuid}/backups', [DatabasesController::class, 'create_backup'])->middleware(['api.ability:write']);
@@ -411,6 +419,7 @@ Route::group([
     Route::post('/services', [ServicesController::class, 'create_service'])->middleware(['api.ability:write']);
 
     Route::get('/services/{uuid}', [ServicesController::class, 'service_by_uuid'])->middleware(['api.ability:read']);
+    Route::get('/services/{uuid}/traffic', [ResourceTrafficController::class, 'service'])->middleware(['api.ability:read']);
     Route::get('/services/{uuid}/vulnerabilities', [VulnerabilitiesController::class, 'service'])->middleware(['api.ability:read']);
     Route::patch('/services/{uuid}', [ServicesController::class, 'update_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/services/{uuid}', [ServicesController::class, 'delete_by_uuid'])->middleware(['api.ability:delete']);
@@ -454,6 +463,7 @@ Route::group([
     Route::post('/services/{uuid}/start', [ServicesController::class, 'action_deploy'])->middleware(['api.ability:deploy']);
     Route::post('/services/{uuid}/restart', [ServicesController::class, 'action_restart'])->middleware(['api.ability:deploy']);
     Route::post('/services/{uuid}/stop', [ServicesController::class, 'action_stop'])->middleware(['api.ability:deploy']);
+    Route::get('/services/{uuid}/activities/{activity_id}', [ServicesController::class, 'show_activity'])->middleware(['api.ability:read'])->whereNumber('activity_id');
 
     Route::get('/services/{uuid}/applications', [ServiceApplicationsController::class, 'index'])->middleware(['api.ability:read']);
     Route::get('/services/{uuid}/applications/{app_uuid}', [ServiceApplicationsController::class, 'show'])->middleware(['api.ability:read']);

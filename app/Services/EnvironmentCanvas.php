@@ -40,6 +40,7 @@ class EnvironmentCanvas
         'keydbs',
         'dragonflies',
         'clickhouses',
+        'influxdbs',
         'sqlites',
     ];
 
@@ -52,6 +53,7 @@ class EnvironmentCanvas
         'keydb' => 'KeyDB',
         'dragonfly' => 'Dragonfly',
         'clickhouse' => 'ClickHouse',
+        'influxdb' => 'InfluxDB',
         'sqlite' => 'SQLite',
     ];
 
