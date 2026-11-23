@@ -142,7 +142,7 @@ abstract class RestActionTool extends Tool
             return $this->mcpError($request, $message, $context);
         }
 
-        return $this->mcpSuccess($request, $this->respond(is_array($result['body']) ? $result['body'] : []), $context);
+        return $this->mcpSuccess($request, $this->respond(is_array($result['body']) ? $result['body'] : [], [], isset($result['total']) ? ['total' => $result['total']] : null), $context);
     }
 
     public function schema(JsonSchema $schema): array

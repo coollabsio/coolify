@@ -169,9 +169,9 @@ trait BuildsResponse
      */
     protected function paginationArgs(Request $request): array
     {
-        $page = max(1, (int) ($request->get('page') ?? 1));
         $perPage = (int) ($request->get('per_page') ?? $this->defaultPerPage);
         $perPage = max(1, min($this->maxPerPage, $perPage));
+        $page = max(1, min(intdiv(PHP_INT_MAX, $perPage), (int) ($request->get('page') ?? 1)));
 
         return [
             'page' => $page,

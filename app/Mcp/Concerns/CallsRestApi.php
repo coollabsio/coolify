@@ -138,6 +138,7 @@ trait CallsRestApi
         return [
             'status' => $response->getStatusCode(),
             'body' => is_array($decoded) ? $decoded : ['message' => (string) $response->getContent()],
+            'total' => $response->headers->has('X-Total-Count') ? (int) $response->headers->get('X-Total-Count') : null,
         ];
     }
 
