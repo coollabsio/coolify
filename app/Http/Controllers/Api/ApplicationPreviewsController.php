@@ -326,7 +326,7 @@ class ApplicationPreviewsController extends Controller
 
     #[OA\Post(
         summary: 'Approve Preview Commit',
-        description: 'Approve the commit of a fork pull request that waits for approval, and queue its deployment. Send the commit that you reviewed (pending_approval_commit of the preview). Needs admin or owner permissions.',
+        description: 'Approve the commit of a fork pull request that waits for approval, and queue its deployment. Send the commit that you reviewed (pending_approval_commit of the preview). Needs admin or owner permissions and a token with the `write` and `deploy` abilities.',
         path: '/applications/{uuid}/previews/{pull_request_id}/approve',
         operationId: 'approve-preview-commit-by-pull-request-id',
         security: [['bearerAuth' => []]],
