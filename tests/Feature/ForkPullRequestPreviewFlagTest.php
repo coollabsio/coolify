@@ -25,7 +25,7 @@ beforeEach(function () {
 });
 
 /**
- * @param  array<string, mixed>  $attributes
+ * @param  array{git_repository?: string, source_id?: int, source_type?: class-string, repository_project_id?: int}  $attributes
  */
 function forkFlagApplication(Team $team, array $attributes = []): Application
 {
@@ -218,6 +218,31 @@ it('updates the fork flag of an existing preview', function (string $provider, b
         ->and(forkFlagDeploymentQueued($application))->toBeTrue();
 })->with('fork flag providers')->with(['fork' => true, 'same repository' => false]);
 
+it('hands the fork flag of a signed GitHub webhook to the pull request job', function (int $headRepositoryId, bool $fork) {
+    Queue::fake([ProcessGithubPullRequestWebhook::class]);
+    $application = forkFlagApplication(Team::factory()->create(), ['git_repository' => 'https://github.com/example/repo']);
+    $body = json_encode([
+        'action' => 'opened',
+        'number' => 7,
+        'repository' => ['id' => 555, 'full_name' => 'example/repo'],
+        'pull_request' => [
+            'html_url' => 'https://github.com/example/repo/pull/7',
+            'title' => 'Add feature',
+            'head' => ['ref' => 'feature', 'sha' => 'e83c5163316f89bfbde7d9ab23ca2e25604af290', 'repo' => ['id' => $headRepositoryId]],
+            'base' => ['ref' => 'main', 'repo' => ['id' => 555]],
+        ],
+    ], JSON_THROW_ON_ERROR);
+
+    $this->call('POST', '/webhooks/source/github/events/manual', [], [], [], [
+        'HTTP_X-GitHub-Event' => 'pull_request',
+        'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $body, $application->manual_webhook_secret_github),
+        'CONTENT_TYPE' => 'application/json',
+    ], $body)->assertOk();
+
+    Queue::assertPushed(ProcessGithubPullRequestWebhook::class, fn (ProcessGithubPullRequestWebhook $job): bool => $job->applicationId === $application->id
+        && $job->isForkPullRequest === $fork);
+})->with(['fork' => [999, true], 'same repository' => [555, false]]);
+
 it('treats missing or malformed repository ids as a fork', function (mixed $source, mixed $target, bool $fork) {
     $checker = new class
     {
@@ -236,4 +261,6 @@ it('treats missing or malformed repository ids as a fork', function (mixed $sour
     'missing source' => [null, 555, true],
     'blank target' => [555, '  ', true],
     'array source' => [[555], 555, true],
+    'boolean ids' => [true, true, true],
+    'float ids' => [555.0, 555.0, true],
 ]);
