@@ -312,16 +312,14 @@ class ApplicationsController extends Controller
             new OA\Parameter(name: 'server_uuid', in: 'query', description: 'Filter applications by the UUID of the server they are deployed to.', required: false, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'status', in: 'query', description: 'Filter applications by status (case-insensitive substring, for example running or exited).', required: false, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'name', in: 'query', description: 'Filter applications by name (case-insensitive substring).', required: false, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'page', in: 'query', description: 'Page number. When page or per_page is set, the response is paginated.', required: false, schema: new OA\Schema(type: 'integer', default: 1, minimum: 1)),
-            new OA\Parameter(name: 'per_page', in: 'query', description: 'Items per page. When page or per_page is set, the response is paginated.', required: false, schema: new OA\Schema(type: 'integer', default: 50, minimum: 1, maximum: 100)),
+            new OA\Parameter(ref: '#/components/parameters/Page'),
+            new OA\Parameter(ref: '#/components/parameters/PerPage'),
         ],
         responses: [
             new OA\Response(
                 response: 200,
                 description: 'Get all applications. An unknown project, environment, or server UUID gives an empty list.',
-                headers: [
-                    new OA\Header(header: 'X-Total-Count', description: 'Total number of applications that match the filters. Sent only for paginated responses.', schema: new OA\Schema(type: 'integer')),
-                ],
+                headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')],
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',
@@ -357,9 +355,7 @@ class ApplicationsController extends Controller
             'server_uuid' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'max:255'],
             'name' => ['nullable', 'string', 'max:255'],
-            'page' => ['nullable', 'integer', 'min:1'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-        ]);
+        ] + apiPaginationRules());
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed.',
@@ -377,15 +373,9 @@ class ApplicationsController extends Controller
             ->applyListFilters($teamId, Arr::only($validated, ['tag', 'project_uuid', 'environment_uuid', 'server_uuid', 'status', 'name']))
             ->orderBy('id');
 
-        $headers = [];
-        if (isset($validated['page']) || isset($validated['per_page'])) {
-            $headers['X-Total-Count'] = (clone $query)->count();
-            $query->forPage((int) ($validated['page'] ?? 1), (int) ($validated['per_page'] ?? 50));
-        }
+        [$applications, $headers] = apiPaginate($query, $request);
 
-        $applications = $query->get()->map(fn ($application) => $this->removeSensitiveData($application));
-
-        return response()->json($applications, 200, $headers);
+        return response()->json($applications->map(fn ($application) => $this->removeSensitiveData($application)), 200, $headers);
     }
 
     #[OA\Post(

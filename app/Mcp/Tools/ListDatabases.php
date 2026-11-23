@@ -74,14 +74,6 @@ class ListDatabases extends Tool
             'name' => $name,
         ]);
 
-        if ($databases === null) {
-            return $this->mcpSuccess($request, $this->respond(
-                [],
-                [],
-                $this->paginationMeta('list_databases', $args, 0, $extra),
-            ));
-        }
-
         $total = (clone $databases)->count();
 
         $summaries = $databases

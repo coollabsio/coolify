@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\Models\Environment;
-use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -20,48 +19,30 @@ class StandaloneDatabaseList
 {
     /**
      * One row per database (id, model_key, uuid, name, status, type, project_uuid, project_name), ordered by name and uuid.
-     * A project, environment, or server UUID that the team does not own gives null (no database matches).
+     * A project, environment, or server UUID that the team does not own matches no database.
      * Status and name are case-insensitive substring matches.
      *
      * @param  array{project_uuid?: ?string, environment_uuid?: ?string, server_uuid?: ?string, status?: ?string, name?: ?string}  $filters
      */
-    public static function query(int $teamId, array $filters = []): ?QueryBuilder
+    public static function query(int $teamId, array $filters = []): QueryBuilder
     {
-        $projectUuid = $filters['project_uuid'] ?? null;
         $environmentUuid = $filters['environment_uuid'] ?? null;
         $serverUuid = $filters['server_uuid'] ?? null;
 
-        $projectIds = Project::where('team_id', $teamId)
-            ->when($projectUuid !== null, fn (Builder $query) => $query->where('uuid', $projectUuid))
-            ->pluck('id');
-        if ($projectIds->isEmpty()) {
-            return null;
-        }
-
-        $environmentQuery = Environment::query()->whereIn('project_id', $projectIds);
-        if ($environmentUuid !== null) {
-            $environment = Environment::ownedByCurrentTeamAPI($teamId)->where('uuid', $environmentUuid)->first();
-            if (! $environment || ! $projectIds->contains($environment->project_id)) {
-                return null;
-            }
-            $environmentQuery->where('id', $environment->id);
-        }
-        $environmentIds = $environmentQuery->pluck('id')->all();
-        if ($environmentIds === []) {
-            return null;
-        }
+        $environmentIds = Environment::ownedByCurrentTeamAPI($teamId)
+            ->when(($filters['project_uuid'] ?? null) !== null, fn (Builder $query) => $query->whereRelation('project', 'uuid', $filters['project_uuid']))
+            ->when($environmentUuid !== null, fn (Builder $query) => $query->where('uuid', $environmentUuid))
+            ->pluck('id')
+            ->all();
 
         $destinationFilter = null;
         if ($serverUuid !== null) {
             $server = Server::whereTeamId($teamId)->where('uuid', $serverUuid)->first();
-            if (! $server) {
-                return null;
-            }
             // Keep morph type and ID sets separate so overlapping auto-increment IDs
             // across standalone_dockers / swarm_dockers cannot cross-match.
             $destinationFilter = [
-                StandaloneDocker::class => $server->standaloneDockers()->pluck('id')->all(),
-                SwarmDocker::class => $server->swarmDockers()->pluck('id')->all(),
+                StandaloneDocker::class => $server?->standaloneDockers()->pluck('id')->all() ?? [],
+                SwarmDocker::class => $server?->swarmDockers()->pluck('id')->all() ?? [],
             ];
         }
 

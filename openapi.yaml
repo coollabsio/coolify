@@ -22,9 +22,16 @@ paths:
           required: true
           schema:
             type: string
+        -
+          $ref: '#/components/parameters/Page'
+        -
+          $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           description: 'List of preview deployments.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -35,6 +42,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -298,32 +307,15 @@ paths:
           schema:
             type: string
         -
-          name: page
-          in: query
-          description: 'Page number. When page or per_page is set, the response is paginated.'
-          required: false
-          schema:
-            type: integer
-            default: 1
-            minimum: 1
+          $ref: '#/components/parameters/Page'
         -
-          name: per_page
-          in: query
-          description: 'Items per page. When page or per_page is set, the response is paginated.'
-          required: false
-          schema:
-            type: integer
-            default: 50
-            maximum: 100
-            minimum: 1
+          $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           description: 'Get all applications. An unknown project, environment, or server UUID gives an empty list.'
           headers:
             X-Total-Count:
-              description: 'Total number of applications that match the filters. Sent only for paginated responses.'
-              schema:
-                type: integer
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -4635,17 +4627,17 @@ paths:
               - scheduler
       responses:
         '200':
-          description: 'A page of audit events, newest first.'
+          description: 'A page of audit events, newest first. The X-Total-Count header gives the total.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
-                properties:
-                  current_page: { type: integer }
-                  data: { type: array, items: { type: object, properties: { id: { type: integer }, team_id: { type: integer, nullable: true }, event: { type: string }, source: { type: string }, action: { type: string }, level: { type: string }, actor_type: { type: string, nullable: true }, actor_id: { type: integer, nullable: true }, actor_name: { type: string, nullable: true }, resource_type: { type: string, nullable: true }, resource_uuid: { type: string, nullable: true }, resource_name: { type: string, nullable: true }, description: { type: string, nullable: true }, created_at: { type: string, format: date-time } } } }
-                  per_page: { type: integer }
-                  last_page: { type: integer }
-                  total: { type: integer }
-                type: object
+                type: array
+                items:
+                  properties: { id: { type: integer }, team_id: { type: [integer, 'null'] }, event: { type: string }, source: { type: string }, action: { type: string }, level: { type: string }, actor_type: { type: [string, 'null'] }, actor_id: { type: [integer, 'null'] }, actor_name: { type: [string, 'null'] }, resource_type: { type: [string, 'null'] }, resource_uuid: { type: [string, 'null'] }, resource_name: { type: [string, 'null'] }, description: { type: [string, 'null'] }, created_at: { type: string, format: date-time } }
+                  type: object
         '401':
           $ref: '#/components/responses/401'
         '403':
@@ -5155,32 +5147,15 @@ paths:
           schema:
             type: string
         -
-          name: page
-          in: query
-          description: 'Page number. When page or per_page is set, the response is paginated.'
-          required: false
-          schema:
-            type: integer
-            default: 1
-            minimum: 1
+          $ref: '#/components/parameters/Page'
         -
-          name: per_page
-          in: query
-          description: 'Items per page. When page or per_page is set, the response is paginated.'
-          required: false
-          schema:
-            type: integer
-            default: 50
-            maximum: 100
-            minimum: 1
+          $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           description: 'Get all databases. An unknown project, environment, or server UUID gives an empty list.'
           headers:
             X-Total-Count:
-              description: 'Total number of databases that match the filters. Sent only for paginated responses.'
-              schema:
-                type: integer
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -6926,17 +6901,27 @@ paths:
           required: true
           schema:
             type: string
+        -
+          $ref: '#/components/parameters/Page'
+        -
+          $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           description: 'List of backup executions'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
-                properties:
-                  executions: { type: array, items: { properties: { uuid: { type: string }, filename: { type: string }, size: { type: integer }, created_at: { type: string }, message: { description: 'Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.', type: [string, 'null'] }, status: { type: string } }, type: object } }
-                type: object
+                type: array
+                items:
+                  properties: { uuid: { type: string }, filename: { type: string }, size: { type: integer }, created_at: { type: string }, message: { description: 'Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.', type: [string, 'null'] }, status: { type: string } }
+                  type: object
         '404':
           description: 'Backup configuration not found.'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -11561,9 +11546,16 @@ paths:
           required: true
           schema:
             type: string
+        -
+          $ref: '#/components/parameters/Page'
+        -
+          $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           description: 'Get all executions for a scheduled task.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -11574,6 +11566,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -11811,9 +11805,16 @@ paths:
           required: true
           schema:
             type: string
+        -
+          $ref: '#/components/parameters/Page'
+        -
+          $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           description: 'Get all executions for a scheduled task.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -11824,6 +11825,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -12690,9 +12693,31 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: page
+          in: query
+          description: 'Page number.'
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        -
+          name: per_page
+          in: query
+          description: 'Items per page.'
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+            minimum: 1
       responses:
         '200':
           description: 'Recent Docker cleanup executions.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -12706,6 +12731,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -15028,32 +15055,15 @@ paths:
           schema:
             type: string
         -
-          name: page
-          in: query
-          description: 'Page number. When page or per_page is set, the response is paginated.'
-          required: false
-          schema:
-            type: integer
-            default: 1
-            minimum: 1
+          $ref: '#/components/parameters/Page'
         -
-          name: per_page
-          in: query
-          description: 'Items per page. When page or per_page is set, the response is paginated.'
-          required: false
-          schema:
-            type: integer
-            default: 50
-            maximum: 100
-            minimum: 1
+          $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           description: 'Get all services. An unknown project, environment, or server UUID gives an empty list.'
           headers:
             X-Total-Count:
-              description: 'Total number of services that match the filters. Sent only for paginated responses.'
-              schema:
-                type: integer
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -17489,19 +17499,29 @@ paths:
           schema:
             type: string
             example: 'update_now,update_available'
+        -
+          $ref: '#/components/parameters/Page'
+        -
+          $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           description: 'Resources with their security status, worst first.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
-                properties:
-                  resources: { type: array, items: { properties: { uuid: { type: string }, name: { type: string }, type: { type: string, enum: [application, service, database] }, project_uuid: { type: [string, 'null'] }, environment_uuid: { type: [string, 'null'] }, server_uuid: { type: [string, 'null'] }, images: { properties: { update: { type: integer }, total: { type: integer } }, type: object }, security: { $ref: '#/components/schemas/SecurityStatus' } }, type: object } }
-                type: object
+                type: array
+                items:
+                  properties: { uuid: { type: string }, name: { type: string }, type: { type: string, enum: [application, service, database] }, project_uuid: { type: [string, 'null'] }, environment_uuid: { type: [string, 'null'] }, server_uuid: { type: [string, 'null'] }, images: { properties: { update: { type: integer }, total: { type: integer } }, type: object }, security: { $ref: '#/components/schemas/SecurityStatus' } }
+                  type: object
         '401':
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -17534,7 +17554,10 @@ paths:
           $ref: '#/components/parameters/VulnerabilityPerPage'
       responses:
         '200':
-          description: 'Scan results.'
+          description: 'Scan results. The X-Total-Count header gives the total number of matching findings.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -17579,7 +17602,10 @@ paths:
           $ref: '#/components/parameters/VulnerabilityPerPage'
       responses:
         '200':
-          description: 'Scan results.'
+          description: 'Scan results. The X-Total-Count header gives the total number of matching findings.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -17624,7 +17650,10 @@ paths:
           $ref: '#/components/parameters/VulnerabilityPerPage'
       responses:
         '200':
-          description: 'Scan results.'
+          description: 'Scan results. The X-Total-Count header gives the total number of matching findings.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -18353,15 +18382,6 @@ components:
               owner_uuid:
                 type: string
             type: object
-        pagination:
-          properties:
-            page:
-              type: integer
-            per_page:
-              type: integer
-            total:
-              type: integer
-          type: object
       type: object
     ApplicationPreview:
       properties:
@@ -20218,6 +20238,25 @@ components:
                 example: forbidden
             type: object
   parameters:
+    Page:
+      name: page
+      in: query
+      description: 'Page number. With page or per_page, the list is paginated and the X-Total-Count header gives the total.'
+      required: false
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+    PerPage:
+      name: per_page
+      in: query
+      description: 'Items per page. With page or per_page, the list is paginated and the X-Total-Count header gives the total.'
+      required: false
+      schema:
+        type: integer
+        default: 50
+        maximum: 100
+        minimum: 1
     MetricsMinutes:
       name: minutes
       in: query
@@ -20290,6 +20329,11 @@ components:
         default: 50
         maximum: 200
         minimum: 1
+  headers:
+    X-Total-Count:
+      description: 'Total number of items that match the filters, on all pages. Sent when the list is paginated.'
+      schema:
+        type: integer
   securitySchemes:
     bearerAuth:
       type: http

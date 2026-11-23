@@ -202,11 +202,6 @@ use OpenApi\Attributes as OA;
                     new OA\Property(property: 'image_ref', type: 'string'),
                     new OA\Property(property: 'owner_uuid', type: 'string'),
                 ], type: 'object')),
-                new OA\Property(property: 'pagination', properties: [
-                    new OA\Property(property: 'page', type: 'integer'),
-                    new OA\Property(property: 'per_page', type: 'integer'),
-                    new OA\Property(property: 'total', type: 'integer'),
-                ], type: 'object'),
             ],
             type: 'object',
         ),
@@ -289,6 +284,9 @@ use OpenApi\Attributes as OA;
             )),
     ],
 )]
+#[OA\Parameter(parameter: 'Page', name: 'page', in: 'query', required: false, description: 'Page number. With page or per_page, the list is paginated and the X-Total-Count header gives the total.', schema: new OA\Schema(type: 'integer', default: 1, minimum: 1))]
+#[OA\Parameter(parameter: 'PerPage', name: 'per_page', in: 'query', required: false, description: 'Items per page. With page or per_page, the list is paginated and the X-Total-Count header gives the total.', schema: new OA\Schema(type: 'integer', default: 50, minimum: 1, maximum: 100))]
+#[OA\Header(header: 'X-Total-Count', description: 'Total number of items that match the filters, on all pages. Sent when the list is paginated.', schema: new OA\Schema(type: 'integer'))]
 class OpenApi
 {
     // This class is used to generate OpenAPI documentation

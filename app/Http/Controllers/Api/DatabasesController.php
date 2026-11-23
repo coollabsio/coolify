@@ -332,16 +332,14 @@ class DatabasesController extends Controller
             new OA\Parameter(name: 'server_uuid', in: 'query', description: 'Filter databases by the UUID of the server they are deployed to.', required: false, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'status', in: 'query', description: 'Filter databases by status (case-insensitive substring, for example running or exited).', required: false, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'name', in: 'query', description: 'Filter databases by name (case-insensitive substring).', required: false, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'page', in: 'query', description: 'Page number. When page or per_page is set, the response is paginated.', required: false, schema: new OA\Schema(type: 'integer', default: 1, minimum: 1)),
-            new OA\Parameter(name: 'per_page', in: 'query', description: 'Items per page. When page or per_page is set, the response is paginated.', required: false, schema: new OA\Schema(type: 'integer', default: 50, minimum: 1, maximum: 100)),
+            new OA\Parameter(ref: '#/components/parameters/Page'),
+            new OA\Parameter(ref: '#/components/parameters/PerPage'),
         ],
         responses: [
             new OA\Response(
                 response: 200,
                 description: 'Get all databases. An unknown project, environment, or server UUID gives an empty list.',
-                headers: [
-                    new OA\Header(header: 'X-Total-Count', description: 'Total number of databases that match the filters. Sent only for paginated responses.', schema: new OA\Schema(type: 'integer')),
-                ],
+                headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')],
                 content: new OA\JsonContent(
                     type: 'array',
                     items: new OA\Items(ref: '#/components/schemas/Database'),
@@ -371,9 +369,7 @@ class DatabasesController extends Controller
             'server_uuid' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'max:255'],
             'name' => ['nullable', 'string', 'max:255'],
-            'page' => ['nullable', 'integer', 'min:1'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-        ]);
+        ] + apiPaginationRules());
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed.',
@@ -387,12 +383,8 @@ class DatabasesController extends Controller
             : [];
 
         $rows = StandaloneDatabaseList::query($teamId, Arr::only($validated, ['project_uuid', 'environment_uuid', 'server_uuid', 'status', 'name']));
-        $headers = [];
-        if (isset($validated['page']) || isset($validated['per_page'])) {
-            $headers['X-Total-Count'] = $rows ? (clone $rows)->count() : 0;
-            $rows?->forPage((int) ($validated['page'] ?? 1), (int) ($validated['per_page'] ?? 50));
-        }
-        $databases = StandaloneDatabaseList::models($rows?->get() ?? [], $databaseRelations);
+        [$rows, $headers] = apiPaginate($rows, $request);
+        $databases = StandaloneDatabaseList::models($rows, $databaseRelations);
 
         if ($request->attributes->get('can_read_sensitive', false) === true) {
             // Their connection URLs read REDIS_PASSWORD; load the variables once per type instead of per database.
@@ -3454,36 +3446,34 @@ class DatabasesController extends Controller
                 description: 'UUID of the backup configuration',
                 schema: new OA\Schema(type: 'string')
             ),
+            new OA\Parameter(ref: '#/components/parameters/Page'),
+            new OA\Parameter(ref: '#/components/parameters/PerPage'),
         ],
         responses: [
             new OA\Response(
                 response: 200,
+                headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')],
                 description: 'List of backup executions',
                 content: new OA\JsonContent(
-                    type: 'object',
-                    properties: [
-                        new OA\Property(
-                            property: 'executions',
-                            type: 'array',
-                            items: new OA\Items(
-                                type: 'object',
-                                properties: [
-                                    new OA\Property(property: 'uuid', type: 'string'),
-                                    new OA\Property(property: 'filename', type: 'string'),
-                                    new OA\Property(property: 'size', type: 'integer'),
-                                    new OA\Property(property: 'created_at', type: 'string'),
-                                    new OA\Property(property: 'message', type: 'string', nullable: true, description: 'Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.'),
-                                    new OA\Property(property: 'status', type: 'string'),
-                                ]
-                            )
-                        ),
-                    ]
+                    type: 'array',
+                    items: new OA\Items(
+                        type: 'object',
+                        properties: [
+                            new OA\Property(property: 'uuid', type: 'string'),
+                            new OA\Property(property: 'filename', type: 'string'),
+                            new OA\Property(property: 'size', type: 'integer'),
+                            new OA\Property(property: 'created_at', type: 'string'),
+                            new OA\Property(property: 'message', type: 'string', nullable: true, description: 'Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.'),
+                            new OA\Property(property: 'status', type: 'string'),
+                        ]
+                    )
                 )
             ),
             new OA\Response(
                 response: 404,
                 description: 'Backup configuration not found.',
             ),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
     public function list_backup_executions(Request $request)
@@ -3514,9 +3504,9 @@ class DatabasesController extends Controller
 
         // Get all executions for this backup configuration
         $messageSecrets = [];
-        $executions = $backup->executions()
-            ->orderBy('created_at', 'desc')
-            ->get()
+        $request->validate(apiPaginationRules());
+        [$executions, $headers] = apiPaginate($backup->executions()->orderBy('created_at', 'desc')->orderBy('id', 'desc'), $request);
+        $executions = $executions
             ->map(function ($execution) use ($database, &$messageSecrets) {
                 $this->redactBackupExecutionMessage($execution, $database, $messageSecrets);
 
@@ -3530,9 +3520,7 @@ class DatabasesController extends Controller
                 ];
             });
 
-        return response()->json([
-            'executions' => $executions,
-        ]);
+        return response()->json($executions, 200, $headers);
     }
 
     #[OA\Post(
