@@ -185,6 +185,26 @@ function writtenProxyFile(array $lines, string $file): ?string
 }
 
 /**
+ * The mode that Server::uploadProxyFile() set on the upload before it moved the upload to $file.
+ *
+ * @param  array<int, string>  $lines  remote script lines (see Process::assertRan)
+ */
+function uploadedProxyFileMode(array $lines, string $file): ?string
+{
+    $modes = [];
+    $mode = null;
+    foreach ($lines as $line) {
+        if (preg_match('#chmod ([0-7]+) (/tmp/coolify-upload-[0-9a-f]+)$#', $line, $matches)) {
+            $modes[$matches[2]] = $matches[1];
+        } elseif (preg_match('#mv -f (/tmp/coolify-upload-[0-9a-f]+) '.preg_quote($file, '#').'$#', $line, $matches)) {
+            $mode = $modes[$matches[1]] ?? null;
+        }
+    }
+
+    return $mode;
+}
+
+/**
  * Inserts an environment variable next to one with the same key, like older versions could do.
  * The model refuses such a row, so the insert skips it.
  *

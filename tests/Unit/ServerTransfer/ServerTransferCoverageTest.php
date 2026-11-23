@@ -241,7 +241,7 @@ test('every exported value arrives unchanged on the target', function () {
         Environment::class => ['canvas_positions'],
     ];
     $values = [
-        Server::class => ['proxy' => ['type' => 'TRAEFIK', 'status' => 'running', 'redirect_enabled' => false, 'redirect_url' => 'https://fuzz.example.test']],
+        Server::class => ['proxy' => ['type' => 'TRAEFIK', 'status' => 'running', 'redirect_enabled' => false, 'redirect_url' => 'https://fuzz.example.test', 'unknown_host_status' => 404]],
         // The import accepts only valid host key lines.
         ServerSetting::class => ['ssh_host_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKgKlP9E2JBLjQ8DDxZUaI5vOJlvo8Uv06UAyqDbyC2I'],
         Application::class => ['fqdn' => 'https://fuzz-a.example.test,https://fuzz-b.example.test', 'domain_port_overrides' => null, 'noindex_domains' => ['https://fuzz-b.example.test']],
