@@ -56,6 +56,7 @@
 - Verify the exact live flow, persisted state, relevant logs, and queue state when they affect the result.
 - When the request covers more than one interface or resource type, inventory and verify each supported path.
 - When a change alters how stored data reaches running containers, simulate the upgrade on the dev VM: start resources on the old code, then migrate and restart them on the new code, and compare the results.
+- A fresh dev VM has no `coolify` Docker network, so a Compose application deployment fails with `network coolify not found`. Create it on the VM (`docker network create --attachable coolify`) before a live deploy test.
 - Horizon workers in a dev instance keep the code they loaded. Run `./scripts/dev exec php artisan horizon:terminate` after a code change and before a live test of queued jobs.
 - To prove that a server side effect is blocked, check the server itself after the request. A model hook or job can be one of several write paths (for example `ServerStorageSaveJob` and `ServerFilesFromServerJob` both write file storages).
 

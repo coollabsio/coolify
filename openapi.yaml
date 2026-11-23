@@ -3573,6 +3573,11 @@ paths:
                 copy_value_to_preview:
                   type: boolean
                   description: 'Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false.'
+                compose_services:
+                  type: array
+                  items: { type: string }
+                  nullable: true
+                  description: 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'
               type: object
       responses:
         '201':
@@ -3634,6 +3639,11 @@ paths:
                 is_shown_once:
                   type: boolean
                   description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
+                compose_services:
+                  type: array
+                  items: { type: string }
+                  nullable: true
+                  description: 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'
               type: object
       responses:
         '201':
@@ -3677,7 +3687,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.' }, copy_value_to_preview: { type: boolean, description: 'Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false.' } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.' }, copy_value_to_preview: { type: boolean, description: 'Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false.' }, compose_services: { type: array, items: { type: string }, nullable: true, description: 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.' } }, type: object }
               type: object
       responses:
         '201':
@@ -13093,6 +13103,7 @@ paths:
                   status: { type: [string, 'null'], example: running }
                   redirect_enabled: { type: boolean, example: true }
                   redirect_url: { type: [string, 'null'], example: 'https://example.com' }
+                  unknown_host_status: { description: 'Saved status of the catch-all for hosts that no resource on the server uses. Traefik and Caddy use it only when redirect_enabled is true and redirect_url is empty. In that mode, the domains of resources on the server get 503 while the resource is down.', type: integer, example: 404, enum: [404, 503] }
                   proxy_error_page: { type: [string, 'null'] }
                   generate_exact_labels: { type: boolean, example: false }
                   traefik_certificate_resolver: { description: 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.', type: [string, 'null'], example: letsencrypt }
@@ -13132,6 +13143,10 @@ paths:
                 redirect_url:
                   description: 'Public http(s) redirect URL, or null to clear.'
                   type: [string, 'null']
+                unknown_host_status:
+                  description: 'Status of the catch-all for hosts that no resource on the server uses. Traefik and Caddy use it only when redirect_enabled is true and redirect_url is empty. In that mode, the domains of resources on the server get 503 while the resource is down.'
+                  type: integer
+                  enum: [404, 503]
                 proxy_error_page:
                   description: 'Custom HTML error page that the proxy shows for unknown hosts (when redirect_url is empty) and for resources in maintenance mode. Null restores the default page.'
                   type: [string, 'null']
@@ -13156,6 +13171,7 @@ paths:
                   status: { type: [string, 'null'] }
                   redirect_enabled: { type: boolean }
                   redirect_url: { type: [string, 'null'] }
+                  unknown_host_status: { type: integer, enum: [404, 503] }
                   proxy_error_page: { type: [string, 'null'] }
                   generate_exact_labels: { type: boolean }
                   traefik_certificate_resolver: { type: [string, 'null'] }
@@ -13213,6 +13229,7 @@ paths:
                   status: { type: [string, 'null'] }
                   redirect_enabled: { type: boolean }
                   redirect_url: { type: [string, 'null'] }
+                  unknown_host_status: { type: integer, enum: [404, 503] }
                   proxy_error_page: { type: [string, 'null'] }
                   generate_exact_labels: { type: boolean }
                   configuration: { type: [string, 'null'] }
@@ -15341,6 +15358,11 @@ paths:
                 is_shown_once:
                   type: boolean
                   description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
+                compose_services:
+                  type: array
+                  items: { type: string }
+                  nullable: true
+                  description: 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'
               type: object
       responses:
         '201':
@@ -15401,6 +15423,11 @@ paths:
                 is_shown_once:
                   type: boolean
                   description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
+                compose_services:
+                  type: array
+                  items: { type: string }
+                  nullable: true
+                  description: 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'
               type: object
       responses:
         '201':
@@ -15446,7 +15473,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.' } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.' }, compose_services: { type: array, items: { type: string }, nullable: true, description: 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.' } }, type: object }
               type: object
       responses:
         '201':
@@ -19374,6 +19401,12 @@ components:
         comment:
           type: string
           nullable: true
+        compose_services:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: 'Docker Compose services that get this variable. Null means all services.'
         version:
           type: string
         created_at:

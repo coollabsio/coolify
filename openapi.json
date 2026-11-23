@@ -5350,6 +5350,14 @@
                                     "copy_value_to_preview": {
                                         "type": "boolean",
                                         "description": "Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false."
+                                    },
+                                    "compose_services": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "nullable": true,
+                                        "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                     }
                                 },
                                 "type": "object"
@@ -5442,6 +5450,14 @@
                                     "is_shown_once": {
                                         "type": "boolean",
                                         "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
+                                    },
+                                    "compose_services": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "nullable": true,
+                                        "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                     }
                                 },
                                 "type": "object"
@@ -5537,6 +5553,14 @@
                                                 "copy_value_to_preview": {
                                                     "type": "boolean",
                                                     "description": "Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false."
+                                                },
+                                                "compose_services": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "nullable": true,
+                                                    "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                                 }
                                             },
                                             "type": "object"
@@ -20765,6 +20789,15 @@
                                             ],
                                             "example": "https:\/\/example.com"
                                         },
+                                        "unknown_host_status": {
+                                            "description": "Saved status of the catch-all for hosts that no resource on the server uses. Traefik and Caddy use it only when redirect_enabled is true and redirect_url is empty. In that mode, the domains of resources on the server get 503 while the resource is down.",
+                                            "type": "integer",
+                                            "example": 404,
+                                            "enum": [
+                                                404,
+                                                503
+                                            ]
+                                        },
                                         "proxy_error_page": {
                                             "type": [
                                                 "string",
@@ -20846,6 +20879,14 @@
                                             "null"
                                         ]
                                     },
+                                    "unknown_host_status": {
+                                        "description": "Status of the catch-all for hosts that no resource on the server uses. Traefik and Caddy use it only when redirect_enabled is true and redirect_url is empty. In that mode, the domains of resources on the server get 503 while the resource is down.",
+                                        "type": "integer",
+                                        "enum": [
+                                            404,
+                                            503
+                                        ]
+                                    },
                                     "proxy_error_page": {
                                         "description": "Custom HTML error page that the proxy shows for unknown hosts (when redirect_url is empty) and for resources in maintenance mode. Null restores the default page.",
                                         "type": [
@@ -20905,6 +20946,13 @@
                                             "type": [
                                                 "string",
                                                 "null"
+                                            ]
+                                        },
+                                        "unknown_host_status": {
+                                            "type": "integer",
+                                            "enum": [
+                                                404,
+                                                503
                                             ]
                                         },
                                         "proxy_error_page": {
@@ -21025,6 +21073,13 @@
                                             "type": [
                                                 "string",
                                                 "null"
+                                            ]
+                                        },
+                                        "unknown_host_status": {
+                                            "type": "integer",
+                                            "enum": [
+                                                404,
+                                                503
                                             ]
                                         },
                                         "proxy_error_page": {
@@ -24466,6 +24521,14 @@
                                     "is_shown_once": {
                                         "type": "boolean",
                                         "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
+                                    },
+                                    "compose_services": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "nullable": true,
+                                        "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                     }
                                 },
                                 "type": "object"
@@ -24557,6 +24620,14 @@
                                     "is_shown_once": {
                                         "type": "boolean",
                                         "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
+                                    },
+                                    "compose_services": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "nullable": true,
+                                        "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                     }
                                 },
                                 "type": "object"
@@ -24647,6 +24718,14 @@
                                                 "is_shown_once": {
                                                     "type": "boolean",
                                                     "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
+                                                },
+                                                "compose_services": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "nullable": true,
+                                                    "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                                 }
                                             },
                                             "type": "object"
@@ -30492,6 +30571,14 @@
                     "comment": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "compose_services": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "nullable": true,
+                        "description": "Docker Compose services that get this variable. Null means all services."
                     },
                     "version": {
                         "type": "string"

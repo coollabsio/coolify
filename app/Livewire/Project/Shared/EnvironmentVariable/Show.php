@@ -18,6 +18,7 @@ use App\Traits\HasSecretManagerAutocomplete;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -92,6 +93,12 @@ class Show extends Component
 
     public bool $is_redis_credential = false;
 
+    /** All Compose services get the variable, also ones that the Compose file gets later. */
+    public bool $allContainers = true;
+
+    /** @var list<string> The Compose services that get the variable when is off. */
+    public array $compose_services = [];
+
     public bool $isValueHidden = false;
 
     /**
@@ -137,12 +144,53 @@ class Show extends Component
             'real_value' => 'nullable',
             'newLockedValue' => 'nullable|string',
             'is_required' => 'required|boolean',
+            ...($this->composeServiceNames === [] ? [] : [
+                'allContainers' => 'boolean',
+                'compose_services' => ['array', 'required_if:allContainers,false'],
+                'compose_services.*' => ['string', Rule::in($this->composeServiceOptionNames())],
+            ]),
         ];
     }
 
     protected function messages(): array
     {
-        return ValidationPatterns::environmentVariableKeyMessages('key');
+        return [
+            ...ValidationPatterns::environmentVariableKeyMessages('key'),
+            'compose_services.*.in' => 'The container ":input" is not in the Compose file.',
+            'compose_services.required_if' => 'Select at least one container, or select All containers.',
+        ];
+    }
+
+    /**
+     * The Compose services that the variable can be limited to. Empty hides the container picker.
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function composeServiceNames(): array
+    {
+        return $this->env instanceof ModelsEnvironmentVariable ? composeServiceNamesForEnvironmentScope($this->resource) : [];
+    }
+
+    /**
+     * Saved services that are no longer in the Compose file. They stay until the user removes them.
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function staleComposeServices(): array
+    {
+        if ($this->composeServiceNames === []) {
+            return [];
+        }
+
+        return array_values(array_diff($this->env->compose_services ?? [], $this->composeServiceNames));
+    }
+
+    /** @return list<string> */
+    private function composeServiceOptionNames(): array
+    {
+        return [...$this->composeServiceNames, ...$this->staleComposeServices];
     }
 
     public function mount()
@@ -255,6 +303,9 @@ class Show extends Component
                 $this->env->is_runtime = $this->is_runtime;
                 $this->env->is_buildtime = $this->is_buildtime;
                 $this->env->is_shared = $this->is_shared;
+                if ($this->composeServiceNames !== []) {
+                    $this->env->compose_services = $this->allContainers ? null : $this->compose_services;
+                }
             }
             $this->env->key = $this->key;
             // The form never holds a locked value, so keep the stored one and keep the lock.
@@ -269,6 +320,7 @@ class Show extends Component
             $this->env->is_literal = $this->is_literal;
             $this->env->save();
             $this->newLockedValue = null;
+            unset($this->staleComposeServices);
             $this->valuesLoaded = true;
         } else {
             // Table metadata only — never decrypt here. Values load via loadValues().
@@ -281,6 +333,8 @@ class Show extends Component
             $this->is_runtime = (bool) ($this->env->is_runtime ?? true);
             $this->is_buildtime = (bool) ($this->env->is_buildtime ?? true);
             $this->is_required = (bool) ($this->env->is_required ?? false);
+            $this->compose_services = $this->env instanceof ModelsEnvironmentVariable ? ($this->env->compose_services ?? []) : [];
+            $this->allContainers = $this->compose_services === [];
             // Use the stored column, not the value-based accessor (that decrypts).
             $this->is_shared = (bool) ($this->env->getAttributes()['is_shared'] ?? false);
             $this->isValueHidden = $this->valuesHiddenForUser();

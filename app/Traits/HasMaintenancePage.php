@@ -33,6 +33,32 @@ trait HasMaintenancePage
      */
     public function maintenanceRoutes(): Collection
     {
+        return $this->parsedMaintenanceDomains()
+            ->filter(fn (array $route) => preg_match('#^/[A-Za-z0-9/._~%-]*$#', $route['path']) === 1)
+            ->unique(fn (array $route) => "{$route['scheme']}://{$route['host']}{$route['path']}")
+            ->values();
+    }
+
+    /**
+     * Lowercase hosts of the domains. A host stays when the path of its domain cannot be a maintenance route.
+     *
+     * @return Collection<int, string>
+     */
+    public function maintenanceHosts(): Collection
+    {
+        return $this->parsedMaintenanceDomains()
+            ->map(fn (array $route) => strtolower($route['host']))
+            ->unique()
+            ->values();
+    }
+
+    /**
+     * Domains with an HTTP or HTTPS scheme and a host that is safe in the proxy configuration.
+     *
+     * @return Collection<int, array{scheme: string, host: string, path: string, force_https: bool}>
+     */
+    private function parsedMaintenanceDomains(): Collection
+    {
         return $this->maintenanceDomains()
             ->map(function (array $domain): ?array {
                 try {
@@ -43,18 +69,14 @@ trait HasMaintenancePage
                 // Host and scheme stay as the proxy labels use them, so the Caddy site address is the same.
                 $scheme = $url->getScheme();
                 $host = $url->getHost();
-                $path = $url->getPath() ?: '/';
 
-                if (! in_array($scheme, ['http', 'https'], true)
-                    || ! preg_match('/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/i', $host)
-                    || ! preg_match('#^/[A-Za-z0-9/._~%-]*$#', $path)) {
+                if (! in_array($scheme, ['http', 'https'], true) || ! preg_match('/^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/i', $host)) {
                     return null;
                 }
 
-                return ['scheme' => $scheme, 'host' => $host, 'path' => $path, 'force_https' => $domain['force_https']];
+                return ['scheme' => $scheme, 'host' => $host, 'path' => $url->getPath() ?: '/', 'force_https' => $domain['force_https']];
             })
             ->filter()
-            ->unique(fn (array $route) => "{$route['scheme']}://{$route['host']}{$route['path']}")
             ->values();
     }
 
