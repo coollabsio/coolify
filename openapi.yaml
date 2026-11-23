@@ -3031,7 +3031,7 @@ paths:
         '401':
           $ref: '#/components/responses/401'
         '403':
-          description: 'Terminal access is disabled on the target server or the terminal API is disabled for the team.'
+          description: 'Terminal access is disabled on the target server, or the terminal API is disabled on the instance or for the team.'
         '404':
           $ref: '#/components/responses/404'
         '422':
@@ -14958,7 +14958,7 @@ paths:
         '401':
           $ref: '#/components/responses/401'
         '403':
-          description: 'Terminal access is disabled on this server or the terminal API is disabled for the team.'
+          description: 'Terminal access is disabled on this server, or the terminal API is disabled on the instance or for the team.'
         '404':
           $ref: '#/components/responses/404'
         '422':

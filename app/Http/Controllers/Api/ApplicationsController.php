@@ -279,7 +279,11 @@ class ApplicationsController extends Controller
         return $field === 'fqdn' ? 'Use the domains field to set application URLs.' : 'This field is not allowed.';
     }
 
-    private function resolveApplicationTerminalTarget(Application $application, Request $request): array|JsonResponse
+    /**
+     * Finds the running container to run a terminal command in. Each scanned server counts once
+     * toward its terminal rate limit, and its `docker ps` runs in a concurrency slot of the server.
+     */
+    private function resolveApplicationTerminalTarget(Application $application, Request $request, int $teamId): array|JsonResponse
     {
         $requestedServerUuid = $request->string('server_uuid')->value();
         $requestedContainer = $request->string('container')->value();
@@ -292,7 +296,7 @@ class ApplicationsController extends Controller
         $application->loadMissing(['destination.server', 'additional_servers']);
         $servers = collect([$application->destination?->server])
             ->merge($application->additional_servers)
-            ->filter()
+            ->filter(fn ($server) => $server !== null && (int) $server->team_id === $teamId)
             ->unique('id')
             ->values();
 
@@ -303,6 +307,11 @@ class ApplicationsController extends Controller
             }
         }
 
+        if ($servers->isNotEmpty() && $servers->every(fn ($server) => $server->isSwarm())) {
+            return response()->json(['message' => 'The terminal API does not support Docker Swarm applications.'], 422);
+        }
+        $servers = $servers->reject(fn ($server) => $server->isSwarm())->values();
+
         $runningContainers = collect();
         $disabledServers = collect();
         foreach ($servers as $server) {
@@ -312,18 +321,19 @@ class ApplicationsController extends Controller
                 continue;
             }
 
-            if ($server->isSwarm()) {
-                $containers = collect([[
-                    'Names' => $application->uuid.'_'.$application->uuid,
-                    'State' => 'running',
-                ]]);
-            } else {
-                $containers = getCurrentApplicationContainerStatus(
-                    $server,
-                    $application,
-                    $pullRequestId,
-                    includePullrequests: $pullRequestId === null,
-                );
+            $rateLimitResponse = $this->enforceTerminalServerRateLimit($server, $teamId);
+            if ($rateLimitResponse instanceof JsonResponse) {
+                return $rateLimitResponse;
+            }
+
+            $containers = $this->runInTerminalServerSlot($server, $teamId, self::TERMINAL_COMMAND_TIMEOUT, fn () => getCurrentApplicationContainerStatus(
+                $server,
+                $application,
+                $pullRequestId,
+                includePullrequests: $pullRequestId === null,
+            ));
+            if ($containers instanceof JsonResponse) {
+                return $containers;
             }
 
             $containers
@@ -2969,7 +2979,7 @@ class ApplicationsController extends Controller
                 ],
             ),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
-            new OA\Response(response: 403, description: 'Terminal access is disabled on the target server or the terminal API is disabled for the team.'),
+            new OA\Response(response: 403, description: 'Terminal access is disabled on the target server, or the terminal API is disabled on the instance or for the team.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
             new OA\Response(response: 429, ref: '#/components/responses/TerminalRateLimited'),
@@ -2989,7 +2999,7 @@ class ApplicationsController extends Controller
 
         $allowedFields = ['command', 'timeout', 'container', 'server_uuid', 'pull_request_id'];
         $validator = customApiValidator($request->all(), [
-            'command' => 'required|string|max:20000',
+            'command' => 'required|string|max:20000|not_regex:/\x00/',
             'timeout' => 'integer|nullable|min:1|max:10',
             'container' => 'string|nullable|max:255',
             'server_uuid' => 'string|nullable|max:255',
@@ -3014,21 +3024,13 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
-        $target = $this->resolveApplicationTerminalTarget($application, $request);
+        $target = $this->resolveApplicationTerminalTarget($application, $request, $teamId);
         if ($target instanceof JsonResponse) {
             return $target;
         }
 
+        // The discovery already counted this request toward the rate limit of the server.
         $server = $target['server'];
-        if ($this->isTerminalDisabledOn($server)) {
-            return response()->json(['message' => 'Terminal access is disabled on this server.'], 403);
-        }
-
-        $rateLimitResponse = $this->enforceTerminalServerRateLimit($server, $teamId);
-        if ($rateLimitResponse instanceof JsonResponse) {
-            return $rateLimitResponse;
-        }
-
         $timeout = $request->integer('timeout') ?: self::TERMINAL_COMMAND_TIMEOUT;
         $dockerCommand = $this->applicationDockerExecCommand($server, $target['container'], $request->command, $timeout);
         try {

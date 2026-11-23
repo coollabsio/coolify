@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
+    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true, 'is_terminal_api_enabled' => true]);
     config(['api.rate_limit' => 1000]);
     RateLimiter::for('api', fn (Request $request) => Limit::perMinute(1000)->by($request->user()?->id ?: $request->ip()));
     Cache::flush();
@@ -150,7 +150,7 @@ describe('POST /api/v1/servers/{uuid}/exec', function () {
 
         Process::assertRan(fn ($process) => $process->timeout === 8
             && str($process->command)->contains('timeout 9 ssh')
-            && str($process->command)->contains('exec timeout 3 "$s"'));
+            && str($process->input)->contains('timeout 3 "$s" -c'));
     });
 
     test('requires terminal token ability', function () {
@@ -226,8 +226,8 @@ describe('POST /api/v1/servers/{uuid}/exec', function () {
             ])
             ->assertOk();
 
-        Process::assertRan(fn ($process) => str($process->command)->contains($command)
-            && ! str($process->command)->contains('sudo'));
+        Process::assertRan(fn ($process) => str($process->input)->contains($command)
+            && ! str($process->input)->contains('sudo'));
     });
 
     test('rejects the unsupported use sudo field', function () {

@@ -53,6 +53,12 @@
                                 ['value' => true, 'label' => 'Enabled'],
                                 ['value' => false, 'label' => 'Disabled'],
                             ]" />
+                        <x-forms.listbox id="is_terminal_api_enabled" label="Terminal API"
+                            helper="Allows API tokens with the terminal permission to run commands on servers and in application containers. Each team must also enable it."
+                            onChange="instantSave" :options="[
+                                ['value' => true, 'label' => 'Enabled'],
+                                ['value' => false, 'label' => 'Disabled'],
+                            ]" />
                         <div class="lg:col-span-2">
                             <x-forms.input id="allowed_ips" label="Allowed IPs"
                                 helper="Applies to the REST API and the MCP endpoint. Comma-separated IPs or CIDR ranges. Empty or 0.0.0.0 allows all sources."

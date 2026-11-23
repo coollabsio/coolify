@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\InstanceSettings;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -10,6 +11,10 @@ class EnsureTeamTerminalApiEnabled
 {
     public function handle(Request $request, Closure $next): Response
     {
+        if (! InstanceSettings::get()->is_terminal_api_enabled) {
+            return response()->json(['message' => 'Terminal API is disabled on this instance.'], 403);
+        }
+
         $user = $request->user();
         $teamId = $user?->currentAccessToken()?->team_id;
 

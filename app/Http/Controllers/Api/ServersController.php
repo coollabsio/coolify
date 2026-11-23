@@ -1446,7 +1446,7 @@ class ServersController extends Controller
                 ],
             ),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
-            new OA\Response(response: 403, description: 'Terminal access is disabled on this server or the terminal API is disabled for the team.'),
+            new OA\Response(response: 403, description: 'Terminal access is disabled on this server, or the terminal API is disabled on the instance or for the team.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
             new OA\Response(response: 429, ref: '#/components/responses/TerminalRateLimited'),
@@ -1466,7 +1466,7 @@ class ServersController extends Controller
 
         $allowedFields = ['command', 'timeout'];
         $validator = customApiValidator($request->all(), [
-            'command' => 'required|string|max:20000',
+            'command' => 'required|string|max:20000|not_regex:/\x00/',
             'timeout' => 'integer|nullable|min:1|max:10',
         ]);
 

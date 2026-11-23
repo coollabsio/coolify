@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\InstanceSettings;
 use App\Models\PersonalAccessToken;
 use App\Models\Team;
 use App\Models\User;
@@ -41,6 +42,7 @@ class PersonalAccessTokenSeeder extends Seeder
         }
 
         // The Terminal API is off by default; turn it on so the dev terminal token works.
+        InstanceSettings::query()->whereKey(0)->update(['is_terminal_api_enabled' => true]);
         $team->update(['is_terminal_api_enabled' => true]);
 
         // Define test tokens with different scopes

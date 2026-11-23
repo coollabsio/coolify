@@ -306,8 +306,8 @@ class ApiTokens extends Component
             if (! auth()->user()->isAdminOfTeam($teamId)) {
                 throw new \Exception('You do not have permission to give tokens terminal permissions.');
             }
-            if ($permissions !== ['terminal'] || $scopes !== null) {
-                throw new \Exception('A terminal token must have only the terminal permission and access to the whole team.');
+            if ($permissions !== ['terminal']) {
+                throw new \Exception('A terminal token must have only the terminal permission.');
             }
         }
         $levels = AccessLevel::parseMany($permissions);

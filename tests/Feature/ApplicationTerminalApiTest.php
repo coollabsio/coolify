@@ -20,7 +20,7 @@ use Illuminate\Support\Str;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true]);
+    InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true, 'is_terminal_api_enabled' => true]);
     config(['api.rate_limit' => 1000]);
     RateLimiter::for('api', fn (Request $request) => Limit::perMinute(1000)->by($request->user()?->id ?: $request->ip()));
     Cache::flush();
@@ -121,8 +121,8 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
             'stderr' => 'warning',
         ]);
 
-        Process::assertRan(fn ($process) => str($process->command)->contains("docker exec 'app-container' sh -c ")
-            && str($process->command)->contains(" sh 'php artisan about'"));
+        Process::assertRan(fn ($process) => str($process->input)->contains("docker exec 'app-container' sh -c ")
+            && str($process->input)->contains(" sh 'php artisan about'"));
     });
 
     test('truncates oversized command output', function () {
@@ -163,8 +163,8 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
         ]);
 
         Process::assertRan(fn ($process) => str($process->command)->contains('timeout 9 ssh')
-            && str($process->command)->contains("docker exec 'app-container'")
-            && str($process->command)->contains('exec timeout 3 "$s"')
+            && str($process->input)->contains("docker exec 'app-container'")
+            && str($process->input)->contains('timeout 3 "$s" -c')
             && $process->timeout === 8);
     });
 
@@ -242,7 +242,7 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
             $locks->each->release();
         }
 
-        Process::assertNotRan(fn ($process) => str($process->command)->contains('docker exec'));
+        Process::assertNotRan(fn ($process) => str($process->input)->contains('docker exec'));
     });
 
     test('selects only the requested pull request container', function () {
@@ -258,7 +258,7 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
             ])
             ->assertOk();
 
-        Process::assertRan(fn ($process) => str($process->command)->contains("docker exec 'preview-123'"));
+        Process::assertRan(fn ($process) => str($process->input)->contains("docker exec 'preview-123'"));
     });
 
     test('selects only the base deployment when pull request id is zero', function () {
@@ -274,7 +274,7 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
             ])
             ->assertOk();
 
-        Process::assertRan(fn ($process) => str($process->command)->contains("docker exec 'base'"));
+        Process::assertRan(fn ($process) => str($process->input)->contains("docker exec 'base'"));
     });
 
     test('asks for a container when multiple running containers are found', function () {
@@ -326,6 +326,6 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
         $response->assertJsonCount(2, 'containers');
         $response->assertJsonPath('containers.0.container', 'app-container');
         $response->assertJsonPath('containers.1.container', 'app-container');
-        Process::assertNotRan(fn ($process) => str($process->command)->contains('docker exec'));
+        Process::assertNotRan(fn ($process) => str($process->input)->contains('docker exec'));
     });
 });

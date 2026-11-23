@@ -44,6 +44,7 @@ class ApiAbility extends CheckForAnyAbility
         'validate',
         'host-key',
         'destinations',
+        'exec',
     ];
 
     public const SCOPED_ACCESS_DENIED_MESSAGE = 'This API token is limited to selected projects, environments, resources, or servers, so it cannot use this endpoint.';

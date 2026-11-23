@@ -111,7 +111,6 @@ class ApiTokenForm extends Form
             $this->permissions = ['root'];
         } elseif ($permissionToUpdate == 'terminal' && in_array('terminal', $this->permissions, true)) {
             $this->permissions = ['terminal'];
-            $this->scopeMode = 'team';
         } elseif (in_array('terminal', $this->permissions, true) && in_array($permissionToUpdate, $this->permissions, true)) {
             $this->permissions = [$permissionToUpdate];
         } elseif ($permissionToUpdate == 'read:sensitive' && ! in_array('read', $this->permissions, true)) {
