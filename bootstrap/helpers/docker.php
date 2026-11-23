@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Rules\ValidIpAllowlist;
 use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
@@ -884,7 +885,7 @@ function caddySiteAddress(string $scheme, string $host, bool $isForceHttpsEnable
     return "{$scheme}://{$host}";
 }
 
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false, ?int $http_basic_auth_bcrypt_cost = null, array $http_basic_auth_argon2id_options = [], bool $is_permanent_redirect_enabled = false)
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false, ?int $http_basic_auth_bcrypt_cost = null, array $http_basic_auth_argon2id_options = [], bool $is_permanent_redirect_enabled = false, ?string $ip_allowlist = null)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -901,6 +902,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
     }
 
     $trafficAppKey = caddyTrafficAppKey($uuid, $service_name);
+    $ip_allowlist_entries = ValidIpAllowlist::validEntries($ip_allowlist);
 
     foreach ($domains as $loop => $domain) {
         $url = Url::fromString($domain);
@@ -939,6 +941,11 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         }
         $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy.stream_close_delay=".CADDY_STREAM_CLOSE_DELAY);
         $labels->push("caddy_{$loop}.{$handle}={$path}*");
+        if ($ip_allowlist_entries !== []) {
+            // respond sorts before reverse_proxy inside the handle block, so blocked clients never reach the app.
+            $labels->push("caddy_{$loop}.@ip_not_allowed=not remote_ip ".implode(' ', $ip_allowlist_entries));
+            $labels->push("caddy_{$loop}.{$handle}.{$loop}_respond=@ip_not_allowed 403");
+        }
         if ($is_gzip_enabled) {
             $labels->push("caddy_{$loop}.encode=zstd gzip");
         }
@@ -1042,7 +1049,7 @@ function traefikHostRulesWithoutIpv6Brackets(Collection $labels): Collection
     ) : $label);
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [], ?string $certificate_resolver = 'letsencrypt', ?int $http_basic_auth_bcrypt_cost = null, bool $is_permanent_redirect_enabled = false)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [], ?string $certificate_resolver = 'letsencrypt', ?int $http_basic_auth_bcrypt_cost = null, bool $is_permanent_redirect_enabled = false, ?string $ip_allowlist = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -1069,6 +1076,15 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
 
     if ($is_http_basic_auth_enabled) {
         $labels->push("traefik.http.middlewares.{$http_basic_auth_label}.basicauth.users={$http_basic_auth_username}:{$hashedPassword}");
+    }
+
+    // The allowlist runs first so blocked clients get 403 before any redirect or other middleware.
+    $ip_allowlist_entries = ValidIpAllowlist::validEntries($ip_allowlist);
+    $base_middlewares = [];
+    if ($ip_allowlist_entries !== []) {
+        $ip_allowlist_label = "ip-allowlist-{$uuid}";
+        $labels->push("traefik.http.middlewares.{$ip_allowlist_label}.ipallowlist.sourcerange=".implode(',', $ip_allowlist_entries));
+        $base_middlewares[] = $ip_allowlist_label;
     }
 
     $middlewares_from_labels = collect([]);
@@ -1159,7 +1175,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 }
                 if ($path !== '/') {
                     // Middleware handling
-                    $middlewares = collect([]);
+                    $middlewares = collect($base_middlewares);
                     if ($is_stripprefix_enabled && ! str($image)->contains('ghost')) {
                         $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}");
                         $middlewares->push("{$https_label}-stripprefix");
@@ -1191,7 +1207,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares->join(',')}");
                     }
                 } else {
-                    $middlewares = collect([]);
+                    $middlewares = collect($base_middlewares);
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip-sse');
                     }
@@ -1232,7 +1248,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
                 }
                 if ($is_force_https_enabled) {
-                    $httpMiddlewares = collect([]);
+                    $httpMiddlewares = collect($base_middlewares);
                     if ($is_noindex) {
                         $httpMiddlewares->push($noindex_name);
                     }
@@ -1252,7 +1268,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
                 }
                 if ($path !== '/') {
-                    $middlewares = collect([]);
+                    $middlewares = collect($base_middlewares);
                     if ($is_stripprefix_enabled && ! str($image)->contains('ghost')) {
                         $labels->push("traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}");
                         $middlewares->push("{$http_label}-stripprefix");
@@ -1285,7 +1301,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares}");
                     }
                 } else {
-                    $middlewares = collect([]);
+                    $middlewares = collect($base_middlewares);
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip-sse');
                     }
@@ -1360,6 +1376,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             http_basic_auth_username: $application->http_basic_auth_username,
                             http_basic_auth_password: $application->http_basic_auth_password,
                             http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
+                            ip_allowlist: $application->ip_allowlist,
                             noindex_domains: $noindexDomains,
                             domainPortOverrides: $application->domain_port_overrides ?? [],
                             certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
@@ -1381,6 +1398,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             http_basic_auth_password: $application->http_basic_auth_password,
                             http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                             http_basic_auth_argon2id_options: $httpBasicAuthArgon2idOptions,
+                            ip_allowlist: $application->ip_allowlist,
                             noindex_domains: $noindexDomains,
                             is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                             supports_log_append: $application->destination->server->caddySupportsLogAppend(),
@@ -1403,6 +1421,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     http_basic_auth_username: $application->http_basic_auth_username,
                     http_basic_auth_password: $application->http_basic_auth_password,
                     http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
+                    ip_allowlist: $application->ip_allowlist,
                     noindex_domains: $noindexDomains,
                     escape_redirect_replacement_for_compose: false,
                     domainPortOverrides: $application->domain_port_overrides ?? [],
@@ -1423,6 +1442,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     http_basic_auth_password: $application->http_basic_auth_password,
                     http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                     http_basic_auth_argon2id_options: $httpBasicAuthArgon2idOptions,
+                    ip_allowlist: $application->ip_allowlist,
                     noindex_domains: $noindexDomains,
                     is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                     supports_log_append: $application->destination->server->caddySupportsLogAppend(),
@@ -1455,6 +1475,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         http_basic_auth_username: $application->http_basic_auth_username,
                         http_basic_auth_password: $application->http_basic_auth_password,
                         http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
+                        ip_allowlist: $application->ip_allowlist,
                         noindex_domains: $noindexDomains,
                         escape_redirect_replacement_for_compose: false,
                         domainPortOverrides: $preview->domain_port_overrides ?? [],
@@ -1476,6 +1497,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                         http_basic_auth_password: $application->http_basic_auth_password,
                         http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                         http_basic_auth_argon2id_options: $httpBasicAuthArgon2idOptions,
+                        ip_allowlist: $application->ip_allowlist,
                         noindex_domains: $noindexDomains,
                         is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                         supports_log_append: $application->destination->server->caddySupportsLogAppend(),
@@ -1497,6 +1519,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 http_basic_auth_username: $application->http_basic_auth_username,
                 http_basic_auth_password: $application->http_basic_auth_password,
                 http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
+                ip_allowlist: $application->ip_allowlist,
                 noindex_domains: $noindexDomains,
                 escape_redirect_replacement_for_compose: false,
                 domainPortOverrides: $preview->domain_port_overrides ?? [],
@@ -1516,6 +1539,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                 http_basic_auth_password: $application->http_basic_auth_password,
                 http_basic_auth_bcrypt_cost: $application->http_basic_auth_bcrypt_cost,
                 http_basic_auth_argon2id_options: $httpBasicAuthArgon2idOptions,
+                ip_allowlist: $application->ip_allowlist,
                 noindex_domains: $noindexDomains,
                 is_traffic_analytics_enabled: $application->destination->server->isTrafficAnalyticsEnabled(),
                 supports_log_append: $application->destination->server->caddySupportsLogAppend(),

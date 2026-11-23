@@ -15,6 +15,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Rules\ManualWebhookSecret;
 use App\Rules\ValidGitBranch;
+use App\Rules\ValidIpAllowlist;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Collection;
@@ -333,6 +334,7 @@ function sharedDataApplications(?Application $application = null): array
         'is_gzip_enabled' => 'boolean',
         'is_stripprefix_enabled' => 'boolean',
         'is_permanent_redirect_enabled' => 'boolean',
+        'ip_allowlist' => ['nullable', 'string', new ValidIpAllowlist],
         'traefik_certificate_resolver' => ['nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
         'is_container_label_readonly_enabled' => 'boolean',
         'is_raw_compose_deployment_enabled' => 'boolean',

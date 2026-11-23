@@ -244,6 +244,7 @@ class ApplicationConfigurationSnapshot
             $this->item('http_basic_auth_bcrypt_cost', 'HTTP basic auth bcrypt cost factor', $this->application->http_basic_auth_bcrypt_cost, 'redeploy'),
             $this->item('http_basic_auth_argon2id_memory_cost', 'HTTP basic auth Argon2id memory (KiB)', $this->application->http_basic_auth_argon2id_memory_cost, 'redeploy'),
             $this->item('http_basic_auth_argon2id_time_cost', 'HTTP basic auth Argon2id iterations', $this->application->http_basic_auth_argon2id_time_cost, 'redeploy'),
+            $this->item('ip_allowlist', 'IP allowlist', $this->application->ip_allowlist, 'redeploy'),
         ];
     }
 
