@@ -49,16 +49,17 @@ trait HandlesTerminalApi
     }
 
     /**
-     * The command can contain secrets, so the audit log keeps only its hash.
+     * Wraps the command so the target stops it after the timeout. The local timeout stops only the
+     * SSH client: without a TTY, the remote process and a `docker exec` process keep running.
+     * A target without a working `timeout` (a minimal image, an old BusyBox) runs the command without it.
      *
-     * @return array{command_sha256: string, command_length: int}
+     * @param  string  $shell  Shell expression that runs the command, for example `sh`.
      */
-    private function terminalCommandAuditContext(string $command): array
+    private function withRemoteTimeout(string $command, int $timeout, string $shell = 'sh'): string
     {
-        return [
-            'command_sha256' => hash('sha256', $command),
-            'command_length' => strlen($command),
-        ];
+        $script = "s={$shell}; if timeout 1 true >/dev/null 2>&1; then exec timeout {$timeout} \"\$s\" -c \"\$1\"; fi; exec \"\$s\" -c \"\$1\"";
+
+        return 'sh -c '.escapeshellarg($script).' sh '.escapeshellarg($command);
     }
 
     private function terminalProcessTimeout(int $commandTimeout): int

@@ -1487,7 +1487,7 @@ class ServersController extends Controller
         if (! $server) {
             return response()->json(['message' => 'Server not found.'], 404);
         }
-        if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
+        if ($this->isTerminalDisabledOn($server)) {
             return response()->json(['message' => 'Terminal access is disabled on this server.'], 403);
         }
 
@@ -1498,7 +1498,9 @@ class ServersController extends Controller
 
         $timeout = $request->integer('timeout') ?: self::TERMINAL_COMMAND_TIMEOUT;
         try {
-            $process = $this->runConcurrentTerminalProcess($server, $teamId, $request->command, $timeout);
+            // Bash runs the command as before (see SshMultiplexingHelper::remoteShellCommand()), sh when the server has no bash.
+            $remoteCommand = $this->withRemoteTimeout($request->command, $timeout, '$(command -v bash || echo sh)');
+            $process = $this->runConcurrentTerminalProcess($server, $teamId, $remoteCommand, $timeout);
         } catch (ProcessTimedOutException) {
             auditLog('api.server.command.executed', [
                 'team_id' => $teamId,

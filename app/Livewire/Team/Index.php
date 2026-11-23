@@ -150,7 +150,14 @@ class Index extends Component
                 return;
             }
             $this->syncData(true);
+            $terminalApiChanged = $this->team->isDirty('is_terminal_api_enabled');
             $this->team->save();
+            if ($terminalApiChanged) {
+                auditLog('ui.team.terminal_api_updated', [
+                    'team_id' => $this->team->id,
+                    'is_terminal_api_enabled' => $this->team->is_terminal_api_enabled,
+                ], 'warning');
+            }
             refreshSession();
             $this->dispatch('team-updated');
             $this->dispatch('success', 'Team updated.');

@@ -306,7 +306,7 @@ class ApplicationsController extends Controller
         $runningContainers = collect();
         $disabledServers = collect();
         foreach ($servers as $server) {
-            if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
+            if ($this->isTerminalDisabledOn($server)) {
                 $disabledServers->push($server);
 
                 continue;
@@ -379,9 +379,9 @@ class ApplicationsController extends Controller
         return $runningContainers->first();
     }
 
-    private function applicationDockerExecCommand(Server $server, string $container, string $command): string
+    private function applicationDockerExecCommand(Server $server, string $container, string $command, int $timeout): string
     {
-        $dockerCommand = 'docker exec '.escapeshellarg($container).' sh -c '.escapeshellarg($command);
+        $dockerCommand = 'docker exec '.escapeshellarg($container).' '.$this->withRemoteTimeout($command, $timeout);
 
         if ($server->isNonRoot()) {
             return "sudo {$dockerCommand}";
@@ -3020,7 +3020,7 @@ class ApplicationsController extends Controller
         }
 
         $server = $target['server'];
-        if (! $server->isTerminalEnabled() || $server->isForceDisabled()) {
+        if ($this->isTerminalDisabledOn($server)) {
             return response()->json(['message' => 'Terminal access is disabled on this server.'], 403);
         }
 
@@ -3029,8 +3029,8 @@ class ApplicationsController extends Controller
             return $rateLimitResponse;
         }
 
-        $dockerCommand = $this->applicationDockerExecCommand($server, $target['container'], $request->command);
         $timeout = $request->integer('timeout') ?: self::TERMINAL_COMMAND_TIMEOUT;
+        $dockerCommand = $this->applicationDockerExecCommand($server, $target['container'], $request->command, $timeout);
         try {
             $process = $this->runConcurrentTerminalProcess($server, $teamId, $dockerCommand, $timeout);
         } catch (ProcessTimedOutException) {

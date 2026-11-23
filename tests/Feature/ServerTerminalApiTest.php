@@ -149,7 +149,8 @@ describe('POST /api/v1/servers/{uuid}/exec', function () {
         ]);
 
         Process::assertRan(fn ($process) => $process->timeout === 8
-            && str($process->command)->contains('timeout 3 ssh'));
+            && str($process->command)->contains('timeout 3 ssh')
+            && str($process->command)->contains('exec timeout 3 "$s"'));
     });
 
     test('requires terminal token ability', function () {

@@ -121,7 +121,8 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
             'stderr' => 'warning',
         ]);
 
-        Process::assertRan(fn ($process) => str($process->command)->contains("docker exec 'app-container' sh -c 'php artisan about'"));
+        Process::assertRan(fn ($process) => str($process->command)->contains("docker exec 'app-container' sh -c ")
+            && str($process->command)->contains(" sh 'php artisan about'"));
     });
 
     test('truncates oversized command output', function () {
@@ -163,6 +164,7 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
 
         Process::assertRan(fn ($process) => str($process->command)->contains('timeout 3 ssh')
             && str($process->command)->contains("docker exec 'app-container'")
+            && str($process->command)->contains('exec timeout 3 "$s"')
             && $process->timeout === 8);
     });
 
