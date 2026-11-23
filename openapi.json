@@ -26976,7 +26976,7 @@
                     "Applications"
                 ],
                 "summary": "Create (static site from an archive)",
-                "description": "Create a static site that is deployed from uploaded archives instead of a Git repository. With upload_id, the uploaded archive becomes the first version of the site and is deployed unless instant_deploy is false. Deploying needs a token with the deploy ability.",
+                "description": "Create a static site that is deployed from uploaded archives instead of a Git repository. With upload_id, the uploaded archive becomes the first version of the site and is deployed, which needs a token with the deploy ability.",
                 "operationId": "create-static-site-archive-application",
                 "requestBody": {
                     "required": true,
@@ -27039,10 +27039,6 @@
                                         "type": "string",
                                         "format": "uuid",
                                         "description": "A completed upload from POST \/applications\/archive\/uploads."
-                                    },
-                                    "instant_deploy": {
-                                        "type": "boolean",
-                                        "description": "Deploy the uploaded archive. The default is true when upload_id is set."
                                     }
                                 },
                                 "type": "object"
@@ -27110,7 +27106,7 @@
                     "Applications"
                 ],
                 "summary": "Deploy static site archive",
-                "description": "Make an uploaded archive the current version of a static site that is deployed from archives, and deploy it. Needs a token with the write and deploy abilities.",
+                "description": "Make an uploaded archive the current version of a static site that is deployed from archives, and build and deploy it. Needs a token with the write and deploy abilities.",
                 "operationId": "deploy-static-site-archive",
                 "parameters": [
                     {
@@ -27136,11 +27132,6 @@
                                         "type": "string",
                                         "format": "uuid",
                                         "description": "A completed upload from POST \/applications\/archive\/uploads."
-                                    },
-                                    "force_rebuild": {
-                                        "type": "boolean",
-                                        "default": false,
-                                        "description": "Build the image even when an image of this version exists."
                                     }
                                 },
                                 "type": "object"
@@ -27188,7 +27179,7 @@
                         "$ref": "#\/components\/responses\/422"
                     },
                     "429": {
-                        "description": "The archive is stored, but the deployment queue is full."
+                        "description": "The deployment queue is full. Upload the archive again later."
                     }
                 },
                 "security": [

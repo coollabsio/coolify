@@ -751,7 +751,7 @@ class General extends Component
             if (! $this->application->is_archive_source) {
                 throw new Exception('This application is not deployed from an uploaded archive.');
             }
-            $result = StaticSiteArchive::publish($this->application, (int) $this->application->team()->id, $uploadId, deploy: true);
+            $result = StaticSiteArchive::publish($this->application, (int) $this->application->team()->id, $uploadId);
             if (blank($result['deployment_uuid'])) {
                 $this->dispatch('error', $result['message'] ?? 'The deployment could not be queued.');
 

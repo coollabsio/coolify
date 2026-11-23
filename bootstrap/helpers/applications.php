@@ -16,13 +16,11 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Services\Dns\ResourceDnsRecords;
-use App\Support\StaticSiteArchive;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Spatie\Url\Url;
 
 function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null, ?string $parent_deployment_uuid = null, ?int $scan_gate_bypassed_by = null, ?string $scan_gate_pinned_image = null, bool $is_mcp = false, ?CancelPreviousDeployments $cancel_previous = null, bool $reject_if_server_busy = false)
@@ -551,15 +549,8 @@ function clone_application(Application $source, $destination, array $overrides =
         'status' => 'exited',
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),
-    ], $overrides));
+    ], $source->is_archive_source ? ['git_commit_sha' => 'HEAD'] : [], $overrides));
     $newApplication->save();
-
-    if ($source->is_archive_source) {
-        $archive = StaticSiteArchive::storageDirectory($source)."/{$source->git_commit_sha}";
-        if (Storage::exists($archive)) {
-            Storage::copy($archive, StaticSiteArchive::storageDirectory($newApplication)."/{$source->git_commit_sha}");
-        }
-    }
 
     // Update custom labels if needed
     if ($newApplication->destination->server->proxyType() !== 'NONE' && $applicationSettings->is_container_label_readonly_enabled === true) {

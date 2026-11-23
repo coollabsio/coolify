@@ -2,9 +2,7 @@
 
 namespace App\Support;
 
-use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
-use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\GithubApp;
 use App\Models\StandaloneDocker;
@@ -251,57 +249,57 @@ final class StaticSiteArchive
         return Storage::exists(self::stagingDirectory($teamId, $uploadId).'/archive');
     }
 
+    /**
+     * Archives wait here, one per deployment, until the deployment copies them to the server. The image on the
+     * server is the only stored copy of a site version. CleanupDatabaseImportUploads deletes orphans.
+     */
     public static function storageDirectory(Application $application): string
     {
         return "applications/{$application->uuid}/static-archives";
     }
 
+    public static function deploymentArchive(Application $application, string $deploymentUuid): string
+    {
+        return self::storageDirectory($application)."/{$deploymentUuid}";
+    }
+
     /**
-     * Moves a staged upload into the archive store of the application, makes it the current site version, and
-     * queues a deployment of it when $deploy is true. Only the newest archive is kept; older versions stay
-     * available as images for rollbacks.
+     * Moves a staged upload to the archive of a new deployment and queues the deployment, which builds the image
+     * from it. A queued deployment makes the archive the current site version.
      *
      * @return array{sha: string, status: string, message: ?string, deployment_uuid: ?string}
      *
      * @throws ValidationException when the upload is not staged for the team
      */
-    public static function publish(Application $application, int $teamId, string $uploadId, bool $deploy, bool $forceRebuild = false, bool $isApi = false): array
+    public static function publish(Application $application, int $teamId, string $uploadId, bool $isApi = false): array
     {
         $staged = self::stagingDirectory($teamId, $uploadId).'/archive';
         if (! Storage::exists($staged)) {
             self::fail('The upload was not found or has expired. Upload the archive again.', 'upload_id');
         }
         $sha = substr(hash_file('sha256', Storage::path($staged)), 0, 40);
-        $directory = self::storageDirectory($application);
-        $target = "{$directory}/{$sha}";
-        Storage::makeDirectory($directory);
+        $deploymentUuid = new_public_id();
+        $target = self::deploymentArchive($application, $deploymentUuid);
+        Storage::makeDirectory(self::storageDirectory($application));
         if (! rename(Storage::path($staged), Storage::path($target))) {
             self::fail('The upload cannot be stored. Upload the archive again.', 'upload_id');
         }
         Storage::deleteDirectory(dirname($staged));
-        $pendingCommits = ApplicationDeploymentQueue::query()
-            ->where('application_id', $application->id)
-            ->whereIn('status', [ApplicationDeploymentStatus::QUEUED->value, ApplicationDeploymentStatus::IN_PROGRESS->value])
-            ->pluck('commit')
-            ->all();
-        foreach (Storage::files($directory) as $file) {
-            if ($file !== $target && ! in_array(basename($file), $pendingCommits, true)) {
-                Storage::delete($file);
-            }
-        }
-        $application->update(['git_commit_sha' => $sha]);
 
-        if (! $deploy) {
-            return ['sha' => $sha, 'status' => 'stored', 'message' => null, 'deployment_uuid' => null];
-        }
-
+        // force_rebuild records that this deployment builds, and keeps a queued redeploy of the same version
+        // (which has no archive) from absorbing it.
         $result = queue_application_deployment(
             application: $application,
-            deployment_uuid: new_public_id(),
+            deployment_uuid: $deploymentUuid,
             commit: $sha,
-            force_rebuild: $forceRebuild,
+            force_rebuild: true,
             is_api: $isApi,
         );
+        if (($result['deployment_uuid'] ?? null) === $deploymentUuid) {
+            $application->update(['git_commit_sha' => $sha]);
+        } else {
+            Storage::delete($target);
+        }
 
         return [
             'sha' => $sha,

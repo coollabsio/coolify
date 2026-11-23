@@ -41,7 +41,8 @@ class StaticArchive extends Component
             }
 
             $application = StaticSiteArchive::createApplication($environment, $destination);
-            $result = StaticSiteArchive::publish($application, $teamId, $uploadId, deploy: auth()->user()->can('deploy', $application));
+            $this->authorize('deploy', $application);
+            $result = StaticSiteArchive::publish($application, $teamId, $uploadId);
 
             $parameters = [
                 'project_uuid' => $project->uuid,

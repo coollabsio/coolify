@@ -86,7 +86,7 @@ class StaticSiteArchivesController extends Controller
         path: '/applications/archive',
         operationId: 'create-static-site-archive-application',
         summary: 'Create (static site from an archive)',
-        description: 'Create a static site that is deployed from uploaded archives instead of a Git repository. With upload_id, the uploaded archive becomes the first version of the site and is deployed unless instant_deploy is false. Deploying needs a token with the deploy ability.',
+        description: 'Create a static site that is deployed from uploaded archives instead of a Git repository. With upload_id, the uploaded archive becomes the first version of the site and is deployed, which needs a token with the deploy ability.',
         security: [['bearerAuth' => []]],
         tags: ['Applications'],
         requestBody: new OA\RequestBody(
@@ -107,7 +107,6 @@ class StaticSiteArchivesController extends Controller
                     'force_domain_override' => ['type' => 'boolean', 'default' => false, 'description' => 'Use the domains even when another resource uses them.'],
                     'is_spa' => ['type' => 'boolean', 'default' => false, 'description' => 'Serve index.html for unknown paths (single-page application).'],
                     'upload_id' => ['type' => 'string', 'format' => 'uuid', 'description' => 'A completed upload from POST /applications/archive/uploads.'],
-                    'instant_deploy' => ['type' => 'boolean', 'description' => 'Deploy the uploaded archive. The default is true when upload_id is set.'],
                 ],
             ),
         ),
@@ -142,7 +141,7 @@ class StaticSiteArchivesController extends Controller
         if ($response = validateIncomingRequest($request)) {
             return $response;
         }
-        $allowedFields = ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'destination_uuid', 'name', 'description', 'domains', 'autogenerate_domain', 'force_domain_override', 'is_spa', 'upload_id', 'instant_deploy'];
+        $allowedFields = ['project_uuid', 'server_uuid', 'environment_name', 'environment_uuid', 'destination_uuid', 'name', 'description', 'domains', 'autogenerate_domain', 'force_domain_override', 'is_spa', 'upload_id'];
         $validator = customApiValidator($request->all(), [
             'project_uuid' => 'string|required',
             'server_uuid' => 'string|required',
@@ -156,7 +155,6 @@ class StaticSiteArchivesController extends Controller
             'force_domain_override' => 'boolean',
             'is_spa' => 'boolean',
             'upload_id' => 'uuid|nullable',
-            'instant_deploy' => 'boolean',
         ], ValidationPatterns::combinedMessages());
         if ($response = $this->validationResponse($validator, $request, $allowedFields)) {
             return $response;
@@ -165,8 +163,8 @@ class StaticSiteArchivesController extends Controller
             return response()->json(['message' => 'You need to provide at least one of environment_name or environment_uuid.'], 422);
         }
         $uploadId = $request->input('upload_id');
-        $deploy = filled($uploadId) && $request->boolean('instant_deploy', true);
-        if ($deploy && ($response = $this->deployAbilityForbiddenResponse($request, 'Deploying the archive needs a token with the deploy permission. Set instant_deploy to false to only create the application.'))) {
+        $deploy = filled($uploadId);
+        if ($deploy && ($response = $this->deployAbilityForbiddenResponse($request, 'Deploying the archive needs a token with the deploy permission. Create the application without upload_id to only create it.'))) {
             return $response;
         }
 
@@ -232,7 +230,8 @@ class StaticSiteArchivesController extends Controller
         $result = null;
         if (filled($uploadId)) {
             try {
-                $result = StaticSiteArchive::publish($application, $teamId, $uploadId, deploy: $deploy, isApi: true);
+                $this->authorize('deploy', $application);
+                $result = StaticSiteArchive::publish($application, $teamId, $uploadId, isApi: true);
             } catch (ValidationException $exception) {
                 return response()->json(['message' => $exception->getMessage(), 'uuid' => $application->uuid], 422);
             }
@@ -261,7 +260,7 @@ class StaticSiteArchivesController extends Controller
         path: '/applications/{uuid}/archive',
         operationId: 'deploy-static-site-archive',
         summary: 'Deploy static site archive',
-        description: 'Make an uploaded archive the current version of a static site that is deployed from archives, and deploy it. Needs a token with the write and deploy abilities.',
+        description: 'Make an uploaded archive the current version of a static site that is deployed from archives, and build and deploy it. Needs a token with the write and deploy abilities.',
         security: [['bearerAuth' => []]],
         tags: ['Applications'],
         parameters: [
@@ -274,7 +273,6 @@ class StaticSiteArchivesController extends Controller
                 required: ['upload_id'],
                 properties: [
                     'upload_id' => ['type' => 'string', 'format' => 'uuid', 'description' => 'A completed upload from POST /applications/archive/uploads.'],
-                    'force_rebuild' => ['type' => 'boolean', 'default' => false, 'description' => 'Build the image even when an image of this version exists.'],
                 ],
             ),
         ),
@@ -296,7 +294,7 @@ class StaticSiteArchivesController extends Controller
             new OA\Response(response: 403, description: 'The token needs the deploy ability.'),
             new OA\Response(response: 404, description: 'Application or upload not found.'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
-            new OA\Response(response: 429, description: 'The archive is stored, but the deployment queue is full.'),
+            new OA\Response(response: 429, description: 'The deployment queue is full. Upload the archive again later.'),
         ],
     )]
     public function deploy(Request $request, string $uuid): JsonResponse
@@ -310,9 +308,8 @@ class StaticSiteArchivesController extends Controller
         }
         $validator = customApiValidator($request->all(), [
             'upload_id' => 'uuid|required',
-            'force_rebuild' => 'boolean',
         ]);
-        if ($response = $this->validationResponse($validator, $request, ['upload_id', 'force_rebuild'])) {
+        if ($response = $this->validationResponse($validator, $request, ['upload_id'])) {
             return $response;
         }
         if ($response = $this->deployAbilityForbiddenResponse($request, 'Uploading a site archive deploys it.')) {
@@ -332,7 +329,7 @@ class StaticSiteArchivesController extends Controller
         }
 
         try {
-            $result = StaticSiteArchive::publish($application, $teamId, $request->input('upload_id'), deploy: true, forceRebuild: $request->boolean('force_rebuild'), isApi: true);
+            $result = StaticSiteArchive::publish($application, $teamId, $request->input('upload_id'), isApi: true);
         } catch (ValidationException $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
         }
@@ -345,7 +342,6 @@ class StaticSiteArchivesController extends Controller
             'application_uuid' => $application->uuid,
             'application_name' => $application->name,
             'deployment_uuid' => $result['deployment_uuid'],
-            'force_rebuild' => $request->boolean('force_rebuild'),
             'site_version' => $result['sha'],
         ]);
 

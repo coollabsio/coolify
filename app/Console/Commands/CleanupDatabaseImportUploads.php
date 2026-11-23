@@ -3,6 +3,8 @@
 namespace App\Console\Commands;
 
 use App\Actions\Database\StartDatabaseImport;
+use App\Enums\ApplicationDeploymentStatus;
+use App\Models\ApplicationDeploymentQueue;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -13,7 +15,7 @@ class CleanupDatabaseImportUploads extends Command
 
     protected $signature = 'cleanup:database-import-uploads';
 
-    protected $description = 'Delete staged database import and static site archive uploads that were not used within a day';
+    protected $description = 'Delete static site archives and staged database import uploads that were not used within a day';
 
     /**
      * Uploads are staged at upload/imports/{team}/{database uuid}/{upload id}/restore. Starting an import
@@ -50,6 +52,22 @@ class CleanupDatabaseImportUploads extends Command
             $this->deleteIfEmpty($teamDirectory);
         }
         $this->info("Deleted {$deletedArchives} staged static site archive upload(s).");
+
+        // A deployment deletes its archive at applications/{uuid}/static-archives/{deployment uuid} when it copies it
+        // to the server. Archives of deployments that were cancelled or never ran stay behind.
+        $orphans = collect(Storage::directories('applications'))
+            ->flatMap(fn (string $directory): array => Storage::files("{$directory}/static-archives"))
+            ->filter(fn (string $file): bool => Storage::lastModified($file) < $cutoff);
+        $pending = ApplicationDeploymentQueue::query()
+            ->whereIn('deployment_uuid', $orphans->map(fn (string $file): string => basename($file))->all())
+            ->whereIn('status', [ApplicationDeploymentStatus::QUEUED->value, ApplicationDeploymentStatus::IN_PROGRESS->value])
+            ->pluck('deployment_uuid')
+            ->all();
+        $deletedOrphans = $orphans
+            ->reject(fn (string $file): bool => in_array(basename($file), $pending, true))
+            ->filter(fn (string $file): bool => Storage::delete($file))
+            ->count();
+        $this->info("Deleted {$deletedOrphans} static site archive(s) of deployments that did not run.");
 
         return self::SUCCESS;
     }

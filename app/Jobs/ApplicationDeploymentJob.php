@@ -1660,8 +1660,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * A static site from an uploaded archive. The commit is the site version (see StaticSiteArchive),
-     * so a redeploy of the same version reuses its image.
+     * A static site from an uploaded archive. The commit is the site version (see StaticSiteArchive).
+     * A deployment of an upload has its own archive and always builds. Any other deployment (redeploy,
+     * restart, rollback, additional server) never builds and runs the image of the version.
      */
     private function deploy_static_archive()
     {
@@ -1671,21 +1672,26 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if (! preg_match('/^[0-9a-f]{40}$/', $this->commit)) {
             throw new DeploymentException('No site archive was uploaded yet. Upload a .tar, .tar.gz, or .tgz archive to deploy the site.');
         }
-        if ($this->use_build_server) {
-            $this->server = $this->build_server;
+        $archivePath = StaticSiteArchive::deploymentArchive($this->application, $this->deployment_uuid);
+        if (! Storage::exists($archivePath)) {
+            $this->run_static_archive_image();
+
+            return;
         }
-        $this->application_deployment_queue->addLogEntry('Starting deployment of site version '.substr($this->commit, 0, 7)." to {$this->server->name}.");
-        $this->prepare_builder_image();
-        $this->generate_image_names();
-        if (! $this->force_rebuild) {
-            $this->check_image_locally_or_remotely();
-            if ($this->should_skip_build()) {
-                return;
+
+        try {
+            if ($this->use_build_server) {
+                $this->server = $this->build_server;
             }
+            $this->application_deployment_queue->addLogEntry('Starting deployment of site version '.substr($this->commit, 0, 7)." to {$this->server->name}.");
+            $this->prepare_builder_image();
+            $this->generate_image_names();
+            $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
+            $this->create_workdir();
+            $this->extract_static_archive(Storage::path($archivePath));
+        } finally {
+            Storage::delete($archivePath);
         }
-        $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
-        $this->create_workdir();
-        $this->extract_static_archive();
         $this->generate_compose_file();
 
         // Save build-time .env file BEFORE the build
@@ -1700,17 +1706,32 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->rolling_update();
     }
 
-    private function extract_static_archive()
+    private function run_static_archive_image()
     {
-        $storedArchive = StaticSiteArchive::storageDirectory($this->application)."/{$this->commit}";
-        if (! Storage::exists($storedArchive)) {
-            throw new DeploymentException('The site archive of this version is not stored. Upload the archive again.');
+        if ($this->use_build_server) {
+            $this->server = $this->build_server;
         }
-        $localPath = Storage::path($storedArchive);
+        $this->application_deployment_queue->addLogEntry('Starting site version '.substr($this->commit, 0, 7)." on {$this->server->name}.");
+        $this->prepare_builder_image();
+        $this->generate_image_names();
+        $this->check_image_locally_or_remotely();
+        if (str($this->saved_outputs->get('local_image_found'))->isEmpty()) {
+            throw new DeploymentException('This site version is no longer on the server. Upload the archive again.');
+        }
+        $this->application_deployment_queue->addLogEntry("Image found ({$this->production_image_name}). Build step skipped.");
+        $this->skip_build = true;
+        $this->generate_compose_file();
+        $this->save_runtime_environment_variables();
+        $this->push_to_docker_registry();
+        $this->rolling_update();
+    }
+
+    private function extract_static_archive(string $localPath)
+    {
         try {
             $archive = StaticSiteArchive::inspect($localPath);
         } catch (ValidationException $exception) {
-            throw new DeploymentException('The stored site archive is not valid: '.$exception->getMessage());
+            throw new DeploymentException('The uploaded site archive is not valid: '.$exception->getMessage());
         }
         $this->application_deployment_queue->addLogEntry("Copying the site archive ({$archive->fileCount} files) to {$this->server->name}.");
 

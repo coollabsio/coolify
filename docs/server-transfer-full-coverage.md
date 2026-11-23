@@ -92,7 +92,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Dockerfile app | |
 | ➕ | Nixpacks app, public GitHub repo | Expected: checklist step for manual webhooks |
 | ✅ | Static app (`is_static`, `is_spa`) | |
-| ➕ | Static site from an uploaded archive (`is_archive_source`) | deployed once. Expected: an export warning that the archive is not transferred; a redeploy on the target reuses the image |
+| ➕ | Static site from an uploaded archive (`is_archive_source`) | deployed once. Expected: a redeploy on the target reuses the image on the server |
 | ➕ | Docker Compose app | raw compose on, one variable with an empty value (`preserve_compose_null`) |
 | ➕ | Docker Compose app with a security update | an image override from the Security page (`docker_compose_image_overrides`); the target deploys the new image |
 | ➕ | App with GitHub App source, app with GitLab App source, app with deploy key | |
