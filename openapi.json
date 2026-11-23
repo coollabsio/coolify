@@ -100,9 +100,9 @@
                                 "properties": {
                                     "pull_request_id": {
                                         "type": "integer",
-                                        "example": 42,
                                         "maximum": 2147483647,
-                                        "minimum": 1
+                                        "minimum": 1,
+                                        "example": 42
                                     },
                                     "pull_request_html_url": {
                                         "type": [
@@ -1192,6 +1192,11 @@
                                         "default": 4,
                                         "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
                                     },
+                                    "ip_allowlist": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone."
+                                    },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
@@ -1873,6 +1878,11 @@
                                         "default": 4,
                                         "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
                                     },
+                                    "ip_allowlist": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone."
+                                    },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
@@ -2549,6 +2559,11 @@
                                         "maximum": 12,
                                         "default": 4,
                                         "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
+                                    },
+                                    "ip_allowlist": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone."
                                     },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
@@ -3231,6 +3246,11 @@
                                         "default": 4,
                                         "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
                                     },
+                                    "ip_allowlist": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone."
+                                    },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
@@ -3802,6 +3822,11 @@
                                         "default": 4,
                                         "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
                                     },
+                                    "ip_allowlist": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone."
+                                    },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
                                         "description": "The flag to connect the service to the predefined Docker network."
@@ -4352,6 +4377,11 @@
                                         "maximum": 12,
                                         "default": 4,
                                         "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
+                                    },
+                                    "ip_allowlist": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone."
                                     },
                                     "connect_to_docker_network": {
                                         "type": "boolean",
@@ -4980,6 +5010,11 @@
                                             "non-www",
                                             "both"
                                         ]
+                                    },
+                                    "ip_allowlist": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone."
                                     },
                                     "instant_deploy": {
                                         "type": "boolean",
@@ -12603,8 +12638,8 @@
                                     "network": {
                                         "description": "Name of a new Docker network. Must not be bridge, host, none, or a network that already exists on the server.",
                                         "type": "string",
-                                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
-                                        "maxLength": 255
+                                        "maxLength": 255,
+                                        "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$"
                                     },
                                     "type": {
                                         "type": "string",
@@ -31108,8 +31143,8 @@
                 "properties": {
                     "frequency": {
                         "type": "string",
-                        "example": "0 2 * * *",
-                        "maxLength": 255
+                        "maxLength": 255,
+                        "example": "0 2 * * *"
                     },
                     "enabled": {
                         "type": "boolean",
@@ -31733,6 +31768,11 @@
                         "minimum": 1,
                         "maximum": 12,
                         "description": "Argon2id time cost (iterations) for the HTTP Basic Authentication password."
+                    },
+                    "ip_allowlist": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone."
                     },
                     "settings": {
                         "$ref": "#\/components\/schemas\/ApplicationSetting"
