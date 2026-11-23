@@ -148,6 +148,7 @@ class StartSentinel
             'COLLECTOR_ENABLED' => $server->isMetricsEnabled() ? 'true' : 'false',
             'COLLECTOR_REFRESH_RATE_SECONDS' => $refreshRate,
             'COLLECTOR_RETENTION_PERIOD_DAYS' => $metricsHistory,
+            'LOG_ARCHIVE_ENABLED' => $server->settings->is_container_log_archive_enabled ? 'true' : 'false',
         ];
         $environments = array_merge($environments, self::sentinelTrafficEnvironment($server));
         $labels = [
@@ -177,6 +178,8 @@ class StartSentinel
         instant_remote_process([
             'docker rm -f coolify-sentinel || true',
             "mkdir -p $mountDir",
+            // Sentinel does not clean up the archive when it is off, so the saved logs are deleted here.
+            ...($server->settings->is_container_log_archive_enabled ? [] : ['rm -rf '.escapeshellarg("{$mountDir}/container-logs")]),
             ...self::trafficLogPreparationCommands($server),
             'sh -ec '.escapeshellarg(implode("\n", [
                 'trap '.escapeshellarg("rm -f $envFile").' EXIT',
