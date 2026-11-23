@@ -7,7 +7,84 @@
     s3FileSize: $wire.entangle('s3FileSize'),
     s3StorageId: $wire.entangle('s3StorageId'),
     s3Path: $wire.entangle('s3Path'),
+    s3Uploading: false,
+    s3Progress: 0,
+    s3Cancel: null,
     restoreType: null,
+    {{-- Uploads the file in parts directly to the instance's import storage, with presigned URLs from the server. --}}
+    async uploadToS3(file) {
+        if (! file || this.s3Uploading) {
+            return;
+        }
+        const wire = this.$wire;
+        const requests = new Set();
+        let stopped = false;
+        this.s3Cancel = () => {
+            stopped = true;
+            requests.forEach((request) => request.abort());
+        };
+        this.s3Uploading = true;
+        this.s3Progress = 0;
+        this.error = false;
+        this.filename = null;
+        this.filesize = null;
+        let started = false;
+        try {
+            started = await wire.startS3Upload(file.name, file.size);
+            if (! started) {
+                return;
+            }
+            const loaded = started.parts.map(() => 0);
+            const report = (index, bytes) => {
+                loaded[index] = bytes;
+                this.s3Progress = Math.min(100, Math.floor(loaded.reduce((sum, value) => sum + value, 0) / file.size * 100));
+            };
+            let next = 0;
+            const worker = async () => {
+                while (! stopped && next < started.parts.length) {
+                    const index = next++;
+                    const offset = (started.parts[index].number - 1) * started.partSize;
+                    await this.putS3Part(started.parts[index].url, file.slice(offset, offset + started.partSize), requests, (bytes) => report(index, bytes), () => stopped);
+                }
+            };
+            await Promise.all(Array.from({ length: Math.min(3, started.parts.length) }, worker));
+            if (stopped) {
+                throw new Error('The upload was cancelled.');
+            }
+            await wire.completeS3Upload();
+        } catch (error) {
+            this.s3Cancel();
+            if (started) {
+                await wire.abortS3Upload();
+            }
+            wire.$dispatch('error', error.message);
+        } finally {
+            this.s3Uploading = false;
+            this.s3Cancel = null;
+        }
+    },
+    putS3Part(url, blob, requests, onProgress, isStopped, attempt = 1) {
+        return new Promise((resolve, reject) => {
+            const request = new XMLHttpRequest();
+            requests.add(request);
+            request.open('PUT', url);
+            request.upload.onprogress = (event) => onProgress(event.loaded);
+            request.onload = () => request.status >= 200 && request.status < 300
+                ? resolve()
+                : reject(new Error(`The storage rejected the upload (HTTP ${request.status}).`));
+            request.onerror = () => reject(new Error('The browser could not upload to the upload storage. Its bucket probably needs a CORS rule that allows PUT from ' + window.location.origin + ', or the storage is not reachable from this browser. Ask the administrator of this Coolify instance to check the storage.'));
+            request.onabort = () => reject(new Error('The upload was cancelled.'));
+            request.onloadend = () => requests.delete(request);
+            request.send(blob);
+        }).then(() => onProgress(blob.size)).catch((error) => {
+            if (attempt >= 3 || isStopped()) {
+                throw error;
+            }
+            onProgress(0);
+
+            return this.putS3Part(url, blob, requests, onProgress, isStopped, attempt + 1);
+        });
+    },
     {{-- Dropzone attaches here, not by auto-discovery: the form can render after page load (in a modal, or when the database starts). --}}
     mountDropzone(element) {
         const wire = this.$wire;
@@ -210,6 +287,25 @@
                         <span class="h-px flex-1 bg-neutral-200 dark:bg-white/[0.08]"></span>
                     </div>
 
+                    @if ($this->uploadsToS3)
+                        <div>
+                            <label
+                                class="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-neutral-300 bg-white p-4 text-center text-sm dark:border-white/[0.12] dark:bg-white/[0.05]"
+                                :class="s3Uploading ? 'pointer-events-none opacity-60' : ''"
+                                @dragover.prevent @drop.prevent="uploadToS3($event.dataTransfer.files[0])">
+                                <span>Select or drop a backup file here.</span>
+                                <span class="text-[11px] text-neutral-500 dark:text-fg-faint">Maximum 10 GiB. Coolify deletes the uploaded file after the import, or after one day when it is not imported.</span>
+                                <input type="file" class="hidden" @change="uploadToS3($event.target.files[0]); $event.target.value = ''">
+                            </label>
+                            <div x-show="s3Uploading" class="mt-3 flex items-center gap-3">
+                                <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/[0.08]">
+                                    <div class="h-full rounded-full bg-coollabs dark:bg-brand" :style="`width: ${s3Progress}%`"></div>
+                                </div>
+                                <span class="text-[11px] tabular-nums text-neutral-500 dark:text-fg-faint" x-text="`${s3Progress}%`"></span>
+                                <x-forms.button @click="s3Cancel && s3Cancel()">Cancel</x-forms.button>
+                            </div>
+                        </div>
+                    @else
                     <form action="{{ route('upload.backup', ['databaseUuid' => $resourceUuid]) }}"
                         class="dropzone rounded-lg! border! border-dashed! border-neutral-300! bg-white! dark:border-white/[0.12]! dark:bg-white/[0.05]!"
                         x-init="mountDropzone($el)" wire:ignore>
@@ -219,6 +315,7 @@
                         <div class="h-full rounded-full bg-coollabs dark:bg-brand"
                             :style="`width: ${progress}%`"></div>
                     </div>
+                    @endif
 
                     <div x-cloak x-show="filename && !error"
                         class="mt-4 flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between">

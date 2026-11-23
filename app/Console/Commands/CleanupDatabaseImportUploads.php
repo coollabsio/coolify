@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Actions\Database\StartDatabaseImport;
+use App\Support\DatabaseImport\DatabaseImportS3Upload;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -13,7 +14,7 @@ class CleanupDatabaseImportUploads extends Command
 
     protected $signature = 'cleanup:database-import-uploads';
 
-    protected $description = 'Delete staged API database import uploads that were not imported within a day';
+    protected $description = 'Delete staged database import uploads (API uploads and browser uploads to S3) that were not imported within a day';
 
     /**
      * Uploads are staged at upload/imports/{team}/{database uuid}/{upload id}/restore. Starting an import
@@ -37,6 +38,13 @@ class CleanupDatabaseImportUploads extends Command
             $this->deleteIfEmpty($teamDirectory);
         }
 
+        // Browser uploads to S3: the marker is saved again when an import starts, so a day counts from that start.
+        foreach (DatabaseImportS3Upload::staleUploads($cutoff) as $upload) {
+            if ($this->discardUnlessImporting($upload)) {
+                $deleted++;
+            }
+        }
+
         $this->info("Deleted {$deleted} staged database import upload(s).");
 
         return self::SUCCESS;
@@ -58,6 +66,20 @@ class CleanupDatabaseImportUploads extends Command
 
         try {
             return Storage::deleteDirectory($directory);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function discardUnlessImporting(DatabaseImportS3Upload $upload): bool
+    {
+        $lock = Cache::lock(StartDatabaseImport::lockKey($upload->marker['resource_uuid']), 60);
+        if (! $lock->get()) {
+            return false;
+        }
+
+        try {
+            return $upload->discard();
         } finally {
             $lock->release();
         }
