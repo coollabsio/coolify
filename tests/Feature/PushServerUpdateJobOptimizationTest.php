@@ -196,9 +196,10 @@ it('queues one catch-all refresh when the running proxy has an outdated catch-al
 
     // The second check runs while the first refresh waits in the queue.
     (new PushServerUpdateJob($server, $data))->handle();
-    (new PushServerUpdateJob($server->fresh(), $data))->handle();
+    Queue::assertPushedTimes(RefreshDefaultRedirectJob::class, $refreshes);
 
-    Queue::assertPushed(RefreshDefaultRedirectJob::class, $refreshes);
+    (new PushServerUpdateJob($server->fresh(), $data))->handle();
+    Queue::assertPushedTimes(RefreshDefaultRedirectJob::class, $refreshes);
 })->with([
     'outdated catch-all' => [false, 1],
     'current catch-all' => [true, 0],
