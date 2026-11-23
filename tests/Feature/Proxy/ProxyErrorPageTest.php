@@ -147,14 +147,16 @@ it('starts the page container through sudo before it writes the catch-all', func
         ->and($lines)->toContain('sudo mkdir -p /data/coolify/proxy/error-pages && sudo find /data/coolify/proxy/error-pages -user root -exec chown -h cooluser:cooluser {} + && sudo chmod o-rwx /data/coolify/proxy/error-pages')
         // The page goes through scp, then sudo moves it into place.
         ->and(collect($lines)->contains(fn (string $line) => preg_match('#^sudo mv -f /tmp/coolify-upload-[0-9a-f]+ /data/coolify/proxy/error-pages/404.html$#', $line) === 1))->toBeTrue()
-        ->and($lines)->toContain('sudo chmod 644 /data/coolify/proxy/error-pages/404.html')
+        ->and(uploadedProxyFileMode($lines, '/data/coolify/proxy/error-pages/404.html'))->toBe('644')
         ->and(writtenProxyFile($lines, '/data/coolify/proxy/error-pages/404.html'))->toContain('There is no site at this address')
         ->and(writtenProxyFile($lines, '/data/coolify/proxy/error-pages/cgi-bin/404'))
         ->toBe("#!/bin/sh\nprintf 'HTTP/1.1 404 Not Found\\r\\nContent-Type: text/html; charset=utf-8\\r\\nCache-Control: no-store\\r\\n\\r\\n'\ncat /www/404.html\n")
         ->and(writtenProxyFile($lines, '/data/coolify/proxy/error-pages/503.html'))->toContain('This site is not available at the moment')
         ->and(writtenProxyFile($lines, '/data/coolify/proxy/error-pages/cgi-bin/503'))
         ->toBe("#!/bin/sh\nprintf 'HTTP/1.1 503 Service Unavailable\\r\\nContent-Type: text/html; charset=utf-8\\r\\nCache-Control: no-store\\r\\n\\r\\n'\ncat /www/503.html\n")
-        ->and($lines)->toContain('sudo chmod 755 /data/coolify/proxy/error-pages/cgi-bin/404 /data/coolify/proxy/error-pages/cgi-bin/503')
+        // The CGI scripts are executable before they replace the live scripts.
+        ->and(uploadedProxyFileMode($lines, '/data/coolify/proxy/error-pages/cgi-bin/404'))->toBe('755')
+        ->and(uploadedProxyFileMode($lines, '/data/coolify/proxy/error-pages/cgi-bin/503'))->toBe('755')
         ->and(writtenProxyFile($lines, $catchAll))->toContain('coolify-proxy-error-pages');
 })->with([
     'traefik' => [ProxyTypes::TRAEFIK->value, '/data/coolify/proxy//dynamic/default_redirect_404.yaml'],
