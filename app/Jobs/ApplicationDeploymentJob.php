@@ -23,6 +23,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Services\ComposeIncludeFlattener;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\ImageScan\DeploymentImageScan;
 use App\Support\RemoteSecretReferences;
@@ -2158,6 +2159,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             '__COOLIFY_COMPOSE_TOO_LARGE__' => 'exceeds the 5 MiB size limit.',
             default => null,
         };
+        if ($problem === null && ComposeIncludeFlattener::hasIncludes($compose)) {
+            try {
+                $compose = (new ComposeIncludeFlattener($this->server, $this->basedir, "/tmp/{$this->deployment_uuid}-compose-include", $this->deployment_uuid))
+                    ->flatten(ltrim($displayPath, '/'), trim((string) $this->application->base_directory, '/'));
+            } catch (DeploymentException $e) {
+                $problem = "has an include that Coolify cannot use, so Coolify did not load it. {$e->getMessage()}";
+            }
+        }
         if ($problem === null) {
             try {
                 validateDockerComposeForInjection($compose);

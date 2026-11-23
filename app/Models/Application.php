@@ -7,6 +7,7 @@ use App\Enums\BuildPackTypes;
 use App\Enums\HttpBasicAuthHashAlgorithm;
 use App\Enums\ProxyTypes;
 use App\Exceptions\DeploymentException;
+use App\Services\ComposeIncludeFlattener;
 use App\Services\ConfigurationGenerator;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\DeploymentConfiguration\ConfigurationDiff;
@@ -2914,11 +2915,7 @@ class Application extends BaseModel
         $composeFile = ltrim(rtrim($this->base_directory, '/').$this->docker_compose_location, '/');
         $submoduleCommand = $this->composeFileSubmoduleCommand($git, $composeFile, $checkoutDir);
         // Go into the submodule that contains the Compose file, and read the file from the objects of that submodule.
-        $enterSubmodule = $submoduleCommand === null ? '' : implode(' ', [
-            'while sub=$(git ls-tree -r HEAD | while read -r mode type object path; do',
-            'if [ "$mode" = 160000 ]; then case "$file" in "$path"/*) echo "$path"; break ;; esac; fi; done) && [ -n "$sub" ];',
-            'do cd "$sub" || exit 1; file="${file#"$sub"/}"; done;',
-        ]);
+        $enterSubmodule = $submoduleCommand === null ? '' : ComposeIncludeFlattener::enterSubmoduleScript();
         $readComposeFile = implode(' ', [
             'file='.escapeshellarg($composeFile).';',
             $enterSubmodule,
@@ -2935,8 +2932,9 @@ class Application extends BaseModel
         ]);
 
         return collect([
-            "rm -rf /tmp/{$uuid}",
-            "mkdir -p /tmp/{$uuid}",
+            // No `-p` and no `rm -rf` first: mkdir fails when the folder exists, so another user of the server
+            // cannot plant the folder or a symbolic link at the path before the clone.
+            "mkdir /tmp/{$uuid}",
             "cd /tmp/{$uuid}",
             // One sh -c line: the non-root sudo parser would turn `&& if ...; then` into invalid `&& sudo if`.
             // The submodule step runs in the same script, because a deploy key is removed when the script exits.
@@ -2994,6 +2992,16 @@ class Application extends BaseModel
             if ($composeFileContent === '__COOLIFY_COMPOSE_TOO_LARGE__' || strlen($composeFileContent) > self::MAX_DOCKER_COMPOSE_SIZE_BYTES) {
                 throw new RuntimeException('Docker Compose file exceeds the 5 MiB size limit.');
             }
+            if ($composeFileContent !== null && ComposeIncludeFlattener::hasIncludes($composeFileContent)) {
+                $composeFileContent = (new ComposeIncludeFlattener($this->destination->server, "/tmp/{$uuid}/checkout", "/tmp/{$uuid}/flat"))
+                    ->flatten(ltrim("{$workdir}{$composeFile}", '/'), trim($workdir, '/'));
+            }
+        } catch (DeploymentException $e) {
+            $this->docker_compose_location = $initialDockerComposeLocation;
+            $this->base_directory = $initialBaseDirectory;
+            $this->save();
+
+            throw new DeploymentException(e("The Docker Compose file at {$workdir}{$composeFile} (branch: {$this->git_branch}) has an include that Coolify cannot use, so Coolify did not load it. {$e->getMessage()}"), previous: $e);
         } catch (\Exception $e) {
             // Restore original values on failure only
             $this->docker_compose_location = $initialDockerComposeLocation;
