@@ -1262,7 +1262,7 @@ test('transfer keeps whether a volume ignores the Compose driver options', funct
 test('transfer keeps the link between an application volume and its sqlite database', function () {
     $sqlite = StandaloneSqlite::create([
         'name' => 'app-sqlite',
-        'image' => 'peakimages/sqlite:3.54.1-v0.2.0',
+        'image' => 'peakimages/sqlite:3.54.1-v0.3.0',
         'environment_id' => $this->environment->id,
         'destination_id' => $this->destination->id,
         'destination_type' => $this->destination->getMorphClass(),
@@ -1453,7 +1453,7 @@ test('export refuses credentials of another team', function () {
         ->toThrow(RuntimeException::class, 'does not belong to the server team');
 });
 
-test('transfer keeps maintenance mode, the server error page and swarm cluster, environment variable flags, the Coolify default variables switch, and the production values in previews switch and copies', function () {
+test('transfer keeps maintenance mode, the server error page and swarm cluster, environment variable flags and Compose service scope, the Coolify default variables switch, and the production values in previews switch and copies', function () {
     $this->application->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>App down</h1>'])->saveQuietly();
     $this->service->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>Service down</h1>', 'include_coolify_default_variables' => false])->saveQuietly();
     $this->application->settings->forceFill(['include_coolify_default_variables' => false, 'use_production_values_in_previews' => false])->saveQuietly();
@@ -1465,6 +1465,7 @@ test('transfer keeps maintenance mode, the server error page and swarm cluster, 
             'key' => 'COMPOSE_NULL',
             'value' => null,
             'preserve_compose_null' => true,
+            'compose_services' => ['web', 'worker'],
             'version' => '4.0.0-beta.400',
             'resourceable_type' => Application::class,
             'resourceable_id' => $this->application->id,
@@ -1508,6 +1509,7 @@ test('transfer keeps maintenance mode, the server error page and swarm cluster, 
         ->and($server->proxy_error_page)->toBe('<h1>Proxy error</h1>')
         ->and((int) $server->swarm_cluster)->toBe(7)
         ->and($variable->preserve_compose_null)->toBeTrue()
+        ->and($variable->compose_services)->toBe(['web', 'worker'])
         ->and($variable->value)->toBeNull()
         ->and($variable->version)->toBe('4.0.0-beta.400')
         ->and($application->environment_variables_preview()->where('key', 'COPIED_SECRET')->sole()->is_production_value_copy)->toBeTrue()
@@ -2441,3 +2443,22 @@ test('the image scanner limits move with the server', function () {
         ->and($settings->image_scan_cpus)->toBe(2.0)
         ->and($settings->image_scan_memory_mb)->toBe(4096);
 });
+
+test('an imported server keeps the status for unknown hosts, and a bundle without it gets the legacy status', function (?array $proxy, int $expected) {
+    $bundle = $this->exporter->export($this->server);
+    $bundle['server']['proxy'] = $proxy;
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    expect(Server::where('uuid', $result['server_uuid'])->first()->proxy->get('unknown_host_status'))->toBe($expected);
+})->with([
+    'no proxy' => [null, Server::LEGACY_UNKNOWN_HOST_STATUS],
+    'empty proxy' => [[], Server::LEGACY_UNKNOWN_HOST_STATUS],
+    'proxy without the status' => [['type' => 'TRAEFIK'], Server::LEGACY_UNKNOWN_HOST_STATUS],
+    'explicit 404' => [['type' => 'TRAEFIK', 'unknown_host_status' => 404], 404],
+    'explicit 503' => [['type' => 'TRAEFIK', 'unknown_host_status' => 503], 503],
+]);

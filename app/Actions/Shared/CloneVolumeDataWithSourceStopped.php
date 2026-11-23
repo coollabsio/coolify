@@ -13,6 +13,7 @@ use App\Models\Application;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -47,7 +48,7 @@ class CloneVolumeDataWithSourceStopped
      * @param  array<int, VolumeCloneJob>  $volumeJobs
      */
     public function handle(
-        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $source,
+        Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $source,
         array $volumeJobs,
     ): void {
         if ($volumeJobs === []) {
@@ -74,7 +75,7 @@ class CloneVolumeDataWithSourceStopped
      * The policy ability that allows a user to stop and start the source.
      */
     public static function sourceAbility(
-        Application|Service|StandaloneClickhouse|StandaloneDragonfly|StandaloneKeydb|StandaloneMariadb|StandaloneMongodb|StandaloneMysql|StandalonePostgresql|StandaloneRedis|StandaloneSqlite $source,
+        Application|Service|StandaloneClickhouse|StandaloneInfluxdb|StandaloneDragonfly|StandaloneKeydb|StandaloneMariadb|StandaloneMongodb|StandaloneMysql|StandalonePostgresql|StandaloneRedis|StandaloneSqlite $source,
     ): string {
         return match (true) {
             $source instanceof Application => 'deploy',
@@ -88,7 +89,7 @@ class CloneVolumeDataWithSourceStopped
      * or a container of the source still runs. The stop actions return their errors instead of throwing.
      */
     public static function stopSource(
-        Application|Service|StandaloneClickhouse|StandaloneDragonfly|StandaloneKeydb|StandaloneMariadb|StandaloneMongodb|StandaloneMysql|StandalonePostgresql|StandaloneRedis|StandaloneSqlite $source,
+        Application|Service|StandaloneClickhouse|StandaloneInfluxdb|StandaloneDragonfly|StandaloneKeydb|StandaloneMariadb|StandaloneMongodb|StandaloneMysql|StandalonePostgresql|StandaloneRedis|StandaloneSqlite $source,
     ): void {
         // A partly stopped application is redeployed, so remember which of its containers ran.
         $runningBefore = $source instanceof Application ? self::runningContainersOrNull($source) : null;
@@ -119,7 +120,7 @@ class CloneVolumeDataWithSourceStopped
      * @param  list<string>|null  $runningAfter
      */
     private static function failedStopCode(
-        Application|Service|StandaloneClickhouse|StandaloneDragonfly|StandaloneKeydb|StandaloneMariadb|StandaloneMongodb|StandaloneMysql|StandalonePostgresql|StandaloneRedis|StandaloneSqlite $source,
+        Application|Service|StandaloneClickhouse|StandaloneInfluxdb|StandaloneDragonfly|StandaloneKeydb|StandaloneMariadb|StandaloneMongodb|StandaloneMysql|StandalonePostgresql|StandaloneRedis|StandaloneSqlite $source,
         ?array $runningBefore,
         ?array $runningAfter = null,
     ): int {
@@ -155,7 +156,7 @@ class CloneVolumeDataWithSourceStopped
      * @return list<string>
      */
     private static function runningContainers(
-        Application|Service|StandaloneClickhouse|StandaloneDragonfly|StandaloneKeydb|StandaloneMariadb|StandaloneMongodb|StandaloneMysql|StandalonePostgresql|StandaloneRedis|StandaloneSqlite $source,
+        Application|Service|StandaloneClickhouse|StandaloneInfluxdb|StandaloneDragonfly|StandaloneKeydb|StandaloneMariadb|StandaloneMongodb|StandaloneMysql|StandalonePostgresql|StandaloneRedis|StandaloneSqlite $source,
     ): array {
         $server = $source->destination->server;
         if ($server->isSwarm()) {
@@ -172,7 +173,7 @@ class CloneVolumeDataWithSourceStopped
     }
 
     public static function startSource(
-        Application|Service|StandaloneClickhouse|StandaloneDragonfly|StandaloneKeydb|StandaloneMariadb|StandaloneMongodb|StandaloneMysql|StandalonePostgresql|StandaloneRedis|StandaloneSqlite $source,
+        Application|Service|StandaloneClickhouse|StandaloneInfluxdb|StandaloneDragonfly|StandaloneKeydb|StandaloneMariadb|StandaloneMongodb|StandaloneMysql|StandalonePostgresql|StandaloneRedis|StandaloneSqlite $source,
     ): void {
         match (true) {
             $source instanceof Application => queue_application_deployment(
@@ -188,7 +189,7 @@ class CloneVolumeDataWithSourceStopped
     }
 
     public static function recoverSource(
-        Application|Service|StandaloneClickhouse|StandaloneDragonfly|StandaloneKeydb|StandaloneMariadb|StandaloneMongodb|StandaloneMysql|StandalonePostgresql|StandaloneRedis|StandaloneSqlite $source,
+        Application|Service|StandaloneClickhouse|StandaloneInfluxdb|StandaloneDragonfly|StandaloneKeydb|StandaloneMariadb|StandaloneMongodb|StandaloneMysql|StandalonePostgresql|StandaloneRedis|StandaloneSqlite $source,
         bool $wasRunning,
         Throwable $e,
     ): void {
@@ -222,7 +223,7 @@ class CloneVolumeDataWithSourceStopped
      * started again; an application or a database that still runs is left alone.
      */
     private static function recoverFromFailedStop(
-        Application|Service|StandaloneClickhouse|StandaloneDragonfly|StandaloneKeydb|StandaloneMariadb|StandaloneMongodb|StandaloneMysql|StandalonePostgresql|StandaloneRedis|StandaloneSqlite $source,
+        Application|Service|StandaloneClickhouse|StandaloneInfluxdb|StandaloneDragonfly|StandaloneKeydb|StandaloneMariadb|StandaloneMongodb|StandaloneMysql|StandalonePostgresql|StandaloneRedis|StandaloneSqlite $source,
         Throwable $e,
     ): void {
         $message = "Coolify did not copy the volume data of '{$source->name}' to its clone, because stopping '{$source->name}' failed. The clone has no copied data.";

@@ -3,6 +3,7 @@ import { initializeCopyButtonComponent } from './copy-button.js';
 import { initializeNumberStepperComponent } from './number-stepper.js';
 import { initializeRuntimeLogsComponent } from './runtime-logs.js';
 import { initializeTerminalComponent } from './terminal.js';
+import { parseItermColors } from './iterm-colors.js';
 import './traffic-globe.js';
 import './traffic-table.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
@@ -44,6 +45,8 @@ window.dismissSecurityCallout = dismissSecurityCallout;
 
 // Used by the log viewers to copy logs that a Livewire call still loads.
 window.copyTextToClipboard = copyTextToClipboard;
+// The Custom theme dialog (themeControls in layouts/base.blade.php) imports iTerm2 color files with it.
+window.parseItermColors = parseItermColors;
 
 document.addEventListener('livewire:init', () => {
     registerLivewireRequestFailureHandler(window.Livewire);

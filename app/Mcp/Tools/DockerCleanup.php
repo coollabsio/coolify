@@ -18,7 +18,7 @@ class DockerCleanup extends RestActionTool
         return [
             'get' => ['method' => 'GET', 'path' => 'servers/{uuid}/docker-cleanup', 'ability' => 'read', 'description' => 'cleanup settings'],
             'update' => ['method' => 'PATCH', 'path' => 'servers/{uuid}/docker-cleanup', 'ability' => 'write', 'description' => 'change cleanup settings (data: docker_cleanup_frequency, docker_cleanup_threshold, force_docker_cleanup, delete_unused_volumes, delete_unused_networks, disable_application_image_retention; turning on delete_unused_volumes needs deploy ability)'],
-            'executions' => ['method' => 'GET', 'path' => 'servers/{uuid}/docker-cleanup/executions', 'ability' => 'read', 'description' => 'last 20 cleanup runs'],
+            'executions' => ['method' => 'GET', 'path' => 'servers/{uuid}/docker-cleanup/executions', 'ability' => 'read', 'description' => 'cleanup runs, newest first (data: page, per_page default 20 max 100)'],
             'run' => ['method' => 'POST', 'path' => 'servers/{uuid}/docker-cleanup/run', 'ability' => 'deploy', 'confirm' => true, 'description' => 'start a cleanup now; removes unused images, and volumes/networks when enabled (data: delete_unused_volumes, delete_unused_networks)'],
         ];
     }

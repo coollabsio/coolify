@@ -43,6 +43,7 @@
                 <div class="runtime-log-toolbar logs-viewer-toolbar">
                     <div class="logs-viewer-toolbar-controls">
                         <div class="logs-viewer-actions">
+                            @if ($archiveFile === null)
                             <button wire:click="toggleStreamLogs"
                                 title="{{ $streamLogs ? 'Stop Streaming' : 'Stream Logs' }}"
                                 class="runtime-log-icon-button {{ $streamLogs ? 'runtime-log-icon-button-active' : '' }}">
@@ -60,6 +61,7 @@
                                     </svg>
                                 @endif
                             </button>
+                            @endif
                             <button x-on:click="refresh()" title="Refresh Logs" {{ $streamLogs ? 'disabled' : '' }}
                                 class="runtime-log-icon-button">
                                 <x-reicon name="refresh" class="size-3.5" />

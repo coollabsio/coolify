@@ -11,10 +11,8 @@ use App\Models\Service;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\VulnerabilityMarkers;
 use App\Support\ResourceStartActivity;
-use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use Spatie\Activitylog\Models\Activity;
 
 /**
  * Builds the environment canvas graph: server zones, resource cards, manual links and saved positions.
@@ -40,6 +38,7 @@ class EnvironmentCanvas
         'keydbs',
         'dragonflies',
         'clickhouses',
+        'influxdbs',
         'sqlites',
     ];
 
@@ -52,6 +51,7 @@ class EnvironmentCanvas
         'keydb' => 'KeyDB',
         'dragonfly' => 'Dragonfly',
         'clickhouse' => 'ClickHouse',
+        'influxdb' => 'InfluxDB',
         'sqlite' => 'SQLite',
     ];
 
@@ -406,25 +406,7 @@ class EnvironmentCanvas
      */
     private function startingServiceUuids(Collection $services): array
     {
-        if ($services->isEmpty()) {
-            return [];
-        }
-
-        $staleAfterSeconds = max(ResourceStartActivity::QUEUED_STALE_AFTER_SECONDS, ResourceStartActivity::IN_PROGRESS_STALE_AFTER_SECONDS);
-
-        /** @var EloquentCollection<int, Activity> $activities */
-        $activities = Activity::query()
-            ->whereIn('properties->type_uuid', $services->pluck('uuid')->all())
-            ->where('updated_at', '>=', now()->subSeconds($staleAfterSeconds))
-            ->latest()
-            ->orderByDesc('id')
-            ->get();
-
-        return $activities
-            ->groupBy(fn (Activity $activity) => (string) data_get($activity, 'properties.type_uuid'))
-            ->filter(fn (EloquentCollection $group) => ResourceStartActivity::isRunning($group->first()))
-            ->keys()
-            ->all();
+        return ResourceStartActivity::runningTypeUuids($services->pluck('uuid')->all());
     }
 
     /**

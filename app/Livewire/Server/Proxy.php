@@ -29,6 +29,8 @@ class Proxy extends Component
 
     public ?string $redirectUrl = null;
 
+    public int $unknownHostStatus = Server::LEGACY_UNKNOWN_HOST_STATUS;
+
     public ?string $customErrorPage = null;
 
     public bool $generateExactLabels = false;
@@ -66,6 +68,7 @@ class Proxy extends Component
         $this->selectedProxy = $this->server->proxyType();
         $this->redirectEnabled = data_get($this->server, 'proxy.redirect_enabled', true);
         $this->redirectUrl = data_get($this->server, 'proxy.redirect_url');
+        $this->unknownHostStatus = $this->server->unknownHostStatus();
         $this->customErrorPage = $this->server->proxy_error_page;
         $this->syncData(false);
         $this->clearAppliedTraefikBranchWarning();
@@ -207,6 +210,22 @@ class Proxy extends Component
             $this->dispatch('success', 'Proxy configuration saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    public function instantSaveUnknownHostStatus(): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $this->validate(['unknownHostStatus' => 'required|integer|in:404,503']);
+            $statusChanged = $this->server->unknownHostStatus() !== $this->unknownHostStatus;
+            $this->server->proxy->set('unknown_host_status', $this->unknownHostStatus);
+            $this->server->save();
+            $this->auditProxyUpdate($statusChanged ? ['unknown_host_status'] : []);
+            $this->server->setupDefaultRedirect();
+            $this->dispatch('success', 'Proxy configuration saved.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 

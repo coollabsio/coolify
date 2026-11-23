@@ -80,6 +80,8 @@ class CreateScheduledBackup extends Component
                 $payload['databases_to_backup'] = $database->mariadb_database;
             } elseif ($database->type() === 'standalone-clickhouse') {
                 $payload['databases_to_backup'] = $database->clickhouse_db;
+            } elseif ($database->type() === 'standalone-influxdb') {
+                $payload['databases_to_backup'] = $database->influxdb_bucket;
             }
 
             // Odoo keeps its data in databases that the user creates in Odoo, so the database

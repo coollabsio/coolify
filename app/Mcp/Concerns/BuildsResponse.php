@@ -45,6 +45,7 @@ trait BuildsResponse
         'mariadb_password', 'mariadb_root_password',
         'mysql_password', 'mysql_root_password',
         'clickhouse_admin_password',
+        'influxdb_admin_password', 'influxdb_admin_token',
 
         // app/env secrets
         'value', 'real_value', 'http_basic_auth_password', 'git_https_password',
@@ -168,9 +169,9 @@ trait BuildsResponse
      */
     protected function paginationArgs(Request $request): array
     {
-        $page = max(1, (int) ($request->get('page') ?? 1));
         $perPage = (int) ($request->get('per_page') ?? $this->defaultPerPage);
         $perPage = max(1, min($this->maxPerPage, $perPage));
+        $page = max(1, min(intdiv(PHP_INT_MAX, $perPage), (int) ($request->get('page') ?? 1)));
 
         return [
             'page' => $page,

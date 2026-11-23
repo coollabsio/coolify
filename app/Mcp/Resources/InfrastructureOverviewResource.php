@@ -59,6 +59,7 @@ class InfrastructureOverviewResource extends Resource
                 'keydbs',
                 'dragonflies',
                 'clickhouses',
+                'influxdbs',
                 'sqlites',
             ])
             ->get()
@@ -76,6 +77,7 @@ class InfrastructureOverviewResource extends Resource
                         + $project->keydbs_count
                         + $project->dragonflies_count
                         + $project->clickhouses_count
+                        + $project->influxdbs_count
                         + $project->sqlites_count,
                 ],
             ])->values()->all();

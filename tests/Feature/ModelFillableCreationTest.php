@@ -20,6 +20,7 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -849,7 +850,7 @@ it('creates StandaloneSqlite with all fillable attributes', function () {
         'is_log_drain_enabled' => false,
         'is_include_timestamps' => false,
         'status' => 'running',
-        'image' => 'peakimages/sqlite:3.54.1-v0.2.0',
+        'image' => 'peakimages/sqlite:3.54.1-v0.3.0',
         'limits_memory' => '1g',
         'limits_memory_swap' => '2g',
         'limits_memory_swappiness' => 30,
@@ -912,6 +913,57 @@ it('creates StandaloneClickhouse with all fillable attributes', function () {
     expect($db->uuid)->toBe('custom-ch-uuid');
     expect($db->clickhouse_admin_user)->toBe('chadmin');
     expect($db->clickhouse_db)->toBe('testdb');
+    expect($db->environment_id)->toBe($this->environment->id);
+});
+
+it('creates StandaloneInfluxdb with all fillable attributes', function () {
+    $db = StandaloneInfluxdb::create([
+        'uuid' => 'custom-influx-uuid',
+        'name' => 'Full Fillable InfluxDB',
+        'description' => 'InfluxDB with all attrs',
+        'influxdb_admin_user' => 'influxadmin',
+        'influxdb_admin_password' => 'influxpass123',
+        'influxdb_admin_token' => 'influxtoken123',
+        'influxdb_org' => 'testorg',
+        'influxdb_bucket' => 'testbucket',
+        'is_log_drain_enabled' => false,
+        'is_include_timestamps' => false,
+        'status' => 'running',
+        'image' => 'influxdb:2.10-alpine',
+        'is_public' => false,
+        'public_port' => 28086,
+        'ports_mappings' => '28086:8086',
+        'limits_memory' => '2g',
+        'limits_memory_swap' => '4g',
+        'limits_memory_swappiness' => 30,
+        'limits_memory_reservation' => '1g',
+        'limits_cpus' => '4',
+        'limits_cpuset' => '0-3',
+        'limits_cpu_shares' => 2048,
+        'started_at' => now()->subDay()->toISOString(),
+        'restart_count' => 0,
+        'last_restart_at' => null,
+        'last_restart_type' => null,
+        'last_online_at' => now()->toISOString(),
+        'public_port_timeout' => 3600,
+        'custom_docker_run_options' => '',
+        'destination_type' => $this->destination->getMorphClass(),
+        'destination_id' => $this->destination->id,
+        'environment_id' => $this->environment->id,
+        'health_check_enabled' => true,
+        'health_check_interval' => 30,
+        'health_check_timeout' => 10,
+        'health_check_retries' => 3,
+        'health_check_start_period' => 10,
+    ]);
+
+    expect($db->exists)->toBeTrue();
+    expect($db->uuid)->toBe('custom-influx-uuid');
+    expect($db->influxdb_admin_user)->toBe('influxadmin');
+    expect($db->influxdb_admin_password)->toBe('influxpass123');
+    expect($db->influxdb_admin_token)->toBe('influxtoken123');
+    expect($db->influxdb_org)->toBe('testorg');
+    expect($db->influxdb_bucket)->toBe('testbucket');
     expect($db->environment_id)->toBe($this->environment->id);
 });
 

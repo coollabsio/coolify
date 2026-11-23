@@ -67,6 +67,10 @@ class All extends Component
      */
     public bool $readyToLoad = false;
 
+    public const SELECTION_RESET_EVENT = 'environment-variable-selection-reset';
+
+    private const BULK_AVAILABILITY_FIELDS = ['is_buildtime', 'is_runtime'];
+
     private ?Collection $composeEnvironmentAssignments = null;
 
     private ?bool $canViewComposeContent = null;
@@ -109,6 +113,8 @@ class All extends Component
         unset($this->environmentVariableRowCount);
         unset($this->environmentVariableLastPage);
         unset($this->currentEnvironmentVariablePage);
+
+        $this->dispatch(self::SELECTION_RESET_EVENT);
     }
 
     public function mount()
@@ -524,6 +530,94 @@ class All extends Component
         $this->clearEnvironmentVariableCaches();
     }
 
+    public function bulkUpdateAvailability(string $field, bool $value, array $ids): void
+    {
+        try {
+            $this->authorize('manageEnvironment', $this->resource);
+
+            if (! in_array($field, self::BULK_AVAILABILITY_FIELDS, true)) {
+                throw new \InvalidArgumentException('Only build time and runtime availability can be changed in bulk.');
+            }
+
+            $ids = collect($ids)
+                ->filter(fn (mixed $id): bool => is_int($id) || (is_string($id) && ctype_digit($id)))
+                ->map(fn (int|string $id): int => (int) $id)
+                ->unique()
+                ->values();
+
+            if ($ids->isEmpty()) {
+                $this->dispatch('error', 'Select at least one environment variable first.');
+
+                return;
+            }
+
+            $this->ensureEnvironmentVariablesLoaded();
+            $visibleIdsBefore = $this->visibleManagedRowIds();
+
+            $updatedIds = EnvironmentVariable::query()
+                ->where('resourceable_type', $this->resource->getMorphClass())
+                ->where('resourceable_id', $this->resource->id)
+                ->whereIn('id', $ids->all())
+                ->get()
+                ->reject(fn (EnvironmentVariable $environmentVariable): bool => $this->isAvailabilityLocked($environmentVariable))
+                ->filter(fn (EnvironmentVariable $environmentVariable): bool => (bool) $environmentVariable->{$field} !== $value)
+                ->each(function (EnvironmentVariable $environmentVariable) use ($field, $value): void {
+                    $environmentVariable->{$field} = $value;
+                    $environmentVariable->save();
+                })
+                ->map(fn (EnvironmentVariable $environmentVariable): int => (int) $environmentVariable->id)
+                ->values()
+                ->all();
+
+            $this->clearEnvironmentVariableCaches();
+
+            if ($updatedIds === []) {
+                $this->dispatch('info', 'The selected environment variables already have this availability.');
+
+                return;
+            }
+
+            // Rows do not listen to refreshEnvs. Refresh them only when the update keeps the same rows
+            // on the page: a row that a filter now hides must not get an update (snapshot race).
+            if ($this->visibleManagedRowIds() === $visibleIdsBefore) {
+                $this->dispatch('refresh')->to(Show::class);
+            }
+
+            $label = $field === 'is_buildtime' ? 'Build time' : 'Runtime';
+            $count = count($updatedIds);
+            $this->dispatch('success', sprintf(
+                '%s availability updated for %d %s.',
+                $label,
+                $count,
+                Str::plural('environment variable', $count),
+            ));
+            $this->dispatch('envsUpdated');
+            $this->dispatch('configurationChanged');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    private function isAvailabilityLocked(EnvironmentVariable $environmentVariable): bool
+    {
+        if (str($environmentVariable->key)->startsWith(['SERVICE_FQDN', 'SERVICE_URL', 'SERVICE_NAME'])) {
+            return true;
+        }
+
+        return $this->resource->type() === 'standalone-redis'
+            && in_array($environmentVariable->key, ['REDIS_PASSWORD', 'REDIS_USERNAME'], true);
+    }
+
+    /** @return list<int> */
+    private function visibleManagedRowIds(): array
+    {
+        return $this->environmentVariablePageRows
+            ->filter(fn (array $row): bool => $row['kind'] === 'managed')
+            ->map(fn (array $row): int => (int) $row['environmentVariable']->id)
+            ->values()
+            ->all();
+    }
+
     public function getServiceFilterOptionsProperty(): array
     {
         $compose = $this->resource->docker_compose_raw ?? $this->resource->docker_compose;
@@ -709,6 +803,7 @@ class All extends Component
         'is_required',
         'is_shown_once',
         'is_shared',
+        'compose_services',
         'resourceable_type',
         'resourceable_id',
         'created_at',
@@ -1014,10 +1109,11 @@ class All extends Component
     private function formatEnvironmentVariables($variables)
     {
         $canViewValues = $this->canViewEnvironmentValues();
+        $withContainers = composeServiceNamesForEnvironmentScope($this->resource) !== [];
 
         return $variables
             ->reject(fn ($item): bool => $this->isProtectedEnvironmentVariable($item->key))
-            ->map(fn ($item) => $this->composeDefaultHint($item).formatEnvVariableForDevView($item, $canViewValues))
+            ->map(fn ($item) => $this->composeDefaultHint($item).formatEnvVariableForDevView($item, $canViewValues, $withContainers))
             ->join("\n");
     }
 
@@ -1055,11 +1151,15 @@ class All extends Component
             $this->authorize('manageEnvironment', $this->resource);
             $this->ensureEnvironmentVariablesLoaded();
             if ($data === null) {
-                $variables = $this->normalizeEnvironmentVariables(parseEnvDevView($this->variables, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS));
+                $composeServiceNames = composeServiceNamesForEnvironmentScope($this->resource);
+                $allowContainers = $composeServiceNames !== [];
+                $variables = $this->normalizeEnvironmentVariables(parseEnvDevView($this->variables, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS, $allowContainers));
+                $this->ensureKnownComposeServices($variables, false, $composeServiceNames);
                 $previewVariables = [];
                 if ($this->showPreview) {
                     try {
-                        $previewVariables = $this->normalizeEnvironmentVariables(parseEnvDevView($this->variablesPreview, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS));
+                        $previewVariables = $this->normalizeEnvironmentVariables(parseEnvDevView($this->variablesPreview, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS, $allowContainers));
+                        $this->ensureKnownComposeServices($previewVariables, true, $composeServiceNames);
                     } catch (\InvalidArgumentException $e) {
                         throw new \InvalidArgumentException('Preview deployments: '.$e->getMessage(), previous: $e);
                     }
@@ -1084,6 +1184,26 @@ class All extends Component
             return handleError($e, $this);
         } finally {
             $this->refreshEnvs();
+        }
+    }
+
+    /**
+     * A "containers=" flag may name the services of the Compose file, and the names that the variable
+     * already has, so that a service removed from the Compose file does not block the save.
+     *
+     * @param  array<string, array{settings: array<string, mixed>}>  $variables
+     * @param  list<string>  $composeServiceNames
+     */
+    private function ensureKnownComposeServices(array $variables, bool $isPreview, array $composeServiceNames): void
+    {
+        $method = $isPreview ? 'environment_variables_preview' : 'environment_variables';
+        $storedScopes = $this->resource->$method()->whereNotNull('compose_services')->pluck('compose_services', 'key');
+
+        foreach ($variables as $key => $data) {
+            $unknown = array_diff($data['settings']['compose_services'] ?? [], $composeServiceNames, $storedScopes[$key] ?? []);
+            if ($unknown !== []) {
+                throw new \InvalidArgumentException("{$key}: unknown container \"".implode('", "', $unknown).'". Containers in the Compose file: '.implode(', ', $composeServiceNames).'.');
+            }
         }
     }
 

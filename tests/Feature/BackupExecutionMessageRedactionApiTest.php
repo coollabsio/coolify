@@ -66,5 +66,5 @@ it('redacts the database password from backup execution messages', function (Clo
 })->with([
     'database list' => [fn () => '/api/v1/databases', '0.backup_configs.0.latest_log.message'],
     'database backups' => [fn () => '/api/v1/databases/'.test()->database->uuid.'/backups', '0.executions.0.message'],
-    'backup executions' => [fn () => '/api/v1/databases/'.test()->database->uuid.'/backups/'.test()->backup->uuid.'/executions', 'executions.0.message'],
+    'backup executions' => [fn () => '/api/v1/databases/'.test()->database->uuid.'/backups/'.test()->backup->uuid.'/executions', '0.message'],
 ]);

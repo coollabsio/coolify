@@ -238,8 +238,8 @@ describe('backup executions api', function () {
         $executions = $this->withHeaders($headers)->getJson($this->executionsUrl)->assertOk();
         $backups = $this->withHeaders($headers)->getJson($this->backupsUrl)->assertOk();
 
-        expect($executions->json('executions.0.status'))->toBe('failed')
-            ->and($executions->json('executions.0.message'))->toBeNull()
+        expect($executions->json('0.status'))->toBe('failed')
+            ->and($executions->json('0.message'))->toBeNull()
             ->and($backups->json('0.executions.0.message'))->toBeNull()
             ->and($executions->getContent().$backups->getContent())->not->toContain('dump failed');
     });
@@ -247,7 +247,7 @@ describe('backup executions api', function () {
     it('returns the redacted execution message to a token with read:sensitive', function () {
         $headers = backupRedactionToken($this->owner, $this->team, ['read', 'read:sensitive']);
 
-        $message = $this->withHeaders($headers)->getJson($this->executionsUrl)->assertOk()->json('executions.0.message');
+        $message = $this->withHeaders($headers)->getJson($this->executionsUrl)->assertOk()->json('0.message');
 
         expect($message)->toContain('dump failed')
             ->and($message)->not->toContain('api-db-secret');

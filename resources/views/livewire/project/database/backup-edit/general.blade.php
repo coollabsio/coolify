@@ -89,6 +89,10 @@
                 <x-forms.input label="Databases to back up"
                     helper="Comma-separated database names. Leave empty to include the default database."
                     id="databasesToBackup" />
+            @elseif ($backup->database_type === 'App\Models\StandaloneInfluxdb')
+                <x-forms.input label="Bucket to back up"
+                    helper="The InfluxDB bucket name. Leave empty to back up the default bucket."
+                    id="databasesToBackup" />
             @elseif ($backup->database_type === 'App\Models\StandaloneSqlite')
                 <x-forms.input label="Database files to back up"
                     helper="Comma-separated file names inside the data volume. Leave empty to back up every configured file."

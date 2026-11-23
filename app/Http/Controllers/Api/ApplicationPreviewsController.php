@@ -28,14 +28,17 @@ class ApplicationPreviewsController extends Controller
         tags: ['Applications'],
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', description: 'UUID of the application.', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(ref: '#/components/parameters/Page'),
+            new OA\Parameter(ref: '#/components/parameters/PerPage'),
         ],
         responses: [
-            new OA\Response(response: 200, description: 'List of preview deployments.', content: new OA\JsonContent(
+            new OA\Response(response: 200, headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')], description: 'List of preview deployments.', content: new OA\JsonContent(
                 type: 'array',
                 items: new OA\Items(ref: '#/components/schemas/ApplicationPreview'),
             )),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],
     )]
     public function index(Request $request): JsonResponse
@@ -52,11 +55,10 @@ class ApplicationPreviewsController extends Controller
 
         $this->authorize('view', $application);
 
-        $previews = $application->previews()
-            ->get()
-            ->map(fn (ApplicationPreview $preview): array => $this->formatPreview($preview));
+        $request->validate(apiPaginationRules());
+        [$previews, $headers] = apiPaginate($application->previews()->orderBy('id', 'desc'), $request);
 
-        return response()->json($previews);
+        return response()->json($previews->map(fn (ApplicationPreview $preview): array => $this->formatPreview($preview)), 200, $headers);
     }
 
     #[OA\Get(
