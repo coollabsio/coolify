@@ -133,6 +133,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | XSRF Cookie Name
+    |--------------------------------------------------------------------------
+    |
+    | The name of the cookie that holds the CSRF token for JavaScript clients,
+    | such as the terminal server. Plain HTTP requests get their own name when
+    | SESSION_SECURE_COOKIE is not set (see App\Http\Middleware\TrustProxies).
+    |
+    */
+
+    'xsrf_cookie' => 'XSRF-TOKEN',
+
+    /*
+    |--------------------------------------------------------------------------
     | Session Cookie Path
     |--------------------------------------------------------------------------
     |

@@ -7,7 +7,7 @@
 
 services:
   outline:
-    image: docker.getoutline.com/outlinewiki/outline:latest
+    image: docker.getoutline.com/outlinewiki/outline:1.13.0
     volumes:
       - storage-data:/var/lib/outline/data
     depends_on:
@@ -77,7 +77,7 @@ services:
       disable: true
 
   redis:
-    image: redis:alpine
+    image: redis:8.10.3-alpine
     environment:
       - REDIS_PASSWORD=${SERVICE_PASSWORD_64_REDIS}
     command: ["redis-server", "--requirepass", "${SERVICE_PASSWORD_64_REDIS}"]
@@ -88,7 +88,7 @@ services:
       retries: 3
 
   postgres:
-    image: postgres:12-alpine
+    image: postgres:16-alpine
     volumes:
       - database-data:/var/lib/postgresql/data
     environment:

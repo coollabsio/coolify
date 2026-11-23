@@ -2,9 +2,16 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
 
+/**
+ * Team and server variables need team-wide access (owners and admins to read their values or change them).
+ * The API token of the request must also cover the whole team, so a token limited to some projects cannot use them.
+ * Project and environment variables follow the access level on their project or environment.
+ */
 class SharedEnvironmentVariablePolicy
 {
     /**
@@ -20,7 +27,15 @@ class SharedEnvironmentVariablePolicy
      */
     public function view(User $user, SharedEnvironmentVariable $sharedEnvironmentVariable): bool
     {
-        return $user->teams->contains('id', $sharedEnvironmentVariable->team_id);
+        return $this->allows($user, AccessLevel::Read, $sharedEnvironmentVariable);
+    }
+
+    /**
+     * Determine whether the user can read the value.
+     */
+    public function viewSensitive(User $user, SharedEnvironmentVariable $sharedEnvironmentVariable): bool
+    {
+        return $this->allows($user, AccessLevel::ReadSensitive, $sharedEnvironmentVariable);
     }
 
     /**
@@ -36,7 +51,7 @@ class SharedEnvironmentVariablePolicy
      */
     public function update(User $user, SharedEnvironmentVariable $sharedEnvironmentVariable): bool
     {
-        return $user->isAdminOfTeam($sharedEnvironmentVariable->team_id);
+        return $this->allows($user, AccessLevel::Write, $sharedEnvironmentVariable);
     }
 
     /**
@@ -44,7 +59,7 @@ class SharedEnvironmentVariablePolicy
      */
     public function delete(User $user, SharedEnvironmentVariable $sharedEnvironmentVariable): bool
     {
-        return $user->isAdminOfTeam($sharedEnvironmentVariable->team_id);
+        return $this->allows($user, AccessLevel::Write, $sharedEnvironmentVariable);
     }
 
     /**
@@ -68,6 +83,24 @@ class SharedEnvironmentVariablePolicy
      */
     public function manageEnvironment(User $user, SharedEnvironmentVariable $sharedEnvironmentVariable): bool
     {
-        return $user->isAdminOfTeam($sharedEnvironmentVariable->team_id);
+        return $this->allows($user, AccessLevel::Write, $sharedEnvironmentVariable);
+    }
+
+    private function allows(User $user, AccessLevel $level, SharedEnvironmentVariable $sharedEnvironmentVariable): bool
+    {
+        if (in_array($sharedEnvironmentVariable->type, ['project', 'environment'], true)) {
+            $target = $sharedEnvironmentVariable->type === 'project'
+                ? $sharedEnvironmentVariable->project
+                : $sharedEnvironmentVariable->environment;
+
+            return $target !== null && $user->canAccess($level, $target);
+        }
+
+        $teamId = (int) $sharedEnvironmentVariable->team_id;
+        if ($level !== AccessLevel::Read && ! $user->isAdminOfTeam($teamId)) {
+            return false;
+        }
+
+        return app(AccessResolver::class)->allowsTeamWide($user, $level, $teamId);
     }
 }

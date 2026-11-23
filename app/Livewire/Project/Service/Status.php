@@ -22,10 +22,13 @@ class Status extends Component
 
     public function getListeners(): array
     {
-        return $this->teamChannelListeners([
-            'ServiceStatusChanged' => 'refreshStatus',
-            'ServiceChecked' => 'refreshStatus',
-        ]);
+        return [
+            'serviceResourceStatusesChanged' => 'refreshStatus',
+            ...$this->teamChannelListeners([
+                'ServiceStatusChanged' => 'refreshStatus',
+                'ServiceChecked' => 'refreshStatus',
+            ]),
+        ];
     }
 
     public function refreshStatus(): void

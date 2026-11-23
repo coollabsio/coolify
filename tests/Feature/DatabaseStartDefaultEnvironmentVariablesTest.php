@@ -91,6 +91,55 @@ it('does not add a Postgres default when the user sets the exact key', function 
     expect($postgresDbEntries)->toBe(['POSTGRES_DB=customdb']);
 });
 
+it('passes the initialization settings to the Postgres container', function () {
+    $database = create_standalone_postgresql($this->environment->id, $this->destination, [
+        'postgres_initdb_args' => '--data-checksums --locale=C',
+        'postgres_host_auth_method' => 'md5',
+    ]);
+
+    StartPostgresql::run($database->fresh(), new Activity);
+
+    expect(databaseStartComposeEnvironment($this->executor, $database->uuid))
+        ->toContain('POSTGRES_INITDB_ARGS=--data-checksums --locale=C')
+        ->toContain('POSTGRES_HOST_AUTH_METHOD=md5');
+});
+
+it('does not pass empty Postgres initialization settings or override the user keys', function () {
+    $database = create_standalone_postgresql($this->environment->id, $this->destination, [
+        'postgres_initdb_args' => null,
+        'postgres_host_auth_method' => 'md5',
+    ]);
+    $database->runtime_environment_variables()->create(['key' => 'POSTGRES_HOST_AUTH_METHOD', 'value' => 'password']);
+
+    StartPostgresql::run($database->fresh(), new Activity);
+
+    $entries = collect(databaseStartComposeEnvironment($this->executor, $database->uuid));
+
+    expect($entries->filter(fn (string $entry) => str($entry)->startsWith('POSTGRES_INITDB_ARGS='))->all())->toBe([])
+        ->and($entries->filter(fn (string $entry) => str($entry)->startsWith('POSTGRES_HOST_AUTH_METHOD='))->values()->all())
+        ->toBe(['POSTGRES_HOST_AUTH_METHOD=password']);
+});
+
+it('sets PGPASSWORD to the Postgres password so psql works when pg_hba.conf requires a password', function (array $userEnvironment, string $expected) {
+    $database = create_standalone_postgresql($this->environment->id, $this->destination, ['postgres_password' => 'model-secret']);
+    foreach ($userEnvironment as $key => $value) {
+        $database->runtime_environment_variables()->create(['key' => $key, 'value' => $value]);
+    }
+
+    StartPostgresql::run($database->fresh(), new Activity);
+
+    $pgPasswordEntries = collect(databaseStartComposeEnvironment($this->executor, $database->uuid))
+        ->filter(fn (string $entry) => str($entry)->startsWith('PGPASSWORD='))
+        ->values()
+        ->all();
+
+    expect($pgPasswordEntries)->toBe([$expected]);
+})->with([
+    'model password' => [[], 'PGPASSWORD=model-secret'],
+    'user POSTGRES_PASSWORD' => [['POSTGRES_PASSWORD' => 'user-secret'], 'PGPASSWORD=user-secret'],
+    'user PGPASSWORD' => [['PGPASSWORD' => 'own-secret'], 'PGPASSWORD=own-secret'],
+]);
+
 it('adds the password default when the user only sets a *_FILE variant', function (string $action, string $factory, array $data, string $userKey, string $expected) {
     $database = $factory($this->environment->id, $this->destination, $data);
     $database->runtime_environment_variables()->create(['key' => $userKey, 'value' => '/run/secrets/x']);

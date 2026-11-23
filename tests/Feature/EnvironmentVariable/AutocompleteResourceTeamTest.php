@@ -43,8 +43,8 @@ beforeEach(function () {
 });
 
 test('add suggests shared variables of the resource team when the session team differs', function () {
-    $component = Livewire::test(Add::class, ['resource' => $this->application])
-        ->set('parameters', $this->parameters);
+    $component = Livewire::test(Add::class, ['resource' => $this->application]);
+    $component->instance()->parameters = $this->parameters;
 
     $suggestions = $component->instance()->availableSharedVariables();
 
@@ -60,8 +60,8 @@ test('show suggests shared variables of the resource team when the session team 
         'resourceable_id' => $this->application->id,
     ]);
 
-    $component = Livewire::test(Show::class, ['env' => $env, 'type' => 'application'])
-        ->set('parameters', $this->parameters);
+    $component = Livewire::test(Show::class, ['env' => $env, 'type' => 'application']);
+    $component->instance()->parameters = $this->parameters;
 
     $suggestions = $component->instance()->availableSharedVariables();
 

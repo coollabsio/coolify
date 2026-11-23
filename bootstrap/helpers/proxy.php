@@ -328,6 +328,34 @@ function dockerNetworkEnsureCommand(string $network, bool $overlay = false, bool
     return "docker network inspect {$safe} >/dev/null 2>&1 || docker network create {$createFlags} {$safe}{$quiet}";
 }
 
+/**
+ * Create a bridge network that the proxy receives traffic from, with IPv6 when Docker can allocate it.
+ * On an IPv4-only network, Docker forwards IPv6 clients through docker-proxy, so the proxy sees the
+ * bridge gateway (172.x.0.1) instead of the client address (#3436). Falls back to IPv4 only when IPv6
+ * is not available, or when Docker reports the IPv6 gateway with a prefix length (Docker 27.0 to 28.0.0,
+ * moby/moby#49520), which the Docker CLI and Compose in the helper image cannot read. Like scripts/upgrade.sh.
+ * An existing network is not changed.
+ *
+ * It is one `sh -c` script that always exits 0, so parseCommandsByLineForSudo() only puts sudo in front.
+ * Do not add a suffix such as `|| true`: then the parser adds sudo inside the script.
+ */
+function dockerProxyNetworkEnsureCommand(string $network): string
+{
+    $script = 'net='.escapeshellarg($network)."\n".<<<'SH'
+        docker network inspect "$net" >/dev/null 2>&1 && exit 0
+        if docker network create --attachable --ipv6 "$net" >/dev/null 2>&1; then
+            case "$(docker network inspect --format '{{range .IPAM.Config}}{{.Gateway}} {{end}}' "$net" 2>/dev/null)" in
+                */*) docker network rm "$net" >/dev/null 2>&1 && docker network create --attachable "$net" >/dev/null ;;
+            esac
+        else
+            docker network create --attachable "$net" >/dev/null
+        fi
+        exit 0
+        SH;
+
+    return 'sh -c '.escapeShellValue($script);
+}
+
 function collectProxyDockerNetworksByServer(Server $server)
 {
     if (! $server->isFunctional()) {
@@ -337,7 +365,7 @@ function collectProxyDockerNetworksByServer(Server $server)
     if (is_null($proxyType) || $proxyType === 'NONE') {
         return collect();
     }
-    $networks = instant_remote_process(['docker inspect --format="{{json .NetworkSettings.Networks }}" coolify-proxy'], $server, false);
+    $networks = instant_remote_process([remoteCommandWithTimeout('docker inspect --format="{{json .NetworkSettings.Networks }}" coolify-proxy')], $server, false, timeout: 30);
 
     return collect($networks)->map(function ($network) {
         return collect(json_decode($network))->keys();
@@ -452,7 +480,9 @@ function ensureProxyNetworksExist(Server $server)
 
         return [
             "echo 'Ensuring network {$safe} exists...'",
-            dockerNetworkEnsureCommand($network, overlay: $server->isSwarm()),
+            $server->isSwarm()
+                ? dockerNetworkEnsureCommand($network, overlay: true)
+                : dockerProxyNetworkEnsureCommand($network),
         ];
     });
 
@@ -867,10 +897,10 @@ function getExactTraefikVersionFromContainer(Server $server): ?string
         Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Checking for exact version");
 
         // Method A: Execute traefik version command (most reliable)
-        $versionCommand = "docker exec coolify-proxy traefik version 2>/dev/null | grep -oP 'Version:\s+\K\d+\.\d+\.\d+'";
+        $versionCommand = remoteCommandWithTimeout('docker exec coolify-proxy traefik version')." 2>/dev/null | grep -oP 'Version:\s+\K\d+\.\d+\.\d+'";
         Log::debug("getExactTraefikVersionFromContainer: Server '{$server->name}' (ID: {$server->id}) - Running: {$versionCommand}");
 
-        $output = instant_remote_process([$versionCommand], $server, false);
+        $output = instant_remote_process([$versionCommand], $server, false, timeout: 30);
 
         if (! empty(trim($output))) {
             $version = trim($output);
@@ -949,4 +979,17 @@ function getTraefikVersionFromDockerCompose(Server $server): ?string
 
         return null;
     }
+}
+
+/**
+ * Validation rule for an HTML page that Coolify sends to the proxy in one shell command
+ * (see Server::PROXY_ERROR_PAGE_MAX_BYTES).
+ */
+function proxyPageSizeRule(string $name): Closure
+{
+    return function (string $attribute, mixed $value, Closure $fail) use ($name): void {
+        if (strlen((string) $value) > Server::PROXY_ERROR_PAGE_MAX_BYTES) {
+            $fail("The {$name} must not be larger than ".(Server::PROXY_ERROR_PAGE_MAX_BYTES / 1024).' KB.');
+        }
+    };
 }

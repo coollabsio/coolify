@@ -3,14 +3,13 @@
 namespace App\Actions\User;
 
 use App\Actions\Stripe\CancelSubscription;
-use App\Models\GithubApp;
-use App\Models\GithubRunnerConfig;
-use App\Models\GithubRunnerExecution;
+use App\Actions\Stripe\FindOpenStripeSubscriptions;
+use App\Actions\Team\DeleteTeamData;
 use App\Models\Subscription;
 use App\Models\Team;
 use App\Models\User;
-use App\Services\AvatarStorageService;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -19,16 +18,19 @@ use RuntimeException;
  *
  * Deletion is refused while the user still owns data that would be lost or
  * orphaned. The user must resolve each blocker first, the same way team
- * deletion requires an empty team. With $removeTeamResources, the servers,
- * resources, projects, and Git sources of teams where the user is the only
+ * deletion requires an empty team. When removesDataOf() allows it, the servers,
+ * resources, projects, and Git sources of a team where the user is the only
  * member are removed from Coolify instead. Nothing is stopped on the servers.
+ *
+ * $cancelledTeam is the team whose subscription the calling action cancels
+ * together with the account deletion. Its subscriptions count as not paying.
  */
 class DeleteUserAccount
 {
     /**
      * @return list<string>
      */
-    public function blockers(User $user, bool $removeTeamResources = false): array
+    public function blockers(User $user, ?Team $cancelledTeam = null): array
     {
         if ($user->id === 0) {
             return ['The root user cannot be deleted.'];
@@ -53,7 +55,7 @@ class DeleteUserAccount
             }
 
             if ($isAlone) {
-                if (! $removeTeamResources && ! $team->isEmpty()) {
+                if (! $this->removesDataOf($team, $cancelledTeam) && ! $team->isEmpty()) {
                     $blockers[] = "Delete all projects, servers, and Git sources of the team \"{$team->name}\".";
                 }
 
@@ -72,63 +74,67 @@ class DeleteUserAccount
         return $blockers;
     }
 
-    public function handle(User $user, bool $removeTeamResources = false): void
+    public function handle(User $user, ?Team $cancelledTeam = null): void
     {
-        if ($blockers = $this->blockers($user, $removeTeamResources)) {
+        if ($blockers = $this->blockers($user, $cancelledTeam)) {
             throw new RuntimeException(implode(' ', $blockers));
         }
 
-        foreach ($this->subscriptionTeams($user) as $team) {
-            if (! CancelSubscription::cancelById($team->subscription->stripe_subscription_id)) {
-                throw new RuntimeException("Could not cancel the subscription of the team \"{$team->name}\". Your account was not deleted. Please try again.");
+        foreach ($this->subscriptionsToCancel($user) as $subscriptionId => $team) {
+            if (! CancelSubscription::cancelById($subscriptionId)) {
+                $owner = $team ? "the team \"{$team->name}\"" : 'your email';
+
+                throw new RuntimeException("Could not cancel the subscription of {$owner}. Your account was not deleted. Please try again.");
             }
         }
 
-        try {
-            app(AvatarStorageService::class)->delete($user);
-        } catch (\Throwable $e) {
-            report($e);
-        }
-
-        DB::transaction(function () use ($user, $removeTeamResources): void {
+        DB::transaction(function () use ($user, $cancelledTeam): void {
             $user = User::query()->lockForUpdate()->findOrFail($user->id);
 
-            if ($blockers = $this->blockers($user, $removeTeamResources)) {
+            if ($blockers = $this->blockers($user, $cancelledTeam)) {
                 throw new RuntimeException(implode(' ', $blockers));
             }
 
-            if ($removeTeamResources) {
-                $this->singleMemberTeams($user)->each(fn (Team $team) => $this->removeTeamResources($team));
-            }
+            // Unless removesDataOf() holds for a team, the blockers above guarantee it holds no
+            // projects, servers, or sources.
+            $this->singleMemberTeams($user)->each(fn (Team $team) => app(DeleteTeamData::class)->handle($team));
 
-            // The subscription row of a deleted team would point to a missing
-            // team, and later Stripe webhooks for its customer would fail.
-            Subscription::query()->whereIn('team_id', $this->singleMemberTeams($user)->pluck('id'))->delete();
-
-            // Deletes the user's single-member teams, promotes an admin where
-            // the user was the only owner, and removes the user from the rest.
+            // Promotes an admin where the user was the only owner, and removes
+            // the user from the remaining teams.
             (new DeleteUserTeams($user))->execute();
 
-            // team_user has no foreign keys, so also remove the root team
-            // membership and the rows of teams deleted above.
+            // team_user has no foreign keys, so also remove the root team membership.
             $user->teams()->detach();
 
-            $user->fresh()->delete();
-
-            DB::table('sessions')->where('user_id', $user->id)->delete();
+            app(DeleteTeamlessUser::class)->handle($user->fresh());
         });
     }
 
     /**
      * @return list<string>
      */
-    public function confirmationActions(User $user): array
+    public function confirmationActions(User $user, ?Team $cancelledTeam = null): array
     {
-        return $this->subscriptionTeams($user)
-            ->map(fn (Team $team): string => "The subscription of the team \"{$team->name}\" will be cancelled immediately. This is required.")
+        $removedTeams = $this->singleMemberTeams($user)
+            ->filter(fn (Team $team): bool => $this->removesDataOf($team, $cancelledTeam) && ! $team->isEmpty());
+
+        return $this->subscriptionConfirmationActions($user, $cancelledTeam)
+            ->concat($removedTeams->map(fn (Team $team): string => "The servers, projects, and Git sources of the team \"{$team->name}\" will be removed from Coolify. Nothing is stopped on the servers."))
             ->push('Your account will be permanently deleted from Coolify.')
             ->values()
             ->all();
+    }
+
+    /**
+     * Whether self-service deletion removes the data of a single-member team instead of asking the
+     * user to delete it first. On Coolify Cloud, a team without a paid or past-due subscription
+     * cannot open its project and server pages, so the user could not do that. The data of a
+     * paying team stays until the user deletes it. $cancelledTeam does not count as paying.
+     */
+    private function removesDataOf(Team $team, ?Team $cancelledTeam): bool
+    {
+        return isCloud() && ($team->is($cancelledTeam)
+            || ! $team->subscriptions()->get()->contains(fn (Subscription $subscription): bool => $subscription->isPaying()));
     }
 
     private function singleMemberTeams(User $user): Collection
@@ -142,52 +148,79 @@ class DeleteUserAccount
     }
 
     /**
-     * Removes the team's data from Coolify. Git sources are removed when the
-     * team itself is deleted.
+     * The Stripe subscriptions that account deletion cancels, with the team each belongs to. These
+     * are the subscription rows of the teams the user owns, and every open Stripe subscription of the
+     * user's email and of those teams' customers, also when Coolify has no row for it. Subscriptions
+     * of a team that the user does not own are not cancelled.
+     *
+     * @return Collection<string, ?Team> keyed by Stripe subscription id
      */
-    private function removeTeamResources(Team $team): void
-    {
-        $this->forgetGithubRunners($team);
-
-        foreach ($team->servers()->get() as $server) {
-            foreach ($server->definedResources() as $resource) {
-                $resource->forceDelete();
-            }
-            $server->forceDelete();
-        }
-
-        foreach ($team->projects()->get() as $project) {
-            $project->delete();
-        }
-    }
-
-    /**
-     * Removes the team's GitHub Actions runner records so that busy runners do
-     * not block the removal of its servers and Git sources. The runners keep
-     * running on the servers; Coolify only stops tracking them.
-     */
-    private function forgetGithubRunners(Team $team): void
-    {
-        $githubAppIds = GithubApp::query()->where('team_id', $team->id)->where('is_system_wide', false)->pluck('id');
-        $serverIds = $team->servers()->pluck('id');
-
-        $belongsToTeam = fn ($query) => $query->whereIn('github_app_id', $githubAppIds)->orWhereIn('server_id', $serverIds);
-
-        GithubRunnerExecution::query()->where($belongsToTeam)->delete();
-        GithubRunnerConfig::query()->where($belongsToTeam)->delete();
-    }
-
-    private function subscriptionTeams(User $user): Collection
+    private function subscriptionsToCancel(User $user): Collection
     {
         if (! isCloud()) {
             return collect();
         }
 
-        return $user->teams()
+        $ownedTeams = $user->teams()
             ->where('teams.id', '!=', 0)
             ->wherePivot('role', 'owner')
-            ->with('subscription')
-            ->get()
-            ->filter(fn (Team $team): bool => filled($team->subscription?->stripe_subscription_id));
+            ->with('subscriptions')
+            ->get();
+
+        $subscriptions = collect();
+        foreach ($ownedTeams as $team) {
+            foreach ($team->subscriptions->whereNotNull('stripe_subscription_id') as $subscription) {
+                $subscriptions->put($subscription->stripe_subscription_id, $team);
+            }
+        }
+
+        $customerIds = $ownedTeams->flatMap->subscriptions->pluck('stripe_customer_id');
+        foreach (app(FindOpenStripeSubscriptions::class)->handle([$user->email], $customerIds) as $subscriptionId => $stripeSubscription) {
+            if ($subscriptions->has($subscriptionId)) {
+                continue;
+            }
+
+            $teamId = FindOpenStripeSubscriptions::teamId($stripeSubscription);
+            $team = $teamId === null ? null : Team::find($teamId);
+            if ($team && ! $ownedTeams->contains($team)) {
+                continue;
+            }
+
+            $subscriptions->put($subscriptionId, $team);
+        }
+
+        return $subscriptions;
+    }
+
+    /**
+     * The Profile page renders this on each request, so the Stripe lookup is cached for a short time.
+     * handle() looks up the subscriptions again. The subscriptions of $cancelledTeam are left out,
+     * because the calling action announces that cancellation itself.
+     *
+     * @return Collection<int, string>
+     */
+    private function subscriptionConfirmationActions(User $user, ?Team $cancelledTeam = null): Collection
+    {
+        if (! isCloud()) {
+            return collect();
+        }
+
+        return collect(Cache::remember("account-deletion-subscriptions:{$user->id}:{$cancelledTeam?->id}", 60, function () use ($user, $cancelledTeam): array {
+            try {
+                return $this->subscriptionsToCancel($user)
+                    ->reject(fn (?Team $team): bool => $team !== null && $team->is($cancelledTeam))
+                    ->map(fn (?Team $team, string $subscriptionId): string => $team
+                        ? "The subscription of the team \"{$team->name}\" will be cancelled immediately. This is required."
+                        : "The Stripe subscription {$subscriptionId} of your email, which is not linked to a team, will be cancelled immediately. This is required.")
+                    ->unique()
+                    ->values()
+                    ->all();
+            } catch (\Throwable $e) {
+                // Cached too, so a Stripe outage does not call Stripe and report on every render.
+                report($e);
+
+                return ['Every subscription of your teams and your email will be cancelled immediately. This is required.'];
+            }
+        }));
     }
 }

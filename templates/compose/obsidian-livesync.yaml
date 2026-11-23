@@ -7,7 +7,7 @@
 
 services:
   couchdb:
-    image: couchdb:3.4.2
+    image: couchdb:3.5.3
     environment:
       # Tells Coolify to proxy this service on port 5984 at the assigned domain
       - SERVICE_FQDN_COUCHDB_5984

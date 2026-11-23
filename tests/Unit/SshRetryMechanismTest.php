@@ -2,7 +2,10 @@
 
 namespace Tests\Unit;
 
+use App\Exceptions\DeploymentException;
 use App\Helpers\SshRetryHandler;
+use App\Models\Server;
+use App\Traits\ExecuteRemoteCommand;
 use App\Traits\SshRetryable;
 use Tests\TestCase;
 
@@ -219,5 +222,86 @@ class SshRetryMechanismTest extends TestCase
             $this->assertEquals(1, $attemptCount);
             throw $e;
         }
+    }
+
+    public function test_refused_ssh_handshake_gets_more_attempts_than_other_ssh_errors()
+    {
+        config([
+            'constants.ssh.max_retries' => 3,
+            'constants.ssh.handshake_max_retries' => 5,
+            'constants.ssh.retry_base_delay' => 0,
+        ]);
+
+        $attemptCount = 0;
+        $result = SshRetryHandler::retry(function () use (&$attemptCount) {
+            $attemptCount++;
+            if ($attemptCount < 5) {
+                throw new \RuntimeException('kex_exchange_identification: read: Connection reset by peer', 255);
+            }
+
+            return 'success';
+        });
+
+        $this->assertSame('success', $result);
+        $this->assertSame(5, $attemptCount);
+
+        $attemptCount = 0;
+        try {
+            SshRetryHandler::retry(function () use (&$attemptCount) {
+                $attemptCount++;
+                throw new \RuntimeException('Broken pipe', 255);
+            });
+            $this->fail('The SSH error was not thrown.');
+        } catch (\RuntimeException) {
+            $this->assertSame(3, $attemptCount);
+        }
+    }
+
+    public function test_refused_ssh_handshake_keeps_an_explicit_attempt_limit()
+    {
+        config([
+            'constants.ssh.handshake_max_retries' => 5,
+            'constants.ssh.retry_base_delay' => 0,
+        ]);
+
+        $attemptCount = 0;
+        $result = SshRetryHandler::retry(function () use (&$attemptCount) {
+            $attemptCount++;
+            throw new \RuntimeException('kex_exchange_identification: Connection closed by remote host', 255);
+        }, throwError: false, maxAttempts: 1);
+
+        $this->assertNull($result);
+        $this->assertSame(1, $attemptCount);
+    }
+
+    public function test_deployment_command_retries_a_refused_ssh_handshake_until_it_connects()
+    {
+        config([
+            'constants.ssh.max_retries' => 3,
+            'constants.ssh.handshake_max_retries' => 5,
+            'constants.ssh.retry_base_delay' => 0,
+        ]);
+
+        $runner = new class
+        {
+            use ExecuteRemoteCommand;
+
+            public Server $server;
+
+            public int $attempts = 0;
+
+            private function executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors, $command_hidden = false, $skip_command_log = false, ?string $input = null)
+            {
+                $this->attempts++;
+                if ($this->attempts < 5) {
+                    throw new DeploymentException("Command execution failed (exit code 255): echo ok\nError: kex_exchange_identification: read: Connection reset by peer", 255);
+                }
+            }
+        };
+        $runner->server = (new Server)->forceFill(['user' => 'root']);
+
+        $runner->execute_remote_command(['command' => 'echo ok']);
+
+        $this->assertSame(5, $runner->attempts);
     }
 }

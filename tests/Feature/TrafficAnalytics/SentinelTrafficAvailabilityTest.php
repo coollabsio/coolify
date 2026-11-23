@@ -65,6 +65,8 @@ it('skips the dashboard fetch of an unreachable server without a remote call', f
 
 it('tries a failing server once and skips it until the failure window ends', function () {
     markTrafficServerReachable($this->server);
+    // Without a pinned host key, the first command would also run a host key scan.
+    $this->server->settings->forceFill(['is_ssh_host_key_check_disabled' => true])->save();
     Process::fake(fn () => Process::result(
         errorOutput: "ssh: connect to host {$this->server->ip} port 22: Connection timed out",
         exitCode: 255,
@@ -91,7 +93,7 @@ it('fetches a healthy server with a bounded ssh and curl timeout', function () {
 
     expect($overview->requests)->toBe(7);
     Process::assertRan(fn (PendingProcess $process) => $process->timeout <= 30
-        && str_contains($process->command, '--max-time'));
+        && str_contains(remoteProcessScript($process), '--max-time'));
 });
 
 it('shows no data without an error when Sentinel has no traffic routes (0.0.x answers 404)', function () {
@@ -116,5 +118,6 @@ it('shows no data without an error when Sentinel has no traffic routes (0.0.x an
         ->assertSet('series', [])
         ->assertNotDispatched('error');
 
-    Process::assertRan(fn (PendingProcess $process) => str_contains($process->command, '/api/traffic/dashboard'));
+    // The concurrent prefetch remembers the failure, so the per-server pass does not fetch it again.
+    Process::assertRanTimes(fn (PendingProcess $process) => str_contains(remoteProcessScript($process), '/api/traffic/dashboard'), 1);
 });

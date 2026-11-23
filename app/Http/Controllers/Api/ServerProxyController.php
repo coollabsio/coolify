@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Proxy\SaveProxyConfiguration;
 use App\Enums\ProxyTypes;
+use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
 use App\Jobs\RestartProxyJob;
 use App\Models\Server;
@@ -15,6 +16,8 @@ use OpenApi\Attributes as OA;
 
 class ServerProxyController extends Controller
 {
+    use RequiresDeployAbility;
+
     private function teamIdOrAbort(): int|JsonResponse
     {
         $teamId = getTeamIdFromToken();
@@ -53,6 +56,7 @@ class ServerProxyController extends Controller
             'status' => data_get($server->proxy, 'status'),
             'redirect_enabled' => (bool) data_get($server->proxy, 'redirect_enabled', true),
             'redirect_url' => data_get($server->proxy, 'redirect_url'),
+            'proxy_error_page' => $server->proxy_error_page,
             'generate_exact_labels' => (bool) ($server->settings->generate_exact_labels ?? false),
             'traefik_certificate_resolver' => $server->traefikCertificateResolver(),
         ];
@@ -88,6 +92,7 @@ class ServerProxyController extends Controller
                         new OA\Property(property: 'status', type: 'string', nullable: true, example: 'running'),
                         new OA\Property(property: 'redirect_enabled', type: 'boolean', example: true),
                         new OA\Property(property: 'redirect_url', type: 'string', nullable: true, example: 'https://example.com'),
+                        new OA\Property(property: 'proxy_error_page', type: 'string', nullable: true),
                         new OA\Property(property: 'generate_exact_labels', type: 'boolean', example: false),
                         new OA\Property(property: 'traefik_certificate_resolver', type: 'string', nullable: true, example: 'letsencrypt', description: 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'),
                         new OA\Property(property: 'configuration', type: 'string', nullable: true, description: 'Docker Compose proxy configuration when stored in the database. Only present with read:sensitive.'),
@@ -118,7 +123,7 @@ class ServerProxyController extends Controller
 
     #[OA\Patch(
         summary: 'Update server proxy',
-        description: 'Update proxy redirect settings, exact labels generation, the Traefik certificate resolver, and optionally the proxy type for a team-owned server.',
+        description: 'Update proxy redirect settings, exact labels generation, the Traefik certificate resolver, and optionally the proxy type for a team-owned server. Changing proxy_type needs a token with the `write` and `deploy` permissions.',
         path: '/servers/{uuid}/proxy',
         operationId: 'update-server-proxy',
         security: [['bearerAuth' => []]],
@@ -133,9 +138,10 @@ class ServerProxyController extends Controller
                 properties: [
                     new OA\Property(property: 'redirect_enabled', type: 'boolean'),
                     new OA\Property(property: 'redirect_url', type: 'string', nullable: true, description: 'Public http(s) redirect URL, or null to clear.'),
+                    new OA\Property(property: 'proxy_error_page', type: 'string', nullable: true, description: 'Custom HTML error page that the proxy shows for unknown hosts (when redirect_url is empty) and for resources in maintenance mode. Null restores the default page.'),
                     new OA\Property(property: 'generate_exact_labels', type: 'boolean'),
                     new OA\Property(property: 'traefik_certificate_resolver', type: 'string', nullable: true, description: 'Traefik certificate resolver for generated HTTPS routers (letters, digits, _ and -). Null or empty to use your own certificates. Redeploy resources to apply.'),
-                    new OA\Property(property: 'proxy_type', type: 'string', enum: ['traefik', 'caddy', 'nginx', 'none'], description: 'Proxy type (case-insensitive).'),
+                    new OA\Property(property: 'proxy_type', type: 'string', enum: ['traefik', 'caddy', 'nginx', 'none'], description: 'Proxy type (case-insensitive). Changing it starts the new proxy on the server and needs the deploy permission.'),
                 ]
             )
         ),
@@ -150,6 +156,7 @@ class ServerProxyController extends Controller
                         new OA\Property(property: 'status', type: 'string', nullable: true),
                         new OA\Property(property: 'redirect_enabled', type: 'boolean'),
                         new OA\Property(property: 'redirect_url', type: 'string', nullable: true),
+                        new OA\Property(property: 'proxy_error_page', type: 'string', nullable: true),
                         new OA\Property(property: 'generate_exact_labels', type: 'boolean'),
                         new OA\Property(property: 'traefik_certificate_resolver', type: 'string', nullable: true),
                         new OA\Property(property: 'configuration', type: 'string', nullable: true),
@@ -158,6 +165,7 @@ class ServerProxyController extends Controller
             ),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission to change the proxy type.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],
@@ -174,10 +182,11 @@ class ServerProxyController extends Controller
             return $return;
         }
 
-        $allowedFields = ['redirect_enabled', 'redirect_url', 'generate_exact_labels', 'traefik_certificate_resolver', 'proxy_type'];
+        $allowedFields = ['redirect_enabled', 'redirect_url', 'proxy_error_page', 'generate_exact_labels', 'traefik_certificate_resolver', 'proxy_type'];
         $validator = customApiValidator($request->all(), [
             'redirect_enabled' => 'boolean',
             'redirect_url' => ['nullable', 'string', new SafeExternalUrl],
+            'proxy_error_page' => ['nullable', 'string', proxyPageSizeRule('custom error page')],
             'generate_exact_labels' => 'boolean',
             'traefik_certificate_resolver' => ['nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
             'proxy_type' => 'string|nullable',
@@ -213,6 +222,12 @@ class ServerProxyController extends Controller
             }
         }
 
+        $proxyTypeChanged = $request->has('proxy_type') && filled($request->proxy_type)
+            && ! str($request->proxy_type)->lower()->exactly(str($server->proxyType())->lower());
+        if ($proxyTypeChanged && ($response = $this->deployAbilityForbiddenResponse($request, 'Changing the proxy type starts the new proxy on the server, so it needs a token with the deploy permission.'))) {
+            return $response;
+        }
+
         $changedFields = array_values(array_intersect($allowedFields, array_keys($request->all())));
         $redirectChanged = false;
 
@@ -223,6 +238,11 @@ class ServerProxyController extends Controller
 
         if ($request->exists('redirect_url')) {
             $server->proxy->redirect_url = $request->input('redirect_url') ?: null;
+            $redirectChanged = true;
+        }
+
+        if ($request->exists('proxy_error_page')) {
+            $server->proxy_error_page = $request->input('proxy_error_page') ?: null;
             $redirectChanged = true;
         }
 
@@ -242,7 +262,7 @@ class ServerProxyController extends Controller
             $server->settings->save();
         }
 
-        if ($request->has('proxy_type') && filled($request->proxy_type)) {
+        if ($proxyTypeChanged) {
             $server->changeProxy($request->proxy_type, async: true);
             $server->refresh();
         }
@@ -270,7 +290,7 @@ class ServerProxyController extends Controller
 
     #[OA\Put(
         summary: 'Save server proxy configuration',
-        description: 'Save the raw proxy Docker Compose configuration for a team-owned server. Multi-line configuration must be base64 encoded (same pattern as other compose payloads).',
+        description: 'Save the raw proxy Docker Compose configuration for a team-owned server. Needs a token with the `write` and `deploy` permissions. Multi-line configuration must be base64 encoded (same pattern as other compose payloads).',
         path: '/servers/{uuid}/proxy/configuration',
         operationId: 'save-server-proxy-configuration',
         security: [['bearerAuth' => []]],
@@ -304,6 +324,7 @@ class ServerProxyController extends Controller
                         new OA\Property(property: 'status', type: 'string', nullable: true),
                         new OA\Property(property: 'redirect_enabled', type: 'boolean'),
                         new OA\Property(property: 'redirect_url', type: 'string', nullable: true),
+                        new OA\Property(property: 'proxy_error_page', type: 'string', nullable: true),
                         new OA\Property(property: 'generate_exact_labels', type: 'boolean'),
                         new OA\Property(property: 'configuration', type: 'string', nullable: true),
                     ]
@@ -320,6 +341,10 @@ class ServerProxyController extends Controller
         $teamId = $this->teamIdOrAbort();
         if (! is_int($teamId)) {
             return $teamId;
+        }
+
+        if ($response = $this->deployAbilityForbiddenResponse($request, 'Coolify applies the proxy configuration on the server, so it needs a token with the deploy permission.')) {
+            return $response;
         }
 
         $return = validateIncomingRequest($request);
@@ -375,6 +400,10 @@ class ServerProxyController extends Controller
             ], 422);
         }
 
+        if (! $server->isFunctional()) {
+            return response()->json(['message' => 'Server is not functional.'], 400);
+        }
+
         SaveProxyConfiguration::run($server, $configuration);
 
         auditLog('api.server.proxy.configuration_saved', [
@@ -391,7 +420,7 @@ class ServerProxyController extends Controller
 
     #[OA\Post(
         summary: 'Restart server proxy',
-        description: 'Queue a proxy restart for a team-owned server.',
+        description: 'Queue a proxy restart for a team-owned server. Needs a token with the `deploy` permission.',
         path: '/servers/{uuid}/proxy/restart',
         operationId: 'restart-server-proxy',
         security: [['bearerAuth' => []]],
@@ -428,6 +457,10 @@ class ServerProxyController extends Controller
         }
 
         $this->authorize('manageProxy', $server);
+
+        if (! $server->isFunctional()) {
+            return response()->json(['message' => 'Server is not functional.'], 400);
+        }
 
         RestartProxyJob::dispatch($server);
 

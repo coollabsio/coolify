@@ -143,7 +143,7 @@ class Change extends Component
             })->whereUuid($gitlab_app_uuid)->firstOrFail();
 
             $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
-            $this->applications = $this->gitlab_app->applications;
+            $this->applications = $this->gitlab_app->applications()->whereRelation('environment.project.team', 'id', currentTeam()->id)->get();
 
             $settings = instanceSettings();
 
@@ -264,16 +264,25 @@ class Change extends Component
         }
     }
 
+    private function authorizeSystemWideChange(): void
+    {
+        if ($this->isSystemWide && ! $this->gitlab_app->is_system_wide) {
+            $this->authorize('makeSystemWide', GitlabApp::class);
+        }
+    }
+
     public function submit()
     {
         try {
             $this->authorize('update', $this->gitlab_app);
+            $this->authorizeSystemWideChange();
 
             $this->validate();
 
             $this->syncData(true);
             $this->gitlab_app->save();
             $this->dispatch('success', 'GitLab App updated.');
+            $this->dispatch('name-changed', uuid: $this->gitlab_app->uuid, name: $this->gitlab_app->name);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -283,6 +292,7 @@ class Change extends Component
     {
         try {
             $this->authorize('update', $this->gitlab_app);
+            $this->authorizeSystemWideChange();
 
             $this->validateOnly('isSystemWide');
 

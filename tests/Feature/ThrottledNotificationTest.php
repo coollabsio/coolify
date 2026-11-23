@@ -2,11 +2,16 @@
 
 use App\Jobs\PushServerUpdateJob;
 use App\Models\Environment;
+use App\Models\NotificationThrottle;
 use App\Models\Project;
+use App\Models\ScheduledJobDelivery;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Notifications\Container\ContainerRestarted;
+use App\Notifications\Server\DockerCleanupFailed;
+use App\Notifications\Server\Unreachable;
+use App\Services\ScheduledJobDeliveryService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -99,4 +104,63 @@ it('sends one TCP proxy restart notification per hour while the proxy does not s
     $push();
 
     Notification::assertSentToTimes($this->team, ContainerRestarted::class, 2);
+});
+
+it('does not count a throttled notification while all its channels are off', function () {
+    $this->team->emailNotificationSettings()->update(['status_change_email_notifications' => false]);
+
+    $this->team->notify(new ContainerRestarted('coolify-proxy', $this->server, restartedResource: $this->server));
+
+    expect(NotificationThrottle::query()->count())->toBe(0);
+    Notification::assertNothingSent();
+
+    $this->team->emailNotificationSettings()->update(['status_change_email_notifications' => true]);
+    $this->team->refresh();
+    $this->team->notify(new ContainerRestarted('coolify-proxy', $this->server, restartedResource: $this->server));
+
+    Notification::assertSentToTimes($this->team, ContainerRestarted::class, 1);
+    expect(NotificationThrottle::query()->count())->toBe(1);
+});
+
+it('does not mark a server as notified unreachable while the unreachable channels are off', function () {
+    $this->team->emailNotificationSettings()->update(['server_unreachable_email_notifications' => false]);
+
+    $this->server->sendUnreachableNotification();
+
+    expect($this->server->fresh()->unreachable_notification_sent)->toBeFalse();
+    Notification::assertNothingSent();
+
+    $this->team->emailNotificationSettings()->update(['server_unreachable_email_notifications' => true]);
+    $this->team->refresh();
+    $this->server->refresh();
+    $this->server->sendUnreachableNotification();
+
+    Notification::assertSentToTimes($this->team, Unreachable::class, 1);
+    expect($this->server->fresh()->unreachable_notification_sent)->toBeTrue();
+});
+
+it('does not count a missed scheduled run notification while its channels are off', function () {
+    $this->team->emailNotificationSettings()->update(['docker_cleanup_failure_email_notifications' => false]);
+    $missedCleanup = fn () => ScheduledJobDelivery::create([
+        'schedule_key' => "docker-cleanup:{$this->server->id}",
+        'scheduled_for' => now()->startOfMinute(),
+        'job_type' => 'docker-cleanup',
+        'resource_id' => $this->server->id,
+        'status' => 'enqueued',
+        'enqueued_at' => now()->subMinutes(ScheduledJobDeliveryService::ENQUEUED_STALE_AFTER_MINUTES + 1),
+    ]);
+
+    $missedCleanup();
+    app(ScheduledJobDeliveryService::class)->recoverStaleEnqueued();
+
+    expect(NotificationThrottle::query()->count())->toBe(0);
+    Notification::assertNothingSent();
+
+    $this->team->emailNotificationSettings()->update(['docker_cleanup_failure_email_notifications' => true]);
+    $this->team->refresh();
+    Carbon::setTestNow(now()->addMinute());
+    $missedCleanup();
+    app(ScheduledJobDeliveryService::class)->recoverStaleEnqueued();
+
+    Notification::assertSentToTimes($this->team, DockerCleanupFailed::class, 1);
 });

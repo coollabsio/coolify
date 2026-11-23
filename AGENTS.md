@@ -29,7 +29,7 @@ Docker Compose-based dev setup with services: coolify (app, which also runs Reve
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 
-The main checkout serves its branch at `localhost:8000` (Reverb `6001`, terminal `6002`, db `5432`, redis `6379`, vite `5173`). Worktrees get a port block at `20000 + slot*10` (app `+0`, Reverb `+1`, terminal `+2`, db `+3`, redis `+4`, vite `+5`). Each instance has its own libvirt network `coolify-dev-<slot>` (`10.221.<slot>.0/24`) and VMs `coolify-dev-<branch>--<profile>`; VMs are reused, use `php artisan dev:qemu <profile> --fresh` to rebuild one. On macOS with Lima >= 2.0 (`brew install lima`), the localhost VM is the Lima instance `coolify-dev-<slot>-<profile>` (same profiles, users, and SSH key); Coolify reaches it through Lima's forwarded SSH port on `host.docker.internal`, and only guest ports 80/443 are forwarded to the Mac. Rebuild it with `limactl delete -f <vm>`. Force it with `COOLIFY_DEV_SERVER_BACKEND=lima`. If `APP_URL` in `.env` is a `*.ts.net` host, the browser ports are published with `tailscale serve`. Set `COOLIFY_DEV_INSTANCE=<name>` to run another instance from the same checkout.
+The main checkout serves its branch at `localhost:8000` (Reverb `6001`, terminal `6002`, db `5432`, redis `6379`, vite `5173`). Worktrees get a port block at `20000 + slot*10` (app `+0`, Reverb `+1`, terminal `+2`, db `+3`, redis `+4`, vite `+5`). Each instance has its own libvirt network `coolify-dev-<slot>` (`10.221.<slot>.0/24`) and VMs `coolify-dev-<branch>--<profile>`; VMs are reused, use `php artisan dev:qemu <profile> --fresh` to rebuild one. On macOS with Lima >= 2.0 (`brew install lima`), the localhost VM is the Lima instance `coolify-dev-<slot>-<profile>` (same profiles, users, and SSH key); Coolify reaches it through Lima's forwarded SSH port on `host.docker.internal`, and only guest ports 80/443 are forwarded to the Mac. Rebuild it with `limactl delete -f <vm>`. Force it with `COOLIFY_DEV_SERVER_BACKEND=lima`. To pass the host NVIDIA GPU through to the KVM localhost VM (`ubuntu-root` only), start with `COOLIFY_DEV_GPU=1 ./scripts/dev start` (or `php artisan dev:qemu ubuntu-root --as-localhost --gpu`). This attaches every PCI function of the GPU, gives the VM 4 GiB, stops `nvidia-persistenced` on the host, and installs the NVIDIA driver and container toolkit in the VM. The host cannot use the GPU while the VM runs. Remove it with `--fresh` without `--gpu`. If `APP_URL` in `.env` is a `*.ts.net` host, the browser ports are published with `tailscale serve`. Set `COOLIFY_DEV_INSTANCE=<name>` to run another instance from the same checkout.
 
 ## Testing the Self-Hosted Upgrade Process
 
@@ -65,6 +65,22 @@ vendor/bin/pint --dirty --format agent              # format changed files
 npm run dev                     # vite dev server
 npm run build                   # production build
 ```
+
+## Testing the Service Parser
+
+`tests/Feature/ServiceParserReferenceTest.php` is a golden test for both compose parsers (`serviceParser` with `updateCompose`, and `applicationParser`) and the proxy label and magic-variable helpers. It parses `tests/Fixtures/parser/service-reference.yaml` and `application-reference.yaml` (one service per parser feature, with setting variations and error fixtures) and every template in `templates/compose`, then compares the output with `tests/Fixtures/parser/expected/`. Only the reference expected files are committed. Template expected files are gitignored, so CI checks only that each template parses.
+
+```bash
+./scripts/parser-snapshot-diff save       # before a parser change: save the output of all cases (~90 s)
+./scripts/parser-snapshot-diff baseline   # after the change: one line per changed case, full diff in storage/framework/testing/parser-snapshot-diff.diff
+php artisan test --compact tests/Feature/ServiceParserReferenceTest.php    # before you commit
+UPDATE_PARSER_SNAPSHOTS=1 php artisan test --compact tests/Feature/ServiceParserReferenceTest.php   # accept an intended change, then review git diff tests/Fixtures/parser/
+```
+
+- A refactor must give "No differences". For an intended change, check every changed line in the diff file.
+- When you add a parser feature, add a small service that uses it to `service-reference.yaml` or `application-reference.yaml` and regenerate the expected files.
+- `./scripts/parser-snapshot-diff <git-ref>` compares with a commit instead of a saved baseline.
+- It covers only the latest compose parsing version. Older parsing versions are not covered.
 
 ## Browser Tests (Pest Browser Plugin)
 
@@ -161,6 +177,29 @@ Because the "server" and the test share one PHP process, they share the phpunit 
 - Add authorization regression tests for protected changes. Cover permitted access, member restrictions where applicable, and cross-team access; verify unauthorized reads and writes return `403` or otherwise reveal no protected data.
 - Do not add a `TRUSTED_PROXIES` setting or change `TrustProxies` to use one. This caused problems in supported Coolify deployments. Fix IP-based rate limits and allow-lists at their call sites instead of changing proxy trust as a shortcut.
 
+### Security threat model (read before you report or rate a vulnerability)
+
+Before you rate a vulnerability or write an advisory, find the security boundary that the attack crosses. The boundary decides the severity. A finding that crosses no boundary is still a valid finding, but its severity is low. The full scope is in [`SECURITY.md`](SECURITY.md).
+
+- Trusted by design (attacks that need these roles are low severity):
+  - A team admin or owner, and an API token with `write` or `root` ability, already has root on every server of that team (terminal, any Compose file with host mounts, scheduled commands, all team secrets).
+  - An instance admin (admin or owner of the root team) already controls the Coolify instance and its host.
+  - A member with write access on a resource (an access grant) already has root on the server of that resource. In the root team, this includes the Coolify host when the resource runs on localhost.
+  - Repository, Dockerfile, and Compose content that a team admin deploys is trusted for that deployment.
+- Real boundaries:
+  - No login -> any access.
+  - Team member (read-only) -> write, command execution, or secrets in the own team.
+  - Member with access grants -> resources, servers, or credentials outside the grants (use `ServerPolicy::placeResource` for servers and `useTeamCredentials` for team credentials).
+  - One team -> another team.
+  - Team user -> the Coolify container or the Coolify host, when the user is not an instance admin.
+  - Token -> more than its abilities allow.
+- Do not report the items in "Intended behavior (not a vulnerability)" in `SECURITY.md` (for example, MCP that works while REST API access is disabled). Add a new item there when a report is closed as intended behavior.
+- Rate with the real role that the attack needs, not the role that the reporter claims. Read the policy or gate that protects the path. Admin needed means `PR:H`. Use `S:C` only when the impact reaches another team, the Coolify instance, or a server that the attacker does not manage.
+- If a path is reachable by a member only because of a different missing authorization check, report that check as the main issue, with high severity. Rate each injection behind it by the role it needs when the check works.
+- Always fix low-severity findings (escape shell arguments, validate input, confine paths) when you find them. Do not dismiss them because the attacker is an admin.
+- Do not put exploit details, payloads, or unreleased advisory IDs in commits, PR descriptions, code comments, or this file.
+- To reply on a security advisory, add a comment. Do not edit the advisory description. Comments API (public preview): `gh api repos/coollabsio/coolify/security-advisories/<GHSA-ID>/comments` lists comments, and `gh api -X POST repos/coollabsio/coolify/security-advisories/<GHSA-ID>/comments -F body=@comment.md` adds one. The API cannot delete comments. `gh api -X PATCH repos/coollabsio/coolify/security-advisories/<GHSA-ID>/comments/<comment-id> -F body=@comment.md` edits one. Advisory comments do not link bare commit SHAs: write `[<short-sha>](https://github.com/coollabsio/coolify/commit/<full-sha>)`.
+
 ### Event Broadcasting
 - Laravel Reverb WebSocket server for real-time updates (port 6001) and a Node terminal WebSocket server (port 6002), both run inside the `coolify` container as s6 services
 - Server-side broadcasts use `PUSHER_BACKEND_HOST`/`PUSHER_BACKEND_PORT` (defaults `127.0.0.1:6001`); `PUSHER_HOST`/`PUSHER_PORT` are browser-facing only
@@ -174,6 +213,22 @@ Because the "server" and the test share one PHP process, they share the phpunit 
 - **Standalone Databases** — Individual database instances (Postgres, MySQL, MariaDB, MongoDB, Redis, Clickhouse, KeyDB, Dragonfly, SQLite).
 - **Project/Environment** — Organizational hierarchy: Team → Project → Environment → Resources.
 - **Proxy** — Traefik reverse proxy managed per server.
+
+### Server transfer (keep it complete)
+
+A server transfer moves a server and every record that belongs to it to another Coolify instance: `ServerTransferExporter` writes the bundle, `ServerTransferImporter` reads it (`app/Services/ServerTransfer/`). `ServerTransferCoverage` records the transfer decision for every model and every column.
+
+- When you add a model, a column, or a relation that belongs to a server or to a resource on a server (application, preview, database, service, volume, environment variable, backup, scheduled task, tag, or setting), decide whether a transfer moves it:
+  - **Moved:** export and import it, and add a round-trip assertion to `tests/Unit/ServerTransfer/ServerTransferExporterImporterTest.php`. For a new model, also add it to `ServerTransferCoverage::TRANSFERRED`.
+  - **Not moved:** add the model to `ServerTransferCoverage::NOT_TRANSFERRED`, or the column to `NOT_EXPORTED_COLUMNS`, with the reason. If the data is lost for the user, also add an export warning.
+- `tests/Unit/ServerTransfer/ServerTransferCoverageTest.php` exports a server with one record of every transferred model. It fails when a model or a column has no decision. When you add a transferred model, add a record of it to the fixture of that test.
+- `docs/server-transfer-full-coverage.md` lists what to set up on a source server for a manual transfer test that covers every transferred model and setting. Add new transferred models and settings to it.
+- `scripts/transfer-test/` has live end-to-end transfer tests between two dev instances (see its README). Run them after a change to the transfer flow. When you add transferred data that the unit tests cannot prove (remote commands, provider calls, queue behavior), add a check to `extras-e2e.sh`.
+- Application, Service, and the standalone databases export their `$fillable` columns, plus hand-written lists for hidden columns. A column that is not fillable is lost unless you add it to those lists.
+- Do not copy a foreign key as a raw ID. IDs are different on the target. Link the record by UUID, or leave the column out with a reason.
+- Team credentials that a moved record needs (integration tokens, S3 storages, git sources, private keys, cloud provider tokens) move with it.
+- When the user must do a step after the transfer (for example, change a webhook URL at GitHub), add an item type to `TransferFinishChecklist`: the "Finish the transfer" list on the server page of the instance that manages the server now. Give it a check where Coolify can verify the step, and a fix where it can do the step. Also add it to the `post_transfer_checklist` of the bundle (`{target_url}` stands for the URL of the target), which the source shows as text.
+- On the source, a transferred server (`Server::isTransferredAway()`) is only an archive, because another instance manages the host. Do not run remote commands, cloud provider calls, or DNS provider calls for it, also not when the archive is deleted.
 
 ### Instance sentinels (`id = 0`)
 
@@ -230,13 +285,84 @@ The persistent-storage implementation is the reference pattern: `Project\Service
 - Run `vendor/bin/pint --dirty --format agent` before finalizing changes
 - Every change must have tests — write or update tests, then run them. For bug fixes, follow TDD: write a failing test first, then fix the bug (see Test Enforcement below)
 - Check sibling files for conventions before creating new files
+- Nixpacks is deprecated. Never recommend it to users (issue replies, docs, UI copy, workarounds). Recommend the Dockerfile build pack, or Railpack where it fits.
 - When adding remote shell commands, account for servers using non-root SSH users: commands pass through `parseCommandsByLineForSudo()`, so test pipelines, redirects, substitutions, and `sh -c`/`bash -c` scripts with the non-root sudo parser.
 
 ## Git Workflow
 
-- Production branch: `main`
-- Development branch: `release/v4.x`, where `x` is the next minor release (for example, `release/v4.5` while production is `4.4.x`). Do not use `next`.
-- Fix PRs should target the current production branch; feature PRs should target the current `release/v4.x` branch
+- Production branch: `main`. It takes fixes only. A new minor or major version gets to `main` as a merge of `next` or a release branch.
+- Merge `next` or a release branch into `main` only right before its release, on the same day. To freeze a minor for longer, publish an RC on `next` or cut a `release/v*` branch.
+- Development branch: `next`. It takes features and publishes prereleases only.
+- Fix PRs target `main`. Feature PRs target `next`.
+- Name a branch after its change: `fix/<topic>` or `feat/<topic>`. Name a backport branch after the version that releases it: `fix/<topic>-v4.4.8`.
+- Merge `next`, `release/v*` branches, and patch branches (`v4.x`, `v4.4.x`) with a merge commit. Never squash merge them, because their commits then come back as conflicts in each later merge.
+- Create `release/v*` and patch branches only when the user asks.
+
+## Change Files
+
+Each change that users of Coolify can see gets a file in `.changes/`, in the same commit as the change. `scripts/release.sh` writes the files into `CHANGELOG.md`, and the release notes come from there.
+
+Write a file with `scripts/change.sh` and its flags:
+
+```bash
+scripts/change.sh --type fixed --summary 'Ignored concurrent build limit of build servers' --detail 'Each build counts on the server that runs it'
+scripts/change.sh --type changed --breaking --summary 'Required the `delete` ability for every delete through the API'
+scripts/change.sh --notes   # the entries of the next release
+```
+
+- Write one file for each change. When a commit changes something that an unreleased change file describes, edit that file instead of adding a second one.
+- Pass `--commit <commit>` only to describe a commit that exists already.
+- Tests, documentation, refactors, and CI, scripts, or release tooling that users do not see need no file. Use `maintenance` only for a change that matters to people who build or release Coolify.
+
+| Type | For | Next release |
+| --- | --- | --- |
+| `added` | Something new for users | minor |
+| `changed` | Existing behavior that works differently | minor |
+| `deprecated` | A feature that is going away | minor |
+| `removed` | A feature that is gone | minor |
+| `fixed` | A bug that users can see | patch |
+| `security` | A closed vulnerability or hardening | patch |
+| `maintenance` | A notable change that only maintainers see | patch |
+
+Add `--breaking` when users must act after the upgrade. The entry moves to `Breaking Changes`, and the next release is a major.
+
+The summary reads as one sentence with the heading of its section, never in the imperative of a commit subject:
+
+| Section | The summary | Example |
+| --- | --- | --- |
+| `Added`, `Changed`, `Deprecated`, `Removed` | What the heading acts on | Added `Automatic cancelling of the older queued webhook deployments` |
+| `Fixed` | The bug, not the fix | Fixed `Ignored concurrent build limit of build servers`, not `Apply the concurrent build limit` |
+| `Breaking Changes`, `Security`, `Maintenance` | Starts with a verb in the past tense | `Compressed the layers with zstd instead of gzip` |
+| A `--detail` under any section | How it works now, in the present tense | `The default is none` |
+
+- Start with a capital letter or a code span, and end without a period. A reason follows after a comma.
+- Write for the person who runs Coolify. Name the page, setting, or API field that changes, not the class or the file.
+- Link the issues that a change fixes or closes at the end of the summary, for example `([#1234](https://github.com/coollabsio/coolify/issues/1234))`. Do not link pull requests.
+- Do not use bold. Put each UI name, such as a page, tab, button, setting, or label, in its own code span, for example `Advanced` > `Deployment`.
+- Do not put exploit details, payloads, or unreleased advisory IDs in a change file.
+
+## Releases
+
+[`RELEASE.md`](RELEASE.md) is the source of truth for releases. Read it before you do a release, a backport, or a major version, and before you change `upstream.json`, `scripts/release.sh`, `scripts/plan-version.sh`, `scripts/sync-cdn.sh`, or the release, nightly, pull request, or merge forward workflows.
+
+- Do not edit `CHANGELOG.md`. Describe each change in a change file (see [Change Files](#change-files)).
+- A push that changes `release.json` publishes a release.
+- NEVER edit `release.json` by hand. `scripts/release.sh` changes it.
+- `scripts/plan-version.sh` shows what the current branch releases. `scripts/plan-version.sh --nightly` shows the next nightly.
+- `scripts/release.sh` is interactive and makes a signed commit, or an unsigned commit when git cannot sign. Do not run it, push a release commit, or start the release or nightly workflow yourself. Give the user the commands from `RELEASE.md` for the release type:
+
+| Release | Branch | Command |
+| --- | --- | --- |
+| Alpha, beta, or RC of the next minor or major | `next` | `scripts/release.sh`, then select the stage and the version |
+| Prerelease of one minor or major | `release/v4.6`, `release/v5.0` | `scripts/release.sh` |
+| Stable patch or minor | `main` | Merge `next` or the release branch with a merge commit when needed, then `scripts/release.sh` |
+| Stable major | `main` | Do the steps in "Release a major version" of `RELEASE.md`, then `scripts/release.sh` |
+| Backport or hotfix | `v4.4.x` | Merge `fix/<topic>-v4.4.8` with a merge commit, then `scripts/release.sh` |
+| Nightly | `next`, or the release branch in progress | Automatic, two times each day |
+| Pull request image `pr-<number>` | PR from a branch of this repository | Automatic, on each push |
+
+- `upstream.json` pins the helper, Sentinel, and Traefik versions. A change of `upstream.json` releases nothing. `RELEASE.md` tells how to ship it.
+- The helper image is in [coollabsio/coolify-helper](https://github.com/coollabsio/coolify-helper). Change it there, not in this repository.
 
 <laravel-boost-guidelines>
 === foundation rules ===

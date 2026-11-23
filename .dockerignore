@@ -31,7 +31,9 @@ docker/coolify-terminal/node_modules
 /storage/app/ssh/mux
 /storage/app/tmp
 /storage/app/debugbar
-/storage/logs
-/storage/pail
+/storage/logs/*
+!/storage/logs/.gitignore
+/storage/pail/*
+!/storage/pail/.gitignore
 /storage/framework/**
 !/storage/framework/**/.gitignore

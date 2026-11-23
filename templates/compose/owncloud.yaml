@@ -1,3 +1,4 @@
+# ignore: true
 # documentation: https://owncloud.com/docs-guides/
 # slogan: OwnCloud with Open Web UI integrates file management with a powerful, user-friendly interface.
 # category: storage
@@ -7,7 +8,7 @@
 
 services:
   owncloud:
-    image: owncloud/server:latest
+    image: owncloud/server:10.16.7
     depends_on:
       mariadb:
         condition: service_healthy
@@ -38,7 +39,7 @@ services:
       - owncloud-data:/mnt/data
 
   mariadb:
-    image: mariadb:latest
+    image: mariadb:13.0.2
     environment:
       - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MARIADBROOT}
       - MYSQL_USER=${SERVICE_USER_MARIADB}

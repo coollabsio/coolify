@@ -30,7 +30,7 @@ beforeEach(function () {
 
     // Every path on the server is missing, and every path is inside the resource directory.
     Process::fake(function ($process) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         if (str_contains($command, 'empty-directory')) {
             return Process::result(output: collect(range(1, substr_count($command, '/ssl/server.')))->map(fn (int $index) => "{$index}:missing")->implode("\n"));
         }
@@ -80,7 +80,7 @@ it('writes a new SSL certificate file on the server before the container starts'
 
     foreach ($files as $file) {
         $path = escapeshellarg($database->workdir()."/ssl/{$file}");
-        Process::assertRan(fn ($process) => str_contains($process->command, "base64 -d | tee {$path}"));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "base64 -d | tee {$path}"));
     }
     $commands = implode("\n", $this->executor->commands);
     expect($commands)->toContain('missing configuration file')
@@ -96,4 +96,50 @@ it('writes the MongoDB server.pem before the certificate owner change mounts it'
     $commands = implode("\n", $this->executor->commands);
     expect($commands)->toContain('Writing 1 missing configuration file.')
         ->and(strpos($commands, 'Writing 1 missing configuration file.'))->toBeLessThan(strpos($commands, '--entrypoint chown'));
+});
+
+dataset('database-start-actions-with-custom-config-files', [
+    'postgresql' => ['create_standalone_postgresql', StartPostgresql::class, 'postgres_conf', 'custom-postgres.conf'],
+    'mysql' => ['create_standalone_mysql', StartMysql::class, 'mysql_conf', 'custom-config.cnf'],
+    'mariadb' => ['create_standalone_mariadb', StartMariadb::class, 'mariadb_conf', 'custom-config.cnf'],
+    'mongodb' => ['create_standalone_mongodb', StartMongodb::class, 'mongo_conf', 'mongod.conf'],
+]);
+
+it('makes the custom config file readable by the container user before the container starts', function (string $createDatabase, string $startAction, string $column, string $file) {
+    $database = $createDatabase($this->environment->id, $this->destination);
+    $database->update([$column => "# custom\n"]);
+
+    $startAction::run($database->fresh(), new Activity);
+
+    $path = $database->workdir()."/{$file}";
+    $commands = implode("\n", $this->executor->commands);
+    expect($commands)->toContain("chmod 644 {$path}")
+        ->and(strpos($commands, "tee {$path}"))->toBeLessThan(strpos($commands, "chmod 644 {$path}"))
+        ->and(strpos($commands, "chmod 644 {$path}"))->toBeLessThan(strpos($commands, 'docker-compose.yml up -d'));
+})->with('database-start-actions-with-custom-config-files');
+
+it('makes PostgreSQL init scripts readable by the postgres user before the container starts', function () {
+    $database = create_standalone_postgresql($this->environment->id, $this->destination);
+    $database->update(['init_scripts' => [['index' => 0, 'filename' => 'init.sql', 'content' => 'SELECT 1;']]]);
+
+    StartPostgresql::run($database->fresh(), new Activity);
+
+    $path = escapeshellarg($database->workdir().'/docker-entrypoint-initdb.d/init.sql');
+    $commands = implode("\n", $this->executor->commands);
+    expect($commands)->toContain("chmod 644 {$path}")
+        ->and(strpos($commands, "tee {$path}"))->toBeLessThan(strpos($commands, "chmod 644 {$path}"))
+        ->and(strpos($commands, "chmod 644 {$path}"))->toBeLessThan(strpos($commands, 'docker-compose.yml up -d'));
+});
+
+it('makes the MongoDB default database init script readable by the mongodb user before the container starts', function () {
+    $database = create_standalone_mongodb($this->environment->id, $this->destination);
+
+    StartMongodb::run($database->fresh(), new Activity);
+
+    $directory = $database->workdir().'/docker-entrypoint-initdb.d';
+    $commands = implode("\n", $this->executor->commands);
+    expect($commands)->toContain("chmod 755 {$directory}\n")
+        ->toContain("chmod 644 {$directory}/01-default-database.js")
+        ->and(strpos($commands, "tee {$directory}/01-default-database.js"))->toBeLessThan(strpos($commands, "chmod 644 {$directory}/01-default-database.js"))
+        ->and(strpos($commands, "chmod 644 {$directory}/01-default-database.js"))->toBeLessThan(strpos($commands, 'docker-compose.yml up -d'));
 });

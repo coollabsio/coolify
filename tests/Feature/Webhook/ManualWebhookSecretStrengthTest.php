@@ -112,34 +112,30 @@ describe('Webhooks component', function () {
         expect($this->application->fresh()->manual_webhook_secret_github)->toBeEmpty();
     });
 
-    test('generate returns a random secret of at least 32 characters that saves with the form', function () {
-        $generated = null;
-
+    test('generate saves a random secret of at least 32 characters for that provider only', function () {
         $component = manualWebhookSecretComponent()
+            ->set('githubManualWebhookSecret', 'unsaved-github-edit')
             ->call('generateSecret', 'gitlab')
-            ->assertHasNoErrors()
-            ->assertReturned(function ($secret) use (&$generated) {
-                $generated = $secret;
-
-                return is_string($secret) && strlen($secret) >= 32;
-            })
-            ->assertSet('gitlabManualWebhookSecret', 'gitlab-legacy');
-
-        expect($this->application->fresh()->manual_webhook_secret_gitlab)->toBe('gitlab-legacy');
-
-        $component->set('gitlabManualWebhookSecret', $generated)
-            ->call('submit')
             ->assertHasNoErrors()
             ->assertDispatched('success');
 
-        expect($this->application->fresh()->manual_webhook_secret_gitlab)->toBe($generated);
+        $generated = $component->get('gitlabManualWebhookSecret');
+        $application = $this->application->fresh();
+
+        expect($generated)->toBeString()->not->toBe('gitlab-legacy')
+            ->and(strlen($generated))->toBeGreaterThanOrEqual(32)
+            ->and($application->manual_webhook_secret_gitlab)->toBe($generated)
+            ->and($application->manual_webhook_secret_github)->toBe('short-legacy');
+
+        $component->assertSet('githubManualWebhookSecret', 'unsaved-github-edit')
+            ->assertSet('savedSecrets.gitlabManualWebhookSecret', $generated)
+            ->assertSet('savedSecrets.githubManualWebhookSecret', 'short-legacy');
     });
 
     test('generate rejects an unknown provider', function () {
         manualWebhookSecretComponent()
             ->call('generateSecret', 'deploywebhook')
-            ->assertDispatched('error')
-            ->assertReturned(null);
+            ->assertDispatched('error');
     });
 
     test('shows generate buttons only to users who can edit secrets', function () {
@@ -158,9 +154,11 @@ describe('Webhooks component', function () {
         session(['currentTeam' => $this->team]);
 
         Livewire::test(Webhooks::class, ['resource' => $this->application->fresh()])
+            ->assertSet('savedSecrets', [])
             ->call('generateSecret', 'github')
-            ->assertDispatched('error')
-            ->assertReturned(null);
+            ->assertDispatched('error');
+
+        expect($this->application->fresh()->manual_webhook_secret_github)->toBe('short-legacy');
     });
 });
 

@@ -145,12 +145,68 @@ trait HasSecretManager
     /**
      * Decides the escaping of a variable for all paths (service .env, database environment,
      * Redis password). A variable saved before exact escaping keeps the old escaping, so its
-     * container gets the same value as before the upgrade. Saving the variable again switches
-     * it to exact escaping.
+     * container gets the same value as before the upgrade, also after it is saved again. Only a
+     * variable that is deleted and added again gets exact escaping. Compose references that got
+     * the stored value before the upgrade (such as `FOO=${FOO:-}`) use exact escaping, so they
+     * keep getting that value. So do old .env lines that Docker Compose cannot read, because
+     * they stop the deployment. So do single-line values with edge spaces, because the old line
+     * loses them.
      */
     public function useExactEscaping(EnvironmentVariable $environmentVariable): bool
     {
-        return ! $environmentVariable->uses_legacy_escaping;
+        if (! $environmentVariable->uses_legacy_escaping || self::hasSingleLineEdgeWhitespace($environmentVariable->value)) {
+            return true;
+        }
+
+        if (! $this instanceof Service && ! $this instanceof Application) {
+            return false;
+        }
+
+        if ($this->legacyEnvFileLineIsUnreadable($environmentVariable)) {
+            return true;
+        }
+
+        $parsesCompose = $this instanceof Service
+            || ($this->build_pack === 'dockercompose' && ! $this->settings?->is_raw_compose_deployment_enabled);
+
+        return $parsesCompose
+            && dockerComposeVariablesWithStoredValueBeforeExactEscaping($this->docker_compose_raw)->contains($environmentVariable->key);
+    }
+
+    /**
+     * Single-line values were saved without edge whitespace before #4734, so such a value is a
+     * new save. The old escaping writes it without quotes, and Docker Compose removes the spaces.
+     */
+    private static function hasSingleLineEdgeWhitespace(?string $value): bool
+    {
+        return is_string($value) && ! str_contains($value, "\n") && $value !== trim($value);
+    }
+
+    /**
+     * The old escaping writes JSON objects and arrays without quotes, so a JSON value with a line
+     * break breaks the whole .env file (#8279). It puts other literal and multiline values in single
+     * quotes without escaping, and Docker Compose ends the value at the next quote. Other values
+     * get no quotes, so Docker Compose ends them at the first line break, for example a plain
+     * variable that references a multiline shared variable (#4595). Trailing line breaks are not
+     * counted: Docker Compose drops them from the old line, and that line works.
+     */
+    private function legacyEnvFileLineIsUnreadable(EnvironmentVariable $environmentVariable): bool
+    {
+        $value = $this->resolvedEnvironmentVariableValue($environmentVariable);
+
+        if (! is_string($value)) {
+            return false;
+        }
+
+        if (json_validate($value) && (str_starts_with($value, '{') || str_starts_with($value, '['))) {
+            return str_contains($value, "\n");
+        }
+
+        if ($environmentVariable->is_literal || $environmentVariable->is_multiline) {
+            return str_contains($value, "'");
+        }
+
+        return str_contains(rtrim($value), "\n");
     }
 
     /**
@@ -210,8 +266,9 @@ trait HasSecretManager
         }
 
         if ($environmentVariable->is_literal || $environmentVariable->is_multiline) {
-            // Service and application .env files strip the old single quotes; database environment lists keep them.
-            return ($this instanceof Service || $this instanceof Application) ? str_contains($value, "'") : true;
+            // Service and application .env files strip the old single quotes (values with a quote use exact
+            // escaping); database environment lists keep them.
+            return ! ($this instanceof Service || $this instanceof Application);
         }
 
         return escapeEnvVariables($value) !== $value

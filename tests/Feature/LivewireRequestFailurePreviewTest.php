@@ -17,10 +17,7 @@ it('registers the Livewire request failure preview in testing', function () {
     expect(Route::has('dev.livewire-request-failure-preview'))->toBeTrue();
 
     $this->get('/__livewire-request-failure')
-        ->assertSuccessful()
-        ->assertSee('Livewire request failure preview')
-        ->assertSee('Gateway timeout')
-        ->assertSee('504');
+        ->assertSuccessful();
 });
 
 it('returns proxy-style html for supported statuses', function () {

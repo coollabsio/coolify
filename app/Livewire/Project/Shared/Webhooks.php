@@ -2,11 +2,14 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Models\Application;
+use App\Models\GitlabApp;
 use App\Rules\ManualWebhookSecret;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use Spatie\Url\Url;
 
 // Refactored ✅
 class Webhooks extends Component
@@ -25,6 +28,12 @@ class Webhooks extends Component
 
     public ?string $giteaManualWebhook;
 
+    /**
+     * Source-level endpoint for GitLab App sources. GitLab has no app-level webhooks,
+     * so users add this URL to each GitLab project themselves.
+     */
+    public ?string $gitlabAppWebhook = null;
+
     public ?string $githubManualWebhookSecret = null;
 
     public ?string $gitlabManualWebhookSecret = null;
@@ -32,6 +41,14 @@ class Webhooks extends Component
     public ?string $bitbucketManualWebhookSecret = null;
 
     public ?string $giteaManualWebhookSecret = null;
+
+    /**
+     * Stored secret per component property. The unsaved bar compares the fields
+     * with these values, because Livewire syncs unsaved field edits with every request.
+     *
+     * @var array<string, string|null>
+     */
+    public array $savedSecrets = [];
 
     /**
      * Maps each manual webhook provider to its component property and model attribute.
@@ -54,12 +71,17 @@ class Webhooks extends Component
             $this->gitlabManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_gitlab');
             $this->bitbucketManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_bitbucket');
             $this->giteaManualWebhookSecret = data_get($this->resource, 'manual_webhook_secret_gitea');
+            $this->syncSavedSecrets();
         }
 
         $this->githubManualWebhook = generateGitManualWebhook($this->resource, 'github');
         $this->gitlabManualWebhook = generateGitManualWebhook($this->resource, 'gitlab');
         $this->bitbucketManualWebhook = generateGitManualWebhook($this->resource, 'bitbucket');
         $this->giteaManualWebhook = generateGitManualWebhook($this->resource, 'gitea');
+
+        if ($this->resource instanceof Application && $this->resource->source instanceof GitlabApp) {
+            $this->gitlabAppWebhook = Url::fromString(base_url()).'/webhooks/source/gitlab/events';
+        }
     }
 
     public function canViewSecrets(): bool
@@ -78,6 +100,7 @@ class Webhooks extends Component
                 'manual_webhook_secret_bitbucket' => $this->bitbucketManualWebhookSecret,
                 'manual_webhook_secret_gitea' => $this->giteaManualWebhookSecret,
             ]);
+            $this->syncSavedSecrets();
             $this->dispatch('success', 'Webhook secrets saved.');
         } catch (ValidationException $e) {
             throw $e;
@@ -87,10 +110,10 @@ class Webhooks extends Component
     }
 
     /**
-     * Return a random secret for the provider's field. The browser fills the field
-     * as an unsaved change, and the user saves it with the form.
+     * Generate a random secret for the provider and save it immediately.
+     * Other unsaved secret edits in the form are kept as they are.
      */
-    public function generateSecret(string $provider): ?string
+    public function generateSecret(string $provider): void
     {
         try {
             $this->authorize('update', $this->resource);
@@ -99,11 +122,21 @@ class Webhooks extends Component
                 throw new \InvalidArgumentException('Unknown webhook provider.');
             }
 
-            return Str::random(40);
+            $field = self::SECRET_FIELDS[$provider];
+            $secret = Str::random(40);
+            $this->resource->update([$field['attribute'] => $secret]);
+            $this->{$field['property']} = $secret;
+            $this->savedSecrets[$field['property']] = $secret;
+            $this->dispatch('success', "New {$field['label']} generated and saved.");
         } catch (\Exception $e) {
             handleError($e, $this);
+        }
+    }
 
-            return null;
+    private function syncSavedSecrets(): void
+    {
+        foreach (self::SECRET_FIELDS as $field) {
+            $this->savedSecrets[$field['property']] = data_get($this->resource, $field['attribute']);
         }
     }
 

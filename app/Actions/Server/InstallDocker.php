@@ -92,7 +92,7 @@ class InstallDocker
                 ]);
             } else {
                 $command = $command->merge([
-                    'docker network create --attachable coolify >/dev/null 2>&1 || true',
+                    dockerProxyNetworkEnsureCommand('coolify'),
                 ]);
                 $command = $command->merge([
                     "echo 'Done!'",
@@ -107,23 +107,36 @@ class InstallDocker
     {
         return 'curl -fsSL https://get.docker.com | sh || ('.
             '. /etc/os-release && '.
+            'DOCKER_CODENAME="${UBUNTU_CODENAME:-$VERSION_CODENAME}" && '.
+            // Docker has no repository for Ubuntu derivatives (Pop!_OS, Linux Mint) and none for Raspbian Trixie.
+            'case "$ID:$DOCKER_CODENAME: $ID_LIKE " in raspbian:trixie:*) DOCKER_REPO=debian ;; *" ubuntu "*) DOCKER_REPO=ubuntu ;; *) DOCKER_REPO=$ID ;; esac && '.
             'install -m 0755 -d /etc/apt/keyrings && '.
-            'curl -fsSL https://download.docker.com/linux/${ID}/gpg -o /etc/apt/keyrings/docker.asc && '.
+            'curl -fsSL https://download.docker.com/linux/${DOCKER_REPO}/gpg -o /etc/apt/keyrings/docker.asc && '.
             'chmod a+r /etc/apt/keyrings/docker.asc && '.
-            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
+            'echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${DOCKER_REPO} ${DOCKER_CODENAME} stable" > /etc/apt/sources.list.d/docker.list && '.
             'apt-get update && '.
             'apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin'.
             ')';
     }
 
+    /**
+     * Docker has no repository for Amazon Linux, so it gets Docker from its own repository and the Compose plugin from GitHub.
+     */
     private function getRhelDockerInstallCommand(): string
     {
-        return 'curl -fsSL https://get.docker.com | sh || ('.
+        $pluginDirectory = '/usr/local/lib/docker/cli-plugins';
+
+        return "sh -c '. /etc/os-release; if [ \"\$ID\" = amzn ]; then ".
+            'dnf install -y docker && '.
+            "mkdir -p {$pluginDirectory} && ".
+            "curl -fsSL \"https://github.com/docker/compose/releases/latest/download/docker-compose-linux-\$(uname -m)\" -o {$pluginDirectory}/docker-compose && ".
+            "chmod +x {$pluginDirectory}/docker-compose; ".
+            'else curl -fsSL https://get.docker.com | sh || ('.
             'dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && '.
             'dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && '.
             'systemctl start docker && '.
             'systemctl enable docker'.
-            ')';
+            "); fi'";
     }
 
     private function getSuseDockerInstallCommand(): string

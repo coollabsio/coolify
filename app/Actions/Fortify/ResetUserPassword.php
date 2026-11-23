@@ -21,9 +21,11 @@ class ResetUserPassword implements ResetsUserPasswords
             'password' => ['required', Password::defaults(), 'confirmed'],
         ])->validate();
 
+        // The reset link went to the mailbox, so its owner now holds the password.
         $user->fill([
             'password' => Hash::make($input['password']),
-        ])->save();
+            'force_password_reset' => false,
+        ])->forceFill(['created_by_invitation' => false])->save();
         $user->deleteAllSessions();
     }
 }

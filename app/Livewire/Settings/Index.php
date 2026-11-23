@@ -201,51 +201,27 @@ class Index extends Component
         }
     }
 
-    public function buildHelperImage()
+    /**
+     * Look up the public IPs of this host again and save them.
+     */
+    public function detectPublicIps()
     {
         try {
             $this->authorize('update', $this->settings);
-            if (! isDev()) {
-                $this->dispatch('error', 'Building helper image is only available in development mode.');
+
+            $detected = detect_public_ips();
+            if ($detected === []) {
+                $this->dispatch('error', 'Could not detect a public IP address.');
 
                 return;
             }
 
-            if (! $this->server) {
-                $this->dispatch('error', 'Server not available.');
-
-                return;
-            }
-
-            $this->validateOnly('dev_helper_version');
-
-            $version = $this->dev_helper_version ?: config('constants.coolify.helper_version');
-            if (empty($version)) {
-                $this->dispatch('error', 'Please specify a version to build.');
-
-                return;
-            }
-
-            if (! preg_match('/^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$/', (string) $version)) {
-                $this->dispatch('error', 'Invalid helper version format.');
-
-                return;
-            }
-
-            $imageRef = escapeshellarg(coolifyHelperImage().":{$version}");
-            $buildCommand = "docker build -t {$imageRef} -f docker/coolify-helper/Dockerfile .";
-
-            $activity = remote_process(
-                command: [$buildCommand],
-                server: $this->server,
-                type: 'build-helper-image'
-            );
-
-            $this->buildActivityId = $activity->id;
-            $this->dispatch('activityMonitor', $activity->id);
-
-            $this->dispatch('success', "Building coolify-helper:{$version}...");
-        } catch (\Exception $e) {
+            $this->settings->fill($detected);
+            $this->saveAndAudit();
+            $this->public_ipv4 = $this->settings->public_ipv4;
+            $this->public_ipv6 = $this->settings->public_ipv6;
+            $this->dispatch('success', 'Detected '.implode(' and ', $detected).'.');
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }

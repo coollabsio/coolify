@@ -7,7 +7,7 @@
 
 services:
   cyberchef:
-    image: ghcr.io/gchq/cyberchef:latest
+    image: ghcr.io/gchq/cyberchef:11.5.0
     platform: linux/amd64
     environment:
       - SERVICE_URL_CYBERCHEF_8080

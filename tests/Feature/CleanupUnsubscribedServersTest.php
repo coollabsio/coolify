@@ -11,7 +11,7 @@ uses(RefreshDatabase::class);
 
 it('sets unreachable fields on servers when subscription ends', function () {
     $team = Team::factory()->create();
-    Subscription::create([
+    $subscription = Subscription::create([
         'team_id' => $team->id,
         'stripe_invoice_paid' => true,
     ]);
@@ -20,7 +20,7 @@ it('sets unreachable fields on servers when subscription ends', function () {
         'unreachable_count' => 0,
     ]);
 
-    $team->subscriptionEnded();
+    $team->subscriptionEnded($subscription);
 
     $server->refresh();
     expect($server->unreachable_count)->toBe(3);

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Application\StopApplicationOneServer;
 use App\Actions\Proxy\StartProxy;
 use App\Actions\Server\InstallDocker;
 use App\Actions\Server\InstallPrerequisites;
@@ -11,32 +12,41 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyTypes;
 use App\Enums\ServerRole;
 use App\Events\ServerReachabilityChanged;
+use App\Helpers\SshMultiplexingHelper;
 use App\Helpers\SslHelper;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Jobs\CheckTraefikVersionForServerJob;
 use App\Jobs\RegenerateSslCertJob;
 use App\Jobs\ServerConnectionCheckJob;
 use App\Livewire\Server\Proxy;
+use App\Notifications\Server\HostKeyChanged;
 use App\Notifications\Server\Reachable;
 use App\Notifications\Server\Unreachable;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
+use App\Services\HostingerService;
 use App\Services\VultrService;
 use App\Support\ValidationPatterns;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\HasStars;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
@@ -118,7 +128,7 @@ use Symfony\Component\Yaml\Yaml;
 
 class Server extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasFactory, HasMetrics, SchemalessAttributesTrait, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasFactory, HasMetrics, HasStars, SchemalessAttributesTrait, SoftDeletes;
 
     /**
      * Sentinel IP for servers that do not have a real address yet
@@ -128,6 +138,21 @@ class Server extends BaseModel
     public const PLACEHOLDER_IP = '1.2.3.4';
 
     public const PLACEHOLDER_IPS = [self::PLACEHOLDER_IP, '0.0.0.0', '::'];
+
+    protected array $auditExclude = ['canvas_position'];
+
+    /**
+     * Serves the proxy error pages (503.html) for the Traefik and Caddy catch-all.
+     */
+    public const PROXY_ERROR_PAGE_CONTAINER = 'coolify-proxy-error-pages';
+
+    public const PROXY_ERROR_PAGE_IMAGE = 'busybox:musl';
+
+    /**
+     * Maximum size of a custom error or maintenance page. The page goes to the server with scp
+     * (see uploadProxyFile()), so this limit only keeps the Livewire payload reasonable.
+     */
+    public const PROXY_ERROR_PAGE_MAX_BYTES = 1048576;
 
     /**
      * Default Caddy proxy image. caddy-docker-proxy 2.13 ships Caddy 2.11.
@@ -160,10 +185,10 @@ class Server extends BaseModel
         static::saving(function ($server) {
             $payload = [];
             if ($server->user) {
-                $payload['user'] = str($server->user)->trim();
+                $payload['user'] = trim($server->user);
             }
             if ($server->ip) {
-                $payload['ip'] = str($server->ip)->trim();
+                $payload['ip'] = trim($server->ip);
 
                 // Update ip_previous when ip is being changed
                 if ($server->isDirty('ip') && $server->getOriginal('ip')) {
@@ -173,8 +198,14 @@ class Server extends BaseModel
             $server->fill($payload);
         });
         static::saved(function ($server) {
+            if ($server->wasChanged(['ip', 'port'])) {
+                $server->settings?->forgetSshHostKey('address_changed');
+            }
             if ($server->wasChanged('private_key_id') || $server->privateKey?->isDirty()) {
                 refresh_server_connection($server->privateKey);
+            } elseif ($server->wasChanged(['user', 'ip', 'port'])) {
+                // An open multiplexed connection keeps the old user and host until it is closed.
+                SshMultiplexingHelper::removeMuxFile($server);
             }
         });
         static::created(function ($server) {
@@ -238,11 +269,19 @@ class Server extends BaseModel
                 $destination->delete();
             });
             // Leftover active runner rows would block deleting the GitHub App.
-            GithubRunnerExecution::deleteAndDeregister(GithubRunnerExecution::query()->where('server_id', $server->id));
+            // The runners of a transferred server now belong to the other instance, so keep them registered at GitHub.
+            $executions = GithubRunnerExecution::query()->where('server_id', $server->id);
+            if ($server->isTransferredAway()) {
+                $executions->delete();
+            } else {
+                GithubRunnerExecution::deleteAndDeregister($executions);
+            }
             $server->githubRunnerConfig()->delete();
             $server->settings()->delete();
+            SshMultiplexingHelper::deleteStaleKnownHostsFiles($server->uuid, null);
             $server->sslCertificates()->delete();
             $server->notificationThrottles()->delete();
+            ImageScanPolicy::query()->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id)->delete();
         });
 
         static::deleted(function (Server $server) {
@@ -266,7 +305,7 @@ class Server extends BaseModel
                 $updated = ApplicationDeploymentQueue::query()
                     ->whereKey($deployment->id)
                     ->where('status', ApplicationDeploymentStatus::QUEUED->value)
-                    ->update(['status' => ApplicationDeploymentStatus::FAILED->value]);
+                    ->update(['status' => ApplicationDeploymentStatus::FAILED->value, 'finished_at' => now()]);
 
                 if ($updated > 0) {
                     $deployment->addLogEntry('The server was deleted.', 'stderr');
@@ -314,6 +353,7 @@ class Server extends BaseModel
         'delete_unused_networks' => 'boolean',
         'force_disabled' => 'boolean',
         'sentinel_waiting_since' => 'datetime',
+        'canvas_position' => 'array',
     ];
 
     /**
@@ -324,6 +364,7 @@ class Server extends BaseModel
     protected $hidden = [
         'logdrain_axiom_api_key',
         'logdrain_newrelic_license_key',
+        'proxy_error_page',
     ];
 
     protected $schemalessAttributes = [
@@ -345,6 +386,8 @@ class Server extends BaseModel
         'vultr_instance_status',
         'digitalocean_droplet_id',
         'digitalocean_droplet_status',
+        'hostinger_virtual_machine_id',
+        'hostinger_virtual_machine_status',
         'is_validating',
         'validation_logs',
         'detected_traefik_version',
@@ -358,7 +401,7 @@ class Server extends BaseModel
     public function setValidationLogsAttribute($value): void
     {
         $this->attributes['validation_logs'] = $value !== null
-            ? Purify::config('validation_logs')->clean($value)
+            ? Purify::config('validation_logs')->clean(remove_iip($value))
             : null;
     }
 
@@ -384,6 +427,10 @@ class Server extends BaseModel
      */
     public function backfillPlaceholderIp(?string $ip): bool
     {
+        if ($this->isTransferredAway()) {
+            return false;
+        }
+
         $ip = blank($ip) ? null : self::normalizeIp($ip);
         if (self::isPlaceholderIp($ip)) {
             return false;
@@ -405,6 +452,8 @@ class Server extends BaseModel
         $this->forceFill(['ip' => $ip]);
         $this->syncOriginalAttribute('ip');
         static::flushIdentityMap();
+        // The query update skips the saved hook, which forgets the host key of the old address.
+        $this->settings?->forgetSshHostKey('address_changed');
 
         return true;
     }
@@ -426,8 +475,27 @@ class Server extends BaseModel
         static::flushIdentityMap();
     }
 
+    /**
+     * Refresh the status of the linked cloud server from its provider.
+     */
+    public function refreshCloudProviderState(): ?string
+    {
+        return match ($this->cloudProviderToken?->provider) {
+            'hetzner' => $this->hetzner_server_id ? $this->refreshHetznerState() : null,
+            'vultr' => $this->vultr_instance_id ? $this->refreshVultrState() : null,
+            'digitalocean' => $this->digitalocean_droplet_id ? $this->refreshDigitalOceanState() : null,
+            'hostinger' => $this->hostinger_virtual_machine_id ? $this->refreshHostingerState() : null,
+            default => null,
+        };
+    }
+
     public function refreshHetznerState(): ?string
     {
+        // Another instance manages the cloud server of an archive; keep the stored status.
+        if ($this->isTransferredAway()) {
+            return $this->hetzner_server_status;
+        }
+
         if (! $this->hetzner_server_id || ! $this->cloudProviderToken || $this->cloudProviderToken->provider !== 'hetzner') {
             return $this->hetzner_server_status;
         }
@@ -449,6 +517,11 @@ class Server extends BaseModel
 
     public function refreshVultrState(): ?string
     {
+        // Another instance manages the cloud server of an archive; keep the stored status.
+        if ($this->isTransferredAway()) {
+            return $this->vultr_instance_status;
+        }
+
         if (! $this->vultr_instance_id || ! $this->cloudProviderToken) {
             return null;
         }
@@ -485,6 +558,11 @@ class Server extends BaseModel
 
     public function refreshDigitalOceanState(): ?string
     {
+        // Another instance manages the cloud server of an archive; keep the stored status.
+        if ($this->isTransferredAway()) {
+            return $this->digitalocean_droplet_status;
+        }
+
         if (! $this->digitalocean_droplet_id || ! $this->cloudProviderToken || $this->cloudProviderToken->provider !== 'digitalocean') {
             return $this->digitalocean_droplet_status;
         }
@@ -519,6 +597,32 @@ class Server extends BaseModel
         $ip = $digitalOceanService->getPublicIpAddress($droplet);
 
         $this->persistProviderState(['digitalocean_droplet_status' => $status]);
+        $this->backfillPlaceholderIp($ip);
+
+        return $status;
+    }
+
+    public function refreshHostingerState(): ?string
+    {
+        // Another instance manages the cloud server of an archive; keep the stored status.
+        if ($this->isTransferredAway()) {
+            return $this->hostinger_virtual_machine_status;
+        }
+
+        if (! $this->hostinger_virtual_machine_id || ! $this->cloudProviderToken || $this->cloudProviderToken->provider !== 'hostinger') {
+            return $this->hostinger_virtual_machine_status;
+        }
+
+        $hostingerService = new HostingerService($this->cloudProviderToken->token);
+        $virtualMachine = $hostingerService->getVirtualMachine((int) $this->hostinger_virtual_machine_id);
+
+        if (empty($virtualMachine)) {
+            return $this->hostinger_virtual_machine_status;
+        }
+
+        $status = $virtualMachine['state'] ?? null;
+        $ip = $hostingerService->getPublicIpAddress($virtualMachine);
+        $this->persistProviderState(['hostinger_virtual_machine_status' => $status]);
         $this->backfillPlaceholderIp($ip);
 
         return $status;
@@ -612,6 +716,21 @@ class Server extends BaseModel
         return $this->hasOne(ServerSetting::class);
     }
 
+    public function imageScans(): HasMany
+    {
+        return $this->hasMany(ImageScan::class);
+    }
+
+    public function imageSboms(): HasMany
+    {
+        return $this->hasMany(ImageSbom::class);
+    }
+
+    public function hostScan(): HasOne
+    {
+        return $this->hasOne(ServerHostScan::class);
+    }
+
     public function dockerCleanupExecutions()
     {
         return $this->hasMany(DockerCleanupExecution::class);
@@ -622,6 +741,10 @@ class Server extends BaseModel
         return $this->proxyType() && $this->proxyType() !== 'NONE' && $this->isFunctional() && ! $this->isSwarmWorker() && $this->canHostResources();
     }
 
+    /**
+     * Writes the catch-all proxy configuration for requests that no resource handles.
+     * Priority: redirect URL > custom error page > Coolify default error page.
+     */
     public function setupDefaultRedirect()
     {
         $banner =
@@ -630,7 +753,6 @@ class Server extends BaseModel
         $dynamic_conf_path = $this->proxyPath().'/dynamic';
         $proxy_type = $this->proxyType();
         $redirect_enabled = $this->proxy->redirect_enabled ?? true;
-        $redirect_url = $this->proxy->redirect_url;
         if ($proxy_type === ProxyTypes::TRAEFIK->value) {
             $default_redirect_file = "$dynamic_conf_path/default_redirect_503.yaml";
         } elseif ($proxy_type === ProxyTypes::CADDY->value) {
@@ -642,65 +764,13 @@ class Server extends BaseModel
             "rm -f $dynamic_conf_path/default_redirect_404.yaml",
             "rm -f $dynamic_conf_path/default_redirect_404.caddy",
         ], $this);
+        // The error page container must run before the catch-all points to it.
+        $this->setupProxyErrorPageContainer();
 
         if ($redirect_enabled === false) {
             instant_remote_process(["rm -f $default_redirect_file"], $this);
         } else {
-            if ($proxy_type === ProxyTypes::CADDY->value) {
-                if (filled($redirect_url)) {
-                    $conf = ":80, :443 {
-   redir $redirect_url
-}";
-                } else {
-                    $conf = ':80, :443 {
-    respond 503
-}';
-                }
-            } elseif ($proxy_type === ProxyTypes::TRAEFIK->value) {
-                $dynamic_conf = [
-                    'http' => [
-                        'routers' => [
-                            'catchall' => [
-                                'entryPoints' => [
-                                    0 => 'http',
-                                    1 => 'https',
-                                ],
-                                'service' => 'noop',
-                                'rule' => 'PathPrefix(`/`)',
-                                'tls' => $this->traefikCertificateResolver() ? ['certResolver' => $this->traefikCertificateResolver()] : [],
-                                'priority' => -1000,
-                            ],
-                        ],
-                        'services' => [
-                            'noop' => [
-                                'loadBalancer' => [
-                                    'servers' => [],
-                                ],
-                            ],
-                        ],
-                    ],
-                ];
-                if (filled($redirect_url)) {
-                    $dynamic_conf['http']['routers']['catchall']['middlewares'] = [
-                        0 => 'redirect-regexp',
-                    ];
-
-                    $dynamic_conf['http']['services']['noop']['loadBalancer']['servers'][0] = [
-                        'url' => '',
-                    ];
-                    $dynamic_conf['http']['middlewares'] = [
-                        'redirect-regexp' => [
-                            'redirectRegex' => [
-                                'regex' => '(.*)',
-                                'replacement' => $redirect_url,
-                                'permanent' => false,
-                            ],
-                        ],
-                    ];
-                }
-                $conf = Yaml::dump($dynamic_conf, 12, 2);
-            }
-            $conf = $banner.$conf;
+            $conf = $banner.$this->defaultRedirectConfiguration();
             $base64 = base64_encode($conf);
             instant_remote_process([
                 "echo '$base64' | base64 -d | tee $default_redirect_file > /dev/null",
@@ -710,6 +780,338 @@ class Server extends BaseModel
         if ($proxy_type === 'CADDY') {
             $this->reloadCaddy();
         }
+    }
+
+    /**
+     * Catch-all proxy configuration (without the banner) for an enabled default redirect.
+     */
+    public function defaultRedirectConfiguration(): string
+    {
+        $redirect_url = $this->proxy->redirect_url;
+        $usesErrorPage = $this->usesProxyErrorPage();
+
+        if ($this->proxyType() === ProxyTypes::CADDY->value) {
+            if (filled($redirect_url)) {
+                return ":80, :443 {
+   redir $redirect_url
+}";
+            }
+            if ($usesErrorPage) {
+                // busybox httpd answers 200, so copy_response sets the 503 status.
+                return ':80, :443 {
+    reverse_proxy '.self::PROXY_ERROR_PAGE_CONTAINER.':80 {
+        rewrite /503.html
+        handle_response {
+            copy_response 503
+        }
+    }
+}';
+            }
+
+            return ':80, :443 {
+    respond 503
+}';
+        }
+
+        $dynamic_conf = [
+            'http' => [
+                'routers' => [
+                    'catchall' => [
+                        'entryPoints' => [
+                            0 => 'http',
+                            1 => 'https',
+                        ],
+                        'service' => 'noop',
+                        'rule' => 'PathPrefix(`/`)',
+                        'tls' => $this->traefikCertificateResolver() ? ['certResolver' => $this->traefikCertificateResolver()] : [],
+                        'priority' => -1000,
+                    ],
+                ],
+                'services' => [
+                    'noop' => [
+                        'loadBalancer' => [
+                            'servers' => [],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+        if (filled($redirect_url)) {
+            $dynamic_conf['http']['routers']['catchall']['middlewares'] = [
+                0 => 'redirect-regexp',
+            ];
+
+            $dynamic_conf['http']['services']['noop']['loadBalancer']['servers'][0] = [
+                'url' => '',
+            ];
+            $dynamic_conf['http']['middlewares'] = [
+                'redirect-regexp' => [
+                    'redirectRegex' => [
+                        'regex' => '(.*)',
+                        'replacement' => $redirect_url,
+                        'permanent' => false,
+                    ],
+                ],
+            ];
+        } elseif ($usesErrorPage) {
+            // The noop service (no servers) keeps the 503; the errors middleware only replaces the body.
+            $dynamic_conf['http']['routers']['catchall']['middlewares'] = [
+                0 => 'error-pages',
+            ];
+            $dynamic_conf['http']['middlewares'] = [
+                'error-pages' => [
+                    'errors' => [
+                        'status' => ['503'],
+                        'service' => 'error-pages',
+                        'query' => '/503.html',
+                    ],
+                ],
+            ];
+            $dynamic_conf['http']['services']['error-pages'] = [
+                'loadBalancer' => [
+                    'servers' => [
+                        ['url' => 'http://'.self::PROXY_ERROR_PAGE_CONTAINER.':80'],
+                    ],
+                ],
+            ];
+        }
+
+        // A router with `tls` matches only HTTPS, so plain HTTP needs its own catch-all router.
+        if (! $this->isSwarm()) {
+            $catchall = $dynamic_conf['http']['routers']['catchall'];
+            $dynamic_conf['http']['routers']['catchall']['entryPoints'] = ['https'];
+            unset($catchall['tls']);
+            $dynamic_conf['http']['routers']['catchall-http'] = array_merge($catchall, ['entryPoints' => ['http']]);
+        }
+
+        return Yaml::dump($dynamic_conf, 12, 2);
+    }
+
+    /**
+     * True when the catch-all shows the error page: a standalone Traefik or Caddy proxy with
+     * the default redirect enabled and no redirect URL. Swarm servers keep the plain 503.
+     */
+    public function usesProxyErrorPage(): bool
+    {
+        return ! $this->isSwarm()
+            && in_array($this->proxyType(), [ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value], true)
+            && ($this->proxy->redirect_enabled ?? true) !== false
+            && blank($this->proxy->redirect_url);
+    }
+
+    public function proxyErrorPagesPath(): string
+    {
+        return base_configuration_dir().'/proxy/error-pages';
+    }
+
+    /**
+     * The custom error page HTML, or the Coolify default page.
+     */
+    public function proxyErrorPageHtml(): string
+    {
+        return filled($this->proxy_error_page) ? $this->proxy_error_page : view('proxy.error-page')->render();
+    }
+
+    /**
+     * Applications and services on this server that are in maintenance mode.
+     *
+     * @return Collection<int, Application|Service>
+     */
+    public function maintenanceResources(): Collection
+    {
+        if ($this->isSwarm() || ! in_array($this->proxyType(), [ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value], true)) {
+            return collect();
+        }
+
+        return $this->applications()->where('is_maintenance_enabled', true)->values()
+            ->concat($this->services()->where('is_maintenance_enabled', true)->get());
+    }
+
+    /**
+     * Writes 503.html and starts the error page container, or removes the container when
+     * neither the catch-all nor a maintenance page uses it. Swarm servers are not supported.
+     */
+    public function setupProxyErrorPageContainer(): void
+    {
+        if ($this->isSwarm()) {
+            return;
+        }
+
+        $container = self::PROXY_ERROR_PAGE_CONTAINER;
+        if (! $this->usesProxyErrorPage() && $this->maintenanceResources()->isEmpty()) {
+            instant_remote_process(["docker rm -f $container >/dev/null 2>&1 || true"], $this);
+
+            return;
+        }
+
+        $path = $this->proxyErrorPagesPath();
+        $mount = devHostDockerPath($this, $path);
+        $restart = RESTART_MODE;
+
+        instant_remote_process(["mkdir -p $path"], $this);
+        $this->uploadProxyFile("$path/503.html", $this->proxyErrorPageHtml());
+        instant_remote_process([
+            dockerProxyNetworkEnsureCommand('coolify'),
+            "docker start $container >/dev/null 2>&1 || docker run -d --name $container --network coolify --restart $restart --label coolify.managed=true -v $mount:/www:ro ".self::PROXY_ERROR_PAGE_IMAGE.' httpd -f -p 80 -h /www',
+            // A proxy on custom networks only must still reach the error page container.
+            'docker network connect coolify coolify-proxy >/dev/null 2>&1 || true',
+        ], $this);
+    }
+
+    /**
+     * Writes $contents to $path on this server with scp. A shell command is limited to 128 KiB,
+     * so large pages and proxy files cannot go inside one command.
+     */
+    public function uploadProxyFile(string $path, string $contents): void
+    {
+        $uploadPath = '/tmp/coolify-upload-'.bin2hex(random_bytes(8));
+        $localPath = tempnam(sys_get_temp_dir(), 'coolify-proxy-file-');
+        try {
+            file_put_contents($localPath, $contents);
+            instant_scp($localPath, $uploadPath, $this);
+        } finally {
+            @unlink($localPath);
+        }
+
+        // The proxy and the page container read the file as root, other users do not need it.
+        instant_remote_process(["mv -f $uploadPath $path", "chmod 644 $path"], $this);
+    }
+
+    /**
+     * Writes the maintenance pages and the proxy configuration that shows them instead of the
+     * applications and services in maintenance mode. Swarm servers are not supported.
+     */
+    public function setupMaintenancePages(): void
+    {
+        $proxyType = $this->proxyType();
+        if ($this->isSwarm() || ! in_array($proxyType, [ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value], true)) {
+            return;
+        }
+
+        $resources = $this->maintenanceResources();
+        $path = $this->proxyErrorPagesPath();
+        $keep = $resources->map(fn ($resource) => "! -name '{$resource->maintenancePageFile()}' ")->implode('');
+
+        instant_remote_process([
+            "mkdir -p $path",
+            "find $path -maxdepth 1 -name 'maintenance-*.html' {$keep}-delete",
+        ], $this);
+        $this->setupProxyErrorPageContainer();
+
+        foreach ($resources as $resource) {
+            $this->uploadProxyFile("$path/{$resource->maintenancePageFile()}", $resource->maintenancePageHtml());
+        }
+
+        $dynamicPath = $this->proxyPath().'/dynamic';
+        instant_remote_process(["mkdir -p $dynamicPath"], $this);
+        if ($proxyType === ProxyTypes::TRAEFIK->value) {
+            $file = "$dynamicPath/coolify-maintenance.yaml";
+            $configuration = $this->maintenanceTraefikConfiguration($resources);
+            if ($configuration === null) {
+                instant_remote_process(["rm -f $file"], $this);
+            } else {
+                $this->uploadProxyFile($file, $configuration);
+            }
+        } else {
+            // caddy-docker-proxy reads the base Caddyfile again on its next poll.
+            $this->uploadProxyFile("$dynamicPath/Caddyfile", $this->caddyBaseCaddyfile($resources));
+        }
+    }
+
+    /**
+     * Traefik routers that use the same rule as the resource routers (from the domains, or
+     * from custom labels), with a priority one higher. Traefik uses the rule length as the
+     * default priority, so a resource on a longer path of the same host keeps its own router.
+     *
+     * @param  Collection<int, Application|Service>  $resources
+     */
+    public function maintenanceTraefikConfiguration(Collection $resources): ?string
+    {
+        $routers = [];
+        $middlewares = [];
+        foreach ($resources as $resource) {
+            $routes = $resource->maintenanceTraefikRouters();
+            if ($routes->isEmpty()) {
+                continue;
+            }
+            $middleware = "coolify-maintenance-{$resource->uuid}";
+            $middlewares[$middleware] = [
+                'errors' => [
+                    'status' => ['503'],
+                    'service' => 'coolify-maintenance-pages',
+                    'query' => '/'.$resource->maintenancePageFile(),
+                ],
+            ];
+            foreach ($routes as $route) {
+                $routers["coolify-maintenance-{$resource->uuid}-{$route['name']}"] = array_filter([
+                    'entryPoints' => $route['entryPoints'],
+                    'rule' => $route['rule'],
+                    'service' => 'coolify-maintenance-noop',
+                    'middlewares' => ['coolify-maintenance-headers', $middleware],
+                    'priority' => $route['priority'],
+                    'tls' => $route['tls'],
+                ], fn ($value) => $value !== null);
+            }
+        }
+
+        if ($routers === []) {
+            return null;
+        }
+
+        $middlewares['coolify-maintenance-headers'] = [
+            'headers' => ['customResponseHeaders' => ['Retry-After' => '300']],
+        ];
+
+        return "# This file is generated by Coolify, do not edit it manually.\n\n".Yaml::dump([
+            'http' => [
+                'routers' => $routers,
+                'middlewares' => $middlewares,
+                'services' => [
+                    // No servers: Traefik answers 503 and the errors middleware adds the page.
+                    'coolify-maintenance-noop' => ['loadBalancer' => ['servers' => []]],
+                    'coolify-maintenance-pages' => [
+                        'loadBalancer' => ['servers' => [['url' => 'http://'.self::PROXY_ERROR_PAGE_CONTAINER.':80']]],
+                    ],
+                ],
+            ],
+        ], 12, 2);
+    }
+
+    /**
+     * The base Caddyfile of caddy-docker-proxy. A maintenance block uses the same site address
+     * as the resource labels, so caddy-docker-proxy merges both into one site block. Its named
+     * matcher has the same path as the resource handle, so Caddy runs it first.
+     *
+     * @param  Collection<int, Application|Service>|null  $resources
+     */
+    public function caddyBaseCaddyfile(?Collection $resources = null): string
+    {
+        $resources ??= $this->maintenanceResources();
+        $sites = [];
+        foreach ($resources as $resource) {
+            foreach ($resource->maintenanceCaddySites() as $index => $site) {
+                $matcher = "@coolify-maintenance-{$resource->uuid}-{$index}";
+                $sites[$site['address']][] = implode("\n", [
+                    "\t{$matcher} path {$site['path']}",
+                    "\thandle {$matcher} {",
+                    "\t\treverse_proxy ".self::PROXY_ERROR_PAGE_CONTAINER.':80 {',
+                    "\t\t\trewrite /{$resource->maintenancePageFile()}",
+                    "\t\t\theader_down Retry-After 300",
+                    "\t\t\thandle_response {",
+                    "\t\t\t\tcopy_response 503",
+                    "\t\t\t}",
+                    "\t\t}",
+                    "\t}",
+                ]);
+            }
+        }
+
+        $caddyfile = 'import /dynamic/*.caddy';
+        foreach ($sites as $address => $blocks) {
+            $caddyfile .= "\n\n{$address} {\n".implode("\n", $blocks)."\n}";
+        }
+
+        return $caddyfile."\n";
     }
 
     public function setupDynamicProxyConfiguration()
@@ -754,14 +1156,7 @@ class Server extends BaseModel
                                     0 => 'http',
                                 ],
                                 'service' => 'coolify-reverb',
-                                'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
-                            ],
-                            'coolify-reverb-api' => [
-                                'entryPoints' => [
-                                    0 => 'http',
-                                ],
-                                'service' => 'coolify-reverb',
-                                'rule' => "Host(`{$host}`) && PathPrefix(`/apps`)",
+                                'rule' => "Host(`{$host}`) && PathPrefix(`/app/`)",
                             ],
                             'coolify-terminal-ws' => [
                                 'entryPoints' => [
@@ -824,15 +1219,7 @@ class Server extends BaseModel
                             0 => 'https',
                         ],
                         'service' => 'coolify-reverb',
-                        'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
-                        'tls' => $tls,
-                    ];
-                    $traefik_dynamic_conf['http']['routers']['coolify-reverb-api-https'] = [
-                        'entryPoints' => [
-                            0 => 'https',
-                        ],
-                        'service' => 'coolify-reverb',
-                        'rule' => "Host(`{$host}`) && PathPrefix(`/apps`)",
+                        'rule' => "Host(`{$host}`) && PathPrefix(`/app/`)",
                         'tls' => $tls,
                     ];
                     $traefik_dynamic_conf['http']['routers']['coolify-terminal-wss'] = [
@@ -872,16 +1259,17 @@ class Server extends BaseModel
 $siteAddress {
     encode zstd gzip
     handle /app/* {
-        reverse_proxy coolify:6001
-    }
-    handle /apps* {
-        reverse_proxy coolify:6001
+        reverse_proxy coolify:6001 {
+            stream_close_delay ".CADDY_STREAM_CLOSE_DELAY.'
+        }
     }
     handle /terminal/ws {
-        reverse_proxy coolify:6002
+        reverse_proxy coolify:6002 {
+            stream_close_delay '.CADDY_STREAM_CLOSE_DELAY.'
+        }
     }
     reverse_proxy coolify:8080
-}";
+}';
                 $base64 = base64_encode($caddy_file);
                 instant_remote_process([
                     "echo '$base64' | base64 -d | tee $file > /dev/null",
@@ -992,6 +1380,16 @@ $siteAddress {
         return $this->proxy->modelScope();
     }
 
+    /**
+     * Servers that this instance manages. A transferred server is only an archive and does not use a server slot.
+     */
+    public function scopeNotTransferredAway(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $query) => $query
+            ->whereNull('server_metadata->transfer->status')
+            ->orWhere('server_metadata->transfer->status', '!=', 'transferred'));
+    }
+
     public function scopeWhereProxyType(Builder $query, string $proxyType): Builder
     {
         return $query->where('proxy->type', $proxyType);
@@ -1039,6 +1437,15 @@ $siteAddress {
     }
 
     /**
+     * On self-hosted, only the unreachable cleanup disables a server, so a working connection can enable it again.
+     * On Cloud the flag enforces the plan server limit, and a transferred server stays an archive.
+     */
+    public function canBeReEnabled(): bool
+    {
+        return $this->settings->force_disabled === true && ! isCloud() && ! $this->isTransferredAway();
+    }
+
+    /**
      * Server was migrated away from this Coolify instance (source side).
      * Must not be revalidated or re-enabled as a live managed host.
      */
@@ -1048,12 +1455,16 @@ $siteAddress {
     }
 
     /**
-     * Management was disabled manually on this instance; the server is ready to be transferred.
+     * Stops an action that changes the host, its cloud server, its Cloudflare tunnel, or its DNS records.
+     * Another Coolify instance manages a transferred server; this instance keeps only an archive of it.
+     *
+     * @throws \RuntimeException
      */
-    public function isManagementDisabled(): bool
+    public function assertNotTransferredAway(): void
     {
-        return $this->isTransferredAway()
-            && (bool) data_get($this->server_metadata, 'transfer.management_disabled', false);
+        if ($this->isTransferredAway()) {
+            throw new \RuntimeException('This server is managed by another Coolify instance.');
+        }
     }
 
     /**
@@ -1062,6 +1473,64 @@ $siteAddress {
     public function canBeValidated(): bool
     {
         return ! $this->isTransferredAway();
+    }
+
+    /**
+     * On Coolify Cloud, limit how often SSH validations can run against one IP and from one team.
+     * The window and the maximums are server_validation_* instance settings.
+     * Without a limit, users can make Cloud try SSH logins on hosts that they do not own.
+     * A successful connection gives its attempt back, so only failed logins use up the limit.
+     *
+     * @throws ThrottleRequestsException
+     */
+    public static function throttleValidation(int $teamId, string $ip): void
+    {
+        if (! isCloud()) {
+            return;
+        }
+
+        $limits = self::validationRateLimits($teamId, $ip);
+        foreach ($limits as $key => $maxAttempts) {
+            if (RateLimiter::tooManyAttempts($key, $maxAttempts)) {
+                $seconds = RateLimiter::availableIn($key);
+
+                throw new ThrottleRequestsException("Too many server validations. Please try again in {$seconds} seconds.", headers: ['Retry-After' => $seconds]);
+            }
+        }
+        foreach (array_keys($limits) as $key) {
+            RateLimiter::hit($key, self::validationRateLimitSeconds());
+        }
+    }
+
+    private static function validationRateLimitSeconds(): int
+    {
+        return instanceSettings()->server_validation_rate_limit_seconds;
+    }
+
+    /**
+     * @return array<string, int> rate limiter key => max attempts
+     */
+    private static function validationRateLimits(int $teamId, string $ip): array
+    {
+        $settings = instanceSettings();
+
+        return [
+            'server-validation:ip:'.strtolower(self::normalizeIp($ip)) => $settings->server_validation_max_failures_per_ip,
+            'server-validation:team:'.$teamId => $settings->server_validation_max_failures_per_team,
+        ];
+    }
+
+    private function refundValidationAttempt(): void
+    {
+        if (! isCloud()) {
+            return;
+        }
+
+        foreach (array_keys(self::validationRateLimits($this->team_id, $this->ip)) as $key) {
+            if (RateLimiter::attempts($key) > 0) {
+                RateLimiter::decrement($key, self::validationRateLimitSeconds());
+            }
+        }
     }
 
     public function forceEnableServer()
@@ -1284,6 +1753,12 @@ $siteAddress {
         return $this->caddyRunsCurrentVersion();
     }
 
+    public function caddySupportsArgon2idBasicAuth(): bool
+    {
+        return $this->caddyRunsCurrentVersion()
+            && self::caddyDockerProxyImageVersion($this->configuredCaddyProxyImage()) >= [2, 11];
+    }
+
     public function isServerApiEnabled(): bool
     {
         return $this->settings->is_sentinel_enabled;
@@ -1309,6 +1784,47 @@ $siteAddress {
         return $applications->concat($databases)->concat($services->get());
     }
 
+    /**
+     * The resources that deleting this server with "Delete all resources" deletes. An application that has this server
+     * only as an additional destination runs on another server, so it is detached instead.
+     *
+     * @return Collection<int, Model>
+     */
+    public function primaryResources(): Collection
+    {
+        return $this->primaryApplications()
+            ->concat($this->databases())
+            ->concat($this->services()->get());
+    }
+
+    /**
+     * Remove this server from the applications that use it only as an additional destination.
+     * The applications keep running on their other servers.
+     *
+     * @param  bool  $stopContainers  stop and remove the containers of the applications on this server (best effort)
+     */
+    public function detachAdditionalApplications(bool $stopContainers = true): void
+    {
+        $applications = $this->additionalApplications();
+        if ($stopContainers) {
+            foreach ($applications as $application) {
+                try {
+                    StopApplicationOneServer::run($application, $this);
+                } catch (\Throwable $e) {
+                    logger()->warning('Could not stop the containers of an application on a deleted server.', [
+                        'application_id' => $application->id,
+                        'server_id' => $this->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+        DB::table('additional_destinations')
+            ->where('server_id', $this->id)
+            ->whereIn('application_id', $applications->pluck('id'))
+            ->delete();
+    }
+
     public function stopUnmanaged($id)
     {
         return instant_remote_process([dockerStopCommand(0, escapeshellarg($id), $this)], $this);
@@ -1329,9 +1845,9 @@ $siteAddress {
         $containers = collect([]);
         $containerReplicates = collect([]);
         if ($this->isSwarm()) {
-            $containers = instant_remote_process_with_timeout(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this, false);
+            $containers = instant_remote_process_with_timeout([remoteCommandWithTimeout('docker service inspect $('.remoteCommandWithTimeout('docker service ls -q', 10).") --format '{{json .}}'", 15)], $this, false);
             $containers = format_docker_command_output_to_json($containers);
-            $containerReplicates = instant_remote_process_with_timeout(["docker service ls --format '{{json .}}'"], $this, false);
+            $containerReplicates = instant_remote_process_with_timeout([remoteCommandWithTimeout("docker service ls --format '{{json .}}'")], $this, false);
             if ($containerReplicates) {
                 $containerReplicates = format_docker_command_output_to_json($containerReplicates);
                 foreach ($containerReplicates as $containerReplica) {
@@ -1355,7 +1871,7 @@ $siteAddress {
                 }
             }
         } else {
-            $containers = instant_remote_process_with_timeout(["docker container inspect $(docker container ls -aq) --format '{{json .}}'"], $this, false);
+            $containers = instant_remote_process_with_timeout([remoteCommandWithTimeout('docker container inspect $('.remoteCommandWithTimeout('docker container ls -aq', 10).") --format '{{json .}}'", 15)], $this, false);
             $containers = format_docker_command_output_to_json($containers);
             $containerReplicates = collect([]);
         }
@@ -1369,7 +1885,7 @@ $siteAddress {
     public function loadAllContainers(): Collection
     {
         if ($this->isFunctional()) {
-            $containers = instant_remote_process(["docker ps -a --format '{{json .}}'"], $this);
+            $containers = instant_remote_process([remoteCommandWithTimeout("docker ps -a --format '{{json .}}'", 30)], $this, timeout: 45);
             $containers = format_docker_command_output_to_json($containers);
 
             return collect($containers);
@@ -1381,7 +1897,7 @@ $siteAddress {
     public function loadUnmanagedContainers(): Collection
     {
         if ($this->isFunctional()) {
-            $containers = instant_remote_process(["docker ps -a --format '{{json .}}'"], $this);
+            $containers = instant_remote_process([remoteCommandWithTimeout("docker ps -a --format '{{json .}}'", 30)], $this, timeout: 45);
             $containers = format_docker_command_output_to_json($containers);
             $containers = $containers->map(function ($container) {
                 $labels = data_get($container, 'Labels');
@@ -1397,18 +1913,6 @@ $siteAddress {
         } else {
             return collect([]);
         }
-    }
-
-    public function hasDefinedResources()
-    {
-        $applications = $this->applications()->count() > 0;
-        $databases = $this->databases()->count() > 0;
-        $services = $this->services()->count() > 0;
-        if ($applications || $databases || $services) {
-            return true;
-        }
-
-        return false;
     }
 
     public function databases()
@@ -1447,25 +1951,16 @@ $siteAddress {
             ->concat($dragonflies)
             ->concat($clickhouses)
             ->concat($sqlites)
-            ->filter(fn ($item) => data_get($item, 'name') !== 'coolify-db');
+            ->reject(fn ($item) => $item instanceof StandalonePostgresql && $item->isInstanceDatabase());
     }
 
+    /**
+     * The applications whose primary destination is on this server, plus the applications that use this server as an
+     * additional destination.
+     */
     public function applications()
     {
-        // Get destination IDs for this server in two efficient queries
-        $standaloneDockerIds = StandaloneDocker::where('server_id', $this->id)->pluck('id');
-        $swarmDockerIds = SwarmDocker::where('server_id', $this->id)->pluck('id');
-
-        // Query all applications in a single query using polymorphic conditions
-        $applications = Application::where(function ($query) use ($standaloneDockerIds, $swarmDockerIds) {
-            $query->where(function ($q) use ($standaloneDockerIds) {
-                $q->where('destination_type', StandaloneDocker::class)
-                    ->whereIn('destination_id', $standaloneDockerIds);
-            })->orWhere(function ($q) use ($swarmDockerIds) {
-                $q->where('destination_type', SwarmDocker::class)
-                    ->whereIn('destination_id', $swarmDockerIds);
-            });
-        })->get();
+        $applications = $this->primaryApplications();
 
         // Get additional server applications
         $additionalApplicationIds = DB::table('additional_destinations')
@@ -1478,6 +1973,45 @@ $siteAddress {
         }
 
         return $applications;
+    }
+
+    /**
+     * The applications whose primary destination is on this server.
+     *
+     * @return Collection<int, Application>
+     */
+    public function primaryApplications(): Collection
+    {
+        // Get destination IDs for this server in two efficient queries
+        $standaloneDockerIds = StandaloneDocker::where('server_id', $this->id)->pluck('id');
+        $swarmDockerIds = SwarmDocker::where('server_id', $this->id)->pluck('id');
+
+        // Query all applications in a single query using polymorphic conditions
+        return Application::where(function ($query) use ($standaloneDockerIds, $swarmDockerIds) {
+            $query->where(function ($q) use ($standaloneDockerIds) {
+                $q->where('destination_type', StandaloneDocker::class)
+                    ->whereIn('destination_id', $standaloneDockerIds);
+            })->orWhere(function ($q) use ($swarmDockerIds) {
+                $q->where('destination_type', SwarmDocker::class)
+                    ->whereIn('destination_id', $swarmDockerIds);
+            });
+        })->get();
+    }
+
+    /**
+     * The applications that use this server only as an additional destination. Their primary destination is on
+     * another server.
+     *
+     * @return Collection<int, Application>
+     */
+    public function additionalApplications(): Collection
+    {
+        $applicationIds = DB::table('additional_destinations')
+            ->where('server_id', $this->id)
+            ->whereNotIn('application_id', $this->primaryApplications()->pluck('id'))
+            ->pluck('application_id');
+
+        return Application::query()->with('destination.server')->whereIn('id', $applicationIds)->get();
     }
 
     public function dockerComposeBasedApplications()
@@ -1546,6 +2080,19 @@ $siteAddress {
     public static function normalizeIp(?string $value): string
     {
         return normalizeIpAddress(preg_replace('/[^0-9a-zA-Z.:%-]/', '', (string) $value));
+    }
+
+    /**
+     * Whether a server of any team already uses this SSH endpoint. The port is part of the endpoint,
+     * so servers behind one NAT address with different forwarded SSH ports are different servers.
+     */
+    public static function sshEndpointInUse(?string $ip, int|string|null $port, ?int $exceptServerId = null): bool
+    {
+        return self::query()
+            ->where('ip', self::normalizeIp($ip))
+            ->where('port', (int) ($port ?? 22))
+            ->when($exceptServerId !== null, fn ($query) => $query->whereKeyNot($exceptServerId))
+            ->exists();
     }
 
     public function getIp(): Attribute
@@ -1678,6 +2225,30 @@ $siteAddress {
         return true;
     }
 
+    /**
+     * Marks a proxy start or restart as running, so status checks do not start a second proxy meanwhile.
+     * ProxyStatusChangedNotification clears the mark when the start or restart finishes.
+     */
+    public function markProxyTransitionStarted(): void
+    {
+        Cache::put($this->proxyTransitionCacheKey(), true, now()->addMinutes(5));
+    }
+
+    public function markProxyTransitionFinished(): void
+    {
+        Cache::forget($this->proxyTransitionCacheKey());
+    }
+
+    public function isProxyTransitionInProgress(): bool
+    {
+        return Cache::has($this->proxyTransitionCacheKey());
+    }
+
+    private function proxyTransitionCacheKey(): string
+    {
+        return "proxy-transition:{$this->uuid}";
+    }
+
     public function skipServer()
     {
         if ($this->hasPlaceholderIp()) {
@@ -1714,7 +2285,7 @@ $siteAddress {
             return false;
         }
 
-        (new ServerConnectionCheckJob($this, disableMux: false))->handle();
+        (new ServerConnectionCheckJob($this))->handle();
         $this->settings->refresh();
 
         return $this->isFunctional();
@@ -1722,31 +2293,55 @@ $siteAddress {
 
     public function isLogDrainEnabled()
     {
-        return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_highlight_enabled || $this->settings->is_logdrain_axiom_enabled || $this->settings->is_logdrain_custom_enabled;
+        return $this->isFluentBitLogDrainEnabled() || $this->settings->is_logdrain_cloudwatch_enabled;
     }
+
+    /**
+     * Whether the active log drain relies on the coolify-log-drain Fluent Bit container.
+     */
+    public function isFluentBitLogDrainEnabled(): bool
+    {
+        return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_axiom_enabled || $this->settings->is_logdrain_custom_enabled;
+    }
+
+    public const UNSUPPORTED_OS_MESSAGE = 'Server OS type is not supported. See the <a target="_blank" class="underline" href="https://coolify.io/docs/start-with-self-hosted#2-supported-operating-systems">supported operating systems</a>. Amazon Linux 2 reached its end of life: use Amazon Linux 2023.';
 
     public function validateOS(): bool|Stringable
     {
         $os_release = instant_remote_process(['cat /etc/os-release'], $this);
-        $releaseLines = collect(explode("\n", $os_release));
-        $collectedData = collect([]);
-        foreach ($releaseLines as $line) {
-            $item = str($line)->trim();
-            $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
-        }
-        $ID = data_get($collectedData, 'ID');
-        // $ID_LIKE = data_get($collectedData, 'ID_LIKE');
-        // $VERSION_ID = data_get($collectedData, 'VERSION_ID');
-        $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID) {
-            if (str($supportedOs)->contains($ID)) {
-                return str($ID);
-            }
-        });
-        if ($supported->count() === 1) {
-            return str($supported->first());
-        } else {
+
+        return self::supportedOsFromOsRelease($os_release);
+    }
+
+    /**
+     * Match /etc/os-release against SUPPORTED_OS: ID first, then each ID_LIKE token (e.g. Manjaro: ID=manjaro, ID_LIKE=arch).
+     * Amazon Linux 2 is rejected: it reached its end of life on 2026-06-30 and has yum instead of dnf.
+     */
+    public static function supportedOsFromOsRelease(?string $osRelease): bool|Stringable
+    {
+        $collectedData = collect(explode("\n", (string) $osRelease))
+            ->mapWithKeys(function ($line) {
+                $item = str($line)->trim();
+
+                return [$item->before('=')->value() => $item->after('=')->lower()->replace(['"', "'"], '')->value()];
+            });
+
+        if (data_get($collectedData, 'ID') === 'amzn' && data_get($collectedData, 'VERSION_ID') === '2') {
             return false;
         }
+
+        $candidates = collect([data_get($collectedData, 'ID')])
+            ->merge(explode(' ', (string) data_get($collectedData, 'ID_LIKE')))
+            ->filter();
+
+        foreach ($candidates as $candidate) {
+            $supported = collect(SUPPORTED_OS)->filter(fn ($supportedOs) => str($supportedOs)->contains($candidate));
+            if ($supported->count() === 1) {
+                return str($supported->first());
+            }
+        }
+
+        return false;
     }
 
     public function gatherServerMetadata(): ?array
@@ -1757,7 +2352,7 @@ $siteAddress {
 
         try {
             $output = instant_remote_process([
-                'echo "---PRETTY_NAME---" && grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\' && echo "---ARCH---" && uname -m && echo "---KERNEL---" && uname -r && echo "---CPUS---" && nproc && echo "---MEMORY---" && free -b | awk \'/Mem:/{print $2}\' && echo "---UPTIME_SINCE---" && uptime -s && echo "---DOCKER---" && (docker version --format \'{{.Server.Version}}\' 2>/dev/null || true) && echo "---COMPOSE---" && (docker compose version --short 2>/dev/null || true)',
+                'echo "---PRETTY_NAME---" && grep PRETTY_NAME /etc/os-release | cut -d= -f2 | tr -d \'"\' && echo "---ARCH---" && uname -m && echo "---KERNEL---" && uname -r && echo "---CPUS---" && nproc && echo "---MEMORY---" && free -b | awk \'/Mem:/{print $2}\' && echo "---UPTIME_SINCE---" && uptime -s && echo "---DOCKER---" && (docker version --format \'{{.Server.Version}}\' 2>/dev/null || true) && echo "---COMPOSE---" && (docker compose version --short 2>/dev/null || true) && echo "---GPUS---" && (nvidia-smi --query-gpu=index,uuid,memory.total,name --format=csv,noheader,nounits 2>/dev/null || true) && echo "---NVIDIA_TOOLKIT---" && (command -v nvidia-container-runtime-hook nvidia-ctk 2>/dev/null || true)',
             ], $this, false);
 
             if (! $output) {
@@ -1765,6 +2360,7 @@ $siteAddress {
             }
 
             $sections = [];
+            $sectionLines = [];
             $currentKey = null;
             foreach (explode("\n", trim($output)) as $line) {
                 $line = trim($line);
@@ -1772,6 +2368,9 @@ $siteAddress {
                     $currentKey = $m[1];
                 } elseif ($currentKey) {
                     $sections[$currentKey] = $line;
+                    if ($line !== '') {
+                        $sectionLines[$currentKey][] = $line;
+                    }
                 }
             }
 
@@ -1782,10 +2381,18 @@ $siteAddress {
                 'cpus' => (int) ($sections['CPUS'] ?? 0),
                 'memory_bytes' => (int) ($sections['MEMORY'] ?? 0),
                 'uptime_since' => $sections['UPTIME_SINCE'] ?? null,
+                'gpus' => self::parseNvidiaSmiGpus($sectionLines['GPUS'] ?? []),
+                'nvidia_container_toolkit' => ($sectionLines['NVIDIA_TOOLKIT'] ?? []) !== [],
                 'collected_at' => now()->toIso8601String(),
             ];
 
-            $this->update(['server_metadata' => $metadata]);
+            // Merge into the saved row: server_metadata also holds the transfer and migration state.
+            DB::transaction(function () use ($metadata) {
+                $locked = self::query()->lockForUpdate()->findOrFail($this->id);
+                $locked->update(['server_metadata' => array_merge($locked->server_metadata ?? [], $metadata)]);
+                $this->server_metadata = $locked->server_metadata;
+                $this->syncOriginalAttribute('server_metadata');
+            });
 
             try {
                 $detectedDockerVersion = parseDockerEngineVersion($sections['DOCKER'] ?? null);
@@ -1813,6 +2420,38 @@ $siteAddress {
 
             return null;
         }
+    }
+
+    /**
+     * Parse `nvidia-smi --query-gpu=index,uuid,memory.total,name --format=csv,noheader,nounits` lines.
+     * The name is the last column because it can contain commas.
+     *
+     * @param  list<string>  $lines
+     * @return list<array{index: string, uuid: string, memory_mb: int, name: string}>
+     */
+    public static function parseNvidiaSmiGpus(array $lines): array
+    {
+        $gpus = [];
+        foreach ($lines as $line) {
+            $columns = array_map('trim', explode(',', $line, 4));
+            if (count($columns) !== 4 || ! ctype_digit($columns[0])) {
+                continue;
+            }
+            [$index, $uuid, $memory, $name] = $columns;
+            $gpus[] = ['index' => $index, 'uuid' => $uuid, 'memory_mb' => (int) $memory, 'name' => $name];
+        }
+
+        return $gpus;
+    }
+
+    /**
+     * GPUs found when the server details were last collected, or null when they were never checked.
+     *
+     * @return list<array{index: string, uuid: string, memory_mb: int, name: string}>|null
+     */
+    public function detectedGpus(): ?array
+    {
+        return data_get($this->server_metadata, 'gpus');
     }
 
     public function isTerminalEnabled()
@@ -1914,16 +2553,32 @@ $siteAddress {
 
     public function sendUnreachableNotification()
     {
+        if ($this->team->getEnabledChannels('server_unreachable') === []) {
+            return;
+        }
+
         NotificationThrottle::sendOnce($this, Unreachable::class, null, fn () => $this->team->notify(new Unreachable($this)));
     }
 
     public function validateConnection(bool $justCheckingNewKey = false)
     {
+        // A validation enables a disabled self-hosted server again, but only when the connection works.
+        $isReEnabling = $this->canBeReEnabled() && ! $this->hasPlaceholderIp();
+        if ($isReEnabling) {
+            $this->forceEnableServer();
+        }
         if ($this->skipServer()) {
             return ['uptime' => false, 'error' => 'Server skipped.'];
         }
         try {
-            instant_remote_process(['ls /'], $this, disableMultiplexing: true);
+            // Enforce mode cannot connect without the key, so it reads the key first. Warn mode learns it after the connection.
+            if (SshMultiplexingHelper::hostKeyCheckingMode($this) === 'enforce') {
+                SshMultiplexingHelper::learnHostKey($this, evenIfUnreachable: true);
+            }
+            // One attempt only: retries would repeat failed logins on a host that may not belong to the user.
+            instant_remote_process(['ls /'], $this, disableMultiplexing: true, maxAttempts: 1);
+            SshMultiplexingHelper::learnHostKey($this, evenIfUnreachable: true);
+            $this->refundValidationAttempt();
             if ($this->settings->is_reachable === false) {
                 $this->settings->is_reachable = true;
                 $this->settings->save();
@@ -1932,17 +2587,73 @@ $siteAddress {
 
             return ['uptime' => true, 'error' => null];
         } catch (\Throwable $e) {
-            if ($justCheckingNewKey) {
-                return ['uptime' => false, 'error' => 'This key is not valid for this server.'];
+            if ($isReEnabling) {
+                $this->forceDisableServer();
             }
-            if ($this->settings->is_reachable === true) {
+            $error = $e->getMessage();
+            if ($error === SshMultiplexingHelper::HOST_KEY_CHANGED_MESSAGE && ! $this->recordHostKeyMismatch()) {
+                $error = 'SSH host key verification failed, but the server still sends the trusted host key.';
+            }
+            if (! $justCheckingNewKey && $this->settings->is_reachable === true) {
                 $this->settings->is_reachable = false;
                 $this->settings->save();
                 ServerReachabilityChanged::dispatch($this);
             }
 
-            return ['uptime' => false, 'error' => $e->getMessage()];
+            return ['uptime' => false, 'error' => $error];
         }
+    }
+
+    /**
+     * ssh reported a host key problem. Returns true when the server sends a host key that is not pinned, and
+     * saves that key as pending, so that an admin can compare and trust it. Returns false when the server
+     * still sends the pinned key or the key cannot be read: then it is a normal connection error.
+     * A key is reported once a day, and the team gets at most one notification an hour, because a load
+     * balancer in front of several hosts can switch between keys on every connection. While a key is
+     * pending, the server is scanned at most every ten minutes.
+     *
+     * @param  string|null  $sshErrorOutput  The stderr of ssh. When it shows the fingerprint of the pending key, no scan is needed.
+     */
+    public function recordHostKeyMismatch(?string $sshErrorOutput = null): bool
+    {
+        $settings = $this->settings;
+        if (filled($settings->ssh_host_key_pending) && preg_match_all('/SHA256:[A-Za-z0-9+\/]+/', (string) $sshErrorOutput, $matches) > 0) {
+            $pendingFingerprints = array_map(fn (string $fingerprint) => strtok($fingerprint, ' '), ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key_pending));
+            if (array_diff($matches[0], $pendingFingerprints) === []) {
+                return true;
+            }
+        }
+        // Each scan is a failed login on the server (fail2ban), so a pending key is scanned again at most every ten minutes.
+        $scannedCacheKey = 'ssh_host_key_mismatch_scanned_'.$this->uuid.'_'.hash('sha256', (string) $settings->ssh_host_key);
+        if (filled($settings->ssh_host_key_pending) && Cache::has($scannedCacheKey)) {
+            return true;
+        }
+
+        $newKey = SshMultiplexingHelper::scanHostKey($this);
+        Cache::put($scannedCacheKey, true, now()->addMinutes(10));
+        if ($newKey === null || array_diff(explode("\n", $newKey), explode("\n", (string) $settings->ssh_host_key)) === []) {
+            return false;
+        }
+        if ($newKey === $settings->ssh_host_key_pending) {
+            return true;
+        }
+
+        $settings->forceFill(['ssh_host_key_pending' => $newKey])->save();
+        if (! Cache::add('ssh_host_key_reported_'.$this->uuid.'_'.hash('sha256', $newKey), true, now()->addDay())) {
+            return true;
+        }
+        Log::warning('SSH host key of server changed', ['server_uuid' => $this->uuid, 'mode' => SshMultiplexingHelper::hostKeyCheckingMode($this)]);
+        auditLog('server.ssh_host_key_changed', [
+            'team_id' => $this->team_id,
+            'server_uuid' => $this->uuid,
+            'server_name' => $this->name,
+            'fingerprints' => ServerSetting::sshHostKeyFingerprints($newKey),
+        ], 'warning');
+        if (Cache::add('ssh_host_key_changed_notified_'.$this->uuid, true, now()->addHour())) {
+            $this->team?->notify(new HostKeyChanged($this));
+        }
+
+        return true;
     }
 
     public function installDocker()
@@ -2058,13 +2769,11 @@ $siteAddress {
     public function validateDockerEngineVersion()
     {
         $dockerVersionRaw = instant_remote_process(['docker version --format json'], $this, false);
-        $dockerVersionJson = json_decode($dockerVersionRaw, true);
-        $dockerVersion = data_get($dockerVersionJson, 'Server.Version', '0.0.0');
-        $this->rememberDockerVersion(is_string($dockerVersion) ? $dockerVersion : null);
+        $dockerVersion = dockerEngineVersionFromJson($dockerVersionRaw);
+        $this->rememberDockerVersion($dockerVersion);
         $composeVersionRaw = instant_remote_process(['docker compose version --short'], $this, false);
         $this->rememberComposeVersion(is_string($composeVersionRaw) ? $composeVersionRaw : null);
-        $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
-        if (is_null($dockerVersion)) {
+        if (is_null(checkMinimumDockerEngineVersion($dockerVersion))) {
             $this->settings->is_usable = false;
             $this->settings->save();
 
@@ -2078,6 +2787,25 @@ $siteAddress {
         return true;
     }
 
+    /**
+     * Explains why validateDockerEngineVersion() failed: the version could not be read, or it is too old.
+     */
+    public function dockerEngineVersionError(): string
+    {
+        $requiredVersion = str(config('constants.docker.minimum_required_version'))->before('.');
+        $documentation = '<a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>';
+        $dockerVersion = $this->dockerVersion();
+
+        if (is_null($dockerVersion)) {
+            $command = $this->isNonRoot() ? 'sudo docker version --format json' : 'docker version --format json';
+            $user = e($this->user);
+
+            return "Coolify could not read the Docker Engine version. Run \"{$command}\" on the server as the {$user} user. It must exit without an error and print only JSON. Text from shell startup files (for example ~/.bashrc) breaks the output.";
+        }
+
+        return "Docker Engine {$dockerVersion} is installed, but Coolify needs version {$requiredVersion} or newer. Please upgrade Docker: {$documentation}.";
+    }
+
     public function validateCoolifyNetwork($isSwarm = false, $isBuildServer = false)
     {
         if ($isBuildServer) {
@@ -2086,7 +2814,7 @@ $siteAddress {
         if ($isSwarm) {
             return instant_remote_process(['docker network create --attachable --driver overlay coolify-overlay >/dev/null 2>&1 || true'], $this, false);
         } else {
-            return instant_remote_process(['docker network create coolify --attachable >/dev/null 2>&1 || true'], $this, false);
+            return instant_remote_process([dockerProxyNetworkEnsureCommand('coolify')], $this, false);
         }
     }
 

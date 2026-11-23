@@ -23,9 +23,13 @@ class ResourceCard extends Component
 
     public function getListeners(): array
     {
-        return $this->teamChannelListeners([
-            'ServiceChecked' => 'refreshResource',
-        ]);
+        return [
+            'serviceResourceStatusesChanged' => 'refreshResource',
+            ...$this->teamChannelListeners([
+                'ServiceStatusChanged' => 'refreshResource',
+                'ServiceChecked' => 'refreshResource',
+            ]),
+        ];
     }
 
     public function refreshResource(): void

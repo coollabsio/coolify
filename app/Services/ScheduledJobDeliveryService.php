@@ -25,9 +25,9 @@ use App\Notifications\Database\BackupFailed;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\Server\DockerCleanupFailed;
 use App\Notifications\VolumeBackup\BackupFailed as VolumeBackupFailed;
-use Closure;
 use Cron\CronExpression;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\Notification;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -381,7 +381,7 @@ class ScheduledJobDeliveryService
                     'finished_at' => now(),
                 ]);
                 ScheduledTaskDone::dispatch($task->team_id);
-                $this->notifyMissedOccurrence($task, fn () => Team::find($task->team_id)?->notify(new TaskFailed($task, $message)));
+                $this->notifyMissedOccurrence($task, Team::find($task->team_id), new TaskFailed($task, $message));
             } elseif ($occurrence->job_type === 'docker-cleanup') {
                 $server = Server::find($occurrence->resource_id);
                 if (! $server) {
@@ -395,7 +395,7 @@ class ScheduledJobDeliveryService
                     'finished_at' => now(),
                 ]);
                 event(new DockerCleanupDone($execution));
-                $this->notifyMissedOccurrence($server, fn () => $server->team?->notify(new DockerCleanupFailed($server, "Docker cleanup job failed with the following error: {$message}")));
+                $this->notifyMissedOccurrence($server, $server->team, new DockerCleanupFailed($server, "Docker cleanup job failed with the following error: {$message}"));
             } elseif ($occurrence->job_type === 'database-backup') {
                 $backup = ScheduledDatabaseBackup::with(['team', 'database'])->find($occurrence->resource_id);
                 if (! $backup?->database) {
@@ -413,7 +413,7 @@ class ScheduledJobDeliveryService
                     'finished_at' => now(),
                 ]);
                 BackupCreated::dispatch($backup->team_id);
-                $this->notifyMissedOccurrence($backup, fn () => $backup->team?->notify(new BackupFailed($backup, $backup->database, $message, $databaseName ?? 'unknown')));
+                $this->notifyMissedOccurrence($backup, $backup->team, new BackupFailed($backup, $backup->database, $message, $databaseName ?? 'unknown'));
             } elseif ($occurrence->job_type === 'volume-backup') {
                 $backup = ScheduledVolumeBackup::with(['team', 'backupable.resource'])->find($occurrence->resource_id);
                 if (! $backup) {
@@ -427,7 +427,7 @@ class ScheduledJobDeliveryService
                     'finished_at' => now(),
                 ]);
                 BackupCreated::dispatch($backup->team_id);
-                $this->notifyMissedOccurrence($backup, fn () => $backup->team?->notify(new VolumeBackupFailed($backup, $message)));
+                $this->notifyMissedOccurrence($backup, $backup->team, new VolumeBackupFailed($backup, $message));
             }
         } catch (\Throwable $e) {
             Log::channel('scheduled-errors')->error('Failed to report missed scheduled occurrence', [
@@ -441,10 +441,15 @@ class ScheduledJobDeliveryService
     /**
      * Every missed run gets its own failed execution, but the team gets at most one missed-run
      * notification per schedule each hour, so dead queue workers do not cause a notification storm.
+     * A notification without enabled channels does not count toward that hour.
      */
-    private function notifyMissedOccurrence(Model $schedule, Closure $send): void
+    private function notifyMissedOccurrence(Model $schedule, ?Team $team, Notification $notification): void
     {
-        NotificationThrottle::sendOnce($schedule, self::MISSED_OCCURRENCE_NOTIFICATION, now()->subMinutes(self::MISSED_OCCURRENCE_NOTIFICATION_INTERVAL_MINUTES), $send);
+        if ($team === null || $notification->via($team) === []) {
+            return;
+        }
+
+        NotificationThrottle::sendOnce($schedule, self::MISSED_OCCURRENCE_NOTIFICATION, now()->subMinutes(self::MISSED_OCCURRENCE_NOTIFICATION_INTERVAL_MINUTES), fn () => $team->notify($notification));
     }
 
     public function deleteOldOccurrences(): void
@@ -627,8 +632,8 @@ class ScheduledJobDeliveryService
             return false;
         }
 
-        // An open previous occurrence usually means the previous run is still running. Backup jobs
-        // then skip this one without running it (see withoutOverlapping()).
+        // An open previous occurrence usually means the previous run is still running. Backup and
+        // task jobs then skip this one without running it (see withoutOverlapping()).
         $previousOpen = ScheduledJobDelivery::query()
             ->where('schedule_key', $occurrence->schedule_key)
             ->where('scheduled_for', '<', $occurrence->scheduled_for)

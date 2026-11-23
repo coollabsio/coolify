@@ -1,10 +1,15 @@
 <?php
 
 use App\Models\Application;
+use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
+use App\Models\Project;
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Models\StandaloneDocker;
+use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 
@@ -15,20 +20,38 @@ beforeEach(function () {
     InstanceSettings::updateOrCreate(['id' => 0]);
 });
 
+function makeFileMountApplication(): Application
+{
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+
+    return Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'build_pack' => 'dockercompose',
+    ]);
+}
+
 it('dedupes when both fs_path and mount_path are identical', function () {
-    $resourceId = fake()->unique()->numberBetween(10000, 99999);
+    $application = makeFileMountApplication();
+    $resourceId = $application->id;
     $resourceType = Application::class;
+    $fsPath = application_configuration_dir()."/{$application->uuid}/shared.html";
 
     for ($i = 0; $i < 2; $i++) {
         LocalFileVolume::updateOrCreate(
             [
-                'fs_path' => '/data/coolify/test/data/shared.html',
+                'fs_path' => $fsPath,
                 'mount_path' => '/usr/share/nginx/html/index.html',
                 'resource_id' => $resourceId,
                 'resource_type' => $resourceType,
             ],
             [
-                'fs_path' => '/data/coolify/test/data/shared.html',
+                'fs_path' => $fsPath,
                 'mount_path' => '/usr/share/nginx/html/index.html',
                 'is_directory' => false,
                 'resource_id' => $resourceId,
@@ -47,13 +70,15 @@ it('dedupes when both fs_path and mount_path are identical', function () {
 });
 
 it('stores sibling file mounts with different host paths and the same container path', function () {
-    $resourceId = fake()->unique()->numberBetween(10000, 99999);
+    $application = makeFileMountApplication();
+    $resourceId = $application->id;
+    $baseDir = application_configuration_dir()."/{$application->uuid}";
     $mountPath = '/usr/share/nginx/html/index.html';
 
     foreach (['index1.html', 'index2.html'] as $fileName) {
         LocalFileVolume::updateOrCreate(
             [
-                'fs_path' => "/data/coolify/test/data/{$fileName}",
+                'fs_path' => "{$baseDir}/{$fileName}",
                 'mount_path' => $mountPath,
                 'resource_id' => $resourceId,
                 'resource_type' => Application::class,
@@ -73,18 +98,17 @@ it('stores sibling file mounts with different host paths and the same container 
             ->toBe(hash('sha256', $volume->fs_path)))
         ->pluck('fs_path')
         ->all())->toEqualCanonicalizing([
-            '/data/coolify/test/data/index1.html',
-            '/data/coolify/test/data/index2.html',
+            "{$baseDir}/index1.html",
+            "{$baseDir}/index2.html",
         ]);
 });
 
 it('finds existing file mount configuration by source and target', function () {
-    $application = new Application(['uuid' => 'source-aware-config-test']);
-    $application->id = fake()->unique()->numberBetween(10000, 99999);
+    $application = makeFileMountApplication();
 
     foreach (['first', 'second'] as $name) {
         $volume = new LocalFileVolume([
-            'fs_path' => base_configuration_dir()."/applications/source-aware-config-test/{$name}.html",
+            'fs_path' => base_configuration_dir()."/applications/{$application->uuid}/{$name}.html",
             'mount_path' => '/usr/share/nginx/html/index.html',
             'content' => "{$name} content",
             'is_directory' => false,

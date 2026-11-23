@@ -295,12 +295,19 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldBeUnique, Shou
         ]);
     }
 
+    /**
+     * Deletes the partial upload from every destination whose copy did not finish uploading. Every destination is
+     * tried; the first failure is rethrown afterwards and keeps the cleanup pending.
+     */
     public static function cleanupS3Upload(ScheduledVolumeBackupExecution $execution): void
     {
-        $execution->loadMissing('s3');
-        $s3 = $execution->s3;
+        $replicas = $execution->s3Replicas()
+            ->with('s3')
+            ->where('s3_storage_deleted', false)
+            ->where(fn ($query) => $query->whereNull('s3_uploaded')->orWhere('s3_uploaded', false))
+            ->get();
 
-        if (! $s3 || blank($execution->filename)) {
+        if ($replicas->isEmpty() || blank($execution->filename)) {
             self::skipRecovery(
                 $execution,
                 ['s3_cleanup_pending' => false],
@@ -310,11 +317,25 @@ class VolumeBackupRecoveryJob implements ShouldBeEncrypted, ShouldBeUnique, Shou
             return;
         }
 
-        deleteBackupsS3($execution->filename, $s3);
-        $execution->update([
-            's3_cleanup_pending' => false,
-            's3_storage_deleted' => true,
-        ]);
+        $failure = null;
+        foreach ($replicas as $replica) {
+            try {
+                if ($replica->s3) {
+                    deleteBackupsS3($execution->filename, $replica->s3);
+                }
+                $replica->update(['s3_storage_deleted' => true]);
+            } catch (Throwable $exception) {
+                $failure ??= $exception;
+            }
+        }
+
+        $execution->refreshS3Summary();
+
+        if ($failure) {
+            throw $failure;
+        }
+
+        $execution->update(['s3_cleanup_pending' => false]);
     }
 
     /**

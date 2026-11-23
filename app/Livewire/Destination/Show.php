@@ -20,10 +20,10 @@ class Show extends Component
     #[Validate(['string', 'required'])]
     public string $name;
 
-    #[Validate(['string', 'required', 'max:255', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/'])]
+    #[Locked]
     public string $network;
 
-    #[Validate(['string', 'required'])]
+    #[Locked]
     public string $serverIp;
 
     public function mount(string $destination_uuid)
@@ -49,10 +49,9 @@ class Show extends Component
         if ($toModel) {
             $this->validate();
             $this->destination->name = $this->name;
-            $this->destination->network = $this->network;
-            $this->destination->server->ip = $this->serverIp;
             $changedFields = auditChangedFields($this->destination);
             $this->destination->save();
+            $this->dispatch('name-changed', uuid: $this->destination->uuid, name: $this->destination->name);
             if ($changedFields !== []) {
                 auditLog('ui.destination.updated', $this->auditContext([
                     'changed_fields' => $changedFields,

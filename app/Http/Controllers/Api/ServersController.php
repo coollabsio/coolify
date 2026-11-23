@@ -2,21 +2,26 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Server\AuthorizedKeys;
 use App\Actions\Server\DeleteServer;
 use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Enums\ServerRole;
+use App\Helpers\SshMultiplexingHelper;
+use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
-use App\Jobs\DeleteResourceJob;
+use App\Jobs\ServerConnectionCheckJob;
 use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server as ModelsServer;
+use App\Models\ServerSetting;
 use App\Models\Team;
 use App\Rules\ValidServerIp;
+use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,6 +32,13 @@ use Stringable;
 
 class ServersController extends Controller
 {
+    use RequiresDeployAbility;
+
+    /**
+     * The server name goes into one-line config files on the server (for example the log drain config), so it must not contain control characters such as new lines.
+     */
+    private const SERVER_NAME_CONTROL_CHARACTERS_PATTERN = '/[\x00-\x1F\x7F]/';
+
     private function removeSensitiveDataFromSettings($settings)
     {
         if (request()->attributes->get('can_read_sensitive', false) === true) {
@@ -41,7 +53,30 @@ class ServersController extends Controller
         }
 
         return serializeApiResponse($settings)
-            ->put('is_build_server', $settings->effectiveServerRole() === ServerRole::BUILD);
+            ->put('is_build_server', $settings->effectiveServerRole() === ServerRole::BUILD)
+            ->put('ssh_host_key_fingerprints', ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key))
+            ->put('ssh_host_key_pending_fingerprints', ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key_pending));
+    }
+
+    /**
+     * Another instance manages a transferred server. Changing its host or credentials would let
+     * "Enable management" connect to a different host, so these fields stay as they are.
+     *
+     * @return array<string, array<int, string>>
+     */
+    private function transferredServerConnectionChanges(Request $request, ModelsServer $server): array
+    {
+        $changed = [
+            'ip' => $request->filled('ip') && ModelsServer::normalizeIp($request->input('ip')) !== ModelsServer::normalizeIp($server->getRawOriginal('ip')),
+            'user' => $request->filled('user') && (string) $request->input('user') !== (string) $server->user,
+            'port' => $request->filled('port') && (int) $request->input('port') !== (int) $server->port,
+            'private_key_uuid' => $request->filled('private_key_uuid') && $request->input('private_key_uuid') !== $server->privateKey?->uuid,
+        ];
+
+        return collect($changed)
+            ->filter()
+            ->map(fn () => ['This field cannot be changed on a transferred server.'])
+            ->all();
     }
 
     /**
@@ -459,7 +494,7 @@ class ServersController extends Controller
                 schema: new OA\Schema(
                     type: 'object',
                     properties: [
-                        'name' => ['type' => 'string', 'example' => 'My Server', 'description' => 'The name of the server.'],
+                        'name' => ['type' => 'string', 'example' => 'My Server', 'description' => 'The name of the server. Must not contain control characters such as new lines.'],
                         'description' => ['type' => 'string', 'example' => 'My Server Description', 'description' => 'The description of the server.'],
                         'ip' => ['type' => 'string', 'example' => '127.0.0.1', 'description' => 'The IP of the server.'],
                         'port' => ['type' => 'integer', 'example' => 22, 'description' => 'The port of the server.'],
@@ -469,6 +504,7 @@ class ServersController extends Controller
                         'is_build_server' => ['type' => 'boolean', 'deprecated' => true, 'description' => 'Deprecated: use server_role instead. true sets server_role to build, false sets it to both. Must not conflict with server_role.'],
                         'instant_validate' => ['type' => 'boolean', 'example' => false, 'description' => 'Instant validate.'],
                         'proxy_type' => ['type' => 'string', 'enum' => ['traefik', 'caddy', 'none'], 'example' => 'traefik', 'description' => 'The proxy type.'],
+                        'ssh_host_key' => ['type' => 'string', 'example' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA...', 'description' => 'The SSH host key(s) of the server, as public key lines (for example the content of /etc/ssh/ssh_host_ed25519_key.pub) or known_hosts lines. Without it, Coolify trusts the key that the server sends on the first connection.'],
                     ],
                 ),
             ),
@@ -508,7 +544,7 @@ class ServersController extends Controller
     )]
     public function create_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'is_build_server', 'instant_validate', 'proxy_type'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'is_build_server', 'instant_validate', 'proxy_type', 'ssh_host_key'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -521,8 +557,8 @@ class ServersController extends Controller
             return $return;
         }
         $validator = customApiValidator($request->all(), [
-            'name' => 'string|max:255',
-            'description' => 'string|nullable',
+            'name' => ['not_regex:'.self::SERVER_NAME_CONTROL_CHARACTERS_PATTERN, ...ValidationPatterns::nameRules(required: false, nullable: false)],
+            'description' => ValidationPatterns::descriptionRules(),
             'ip' => ['string', 'required', new ValidServerIp],
             'port' => 'integer|nullable|between:1,65535',
             'private_key_uuid' => 'string|required',
@@ -531,13 +567,21 @@ class ServersController extends Controller
             'is_build_server' => 'boolean|nullable',
             'instant_validate' => 'boolean|nullable',
             'proxy_type' => 'string|nullable',
+            'ssh_host_key' => 'string|nullable|max:16384',
         ], [
             ...ValidationPatterns::serverUsernameMessages(),
+            ...ValidationPatterns::combinedMessages(),
+            'name.not_regex' => 'The name must not contain control characters such as new lines.',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
-        if ($validator->fails() || ! empty($extraFields)) {
+        $rawSshHostKey = $request->input('ssh_host_key');
+        $sshHostKey = is_string($rawSshHostKey) ? ServerSetting::normalizeSshHostKeys($rawSshHostKey) : null;
+        if ($validator->fails() || ! empty($extraFields) || ($request->filled('ssh_host_key') && $sshHostKey === null)) {
             $errors = $validator->errors();
+            if ($request->filled('ssh_host_key') && $sshHostKey === null && ! $errors->has('ssh_host_key')) {
+                $errors->add('ssh_host_key', 'The SSH host key must contain public key lines ("type base64") or known_hosts lines.');
+            }
             if (! empty($extraFields)) {
                 foreach ($extraFields as $field) {
                     $errors->add($field, 'This field is not allowed.');
@@ -589,9 +633,11 @@ class ServersController extends Controller
         if (! $privateKey) {
             return response()->json(['message' => 'Private key not found.'], 404);
         }
-        $foundServer = ModelsServer::whereIp(ModelsServer::normalizeIp($request->ip))->first();
-        if ($foundServer) {
-            return response()->json(['message' => 'A server with this IP/Domain is already in use.'], 400);
+        if (ModelsServer::sshEndpointInUse($request->ip, $request->port)) {
+            return response()->json(['message' => 'A server with this IP/Domain and SSH port is already in use.'], 400);
+        }
+        if ($request->instant_validate) {
+            ModelsServer::throttleValidation($teamId, $request->ip);
         }
 
         $proxyType = $request->proxy_type ? str($request->proxy_type)->upper() : ProxyTypes::TRAEFIK->value;
@@ -617,6 +663,13 @@ class ServersController extends Controller
             'server_role' => $serverRole,
             'is_build_server' => $serverRole === ServerRole::BUILD,
         ]);
+        if ($sshHostKey !== null) {
+            $server->settings->refresh()->forceFill([
+                'ssh_host_key' => $sshHostKey,
+                'ssh_host_key_source' => 'manual',
+                'ssh_host_key_trusted_at' => now(),
+            ])->save();
+        }
         if ($request->instant_validate) {
             ValidateServer::dispatch($server);
         }
@@ -636,7 +689,7 @@ class ServersController extends Controller
 
     #[OA\Patch(
         summary: 'Update',
-        description: 'Update Server.',
+        description: 'Update Server. Changing proxy_type needs a token with the write and deploy permissions.',
         path: '/servers/{uuid}',
         operationId: 'update-server-by-uuid',
         security: [
@@ -654,7 +707,7 @@ class ServersController extends Controller
                 schema: new OA\Schema(
                     type: 'object',
                     properties: [
-                        'name' => ['type' => 'string', 'description' => 'The name of the server.'],
+                        'name' => ['type' => 'string', 'description' => 'The name of the server. Must not contain control characters such as new lines.'],
                         'description' => ['type' => 'string', 'description' => 'The description of the server.'],
                         'ip' => ['type' => 'string', 'description' => 'The IP of the server.'],
                         'port' => ['type' => 'integer', 'description' => 'The port of the server.'],
@@ -663,7 +716,7 @@ class ServersController extends Controller
                         'server_role' => ['type' => 'string', 'enum' => ['deployment', 'build', 'both'], 'description' => 'Server role.'],
                         'is_build_server' => ['type' => 'boolean', 'deprecated' => true, 'description' => 'Deprecated: use server_role instead. true sets server_role to build, false changes a build server to both and leaves other roles unchanged. Must not conflict with server_role.'],
                         'instant_validate' => ['type' => 'boolean', 'description' => 'Instant validate.'],
-                        'proxy_type' => ['type' => 'string', 'enum' => ['traefik', 'caddy', 'none'], 'description' => 'The proxy type.'],
+                        'proxy_type' => ['type' => 'string', 'enum' => ['traefik', 'caddy', 'none'], 'description' => 'The proxy type. Changing it starts the new proxy on the server and needs the deploy permission.'],
                         'concurrent_builds' => ['type' => 'integer', 'description' => 'Number of concurrent builds.'],
                         'dynamic_timeout' => ['type' => 'integer', 'description' => 'Deployment timeout in seconds.'],
                         'deployment_queue_limit' => ['type' => 'integer', 'description' => 'Maximum number of queued deployments.'],
@@ -671,11 +724,17 @@ class ServersController extends Controller
                         'server_disk_usage_check_frequency' => ['type' => 'string', 'description' => 'Cron expression for disk usage check frequency.'],
                         'server_disk_usage_notification_interval_hours' => ['type' => 'integer', 'description' => 'Minimum hours between high disk usage notifications (1-720). Default: 24.'],
                         'connection_timeout' => ['type' => 'integer', 'description' => 'SSH connection timeout in seconds (1-300). Default: 10.'],
+                        'wildcard_domain' => ['type' => 'string', 'nullable' => true, 'description' => 'Wildcard domain (URL) used to generate domains for new resources on this server. Null removes it.'],
+                        'public_ipv4' => ['type' => 'string', 'nullable' => true, 'description' => 'Public IPv4 that DNS checks and DNS records use instead of the server IP, for servers that Coolify reaches over a private network. Ignored for localhost. Null removes it.'],
+                        'public_ipv6' => ['type' => 'string', 'nullable' => true, 'description' => 'Public IPv6 that DNS checks and DNS records use instead of the server IP, for servers that Coolify reaches over a private network. Ignored for localhost. Null removes it.'],
+                        'server_timezone' => ['type' => 'string', 'description' => 'Timezone of the server, for example Europe/Berlin. Scheduled tasks and backups use it.'],
+                        'backup_compression_cpu_percentage' => ['type' => 'integer', 'enum' => [25, 50, 75, 100], 'description' => 'Maximum CPU percentage that backup compression can use. Default: 25.'],
                     ],
                 ),
             ),
         ),
         responses: [
+            new OA\Response(response: 403, description: 'The token needs the deploy permission to change the proxy type.'),
             new OA\Response(
                 response: 201,
                 description: 'Server updated.',
@@ -707,7 +766,7 @@ class ServersController extends Controller
     )]
     public function update_server(Request $request)
     {
-        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout', 'is_terminal_enabled'];
+        $allowedFields = ['name', 'description', 'ip', 'port', 'user', 'private_key_uuid', 'server_role', 'is_build_server', 'instant_validate', 'proxy_type', 'concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout', 'is_terminal_enabled', 'wildcard_domain', 'public_ipv4', 'public_ipv6', 'server_timezone', 'backup_compression_cpu_percentage'];
 
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -719,8 +778,8 @@ class ServersController extends Controller
             return $return;
         }
         $validator = customApiValidator($request->all(), [
-            'name' => 'string|max:255|nullable',
-            'description' => 'string|nullable',
+            'name' => ['not_regex:'.self::SERVER_NAME_CONTROL_CHARACTERS_PATTERN, ...ValidationPatterns::nameRules(required: false, nullable: false)],
+            'description' => ValidationPatterns::descriptionRules(),
             'ip' => ['string', 'nullable', new ValidServerIp],
             'port' => 'integer|nullable|between:1,65535',
             'private_key_uuid' => 'string|nullable',
@@ -737,8 +796,19 @@ class ServersController extends Controller
             'server_disk_usage_notification_interval_hours' => 'integer|min:1|max:720',
             'connection_timeout' => 'integer|min:1|max:300',
             'is_terminal_enabled' => 'boolean|nullable',
+            'wildcard_domain' => 'nullable|url',
+            'public_ipv4' => 'nullable|ipv4',
+            'public_ipv6' => 'nullable|ipv6',
+            'server_timezone' => ['bail', 'filled', 'string', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! is_string($value) || ! validate_timezone($value)) {
+                    $fail('The server_timezone must be a valid timezone.');
+                }
+            }],
+            'backup_compression_cpu_percentage' => 'integer|in:25,50,75,100',
         ], [
             ...ValidationPatterns::serverUsernameMessages(),
+            ...ValidationPatterns::combinedMessages(),
+            'name.not_regex' => 'The name must not contain control characters such as new lines.',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -760,6 +830,22 @@ class ServersController extends Controller
             return response()->json(['message' => 'Server not found.'], 404);
         }
         $this->authorize('update', $server);
+        if ($server->isTransferredAway() && ($connectionErrors = $this->transferredServerConnectionChanges($request, $server))) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $connectionErrors,
+            ], 422);
+        }
+        $newIp = $request->filled('ip') ? $request->input('ip') : $server->getRawOriginal('ip');
+        $newPort = $request->filled('port') ? (int) $request->input('port') : (int) $server->port;
+        $endpointChanged = ModelsServer::normalizeIp($newIp) !== ModelsServer::normalizeIp($server->getRawOriginal('ip'))
+            || $newPort !== (int) $server->port;
+        if ($endpointChanged && ModelsServer::sshEndpointInUse($newIp, $newPort, $server->id)) {
+            return response()->json(['message' => 'A server with this IP/Domain and SSH port is already in use.'], 400);
+        }
+        if ($request->instant_validate) {
+            ModelsServer::throttleValidation($teamId, $request->ip ?? $server->ip);
+        }
         if ($request->proxy_type) {
             $validProxyTypes = collect(ProxyTypes::cases())->map(function ($proxyType) {
                 return str($proxyType->value)->lower();
@@ -822,6 +908,11 @@ class ServersController extends Controller
             ], 422);
         }
 
+        $proxyTypeChanged = $request->proxy_type && ! str($request->proxy_type)->lower()->exactly(str($server->proxyType())->lower());
+        if ($proxyTypeChanged && ($response = $this->deployAbilityForbiddenResponse($request, 'Changing the proxy type starts the new proxy on the server, so it needs a token with the deploy permission.'))) {
+            return $response;
+        }
+
         $server->update($updateFields);
         if ($serverRole !== null) {
             $server->settings()->update([
@@ -836,12 +927,19 @@ class ServersController extends Controller
             ]);
         }
 
-        $advancedSettings = $request->only(['concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout']);
+        $advancedSettings = $request->only(['concurrent_builds', 'dynamic_timeout', 'deployment_queue_limit', 'server_disk_usage_notification_threshold', 'server_disk_usage_check_frequency', 'server_disk_usage_notification_interval_hours', 'connection_timeout', 'server_timezone', 'backup_compression_cpu_percentage']);
         if (! empty($advancedSettings)) {
             $server->settings()->update(array_filter($advancedSettings, fn ($value) => ! is_null($value)));
         }
+        if ($request->has('wildcard_domain')) {
+            $server->settings()->update(['wildcard_domain' => $request->input('wildcard_domain')]);
+        }
+        $publicIps = $request->only(['public_ipv4', 'public_ipv6']);
+        if ($publicIps !== [] && ! $server->isLocalhost()) {
+            $server->settings->update($publicIps);
+        }
 
-        if ($request->proxy_type) {
+        if ($proxyTypeChanged) {
             $server->changeProxy($request->proxy_type, async: true);
         }
 
@@ -863,7 +961,7 @@ class ServersController extends Controller
 
     #[OA\Delete(
         summary: 'Delete',
-        description: 'Delete server by UUID.',
+        description: 'Delete server by UUID. With force or delete_from_provider, needs a token with the write and deploy permissions.',
         path: '/servers/{uuid}',
         operationId: 'delete-server-by-uuid',
         security: [
@@ -883,19 +981,34 @@ class ServersController extends Controller
             new OA\Parameter(
                 name: 'force',
                 in: 'query',
-                description: 'Also delete all resources on the server.',
+                description: 'Also delete all resources whose main destination is on the server. Applications that use the server only as an additional destination are not deleted. They are removed from the server and keep running on their other servers. Needs the deploy permission.',
                 required: false,
                 schema: new OA\Schema(type: 'boolean', default: false)
             ),
             new OA\Parameter(
                 name: 'delete_from_provider',
                 in: 'query',
-                description: 'Also delete the server from its cloud provider (Hetzner, Vultr or DigitalOcean). This cannot be undone.',
+                description: 'Also delete the server from its cloud provider (Hetzner, Vultr or DigitalOcean). This cannot be undone. Needs the deploy permission.',
                 required: false,
                 schema: new OA\Schema(type: 'boolean', default: false)
             ),
+            new OA\Parameter(
+                name: 'remove_ssh_key',
+                in: 'query',
+                description: 'Remove the public key of the server\'s SSH key from ~/.ssh/authorized_keys on the server before the server is deleted. The server must have no resources. If the key cannot be removed, the server is not deleted.',
+                required: false,
+                schema: new OA\Schema(type: 'boolean', default: false)
+            ),
+            new OA\Parameter(
+                name: 'remove_resources_from_server',
+                in: 'query',
+                description: 'With force=true, also remove the containers, volumes, and files of the resources from the server. Set it to false to delete the resources only from Coolify and leave them running on the server.',
+                required: false,
+                schema: new OA\Schema(type: 'boolean', default: true)
+            ),
         ],
         responses: [
+            new OA\Response(response: 403, description: 'The token needs the deploy permission to delete the resources or the cloud server.'),
             new OA\Response(
                 response: 200,
                 description: 'Server deleted.',
@@ -946,18 +1059,38 @@ class ServersController extends Controller
         $this->authorize('delete', $server);
 
         $force = filter_var($request->query('force', false), FILTER_VALIDATE_BOOLEAN);
+        $deleteFromProvider = filter_var($request->query('delete_from_provider', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if (is_null($deleteFromProvider)) {
+            return response()->json(['message' => 'delete_from_provider must be a boolean.'], 422);
+        }
+        $removeSshKey = filter_var($request->query('remove_ssh_key', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if (is_null($removeSshKey)) {
+            return response()->json(['message' => 'remove_ssh_key must be a boolean.'], 422);
+        }
+        $removeResourcesFromServer = filter_var($request->query('remove_resources_from_server', true), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if (is_null($removeResourcesFromServer)) {
+            return response()->json(['message' => 'remove_resources_from_server must be a boolean.'], 422);
+        }
+        // Another Coolify instance manages a transferred server. This instance deletes only its own records:
+        // never the cloud server, the containers, or the DNS records that the other instance uses.
+        if ($server->isTransferredAway()) {
+            if ($deleteFromProvider || $removeSshKey) {
+                return response()->json(['message' => 'This server is managed by another Coolify instance. Delete its cloud server or SSH key from that instance.'], 422);
+            }
+            app(ServerTransferClaimer::class)->deleteArchive($server);
+            auditLog('api.server.deleted', ['team_id' => $teamId, 'server_uuid' => $server->uuid, 'server_name' => $server->name, 'ip' => $server->ip, 'archive' => true]);
 
-        if ($server->definedResources()->count() > 0 && ! $force) {
+            return response()->json(['message' => 'Server deleted.']);
+        }
+
+        $resources = $server->primaryResources();
+        if ($resources->isNotEmpty() && ! $force) {
             return response()->json(['message' => 'Server has resources. Use ?force=true to delete all resources and the server, or delete resources manually first.'], 400);
         }
         if ($server->is_coolify_host) {
             return response()->json(['message' => 'Local server cannot be deleted.'], 400);
         }
 
-        $deleteFromProvider = filter_var($request->query('delete_from_provider', false), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-        if (is_null($deleteFromProvider)) {
-            return response()->json(['message' => 'delete_from_provider must be a boolean.'], 422);
-        }
         if ($deleteFromProvider) {
             $linkedProviders = array_keys(array_filter([
                 'hetzner' => $server->hetzner_server_id,
@@ -974,11 +1107,28 @@ class ServersController extends Controller
             }
         }
 
-        if ($force) {
-            foreach ($server->definedResources() as $resource) {
-                DeleteResourceJob::dispatch($resource);
-            }
+        if (($force || $deleteFromProvider) && ($response = $this->deployAbilityForbiddenResponse($request, 'Deleting the resources or the cloud server needs a token with the deploy permission.'))) {
+            return $response;
         }
+
+        // The key is removed before the server record, while the connection still works.
+        if ($removeSshKey && ! $deleteFromProvider) {
+            if ($server->definedResources()->count() > 0) {
+                return response()->json(['message' => 'Delete the resources of the server first, then delete the server with remove_ssh_key.'], 422);
+            }
+            $context = ['team_id' => $teamId, 'server_uuid' => $server->uuid, 'server_name' => $server->name, 'private_key_uuid' => $server->privateKey?->uuid];
+            try {
+                $removed = AuthorizedKeys::remove($server, $server->privateKey);
+            } catch (\Throwable $e) {
+                auditLog('api.server.ssh_key_removed', [...$context, 'result' => 'failed'], 'warning');
+
+                return response()->json(['message' => 'The SSH key was not removed from the server, so the server was not deleted: '.remove_iip($e->getMessage())], 422);
+            }
+            auditLog('api.server.ssh_key_removed', [...$context, 'result' => $removed ? 'removed' : 'kept_for_other_server']);
+        }
+
+        // Applications that use the server only as an additional destination keep running on their other servers.
+        $server->detachAdditionalApplications(stopContainers: $removeResourcesFromServer);
 
         $deletedUuid = $server->uuid;
         $deletedName = $server->name;
@@ -993,7 +1143,10 @@ class ServersController extends Controller
             $deleteFromProvider,
             $server->vultr_instance_id,
             $deleteFromProvider,
-            $server->digitalocean_droplet_id
+            $server->digitalocean_droplet_id,
+            false,
+            null,
+            $removeResourcesFromServer,
         );
 
         auditLog('api.server.deleted', [
@@ -1003,6 +1156,7 @@ class ServersController extends Controller
             'ip' => $deletedIp,
             'force' => $force,
             'delete_from_provider' => $deleteFromProvider,
+            'remove_ssh_key' => $removeSshKey,
         ]);
 
         return response()->json(['message' => 'Server deleted.']);
@@ -1010,7 +1164,7 @@ class ServersController extends Controller
 
     #[OA\Post(
         summary: 'Validate',
-        description: 'Validate server by UUID.',
+        description: 'Validate server by UUID. With install=true, needs a token with the write and deploy permissions.',
         path: '/servers/{uuid}/validate',
         operationId: 'validate-server-by-uuid',
         security: [
@@ -1026,7 +1180,7 @@ class ServersController extends Controller
                 properties: [
                     new OA\Property(
                         property: 'install',
-                        description: 'Install missing prerequisites and Docker. This can restart the Docker daemon.',
+                        description: 'Install missing prerequisites and Docker, then start the proxy. This can restart the Docker daemon. Needs the deploy permission.',
                         type: 'boolean',
                         default: false,
                     ),
@@ -1034,6 +1188,7 @@ class ServersController extends Controller
             ),
         ),
         responses: [
+            new OA\Response(response: 403, description: 'The token needs the deploy permission to install the server.'),
             new OA\Response(
                 response: 201,
                 description: 'Server validation started.',
@@ -1100,6 +1255,10 @@ class ServersController extends Controller
         }
 
         $install = $request->boolean('install', false);
+        if ($install && ($response = $this->deployAbilityForbiddenResponse($request, 'Installing the server runs commands on it and starts the proxy, so it needs a token with the deploy permission.'))) {
+            return $response;
+        }
+        ModelsServer::throttleValidation($teamId, $server->ip);
         if ($install) {
             ValidateAndInstallServerJob::dispatch($server);
         } else {
@@ -1116,6 +1275,127 @@ class ServersController extends Controller
         $message = $install ? 'Validation and installation started.' : 'Validation started.';
 
         return response()->json(['message' => $message], 201);
+    }
+
+    #[OA\Post(
+        summary: 'Reset host key',
+        description: 'Remove the trusted SSH host key of the server, or trust the given key. Without ssh_host_key, Coolify trusts the key that the server sends on the next connection.',
+        path: '/servers/{uuid}/host-key/reset',
+        operationId: 'reset-server-host-key-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(
+                        property: 'ssh_host_key',
+                        description: 'The SSH host key(s) to trust, as public key lines or known_hosts lines.',
+                        type: 'string',
+                    ),
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Host key reset.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Host key reset.'],
+                                'ssh_host_key_fingerprints' => ['type' => 'array', 'items' => ['type' => 'string']],
+                            ]
+                        )
+                    ),
+                ]),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 403,
+                description: 'Only team admins and owners can reset the host key.',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+            new OA\Response(
+                response: 422,
+                ref: '#/components/responses/422',
+            ),
+        ]
+    )]
+    public function reset_host_key(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->uuid)->first();
+        if (! $server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+        $this->authorize('update', $server);
+        if (! $server->canBeValidated()) {
+            return response()->json([
+                'message' => 'This server was transferred to another Coolify instance.',
+            ], 422);
+        }
+
+        $validator = customApiValidator($request->all(), [
+            'ssh_host_key' => 'string|nullable|max:16384',
+        ]);
+        $rawSshHostKey = $request->input('ssh_host_key');
+        $sshHostKey = is_string($rawSshHostKey) ? ServerSetting::normalizeSshHostKeys($rawSshHostKey) : null;
+        if ($validator->fails() || ($request->filled('ssh_host_key') && $sshHostKey === null)) {
+            $errors = $validator->errors();
+            if (! $errors->has('ssh_host_key')) {
+                $errors->add('ssh_host_key', 'The SSH host key must contain public key lines ("type base64") or known_hosts lines.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $settings = $server->settings;
+        $previousFingerprints = ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key);
+        $settings->forceFill([
+            'ssh_host_key' => $sshHostKey,
+            'ssh_host_key_source' => $sshHostKey ? 'manual' : null,
+            'ssh_host_key_trusted_at' => $sshHostKey ? now() : null,
+            'ssh_host_key_pending' => null,
+        ])->save();
+        SshMultiplexingHelper::removeMuxFile($server);
+        ServerConnectionCheckJob::dispatch($server);
+
+        auditLog('api.server.ssh_host_key.reset', [
+            'team_id' => $teamId,
+            'server_uuid' => $server->uuid,
+            'server_name' => $server->name,
+            'previous_fingerprints' => $previousFingerprints,
+            'fingerprints' => ServerSetting::sshHostKeyFingerprints($sshHostKey),
+        ]);
+
+        return response()->json([
+            'message' => 'Host key reset.',
+            'ssh_host_key_fingerprints' => ServerSetting::sshHostKeyFingerprints($sshHostKey),
+        ]);
     }
 
     /**

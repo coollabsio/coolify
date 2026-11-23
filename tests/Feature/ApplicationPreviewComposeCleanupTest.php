@@ -5,6 +5,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
+use App\Models\LocalFileVolume;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -91,7 +92,7 @@ beforeEach(function () {
 function fakePreviewCleanupServer(array &$commands, string $previewNetwork, ?array $previewNetworkContainers = [], string $dockerPs = ''): void
 {
     Process::fake(function ($process) use (&$commands, $previewNetwork, $previewNetworkContainers, $dockerPs) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         $commands[] = $command;
 
         if (str_contains($command, 'docker network inspect') && str_contains($command, "'{$previewNetwork}'")) {
@@ -220,7 +221,17 @@ it('removes the preview containers, network, and volumes through the delete job 
     $commands = [];
     fakePreviewCleanupServer($commands, $this->previewNetwork, [], $previewContainer."\n".$mainContainer);
 
-    (new DeleteResourceJob($this->preview))->handle();
+    foreach (['config/app.conf' => true, 'shared.conf' => false] as $path => $hasSuffix) {
+        LocalFileVolume::create([
+            'fs_path' => $this->application->workdir().'/'.$path,
+            'mount_path' => '/etc/'.basename($path),
+            'is_preview_suffix_enabled' => $hasSuffix,
+            'resource_id' => $this->application->id,
+            'resource_type' => $this->application->getMorphClass(),
+        ]);
+    }
+
+    (new DeleteResourceJob($this->preview->fresh()))->handle();
 
     $all = implode("\n", $commands);
     $containerRemoval = collect($commands)->search(fn (string $command): bool => str_contains($command, "docker rm -f 'web-{$this->uuid}-pr-42'"));
@@ -231,6 +242,11 @@ it('removes the preview containers, network, and volumes through the delete job 
         ->and($containerRemoval)->toBeLessThan($networkRemoval)
         ->and($all)->not->toContain("docker rm -f 'web-{$this->uuid}'")
         ->and($all)->toContain("docker volume rm -f '{$this->uuid}_app-data-pr-42'")
+        ->and($all)->toContain('rm -rf '.escapeshellarg($this->application->workdir().'-pr-42'))
+        ->and($all)->toContain('rm -f '.escapeshellarg($this->application->workdir().'/docker-compose-pr-42.yaml'))
+        ->and($all)->toContain('rm -rf '.escapeshellarg($this->application->workdir().'/config/app.conf-pr-42'))
+        ->and($all)->not->toContain('rm -rf '.escapeshellarg($this->application->workdir().'/shared.conf'))
+        ->and($all)->not->toContain('rm -rf '.escapeshellarg($this->application->workdir())."\n")
         ->and(implode("\n", dockerResourceCommands($commands)))
         ->not->toContain("'coolify'")
         ->not->toContain("'shared-proxy'")
@@ -248,4 +264,18 @@ it('parses a preview with a bind mount in development mode', function () {
     $compose = $this->application->fresh()->parse(pull_request_id: 42);
 
     expect(json_encode($compose, JSON_UNESCAPED_SLASHES))->toContain('/config/app.conf-pr-42');
+});
+
+it('keeps the production service URL variables when it parses a preview', function () {
+    Process::fake();
+    $this->application->update(['docker_compose_domains' => json_encode(['web' => ['domain' => 'https://web.example.com']])]);
+    $this->application->fresh()->parse();
+    $this->preview->update(['docker_compose_domains' => json_encode(['web' => ['domain' => 'https://pr-42.example.com']])]);
+
+    $compose = $this->application->fresh()->parse(pull_request_id: 42, preview_id: $this->preview->id);
+
+    $productionVariables = $this->application->environment_variables()->pluck('value', 'key');
+    expect($productionVariables->get('SERVICE_URL_WEB'))->toBe('https://web.example.com')
+        ->and($productionVariables->get('SERVICE_FQDN_WEB'))->toBe('web.example.com')
+        ->and(json_encode($compose, JSON_UNESCAPED_SLASHES))->toContain('https://pr-42.example.com');
 });

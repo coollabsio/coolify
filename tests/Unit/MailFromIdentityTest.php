@@ -85,3 +85,35 @@ it('rejects enabled email settings without a from address', function () {
         'smtp_from_name' => 'Coolify',
     ]);
 })->throws(InvalidArgumentException::class, 'Transactional email sender address is not configured.');
+
+it('uses the resend sender when resend is enabled', function () {
+    $identity = mail_from_identity((object) [
+        'resend_enabled' => true,
+        'resend_from_address' => 'resend@example.com',
+        'resend_from_name' => 'Resend Sender',
+        'smtp_from_address' => 'smtp@example.com',
+        'smtp_from_name' => 'SMTP Sender',
+    ]);
+
+    expect($identity)->toBe(['address' => 'resend@example.com', 'name' => 'Resend Sender']);
+});
+
+it('falls back to the smtp sender when resend is enabled without a resend sender', function () {
+    $identity = mail_from_identity((object) [
+        'resend_enabled' => true,
+        'resend_from_address' => null,
+        'resend_from_name' => '',
+        'smtp_from_address' => 'smtp@example.com',
+        'smtp_from_name' => 'SMTP Sender',
+    ]);
+
+    expect($identity)->toBe(['address' => 'smtp@example.com', 'name' => 'SMTP Sender']);
+});
+
+it('rejects resend settings without a resend or smtp from address', function () {
+    mail_from_identity((object) [
+        'resend_enabled' => true,
+        'resend_from_address' => null,
+        'smtp_from_address' => null,
+    ]);
+})->throws(InvalidArgumentException::class, 'Transactional email sender address is not configured.');

@@ -1,6 +1,6 @@
 <?php
 
-use App\Livewire\Project\Application\General;
+use App\Livewire\Project\Application\Heading;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -47,44 +47,36 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         ?? StandaloneDocker::factory()->create(['server_id' => $this->server->id, 'network' => 'coolify-test']);
 });
 
-test('the application page shows the nixpacks deprecation notice only for nixpacks', function (string $buildPack, bool $showsNotice) {
-    $application = Application::factory()->create([
-        'environment_id' => $this->environment->id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => StandaloneDocker::class,
-        'build_pack' => $buildPack,
-        'static_image' => 'nginx:alpine',
-        'base_directory' => '/',
-        'ports_exposes' => '3000',
-        'is_http_basic_auth_enabled' => false,
-        'redirect' => 'no',
-    ]);
-
-    $component = Livewire::test(General::class, ['application' => $application])->assertSuccessful();
-
-    $showsNotice
-        ? $component->assertSee(config('deprecations.nixpacks'))
-        : $component->assertDontSee(config('deprecations.nixpacks'));
-})->with([
-    'nixpacks' => ['nixpacks', true],
-    'railpack' => ['railpack', false],
-]);
-
-test('switching the build pack to railpack hides the nixpacks deprecation notice', function () {
+test('switching the build pack to railpack hides the nixpacks deprecation notice in the heading', function () {
     $application = Application::factory()->create([
         'environment_id' => $this->environment->id,
         'destination_id' => $this->destination->id,
         'destination_type' => StandaloneDocker::class,
         'build_pack' => 'nixpacks',
-        'static_image' => 'nginx:alpine',
-        'base_directory' => '/',
-        'ports_exposes' => '3000',
-        'is_http_basic_auth_enabled' => false,
-        'redirect' => 'no',
     ]);
 
-    Livewire::test(General::class, ['application' => $application])
-        ->assertSee(config('deprecations.nixpacks'))
-        ->set('buildPack', 'railpack')
-        ->assertDontSee(config('deprecations.nixpacks'));
+    $component = Livewire::test(Heading::class, ['application' => $application])
+        ->assertSee(config('deprecations.nixpacks'));
+
+    $application->update(['build_pack' => 'railpack']);
+
+    $component->call('$refresh')->assertDontSee(config('deprecations.nixpacks'));
 });
+
+test('the application heading shows the nixpacks deprecation notice only for nixpacks', function (string $buildPack, bool $showsNotice) {
+    $application = Application::factory()->create([
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => $buildPack,
+    ]);
+
+    $component = Livewire::test(Heading::class, ['application' => $application])->assertSuccessful();
+
+    $showsNotice
+        ? $component->assertSee(config('deprecations.nixpacks'))->assertSee('Switch to Railpack')
+        : $component->assertDontSee(config('deprecations.nixpacks'));
+})->with([
+    'nixpacks' => ['nixpacks', true],
+    'railpack' => ['railpack', false],
+]);

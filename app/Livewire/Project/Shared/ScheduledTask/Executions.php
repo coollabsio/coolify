@@ -6,15 +6,13 @@ use App\Models\ScheduledTask;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Executions extends Component
 {
     use ListensToTeamChannel;
-
-    #[Locked]
-    public ScheduledTask $task;
 
     #[Locked]
     public int $taskId;
@@ -48,11 +46,11 @@ class Executions extends Component
     {
         try {
             $this->taskId = $taskId;
-            $this->task = ScheduledTask::where('team_id', Auth::user()->currentTeam()->id)->findOrFail($taskId);
-            $this->executions = $this->task->executions()->take(20)->get();
-            $this->serverTimezone = data_get($this->task, 'application.destination.server.settings.server_timezone');
+            $task = ScheduledTask::where('team_id', Auth::user()->currentTeam()->id)->findOrFail($taskId);
+            $this->executions = $task->executions()->take(20)->get();
+            $this->serverTimezone = data_get($task, 'application.destination.server.settings.server_timezone');
             if (! $this->serverTimezone) {
-                $this->serverTimezone = data_get($this->task, 'service.destination.server.settings.server_timezone');
+                $this->serverTimezone = data_get($task, 'service.destination.server.settings.server_timezone');
             }
             if (! $this->serverTimezone) {
                 $this->serverTimezone = 'UTC';
@@ -62,8 +60,22 @@ class Executions extends Component
         }
     }
 
+    /**
+     * Load the task on each request instead of storing it as a model property. A stored model fails
+     * with a 404 when the poll runs after the task is deleted and before the page navigates away.
+     */
+    #[Computed]
+    public function task(): ?ScheduledTask
+    {
+        return ScheduledTask::find($this->taskId);
+    }
+
     public function refreshExecutions(): void
     {
+        if (! $this->task) {
+            return;
+        }
+
         $this->executions = $this->task->executions()->take(20)->get();
         if ($this->selectedKey) {
             $this->selectedExecution = $this->task->executions()->find($this->selectedKey);
@@ -84,7 +96,7 @@ class Executions extends Component
             return;
         }
         $this->selectedKey = $key;
-        $this->selectedExecution = $this->task->executions()->find($key);
+        $this->selectedExecution = $this->task?->executions()->find($key);
         $this->currentPage = 1;
 
         // Start polling if task is running
@@ -157,7 +169,9 @@ class Executions extends Component
      */
     public function canReadOutput(): bool
     {
-        return auth()->user()?->can('update', $this->task->application ?? $this->task->service) ?? false;
+        $resource = $this->task?->application ?? $this->task?->service;
+
+        return $resource && auth()->user()?->can('update', $resource);
     }
 
     public function hasMoreLogs()

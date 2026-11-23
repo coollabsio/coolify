@@ -4,7 +4,9 @@ namespace App\Mcp\Tools;
 
 use App\Actions\Application\CleanupCancelledDeployment;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\SyncGithubDeploymentJob;
 use App\Mcp\Concerns\BuildsResponse;
+use App\Mcp\Concerns\ChecksTokenAbilities;
 use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
@@ -12,7 +14,13 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
+use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly(false)]
+#[IsDestructive]
+#[IsIdempotent]
 class CancelDeployment extends Tool
 {
     protected string $name = 'cancel_deployment';
@@ -20,7 +28,13 @@ class CancelDeployment extends Tool
     protected string $description = 'Cancel a queued or in-progress deployment by deployment UUID for the authenticated team. Requires deploy ability.';
 
     use BuildsResponse;
+    use ChecksTokenAbilities;
     use ResolvesTeam;
+
+    public function shouldRegister(): bool
+    {
+        return $this->currentTokenCan('deploy');
+    }
 
     public function handle(Request $request): Response
     {
@@ -58,7 +72,7 @@ class CancelDeployment extends Tool
 
         $updated = ApplicationDeploymentQueue::whereKey($deployment->getKey())
             ->whereIn('status', $cancellable)
-            ->update(['status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value]);
+            ->update(['status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value, 'finished_at' => now()]);
 
         if ($updated !== 1) {
             $deployment->refresh();
@@ -73,6 +87,13 @@ class CancelDeployment extends Tool
             CleanupCancelledDeployment::run($deployment, (int) $teamId);
         } catch (\Throwable) {
             // Cancellation is still recorded even if the helper container cleanup fails.
+        }
+
+        try {
+            // The query update above fires no model event.
+            SyncGithubDeploymentJob::dispatchFor($deployment);
+        } catch (\Throwable $e) {
+            \Log::warning("Failed to queue the GitHub deployment sync after cancelling deployment {$deployment->id}: {$e->getMessage()}");
         }
 
         auditLog('mcp.deployment.cancelled', [

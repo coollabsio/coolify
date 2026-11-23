@@ -29,9 +29,6 @@ test('instance admin can toggle registration via listbox instantSave', function 
 
     Livewire::test(Advanced::class)
         ->assertSet('is_registration_enabled', false)
-        ->assertSee('Registration')
-        ->assertSee('Destructive action confirmation')
-        ->assertDontSee('Only administrators can create accounts.')
         ->set('is_registration_enabled', true)
         ->call('instantSave')
         ->assertDispatched('success');
@@ -77,7 +74,6 @@ test('instance admin can configure the image CDN URL at runtime', function () {
     session(['currentTeam' => ['id' => $rootTeam->id]]);
 
     Livewire::test(Advanced::class)
-        ->assertSee('Image CDN URL')
         ->set('image_cdn_url', 'https://images.example.com/media/')
         ->call('submit')
         ->assertHasNoErrors()

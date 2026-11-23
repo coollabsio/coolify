@@ -6,6 +6,10 @@
 
 -
 
+## Preview
+
+<!-- Screenshot or short video showing your changes in action. Mandatory for new features. -->
+
 ## Why
 
 <!-- Explain why these changes are needed, what they try to achieve, and why they make sense for Coolify. This "Why" section must be human-written and not AI-generated. -->
@@ -23,10 +27,6 @@
 - [ ] New feature
 - [ ] Adding new one click service
 - [ ] Fixing or updating existing one click service
-
-## Preview
-
-<!-- Screenshot or short video showing your changes in action. Mandatory for new features. -->
 
 ## AI Assistance
 

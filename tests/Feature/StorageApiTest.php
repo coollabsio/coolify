@@ -298,8 +298,8 @@ describe('POST /api/v1/applications/{uuid}/storages', function () {
 
     test('hides created file storage content for write tokens and reveals it for sensitive tokens', function () {
         $app = createTestApplication($this);
-        $writeToken = createStorageApiToken($this, ['write']);
-        $sensitiveToken = createStorageApiToken($this, ['write', 'read:sensitive']);
+        $writeToken = createStorageApiToken($this, ['write', 'deploy']);
+        $sensitiveToken = createStorageApiToken($this, ['write', 'deploy', 'read:sensitive']);
 
         $writeResponse = $this->withHeaders([
             'Authorization' => 'Bearer '.$writeToken,

@@ -17,9 +17,12 @@ use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GithubRunnerExecution;
 use App\Models\PrivateKey;
+use App\Models\User;
 use App\Services\GithubRunner\GithubRunnerApi;
 use App\Services\GithubRunner\GithubRunnerContainer;
+use App\Services\ServerTransfer\TransferFinishChecklist;
 use Exception;
+use Illuminate\Http\Client\Response;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -71,7 +74,6 @@ class Github extends Controller
                     'before_sha' => $before_sha,
                     'after_sha' => $after_sha,
                     'commit_sha' => $commit_sha,
-                    'author_association' => $author_association,
                     'is_fork_pull_request' => $is_fork_pull_request,
                 ] = $this->readPullRequestPayload($payload);
                 $full_name = data_get($payload, 'repository.full_name');
@@ -136,6 +138,7 @@ class Github extends Controller
 
                         continue;
                     }
+                    TransferFinishChecklist::recordWebhook('application', $application->uuid);
                     $isFunctional = $application->destination->server->isFunctional();
                     if (! $isFunctional) {
                         $return_payloads->push([
@@ -239,7 +242,6 @@ class Github extends Controller
                             beforeSha: $before_sha,
                             afterSha: $after_sha,
                             commitSha: $commit_sha,
-                            authorAssociation: $author_association,
                             fullName: $full_name,
                             isForkPullRequest: $is_fork_pull_request,
                         );
@@ -341,7 +343,8 @@ class Github extends Controller
         if ($action === 'completed') {
             if ($execution) {
                 $execution->update([...$jobDetails, 'conclusion' => $this->limitRunnerColumn(data_get($payload, 'workflow_job.conclusion'))]);
-                if ($execution->isActive() || $execution->status === GithubRunnerStatus::Failed) {
+                // A run that Coolify cancelled after the runner container failed stays failed.
+                if ($execution->isActive() || ($execution->status === GithubRunnerStatus::Failed && $execution->conclusion !== 'cancelled')) {
                     $execution->finish(GithubRunnerStatus::Completed);
                     CleanupGithubRunnerJob::dispatch($execution->id);
                 }
@@ -400,7 +403,12 @@ class Github extends Controller
                 // Just pong
                 return response('pong');
             }
-            $github_app = GithubApp::where('app_id', $x_github_hook_installation_target_id)->first();
+            // One GitHub App can be installed on several accounts, each added as its own source.
+            $installation_id = data_get($payload, 'installation.id');
+            $github_app = is_numeric($installation_id)
+                ? GithubApp::where('app_id', $x_github_hook_installation_target_id)->where('installation_id', (int) $installation_id)->first()
+                : null;
+            $github_app ??= GithubApp::where('app_id', $x_github_hook_installation_target_id)->first();
             if (is_null($github_app)) {
                 return response('Nothing to do. No GitHub App found.');
             }
@@ -416,18 +424,17 @@ class Github extends Controller
                 return response('Invalid signature.');
             }
             $hmac = hash_hmac('sha256', $request->getContent(), $webhook_secret);
-            if (config('app.env') !== 'local') {
-                if (! hash_equals($x_hub_signature_256, $hmac)) {
-                    auditLogWebhookFailure('github', 'invalid_signature', [
-                        'mode' => 'app',
-                        'github_app_id' => $github_app->id,
-                        'github_app_name' => $github_app->name,
-                        'installation_target_id' => $x_github_hook_installation_target_id,
-                    ]);
+            if (! hash_equals($x_hub_signature_256, $hmac)) {
+                auditLogWebhookFailure('github', 'invalid_signature', [
+                    'mode' => 'app',
+                    'github_app_id' => $github_app->id,
+                    'github_app_name' => $github_app->name,
+                    'installation_target_id' => $x_github_hook_installation_target_id,
+                ]);
 
-                    return response('Invalid signature.');
-                }
+                return response('Invalid signature.');
             }
+            TransferFinishChecklist::recordWebhook('github_app', $github_app->uuid);
             if ($x_github_event === 'installation' || $x_github_event === 'installation_repositories') {
                 // Installation handled by setup redirect url. Repositories queried on-demand.
                 $action = data_get($payload, 'action');
@@ -459,7 +466,6 @@ class Github extends Controller
                     'before_sha' => $before_sha,
                     'after_sha' => $after_sha,
                     'commit_sha' => $commit_sha,
-                    'author_association' => $author_association,
                     'is_fork_pull_request' => $is_fork_pull_request,
                 ] = $this->readPullRequestPayload($payload);
                 $full_name = $this->manualWebhookRepositoryFullName(data_get($payload, 'repository.full_name'));
@@ -478,11 +484,15 @@ class Github extends Controller
             }
             $applications = Application::where('repository_project_id', $id)
                 ->where('source_id', $github_app->id)
+                ->where('source_type', GithubApp::class)
                 ->whereRelation('source', 'is_public', false);
             if ($x_github_event === 'push') {
                 $applications = $applications->where('git_branch', $branch)->get();
                 if ($applications->isEmpty()) {
                     return response("Nothing to do. No applications found with branch '$branch'.");
+                }
+                if ($applications->contains(fn (Application $application): bool => filled($application->watch_paths))) {
+                    $changed_files = $this->githubPushComparedFiles($github_app, $payload) ?? $changed_files;
                 }
             }
             if ($x_github_event === 'pull_request') {
@@ -598,7 +608,6 @@ class Github extends Controller
                             beforeSha: $before_sha,
                             afterSha: $after_sha,
                             commitSha: $commit_sha,
-                            authorAssociation: $author_association,
                             fullName: $full_name,
                             isForkPullRequest: $is_fork_pull_request,
                         );
@@ -621,9 +630,38 @@ class Github extends Controller
     }
 
     /**
+     * Files that the push changes between its before and after commits, from
+     * the GitHub compare API.
+     *
+     * The file lists of the pushed commits are not the net change: a merge
+     * commit names the files that it changes relative to its first parent,
+     * also when the push does not change them. Returns null for a new branch,
+     * a missing repository name or an API failure; the caller then uses the
+     * file lists of the pushed commits.
+     *
+     * @return Collection<int, string>|null
+     *
+     * @throws InvalidWebhookPayloadException When the before or after value is not a commit SHA.
+     */
+    private function githubPushComparedFiles(GithubApp $githubApp, mixed $payload): ?Collection
+    {
+        $before = $this->webhookCommitSha($payload, 'before');
+        $after = $this->webhookCommitSha($payload, 'after');
+        $fullName = $this->manualWebhookRepositoryFullName(data_get($payload, 'repository.full_name'));
+        if ($before === null || $after === null || $fullName === null || preg_match('/\A0+\z/', $before) === 1) {
+            return null;
+        }
+
+        [$owner, $repo] = explode('/', $fullName, 2);
+        $files = getGithubCommitRangeFiles($githubApp, $owner, $repo, $before, $after);
+
+        return $files === null ? null : collect($files);
+    }
+
+    /**
      * Read and validate the pull_request payload fields that the handlers use.
      *
-     * @return array{action: string, pull_request_id: int, pull_request_html_url: string, pull_request_title: ?string, branch: ?string, base_branch: ?string, before_sha: ?string, after_sha: ?string, commit_sha: string, author_association: ?string, is_fork_pull_request: bool}
+     * @return array{action: string, pull_request_id: int, pull_request_html_url: string, pull_request_title: ?string, branch: ?string, base_branch: ?string, before_sha: ?string, after_sha: ?string, commit_sha: string, is_fork_pull_request: bool}
      *
      * @throws InvalidWebhookPayloadException When a field has a wrong type or format.
      */
@@ -641,7 +679,6 @@ class Github extends Controller
             'before_sha' => $this->webhookCommitSha($payload, 'before'),
             'after_sha' => $this->webhookCommitSha($payload, 'after') ?? $head_sha,
             'commit_sha' => $head_sha ?? 'HEAD',
-            'author_association' => $this->webhookPayloadString($payload, 'pull_request.author_association'),
             'is_fork_pull_request' => $this->isForkPullRequest($payload),
         ];
     }
@@ -649,13 +686,15 @@ class Github extends Controller
     /**
      * Determine whether a pull_request webhook payload originates from a fork.
      *
-     * GitHub's `author_association` is not a reliable trust signal (it grants
-     * CONTRIBUTOR to anyone who has merely opened an issue/PR before), so fork
-     * detection is gated on whether the PR crosses repository boundaries.
+     * A same-repository PR branch can only be pushed by users with write access,
+     * so this is the trust signal for preview deployments. GitHub's
+     * `author_association` is not reliable for this: users with access through a
+     * team or a private organization membership arrive as CONTRIBUTOR or NONE.
      *
      * The repository id comparison is the canonical signal; the `head.repo.fork`
      * flag and a case-insensitive full_name comparison are fallbacks for payloads
-     * where the ids are unavailable (e.g. a deleted head repository).
+     * where the ids are unavailable. A PR whose head repository is unknown (e.g.
+     * a deleted fork) is treated as a fork.
      *
      * @throws InvalidWebhookPayloadException When a repository id is not a positive integer.
      */
@@ -679,7 +718,7 @@ class Github extends Controller
             return Str::lower($headRepoFullName) !== Str::lower($baseRepoFullName);
         }
 
-        return false;
+        return true;
     }
 
     public function redirect(Request $request)
@@ -699,7 +738,6 @@ class Github extends Controller
         $data = Http::GitSource($api_url)->withBody(null)
             ->accept('application/vnd.github+json')
             ->timeout(10)
-            ->connectTimeout(5)
             ->post("$api_url/app-manifests/$code/conversions")
             ->throw()
             ->json();
@@ -725,9 +763,43 @@ class Github extends Controller
         $github_app->client_secret = $client_secret;
         $github_app->webhook_secret = $webhook_secret;
         $github_app->private_key_id = $private_key->id;
+        $ownerMismatch = $this->syncGithubAppOwner($github_app, (array) data_get($data, 'owner'));
         $github_app->save();
 
-        return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
+        $redirect = redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
+
+        return $ownerMismatch ? $redirect->with('error', $ownerMismatch) : $redirect;
+    }
+
+    /**
+     * GitHub registers the App on the account that it shows in its form, not always on the organization
+     * of the manifest URL (for example, when the user cannot manage GitHub Apps of that organization).
+     * Store the real owner, so that the install, permission, and runner settings point to it.
+     *
+     * @param  array{login?: string, type?: string}  $owner
+     * @return string|null The warning for the user when the owner is not the requested organization
+     */
+    private function syncGithubAppOwner(GithubApp $github_app, array $owner): ?string
+    {
+        $login = data_get($owner, 'login');
+        if (blank($login)) {
+            return null;
+        }
+
+        $requested = normalizeGithubOrganization($github_app->organization);
+        $isOrganization = data_get($owner, 'type') === 'Organization';
+        $github_app->organization = $isOrganization ? $login : null;
+
+        if (blank($requested) || ($isOrganization && strcasecmp($requested, $login) === 0)) {
+            return null;
+        }
+
+        [$login, $requested] = [e($login), e($requested)];
+        $account = data_get($owner, 'type') === 'User' ? "personal account {$login}" : "account {$login}";
+
+        return "GitHub registered this GitHub App on your {$account}, not on the organization {$requested}. "
+            ."It can only be installed on {$login}. Make sure that your GitHub user is an owner or a GitHub App manager of {$requested}, "
+            .'then delete this GitHub App on GitHub and in Coolify, and create it again.';
     }
 
     public function install(Request $request)
@@ -748,7 +820,7 @@ class Github extends Controller
             action: 'install',
         );
 
-        $verification_error = $this->githubInstallationVerificationError($github_app, $installation_id);
+        [$installation, $verification_error] = $this->verifiedGithubInstallation($github_app, $installation_id);
         if ($verification_error) {
             Log::warning('GitHub App installation could not be verified.', [
                 'github_app_id' => $github_app->id,
@@ -764,10 +836,67 @@ class Github extends Controller
                 ->with('error', $message);
         }
 
-        $github_app->installation_id = $installation_id;
-        $github_app->save();
+        $source = $this->sourceForGithubInstallation($github_app, $installation_id, $installation, $request->user());
+        $source->installation_id = $installation_id;
+        $source->installation_account = data_get($installation, 'account.login');
+        $source->deployments = data_get($installation, 'permissions.deployments');
+        $source->save();
 
-        return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
+        $redirect = redirect()->route('source.github.show', ['github_app_uuid' => $source->uuid]);
+
+        return $source->is($github_app)
+            ? $redirect
+            : $redirect->with('success', 'Added a new source for this installation. Each account that installs the GitHub App has its own source.');
+    }
+
+    /**
+     * One GitHub App can be installed on several accounts. Each installation is its own source,
+     * so an installation on another account must not replace the installation that applications already use.
+     */
+    private function sourceForGithubInstallation(GithubApp $github_app, string $installation_id, array $installation, User $user): GithubApp
+    {
+        if ($this->installationReplacesSourceInstallation($github_app, $installation_id, $installation)) {
+            return $github_app;
+        }
+
+        $existing = GithubApp::where('team_id', $github_app->team_id)
+            ->where('api_url', $github_app->api_url)
+            ->where('app_id', $github_app->app_id)
+            ->where('installation_id', $installation_id)
+            ->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        // Runner groups and approved permissions belong to one installation.
+        $source = $github_app->replicate(['uuid', 'installation_id', 'installation_account', 'deployments', 'runner_group_id']);
+        $source->is_system_wide = $github_app->is_system_wide && $user->can('makeSystemWide', GithubApp::class);
+
+        return $source;
+    }
+
+    /**
+     * The new installation replaces the current one when the source has none yet, or when the
+     * current installation was removed at GitHub or belongs to the same account (a reinstall).
+     */
+    private function installationReplacesSourceInstallation(GithubApp $github_app, string $installation_id, array $installation): bool
+    {
+        if (blank($github_app->installation_id) || (string) $github_app->installation_id === $installation_id) {
+            return true;
+        }
+
+        try {
+            $response = $this->requestGithubInstallation($github_app, (string) $github_app->installation_id);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        if ($response->notFound()) {
+            return true;
+        }
+
+        return $response->successful()
+            && data_get($response->json(), 'account.id') === data_get($installation, 'account.id');
     }
 
     private function redirectAfterGithubAppInstallationUpdate(string $installation_id): RedirectResponse
@@ -790,36 +919,43 @@ class Github extends Controller
      * unauthenticated-reachable GET callback, so it must be confirmed against
      * the GitHub API using the App's own credentials before it is persisted.
      *
-     * @return string|null The reason the verification failed, or null when it passed.
+     * @return array{0: array<string, mixed>, 1: null}|array{0: null, 1: string} The installation, or the reason the verification failed.
      */
-    private function githubInstallationVerificationError(GithubApp $github_app, string $installation_id): ?string
+    private function verifiedGithubInstallation(GithubApp $github_app, string $installation_id): array
     {
         if (blank($github_app->app_id) || blank(githubAppPrivateKey($github_app)?->private_key)) {
-            return 'The GitHub App ID or private key is missing.';
+            return [null, 'The GitHub App ID or private key is missing.'];
         }
 
         try {
-            $jwt = generateGithubJwt($github_app);
-            $response = Http::GitSource($github_app->api_url)->withHeaders([
-                'Authorization' => "Bearer $jwt",
-                'Accept' => 'application/vnd.github+json',
-            ])
-                ->timeout(10)
-                ->connectTimeout(5)
-                ->get("{$github_app->api_url}/app/installations/{$installation_id}");
+            $response = $this->requestGithubInstallation($github_app, $installation_id);
+            if (! $response->successful()) {
+                assertGithubClockInSync($response);
+            }
         } catch (\Throwable $e) {
-            return strip_tags(str_replace('<br>', ' ', $e->getMessage()));
+            return [null, strip_tags(str_replace('<br>', ' ', $e->getMessage()))];
         }
 
         if (! $response->successful()) {
-            return "GitHub API returned HTTP {$response->status()}: ".data_get($response->json(), 'message', 'no error message found');
+            return [null, "GitHub API returned HTTP {$response->status()}: ".data_get($response->json(), 'message', 'no error message found')];
         }
 
-        if ((string) data_get($response->json(), 'app_id') !== (string) $github_app->app_id) {
-            return 'The installation belongs to a different GitHub App.';
+        $installation = $response->json();
+        if (! is_array($installation) || (string) data_get($installation, 'app_id') !== (string) $github_app->app_id) {
+            return [null, 'The installation belongs to a different GitHub App.'];
         }
 
-        return null;
+        return [$installation, null];
+    }
+
+    private function requestGithubInstallation(GithubApp $github_app, string $installation_id): Response
+    {
+        return Http::GitSource($github_app->api_url)->withHeaders([
+            'Authorization' => 'Bearer '.generateGithubJwt($github_app),
+            'Accept' => 'application/vnd.github+json',
+        ])
+            ->timeout(10)
+            ->get("{$github_app->api_url}/app/installations/{$installation_id}");
     }
 
     private function consumeGithubAppSetupState(Request $request, string $state, string $action): GithubApp
@@ -841,6 +977,7 @@ class Github extends Controller
         $github_app = GithubApp::whereKey(data_get($payload, 'github_app_id'))
             ->where('team_id', $team_id)
             ->firstOrFail();
+        abort_unless($request->user()->can('update', $github_app), 403);
 
         if ($request->user()->currentTeam()?->id !== $team_id) {
             refreshSession($github_app->team);

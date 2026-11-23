@@ -29,8 +29,8 @@ function apiRequest($test, string $token, string $method = 'get', string $url = 
 }
 
 /**
- * The api.token.team middleware rejects elevated abilities on member tokens
- * before ApiAbility runs, so REST clients get its generic role message.
+ * The api.token.team middleware rejects member tokens with more access than the member has
+ * before ApiAbility runs.
  */
 describe('member with legacy elevated token is rejected', function () {
     test('member with legacy elevated token gets 403', function (array $abilities) {
@@ -39,7 +39,7 @@ describe('member with legacy elevated token is rejected', function () {
         $response = apiRequest($this, $token->plainTextToken);
 
         $response->assertStatus(403);
-        $response->assertExactJson(['message' => 'Missing required team role.']);
+        $response->assertExactJson(['message' => 'This API token has more access than you have in this team. Revoke it and create a new token.']);
     })->with([
         'write' => [['read', 'write']],
         'deploy' => [['read', 'deploy']],
@@ -55,7 +55,7 @@ describe('member with legacy elevated token is rejected', function () {
         $response = apiRequest($this, $token->plainTextToken, 'patch', '/api/v1/team');
 
         $response->assertStatus(403);
-        $response->assertExactJson(['message' => 'Missing required team role.']);
+        $response->assertExactJson(['message' => 'This API token has more access than you have in this team. Revoke it and create a new token.']);
     });
 });
 

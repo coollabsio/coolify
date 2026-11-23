@@ -48,7 +48,7 @@ it('uses resource tile icons for databases', function () {
     $databases = collect((new Select)->loadServices()['databases'])->keyBy('id');
 
     foreach (['keydb', 'dragonfly', 'clickhouse'] as $database) {
-        expect($databases[$database]['logo'])->toBe(asset("svgs/resources/{$database}.svg"));
+        expect($databases[$database]['logo'])->toBe(resource_logo_url($database));
     }
 });
 
@@ -134,4 +134,31 @@ it('preserves one click service key casing when selecting a service template', f
     $component->setType('one-click-service-denoKV');
 
     expect($component->type)->toBe('one-click-service-denoKV');
+});
+
+it('links service websites to the project page instead of a shared host root', function () {
+    $path = base_path('templates/'.config('constants.services.file_name'));
+    $payload = json_encode([
+        'uptime-kuma' => ['documentation' => 'https://github.com/louislam/uptime-kuma?tab=readme-ov-file&utm_source=coolify.io'],
+        'alexandrie' => ['documentation' => 'https://www.github.com/Smaug6739/Alexandrie/tree/main/docs'],
+        'radarr' => ['documentation' => 'https://hub.docker.com/r/linuxserver/radarr?utm_source=coolify.io'],
+        'n8n' => ['documentation' => 'https://n8n.io/docs?utm_source=coolify.io'],
+        'broken' => ['documentation' => 'not a url'],
+    ]);
+
+    File::partialMock()
+        ->shouldReceive('exists')
+        ->with($path)
+        ->andReturn(true)
+        ->shouldReceive('get')
+        ->with($path)
+        ->andReturn($payload);
+
+    $services = (new Select)->loadServices()['services'];
+
+    expect($services['uptime-kuma']['website'])->toBe('https://github.com/louislam/uptime-kuma?ref=coolify.io')
+        ->and($services['alexandrie']['website'])->toBe('https://www.github.com/Smaug6739/Alexandrie?ref=coolify.io')
+        ->and($services['radarr']['website'])->toBe('https://hub.docker.com/r/linuxserver/radarr?ref=coolify.io')
+        ->and($services['n8n']['website'])->toBe('https://n8n.io?ref=coolify.io')
+        ->and($services['broken']['website'])->toBeNull();
 });

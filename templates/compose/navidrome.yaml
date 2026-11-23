@@ -7,7 +7,7 @@
 
 services:
   navidrome:
-    image: deluan/navidrome:latest
+    image: deluan/navidrome:0.64.2
     restart: unless-stopped
     environment:
       - SERVICE_URL_NAVIDROME_4533

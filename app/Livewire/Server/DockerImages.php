@@ -4,12 +4,15 @@ namespace App\Livewire\Server;
 
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class DockerImages extends Component
 {
     use AuthorizesRequests;
+    use WithPagination;
 
     public Server $server;
 
@@ -26,6 +29,50 @@ class DockerImages extends Component
     public string $search = '';
 
     public bool $loaded = false;
+
+    public int $perPage = 10;
+
+    /**
+     * Column sort such as "size_desc". Empty keeps the order of `docker image ls` (newest first).
+     */
+    public string $sort = '';
+
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedPerPage(): void
+    {
+        $this->perPage = max(1, min(100, $this->perPage));
+        $this->resetPage();
+    }
+
+    public function setSort(string $sort): void
+    {
+        if (! array_key_exists(str($sort)->beforeLast('_')->value(), $this->sortColumns())
+            || ! in_array(str($sort)->afterLast('_')->value(), ['asc', 'desc'], true)) {
+            return;
+        }
+
+        $this->sort = $sort;
+        $this->resetPage();
+    }
+
+    /**
+     * @return array<string, \Closure(array): mixed>
+     */
+    private function sortColumns(): array
+    {
+        return [
+            'repository' => fn (array $image) => $image['repository'].':'.$image['tag'],
+            'tag' => fn (array $image) => $image['tag'],
+            'id' => fn (array $image) => $image['short_id'],
+            'created' => fn (array $image) => $image['created_at'] ?? 0,
+            'size' => fn (array $image) => $image['size_bytes'] ?? 0,
+            'used' => fn (array $image) => implode(', ', $image['containers']),
+        ];
+    }
 
     public function mount(string $server_uuid)
     {
@@ -47,7 +94,7 @@ class DockerImages extends Component
             }
             $containersByImage = $this->containersByImage();
             $this->images = format_docker_command_output_to_json(
-                instant_remote_process(["docker image ls --no-trunc --format '{{json .}}'"], $this->server, false)
+                instant_remote_process([remoteCommandWithTimeout("docker image ls --no-trunc --format '{{json .}}'", 30)], $this->server, false, timeout: 45)
             )
                 ->map(fn (array $image) => $this->summarize($image, $containersByImage))
                 ->values()
@@ -95,9 +142,10 @@ class DockerImages extends Component
     private function containersByImage(): array
     {
         $output = instant_remote_process(
-            ["docker ps -a --no-trunc --format '{{.ID}}' | xargs -r docker container inspect --format '{{.Image}}#{{.Name}}' 2>/dev/null || true"],
+            [remoteCommandWithTimeout("docker ps -a --no-trunc --format '{{.ID}}'", 30).' | xargs -r '.remoteCommandWithTimeout("docker container inspect --format '{{.Image}}#{{.Name}}'", 30).' 2>/dev/null || true'],
             $this->server,
-            false
+            false,
+            timeout: 45,
         );
 
         return str($output ?? '')->explode("\n")
@@ -115,7 +163,7 @@ class DockerImages extends Component
     private function diskUsage(): ?array
     {
         $row = format_docker_command_output_to_json(
-            instant_remote_process(["docker system df --format '{{json .}}'"], $this->server, false)
+            instant_remote_process([remoteCommandWithTimeout("docker system df --format '{{json .}}'", 30)], $this->server, false, timeout: 45)
         )->firstWhere('Type', 'Images');
 
         if (! $row) {
@@ -145,9 +193,25 @@ class DockerImages extends Component
             // removed by ID, Docker refuses with "image is referenced in multiple repositories".
             'reference' => $isDangling ? $id : "{$repository}:{$tag}",
             'size' => data_get($image, 'Size'),
+            'size_bytes' => $this->sizeToBytes((string) data_get($image, 'Size')),
             'created' => data_get($image, 'CreatedSince'),
+            // Docker prints "2024-05-01 10:00:00 +0000 UTC"; the trailing zone name breaks strtotime().
+            'created_at' => strtotime(str((string) data_get($image, 'CreatedAt'))->replaceMatches('/ [A-Z]+$/', '')->value()) ?: 0,
             'containers' => $containersByImage[$id] ?? [],
         ];
+    }
+
+    /**
+     * Docker prints sizes with decimal units, for example "512kB", "52.5MB" or "1.2GB".
+     */
+    private function sizeToBytes(string $size): int
+    {
+        if (! preg_match('/^([\d.]+)\s*([kKMGTP]?)B$/', trim($size), $matches)) {
+            return 0;
+        }
+        $exponent = strpos('KMGTP', strtoupper($matches[2]));
+
+        return (int) round((float) $matches[1] * 1000 ** ($matches[2] === '' ? 0 : $exponent + 1));
     }
 
     public function render()
@@ -159,10 +223,30 @@ class DockerImages extends Component
                 ->contains($search, ignoreCase: true));
         }
 
+        $column = $this->sortColumns()[str($this->sort)->beforeLast('_')->value()] ?? null;
+        if ($column) {
+            $images = $images->sortBy(
+                fn (array $image) => [$column($image), $image['reference']],
+                descending: str($this->sort)->endsWith('_desc'),
+            );
+        }
+
+        $this->perPage = max(1, min(100, $this->perPage));
+        $lastPage = max(1, (int) ceil($images->count() / $this->perPage));
+        $page = max(1, min((int) $this->getPage(), $lastPage));
+        if ($page !== $this->getPage()) {
+            $this->setPage($page);
+        }
+
         return view('livewire.server.docker-images', [
             // Not "images": Livewire shares public properties with the view, so that name is
             // already taken by the unfiltered array.
-            'visibleImages' => $images->values(),
+            'visibleImages' => new LengthAwarePaginator(
+                $images->forPage($page, $this->perPage)->values(),
+                $images->count(),
+                $this->perPage,
+                $page,
+            ),
         ]);
     }
 }

@@ -28,23 +28,10 @@ class SettingsBackup extends Component
     #[Locked]
     public $s3s;
 
-    #[Locked]
-    public $executions = [];
-
-    #[Validate(['required'])]
-    public string $uuid;
-
-    #[Validate(['required'])]
-    public string $name;
-
     #[Validate(['nullable'])]
     public ?string $description = null;
 
-    #[Validate(['required'])]
-    public string $postgres_user;
-
-    #[Validate(['required'])]
-    public string $postgres_password;
+    public bool $is_backup_before_update_enabled;
 
     public function mount()
     {
@@ -57,11 +44,7 @@ class SettingsBackup extends Component
         $this->database = StandalonePostgresql::find(0);
         $s3s = S3Storage::whereTeamId(0)->get() ?? [];
         if ($this->database) {
-            $this->uuid = $this->database->uuid;
-            $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $this->postgres_user = $this->database->postgres_user;
-            $this->postgres_password = $this->database->postgres_password;
 
             if ($this->database->status !== 'running') {
                 $this->database->status = 'running';
@@ -72,9 +55,9 @@ class SettingsBackup extends Component
                 $this->backup->enabled = false;
                 $this->backup->save();
             }
-            $this->executions = $this->backup?->executions ?? [];
         }
         $this->settings = $settings;
+        $this->is_backup_before_update_enabled = $settings->is_backup_before_update_enabled;
         $this->s3s = $s3s;
     }
 
@@ -124,14 +107,30 @@ class SettingsBackup extends Component
             }
             $this->s3s = S3Storage::whereTeamId(0)->get();
 
-            $this->uuid = $this->database->uuid;
-            $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $this->postgres_user = $this->database->postgres_user;
-            $this->postgres_password = $this->database->postgres_password;
-            $this->executions = $this->backup->executions;
 
         } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function instantSave()
+    {
+        try {
+            $this->authorize('update', $this->settings);
+            $this->settings->is_backup_before_update_enabled = $this->is_backup_before_update_enabled;
+            $changedFields = auditChangedFields($this->settings);
+            $this->settings->save();
+            if ($changedFields !== []) {
+                auditLog('ui.instance.settings.updated', [
+                    'team_id' => null,
+                    'resource' => 'instance',
+                    'section' => 'backup',
+                    'changed_fields' => $changedFields,
+                ]);
+            }
+            $this->dispatch('success', 'Backup updated.');
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
@@ -142,11 +141,9 @@ class SettingsBackup extends Component
             $this->authorize('update', $this->settings);
             $this->validate();
 
+            // Credentials come from the coolify-db container and are display-only, so only the description is saved.
             $this->database->update([
-                'name' => $this->name,
                 'description' => $this->description,
-                'postgres_user' => $this->postgres_user,
-                'postgres_password' => $this->postgres_password,
             ]);
             $this->dispatch('success', 'Backup updated.');
         } catch (\Throwable $e) {

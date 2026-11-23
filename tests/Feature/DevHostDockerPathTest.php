@@ -60,7 +60,7 @@ beforeEach(function () {
 
     $this->commands = [];
     Process::fake(function ($process) {
-        $this->commands[] = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $this->commands[] = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
         return Process::result(output: '');
     });
@@ -217,7 +217,8 @@ it('mounts the Sentinel database and traffic log directory from the server data 
     expect(StartSentinel::trafficLogDirectory($server))->toBe($directory)
         ->and($script)->toContain("-v {$base}/sentinel:/app/db")
         ->toContain(escapeshellarg("{$directory}:{$directory}:ro"))
-        ->toContain(escapeshellarg("TRAFFIC_ACCESS_LOG_PATH={$directory}/access.log"));
+        ->toContain("--env-file {$base}/sentinel.env")
+        ->and(sentinelEnvFile($script))->toHaveKey('TRAFFIC_ACCESS_LOG_PATH', "{$directory}/access.log");
     if ($kind !== 'testing-host') {
         expect($script)->not->toContain('/var/lib/docker/volumes');
     }

@@ -143,7 +143,7 @@ function runStartSentinelAndCaptureScript(Server $server): string
     Event::fake([SentinelRestarted::class]);
     $scripts = [];
     Process::fake(function ($process) use (&$scripts) {
-        $scripts[] = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $scripts[] = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
         return Process::result(output: '');
     });
@@ -180,6 +180,12 @@ it('starts sentinel with a restart policy so Docker restarts it after a crash or
     expect($script)->toContain('--name coolify-sentinel --restart unless-stopped ');
 });
 
+it('starts sentinel in the host user namespace so --pid host works on a userns-remap daemon', function () {
+    $script = runStartSentinelAndCaptureScript(sentinelTrafficServer($this, 'TRAEFIK', analyticsEnabled: false));
+
+    expect($script)->toContain('--userns host --pid host ');
+});
+
 it('does not touch the access log when traffic analytics cannot run', function (?string $proxyType, bool $analyticsEnabled) {
     $server = sentinelTrafficServer($this, $proxyType, $analyticsEnabled);
 
@@ -187,10 +193,11 @@ it('does not touch the access log when traffic analytics cannot run', function (
 
     $script = runStartSentinelAndCaptureScript($server);
 
+    // The script touches only sentinel.env, which holds the Sentinel variables.
     expect($script)->toContain('docker run -d')
-        ->not->toContain('touch ')
+        ->not->toContain('access.log')
         ->not->toContain('/data/coolify/proxy:/data/coolify/proxy')
-        ->not->toContain('TRAFFIC_ENABLED');
+        ->and(sentinelEnvFile($script))->not->toHaveKey('TRAFFIC_ENABLED');
 })->with([
     'analytics disabled' => ['TRAEFIK', false],
     'proxy none' => ['NONE', true],
@@ -239,7 +246,7 @@ it('mounts the configured dev data volume for traffic logs and Sentinel data on 
 
     expect(StartSentinel::trafficLogDirectory($server))->toBe($directory)
         ->and($script)->toContain(escapeshellarg("{$directory}:{$directory}:ro"))
-        ->toContain(escapeshellarg("TRAFFIC_ACCESS_LOG_PATH={$directory}/access.log"))
         ->toContain('-v /var/lib/docker/volumes/coolify-dev-feature_coolify_data/_data/sentinel:/app/db')
-        ->not->toContain('coolify_dev_coolify_data');
+        ->not->toContain('coolify_dev_coolify_data')
+        ->and(sentinelEnvFile($script))->toHaveKey('TRAFFIC_ACCESS_LOG_PATH', "{$directory}/access.log");
 });

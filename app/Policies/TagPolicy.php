@@ -2,8 +2,10 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
 use App\Models\Tag;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
 
 class TagPolicy
 {
@@ -24,11 +26,13 @@ class TagPolicy
     }
 
     /**
-     * Determine whether the user can create models.
+     * Determine whether the user can create models. Tags are team-wide, so this needs team-wide write.
      */
     public function create(User $user): bool
     {
-        return $user->isAdmin();
+        $teamId = $user->currentTeam()?->id;
+
+        return $teamId !== null && $this->allowsTeamWideWrite($user, (int) $teamId);
     }
 
     /**
@@ -36,7 +40,7 @@ class TagPolicy
      */
     public function update(User $user, Tag $tag): bool
     {
-        return $user->isAdminOfTeam((int) $tag->team_id);
+        return $this->allowsTeamWideWrite($user, (int) $tag->team_id);
     }
 
     /**
@@ -44,7 +48,7 @@ class TagPolicy
      */
     public function delete(User $user, Tag $tag): bool
     {
-        return $user->isAdminOfTeam((int) $tag->team_id);
+        return $this->allowsTeamWideWrite($user, (int) $tag->team_id);
     }
 
     /**
@@ -61,5 +65,10 @@ class TagPolicy
     public function forceDelete(User $user, Tag $tag): bool
     {
         return false;
+    }
+
+    private function allowsTeamWideWrite(User $user, int $teamId): bool
+    {
+        return app(AccessResolver::class)->allowsTeamWide($user, AccessLevel::Write, $teamId);
     }
 }

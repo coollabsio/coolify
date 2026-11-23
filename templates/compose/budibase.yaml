@@ -7,7 +7,7 @@
 
 services:
   app-service:
-    image: budibase.docker.scarf.sh/budibase/apps
+    image: budibase.docker.scarf.sh/budibase/apps:v4.0.1
     environment:
       - SELF_HOSTED=1
       - COUCH_DB_URL=http://$SERVICE_USER_COUCHDB:$SERVICE_PASSWORD_COUCHDB@couchdb-service:5984
@@ -38,7 +38,7 @@ services:
       start_period: 10s
 
   worker-service:
-    image: budibase.docker.scarf.sh/budibase/worker
+    image: budibase.docker.scarf.sh/budibase/worker:v4.0.1
     environment:
       - SELF_HOSTED=1
       - PORT=4003
@@ -66,7 +66,7 @@ services:
       start_period: 10s
 
   minio-service:
-    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
+    image: pgsty/silo:RELEASE.2026-10-15T00-00-00Z # Released on 15 October 2026
     volumes:
       - minio_data:/data
     environment:
@@ -81,7 +81,7 @@ services:
       retries: 10
 
   proxy-service:
-    image: budibase/proxy
+    image: budibase/proxy:v4.0.1
     environment:
       - SERVICE_URL_BUDIBASE_10000
       - PROXY_RATE_LIMIT_WEBHOOKS_PER_SECOND=10
@@ -104,7 +104,7 @@ services:
       start_period: 10s
 
   couchdb-service:
-    image: budibase/database
+    image: budibase/database:2.1.0
     environment:
       - COUCHDB_PASSWORD=$SERVICE_PASSWORD_COUCHDB
       - COUCHDB_USER=$SERVICE_USER_COUCHDB
@@ -119,7 +119,7 @@ services:
       - couchdb3_data:/data
 
   redis-service:
-    image: redis
+    image: redis:8.10.3
     command: redis-server --requirepass "$SERVICE_PASSWORD_REDIS"
     volumes:
       - redis_data:/data

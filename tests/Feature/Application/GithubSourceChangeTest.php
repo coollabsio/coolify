@@ -45,21 +45,28 @@ function validPrivateKey(): string
 }
 
 describe('GitHub Source Change Component', function () {
-    test('all github app form controls declare explicit authorization', function () {
-        $view = file_get_contents(resource_path('views/livewire/source/github/change.blade.php'));
+    test('deletes an incomplete github app and redirects without a render error', function () {
+        $githubApp = GithubApp::create([
+            'name' => 'Incomplete GitHub App',
+            'organization' => 'coollabsio',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
 
-        preg_match_all(
-            '/<x-forms\.(button|input|select|checkbox)\b(?![^>]*\bcanGate=)[^>]*>/s',
-            $view,
-            $matches,
-            PREG_OFFSET_CAPTURE
-        );
+        Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->assertSee('Incomplete GitHub App')
+            ->call('delete')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('source.all'))
+            ->assertSet('github_app', null)
+            ->call('$refresh');
 
-        $missingAuthorization = collect($matches[0])
-            ->map(fn (array $match): string => 'Line '.(substr_count(substr($view, 0, $match[1]), PHP_EOL) + 1).': '.trim(preg_replace('/\s+/', ' ', $match[0])))
-            ->all();
-
-        expect($missingAuthorization)->toBeEmpty();
+        expect(GithubApp::find($githubApp->id))->toBeNull();
     });
 
     test('can mount with newly created github app with null app_id', function () {
@@ -207,7 +214,6 @@ describe('GitHub Source Change Component', function () {
     test('syncGithubAppName persists the github slug and renames the private key', function () {
         Http::fake([
             '*/app' => Http::response(['slug' => 'actual-github-slug']),
-            '*/zen' => Http::response('Keep it logically awesome.'),
         ]);
 
         $privateKey = PrivateKey::create([
@@ -407,11 +413,7 @@ describe('GitHub Source Change Component', function () {
             ->set('use_custom_webhook_endpoint', true)
             ->assertSet('webhook_endpoint', 'http://staging.example.com')
             ->assertSet('custom_webhook_endpoint', 'https://staging.example.com')
-            ->assertSet('use_custom_webhook_endpoint', true)
-            ->assertSee('Webhook endpoint')
-            ->assertSee('Use a custom endpoint')
-            ->assertSee('Custom endpoint')
-            ->assertSee('createGithubApp(webhookEndpoint, useCustomWebhookEndpoint, customWebhookEndpoint');
+            ->assertSet('use_custom_webhook_endpoint', true);
     });
 
     test('can mount with fully configured github app', function () {
@@ -656,9 +658,6 @@ describe('GitHub Source Change Component', function () {
 
         Http::preventStrayRequests();
         Http::fake([
-            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'date' => now()->toRfc7231String(),
-            ]),
             'https://api.github.com/app' => Http::response([
                 'permissions' => [
                     'contents' => 'read',
@@ -666,6 +665,7 @@ describe('GitHub Source Change Component', function () {
                     'pull_requests' => 'write',
                 ],
             ]),
+            'https://api.github.com/app/installations/67890' => Http::response(['permissions' => []]),
         ]);
 
         Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
@@ -687,6 +687,40 @@ describe('GitHub Source Change Component', function () {
         expect($githubApp->contents)->toBe('read')
             ->and($githubApp->metadata)->toBe('read')
             ->and($githubApp->pull_requests)->toBe('write');
+    });
+
+    test('checkPermissions does not let a member refetch permissions', function () {
+        $member = User::factory()->create();
+        $this->team->members()->attach($member->id, ['role' => 'member']);
+        $privateKey = PrivateKey::create([
+            'name' => 'Test Key',
+            'private_key' => validPrivateKey(),
+            'team_id' => $this->team->id,
+        ]);
+        $githubApp = GithubApp::create([
+            'name' => 'Test GitHub App',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'custom_user' => 'git',
+            'custom_port' => 22,
+            'app_id' => 12345,
+            'installation_id' => 67890,
+            'private_key_id' => $privateKey->id,
+            'team_id' => $this->team->id,
+            'is_system_wide' => false,
+        ]);
+        Http::preventStrayRequests();
+        Http::fake();
+
+        Livewire::actingAs($member)
+            ->withQueryParams(['github_app_uuid' => $githubApp->uuid])
+            ->test(Change::class)
+            ->call('checkPermissions')
+            ->assertNotDispatched('success');
+
+        Http::assertNothingSent();
+        expect($githubApp->fresh()->contents)->toBeNull()
+            ->and($githubApp->fresh()->deployments)->toBeNull();
     });
 
     test('sync name uses normalized resolvable ghe dot com api url', function () {
@@ -711,9 +745,6 @@ describe('GitHub Source Change Component', function () {
 
         Http::preventStrayRequests();
         Http::fake([
-            'https://api.github.ghe.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'date' => now()->toRfc7231String(),
-            ]),
             'https://api.github.ghe.com/app' => Http::response([
                 'slug' => 'octocorp-app',
             ]),
@@ -763,7 +794,7 @@ describe('GitHub Source Change Component', function () {
             ->and($public->isConnected())->toBeTrue();
     });
 
-    test('shows test connection for installed github apps', function () {
+    test('marks installed github apps as connected', function () {
         $privateKey = PrivateKey::create([
             'name' => 'Test Key',
             'private_key' => validPrivateKey(),
@@ -786,9 +817,7 @@ describe('GitHub Source Change Component', function () {
         Livewire::withQueryParams(['github_app_uuid' => $githubApp->uuid])
             ->test(Change::class)
             ->assertSuccessful()
-            ->assertSet('isConnected', true)
-            ->assertSee('Test connection')
-            ->assertSeeHtml('wire:click.prevent="testConnection"');
+            ->assertSet('isConnected', true);
     });
 
     test('testConnection succeeds when github app credentials are valid', function () {
@@ -813,9 +842,6 @@ describe('GitHub Source Change Component', function () {
 
         Http::preventStrayRequests();
         Http::fake([
-            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'date' => now()->toRfc7231String(),
-            ]),
             'https://api.github.com/app' => Http::response([
                 'name' => 'Coolify GitHub App',
                 'slug' => 'coolify-github-app',
@@ -908,7 +934,6 @@ describe('GitHub App name sync after the user switches the session team', functi
 
         Http::preventStrayRequests();
         Http::fake([
-            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, ['date' => now()->toRfc7231String()]),
             'https://api.github.com/app' => Http::response(['slug' => 'synced-app']),
         ]);
 

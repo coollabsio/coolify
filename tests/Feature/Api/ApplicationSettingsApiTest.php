@@ -55,6 +55,7 @@ function recommendedApplicationSettingsPayload(): array
         'is_env_sorting_enabled' => true,
         'is_pr_deployments_public_enabled' => true,
         'stop_grace_period' => 45,
+        'rolling_update_drain_seconds' => 12,
         'docker_images_to_keep' => 7,
         'is_gzip_enabled' => false,
         'is_stripprefix_enabled' => false,
@@ -295,6 +296,35 @@ test('deployment parsing keeps commas in raw custom label values', function () {
         ->and($this->application->fresh()->custom_labels)->toBe(base64_encode($labels));
 });
 
+test('http basic auth hash settings are saved and applied to managed labels', function () {
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'is_http_basic_auth_enabled' => true,
+        'http_basic_auth_username' => 'api-user',
+        'http_basic_auth_password' => 'api-password',
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['http_basic_auth_bcrypt_cost' => 4])
+        ->assertOk();
+
+    expect($this->application->fresh()->parseContainerLabels())->toContain('.basicauth.users=api-user:$2y$04$');
+});
+
+test('rejects http basic auth settings that are not supported', function (string $field, mixed $value) {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [$field => $value])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors($field);
+})->with([
+    'Argon2id on a proxy without it' => ['http_basic_auth_hash_algorithm', 'argon2id'],
+    'unknown algorithm' => ['http_basic_auth_hash_algorithm', 'md5'],
+    'bcrypt cost above 14' => ['http_basic_auth_bcrypt_cost', 15],
+    'Argon2id memory above 256 MiB' => ['http_basic_auth_argon2id_memory_cost', 262145],
+    'Argon2id iterations above 12' => ['http_basic_auth_argon2id_time_cost', 13],
+    'password longer than 72 characters' => ['http_basic_auth_password', str_repeat('a', 73)],
+]);
+
 test('rejects invalid boolean application settings', function () {
     $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
         ->patchJson("/api/v1/applications/{$this->application->uuid}", [
@@ -314,6 +344,18 @@ test('validates stop grace period bounds', function (int $stopGracePeriod) {
 })->with([
     'below minimum' => 0,
     'above maximum' => 3601,
+]);
+
+test('validates rolling update drain time bounds', function (int $seconds) {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'rolling_update_drain_seconds' => $seconds,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('rolling_update_drain_seconds');
+})->with([
+    'below minimum' => -1,
+    'above maximum' => 301,
 ]);
 
 test('validates Docker image retention bounds', function (int $dockerImagesToKeep) {
@@ -674,4 +716,79 @@ test('application creation rejects an unsafe Traefik certificate resolver', func
         ->assertJsonValidationErrors('traefik_certificate_resolver');
 
     expect(Application::query()->where('git_repository', 'like', '%resolver-test%')->exists())->toBeFalse();
+});
+
+test('PATCH /api/v1/applications/{uuid} turns off label management and keeps custom labels with new domains', function () {
+    $this->application->settings->update(['is_container_label_readonly_enabled' => true]);
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'custom_labels' => base64_encode('sentinel-label=true'),
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'is_container_label_readonly_enabled' => false,
+            'domains' => 'https://new.example.com',
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+
+    expect($application->settings->is_container_label_readonly_enabled)->toBeFalse()
+        ->and($application->fqdn)->toBe('https://new.example.com')
+        ->and(base64_decode($application->custom_labels))->toBe('sentinel-label=true');
+});
+
+test('PATCH /api/v1/applications/{uuid} regenerates labels when label management is turned back on', function () {
+    $this->application->settings->update(['is_container_label_readonly_enabled' => false]);
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'custom_labels' => base64_encode('sentinel-label=true'),
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'is_container_label_readonly_enabled' => true,
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+    $labels = $application->parseContainerLabels();
+
+    expect($application->settings->is_container_label_readonly_enabled)->toBeTrue()
+        ->and($labels)->not->toContain('sentinel-label=true')
+        ->and($labels)->toContain('app.example.com');
+});
+
+test('application creation keeps custom labels when label management is off', function () {
+    Queue::fake();
+
+    $response = $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/readonly-labels-test',
+            'git_branch' => 'main',
+            'build_pack' => 'nixpacks',
+            'ports_exposes' => '3000',
+            'domains' => 'https://app.example.com',
+            'custom_labels' => base64_encode('sentinel-label=true'),
+            'is_container_label_readonly_enabled' => false,
+        ])
+        ->assertCreated();
+
+    $application = Application::where('uuid', $response->json('uuid'))->firstOrFail();
+
+    expect($application->settings->is_container_label_readonly_enabled)->toBeFalse()
+        ->and(base64_decode($application->custom_labels))->toBe('sentinel-label=true');
+});
+
+test('rejects an invalid is_container_label_readonly_enabled value', function () {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'is_container_label_readonly_enabled' => 'not-a-boolean',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('is_container_label_readonly_enabled');
 });

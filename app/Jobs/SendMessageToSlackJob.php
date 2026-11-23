@@ -71,9 +71,9 @@ class SendMessageToSlackJob implements ShouldBeEncrypted, ShouldQueue
          *
          * @see https://github.com/coollabsio/coolify/pull/6139#issuecomment-3756777708
          */
-        $response = $this->isSlackWebhook()
+        $response = $this->sendNotificationRequest('Slack', $this->webhookUrl, fn () => $this->isSlackWebhook()
             ? $this->sendToSlack($httpOptions)
-            : $this->sendToMattermost($httpOptions);
+            : $this->sendToMattermost($httpOptions));
 
         // 403: posting is not allowed, 404: the webhook or channel was removed, 410: the channel is archived.
         $this->handleNotificationResponse($response, 'Slack', in_array($response->status(), [403, 404, 410], true));

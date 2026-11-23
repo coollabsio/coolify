@@ -9,6 +9,7 @@ use App\Actions\Database\StopDatabaseProxy;
 use App\Actions\Service\StopServiceApplication;
 use App\Actions\Shared\ComplexStatusCheck;
 use App\Events\ServiceChecked;
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
@@ -125,6 +126,11 @@ class GetContainersStatus implements ShouldBeUnique
         $databases = $this->server->databases();
         $services = $this->server->services()->get();
         $previews = $this->server->previews();
+        $upResourceIds = NotifyResourceStoppedJob::upResourceIds(collect($this->applications)
+            ->concat($previews)
+            ->concat($databases)
+            ->concat($services->flatMap(fn ($service) => $service->applications))
+            ->concat($services->flatMap(fn ($service) => $service->databases)));
         $foundApplications = [];
         $foundApplicationPreviews = [];
         $foundDatabases = [];
@@ -241,6 +247,8 @@ class GetContainersStatus implements ShouldBeUnique
                                     })->first();
                                     if (! $foundTcpProxy) {
                                         StartDatabaseProxy::run($service_db);
+                                    } elseif (! $this->server->isSwarm() && StartDatabaseProxy::claimOutdatedRefresh($proxyUuid, data_get($foundTcpProxy, 'Config.Labels'))) {
+                                        StartDatabaseProxy::run($service_db);
                                     }
                                 } else {
                                     // Clean up orphaned proxy when is_public=false
@@ -291,6 +299,8 @@ class GetContainersStatus implements ShouldBeUnique
                                     }
                                 })->first();
                                 if (! $foundTcpProxy) {
+                                    StartDatabaseProxy::run($database);
+                                } elseif (! $this->server->isSwarm() && StartDatabaseProxy::claimOutdatedRefresh($uuid, data_get($foundTcpProxy, 'Config.Labels'))) {
                                     StartDatabaseProxy::run($database);
                                 }
                             } else {
@@ -529,7 +539,9 @@ class GetContainersStatus implements ShouldBeUnique
                         ->where('restart_limit_reached', false)
                         ->update(['restart_limit_reached' => true]) === 1;
 
-                    if ($restartLimitClaimed) {
+                    // Stop again while a container still runs: an earlier stop can fail or come too late.
+                    $stillRunning = $containerStatuses->contains(fn (string $status): bool => ! str($status)->contains('exited'));
+                    if ($restartLimitClaimed || $stillRunning) {
                         $application->refresh();
                         StopApplication::dispatch(
                             application: $application,
@@ -538,6 +550,8 @@ class GetContainersStatus implements ShouldBeUnique
                             resetRestartCount: false,
                             removeContainers: false,
                         );
+                    }
+                    if ($restartLimitClaimed) {
                         $application->environment->project->team?->notify(new ApplicationRestartLimitReached($application));
                     }
                 }
@@ -546,6 +560,8 @@ class GetContainersStatus implements ShouldBeUnique
 
         // Aggregate multi-container service statuses
         $this->aggregateServiceContainerStatuses($services);
+
+        NotifyResourceStoppedJob::dispatchForStopped($upResourceIds);
 
         ServiceChecked::dispatch($this->server->team->id);
     }

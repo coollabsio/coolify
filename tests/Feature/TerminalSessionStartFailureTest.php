@@ -8,10 +8,14 @@ use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Events\RouteMatched;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
@@ -52,7 +56,7 @@ beforeEach(function () {
 function fakeTerminalContainer(string $state, bool $hasShell = true, array $runningContainers = []): void
 {
     Process::fake(function ($process) use ($state, $hasShell, $runningContainers) {
-        $command = (string) $process->command;
+        $command = remoteProcessScript($process);
 
         if (str_contains($command, 'docker ps -a')) {
             return Process::result(output: collect($runningContainers)
@@ -106,6 +110,27 @@ function createTerminalApplication(Server $server, Team $team): Application
     ]);
 }
 
+/**
+ * A degraded service: app0 has exited, app1 and postgres are running.
+ */
+function createDegradedTerminalService(Server $server, Team $team): Service
+{
+    $destination = StandaloneDocker::query()->where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $service = Service::factory()->create([
+        'environment_id' => $environment->id,
+        'server_id' => $server->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+    ServiceApplication::create(['service_id' => $service->id, 'name' => 'app0', 'status' => 'exited']);
+    ServiceApplication::create(['service_id' => $service->id, 'name' => 'app1', 'status' => 'running:unhealthy']);
+    ServiceDatabase::create(['service_id' => $service->id, 'name' => 'postgres', 'status' => 'running:healthy']);
+
+    return $service;
+}
+
 describe('Terminal::sendTerminalCommand', function () {
     it('issues a token for a running container with a shell', function () {
         fakeTerminalContainer('running');
@@ -115,6 +140,25 @@ describe('Terminal::sendTerminalCommand', function () {
             ->assertDispatched('send-terminal-token')
             ->assertNotDispatched(Terminal::SESSION_FAILED_EVENT);
     });
+
+    it('records the client IP in the terminal token like other audit events', function (string $peer, string $expectedIp) {
+        $component = Livewire::test(Terminal::class);
+        $request = Request::create('/', server: [
+            'REMOTE_ADDR' => $peer,
+            'HTTP_X_FORWARDED_FOR' => '203.0.113.42',
+        ]);
+        $request->setTrustedProxies([$peer], Request::HEADER_X_FORWARDED_FOR);
+        app()->instance('request', $request);
+
+        $component->instance()->sendTerminalCommand(false, $this->server->name, $this->server->uuid);
+        $events = \Livewire\store($component->instance())->get('dispatched');
+        $token = $events[0]->serialize()['params'][0];
+
+        expect(Cache::get('terminal-session:'.$token)['client_ip'])->toBe($expectedIp);
+    })->with([
+        'behind the local proxy' => ['127.0.0.1', '203.0.113.42'],
+        'forwarded header from a public peer' => ['198.51.100.7', '198.51.100.7'],
+    ]);
 
     it('reports a stopped container instead of leaving the terminal connecting', function () {
         fakeTerminalContainer('exited');
@@ -152,6 +196,18 @@ describe('Terminal::sendTerminalCommand', function () {
 
         Livewire::test(Terminal::class)
             ->call('sendTerminalCommand', false, $this->server->name, $this->server->uuid)
+            ->assertDispatched(Terminal::SESSION_FAILED_EVENT, message: 'Terminal access is disabled on this server.')
+            ->assertNotDispatched('send-terminal-token');
+
+        Process::assertNothingRan();
+    });
+
+    it('reports a server transferred to another instance without running commands on it', function () {
+        Process::fake();
+        $this->server->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->saveQuietly();
+
+        Livewire::test(Terminal::class)
+            ->call('sendTerminalCommand', true, 'app-container', $this->server->uuid)
             ->assertDispatched(Terminal::SESSION_FAILED_EVENT, message: 'Terminal access is disabled on this server.')
             ->assertNotDispatched('send-terminal-token');
 
@@ -268,5 +324,33 @@ describe('ExecuteContainerCommand', function () {
             ->call('loadContainers')
             ->assertDispatchedTo(Terminal::class, Terminal::AUTO_START_CANCELLED_EVENT)
             ->assertNotDispatched('send-terminal-command');
+    });
+
+    it('lists the running containers of a degraded service', function () {
+        Process::fake();
+        $service = createDegradedTerminalService($this->server, $this->team);
+        bindTerminalRouteParameters(['service_uuid' => $service->uuid]);
+
+        expect($service->fresh()->status)->toStartWith('degraded');
+
+        $component = Livewire::test(ExecuteContainerCommand::class)
+            ->call('loadContainers')
+            ->assertDispatchedTo(Terminal::class, Terminal::AUTO_START_CANCELLED_EVENT);
+
+        expect(collect($component->get('containerOptions'))->pluck('value')->all())->toBe([
+            "{$this->server->uuid}:app1-{$service->uuid}",
+            "{$this->server->uuid}:postgres-{$service->uuid}",
+        ]);
+    });
+
+    it('lists no service containers when terminal access is disabled on the server', function () {
+        Process::fake();
+        $service = createDegradedTerminalService($this->server, $this->team);
+        $this->server->settings->update(['is_terminal_enabled' => false]);
+        bindTerminalRouteParameters(['service_uuid' => $service->uuid]);
+
+        Livewire::test(ExecuteContainerCommand::class)
+            ->call('loadContainers')
+            ->assertSet('containerOptions', []);
     });
 });

@@ -396,6 +396,45 @@ YAML;
         ->and(Yaml::parse($service->fresh()->docker_compose_raw))->toBe(Yaml::parse($dockerCompose));
 });
 
+it('stores the Compose default for a variable that another service references without one', function (string $dockerCompose) {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => Server::factory()->create(['team_id' => $this->team->id])->id,
+        'docker_compose_raw' => $dockerCompose,
+    ]);
+
+    $service->parse();
+
+    expect($service->environment_variables()->where('key', 'POSTGRES_DB')->value('value'))->toBe('umami');
+})->with([
+    'reference before default' => "services:\n  app:\n    image: nginx\n    environment:\n      DATABASE_URL: postgres://user:pass@postgresql:5432/\$POSTGRES_DB\n  postgresql:\n    image: postgres:16-alpine\n    environment:\n      POSTGRES_DB: \${POSTGRES_DB:-umami}\n",
+    'default before reference' => "services:\n  postgresql:\n    image: postgres:16-alpine\n    environment:\n      POSTGRES_DB: \${POSTGRES_DB:-umami}\n  app:\n    image: nginx\n    environment:\n      DATABASE_URL: postgres://user:pass@postgresql:5432/\${POSTGRES_DB}\n",
+]);
+
+it('does not store a nested Compose default for a bare reference', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => Server::factory()->create(['team_id' => $this->team->id])->id,
+        'docker_compose_raw' => "services:\n  app:\n    image: alpine\n    environment:\n      DB: \${DB:-\${APP_NAME}}\n      URL: postgres://db/\$DB\n",
+    ]);
+
+    $service->parse();
+
+    expect($service->environment_variables()->where('key', 'DB')->firstOrFail()->value)->toBeNull();
+});
+
+it('does not store a Compose default when the defaults for a bare reference conflict', function () {
+    $service = Service::factory()->create([
+        'environment_id' => $this->environment->id,
+        'server_id' => Server::factory()->create(['team_id' => $this->team->id])->id,
+        'docker_compose_raw' => "services:\n  app:\n    image: alpine\n    environment:\n      LEVEL: \${LEVEL:-info}\n      LOG: level=\$LEVEL\n  worker:\n    image: alpine\n    environment:\n      LEVEL: \${LEVEL:-warn}\n",
+    ]);
+
+    $service->parse();
+
+    expect($service->environment_variables()->where('key', 'LEVEL')->firstOrFail()->value)->toBeNull();
+});
+
 it('keeps editable and literal rows when services use the same key differently', function () {
     $service = Service::factory()->create([
         'environment_id' => $this->environment->id,

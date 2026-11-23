@@ -7,7 +7,7 @@
 
 services:
   docling-serve:
-    image: ghcr.io/docling-project/docling-serve-cpu:latest
+    image: ghcr.io/docling-project/docling-serve-cpu:v1.38.2
     environment:
       - SERVICE_URL_DOCLING_5001
       - DOCLING_SERVE_ENABLE_UI=${DOCLING_SERVE_ENABLE_UI:-true}

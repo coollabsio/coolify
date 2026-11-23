@@ -125,7 +125,7 @@ class ServerDockerRegistriesController extends Controller
 
     #[OA\Post(
         summary: 'Log in to a registry on a server',
-        description: 'Run docker login on the server, writing to the Docker config that deployments use. Logging in again to the same registry replaces the saved login.',
+        description: 'Run docker login on the server, writing to the Docker config that deployments use. Logging in again to the same registry replaces the saved login. Needs a token with the write and deploy permissions.',
         path: '/servers/{uuid}/registries',
         operationId: 'login-server-registry',
         security: [['bearerAuth' => []]],
@@ -158,6 +158,7 @@ class ServerDockerRegistriesController extends Controller
             ),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],
@@ -230,7 +231,7 @@ class ServerDockerRegistriesController extends Controller
 
     #[OA\Post(
         summary: 'Check a registry login on a server',
-        description: 'Check that the saved login of the server for a registry still works. Runs docker login with the saved credentials on the server.',
+        description: 'Check that the saved login of the server for a registry still works. Runs docker login with the saved credentials on the server. Needs a token with the write and deploy permissions.',
         path: '/servers/{uuid}/registries/{registry}/check',
         operationId: 'check-server-registry-login',
         security: [['bearerAuth' => []]],

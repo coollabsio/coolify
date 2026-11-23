@@ -2,6 +2,8 @@
 
 namespace App\Actions\Development;
 
+use App\Enums\ProxyStatus;
+use App\Enums\ProxyTypes;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use InvalidArgumentException;
@@ -31,10 +33,13 @@ class SeedDevelopmentQemuServer
         }
 
         if ($removeOtherServers) {
+            // A server that still has resources stays, because its resources need it.
             Server::query()
                 ->where('uuid', 'like', 'development-qemu-%')
                 ->where('uuid', '!=', $profile['uuid'])
-                ->delete();
+                ->get()
+                ->filter(fn (Server $server) => $server->definedResources()->isEmpty())
+                ->each->delete();
         }
 
         $server = $asLocalhost
@@ -50,6 +55,10 @@ class SeedDevelopmentQemuServer
             'team_id' => 0,
             'private_key_id' => $privateKey->id,
         ]);
+        if (! $server->proxyType()) {
+            $server->proxy->set('type', ProxyTypes::CADDY->value);
+            $server->proxy->set('status', ProxyStatus::EXITED->value);
+        }
         $server->deleted_at = null;
         $server->save();
 

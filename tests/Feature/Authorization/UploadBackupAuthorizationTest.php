@@ -174,7 +174,12 @@ test('member gets 403 from POST /upload/backup and no file lands on disk', funct
     expect(File::exists($uploadDir.'/restore'))->toBeFalse();
 });
 
-test('user from different team hits null-resource branch with 500', function () {
+test('user from different team gets 404 from POST /upload/backup and no file lands on disk', function () {
+    $uploadDir = storage_path('app/upload/'.$this->database->uuid);
+    if (File::exists($uploadDir)) {
+        File::deleteDirectory($uploadDir);
+    }
+
     $otherTeam = Team::factory()->create();
     $otherUser = User::factory()->create();
     $otherUser->teams()->attach($otherTeam, ['role' => 'admin']);
@@ -182,9 +187,31 @@ test('user from different team hits null-resource branch with 500', function () 
     $this->actingAs($otherUser);
     session(['currentTeam' => $otherTeam]);
 
-    $response = $this->post(route('upload.backup', ['databaseUuid' => $this->database->uuid]));
+    $response = $this->withHeader('Accept', 'application/json')
+        ->post(route('upload.backup', ['databaseUuid' => $this->database->uuid]));
 
-    $response->assertStatus(500);
+    $response->assertNotFound();
+    $response->assertJsonMissing(['error' => 'You do not have permission for this database']);
+
+    expect(File::exists($uploadDir.'/restore'))->toBeFalse();
+});
+
+test('unknown database uuid gets 404 from POST /upload/backup and no file lands on disk', function () {
+    $unknownUuid = (string) Str::uuid();
+    $uploadDir = storage_path('app/upload/'.$unknownUuid);
+    if (File::exists($uploadDir)) {
+        File::deleteDirectory($uploadDir);
+    }
+
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    $response = $this->withHeader('Accept', 'application/json')
+        ->post(route('upload.backup', ['databaseUuid' => $unknownUuid]));
+
+    $response->assertNotFound();
+
+    expect(File::exists($uploadDir.'/restore'))->toBeFalse();
 });
 
 test('unauthenticated request is redirected to login', function () {

@@ -153,6 +153,29 @@ class FileStorage extends Component
         return [];
     }
 
+    /**
+     * Switches a storage that kept its saved host path to the path that its Compose variable gives. The next
+     * deployment mounts the new path; the data at the saved path stays where it is.
+     */
+    public function useVariablePath(): void
+    {
+        $this->authorize('update', $this->resource);
+
+        $variablePath = $this->fileStorage->variable_fs_path;
+        if (blank($variablePath)) {
+            $this->dispatch('error', 'This storage already uses the path of its variable.');
+
+            return;
+        }
+        $this->fileStorage->fs_path = $variablePath;
+        $this->fileStorage->variable_fs_path = null;
+        $changedFields = auditChangedFields($this->fileStorage);
+        $this->fileStorage->save();
+        $this->auditFileStorageUpdate($changedFields, 'switched_to_variable_path');
+        $this->fs_path = $variablePath;
+        $this->dispatch('success', 'The storage uses the path of its variable from the next deployment.');
+    }
+
     public function convertToDirectory()
     {
         try {
@@ -167,10 +190,12 @@ class FileStorage extends Component
             $this->fileStorage->content = null;
             $this->fileStorage->is_based_on_git = false;
             $changedFields = auditChangedFields($this->fileStorage);
-            $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
+            $this->fileStorage->save();
             $this->auditFileStorageUpdate($changedFields, 'converted_to_directory');
         } catch (\Throwable $e) {
+            $this->fileStorage->refresh();
+
             return handleError($e, $this);
         } finally {
             $this->dispatch('storageCountsChanged')->to(Storage::class);
@@ -216,10 +241,12 @@ class FileStorage extends Component
                 $this->fileStorage->is_based_on_git = true;
             }
             $changedFields = auditChangedFields($this->fileStorage);
-            $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
+            $this->fileStorage->save();
             $this->auditFileStorageUpdate($changedFields, 'converted_to_file');
         } catch (\Throwable $e) {
+            $this->fileStorage->refresh();
+
             return handleError($e, $this);
         } finally {
             $this->dispatch('storageCountsChanged')->to(Storage::class);
@@ -228,7 +255,7 @@ class FileStorage extends Component
 
     public function delete($password, $selectedActions = [])
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('delete', $this->resource);
 
         if (! verifyPasswordConfirmation($password, $this)) {
             return 'The provided password is incorrect.';

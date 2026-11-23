@@ -30,7 +30,7 @@ beforeEach(function () {
     $this->environment = Environment::factory()->create(['project_id' => $this->project->id]);
 });
 
-test('public application api converts scp-style ssh urls to https', function () {
+test('public application api converts ssh urls to https', function (string $gitRepository) {
     $response = $this->withHeaders([
         'Authorization' => 'Bearer '.$this->bearerToken,
         'Content-Type' => 'application/json',
@@ -38,7 +38,7 @@ test('public application api converts scp-style ssh urls to https', function () 
         'project_uuid' => $this->project->uuid,
         'environment_uuid' => $this->environment->uuid,
         'server_uuid' => $this->server->uuid,
-        'git_repository' => 'custom-user@git.example.com:2222/organization/repository.git',
+        'git_repository' => $gitRepository,
         'git_branch' => 'main',
         'build_pack' => 'nixpacks',
         'ports_exposes' => '3000',
@@ -50,4 +50,7 @@ test('public application api converts scp-style ssh urls to https', function () 
     $application = Application::where('uuid', $response->json('uuid'))->firstOrFail();
 
     expect($application->git_repository)->toBe('https://git.example.com/organization/repository.git');
-});
+})->with([
+    'scp-style with port' => 'custom-user@git.example.com:2222/organization/repository.git',
+    'ssh scheme with port' => 'ssh://custom-user@git.example.com:2222/organization/repository.git',
+]);

@@ -7,6 +7,7 @@ use App\Events\ProxyStatusChanged;
 use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
 use App\Services\ProxyPortParser;
+use Illuminate\Support\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Lorisleiva\Actions\Decorators\JobDecorator;
 use Spatie\Activitylog\Models\Activity;
@@ -40,12 +41,34 @@ class StartProxy
             ProxyStatusChangedUI::dispatch($server->team_id);
         }
 
+        SaveProxyConfiguration::run($server, $configuration);
+        $server->markProxyConfigurationApplied($configuration);
+        $commands = self::startCommands($server);
+
+        if ($async) {
+            $server->markProxyTransitionStarted();
+
+            return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: ProxyStatusChanged::dataFor($server), queue: deployment_queue());
+        } else {
+            instant_remote_process($commands, $server);
+
+            $server->proxy->set('type', $proxyType);
+            $server->save();
+            ProxyStatusChanged::dispatch(ProxyStatusChanged::dataFor($server));
+
+            return 'OK';
+        }
+    }
+
+    /**
+     * Commands that start or restart the proxy. They remove an existing proxy container only after the image pull.
+     */
+    public static function startCommands(Server $server): Collection
+    {
         $commands = collect([]);
         $proxy_path = $server->proxyPath();
         // Absolute paths: a non-root SSH user may not be able to enter the proxy directory (#4255).
         $compose_file = rtrim($proxy_path, '/').'/docker-compose.yml';
-        SaveProxyConfiguration::run($server, $configuration);
-        $server->markProxyConfigurationApplied($configuration);
 
         if ($server->isSwarmManager()) {
             $commands = $commands->merge([
@@ -56,16 +79,17 @@ class StartProxy
                 "echo 'Successfully started coolify-proxy.'",
             ]);
         } else {
-            $caddyfile = 'import /dynamic/*.caddy';
+            // The base Caddyfile also holds the maintenance blocks (see Server::caddyBaseCaddyfile()).
+            $caddyfile = base64_encode($server->caddyBaseCaddyfile());
             $commands = $commands->merge([
                 "mkdir -p $proxy_path/dynamic",
-                "echo '$caddyfile' | tee $proxy_path/dynamic/Caddyfile > /dev/null",
+                "echo '$caddyfile' | base64 -d | tee $proxy_path/dynamic/Caddyfile > /dev/null",
                 "echo 'Creating required Docker Compose file.'",
                 "echo 'Pulling docker image.'",
-                "docker compose -f $compose_file pull",
+                serverDockerConfigPrefix($server)."docker compose -f $compose_file pull",
                 'if docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
                 "    echo 'Stopping and removing existing coolify-proxy.'",
-                '    docker stop coolify-proxy 2>/dev/null || true',
+                '    '.dockerStopCommand(30, 'coolify-proxy', $server).' 2>/dev/null || true',
                 '    docker rm -f coolify-proxy 2>/dev/null || true',
                 '    # Wait for container to be fully removed',
                 '    for i in {1..10}; do',
@@ -78,7 +102,7 @@ class StartProxy
                 "    echo 'Successfully stopped and removed existing coolify-proxy.'",
                 'fi',
             ]);
-            if ($proxyType !== ProxyTypes::TRAEFIK->value) {
+            if ($server->proxyType() !== ProxyTypes::TRAEFIK->value) {
                 // The sidecar belongs to the Traefik compose project, so --remove-orphans of another proxy keeps it.
                 $commands->push('docker rm -f '.TRAEFIK_LOGROTATE_CONTAINER.' 2>/dev/null || true');
             }
@@ -92,16 +116,6 @@ class StartProxy
             $commands = $commands->merge(connectProxyToNetworks($server));
         }
 
-        if ($async) {
-            return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: $server->id, queue: deployment_queue());
-        } else {
-            instant_remote_process($commands, $server);
-
-            $server->proxy->set('type', $proxyType);
-            $server->save();
-            ProxyStatusChanged::dispatch($server->id);
-
-            return 'OK';
-        }
+        return $commands;
     }
 }

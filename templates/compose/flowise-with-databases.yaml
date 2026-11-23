@@ -4,10 +4,11 @@
 # tags: lowcode, nocode, ai, llm, openai, anthropic, machine-learning, rag, agents, chatbot, api, team, bot, flows
 # logo: svgs/flowise.png
 # port: 3001
+# outdated: true
 
 services:
   flowise:
-    image: flowiseai/flowise:latest
+    image: flowiseai/flowise:3.1.3
     depends_on:
       pg-record-manager:
         condition: service_healthy
@@ -20,15 +21,15 @@ services:
       - DEBUG=${DEBUG:-false}
       - DISABLE_FLOWISE_TELEMETRY=${DISABLE_FLOWISE_TELEMETRY:-true}
       - PORT=${PORT:-3001}
-      - DATABASE_PATH=/root/.flowise
-      - APIKEY_PATH=/root/.flowise
-      - SECRETKEY_PATH=/root/.flowise
-      - LOG_PATH=/root/.flowise/logs
-      - BLOB_STORAGE_PATH=/root/.flowise/storage
+      - DATABASE_PATH=/home/node/.flowise
+      - APIKEY_PATH=/home/node/.flowise
+      - SECRETKEY_PATH=/home/node/.flowise
+      - LOG_PATH=/home/node/.flowise/logs
+      - BLOB_STORAGE_PATH=/home/node/.flowise/storage
       - FLOWISE_USERNAME=${SERVICE_USER_FLOWISE}
       - FLOWISE_PASSWORD=${SERVICE_PASSWORD_FLOWISE}
     volumes:
-      - flowise-data:/root/.flowise
+      - flowise-data:/home/node
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001 || exit 1"]
       interval: 5s
@@ -65,7 +66,7 @@ services:
       retries: 3
 
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:v1.20.1
     environment:
       - SERVICE_URL_QDRANT_6333
       - QDRANT__SERVICE__API_KEY=${SERVICE_PASSWORD_QDRANTAPIKEY}

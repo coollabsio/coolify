@@ -3,6 +3,7 @@
 use App\Actions\Fortify\CreateNewUser;
 use App\Models\InstanceSettings;
 use App\Models\OauthSetting;
+use App\Support\RootSetupWindow;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Once;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -10,6 +11,8 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    RootSetupWindow::openIfNoUserExists();
+
     InstanceSettings::forceCreate([
         'id' => 0,
         'is_registration_enabled' => true,

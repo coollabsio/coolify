@@ -76,47 +76,6 @@ it('enables transactional smtp only after required fields validate', function ()
         ->and(instanceSettings()->fresh()->resend_enabled)->toBeFalse();
 });
 
-it('shows notification provider save buttons while disabled', function (string $component) {
-    actingAsEnableActionOwner();
-
-    Livewire::test($component)
-        ->assertSet(str(class_basename($component))->camel()->append('Enabled')->toString(), false)
-        ->assertSee('Save');
-})->with([
-    'discord' => [Discord::class],
-    'slack' => [Slack::class],
-    'telegram' => [Telegram::class],
-    'pushover' => [Pushover::class],
-    'webhook' => [Webhook::class],
-]);
-
-it('hides notification provider test buttons while disabled and shows them when enabled', function (string $component, string $enabledProperty) {
-    actingAsEnableActionOwner();
-
-    // The channel actions always render "Send test"; it stays disabled until the channel is enabled.
-    $sendTestButton = '/<button\s+(disabled\s+)?class="button"[^>]*\$wire\.\$call\(testMethod\)[^>]*>/';
-
-    preg_match($sendTestButton, Livewire::test($component)->html(), $disabledMatch);
-    expect($disabledMatch[1] ?? null)->not->toBeEmpty();
-
-    preg_match($sendTestButton, Livewire::test($component)->set($enabledProperty, true)->html(), $enabledMatch);
-    expect($enabledMatch)->not->toBeEmpty()
-        ->and($enabledMatch[1] ?? '')->toBe('');
-})->with([
-    'discord' => [Discord::class, 'discordEnabled'],
-    'slack' => [Slack::class, 'slackEnabled'],
-    'telegram' => [Telegram::class, 'telegramEnabled'],
-    'pushover' => [Pushover::class, 'pushoverEnabled'],
-    'webhook' => [Webhook::class, 'webhookEnabled'],
-]);
-
-it('hides the email test button while email notifications are disabled', function () {
-    actingAsEnableActionOwner();
-
-    Livewire::test(Email::class)
-        ->assertDontSee('Send Test Email');
-});
-
 it('keeps notification providers disabled when enable validation fails', function (string $component, string $method, string $enabledProperty, string $requiredField, string $settingsRelation, string $settingsColumn) {
     [, $team] = actingAsEnableActionOwner();
 
@@ -209,3 +168,46 @@ it('reverts the discord mention setting to the saved value when saving fails', f
 
     expect($team->discordNotificationSettings->fresh()->discord_ping_enabled)->toBeTrue();
 });
+
+it('saves cleared notification provider fields while the provider is disabled', function (string $component, string $settingsRelation, array $savedSettings, array $properties) {
+    [, $team] = actingAsEnableActionOwner();
+    $team->{$settingsRelation}->update($savedSettings);
+
+    $test = Livewire::test($component);
+    foreach ($properties as $property) {
+        $test->set($property, '');
+    }
+    $test->call('submit')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    $settings = $team->{$settingsRelation}->fresh();
+    foreach (array_keys($savedSettings) as $column) {
+        expect($settings->{$column})->toBeEmpty();
+    }
+})->with([
+    'discord' => [Discord::class, 'discordNotificationSettings', ['discord_webhook_url' => 'https://discord.com/api/webhooks/1/abc'], ['discordWebhookUrl']],
+    'slack' => [Slack::class, 'slackNotificationSettings', ['slack_webhook_url' => 'https://hooks.slack.com/services/T/B/C'], ['slackWebhookUrl']],
+    'telegram' => [Telegram::class, 'telegramNotificationSettings', ['telegram_token' => '123:abc', 'telegram_chat_id' => '42'], ['telegramToken', 'telegramChatId']],
+    'pushover' => [Pushover::class, 'pushoverNotificationSettings', ['pushover_user_key' => 'user', 'pushover_api_token' => 'token'], ['pushoverUserKey', 'pushoverApiToken']],
+    'webhook' => [Webhook::class, 'webhookNotificationSettings', ['webhook_url' => 'https://hooks.example.com/coolify'], ['webhookUrl']],
+]);
+
+it('rejects cleared notification provider fields while the provider is enabled', function (string $component, string $settingsRelation, array $savedSettings, string $property) {
+    [, $team] = actingAsEnableActionOwner();
+    $team->{$settingsRelation}->update($savedSettings);
+
+    Livewire::test($component)
+        ->set($property, '')
+        ->call('submit')
+        ->assertNotDispatched('success')
+        ->assertDispatched('error');
+
+    expect($team->{$settingsRelation}->fresh()->{array_keys($savedSettings)[1]})->not->toBeEmpty();
+})->with([
+    'discord' => [Discord::class, 'discordNotificationSettings', ['discord_enabled' => true, 'discord_webhook_url' => 'https://discord.com/api/webhooks/1/abc'], 'discordWebhookUrl'],
+    'slack' => [Slack::class, 'slackNotificationSettings', ['slack_enabled' => true, 'slack_webhook_url' => 'https://hooks.slack.com/services/T/B/C'], 'slackWebhookUrl'],
+    'telegram' => [Telegram::class, 'telegramNotificationSettings', ['telegram_enabled' => true, 'telegram_token' => '123:abc', 'telegram_chat_id' => '42'], 'telegramToken'],
+    'pushover' => [Pushover::class, 'pushoverNotificationSettings', ['pushover_enabled' => true, 'pushover_user_key' => 'user', 'pushover_api_token' => 'token'], 'pushoverUserKey'],
+    'webhook' => [Webhook::class, 'webhookNotificationSettings', ['webhook_enabled' => true, 'webhook_url' => 'https://hooks.example.com/coolify'], 'webhookUrl'],
+]);

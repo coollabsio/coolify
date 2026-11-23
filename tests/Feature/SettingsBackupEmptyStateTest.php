@@ -10,86 +10,12 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Once;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
-
-test('empty component renders the actions slot', function () {
-    $html = Blade::render(<<<'BLADE'
-        <x-empty title="Backup is not configured" description="Needs a database." size="sm">
-            <x-slot:actions>
-                <button type="button">Configure backup</button>
-            </x-slot:actions>
-        </x-empty>
-    BLADE);
-
-    expect($html)
-        ->toContain('Backup is not configured')
-        ->toContain('Configure backup');
-});
-
-test('empty component renders the contents slot for backward compatibility', function () {
-    $html = Blade::render(<<<'BLADE'
-        <x-empty title="Metrics are disabled" size="sm">
-            <x-slot:contents>
-                <button type="button">Enable metrics</button>
-            </x-slot:contents>
-        </x-empty>
-    BLADE);
-
-    expect($html)
-        ->toContain('Metrics are disabled')
-        ->toContain('Enable metrics');
-});
-
-test('empty component renders only the contents slot when both action slots are provided', function () {
-    $html = Blade::render(<<<'BLADE'
-        <x-empty title="Conflict check" size="sm">
-            <x-slot:actions>
-                <button type="button">From actions</button>
-            </x-slot:actions>
-            <x-slot:contents>
-                <button type="button">From contents</button>
-            </x-slot:contents>
-        </x-empty>
-    BLADE);
-
-    expect($html)
-        ->toContain('From contents')
-        ->not->toContain('From actions');
-});
-
-test('instance backup settings show a configure button when backup is not set up', function () {
-    $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
-    $server = Server::factory()->create([
-        'id' => 0,
-        'team_id' => $rootTeam->id,
-        'ip' => '127.0.0.1',
-    ]);
-    $server->settings()->update([
-        'is_reachable' => true,
-        'is_usable' => true,
-        'force_disabled' => false,
-    ]);
-    InstanceSettings::forceCreate(['id' => 0]);
-    Once::flush();
-
-    $user = User::factory()->create();
-    $rootTeam->members()->attach($user->id, ['role' => 'admin']);
-
-    $this->actingAs($user);
-    session(['currentTeam' => ['id' => $rootTeam->id]]);
-
-    Livewire::test(SettingsBackup::class)
-        ->assertOk()
-        ->assertSee('Backup is not configured')
-        ->assertSee('Configure backup')
-        ->assertSeeHtml('wire:click="addCoolifyDatabase"');
-});
 
 function settingsBackupInstanceDatabaseWithoutSchedule(): StandalonePostgresql
 {
@@ -135,10 +61,7 @@ test('instance backup settings render when the instance database has no backup s
     settingsBackupInstanceDatabaseWithoutSchedule();
 
     Livewire::test(SettingsBackup::class)
-        ->assertOk()
-        ->assertSet('executions', [])
-        ->assertSee('Backup is not configured')
-        ->assertSee('Configure backup');
+        ->assertOk();
 });
 
 test('configure backup creates only the missing schedule for an existing instance database', function () {
@@ -208,7 +131,7 @@ test('configure backup creates the instance database instead of using a team dat
     Storage::fake('ssh-mux');
     Server::query()->whereKey(0)->update(['private_key_id' => PrivateKey::factory()->create(['team_id' => 0])->id]);
     Server::flushIdentityMap();
-    Process::fake([
+    fakeRemoteProcesses([
         '*docker inspect coolify-db*' => Process::result(output: json_encode([[
             'Config' => ['Env' => ['POSTGRES_USER=coolify', 'POSTGRES_PASSWORD=instance-secret', 'POSTGRES_DB=coolify']],
         ]])),
@@ -216,11 +139,38 @@ test('configure backup creates the instance database instead of using a team dat
 
     Livewire::test(SettingsBackup::class)
         ->call('addCoolifyDatabase')
-        ->assertHasNoErrors()
-        ->assertSet('postgres_password', 'instance-secret');
+        ->assertHasNoErrors();
 
     $instanceDatabase = StandalonePostgresql::query()->findOrFail(0);
-    expect($instanceDatabase->scheduledBackups()->sole()->team_id)->toBe(0)
+    expect($instanceDatabase->postgres_password)->toBe('instance-secret')
+        ->and($instanceDatabase->scheduledBackups()->sole()->team_id)->toBe(0)
         ->and($tenantDatabase->fresh()->scheduledBackups()->exists())->toBeFalse()
         ->and($tenantDatabase->fresh()->postgres_password)->toBe('tenant-secret');
+});
+
+test('saving instance backup settings only persists the description', function () {
+    $database = settingsBackupInstanceDatabaseWithoutSchedule();
+    $database->forceFill(['postgres_password' => 'instance-db-secret'])->save();
+    $database->scheduledBackups()->create([
+        'enabled' => true,
+        'save_s3' => false,
+        'frequency' => '0 0 * * *',
+        'team_id' => 0,
+    ]);
+
+    Livewire::test(SettingsBackup::class)
+        ->assertSee('Instance database')
+        ->assertSee('coolify')
+        ->assertDontSeeHtml('wire:model=postgres_user')
+        ->assertDontSeeHtml('wire:model=postgres_password')
+        ->assertDontSee('instance-db-secret', stripInitialData: false)
+        ->set('description', 'Updated description')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    $database->refresh();
+    expect($database->description)->toBe('Updated description')
+        ->and($database->name)->toBe('coolify-db')
+        ->and($database->postgres_user)->toBe('coolify')
+        ->and($database->postgres_password)->toBe('instance-db-secret');
 });

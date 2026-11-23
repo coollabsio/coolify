@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Collection;
 use OpenApi\Attributes as OA;
@@ -22,7 +23,7 @@ use OpenApi\Attributes as OA;
 class Project extends BaseModel
 {
     use Auditable, HasFactory;
-    use ClearsGlobalSearchCache;
+    use ClearsGlobalSearchCache, ScopedByAccessGrants;
     use HasSafeStringAttribute;
 
     protected $fillable = [
@@ -31,6 +32,15 @@ class Project extends BaseModel
         'team_id',
         'uuid',
     ];
+
+    protected array $auditExclude = ['canvas_position'];
+
+    protected function casts(): array
+    {
+        return [
+            'canvas_position' => 'array',
+        ];
+    }
 
     /**
      * Get query builder for projects owned by current team.

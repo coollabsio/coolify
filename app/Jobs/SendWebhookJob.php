@@ -71,7 +71,7 @@ class SendWebhookJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        $response = Http::withOptions($httpOptions)->post($this->webhookUrl, $this->payload);
+        $response = $this->sendNotificationRequest('Webhook', $this->webhookUrl, fn () => Http::withOptions($httpOptions)->post($this->webhookUrl, $this->payload));
 
         // 401/403: the endpoint rejects us, 404/410: the endpoint does not exist anymore.
         $this->handleNotificationResponse($response, 'Webhook', in_array($response->status(), [401, 403, 404, 410], true));

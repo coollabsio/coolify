@@ -3,14 +3,14 @@
 # tags: jitsi,video,conference,webrtc,meeting,self-hosted
 # category: productivity
 # logo: svgs/jitsi.svg
-# port: 80
+# port: 8000
 
 services:
   jitsi-web:
-    image: "jitsi/web:stable-10888"
+    image: "ghcr.io/jitsi/web:stable-11509"
     restart: unless-stopped
     environment:
-      - SERVICE_URL_JITSI
+      - SERVICE_URL_JITSI_8000
       - PUBLIC_URL=$SERVICE_URL_JITSI
       - ENABLE_AUTH=0
       - ENABLE_GUESTS=1
@@ -34,18 +34,19 @@ services:
       - jvb
     volumes:
       - jitsi-web:/config
+      - jitsi-web-storage:/storage
     networks:
       meet.jitsi:
         aliases:
           - meet.jitsi
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
       interval: 5s
       timeout: 10s
       retries: 15
 
   prosody:
-    image: "jitsi/prosody:stable-10888"
+    image: "ghcr.io/jitsi/prosody:stable-11509"
     restart: unless-stopped
     environment:
       - AUTH_TYPE=internal
@@ -64,6 +65,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
       - jitsi-prosody:/config
+      - jitsi-prosody-data:/var/lib/prosody
     networks:
       meet.jitsi:
         aliases:
@@ -77,7 +79,7 @@ services:
       retries: 15
 
   jicofo:
-    image: "jitsi/jicofo:stable-10888"
+    image: "ghcr.io/jitsi/jicofo:stable-11509"
     restart: unless-stopped
     environment:
       - AUTH_TYPE=internal
@@ -105,7 +107,7 @@ services:
       retries: 15
 
   jvb:
-    image: "jitsi/jvb:stable-10888"
+    image: "ghcr.io/jitsi/jvb:stable-11509"
     restart: unless-stopped
     ports:
       - "10000:10000/udp"

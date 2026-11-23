@@ -68,12 +68,12 @@ it('streams a large compose file over stdin instead of the command line', functi
     expect($composeWrite)->not->toBeNull()
         ->and($composeWrite['command'])->toEndWith(escapeshellarg("{$tee} '{$workdir}/docker-compose.yml' > /dev/null"));
 
-    $envWrite = $this->processes->first(fn (array $process) => $process['input'] === 'SERVICE_NAME_APP=app');
+    $envWrite = $this->processes->first(fn (array $process) => $process['input'] === "SERVICE_NAME_APP=app\nCOOLIFY_RESOURCE_UUID={$this->service->uuid}");
     expect($envWrite)->not->toBeNull()
         ->and($envWrite['command'])->toMatch('/'.preg_quote($tee, '/').' \S+\.env\.tmp/');
 
     $this->processes->each(fn (array $process) => expect(strlen($process['command']))->toBeLessThan(8 * 1024));
-    expect($this->processes->last()['command'])->toMatch('/mv \S+\.env\.tmp '.preg_quote($workdir, '/').'\/\.env/');
+    expect($this->processes->last()['command']."\n".$this->processes->last()['input'])->toMatch('/mv \S+\.env\.tmp '.preg_quote($workdir, '/').'\/\.env/');
 })->with([
     'root' => ['root', 'tee'],
     'non-root' => ['cooluser', 'sudo tee'],

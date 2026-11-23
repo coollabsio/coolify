@@ -4,6 +4,7 @@ namespace App\Actions\Service;
 
 use App\Models\ServiceApplication;
 use App\Services\Dns\ManagedDnsRecordCleanup;
+use App\Services\Dns\ResourceDnsRecords;
 use App\Support\ServiceComposeUrl;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,7 @@ class UpdateServiceApplicationFromApi
         $forceDomainOverride = $request->boolean('force_domain_override');
         $dnsCleanup = app(ManagedDnsRecordCleanup::class);
         $previousDnsHostnames = $dnsCleanup->hostnamesOf($serviceApplication->fresh() ?? $serviceApplication);
+        $previousServiceDnsHostnames = array_keys(app(ResourceDnsRecords::class)->hostnameUsers($serviceApplication->service));
 
         if (array_key_exists('url', $payload)) {
             $urlRaw = $payload['url'];
@@ -67,6 +69,16 @@ class UpdateServiceApplicationFromApi
             $serviceApplication->setNoindexDomains($payload['noindex_domains'] ?? []);
         }
 
+        if (array_key_exists('redirect', $payload)) {
+            if (in_array($payload['redirect'], ['www', 'non-www'], true) && ! $this->hasWwwAndNonWwwDomains($serviceApplication->fqdn)) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => ['redirect' => ['The www and non-www redirects need both a www and a non-www domain in url.']],
+                ], 422);
+            }
+            $serviceApplication->redirect = $payload['redirect'];
+        }
+
         if (array_key_exists('human_name', $payload)) {
             $serviceApplication->human_name = $payload['human_name'];
         }
@@ -99,6 +111,10 @@ class UpdateServiceApplicationFromApi
             $serviceApplication->is_force_https_enabled = filter_var($payload['is_force_https_enabled'], FILTER_VALIDATE_BOOLEAN);
         }
 
+        if (array_key_exists('is_permanent_redirect_enabled', $payload)) {
+            $serviceApplication->is_permanent_redirect_enabled = filter_var($payload['is_permanent_redirect_enabled'], FILTER_VALIDATE_BOOLEAN);
+        }
+
         if (array_key_exists('max_restart_count', $payload)) {
             $serviceApplication->max_restart_count = $payload['max_restart_count'];
             $serviceApplication->restart_limit_reached = false;
@@ -121,9 +137,20 @@ class UpdateServiceApplicationFromApi
         $serviceApplication->save();
         $serviceApplication->refresh();
         $dnsCleanup->queueReleaseOfRemovedHostnames($serviceApplication, $previousDnsHostnames, (int) $teamId);
+        app(ResourceDnsRecords::class)->queueAutomaticRecords($serviceApplication->service, $previousServiceDnsHostnames);
 
         updateCompose($serviceApplication);
 
         return null;
+    }
+
+    private function hasWwwAndNonWwwDomains(?string $fqdn): bool
+    {
+        $hosts = str($fqdn ?? '')->explode(',')
+            ->map(fn (string $url) => strtolower((string) parse_url(trim($url), PHP_URL_HOST)))
+            ->filter();
+
+        return $hosts->contains(fn (string $host) => str_starts_with($host, 'www.'))
+            && $hosts->contains(fn (string $host) => ! str_starts_with($host, 'www.'));
     }
 }

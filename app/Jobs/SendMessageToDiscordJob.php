@@ -72,7 +72,7 @@ class SendMessageToDiscordJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        $response = Http::withOptions($httpOptions)->post($this->webhookUrl, $this->message->toPayload());
+        $response = $this->sendNotificationRequest('Discord', $this->webhookUrl, fn () => Http::withOptions($httpOptions)->post($this->webhookUrl, $this->message->toPayload()));
 
         // 401: invalid webhook token, 403: missing access, 404: unknown (deleted) webhook.
         $this->handleNotificationResponse($response, 'Discord', in_array($response->status(), [401, 403, 404], true));

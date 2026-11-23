@@ -6,7 +6,7 @@
 
 services:
   tailscale-client:
-    image: 'tailscale/tailscale:latest'
+    image: 'tailscale/tailscale:v1.104.7'
     hostname: '${TS_HOSTNAME:-coolify-ts}'
     environment:
       - 'TS_HOSTNAME=${TS_HOSTNAME:-coolify-ts}'
@@ -26,7 +26,7 @@ services:
       retries: 5
 
   nginx:
-    image: nginx:latest
+    image: nginx:1.31.8
     depends_on:
       - tailscale-client
     network_mode: 'service:tailscale-client'
