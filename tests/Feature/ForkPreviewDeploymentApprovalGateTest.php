@@ -56,22 +56,22 @@ function forkGateJob(array $preview, array $settings = [], string $checkedOutCom
         'status' => 'in_progress',
     ]);
 
-    $job = new class extends ApplicationDeploymentJob
+    $job = new class($checkedOutCommit) extends ApplicationDeploymentJob
     {
-        public string $checkedOutCommit = '';
-
         public int $remoteCommands = 0;
 
-        public function __construct() {}
+        /**
+         * Skips the production constructor, so the fixture never connects to a server.
+         */
+        public function __construct(public string $checkedOutCommit) {}
 
-        public function execute_remote_command(...$commands)
+        public function execute_remote_command(mixed ...$commands): void
         {
             $this->remoteCommands++;
             (new ReflectionProperty(ApplicationDeploymentJob::class, 'saved_outputs'))->getValue($this)
                 ->put('checked_out_commit', str($this->checkedOutCommit."\n"));
         }
     };
-    $job->checkedOutCommit = $checkedOutCommit;
 
     foreach ([
         'application' => $application,
@@ -140,6 +140,37 @@ it('deploys fork commits without approval when the admin turned the approval off
     expect($preview->fresh()->pending_approval_commit)->toBeNull();
 });
 
+it('does not report a saved commit as waiting after the admin turned the approval off', function () {
+    [, $preview] = forkGateJob(['is_fork_pull_request' => true, 'pending_approval_commit' => FORK_GATE_COMMIT]);
+
+    expect($preview->fresh()->approvalStatus())->toBe('waiting_for_approval');
+
+    $preview->application->settings->update(['is_pr_deployments_public_approval_required' => false]);
+
+    expect($preview->fresh()->isWaitingForApproval())->toBeFalse()
+        ->and($preview->fresh()->approvalStatus())->toBeNull();
+});
+
+it('does not log an approval for a new commit when the approval is off', function () {
+    [$job, $preview, $queue] = forkGateJob(
+        ['is_fork_pull_request' => true, 'approved_commit' => FORK_GATE_OLD_COMMIT],
+        ['is_pr_deployments_public_approval_required' => false],
+    );
+
+    runForkGate($job);
+
+    expect($preview->fresh()->pending_approval_commit)->toBeNull()
+        ->and((string) $queue->fresh()->logs)->not->toContain('An admin approved commit');
+});
+
+it('logs the approval of the approved fork commit', function () {
+    [$job, , $queue] = forkGateJob(['is_fork_pull_request' => true, 'approved_commit' => FORK_GATE_COMMIT]);
+
+    runForkGate($job);
+
+    expect((string) $queue->fresh()->logs)->toContain('An admin approved commit '.FORK_GATE_COMMIT);
+});
+
 it('still needs an approval for a fork preview when public previews are off', function () {
     [$job] = forkGateJob(['is_fork_pull_request' => true], [
         'is_pr_deployments_public_enabled' => false,
@@ -162,4 +193,18 @@ it('requires approval by default for applications that already deploy public pul
 
     expect($preview->application->settings->is_pr_deployments_public_approval_required)->toBeTrue()
         ->and($preview->forkCommitNeedsApproval(FORK_GATE_COMMIT))->toBeTrue();
+});
+
+it('skips the queued approval request when the commit is no longer pending at delivery', function () {
+    [, $preview, , $team] = forkGateJob(['is_fork_pull_request' => true]);
+    $preview->markWaitingForApproval(FORK_GATE_COMMIT);
+    $notification = new PreviewApprovalRequired($preview->application, $preview, 'fork-gate-deployment');
+
+    expect($notification->shouldSend($team, 'mail'))->toBeTrue();
+
+    $preview->markWaitingForApproval(FORK_GATE_OLD_COMMIT);
+    expect($notification->shouldSend($team, 'mail'))->toBeFalse();
+
+    $preview->approveCommit(FORK_GATE_OLD_COMMIT);
+    expect($notification->shouldSend($team, 'mail'))->toBeFalse();
 });
