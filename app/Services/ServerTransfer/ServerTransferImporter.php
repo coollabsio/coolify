@@ -710,6 +710,13 @@ class ServerTransferImporter
             'swarm_cluster' => data_get($payload, 'swarm_cluster'),
         ]);
         $server->uuid = $uuid;
+        $proxy = data_get($payload, 'proxy');
+        $proxy = is_array($proxy) ? $proxy : [];
+        // A bundle of an older Coolify has no status for unknown hosts: keep the status of the source.
+        $proxy['unknown_host_status'] ??= Server::LEGACY_UNKNOWN_HOST_STATUS;
+        foreach ($proxy as $key => $value) {
+            $server->proxy->set($key, $value);
+        }
         $server->save();
 
         if ($server->settings) {
@@ -720,18 +727,6 @@ class ServerTransferImporter
             $server->settings->server_role = $serverRole;
             $server->settings->is_build_server = $serverRole === ServerRole::BUILD->value;
             $server->settings->save();
-        }
-
-        $proxy = data_get($payload, 'proxy', []);
-        if (is_array($proxy) && $proxy !== []) {
-            foreach ($proxy as $key => $value) {
-                $server->proxy->set($key, $value);
-            }
-            // A bundle of an older Coolify has no status for unknown hosts: keep the status of the source.
-            if (! array_key_exists('unknown_host_status', $proxy)) {
-                $server->proxy->set('unknown_host_status', Server::LEGACY_UNKNOWN_HOST_STATUS);
-            }
-            $server->save();
         }
 
         $settingsPayload = data_get($payload, 'settings', []);
