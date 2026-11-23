@@ -4,6 +4,8 @@ namespace App\Actions\Server;
 
 use App\Enums\TrafficIpMode;
 use App\Events\SentinelRestarted;
+use App\Jobs\PullSentinelReportJob;
+use App\Jobs\ServerManagerJob;
 use App\Models\Server;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
@@ -154,14 +156,18 @@ class StartSentinel
         $refreshRate = data_get($server, 'settings.sentinel_metrics_refresh_rate_seconds');
         $pushInterval = data_get($server, 'settings.sentinel_push_interval_seconds');
         $token = $server->settings->ensureValidSentinelToken();
-        $endpoint = $server->settings->ensureSentinelUrl();
         $debug = data_get($server, 'settings.is_sentinel_debug_enabled');
         $mountDir = devHostDockerPath($server, base_configuration_dir().'/sentinel');
         $image = coolifyRegistryUrl().'/coollabsio/sentinel:'.$version;
+        // In pull mode Coolify reads the report over SSH (PullSentinelReportJob), so the server needs no route to Coolify.
+        // Older Sentinel versions exit without PUSH_ENDPOINT even when push is off, so pull mode still sends one when it exists.
+        $push = $server->settings->is_sentinel_pull_enabled
+            ? array_filter(['PUSH_ENABLED' => 'false', 'PUSH_ENDPOINT' => rescue(fn () => $server->settings->ensureSentinelUrl(), null, false)])
+            : ['PUSH_ENDPOINT' => $server->settings->ensureSentinelUrl()];
         $environments = [
             'TOKEN' => $token,
             'DEBUG' => $debug ? 'true' : 'false',
-            'PUSH_ENDPOINT' => $endpoint,
+            ...$push,
             'PUSH_INTERVAL_SECONDS' => $pushInterval,
             'COLLECTOR_ENABLED' => $server->isMetricsEnabled() ? 'true' : 'false',
             'COLLECTOR_REFRESH_RATE_SECONDS' => $refreshRate,
@@ -227,5 +233,12 @@ class StartSentinel
 
         // Dispatch event to notify UI components
         SentinelRestarted::dispatch($server, $version);
+
+        // The first scheduled pull can be up to a minute away, so pull as soon as the Sentinel API is up
+        // and start the pull interval from this pull.
+        if ($server->settings->is_sentinel_pull_enabled) {
+            Cache::put(ServerManagerJob::sentinelPullDueCacheKey($server), true, ServerManagerJob::sentinelPullSpacingSeconds($server));
+            PullSentinelReportJob::dispatch($server)->delay(now()->addSeconds(10));
+        }
     }
 }

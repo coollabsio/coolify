@@ -22379,6 +22379,10 @@
                                             "description": "Only present with read:sensitive.",
                                             "type": "string"
                                         },
+                                        "is_sentinel_pull_enabled": {
+                                            "description": "Coolify reads Sentinel reports over SSH instead of Sentinel pushing them to the Coolify URL.",
+                                            "type": "boolean"
+                                        },
                                         "sentinel_updated_at": {
                                             "type": [
                                                 "string",
@@ -22501,6 +22505,10 @@
                                             "string",
                                             "null"
                                         ]
+                                    },
+                                    "is_sentinel_pull_enabled": {
+                                        "description": "Coolify reads Sentinel reports over SSH. Use it when the server cannot reach Coolify. Restarts Sentinel.",
+                                        "type": "boolean"
                                     },
                                     "traffic_topn": {
                                         "type": "integer",
@@ -32291,6 +32299,10 @@
                     },
                     "is_sentinel_enabled": {
                         "type": "boolean"
+                    },
+                    "is_sentinel_pull_enabled": {
+                        "type": "boolean",
+                        "description": "Coolify reads Sentinel reports over SSH instead of Sentinel pushing them."
                     },
                     "is_swarm_manager": {
                         "type": "boolean"
