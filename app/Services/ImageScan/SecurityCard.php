@@ -50,6 +50,7 @@ final class SecurityCard
         'keydb' => 'KeyDB',
         'dragonfly' => 'Dragonfly',
         'clickhouse' => 'ClickHouse',
+        'influxdb' => 'InfluxDB',
     ];
 
     /**

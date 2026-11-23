@@ -119,7 +119,28 @@ class InstallDocker
             ')';
     }
 
+    /**
+     * Amazon Linux is not supported by get.docker.com or the CentOS repo, so use its own docker package.
+     * validateOS() returns the whole RHEL family group, so check the real distro ID at runtime.
+     */
     private function getRhelDockerInstallCommand(): string
+    {
+        return 'if (. /etc/os-release && [ "$ID" = "amzn" ]); then '.
+            $this->getAmazonLinuxDockerInstallCommand().
+            '; else '.
+            $this->getRhelDockerCeInstallCommand().
+            '; fi';
+    }
+
+    private function getAmazonLinuxDockerInstallCommand(): string
+    {
+        return 'dnf install -y docker && '.
+            'mkdir -p /usr/local/lib/docker/cli-plugins && '.
+            'curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose && '.
+            'chmod +x /usr/local/lib/docker/cli-plugins/docker-compose';
+    }
+
+    private function getRhelDockerCeInstallCommand(): string
     {
         return 'curl -fsSL https://get.docker.com | sh || ('.
             'dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && '.

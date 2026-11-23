@@ -604,7 +604,7 @@ class Application extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
-            if ($storage->isSharedWithAnotherResource()) {
+            if ($storage->is_external || $storage->isSharedWithAnotherResource()) {
                 continue;
             }
             instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
@@ -3163,13 +3163,7 @@ class Application extends BaseModel
 
         // Always check if healthcheck was removed, regardless of health_check_enabled setting
         if (! $hasHealthcheck && $this->custom_healthcheck_found) {
-            // HEALTHCHECK was removed from Dockerfile, reset to defaults
-            $this->custom_healthcheck_found = false;
-            $this->health_check_interval = 5;
-            $this->health_check_timeout = 5;
-            $this->health_check_retries = 10;
-            $this->health_check_start_period = 5;
-            $this->save();
+            $this->resetCustomHealthcheck();
 
             return;
         }
@@ -3184,6 +3178,47 @@ class Application extends BaseModel
             $this->custom_healthcheck_found = true;
             $this->save();
         }
+    }
+
+    /**
+     * Read the HEALTHCHECK of a pulled Docker image from the output of
+     * `docker inspect --format '{{json .Config.Healthcheck}}'`. Docker gives the durations in
+     * nanoseconds and leaves out zero values, which mean the Docker defaults (30s, 30s, 0s, 3 retries).
+     */
+    public function parseHealthcheckFromImage(?string $inspectOutput): void
+    {
+        $healthcheck = json_decode(trim((string) $inspectOutput), true);
+        $test = is_array($healthcheck) ? ($healthcheck['Test'] ?? null) : null;
+        $hasHealthcheck = is_array($test) && $test !== [] && strtoupper((string) $test[0]) !== 'NONE';
+
+        if (! $hasHealthcheck) {
+            if ($this->custom_healthcheck_found) {
+                $this->resetCustomHealthcheck();
+            }
+
+            return;
+        }
+
+        $seconds = fn (string $key, int $default): int => isset($healthcheck[$key]) && $healthcheck[$key] > 0
+            ? max(1, intdiv((int) $healthcheck[$key], 1_000_000_000))
+            : $default;
+
+        $this->health_check_interval = $seconds('Interval', 30);
+        $this->health_check_timeout = $seconds('Timeout', 30);
+        $this->health_check_start_period = $seconds('StartPeriod', 0);
+        $this->health_check_retries = isset($healthcheck['Retries']) && $healthcheck['Retries'] > 0 ? (int) $healthcheck['Retries'] : 3;
+        $this->custom_healthcheck_found = true;
+        $this->save();
+    }
+
+    private function resetCustomHealthcheck(): void
+    {
+        $this->custom_healthcheck_found = false;
+        $this->health_check_interval = 5;
+        $this->health_check_timeout = 5;
+        $this->health_check_retries = 10;
+        $this->health_check_start_period = 5;
+        $this->save();
     }
 
     public function getLimits(): array

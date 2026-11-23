@@ -208,5 +208,8 @@
             </x-application.settings-section>
 
         </form>
+        <div class="mt-6">
+            <livewire:settings.custom-theme />
+        </div>
     </x-settings.layout>
 </div>

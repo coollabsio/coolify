@@ -67,6 +67,10 @@ class All extends Component
      */
     public bool $readyToLoad = false;
 
+    public const SELECTION_RESET_EVENT = 'environment-variable-selection-reset';
+
+    private const BULK_AVAILABILITY_FIELDS = ['is_buildtime', 'is_runtime'];
+
     private ?Collection $composeEnvironmentAssignments = null;
 
     private ?bool $canViewComposeContent = null;
@@ -109,6 +113,8 @@ class All extends Component
         unset($this->environmentVariableRowCount);
         unset($this->environmentVariableLastPage);
         unset($this->currentEnvironmentVariablePage);
+
+        $this->dispatch(self::SELECTION_RESET_EVENT);
     }
 
     public function mount()
@@ -522,6 +528,94 @@ class All extends Component
         $this->environmentFilter = 'all';
         $this->page = 1;
         $this->clearEnvironmentVariableCaches();
+    }
+
+    public function bulkUpdateAvailability(string $field, bool $value, array $ids): void
+    {
+        try {
+            $this->authorize('manageEnvironment', $this->resource);
+
+            if (! in_array($field, self::BULK_AVAILABILITY_FIELDS, true)) {
+                throw new \InvalidArgumentException('Only build time and runtime availability can be changed in bulk.');
+            }
+
+            $ids = collect($ids)
+                ->filter(fn (mixed $id): bool => is_int($id) || (is_string($id) && ctype_digit($id)))
+                ->map(fn (int|string $id): int => (int) $id)
+                ->unique()
+                ->values();
+
+            if ($ids->isEmpty()) {
+                $this->dispatch('error', 'Select at least one environment variable first.');
+
+                return;
+            }
+
+            $this->ensureEnvironmentVariablesLoaded();
+            $visibleIdsBefore = $this->visibleManagedRowIds();
+
+            $updatedIds = EnvironmentVariable::query()
+                ->where('resourceable_type', $this->resource->getMorphClass())
+                ->where('resourceable_id', $this->resource->id)
+                ->whereIn('id', $ids->all())
+                ->get()
+                ->reject(fn (EnvironmentVariable $environmentVariable): bool => $this->isAvailabilityLocked($environmentVariable))
+                ->filter(fn (EnvironmentVariable $environmentVariable): bool => (bool) $environmentVariable->{$field} !== $value)
+                ->each(function (EnvironmentVariable $environmentVariable) use ($field, $value): void {
+                    $environmentVariable->{$field} = $value;
+                    $environmentVariable->save();
+                })
+                ->map(fn (EnvironmentVariable $environmentVariable): int => (int) $environmentVariable->id)
+                ->values()
+                ->all();
+
+            $this->clearEnvironmentVariableCaches();
+
+            if ($updatedIds === []) {
+                $this->dispatch('info', 'The selected environment variables already have this availability.');
+
+                return;
+            }
+
+            // Rows do not listen to refreshEnvs. Refresh them only when the update keeps the same rows
+            // on the page: a row that a filter now hides must not get an update (snapshot race).
+            if ($this->visibleManagedRowIds() === $visibleIdsBefore) {
+                $this->dispatch('refresh')->to(Show::class);
+            }
+
+            $label = $field === 'is_buildtime' ? 'Build time' : 'Runtime';
+            $count = count($updatedIds);
+            $this->dispatch('success', sprintf(
+                '%s availability updated for %d %s.',
+                $label,
+                $count,
+                Str::plural('environment variable', $count),
+            ));
+            $this->dispatch('envsUpdated');
+            $this->dispatch('configurationChanged');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    private function isAvailabilityLocked(EnvironmentVariable $environmentVariable): bool
+    {
+        if (str($environmentVariable->key)->startsWith(['SERVICE_FQDN', 'SERVICE_URL', 'SERVICE_NAME'])) {
+            return true;
+        }
+
+        return $this->resource->type() === 'standalone-redis'
+            && in_array($environmentVariable->key, ['REDIS_PASSWORD', 'REDIS_USERNAME'], true);
+    }
+
+    /** @return list<int> */
+    private function visibleManagedRowIds(): array
+    {
+        return $this->environmentVariablePageRows
+            ->filter(fn (array $row): bool => $row['kind'] === 'managed')
+            ->map(fn (array $row): int => (int) $row['environmentVariable']->id)
+            ->values()
+            ->all();
     }
 
     public function getServiceFilterOptionsProperty(): array

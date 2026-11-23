@@ -14,6 +14,7 @@ use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -52,6 +53,7 @@ class AccessResolver
         StandaloneKeydb::class,
         StandaloneDragonfly::class,
         StandaloneClickhouse::class,
+        StandaloneInfluxdb::class,
         StandaloneSqlite::class,
     ];
 
@@ -135,8 +137,11 @@ class AccessResolver
         }
 
         $stored = $membership->access ?? null;
+        if ($stored === null) {
+            return self::defaultMemberGrants();
+        }
 
-        return $stored === null ? self::defaultMemberGrants() : Grant::listFrom($stored);
+        return array_values(array_filter(Grant::listFrom($stored), fn (Grant $grant) => $grant->scope !== AccessScope::Server));
     }
 
     private function isMember(User $user, int $teamId): bool
@@ -231,8 +236,28 @@ class AccessResolver
     }
 
     /**
+     * UUIDs of the servers whose server endpoints the user (and the current token) can use through token server
+     * grants, or null when every layer covers the whole team.
+     *
+     * @return list<string>|null
+     */
+    public function scopedServerUuids(User $user, int $teamId): ?array
+    {
+        $uuids = null;
+        foreach ($this->layersFor($user, $teamId) as $layer) {
+            if ($layer->coversWholeTeam()) {
+                continue;
+            }
+            $uuids = $uuids === null ? $layer->serverUuids() : array_values(array_intersect($uuids, $layer->serverUuids()));
+        }
+
+        return $uuids;
+    }
+
+    /**
      * True when the user (and the current token) has the level on at least one resource that runs on the server,
-     * as its main destination or as an additional server of an application.
+     * as its main destination or as an additional server of an application. A layer with the level on the server
+     * itself (a token server grant) needs no such resource.
      */
     public function allowsOnServer(User $user, AccessLevel $level, Server $server): bool
     {
@@ -241,7 +266,10 @@ class AccessResolver
             return false;
         }
 
-        $layers = $this->layersFor($user, $teamId);
+        $layers = array_values(array_filter(
+            $this->layersFor($user, $teamId),
+            fn (AccessGrants $layer) => ! $layer->allowsServer($level, $server->uuid),
+        ));
         if ($layers === []) {
             return true;
         }
@@ -392,7 +420,7 @@ class AccessResolver
     private function build(int $teamId, array $grants): AccessGrants
     {
         $teamLevels = [];
-        $byScope = [AccessScope::Project->value => [], AccessScope::Environment->value => [], AccessScope::Resource->value => []];
+        $byScope = [AccessScope::Project->value => [], AccessScope::Environment->value => [], AccessScope::Resource->value => [], AccessScope::Server->value => []];
 
         foreach ($grants as $grant) {
             if ($grant->levels === []) {
@@ -453,6 +481,17 @@ class AccessResolver
             }
         }
 
+        $serverLevels = [];
+        if ($byScope[AccessScope::Server->value] !== []) {
+            $serverUuids = Server::query()
+                ->where('team_id', $teamId)
+                ->whereIn('uuid', array_keys($byScope[AccessScope::Server->value]))
+                ->pluck('uuid');
+            foreach ($serverUuids as $serverUuid) {
+                $serverLevels[$serverUuid] = $byScope[AccessScope::Server->value][$serverUuid];
+            }
+        }
+
         return new AccessGrants(
             $teamLevels,
             $projectLevels,
@@ -461,6 +500,7 @@ class AccessResolver
             $environmentProjects,
             $resourceEnvironments,
             $projectEnvironmentIds,
+            $serverLevels,
         );
     }
 
@@ -504,11 +544,13 @@ class AccessResolver
     }
 
     /**
+     * A server grant needs the level on the whole team, so a token never gets server access that the user lacks.
+     *
      * @return array{0: int|null, 1: int|null, 2: string|null}|null project, environment, resource UUID
      */
     private function locateScope(int $teamId, Grant $grant): ?array
     {
-        if ($grant->scope === AccessScope::Team) {
+        if ($grant->scope === AccessScope::Team || $grant->scope === AccessScope::Server) {
             return [null, null, null];
         }
 
@@ -518,6 +560,7 @@ class AccessResolver
             AccessScope::Project => ($layer->visibleProjectIds()[0] ?? null) === null ? null : [$layer->visibleProjectIds()[0], null, null],
             AccessScope::Environment => ($layer->fullEnvironmentIds()[0] ?? null) === null ? null : [$layer->visibleProjectIds()[0], $layer->fullEnvironmentIds()[0], null],
             AccessScope::Resource => $layer->resourceUuids() === [] ? null : [$layer->visibleProjectIds()[0], $layer->visibleEnvironmentIds()[0], $grant->uuid],
+            AccessScope::Team, AccessScope::Server => null,
         };
     }
 }

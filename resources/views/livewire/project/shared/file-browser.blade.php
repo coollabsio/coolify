@@ -52,7 +52,6 @@
         helper="Browse and manage files inside the running container." :flush="true">
 
         <x-slot:badges>
-            <x-beta-badge />
             @if ($containerRunning && $filesLoaded && count($availableContainers) > 1)
                 <div class="-my-0.5 w-full sm:w-72" wire:key="file-browser-container-{{ $container }}"
                     x-data="{ selected: @js($container) }"
@@ -65,6 +64,7 @@
         </x-slot:badges>
 
         <x-slot:actions>
+            <x-experimental-badge />
             @if ($containerRunning && $filesLoaded && ! $shellUnavailable)
                 <input type="file" class="hidden" x-ref="uploadInput"
                     @change="if ($event.target.files.length) { uploadFile($event.target.files[0]); $event.target.value = '' }" />

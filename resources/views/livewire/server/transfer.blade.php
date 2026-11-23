@@ -21,6 +21,7 @@
                 <x-application.settings-section id="server-transfer-section" title="Transfer server"
                     helper="Move this server’s control-plane config to another Coolify instance (same physical host).">
                     <x-slot:actions>
+                        <x-experimental-badge />
                         @php
                             $exportTooltip = $exportId ? "Export ID: {$exportId}" : null;
                         @endphp

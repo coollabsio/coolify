@@ -70,7 +70,7 @@ test('numeric resource limits are accepted and stored as strings', function (str
         ->and($database->limits_memory_reservation)->toBe('512')
         ->and($database->limits_cpus)->toBe('1.5')
         ->and($database->limits_cpuset)->toBe('1');
-})->with(['postgresql', 'mysql', 'mariadb', 'mongodb', 'redis', 'keydb', 'dragonfly', 'clickhouse', 'sqlite']);
+})->with(['postgresql', 'mysql', 'mariadb', 'mongodb', 'redis', 'keydb', 'dragonfly', 'clickhouse', 'influxdb', 'sqlite']);
 
 test('string resource limits are still accepted', function () {
     $response = $this->withHeaders(databaseCreateNumericLimitsHeaders($this->user, $this->team->id))

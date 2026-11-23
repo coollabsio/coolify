@@ -24,6 +24,7 @@ class Star extends Model
         StandaloneKeydb::class,
         StandaloneDragonfly::class,
         StandaloneClickhouse::class,
+        StandaloneInfluxdb::class,
         StandaloneSqlite::class,
     ];
 
