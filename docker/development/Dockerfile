@@ -35,13 +35,14 @@ WORKDIR /var/www/html
 USER root
 
 # Install patched Nginx from the official nginx.org Alpine repository
+# nginx.org no longer serves this key for download; it still signs the Alpine packages.
+COPY docker/nginx/nginx_signing.rsa.pub /etc/apk/keys/nginx_signing.rsa.pub
 RUN set -eux; \
     apk add --no-cache ca-certificates curl; \
     NGINX_ALPINE_VERSION="$(egrep -o '^[0-9]+\.[0-9]+' /etc/alpine-release)"; \
     NGINX_REPOSITORY="https://nginx.org/packages/mainline/alpine/v${NGINX_ALPINE_VERSION}/main"; \
     sed -i 's|http://nginx.org/packages|https://nginx.org/packages|g' /etc/apk/repositories; \
     grep -qxF "@nginx ${NGINX_REPOSITORY}" /etc/apk/repositories || echo "@nginx ${NGINX_REPOSITORY}" >> /etc/apk/repositories; \
-    curl -fsSL https://nginx.org/keys/nginx_signing.rsa.pub -o /etc/apk/keys/nginx_signing.rsa.pub; \
     apk add --no-cache --upgrade "nginx@nginx=${NGINX_VERSION}"; \
     rm -f /etc/nginx/nginx.conf /etc/nginx/conf.d/default.conf; \
     nginx -v
