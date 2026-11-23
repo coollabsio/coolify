@@ -70,12 +70,6 @@ class StartSentinel
     }
 
     /**
-     * Sentinel opens the access log once at startup and never retries, so the file must exist
-     * before the container starts. `touch` keeps an existing log intact.
-     *
-     * @return array<int, string>
-     */
-    /**
      * Sentinel 1.1.8 and later archive the logs of Coolify-managed containers under /app/db/container-logs.
      * Older Sentinel versions ignore these variables.
      *
@@ -93,6 +87,12 @@ class StartSentinel
         ];
     }
 
+    /**
+     * Sentinel opens the access log once at startup and never retries, so the file must exist
+     * before the container starts. `touch` keeps an existing log intact.
+     *
+     * @return array<int, string>
+     */
     public static function trafficLogPreparationCommands(Server $server): array
     {
         if (! $server->isTrafficAnalyticsEnabled() || ! $server->supportsTrafficAnalytics()) {
