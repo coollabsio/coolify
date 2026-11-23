@@ -2995,7 +2995,7 @@ class Application extends BaseModel
             if ($composeFileContent === '__COOLIFY_COMPOSE_TOO_LARGE__' || strlen($composeFileContent) > self::MAX_DOCKER_COMPOSE_SIZE_BYTES) {
                 throw new RuntimeException('Docker Compose file exceeds the 5 MiB size limit.');
             }
-            if (ComposeIncludeFlattener::hasIncludes($composeFileContent)) {
+            if ($composeFileContent !== null && ComposeIncludeFlattener::hasIncludes($composeFileContent)) {
                 $composeFileContent = (new ComposeIncludeFlattener($this->destination->server, "/tmp/{$uuid}"))
                     ->flatten(ltrim("{$workdir}{$composeFile}", '/'), trim($workdir, '/'));
             }
