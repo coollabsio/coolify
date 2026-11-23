@@ -191,9 +191,9 @@ test('member cannot create write token through livewire token form', function ()
     session(['currentTeam' => $this->team]);
 
     Livewire::test(ApiTokens::class)
-        ->set('description', 'member-write-token')
-        ->set('expiresInDays', 30)
-        ->set('permissions', ['write'])
+        ->set('form.description', 'member-write-token')
+        ->set('form.expiresInDays', '30')
+        ->set('form.permissions', ['write'])
         ->call('addNewToken');
 
     expect($this->user->tokens()->where('name', 'member-write-token')->exists())->toBeFalse();

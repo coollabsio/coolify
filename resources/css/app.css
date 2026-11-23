@@ -2343,6 +2343,16 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
 }
 
 /*
+ * Checkbox/toggle rows wrap their text in a <label> that shares its baseline with
+ * the control, so it must not inherit the stacked field-label bottom margin —
+ * otherwise the control sits above the row's vertical center.
+ */
+.application-settings-workspace .form-control label,
+.application-settings-form .form-control label {
+    margin-bottom: 0;
+}
+
+/*
  * Labels that sit in a fixed-height control row (with optional helper icon) must not
  * add their own bottom margin — the row wrapper owns spacing so side-by-side inputs align.
  */
@@ -3286,6 +3296,30 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(14rem, 2.5fr) 4.8rem 4rem 4.5rem 4.8rem 4.2rem 4.5rem;
 }
 
+.env-table-grid.env-table-grid-selectable {
+    grid-template-columns: 1.125rem minmax(14rem, 2.5fr) 4.8rem 6rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
+}
+
+.env-table-grid.env-table-grid-no-type.env-table-grid-selectable {
+    grid-template-columns: 1.125rem minmax(14rem, 2.5fr) 4.8rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
+}
+
+.environment-table-scroll .env-table-grid.env-table-grid-selectable {
+    min-width: 55.25rem;
+}
+
+/* Selection checkboxes show when the table is hovered or focused, or a row is selected.
+   Devices without hover always show them. */
+.env-table-grid-selectable > :first-child {
+    transition: opacity 150ms;
+}
+
+@media (hover: hover) {
+    .data-table:not(:hover, :focus-within, .env-table-has-selection) .env-table-grid-selectable > :first-child {
+        opacity: 0;
+    }
+}
+
 @media (max-width: 768px) {
     .environment-table-scroll .env-table-grid {
         min-width: 0;
@@ -3308,6 +3342,18 @@ input[type="search"]::-webkit-search-results-decoration {
     .data-table-row.env-table-grid > :last-child {
         display: flex;
         justify-self: end;
+    }
+
+    .environment-table-scroll .env-table-grid.env-table-grid-selectable {
+        min-width: 0;
+    }
+
+    .data-table-row.env-table-grid.env-table-grid-selectable {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    .data-table-row.env-table-grid.env-table-grid-selectable > :nth-child(2) {
+        display: flex;
     }
 }
 

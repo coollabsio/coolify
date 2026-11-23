@@ -6,6 +6,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -52,6 +53,7 @@ it('limits restarts only for applications', function () {
         StandaloneKeydb::class,
         StandaloneDragonfly::class,
         StandaloneClickhouse::class,
+        StandaloneInfluxdb::class,
         StandaloneSqlite::class,
     ];
 
@@ -69,6 +71,7 @@ it('limits restarts only for applications', function () {
         'standalone_keydbs',
         'standalone_dragonflies',
         'standalone_clickhouses',
+        'standalone_influxdbs',
         'standalone_sqlites',
     ] as $databaseTable) {
         expect(Schema::hasColumn($databaseTable, 'max_restart_count'))->toBeFalse()

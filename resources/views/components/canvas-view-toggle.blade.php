@@ -38,7 +38,7 @@
         @if (filled($canvasUrl))
             {{-- A label and a purple "Try it" badge, so people notice the canvas view. --}}
             <a href="{{ $canvasUrl }}" {{ wireNavigate() }}
-                class="{{ $canvasItem }} {{ $idle }}" title="Canvas view (beta): see everything and how it connects">
+                class="{{ $canvasItem }} {{ $idle }}" title="Canvas view (experimental): see everything and how it connects">
                 <x-reicon name="deploy-canvas" class="size-3.5" />
                 Canvas
                 <span

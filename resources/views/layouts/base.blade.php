@@ -98,6 +98,9 @@
             return color;
         };
         window.customThemeKeys = ['sidebar', 'selected', 'accent', 'background'];
+        // The default Custom theme of the instance (Settings > Advanced), normalized on the server. Users
+        // who never chose a theme (no "theme" key in localStorage) see it.
+        window.instanceCustomTheme = @js(rescue(fn () => \App\Rules\ValidCustomTheme::normalize(instanceSettings()->custom_theme), null, false));
         window.serializeCustomTheme = (theme) => window.customThemeKeys.map((key) => theme[key]).join(',');
         // A theme from a share code, or null when the text is not four hex colors.
         window.parseCustomTheme = (code) => {
@@ -124,9 +127,20 @@
             { name: 'Slate', theme: { sidebar: '#2b3038', selected: '#4a5361', accent: '#6cc4f5', background: '#353b45' } },
             { name: 'Nord', theme: { sidebar: '#2e3440', selected: '#4c566a', accent: '#88c0d0', background: '#3b4252' } },
             { name: 'Dracula', theme: { sidebar: '#21222c', selected: '#44475a', accent: '#bd93f9', background: '#282a36' } },
+            { name: 'Catppuccin Mocha', theme: { sidebar: '#181825', selected: '#45475a', accent: '#cba6f7', background: '#1e1e2e' } },
+            { name: 'Gruvbox Dark', theme: { sidebar: '#282828', selected: '#504945', accent: '#fe8019', background: '#32302f' } },
+            { name: 'One Dark', theme: { sidebar: '#21252b', selected: '#3e4451', accent: '#61afef', background: '#282c34' } },
+            { name: 'Rosé Pine', theme: { sidebar: '#1f1d2e', selected: '#403d52', accent: '#c4a7e7', background: '#26233a' } },
+            { name: 'Solarized Dark', theme: { sidebar: '#002b36', selected: '#144956', accent: '#268bd2', background: '#073642' } },
+            { name: 'Tokyo Night', theme: { sidebar: '#1a1b26', selected: '#414868', accent: '#7aa2f7', background: '#1f2335' } },
             { name: 'GitHub Dark', theme: { sidebar: '#010409', selected: '#21262d', accent: '#2f81f7', background: '#0d1117' } },
             { name: 'Aubergine', theme: { sidebar: '#3f0e40', selected: '#1164a3', accent: '#1164a3', background: '#ffffff' } },
             { name: 'GitHub Light', theme: { sidebar: '#f6f8fa', selected: '#dde4ec', accent: '#0969da', background: '#ffffff' } },
+            { name: 'Catppuccin Latte', theme: { sidebar: '#e6e9ef', selected: '#bcc0cc', accent: '#8839ef', background: '#eff1f5' } },
+            { name: 'Gruvbox Light', theme: { sidebar: '#fbf1c7', selected: '#d5c4a1', accent: '#af3a03', background: '#f2e5bc' } },
+            { name: 'Rosé Pine Dawn', theme: { sidebar: '#fffaf3', selected: '#dfdad9', accent: '#907aa9', background: '#f2e9e1' } },
+            // Selected is base2 (#eee8d5) mixed 30% toward base1 (#93a1a1); Solarized has no color between them.
+            { name: 'Solarized Light', theme: { sidebar: '#eee8d5', selected: '#d3d3c5', accent: '#268bd2', background: '#fdf6e3' } },
             { name: 'Paper', theme: { sidebar: '#ebe6da', selected: '#d9d1bf', accent: '#c2410c', background: '#f7f4ec' } },
             { name: 'Blossom', theme: { sidebar: '#fde8f1', selected: '#f9c4dc', accent: '#d61f69', background: '#fff7fa' } },
         ];
@@ -159,17 +173,23 @@
             }
             document.querySelector('meta[name=theme-color]')?.setAttribute('content', theme.background);
         };
+        window.instanceTheme = () => window.parseCustomTheme(window.instanceCustomTheme);
+        window.usesInstanceTheme = () => !localStorage.getItem('theme') && window.instanceTheme() !== null;
+        // The theme in use: the user's own choice, else the instance theme as "custom", else "dark".
+        window.selectedTheme = () => {
+            if (localStorage.getItem('theme') === 'purple') localStorage.setItem('theme', 'custom');
+            return localStorage.getItem('theme') || (window.instanceTheme() ? 'custom' : 'dark');
+        };
         window.storedUiScale = () => ['80', '90', '100'].includes(localStorage.uiScale) ? localStorage.uiScale : '100';
         window.applyStoredTheme = () => {
             const root = document.documentElement;
-            const theme = localStorage.theme === 'purple' ? 'custom' : (localStorage.theme || 'dark');
+            const theme = window.selectedTheme();
             root.dataset.navStyle = localStorage.navStyle === 'floating' ? 'floating' : 'default';
             root.dataset.navItems = localStorage.navItems === 'flat' ? 'flat' : '3d';
             root.dataset.uiScale = window.storedUiScale();
-            localStorage.theme = theme;
             if (localStorage.themeColor) localStorage.themeColor = window.normalizeThemeColor(localStorage.themeColor);
             if (theme === 'custom') {
-                window.applyCustomTheme(window.storedCustomTheme());
+                window.applyCustomTheme(window.usesInstanceTheme() ? window.instanceTheme() : window.storedCustomTheme());
                 return;
             }
 
@@ -247,17 +267,11 @@
                 source.el.addEventListener('mouseleave', () => peers(source).forEach(hide));
             });
         };
-        // Alpine state for the theme controls on the Appearance page (x-data="themeControls()").
-        window.themeControls = () => ({
-            theme: localStorage.getItem('theme') === 'purple' ? 'custom' : (localStorage.getItem('theme') || 'dark'),
-            customTheme: window.storedCustomTheme(),
-            pageWidth: localStorage.getItem('pageWidth') || 'centered',
-            navStyle: localStorage.getItem('navStyle') === 'floating' ? 'floating' : 'default',
-            navItems: localStorage.getItem('navItems') === 'flat' ? 'flat' : '3d',
-            chartTimes: localStorage.getItem('chartTimes') === 'utc' ? 'utc' : 'local',
-            uiScale: window.storedUiScale(),
+        // Alpine state of the Custom theme dialog (components/theme-controls/custom-dialog.blade.php): presets, four
+        // colors, the share code, and the iTerm2 import. It edits a draft; a null draft is the built-in Dark theme.
+        // The page state adds saveCustomTheme(). Returned as property descriptors, so the draftColors getter survives.
+        window.customThemeEditor = (state) => Object.defineProperties(state, Object.getOwnPropertyDescriptors({
             presets: window.customThemePresets,
-            // The custom theme dialog edits a draft; Save applies it. A null draft is the built-in Dark theme.
             dialogOpen: false,
             draft: null,
             get draftColors() {
@@ -266,13 +280,8 @@
             shareCode: '',
             shareCodeInvalid: false,
             shareCodeCopied: false,
-            setTheme(type) {
-                this.theme = type;
-                localStorage.setItem('theme', type);
-                window.applyStoredTheme();
-            },
-            openCustomDialog() {
-                this.setDraft(this.theme === 'custom' ? { ...this.customTheme } : null);
+            openDialogWith(theme) {
+                this.setDraft(theme && { ...theme });
                 this.dialogOpen = true;
             },
             setDraft(theme) {
@@ -286,13 +295,21 @@
                     this.setDraft(theme);
                 }
             },
+            // A share code, or the content of an iTerm2 .itermcolors file.
             readShareCode(code) {
-                const theme = window.parseCustomTheme(code);
+                const theme = window.parseCustomTheme(code) ?? window.parseItermColors?.(code);
                 if (theme) {
                     this.setDraft(theme);
                     return;
                 }
                 this.shareCodeInvalid = code.trim() !== '';
+            },
+            async importItermFile(input) {
+                const file = input.files?.[0];
+                input.value = '';
+                if (file) {
+                    this.readShareCode(file.size > 1024 * 1024 ? 'too large' : await file.text());
+                }
             },
             async copyShareCode() {
                 try {
@@ -316,6 +333,35 @@
             },
             accentTextOn(color) {
                 return window.themeAccentForeground(color);
+            },
+        }));
+        // Alpine state for the theme controls on the Appearance page (x-data="themeControls()").
+        window.themeControls = () => window.customThemeEditor({
+            theme: window.selectedTheme(),
+            customTheme: window.usesInstanceTheme() ? window.instanceTheme() : window.storedCustomTheme(),
+            instanceTheme: window.instanceTheme(),
+            usesInstanceTheme: window.usesInstanceTheme(),
+            pageWidth: localStorage.getItem('pageWidth') || 'centered',
+            navStyle: localStorage.getItem('navStyle') === 'floating' ? 'floating' : 'default',
+            navItems: localStorage.getItem('navItems') === 'flat' ? 'flat' : '3d',
+            chartTimes: localStorage.getItem('chartTimes') === 'utc' ? 'utc' : 'local',
+            uiScale: window.storedUiScale(),
+            setTheme(type) {
+                this.theme = type;
+                this.usesInstanceTheme = false;
+                localStorage.setItem('theme', type);
+                window.applyStoredTheme();
+            },
+            // Forgets the user's own theme choice, so the instance theme applies again.
+            useInstanceTheme() {
+                localStorage.removeItem('theme');
+                this.theme = 'custom';
+                this.customTheme = window.instanceTheme();
+                this.usesInstanceTheme = true;
+                window.applyStoredTheme();
+            },
+            openCustomDialog() {
+                this.openDialogWith(this.theme === 'custom' ? this.customTheme : null);
             },
             saveCustomTheme() {
                 this.dialogOpen = false;
@@ -352,6 +398,23 @@
             setChartTimes(value) {
                 this.chartTimes = value;
                 localStorage.setItem('chartTimes', value);
+            },
+        });
+        // Alpine state of the instance theme on Settings > Advanced (livewire/settings/custom-theme.blade.php).
+        // Save stores the draft on the server; the "Coolify" preset removes the instance theme.
+        window.instanceThemeControls = (wire) => window.customThemeEditor({
+            customTheme: window.instanceTheme(),
+            openCustomDialog() {
+                this.openDialogWith(this.customTheme);
+            },
+            async saveCustomTheme() {
+                const code = this.draft && window.serializeCustomTheme(this.draft);
+                const saved = await wire.saveCustomTheme(code);
+                if (saved === undefined || saved !== code) return;
+                this.dialogOpen = false;
+                window.instanceCustomTheme = saved;
+                this.customTheme = window.instanceTheme();
+                window.applyStoredTheme();
             },
         });
 
@@ -505,12 +568,7 @@
             return DOMPurify.sanitize(html, config);
         };
 
-        // Initialize theme if not set
-        if (!('theme' in localStorage)) {
-            localStorage.theme = 'dark';
-        }
-
-        let theme = localStorage.theme
+        let theme = window.selectedTheme()
         let cpuColor = '#1e90ff'
         let ramColor = '#00ced1'
         // Chart text follows the CSS text color, so it stays readable after a theme change without a re-render
@@ -520,7 +578,7 @@
         let editorTheme = 'blackboard'
 
         function checkTheme() {
-            theme = localStorage.theme
+            theme = window.selectedTheme()
             if (theme == 'system') {
                 theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
             }

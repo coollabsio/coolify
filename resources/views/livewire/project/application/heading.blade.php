@@ -163,9 +163,9 @@
         <div class="hidden w-full items-center xl:flex xl:w-auto">
             <div
                 class="resource-heading-navbar application-heading-actions flex w-full min-w-0 items-center justify-start gap-1 overflow-visible xl:w-auto xl:justify-end">
-                <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
+                <div class="resource-heading-actions flex shrink-0 items-center gap-1">
                     @if ($this->runningDeploymentUrl)
-                        <x-deploying-indicator :href="$this->runningDeploymentUrl" class="mr-1" />
+                        <x-deploying-indicator :href="$this->runningDeploymentUrl" size="md" />
                     @endif
                     @if ($this->needsComposeFile())
                         @can('update', $application)
