@@ -53,7 +53,7 @@ final readonly class ResolvedEnvironment
      * The file as a one-time template: only its resources. Applications without a repository use the
      * repository that the user adds, so a fork or a copy of the repository builds itself.
      *
-     * @param  array{repository: string, branch: string, github_app?: string, gitea_app?: string, deploy_key?: string}  $source
+     * @param  array{repository: string, branch: string, github_app?: string, gitlab_app?: string, gitea_app?: string, deploy_key?: string}  $source
      */
     public function asTemplate(array $source): self
     {

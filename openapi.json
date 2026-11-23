@@ -16416,6 +16416,224 @@
                 ]
             }
         },
+        "\/environments\/{uuid}\/config\/template\/plan": {
+            "post": {
+                "tags": [
+                    "Project config"
+                ],
+                "summary": "Plan coolify.json as a template",
+                "description": "Read coolify.json from a repository and plan the resources that a template creates in the environment. Nothing changes. Needs the right to create resources in the environment. A git source or deploy key needs write access to the whole team.",
+                "operationId": "plan-environment-config-template",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "repository",
+                                    "branch",
+                                    "source_type",
+                                    "server_uuid"
+                                ],
+                                "properties": {
+                                    "repository": {
+                                        "description": "The repository: a URL, or owner\/name for a git app.",
+                                        "type": "string"
+                                    },
+                                    "branch": {
+                                        "type": "string"
+                                    },
+                                    "file_path": {
+                                        "description": "The default is coolify.json.",
+                                        "type": "string"
+                                    },
+                                    "source_type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "public",
+                                            "github_app",
+                                            "gitlab_app",
+                                            "gitea_app",
+                                            "deploy_key"
+                                        ]
+                                    },
+                                    "source_uuid": {
+                                        "description": "The UUID of the git app or the private key.",
+                                        "type": "string"
+                                    },
+                                    "server_uuid": {
+                                        "description": "The server that reads the file. Resources that name no server run on it.",
+                                        "type": "string"
+                                    },
+                                    "destination_uuid": {
+                                        "description": "Needed only when the server has more than one destination.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The plan. Its commit goes to the create request.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Not allowed."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "description": "The request or the file is not valid."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/environments\/{uuid}\/config\/template": {
+            "post": {
+                "tags": [
+                    "Project config"
+                ],
+                "summary": "Create resources from coolify.json",
+                "description": "Create the resources of coolify.json in the environment one time. They are normal resources: the file does not manage them. Nothing deploys. Needs the right to create resources in the environment.",
+                "operationId": "create-from-environment-config-template",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "repository",
+                                    "branch",
+                                    "source_type",
+                                    "server_uuid"
+                                ],
+                                "properties": {
+                                    "repository": {
+                                        "type": "string"
+                                    },
+                                    "branch": {
+                                        "type": "string"
+                                    },
+                                    "file_path": {
+                                        "type": "string"
+                                    },
+                                    "source_type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "public",
+                                            "github_app",
+                                            "gitlab_app",
+                                            "gitea_app",
+                                            "deploy_key"
+                                        ]
+                                    },
+                                    "source_uuid": {
+                                        "type": "string"
+                                    },
+                                    "server_uuid": {
+                                        "type": "string"
+                                    },
+                                    "destination_uuid": {
+                                        "type": "string"
+                                    },
+                                    "commit": {
+                                        "description": "The commit of the plan. Coolify creates the resources from the file at this commit. Without it, the head of the branch.",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The created resources.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "resources": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "uuid": {
+                                                        "type": "string"
+                                                    },
+                                                    "type": {
+                                                        "type": "string"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Not allowed."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "description": "The request or the file is not valid."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/config\/links": {
             "post": {
                 "tags": [
@@ -31864,6 +32082,10 @@
                     },
                     "is_terminal_enabled": {
                         "type": "boolean"
+                    },
+                    "is_container_log_archive_enabled": {
+                        "type": "boolean",
+                        "description": "Sentinel keeps the logs of containers after they are removed."
                     },
                     "is_usable": {
                         "type": "boolean"

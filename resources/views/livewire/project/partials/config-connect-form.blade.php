@@ -3,11 +3,12 @@
         <x-forms.listbox id="connectSourceType" label="Source" live :options="[
             ['value' => 'public', 'label' => 'Public repository'],
             ['value' => 'github_app', 'label' => 'GitHub App', 'disabled' => empty($connectSources['github_app'] ?? [])],
+            ['value' => 'gitlab_app', 'label' => 'GitLab App', 'disabled' => empty($connectSources['gitlab_app'] ?? [])],
             ['value' => 'gitea_app', 'label' => 'Gitea App', 'disabled' => empty($connectSources['gitea_app'] ?? [])],
             ['value' => 'deploy_key', 'label' => 'Deploy key', 'disabled' => empty($connectSources['deploy_key'] ?? [])],
         ]" />
         @if ($connectSourceType !== 'public')
-            <x-forms.listbox id="connectSourceUuid" label="{{ ['github_app' => 'GitHub App', 'gitea_app' => 'Gitea App', 'deploy_key' => 'Deploy key'][$connectSourceType] ?? 'Source' }}"
+            <x-forms.listbox id="connectSourceUuid" label="{{ ['github_app' => 'GitHub App', 'gitlab_app' => 'GitLab App', 'gitea_app' => 'Gitea App', 'deploy_key' => 'Deploy key'][$connectSourceType] ?? 'Source' }}"
                 :options="collect($connectSources[$connectSourceType] ?? [])->map(fn ($item) => ['value' => $item['uuid'], 'label' => $item['name']])->all()" />
         @endif
     </div>

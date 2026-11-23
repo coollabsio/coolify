@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://coolify.io/schemas/coolify.v1.json",
+    "$id": "https://cdn.coollabs.io/coolify/schemas/coolify.v1.json",
     "title": "coolify.json",
     "type": "object",
     "required": [

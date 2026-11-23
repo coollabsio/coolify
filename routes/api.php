@@ -262,6 +262,8 @@ Route::group([
 
     Route::get('/environments/{uuid}/config/export', [ProjectConfigController::class, 'export'])->middleware(['api.ability:read']);
     Route::post('/environments/{uuid}/config/plan', [ProjectConfigController::class, 'plan'])->middleware(['api.ability:read']);
+    Route::post('/environments/{uuid}/config/template/plan', [ProjectConfigController::class, 'templatePlan'])->middleware(['api.ability:write']);
+    Route::post('/environments/{uuid}/config/template', [ProjectConfigController::class, 'templateCreate'])->middleware(['api.ability:write']);
     Route::post('/config/links', [ProjectConfigController::class, 'createLink'])->middleware(['api.ability:write']);
     Route::get('/config/links/{uuid}', [ProjectConfigController::class, 'showLink'])->middleware(['api.ability:read']);
     Route::patch('/config/links/{uuid}', [ProjectConfigController::class, 'updateLink'])->middleware(['api.ability:write']);

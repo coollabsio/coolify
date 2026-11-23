@@ -4,7 +4,6 @@ namespace App\Services\ProjectConfig\Adapters;
 
 use App\Jobs\DeleteResourceJob;
 use App\Models\Environment;
-use App\Models\S3Storage;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
@@ -29,6 +28,7 @@ use App\Services\ProjectConfig\ConfigError;
 use App\Services\ProjectConfig\Field;
 use App\Services\ProjectConfig\FieldMap;
 use App\Services\ProjectConfig\FieldValues;
+use App\Services\ProjectConfig\NamedCredentials;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
@@ -356,8 +356,8 @@ class StandaloneDatabaseAdapter implements ResourceAdapter
         }
         foreach (array_values((array) ($desired['backups'] ?? [])) as $index => $backup) {
             $storage = $backup['s3_storage'] ?? null;
-            if ($storage !== null && ! S3Storage::query()->where('team_id', $ctx->teamId)->where('name', $storage)->exists()) {
-                $errors[] = new ConfigError("{$base}.backups.{$index}.s3_storage", "No S3 storage named \"{$storage}\" is in this team.");
+            if ($storage !== null && ($message = NamedCredentials::error('s3_storage', (string) $storage, $ctx->teamId)) !== null) {
+                $errors[] = new ConfigError("{$base}.backups.{$index}.s3_storage", $message);
             }
         }
 

@@ -11,6 +11,11 @@ use InvalidArgumentException;
  */
 class AdapterRegistry
 {
+    /**
+     * Published from public/schemas/coolify.v1.json to the coollabs-cdn repository (json/coolify/schemas/).
+     */
+    public const SCHEMA_URL = 'https://cdn.coollabs.io/coolify/schemas/coolify.v1.json';
+
     /** @var array<string, ResourceAdapter> */
     private array $adapters = [];
 
@@ -74,7 +79,7 @@ class AdapterRegistry
 
         return [
             '$schema' => 'https://json-schema.org/draft/2020-12/schema',
-            '$id' => 'https://coolify.io/schemas/coolify.v1.json',
+            '$id' => self::SCHEMA_URL,
             'title' => 'coolify.json',
             'type' => 'object',
             'required' => ['version', 'resources'],

@@ -55,7 +55,7 @@ class ConfigExporter
         }
 
         return [
-            '$schema' => 'https://coolify.io/schemas/coolify.v1.json',
+            '$schema' => AdapterRegistry::SCHEMA_URL,
             'version' => ConfigParser::FORMAT_VERSION,
             'resources' => $resources === [] ? new \stdClass : $resources,
             'environments' => [$environment->name => $environmentEntry],

@@ -34,7 +34,7 @@ class RepositoryFileReader
         try {
             $output = instant_remote_process($this->commands($link, $uuid, $commit), $server, maxAttempts: 3);
         } catch (Throwable $e) {
-            throw new RepositoryFileException($e->getMessage(), 0, $e);
+            throw new RepositoryFileException(self::withoutCredentials($e->getMessage()), 0, $e);
         } finally {
             rescue(fn () => instant_remote_process(["rm -rf /tmp/{$uuid}"], $server, throwError: false), report: false);
         }
@@ -73,6 +73,15 @@ class RepositoryFileReader
             "cd {$checkoutDir}",
             'sh -c '.escapeshellarg($read),
         ]);
+    }
+
+    /**
+     * Git errors can quote the clone URL with its token (https://x-access-token:TOKEN@host/...). The message is stored
+     * on the revision and shown in the UI and the API, so the credentials of every URL are removed.
+     */
+    public static function withoutCredentials(string $message): string
+    {
+        return (string) preg_replace('#([a-z][a-z0-9+.-]*://)[^/@\s\'"]+@#i', '$1***@', $message);
     }
 
     public function parse(string $output): RepositoryFile

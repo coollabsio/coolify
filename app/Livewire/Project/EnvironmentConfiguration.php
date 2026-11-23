@@ -10,6 +10,7 @@ use App\Models\EnvironmentConfigLink;
 use App\Models\EnvironmentConfigRevision;
 use App\Models\GiteaApp;
 use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -155,7 +156,7 @@ class EnvironmentConfiguration extends Component
             'repository' => 'required|string|max:500',
             'branch' => ['required', 'string', new ValidGitBranch],
             'file_path' => ['required', 'string', 'max:255', 'regex:#^[A-Za-z0-9._/-]+\z#', 'not_regex:#(^|/)\.\.(/|\z)#'],
-            'source_type' => 'required|in:public,github_app,gitea_app,deploy_key',
+            'source_type' => 'required|in:public,github_app,gitlab_app,gitea_app,deploy_key',
             'source_uuid' => 'required_unless:source_type,public|nullable|string',
             'destination_uuid' => 'required|string',
         ])->validate();
@@ -401,6 +402,7 @@ class EnvironmentConfiguration extends Component
 
         return [
             'github_app' => GithubApp::query()->where('is_public', false)->tap($teamScope)->orderBy('name')->get(['uuid', 'name'])->toArray(),
+            'gitlab_app' => GitlabApp::query()->where('is_public', false)->whereNotNull('access_token')->tap($teamScope)->orderBy('name')->get(['uuid', 'name'])->toArray(),
             'gitea_app' => GiteaApp::query()->tap($teamScope)->orderBy('name')->get(['uuid', 'name'])->toArray(),
             'deploy_key' => PrivateKey::query()->where('team_id', $teamId)->orderBy('name')->get(['uuid', 'name'])->toArray(),
         ];

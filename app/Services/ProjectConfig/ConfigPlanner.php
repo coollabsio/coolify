@@ -314,7 +314,7 @@ class ConfigPlanner
         }
 
         $credentials = [];
-        foreach (['github_app', 'gitea_app', 'deploy_key'] as $kind) {
+        foreach (['github_app', 'gitlab_app', 'gitea_app', 'deploy_key'] as $kind) {
             if (isset($desired['source'][$kind])) {
                 $credentials[] = "source.{$kind}";
             }

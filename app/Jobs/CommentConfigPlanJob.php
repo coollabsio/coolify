@@ -75,7 +75,7 @@ class CommentConfigPlanJob implements ShouldBeEncrypted, ShouldQueue
             foreach ($plan->errors as $error) {
                 $lines[] = '- '.self::code($error->path);
             }
-            $lines[] = 'See the details with `coolify config plan` or on the coolify.json page of the environment.';
+            $lines[] = 'See the details on the `Config as code` page of the environment.';
             $lines[] = '';
         }
         if ($plan->isEmpty()) {

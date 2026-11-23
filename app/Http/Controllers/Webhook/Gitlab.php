@@ -146,6 +146,7 @@ class Gitlab extends Controller
                     ]);
                 }
                 $commit = $this->webhookCommitSha($payload, 'after');
+                $this->beginConfigPush($gitlab_app, data_get($payload, 'project.path_with_namespace'), $branch, $commit);
 
                 $applications = $applications->where('git_branch', $branch)->get();
                 $changed_files = $this->webhookPushChangedFiles($payload);

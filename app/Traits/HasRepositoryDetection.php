@@ -20,8 +20,10 @@ use App\Services\ProjectConfig\ConfigLinks;
 use App\Services\ProjectConfig\ConfigTemplate;
 use App\Services\RepositoryDetector;
 use App\Support\ValidationPatterns;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 
 /**
@@ -207,7 +209,9 @@ trait HasRepositoryDetection
             }
             ['plan' => $this->configPlan, 'error' => $this->configPlanError] = $this->configPlans[$cacheKey];
         } catch (\Throwable $e) {
-            $this->configPlanError = $e instanceof \RuntimeException ? $e->getMessage() : 'Coolify could not read coolify.json.';
+            $this->configPlanError = $e instanceof \RuntimeException || $e instanceof AuthorizationException || $e instanceof ValidationException
+                ? $e->getMessage()
+                : 'Coolify could not read coolify.json.';
         }
     }
 
@@ -235,33 +239,17 @@ trait HasRepositoryDetection
     /**
      * A link that is not saved, to read and plan the file of the form.
      *
-     * @param  array{repository: string, branch: string, file_path: string}  $data
+     * @param  array{repository: string, branch: string, file_path: string, source_type: string, source_uuid: ?string}  $data
      */
     private function unsavedConfigLink(array $data): EnvironmentConfigLink
     {
-        $environment = $this->detectionEnvironment();
         $destination = find_resource_destination_for_current_team(data_get($this->query, 'destination'))
             ?? throw new \RuntimeException('Destination not found.');
-        $link = new EnvironmentConfigLink([
-            'environment_id' => $environment->id,
-            'mode' => EnvironmentConfigLink::MODE_GIT,
-            'repository' => $data['repository'],
-            'branch' => $data['branch'],
-            'file_path' => $data['file_path'],
-        ]);
-        $application = $this->applicationForDetection();
-        $link->forceFill(['private_key_id' => $application->private_key_id]);
-        $source = $application->getRelation('source');
-        if ($source !== null && ! ($source instanceof GithubApp && (int) $source->id === 0)) {
-            $link->forceFill(['source_type' => $source::class, 'source_id' => $source->id]);
-            $link->setRelation('source', $source);
-        }
-        $link->setRelation('environment', $environment);
-        $link->forceFill(['read_server_id' => $destination->server->id, 'destination_type' => $destination->getMorphClass(), 'destination_id' => $destination->id]);
-        $link->setRelation('readServer', $destination->server);
-        $link->setRelation('destination', $destination);
 
-        return $link;
+        return app(ConfigLinks::class)->unsavedGitLink(auth()->user(), $this->detectionEnvironment(), $data + [
+            'server_uuid' => $destination->server->uuid,
+            'destination_uuid' => $destination->uuid,
+        ]);
     }
 
     /**
@@ -305,7 +293,7 @@ trait HasRepositoryDetection
         $source = $application->getRelation('source');
         [$type, $uuid] = match (true) {
             $application->private_key_id !== null => ['deploy_key', PrivateKey::query()->find($application->private_key_id)?->uuid],
-            $source instanceof GitlabApp => throw new \RuntimeException('GitLab app sources cannot be linked to coolify.json yet. Use a deploy key.'),
+            $source instanceof GitlabApp => ['gitlab_app', $source->uuid],
             $source instanceof GiteaApp => ['gitea_app', $source->uuid],
             $source instanceof GithubApp && (int) $source->id !== 0 => ['github_app', $source->uuid],
             default => ['public', null],

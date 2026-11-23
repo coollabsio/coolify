@@ -11,6 +11,7 @@ use App\Models\EnvironmentConfigLink;
 use App\Models\EnvironmentConfigRevision;
 use App\Models\GiteaApp;
 use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -69,6 +70,30 @@ class ConfigLinks
     }
 
     /**
+     * A git link that is not saved, to read and plan a file one time (a template or a link preview).
+     *
+     * @param  array{repository: string, branch: string, file_path?: ?string, source_type: string, source_uuid?: ?string, server_uuid: string, destination_uuid?: ?string}  $data
+     *
+     * @throws AuthorizationException when a git source or deploy key is used without write access to the whole team
+     * @throws ValidationException
+     */
+    public function unsavedGitLink(User $user, Environment $environment, array $data): EnvironmentConfigLink
+    {
+        $teamId = (int) $environment->project->team_id;
+        if ($data['source_type'] !== 'public' && ! app(AccessResolver::class)->allowsTeamWide($user, AccessLevel::Write, $teamId)) {
+            throw new AuthorizationException('You need write access on the whole team to use team credentials, such as private keys and git sources.');
+        }
+        $link = (new EnvironmentConfigLink)->forceFill([
+            'environment_id' => $environment->id,
+            'mode' => EnvironmentConfigLink::MODE_GIT,
+            ...$this->gitAttributes($user, $teamId, $data),
+        ]);
+        $link->setRelation('environment', $environment);
+
+        return $link;
+    }
+
+    /**
      * Source, repository, and server of a git link. Every record must belong to the team.
      *
      * @throws ValidationException
@@ -100,9 +125,10 @@ class ConfigLinks
             return $attributes + ['private_key_id' => $key->id];
         }
 
-        $class = ['github_app' => GithubApp::class, 'gitea_app' => GiteaApp::class][$kind];
+        $class = ['github_app' => GithubApp::class, 'gitlab_app' => GitlabApp::class, 'gitea_app' => GiteaApp::class][$kind];
         $source = $class::query()
             ->where('uuid', $data['source_uuid'] ?? '')
+            ->when($kind === 'gitlab_app', fn ($query) => $query->where('is_public', false)->whereNotNull('access_token'))
             ->where(fn ($query) => $query->where('team_id', $teamId)->orWhere('is_system_wide', true))
             ->first() ?? throw ValidationException::withMessages(['source_uuid' => ['No git source with this UUID is available to this team.']]);
 

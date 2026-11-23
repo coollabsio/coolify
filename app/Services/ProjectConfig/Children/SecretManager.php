@@ -2,12 +2,13 @@
 
 namespace App\Services\ProjectConfig\Children;
 
-use App\Models\IntegrationToken;
 use App\Models\SecretManagerLink;
 use App\Services\ProjectConfig\ApplyContext;
 use App\Services\ProjectConfig\Field;
 use App\Services\ProjectConfig\FieldMap;
+use App\Services\ProjectConfig\NamedCredentials;
 use Illuminate\Database\Eloquent\Model;
+use LogicException;
 
 /**
  * The external secret manager of a resource: a team integration token by name, plus its settings.
@@ -73,7 +74,8 @@ class SecretManager implements ChildRecords
 
             return;
         }
-        $token = IntegrationToken::query()->where('team_id', $ctx->teamId)->where('name', $desired['token'])->firstOrFail();
+        $token = NamedCredentials::find('token', (string) $desired['token'], $ctx->teamId)
+            ?? throw new LogicException("Integration token \"{$desired['token']}\" not found.");
         $settings = array_filter((array) ($desired['settings'] ?? []), fn ($value) => filled($value));
         $owner->secretManagerLink()->updateOrCreate([], [
             'integration_token_id' => $token->id,

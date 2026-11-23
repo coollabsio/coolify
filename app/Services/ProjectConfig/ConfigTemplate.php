@@ -5,11 +5,13 @@ namespace App\Services\ProjectConfig;
 use App\Models\EnvironmentConfigLink;
 use App\Models\GiteaApp;
 use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\User;
 use App\Policies\ResourceCreatePolicy;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
+use PDOException;
 use RuntimeException;
 use Throwable;
 
@@ -30,18 +32,25 @@ class ConfigTemplate
     ) {}
 
     /**
-     * @return array{plan: ?array, error: ?string}
+     * @return array{plan: ?array, error: ?string, errors: list<array{path: string, message: string}>}
      */
     public function plan(EnvironmentConfigLink $link, User $user): array
     {
         try {
             [$plan, $commit] = $this->planAt($link, $user, null);
 
-            return ['plan' => $plan->toArray() + ['commit' => $commit], 'error' => null];
-        } catch (ConfigException|RuntimeException|AuthorizationException $e) {
-            return ['plan' => null, 'error' => $e->getMessage()];
+            return ['plan' => $plan->toArray() + ['commit' => $commit], 'error' => null, 'errors' => []];
+        } catch (ConfigException $e) {
+            return ['plan' => null, 'error' => $e->getMessage(), 'errors' => array_map(fn (ConfigError $error) => $error->toArray(), $e->errors())];
+        } catch (PDOException $e) {
+            // A database error is a RuntimeException too, and its message has the SQL.
+            report($e);
+
+            return ['plan' => null, 'error' => 'Coolify could not read coolify.json.', 'errors' => []];
+        } catch (RuntimeException|AuthorizationException $e) {
+            return ['plan' => null, 'error' => $e->getMessage(), 'errors' => []];
         } catch (Throwable) {
-            return ['plan' => null, 'error' => 'Coolify could not read coolify.json.'];
+            return ['plan' => null, 'error' => 'Coolify could not read coolify.json.', 'errors' => []];
         }
     }
 
@@ -91,7 +100,7 @@ class ConfigTemplate
     /**
      * The repository and git source that the user adds, in the shape of `source` in the file.
      *
-     * @return array{repository: string, branch: string, github_app?: string, gitea_app?: string, deploy_key?: string}
+     * @return array{repository: string, branch: string, github_app?: string, gitlab_app?: string, gitea_app?: string, deploy_key?: string}
      */
     private function source(EnvironmentConfigLink $link): array
     {
@@ -99,6 +108,8 @@ class ConfigTemplate
         $app = $link->source;
         if ($link->private_key_id !== null) {
             $source['deploy_key'] = (string) PrivateKey::query()->whereKey($link->private_key_id)->value('name');
+        } elseif ($app instanceof GitlabApp) {
+            $source['gitlab_app'] = $app->name;
         } elseif ($app instanceof GiteaApp) {
             $source['gitea_app'] = $app->name;
         } elseif ($app instanceof GithubApp && (int) $app->id !== 0) {

@@ -9,7 +9,6 @@ use App\Models\Environment;
 use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
-use App\Models\IntegrationToken;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Services\ProjectConfig\Adapters\Concerns\MapsFields;
@@ -27,6 +26,7 @@ use App\Services\ProjectConfig\ConfigError;
 use App\Services\ProjectConfig\Field;
 use App\Services\ProjectConfig\FieldMap;
 use App\Services\ProjectConfig\FieldValues;
+use App\Services\ProjectConfig\NamedCredentials;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
@@ -459,8 +459,8 @@ class ApplicationAdapter implements ResourceAdapter
     {
         $errors = [];
         $token = $desired['secret_manager']['token'] ?? null;
-        if ($token !== null && ! IntegrationToken::query()->where('team_id', $ctx->teamId)->where('name', $token)->exists()) {
-            $errors[] = new ConfigError("{$base}.secret_manager.token", "No integration token named \"{$token}\" is in this team.");
+        if ($token !== null && ($message = NamedCredentials::error('token', (string) $token, $ctx->teamId)) !== null) {
+            $errors[] = new ConfigError("{$base}.secret_manager.token", $message);
         }
         foreach (array_values((array) ($desired['additional_servers'] ?? [])) as $index => $entry) {
             $name = is_array($entry) ? ($entry['server'] ?? null) : $entry;
@@ -487,33 +487,18 @@ class ApplicationAdapter implements ResourceAdapter
     {
         $kinds = array_values(array_intersect(['github_app', 'gitlab_app', 'gitea_app', 'deploy_key'], array_keys($source)));
         if (count($kinds) > 1) {
-            return [new ConfigError("{$base}.source", 'Use one of github_app, gitea_app, or deploy_key.')];
+            return [new ConfigError("{$base}.source", 'Use one of github_app, gitlab_app, gitea_app, or deploy_key.')];
         }
         if ($kinds === []) {
             return [];
         }
         $kind = $kinds[0];
         $path = "{$base}.source.{$kind}";
-        if ($kind === 'gitlab_app') {
-            return [new ConfigError($path, 'GitLab app sources are not supported in coolify.json yet. Use a deploy key.')];
-        }
-        if ($this->sourceModel($kind, (string) $source[$kind], $ctx) === null) {
-            return [new ConfigError($path, "No {$kind} named \"{$source[$kind]}\" is available to this team.")];
+        if (($message = NamedCredentials::error($kind, (string) $source[$kind], $ctx->teamId)) !== null) {
+            return [new ConfigError($path, $message)];
         }
 
         return [];
-    }
-
-    private function sourceModel(string $kind, string $name, ApplyContext $ctx): ?Model
-    {
-        return match ($kind) {
-            'deploy_key' => PrivateKey::query()->where('team_id', $ctx->teamId)->where('name', $name)->first(),
-            'github_app', 'gitea_app' => self::SOURCE_KINDS[$kind]::query()
-                ->where('name', $name)
-                ->where(fn ($query) => $query->where('team_id', $ctx->teamId)->orWhere('is_system_wide', true))
-                ->first(),
-            default => null,
-        };
     }
 
     public function create(string $key, array $desired, ApplyContext $ctx): Model
@@ -596,13 +581,13 @@ class ApplicationAdapter implements ResourceAdapter
     private function fillSource(Application $application, array $source, ApplyContext $ctx): void
     {
         $application->private_key_id = null;
-        $kind = collect(['github_app', 'gitea_app', 'deploy_key'])->first(fn ($candidate) => isset($source[$candidate]));
+        $kind = collect(['github_app', 'gitlab_app', 'gitea_app', 'deploy_key'])->first(fn ($candidate) => isset($source[$candidate]));
 
         if ($kind === 'deploy_key') {
             $application->source_type = null;
             $application->source_id = null;
             $application->repository_project_id = null;
-            $application->private_key_id = $this->sourceModel('deploy_key', $source['deploy_key'], $ctx)?->id;
+            $application->private_key_id = NamedCredentials::find('deploy_key', (string) $source['deploy_key'], $ctx->teamId)?->id;
 
             return;
         }
@@ -614,7 +599,7 @@ class ApplicationAdapter implements ResourceAdapter
             return;
         }
 
-        $model = $this->sourceModel($kind, (string) $source[$kind], $ctx) ?? throw new LogicException("Git source \"{$source[$kind]}\" not found.");
+        $model = NamedCredentials::find($kind, (string) $source[$kind], $ctx->teamId) ?? throw new LogicException("Git source \"{$source[$kind]}\" not found.");
         $changed = $application->source_type !== $model::class
             || (int) $application->source_id !== (int) $model->id
             || (string) $application->getOriginal('git_repository') !== (string) $application->git_repository
@@ -623,9 +608,11 @@ class ApplicationAdapter implements ResourceAdapter
         $application->source_id = $model->id;
         if ($changed) {
             $lookup = app(LookupGitAppRepository::class);
-            $result = $kind === 'github_app'
-                ? $lookup->github($model, (string) $application->git_repository)
-                : $lookup->gitea($model, (string) $application->git_repository);
+            $result = match ($kind) {
+                'github_app' => $lookup->github($model, (string) $application->git_repository),
+                'gitlab_app' => $lookup->gitlab($model, (string) $application->git_repository),
+                default => $lookup->gitea($model, (string) $application->git_repository),
+            };
             $application->git_repository = $result['repository'];
             $application->repository_project_id = $result['repository_project_id'];
         }

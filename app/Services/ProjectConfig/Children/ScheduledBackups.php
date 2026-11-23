@@ -2,11 +2,11 @@
 
 namespace App\Services\ProjectConfig\Children;
 
-use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Services\ProjectConfig\ApplyContext;
 use App\Services\ProjectConfig\Field;
 use App\Services\ProjectConfig\FieldMap;
+use App\Services\ProjectConfig\NamedCredentials;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -121,7 +121,7 @@ class ScheduledBackups implements ChildRecords
                 'database_id' => $owner->getKey(),
                 'team_id' => $ctx->teamId,
                 's3_storage_id' => isset($entry['s3_storage'])
-                    ? S3Storage::query()->where('team_id', $ctx->teamId)->where('name', $entry['s3_storage'])->value('id')
+                    ? NamedCredentials::find('s3_storage', (string) $entry['s3_storage'], $ctx->teamId)?->id
                     : null,
             ];
             foreach (self::FIELDS as $path => [$column, $default]) {
