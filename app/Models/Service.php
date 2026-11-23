@@ -1566,7 +1566,7 @@ class Service extends BaseModel
      */
     public function maintenanceDomains(): Collection
     {
-        return $this->applications()->get()
+        return $this->applications
             ->flatMap(fn (ServiceApplication $application) => collect($application->fqdns)
                 ->map(fn ($url) => trim((string) $url))
                 ->filter()
