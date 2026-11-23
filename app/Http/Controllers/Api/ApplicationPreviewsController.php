@@ -389,7 +389,7 @@ class ApplicationPreviewsController extends Controller
         }
 
         try {
-            $result = ApproveForkPreviewCommit::run($preview, $request->string('commit')->value(), 'api');
+            $result = ApproveForkPreviewCommit::run($preview, $request->string('commit')->lower()->value(), 'api');
         } catch (ConflictHttpException $exception) {
             return response()->json(['message' => $exception->getMessage()], 409);
         }

@@ -100,6 +100,14 @@ test('approving the pending commit queues its deployment', function () {
     Queue::assertPushed(ApplicationDeploymentJob::class);
 });
 
+test('an uppercase commit SHA approves the pending commit', function () {
+    $this->withHeaders(approveApiHeaders($this->bearerToken))
+        ->postJson("/api/v1/applications/{$this->application->uuid}/previews/42/approve", ['commit' => strtoupper($this->pendingCommit)])
+        ->assertOk();
+
+    expect($this->preview->fresh()->approved_commit)->toBe($this->pendingCommit);
+});
+
 test('a token without write and deploy abilities cannot approve', function (array $abilities) {
     $this->withHeaders(approveApiHeaders(approveApiToken($this->user, $this->team, $abilities)))
         ->postJson("/api/v1/applications/{$this->application->uuid}/previews/42/approve", ['commit' => $this->pendingCommit])

@@ -2401,6 +2401,11 @@
                                         "type": "boolean",
                                         "description": "Make pull request deployments public."
                                     },
+                                    "is_pr_deployments_public_approval_required": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval."
+                                    },
                                     "stop_grace_period": {
                                         "type": "integer",
                                         "nullable": true,
@@ -31460,6 +31465,10 @@
                     },
                     "is_terminal_enabled": {
                         "type": "boolean"
+                    },
+                    "is_container_log_archive_enabled": {
+                        "type": "boolean",
+                        "description": "Sentinel keeps the logs of containers after they are removed."
                     },
                     "is_usable": {
                         "type": "boolean"
