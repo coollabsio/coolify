@@ -89,18 +89,17 @@ trait ResolvesTeam
     }
 
     /**
-     * Servers of the team, or none for a token or member limited to some projects, environments, or resources.
+     * Servers of the team. A token or member limited to some projects, environments, or resources sees only
+     * the servers of its token server grants.
      *
      * @return Builder<Server>
      */
     protected function visibleServers(Request $request, int $teamId): Builder
     {
-        $query = Server::whereTeamId($teamId);
-        if (! app(AccessResolver::class)->coversWholeTeam($request->user(), $teamId)) {
-            $query->whereRaw('1 = 0');
-        }
+        $scopedServerUuids = app(AccessResolver::class)->scopedServerUuids($request->user(), $teamId);
 
-        return $query;
+        return Server::whereTeamId($teamId)
+            ->when($scopedServerUuids !== null, fn (Builder $query) => $query->whereIn('uuid', $scopedServerUuids));
     }
 
     protected function mcpSuccess(Request $request, Response $response, array $context = []): Response

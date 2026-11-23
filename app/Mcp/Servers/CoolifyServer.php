@@ -267,6 +267,27 @@ MD;
         ManageNotifications::class,
     ];
 
+    /**
+     * Team-level tools that a token with server grants gets for its servers (same rule as
+     * ApiAbility::SERVER_SCOPE_SECTIONS for REST). The REST routes behind them check each server.
+     *
+     * @var array<int, class-string<Tool>>
+     */
+    public const SERVER_SCOPE_TOOLS = [
+        ListServers::class,
+        GetServer::class,
+        GetServerDomains::class,
+        GetServerResources::class,
+        GetServerMetrics::class,
+        ListDestinations::class,
+        ManageServer::class,
+        ManageProxy::class,
+        ManageImageScanning::class,
+        ManageCloudflareTunnel::class,
+        DockerCleanup::class,
+        ManageDestination::class,
+    ];
+
     protected array $tools = self::TOOLS;
 
     /**
@@ -277,11 +298,20 @@ MD;
         $user = request()->user();
         $teamId = $user?->currentAccessToken()?->team_id;
 
-        if ($user !== null && $teamId !== null && app(AccessResolver::class)->coversWholeTeam($user, (int) $teamId)) {
+        if ($user === null || $teamId === null) {
+            return array_values(array_diff(self::TOOLS, self::TEAM_LEVEL_TOOLS));
+        }
+
+        $resolver = app(AccessResolver::class);
+        if ($resolver->coversWholeTeam($user, (int) $teamId)) {
             return self::TOOLS;
         }
 
-        return array_values(array_diff(self::TOOLS, self::TEAM_LEVEL_TOOLS));
+        $hiddenTools = ($resolver->scopedServerUuids($user, (int) $teamId) ?? []) === []
+            ? self::TEAM_LEVEL_TOOLS
+            : array_diff(self::TEAM_LEVEL_TOOLS, self::SERVER_SCOPE_TOOLS);
+
+        return array_values(array_diff(self::TOOLS, $hiddenTools));
     }
 
     public function createContext(): ServerContext
