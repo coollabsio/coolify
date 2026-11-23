@@ -10,6 +10,7 @@ use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Application;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
+use App\Rules\ValidIpAllowlist;
 use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Services\Dns\ResourceDnsRecords;
 use App\Services\ProjectConfig\ManagedResources;
@@ -130,6 +131,8 @@ class General extends Component
 
     public int $httpBasicAuthArgon2idTimeCost = 4;
 
+    public ?string $ipAllowlist = null;
+
     public ?string $watchPaths = null;
 
     public string $redirect;
@@ -217,6 +220,7 @@ class General extends Component
             'httpBasicAuthBcryptCost' => 'required|integer|min:4|max:14',
             'httpBasicAuthArgon2idMemoryCost' => 'required|integer|min:8192|max:262144',
             'httpBasicAuthArgon2idTimeCost' => 'required|integer|min:1|max:12',
+            'ipAllowlist' => ['nullable', 'string', new ValidIpAllowlist],
             'watchPaths' => 'nullable',
             'redirect' => 'string|required',
         ];
@@ -452,6 +456,7 @@ class General extends Component
             $this->application->http_basic_auth_bcrypt_cost = $this->httpBasicAuthBcryptCost;
             $this->application->http_basic_auth_argon2id_memory_cost = $this->httpBasicAuthArgon2idMemoryCost;
             $this->application->http_basic_auth_argon2id_time_cost = $this->httpBasicAuthArgon2idTimeCost;
+            $this->application->ip_allowlist = $this->ipAllowlist;
             $this->application->watch_paths = $this->watchPaths;
             $this->application->redirect = $this->redirect;
 
@@ -507,6 +512,7 @@ class General extends Component
             $this->httpBasicAuthBcryptCost = $this->application->http_basic_auth_bcrypt_cost;
             $this->httpBasicAuthArgon2idMemoryCost = $this->application->http_basic_auth_argon2id_memory_cost;
             $this->httpBasicAuthArgon2idTimeCost = $this->application->http_basic_auth_argon2id_time_cost;
+            $this->ipAllowlist = $this->application->ip_allowlist;
             $this->watchPaths = $this->application->watch_paths;
             $this->redirect = $this->application->redirect;
 
