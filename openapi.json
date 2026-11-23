@@ -5350,6 +5350,14 @@
                                     "copy_value_to_preview": {
                                         "type": "boolean",
                                         "description": "Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false."
+                                    },
+                                    "compose_services": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "nullable": true,
+                                        "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                     }
                                 },
                                 "type": "object"
@@ -5442,6 +5450,14 @@
                                     "is_shown_once": {
                                         "type": "boolean",
                                         "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
+                                    },
+                                    "compose_services": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "nullable": true,
+                                        "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                     }
                                 },
                                 "type": "object"
@@ -5537,6 +5553,14 @@
                                                 "copy_value_to_preview": {
                                                     "type": "boolean",
                                                     "description": "Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false."
+                                                },
+                                                "compose_services": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "nullable": true,
+                                                    "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                                 }
                                             },
                                             "type": "object"
@@ -6865,6 +6889,89 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/applications\/{uuid}\/destinations\/{destination_uuid}\/deploy": {
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Deploy to Destination",
+                "description": "Queue a deployment of the application to a single destination (primary or attached) without redeploying the other destinations.",
+                "operationId": "deploy-application-destination",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "destination_uuid",
+                        "in": "path",
+                        "description": "UUID of the destination.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "force",
+                        "in": "query",
+                        "description": "Force rebuild.",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Deployment queued.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Deployment request queued.",
+                                            "description": "Message."
+                                        },
+                                        "deployment_uuid": {
+                                            "type": "string",
+                                            "example": "doogksw",
+                                            "description": "UUID of the deployment."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "A deployment of this application is already queued or in progress on the server of this destination."
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
@@ -21252,6 +21359,15 @@
                                             ],
                                             "example": "https:\/\/example.com"
                                         },
+                                        "unknown_host_status": {
+                                            "description": "Saved status of the catch-all for hosts that no resource on the server uses. Traefik and Caddy use it only when redirect_enabled is true and redirect_url is empty. In that mode, the domains of resources on the server get 503 while the resource is down.",
+                                            "type": "integer",
+                                            "example": 404,
+                                            "enum": [
+                                                404,
+                                                503
+                                            ]
+                                        },
                                         "proxy_error_page": {
                                             "type": [
                                                 "string",
@@ -21333,6 +21449,14 @@
                                             "null"
                                         ]
                                     },
+                                    "unknown_host_status": {
+                                        "description": "Status of the catch-all for hosts that no resource on the server uses. Traefik and Caddy use it only when redirect_enabled is true and redirect_url is empty. In that mode, the domains of resources on the server get 503 while the resource is down.",
+                                        "type": "integer",
+                                        "enum": [
+                                            404,
+                                            503
+                                        ]
+                                    },
                                     "proxy_error_page": {
                                         "description": "Custom HTML error page that the proxy shows for unknown hosts (when redirect_url is empty) and for resources in maintenance mode. Null restores the default page.",
                                         "type": [
@@ -21392,6 +21516,13 @@
                                             "type": [
                                                 "string",
                                                 "null"
+                                            ]
+                                        },
+                                        "unknown_host_status": {
+                                            "type": "integer",
+                                            "enum": [
+                                                404,
+                                                503
                                             ]
                                         },
                                         "proxy_error_page": {
@@ -21512,6 +21643,13 @@
                                             "type": [
                                                 "string",
                                                 "null"
+                                            ]
+                                        },
+                                        "unknown_host_status": {
+                                            "type": "integer",
+                                            "enum": [
+                                                404,
+                                                503
                                             ]
                                         },
                                         "proxy_error_page": {
@@ -24953,6 +25091,14 @@
                                     "is_shown_once": {
                                         "type": "boolean",
                                         "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
+                                    },
+                                    "compose_services": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "nullable": true,
+                                        "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                     }
                                 },
                                 "type": "object"
@@ -25044,6 +25190,14 @@
                                     "is_shown_once": {
                                         "type": "boolean",
                                         "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
+                                    },
+                                    "compose_services": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "nullable": true,
+                                        "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                     }
                                 },
                                 "type": "object"
@@ -25134,6 +25288,14 @@
                                                 "is_shown_once": {
                                                     "type": "boolean",
                                                     "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
+                                                },
+                                                "compose_services": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "nullable": true,
+                                                    "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                                 }
                                             },
                                             "type": "object"
@@ -25422,6 +25584,11 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Service starting request queued."
+                                        },
+                                        "activity_id": {
+                                            "type": "integer",
+                                            "description": "ID of the activity running the start. Poll it with GET \/services\/{uuid}\/activities\/{activity_id}.",
+                                            "example": 1234
                                         }
                                     },
                                     "type": "object"
@@ -25545,7 +25712,103 @@
                                     "properties": {
                                         "message": {
                                             "type": "string",
-                                            "example": "Service restaring request queued."
+                                            "example": "Service restarting request queued."
+                                        },
+                                        "activity_id": {
+                                            "type": "integer",
+                                            "description": "ID of the activity running the restart. Poll it with GET \/services\/{uuid}\/activities\/{activity_id}.",
+                                            "example": 1234
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/activities\/{activity_id}": {
+            "get": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Get activity",
+                "description": "Get the status and output of a start or restart activity of a service.",
+                "operationId": "get-service-activity-by-id",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "activity_id",
+                        "in": "path",
+                        "description": "ID of the activity, as returned by the start or restart endpoints.",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Activity status and output.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer",
+                                            "example": 1234
+                                        },
+                                        "status": {
+                                            "type": "string",
+                                            "description": "One of queued, in_progress, finished, error, killed, cancelled, closed.",
+                                            "example": "finished"
+                                        },
+                                        "exit_code": {
+                                            "type": "integer",
+                                            "nullable": true,
+                                            "example": 0
+                                        },
+                                        "output": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "description": "Combined output of the executed commands. Null unless the token has the read:sensitive ability and its user is an admin or owner of the team."
+                                        },
+                                        "created_at": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        },
+                                        "updated_at": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        },
+                                        "finished_at": {
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "nullable": true,
+                                            "description": "Null while the activity is still running."
                                         }
                                     },
                                     "type": "object"
@@ -30878,6 +31141,14 @@
                     "comment": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "compose_services": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "nullable": true,
+                        "description": "Docker Compose services that get this variable. Null means all services."
                     },
                     "version": {
                         "type": "string"

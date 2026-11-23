@@ -341,6 +341,7 @@ Route::group([
     Route::get('/applications/{uuid}/destinations', [ApplicationsController::class, 'destinations'])->middleware(['api.ability:read']);
     Route::post('/applications/{uuid}/destinations', [ApplicationsController::class, 'add_destination'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/destinations/{destination_uuid}', [ApplicationsController::class, 'remove_destination'])->middleware(['api.ability:delete']);
+    Route::post('/applications/{uuid}/destinations/{destination_uuid}/deploy', [ApplicationsController::class, 'deploy_destination'])->middleware(['api.ability:deploy']);
     Route::get('/applications/{uuid}/start', [OtherController::class, 'post_required'])->middleware(['api.ability:deploy']);
     Route::get('/applications/{uuid}/restart', [OtherController::class, 'post_required'])->middleware(['api.ability:deploy']);
     Route::get('/applications/{uuid}/stop', [OtherController::class, 'post_required'])->middleware(['api.ability:deploy']);
@@ -478,6 +479,7 @@ Route::group([
     Route::post('/services/{uuid}/start', [ServicesController::class, 'action_deploy'])->middleware(['api.ability:deploy']);
     Route::post('/services/{uuid}/restart', [ServicesController::class, 'action_restart'])->middleware(['api.ability:deploy']);
     Route::post('/services/{uuid}/stop', [ServicesController::class, 'action_stop'])->middleware(['api.ability:deploy']);
+    Route::get('/services/{uuid}/activities/{activity_id}', [ServicesController::class, 'show_activity'])->middleware(['api.ability:read'])->whereNumber('activity_id');
 
     Route::get('/services/{uuid}/applications', [ServiceApplicationsController::class, 'index'])->middleware(['api.ability:read']);
     Route::get('/services/{uuid}/applications/{app_uuid}', [ServiceApplicationsController::class, 'show'])->middleware(['api.ability:read']);

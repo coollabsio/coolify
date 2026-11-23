@@ -137,7 +137,7 @@ Database backups (✅ one exists): add S3 on, dump all, databases list, local an
 | ✅ | Custom compose service with an app and a database part | |
 | ✅ | Service app settings | domain, gzip off, strip prefix off, force HTTPS, exclude from status, redirect, port overrides, log drain, custom image, Traefik resolver |
 | ✅ | Service database settings | public port + public on, custom type |
-| ✅ | Service level | connect to network, label escape off, redact env values, Coolify default variables off, maintenance mode + page, environment variables, scheduled task, tags, volume backup on a service volume |
+| ✅ | Service level | connect to network, label escape off, redact env values, Coolify default variables off, maintenance mode + page, environment variables (one limited to some Compose services), scheduled task, tags, volume backup on a service volume |
 
 ## 9. After the transfer, check
 

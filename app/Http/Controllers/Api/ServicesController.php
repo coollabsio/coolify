@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\CoolifyTask\RunRemoteProcess;
 use App\Actions\Service\CreateServiceFromCompose;
 use App\Actions\Service\RestartService;
 use App\Actions\Service\StartService;
@@ -28,6 +29,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
+use Spatie\Activitylog\Models\Activity;
 
 class ServicesController extends Controller
 {
@@ -1458,6 +1460,7 @@ class ServicesController extends Controller
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                             'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
+                            'compose_services' => ['type' => 'array', 'items' => ['type' => 'string'], 'nullable' => true, 'description' => 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'],
                         ],
                     ),
                 ),
@@ -1519,6 +1522,7 @@ class ServicesController extends Controller
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',
             'comment' => 'string|nullable|max:256',
+            ...composeServicesValidationRules($service),
         ]);
 
         if ($validator->fails()) {
@@ -1548,6 +1552,9 @@ class ServicesController extends Controller
         }
         if ($request->has('comment')) {
             $env->comment = $request->comment;
+        }
+        if ($request->has('compose_services')) {
+            $env->compose_services = $request->compose_services;
         }
         // One audit row with the service context, instead of a second row from the model.
         $env->withoutAuditLogging(fn () => $env->save());
@@ -1606,6 +1613,7 @@ class ServicesController extends Controller
                                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                                         'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
+                                        'compose_services' => ['type' => 'array', 'items' => ['type' => 'string'], 'nullable' => true, 'description' => 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'],
                                     ],
                                 ),
                             ],
@@ -1667,7 +1675,7 @@ class ServicesController extends Controller
 
         $updatedEnvs = collect();
         foreach ($bulk_data as $item) {
-            $item = Arr::only($item, ['key', 'value', 'is_literal', 'is_multiline', 'is_shown_once', 'comment']);
+            $item = Arr::only($item, ['key', 'value', 'is_literal', 'is_multiline', 'is_shown_once', 'comment', 'compose_services']);
             if (array_key_exists('key', $item)) {
                 $item['key'] = ValidationPatterns::normalizeEnvironmentVariableKey((string) $item['key']);
             }
@@ -1679,6 +1687,7 @@ class ServicesController extends Controller
                 'is_multiline' => 'boolean',
                 'is_shown_once' => 'boolean',
                 'comment' => 'string|nullable|max:256',
+                ...composeServicesValidationRules($service),
             ]);
 
             if ($validator->fails()) {
@@ -1738,6 +1747,7 @@ class ServicesController extends Controller
                         'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                         'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
+                        'compose_services' => ['type' => 'array', 'items' => ['type' => 'string'], 'nullable' => true, 'description' => 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'],
                     ],
                 ),
             ),
@@ -1801,6 +1811,7 @@ class ServicesController extends Controller
             'is_multiline' => 'boolean',
             'is_shown_once' => 'boolean',
             'comment' => 'string|nullable|max:256',
+            ...composeServicesValidationRules($service),
         ]);
 
         if ($validator->fails()) {
@@ -1825,6 +1836,7 @@ class ServicesController extends Controller
             'is_multiline' => $request->is_multiline ?? false,
             'is_shown_once' => $request->is_shown_once ?? false,
             'comment' => $request->comment ?? null,
+            'compose_services' => $request->compose_services,
         ]);
 
         auditLog('api.service.env_created', [
@@ -2105,6 +2117,7 @@ class ServicesController extends Controller
                             type: 'object',
                             properties: [
                                 'message' => ['type' => 'string', 'example' => 'Service starting request queued.'],
+                                'activity_id' => ['type' => 'integer', 'description' => 'ID of the activity running the start. Poll it with GET /services/{uuid}/activities/{activity_id}.', 'example' => 1234],
                             ]
                         )
                     ),
@@ -2144,17 +2157,22 @@ class ServicesController extends Controller
         if (str($service->status)->contains('running')) {
             return response()->json(['message' => 'Service is already running.'], 400);
         }
-        StartService::dispatch($service);
+        if ($service->isStarting()) {
+            return response()->json(['message' => 'There is a deployment in progress.'], 400);
+        }
+        $activity = StartService::run($service);
 
         auditLog('api.service.deployed', [
             'team_id' => $teamId,
             'service_uuid' => $service->uuid,
             'service_name' => $service->name,
+            'activity_id' => $activity->id,
         ]);
 
         return response()->json(
             [
                 'message' => 'Service starting request queued.',
+                'activity_id' => $activity->id,
             ],
             200
         );
@@ -2297,7 +2315,8 @@ class ServicesController extends Controller
                         schema: new OA\Schema(
                             type: 'object',
                             properties: [
-                                'message' => ['type' => 'string', 'example' => 'Service restaring request queued.'],
+                                'message' => ['type' => 'string', 'example' => 'Service restarting request queued.'],
+                                'activity_id' => ['type' => 'integer', 'description' => 'ID of the activity running the restart. Poll it with GET /services/{uuid}/activities/{activity_id}.', 'example' => 1234],
                             ]
                         )
                     ),
@@ -2334,22 +2353,132 @@ class ServicesController extends Controller
 
         $this->authorize('deploy', $service);
 
+        if ($service->isStarting()) {
+            return response()->json(['message' => 'There is a deployment in progress.'], 400);
+        }
         $pullLatest = $request->boolean('latest');
-        RestartService::dispatch($service, $pullLatest);
+        $activity = RestartService::run($service, $pullLatest);
 
         auditLog('api.service.restarted', [
             'team_id' => $teamId,
             'service_uuid' => $service->uuid,
             'service_name' => $service->name,
             'pull_latest' => $pullLatest,
+            'activity_id' => $activity->id,
         ]);
 
         return response()->json(
             [
                 'message' => 'Service restarting request queued.',
+                'activity_id' => $activity->id,
             ],
             200
         );
+    }
+
+    #[OA\Get(
+        summary: 'Get activity',
+        description: 'Get the status and output of a start or restart activity of a service.',
+        path: '/services/{uuid}/activities/{activity_id}',
+        operationId: 'get-service-activity-by-id',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(
+                name: 'uuid',
+                in: 'path',
+                description: 'UUID of the service.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'string',
+                )
+            ),
+            new OA\Parameter(
+                name: 'activity_id',
+                in: 'path',
+                description: 'ID of the activity, as returned by the start or restart endpoints.',
+                required: true,
+                schema: new OA\Schema(
+                    type: 'integer',
+                )
+            ),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Activity status and output.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'id' => ['type' => 'integer', 'example' => 1234],
+                                'status' => ['type' => 'string', 'description' => 'One of queued, in_progress, finished, error, killed, cancelled, closed.', 'example' => 'finished'],
+                                'exit_code' => ['type' => 'integer', 'nullable' => true, 'example' => 0],
+                                'output' => ['type' => 'string', 'nullable' => true, 'description' => 'Combined output of the executed commands. Null unless the token has the read:sensitive ability and its user is an admin or owner of the team.'],
+                                'created_at' => ['type' => 'string', 'format' => 'date-time'],
+                                'updated_at' => ['type' => 'string', 'format' => 'date-time'],
+                                'finished_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'Null while the activity is still running.'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 404,
+                ref: '#/components/responses/404',
+            ),
+        ]
+    )]
+    public function show_activity(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $uuid = $request->route('uuid');
+        if (! $uuid) {
+            return response()->json(['message' => 'UUID is required.'], 400);
+        }
+        $service = Service::whereRelation('environment.project.team', 'id', $teamId)->whereUuid($uuid)->first();
+        if (! $service) {
+            return response()->json(['message' => 'Service not found.'], 404);
+        }
+
+        $this->authorize('view', $service);
+
+        $activity = Activity::query()->whereKey((int) $request->route('activity_id'))
+            ->where('properties->team_id', (int) $teamId)
+            ->where('properties->type_uuid', $service->uuid)
+            ->first();
+        if (! $activity) {
+            return response()->json(['message' => 'Activity not found.'], 404);
+        }
+        $status = data_get($activity, 'properties.status');
+        $terminal = in_array($status, ['finished', 'error', 'killed', 'cancelled', 'closed'], true);
+
+        return response()->json([
+            'id' => $activity->id,
+            'status' => $status,
+            'exit_code' => data_get($activity, 'properties.exitCode'),
+            'output' => $request->attributes->get('can_read_sensitive', false) === true
+                ? remove_iip(RunRemoteProcess::decodeOutput($activity))
+                : null,
+            'created_at' => $activity->created_at,
+            'updated_at' => $activity->updated_at,
+            'finished_at' => $terminal ? $activity->updated_at : null,
+        ]);
     }
 
     #[OA\Get(

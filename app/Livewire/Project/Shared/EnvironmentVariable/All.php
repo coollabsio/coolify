@@ -808,6 +808,7 @@ class All extends Component
         'is_shown_once',
         'is_shared',
         'config_meta',
+        'compose_services',
         'resourceable_type',
         'resourceable_id',
         'created_at',
@@ -1113,10 +1114,11 @@ class All extends Component
     private function formatEnvironmentVariables($variables)
     {
         $canViewValues = $this->canViewEnvironmentValues();
+        $withContainers = composeServiceNamesForEnvironmentScope($this->resource) !== [];
 
         return $variables
             ->reject(fn ($item): bool => $this->isProtectedEnvironmentVariable($item->key))
-            ->map(fn ($item) => $this->composeDefaultHint($item).formatEnvVariableForDevView($item, $canViewValues))
+            ->map(fn ($item) => $this->composeDefaultHint($item).formatEnvVariableForDevView($item, $canViewValues, $withContainers))
             ->join("\n");
     }
 
@@ -1154,11 +1156,15 @@ class All extends Component
             $this->authorize('manageEnvironment', $this->resource);
             $this->ensureEnvironmentVariablesLoaded();
             if ($data === null) {
-                $variables = $this->normalizeEnvironmentVariables(parseEnvDevView($this->variables, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS));
+                $composeServiceNames = composeServiceNamesForEnvironmentScope($this->resource);
+                $allowContainers = $composeServiceNames !== [];
+                $variables = $this->normalizeEnvironmentVariables(parseEnvDevView($this->variables, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS, $allowContainers));
+                $this->ensureKnownComposeServices($variables, false, $composeServiceNames);
                 $previewVariables = [];
                 if ($this->showPreview) {
                     try {
-                        $previewVariables = $this->normalizeEnvironmentVariables(parseEnvDevView($this->variablesPreview, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS));
+                        $previewVariables = $this->normalizeEnvironmentVariables(parseEnvDevView($this->variablesPreview, EnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS, $allowContainers));
+                        $this->ensureKnownComposeServices($previewVariables, true, $composeServiceNames);
                     } catch (\InvalidArgumentException $e) {
                         throw new \InvalidArgumentException('Preview deployments: '.$e->getMessage(), previous: $e);
                     }
@@ -1183,6 +1189,26 @@ class All extends Component
             return handleError($e, $this);
         } finally {
             $this->refreshEnvs();
+        }
+    }
+
+    /**
+     * A "containers=" flag may name the services of the Compose file, and the names that the variable
+     * already has, so that a service removed from the Compose file does not block the save.
+     *
+     * @param  array<string, array{settings: array<string, mixed>}>  $variables
+     * @param  list<string>  $composeServiceNames
+     */
+    private function ensureKnownComposeServices(array $variables, bool $isPreview, array $composeServiceNames): void
+    {
+        $method = $isPreview ? 'environment_variables_preview' : 'environment_variables';
+        $storedScopes = $this->resource->$method()->whereNotNull('compose_services')->pluck('compose_services', 'key');
+
+        foreach ($variables as $key => $data) {
+            $unknown = array_diff($data['settings']['compose_services'] ?? [], $composeServiceNames, $storedScopes[$key] ?? []);
+            if ($unknown !== []) {
+                throw new \InvalidArgumentException("{$key}: unknown container \"".implode('", "', $unknown).'". Containers in the Compose file: '.implode(', ', $composeServiceNames).'.');
+            }
         }
     }
 
