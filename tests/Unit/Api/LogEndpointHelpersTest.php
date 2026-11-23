@@ -1,5 +1,6 @@
 <?php
 
+use App\Mcp\Concerns\ResolvesResource;
 use App\Models\Server;
 
 it('normalizes requested log line counts', function () {
@@ -12,10 +13,30 @@ it('normalizes requested log line counts', function () {
     expect(normalizeLogLines(null))->toBe(100)
         ->and(normalizeLogLines(''))->toBe(100)
         ->and(normalizeLogLines('abc'))->toBe(100)
-        ->and(normalizeLogLines('0'))->toBe(100)
+        ->and(normalizeLogLines('all'))->toBe('all')
+        ->and(normalizeLogLines('ALL'))->toBe(100)
+        ->and(normalizeLogLines('-1'))->toBe('all')
+        ->and(normalizeLogLines('0'))->toBe(0)
         ->and(normalizeLogLines('-5'))->toBe(100)
         ->and(normalizeLogLines('50'))->toBe(50)
         ->and(normalizeLogLines('50000'))->toBe(10000);
+});
+
+it('keeps MCP log requests bounded', function () {
+    $normalizer = new class
+    {
+        use ResolvesResource;
+
+        public function normalize(mixed $lines): int
+        {
+            return $this->normalizeMcpLogLines($lines);
+        }
+    };
+
+    expect($normalizer->normalize('all'))->toBe(100)
+        ->and($normalizer->normalize('-1'))->toBe(100)
+        ->and($normalizer->normalize('0'))->toBe(100)
+        ->and($normalizer->normalize('501'))->toBe(500);
 });
 
 it('parses show_timestamps query values as booleans', function () {
@@ -49,6 +70,16 @@ it('builds docker log commands with options before an escaped container id', fun
         ->toBe("docker logs -n 25 --timestamps 'container-1' 2>&1");
 });
 
+it('builds docker log commands for all and zero lines', function () {
+    $server = new Server;
+    $server->settings = ['is_swarm_manager' => false];
+
+    expect(buildContainerLogsCommand($server, 'container-1', 'all'))
+        ->toBe("docker logs -n all 'container-1' 2>&1")
+        ->and(buildContainerLogsCommand($server, 'container-1', 0))
+        ->toBe("docker logs -n 0 'container-1' 2>&1");
+});
+
 it('builds swarm service log commands with options before an escaped service id', function () {
     if (! function_exists('buildContainerLogsCommand')) {
         expect(function_exists('buildContainerLogsCommand'))->toBeTrue();
@@ -80,8 +111,14 @@ it('filters service sub containers in PHP instead of using user input in shell f
         ->toBe(['first', 'third']);
 });
 
-it('does not interpolate the requested service name into the docker ps shell command', function () {
-    $source = file_get_contents(__DIR__.'/../../../bootstrap/helpers/docker.php');
+it('filters service containers when another Docker label contains commas', function () {
+    $containers = collect([
+        [
+            'ID' => 'app',
+            'Labels' => 'traefik.http.routers.app.rule=Host(`one.example.com`,`two.example.com`),coolify.name=app-service-uuid',
+        ],
+    ]);
 
-    expect($source)->not->toContain('coolify.name={$name}');
+    expect(filterServiceSubContainersByName($containers, 'app-service-uuid')->pluck('ID')->all())
+        ->toBe(['app']);
 });

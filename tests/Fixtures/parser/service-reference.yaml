@@ -1,0 +1,181 @@
+# Reference compose for the service parser (serviceParser + updateCompose).
+# Test-only: tests/Feature/ServiceParserReferenceTest.php parses it and compares the result
+# with service-reference.expected.yaml. Each service covers one group of parser features.
+services:
+  # Domain with a port, magic secrets, all environment syntaxes, labels, volumes.
+  web:
+    image: nginx:alpine
+    environment:
+      - SERVICE_URL_WEB_8080
+      - LITERAL=plain-value
+      - BARE_PASSTHROUGH
+      - SELF_REF=${SELF_REF}
+      - WITH_DEFAULT=${WITH_DEFAULT:-fallback}
+      - REQUIRED=${REQUIRED:?REQUIRED must be set}
+      - NO_BRACES=$NO_BRACES_VALUE
+      - NESTED=${NESTED_OUTER:-${NESTED_INNER:-inner-default}}
+      - NESTED_NO_DEFAULT=${NESTED_NO_DEFAULT_OUTER:-${NESTED_NO_DEFAULT_INNER}}
+      - DASH_DEFAULT=${DASH_DEFAULT_VAR-dash-default}
+      - NO_BRACES_DEFAULT=$NO_BRACES_DEFAULT_VAR:-no-braces-default
+      - SHARED={{environment.SHARED_KEY}}
+      - SHARED_MISSING={{environment.NOT_DEFINED}}
+      - INTERPOLATED=http://${INTERPOLATED_HOST:-localhost}/path
+      - PASSWORD=${SERVICE_PASSWORD_WEB}
+      - PASSWORD_64=${SERVICE_PASSWORD_64_WEB}
+      - PASSWORD_SYMBOLS=${SERVICE_PASSWORDWITHSYMBOLS_WEB}
+      - BASE64=${SERVICE_BASE64_WEB}
+      - BASE64_64=${SERVICE_BASE64_64_WEB}
+      - REALBASE64_64=${SERVICE_REALBASE64_64_WEB}
+      - PASSWORD_SYMBOLS_64=${SERVICE_PASSWORDWITHSYMBOLS_64_WEB}
+      - REALBASE64_128=${SERVICE_REALBASE64_128_WEB}
+      - HEX_32=${SERVICE_HEX_32_WEB}
+      - HEX_128=${SERVICE_HEX_128_WEB}
+      - SUPABASE_ANON_WITHOUT_JWT=${SERVICE_SUPABASEANON_KEY}
+      - USER=${SERVICE_USER_WEB}
+      - LOWERCASE_USER=${SERVICE_LOWERCASEUSER_WEB}
+      - UNKNOWN_MAGIC=${SERVICE_FOO_WEB}
+      - API_URL=${SERVICE_URL_API}
+    labels:
+      com.example.team: platform
+      com.example.dollar: price-$5
+      traefik.http.middlewares.reference-headers.headers.customresponseheaders.X-Reference: "1"
+    volumes:
+      - web-data:/usr/share/nginx/html
+      - ./config:/etc/nginx/conf.d:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - type: bind
+        source: ./web-init.sh
+        target: /docker-entrypoint.d/init.sh
+        read_only: true
+        content: |
+          #!/bin/sh
+          echo "reference fixture"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080"]
+      interval: 10s
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: custom.env
+
+  # Path value with FQDN declaration, map-style environment, build args, ports.
+  api:
+    image: node:22-alpine
+    build:
+      context: .
+      args:
+        - BUILD_VERSION=${BUILD_VERSION:-1.0.0}
+    environment:
+      SERVICE_FQDN_API: /api
+      MAP_LITERAL: map-value
+      MAP_NULL:
+      GHOST_URL: ${SERVICE_URL_GHOST}
+      DB_URL: postgres://${SERVICE_USER_DB}:${SERVICE_PASSWORD_DB}@db:5432/app
+    ports:
+      - "3000:3000"
+      - target: 3001
+        published: 3001
+        protocol: tcp
+    volumes:
+      - nfs-data:/mnt/nfs
+      - type: bind
+        source: ./api-data
+        target: /data
+      - type: bind
+        source: ./optional
+        target: /optional
+        bind:
+          create_host_path: false
+    expose:
+      - 3000
+
+  # Hyphenated service name: SERVICE_URL_MY_APP maps to compose service "my-app".
+  my-app:
+    image: httpd:2.4-alpine
+    environment:
+      - SERVICE_URL_MY_APP_80
+
+  # Host www.example.com after the custom domain step (redirect to non-www in the settings case).
+  www:
+    image: nginx:alpine
+    environment:
+      - SERVICE_URL_WWW
+
+  # Ghost image with a path domain: extra redirect labels for the path.
+  blog:
+    image: ghost:5-alpine
+    environment:
+      - SERVICE_URL_BLOG_2368=/blog
+
+  # Shared host with path routing (Appwrite style): same variable, different paths.
+  gateway:
+    image: traefik/whoami
+    environment:
+      - SERVICE_URL_GATEWAY=/
+  gateway-ws:
+    image: traefik/whoami
+    environment:
+      - SERVICE_URL_GATEWAY=/ws
+
+  # Exact copy of web's declaration (old Twenty template, #11924): no domain, no variable writes.
+  worker:
+    image: nginx:alpine
+    command: ["sleep", "infinity"]
+    environment:
+      - SERVICE_URL_WEB_8080
+      - APP_URL=${SERVICE_URL_WEB}
+
+  # SERVICE_FQDN_ twin of web's SERVICE_URL_ declaration: also a copy.
+  scheduler:
+    image: nginx:alpine
+    command: ["sleep", "infinity"]
+    environment:
+      - SERVICE_FQDN_WEB_8080
+    exclude_from_hc: true
+
+  # Database image: ServiceDatabase row, no domain, no proxy labels.
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_DB}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_DB}
+      - POSTGRES_DB=app
+      - SERVICE_URL_DB_5432
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - shared-external:/backups
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+
+  # restart "no": excluded from status checks; shares web's network namespace.
+  sidecar:
+    image: busybox
+    restart: "no"
+    network_mode: "service:web"
+    command: ["true"]
+
+volumes:
+  web-data:
+  db-data:
+    driver_opts:
+      type: none
+      o: bind
+      device: /srv/db
+  shared-external:
+    external: true
+  nfs-data:
+    driver_opts:
+      type: nfs
+      o: addr=10.0.0.2,rw
+      device: ":/exports/data"
+
+networks:
+  internal:
+  default:
+  # Networks with aliases are not added to every service.
+  aliased:
+    aliases:
+      - alias-name

@@ -3,6 +3,8 @@
 namespace App\Livewire\Server\New;
 
 use App\Enums\ProxyTypes;
+use App\Jobs\ValidateNewCloudServerJob;
+use App\Livewire\Server\New\Concerns\SetsImageScanning;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
@@ -14,12 +16,15 @@ use App\Services\VultrService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class ByVultr extends Component
 {
     use AuthorizesRequests;
+    use SetsImageScanning;
 
     public int $current_step = 1;
 
@@ -144,7 +149,7 @@ class ByVultr extends Component
     protected function rules(): array
     {
         $rules = [
-            'selected_token_id' => 'required|integer|exists:cloud_provider_tokens,id',
+            'selected_token_id' => ['required', 'integer', Rule::exists('cloud_provider_tokens', 'id')->where('team_id', currentTeam()->id)],
         ];
 
         if ($this->current_step === 2) {
@@ -161,7 +166,7 @@ class ByVultr extends Component
                 'cloud_init_script' => ['nullable', 'string', new ValidCloudInitYaml],
                 'save_cloud_init_script' => 'boolean',
                 'cloud_init_script_name' => 'nullable|string|max:255',
-                'selected_cloud_init_script_id' => 'nullable|integer|exists:cloud_init_scripts,id',
+                'selected_cloud_init_script_id' => ['nullable', 'integer', Rule::exists('cloud_init_scripts', 'id')->where('team_id', currentTeam()->id)],
             ]);
         }
 
@@ -202,7 +207,7 @@ class ByVultr extends Component
     public function nextStep(): mixed
     {
         $this->validate([
-            'selected_token_id' => 'required|integer|exists:cloud_provider_tokens,id',
+            'selected_token_id' => ['required', 'integer', Rule::exists('cloud_provider_tokens', 'id')->where('team_id', currentTeam()->id)],
         ]);
 
         try {
@@ -374,12 +379,13 @@ class ByVultr extends Component
             $details = data_get($e->response->json(), $jsonMessageKey) ?: $e->response->body() ?: $details;
         }
 
-        return "{$providerName} API error: {$details}";
+        $prefix = "{$providerName} API error: ";
+
+        return str_starts_with($details, $prefix) ? $details : $prefix.$details;
     }
 
-    private function createVultrServer(string $token): array
+    private function createVultrServer(VultrService $vultrService): array
     {
-        $vultrService = new VultrService($token);
         $privateKey = PrivateKey::ownedByCurrentTeam()->findOrFail($this->private_key_id);
         $publicKey = $privateKey->getPublicKey();
         $existingKey = $this->findMatchingSshKey($vultrService->getSshKeys(), $publicKey);
@@ -419,6 +425,10 @@ class ByVultr extends Component
             return null;
         }
 
+        $vultrService = null;
+        $vultrInstanceId = null;
+        $server = null;
+
         try {
             $this->authorize('create', Server::class);
 
@@ -429,41 +439,60 @@ class ByVultr extends Component
             if ($this->save_cloud_init_script && ! empty($this->cloud_init_script) && ! empty($this->cloud_init_script_name)) {
                 $this->authorize('create', CloudInitScript::class);
 
-                CloudInitScript::create([
+                $cloudInitScript = CloudInitScript::create([
                     'team_id' => currentTeam()->id,
                     'name' => $this->cloud_init_script_name,
                     'script' => $this->cloud_init_script,
                 ]);
-            }
 
-            $vultrService = new VultrService($this->getVultrToken());
-            $vultrInstance = $this->createVultrServer($this->getVultrToken());
-            $ipAddress = $vultrService->getPublicIp($vultrInstance, $this->disable_public_ipv4, $this->enable_ipv6) ?? '0.0.0.0';
-
-            $server = Server::create([
-                'name' => strtolower(trim($this->server_name)),
-                'ip' => $ipAddress,
-                'user' => 'root',
-                'port' => 22,
-                'team_id' => currentTeam()->id,
-                'private_key_id' => $this->private_key_id,
-                'cloud_provider_token_id' => $this->selected_token_id,
-                'vultr_instance_id' => $vultrInstance['id'],
-                'vultr_instance_status' => $vultrInstance['status'] ?? null,
-            ]);
-
-            $vultrInstance = $vultrService->waitForPublicIp($vultrInstance, $this->disable_public_ipv4, $this->enable_ipv6);
-            $assignedIpAddress = $vultrService->getPublicIp($vultrInstance, $this->disable_public_ipv4, $this->enable_ipv6);
-            if ($assignedIpAddress && $assignedIpAddress !== $server->ip) {
-                $server->update([
-                    'ip' => $assignedIpAddress,
-                    'vultr_instance_status' => $vultrInstance['status'] ?? $server->vultr_instance_status,
+                auditLog('ui.cloud_init_script.created', [
+                    'team_id' => currentTeam()->id,
+                    'cloud_init_script_id' => $cloudInitScript->id,
+                    'cloud_init_script_name' => $cloudInitScript->name,
                 ]);
             }
 
-            $server->proxy->set('status', 'exited');
-            $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
-            $server->save();
+            $vultrService = new VultrService($this->getVultrToken());
+            $vultrInstance = $this->createVultrServer($vultrService);
+            $vultrInstanceId = (string) $vultrInstance['id'];
+            $ipAddress = $vultrService->getPublicIp($vultrInstance, $this->disable_public_ipv4, $this->enable_ipv6) ?? Server::PLACEHOLDER_IP;
+
+            $server = DB::transaction(function () use ($ipAddress, $vultrInstanceId, $vultrInstance): Server {
+                $server = Team::createServerWithinLimit(currentTeam()->id, [
+                    'name' => strtolower(trim($this->server_name)),
+                    'ip' => $ipAddress,
+                    'user' => 'root',
+                    'port' => 22,
+                    'team_id' => currentTeam()->id,
+                    'private_key_id' => $this->private_key_id,
+                    'cloud_provider_token_id' => $this->selected_token_id,
+                    'vultr_instance_id' => $vultrInstanceId,
+                    'vultr_instance_status' => $vultrInstance['status'] ?? null,
+                ]);
+
+                $server->proxy->set('status', 'exited');
+                $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
+                $server->save();
+                $this->applyImageScanning($server);
+
+                return $server;
+            });
+
+            try {
+                $vultrInstance = $vultrService->waitForPublicIp($vultrInstance, $this->disable_public_ipv4, $this->enable_ipv6);
+                $assignedIpAddress = $vultrService->getPublicIp($vultrInstance, $this->disable_public_ipv4, $this->enable_ipv6);
+                if ($assignedIpAddress && $assignedIpAddress !== $server->ip) {
+                    $server->update([
+                        'ip' => $assignedIpAddress,
+                        'vultr_instance_status' => $vultrInstance['status'] ?? $server->vultr_instance_status,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                // Non-fatal: the server page polling backfills the IP later.
+                report($e);
+            }
+
+            ValidateNewCloudServerJob::dispatch($server);
 
             if ($this->from_onboarding) {
                 currentTeam()->update([
@@ -474,7 +503,22 @@ class ByVultr extends Component
 
             return redirectRoute($this, 'server.show', [$server->uuid]);
         } catch (\Throwable $e) {
+            $this->deleteUntrackedInstance($vultrService, $vultrInstanceId, $server);
+
             return handleError($e, $this);
+        }
+    }
+
+    private function deleteUntrackedInstance(?VultrService $vultrService, ?string $vultrInstanceId, ?Server $server): void
+    {
+        if (! $vultrService || ! $vultrInstanceId || $server) {
+            return;
+        }
+
+        try {
+            $vultrService->deleteInstance($vultrInstanceId);
+        } catch (\Throwable $e) {
+            report($e);
         }
     }
 

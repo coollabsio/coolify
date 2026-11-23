@@ -9,12 +9,14 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class ListServices extends Tool
 {
     protected string $name = 'list_services';
 
-    protected string $description = 'List services (multi-container stacks) owned by the authenticated team. Returns summary (uuid, name, status). Use get_service for full details.';
+    protected string $description = 'List services (multi-container stacks) owned by the authenticated team. Filters: project_uuid, environment_uuid, server_uuid, status, name.';
 
     use BuildsResponse;
     use ResolvesTeam;
@@ -30,35 +32,90 @@ class ListServices extends Tool
             return $this->mcpError($request, 'Invalid token.');
         }
 
+        $projectUuid = $request->get('project_uuid');
+        if ($projectUuid !== null && (! is_string($projectUuid) || $projectUuid === '')) {
+            return $this->mcpError($request, 'project_uuid must be a non-empty string.');
+        }
+
+        $environmentUuid = $request->get('environment_uuid');
+        if ($environmentUuid !== null && (! is_string($environmentUuid) || $environmentUuid === '')) {
+            return $this->mcpError($request, 'environment_uuid must be a non-empty string.');
+        }
+
+        $serverUuid = $request->get('server_uuid');
+        if ($serverUuid !== null && (! is_string($serverUuid) || $serverUuid === '')) {
+            return $this->mcpError($request, 'server_uuid must be a non-empty string.');
+        }
+
+        $status = $request->get('status');
+        if ($status !== null && (! is_string($status) || trim($status) === '')) {
+            return $this->mcpError($request, 'status must be a non-empty string.');
+        }
+
+        $name = $request->get('name');
+        if ($name !== null && (! is_string($name) || trim($name) === '')) {
+            return $this->mcpError($request, 'name argument must be a non-empty string.');
+        }
+
         $args = $this->paginationArgs($request);
 
-        $query = Service::whereHas('environment.project', fn ($q) => $q->where('team_id', $teamId));
+        $query = Service::whereHas('environment.project', fn ($q) => $q->where('team_id', $teamId))
+            ->with(['environment.project:id,uuid,name,team_id'])
+            ->applyListFilters($teamId, [
+                'project_uuid' => $projectUuid,
+                'environment_uuid' => $environmentUuid,
+                'server_uuid' => $serverUuid,
+                'name' => $name,
+            ]);
 
-        $total = (clone $query)->count();
+        if (is_string($status)) {
+            [$total, $services] = Service::pageByStatus($query, $status, $args['offset'], $args['per_page']);
+        } else {
+            $total = (clone $query)->count();
+            $services = $query
+                ->orderBy('name')
+                ->orderBy('id')
+                ->skip($args['offset'])
+                ->take($args['per_page'])
+                ->get();
+        }
 
-        $summaries = $query
-            ->orderBy('name')
-            ->skip($args['offset'])
-            ->take($args['per_page'])
-            ->get()
+        $summaries = $services
             ->map(fn ($svc) => [
                 'uuid' => $svc->uuid,
                 'name' => $svc->name,
                 'status' => $svc->status ?? null,
+                'project_uuid' => $svc->environment?->project?->uuid,
+                'project_name' => $svc->environment?->project?->name,
+                'environment_name' => $svc->environment?->name,
+                'environment_uuid' => $svc->environment?->uuid,
             ])
             ->values()
             ->all();
 
+        $extra = array_filter([
+            'project_uuid' => $projectUuid,
+            'environment_uuid' => $environmentUuid,
+            'server_uuid' => $serverUuid,
+            'status' => $status,
+            'name' => $name,
+        ], fn ($v) => $v !== null);
+
         return $this->mcpSuccess($request, $this->respond(
             $summaries,
             [],
-            $this->paginationMeta('list_services', $args, $total),
+            $this->paginationMeta('list_services', $args, $total, $extra),
         ));
     }
 
     public function schema(JsonSchema $schema): array
     {
         return [
+            'project_uuid' => $schema->string()->description('Optional project UUID filter.'),
+            'environment_uuid' => $schema->string()->description('Optional environment UUID filter.'),
+            'server_uuid' => $schema->string()->description('Optional server UUID filter.'),
+            'status' => $schema->string()->description('Optional status substring filter.'),
+            'name' => $schema->string()->description('Optional name substring filter.'),
             'page' => $schema->integer()->description('Page number (default 1).'),
             'per_page' => $schema->integer()->description('Items per page (default 50, max 100).'),
         ];

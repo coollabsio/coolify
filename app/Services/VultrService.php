@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\CloudProviderApiException;
 use App\Exceptions\RateLimitException;
 use Illuminate\Support\Facades\Http;
 
@@ -17,7 +18,7 @@ class VultrService
             'Authorization' => 'Bearer '.$this->token,
         ])
             ->timeout(30)
-            ->retry(3, fn (int $attempt) => $attempt * 100)
+            ->retry(3, fn (int $attempt) => $attempt * 100, throw: false)
             ->{$method}($this->baseUrl.$endpoint, $data);
 
         if (! $response->successful()) {
@@ -28,7 +29,7 @@ class VultrService
                 );
             }
 
-            throw new \Exception('Vultr API error: '.$response->json('error', 'Unknown error'), $response->status());
+            throw new CloudProviderApiException('Vultr', $response->json('error', 'Unknown error'), $response->status());
         }
 
         return $response->json() ?? [];

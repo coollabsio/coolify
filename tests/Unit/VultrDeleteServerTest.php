@@ -116,3 +116,52 @@ it('does not use another team Vultr token when deleting an instance', function (
 
     expect($request->header('Authorization'))->toBe(['Bearer test-vultr-token']);
 });
+
+it('retains the server and surfaces a Vultr deletion failure', function () {
+    Http::fake([
+        'https://api.vultr.com/v2/instances/instance-1' => Http::response([
+            'error' => 'deletion failed',
+        ], 500),
+    ]);
+
+    $server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->privateKey->id,
+        'cloud_provider_token_id' => $this->vultrToken->id,
+        'vultr_instance_id' => 'instance-1',
+    ]);
+    $server->delete();
+
+    expect(fn () => DeleteServer::run(
+        serverId: $server->id,
+        cloudProviderTokenId: $this->vultrToken->id,
+        teamId: $this->team->id,
+        deleteFromVultr: true,
+        vultrInstanceId: 'instance-1'
+    ))->toThrow(Exception::class, 'Vultr API error: deletion failed');
+
+    expect(Server::withTrashed()->find($server->id))->not->toBeNull();
+});
+
+it('retains the server when no Vultr token can delete the instance', function () {
+    Http::preventStrayRequests();
+
+    $this->vultrToken->delete();
+
+    $server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->privateKey->id,
+        'cloud_provider_token_id' => null,
+        'vultr_instance_id' => 'instance-1',
+    ]);
+    $server->delete();
+
+    expect(fn () => DeleteServer::run(
+        serverId: $server->id,
+        teamId: $this->team->id,
+        deleteFromVultr: true,
+        vultrInstanceId: 'instance-1'
+    ))->toThrow(RuntimeException::class, 'No Vultr token found');
+
+    expect(Server::withTrashed()->find($server->id))->not->toBeNull();
+});

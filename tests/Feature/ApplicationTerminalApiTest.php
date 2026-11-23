@@ -94,6 +94,7 @@ function dockerPsApplicationContainerOutput(string $container = 'app-container',
     }
 
     return json_encode([
+        'ID' => $container,
         'Names' => $container,
         'State' => $state,
         'Labels' => implode(',', $labels),
@@ -102,7 +103,7 @@ function dockerPsApplicationContainerOutput(string $container = 'app-container',
 
 describe('POST /api/v1/applications/{uuid}/exec', function () {
     test('runs a command in the application container and returns process output', function () {
-        Process::fake([
+        fakeRemoteProcesses([
             '*docker ps*' => Process::result(output: dockerPsApplicationContainerOutput()),
             '*docker exec*' => Process::result(output: "hello\n", errorOutput: "warning\n", exitCode: 0),
         ]);
@@ -124,7 +125,7 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
     });
 
     test('truncates oversized command output', function () {
-        Process::fake([
+        fakeRemoteProcesses([
             '*docker ps*' => Process::result(output: dockerPsApplicationContainerOutput()),
             '*docker exec*' => Process::result(output: str_repeat('a', 70000), errorOutput: str_repeat('b', 70000)),
         ]);
@@ -142,7 +143,7 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
     });
 
     test('uses the requested timeout for ssh and preserves timeout output', function () {
-        Process::fake([
+        fakeRemoteProcesses([
             '*docker ps*' => Process::result(output: dockerPsApplicationContainerOutput()),
             '*docker exec*' => Process::result(output: '', errorOutput: "timed out\n", exitCode: 124),
         ]);
@@ -212,7 +213,7 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
     });
 
     test('shares the server concurrent command limit', function () {
-        Process::fake([
+        fakeRemoteProcesses([
             '*docker ps*' => Process::result(output: dockerPsApplicationContainerOutput()),
         ]);
 
@@ -243,7 +244,7 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
     });
 
     test('selects only the requested pull request container', function () {
-        Process::fake([
+        fakeRemoteProcesses([
             '*docker ps*' => Process::result(output: dockerPsApplicationContainerOutput('base').dockerPsApplicationContainerOutput('preview-123', pullRequestId: 123).dockerPsApplicationContainerOutput('preview-456', pullRequestId: 456)),
             '*docker exec*' => Process::result(output: "ok\n"),
         ]);
@@ -259,7 +260,7 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
     });
 
     test('selects only the base deployment when pull request id is zero', function () {
-        Process::fake([
+        fakeRemoteProcesses([
             '*docker ps*' => Process::result(output: dockerPsApplicationContainerOutput('base').dockerPsApplicationContainerOutput('preview-123', pullRequestId: 123)),
             '*docker exec*' => Process::result(output: "ok\n"),
         ]);
@@ -275,7 +276,7 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
     });
 
     test('asks for a container when multiple running containers are found', function () {
-        Process::fake([
+        fakeRemoteProcesses([
             '*docker ps*' => Process::result(output: dockerPsApplicationContainerOutput('web').dockerPsApplicationContainerOutput('worker')),
         ]);
 
@@ -308,7 +309,7 @@ describe('POST /api/v1/applications/{uuid}/exec', function () {
             'standalone_docker_id' => $additionalDestination->id,
         ]);
 
-        Process::fake([
+        fakeRemoteProcesses([
             '*docker ps*' => Process::result(output: dockerPsApplicationContainerOutput('app-container')),
         ]);
 

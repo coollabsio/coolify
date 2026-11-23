@@ -4,14 +4,17 @@ namespace App\Livewire\Project\Database;
 
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
+use App\Traits\ListensToTeamChannel;
+use App\Traits\PreparesBackupDownloads;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class BackupExecutions extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
+    use PreparesBackupDownloads;
 
     public ?ScheduledDatabaseBackup $backup = null;
 
@@ -37,19 +40,17 @@ class BackupExecutions extends Component
 
     public $delete_backup_sftp = false;
 
-    public function getListeners()
+    public function getListeners(): array
     {
-        $userId = Auth::id();
-
-        return [
-            "echo-private:team.{$userId},BackupCreated" => 'refreshBackupExecutions',
-        ];
+        return $this->teamChannelListeners([
+            'BackupCreated' => 'refreshBackupExecutions',
+        ]);
     }
 
     public function cleanupFailed()
     {
         try {
-            $this->authorize('manageBackups', $this->database);
+            $this->authorize('delete', $this->database);
             if ($this->backup) {
                 $this->backup->executions()->where('status', 'failed')->delete();
                 $this->refreshBackupExecutions();
@@ -63,7 +64,7 @@ class BackupExecutions extends Component
     public function cleanupDeleted()
     {
         try {
-            $this->authorize('manageBackups', $this->database);
+            $this->authorize('delete', $this->database);
             if ($this->backup) {
                 $deletedCount = $this->backup->executions()->where('local_storage_deleted', true)->count();
                 if ($deletedCount > 0) {
@@ -82,7 +83,7 @@ class BackupExecutions extends Component
     public function deleteBackup($executionId, $password, $selectedActions = [])
     {
         try {
-            $this->authorize('manageBackups', $this->database);
+            $this->authorize('delete', $this->database);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -98,34 +99,54 @@ class BackupExecutions extends Component
             return;
         }
 
-        $server = $execution->scheduledDatabaseBackup->database->getMorphClass() === ServiceDatabase::class
-            ? $execution->scheduledDatabaseBackup->database->service->destination->server
-            : $execution->scheduledDatabaseBackup->database->destination->server;
-
         try {
-            if ($execution->filename) {
-                deleteBackupsLocally($execution->filename, $server);
+            $deleteFromS3 = in_array('delete_backup_s3', $selectedActions, true);
 
-                if ($this->delete_backup_s3 && $execution->scheduledDatabaseBackup->s3) {
-                    deleteBackupsS3($execution->filename, $execution->scheduledDatabaseBackup->s3);
+            if ($execution->filename && ! $execution->local_storage_deleted) {
+                $server = $this->backup->server();
+                if (! $server) {
+                    throw new \RuntimeException('The backup server is unavailable.');
                 }
+
+                deleteBackupsLocally($execution->filename, $server, throwError: true);
+            }
+
+            if ($deleteFromS3) {
+                $execution->deleteS3Copies();
             }
 
             $execution->delete();
+            $this->delete_backup_s3 = false;
             $this->dispatch('success', 'Backup deleted.');
             $this->refreshBackupExecutions();
         } catch (\Exception $e) {
             $this->dispatch('error', 'Failed to delete backup: '.$e->getMessage());
 
-            return true;
+            return false;
         }
 
         return true;
     }
 
-    public function download_file($exeuctionId)
+    public function download_file($executionId): void
     {
-        return redirect()->route('download.backup', $exeuctionId);
+        try {
+            $this->authorize('manageBackups', $this->database);
+            $execution = $this->backup->executions()->whereKey($executionId)->first();
+            if (! $execution) {
+                $this->dispatch('error', 'Backup execution not found.');
+
+                return;
+            }
+
+            $this->prepareBackupDownload(
+                $execution->local_storage_deleted ? null : $this->server(),
+                $execution->filename,
+                route('download.backup', $execution->id),
+            );
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
     public function refreshBackupExecutions(): void
@@ -220,6 +241,8 @@ class BackupExecutions extends Component
 
     public function render()
     {
-        return view('livewire.project.database.backup-executions');
+        return view('livewire.project.database.backup-executions', [
+            's3Downloads' => $this->s3BackupDownloadsEnabled(),
+        ]);
     }
 }

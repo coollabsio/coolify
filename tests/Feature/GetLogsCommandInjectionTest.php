@@ -3,6 +3,7 @@
 use App\Livewire\Project\Shared\GetLogs;
 use App\Models\Application;
 use App\Models\Environment;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -10,7 +11,8 @@ use App\Models\Team;
 use App\Models\User;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Livewire\Attributes\Locked;
+use Illuminate\Support\Facades\Process;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -20,7 +22,11 @@ beforeEach(function () {
     $this->team = Team::factory()->create();
     $this->user->teams()->attach($this->team, ['role' => 'owner']);
 
-    $this->server = Server::factory()->create(['team_id' => $this->team->id]);
+    $privateKey = PrivateKey::factory()->create(['team_id' => $this->team->id]);
+    $this->server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $privateKey->id,
+    ]);
     // Server::created auto-creates a StandaloneDocker, reuse it
     $this->destination = StandaloneDocker::where('server_id', $this->server->id)->first();
     $this->project = Project::factory()->create(['team_id' => $this->team->id]);
@@ -37,36 +43,69 @@ beforeEach(function () {
 });
 
 describe('GetLogs locked properties', function () {
-    test('container property has Locked attribute', function () {
-        $property = new ReflectionProperty(GetLogs::class, 'container');
-        $attributes = $property->getAttributes(Locked::class);
-
-        expect($attributes)->not->toBeEmpty();
-    });
-
-    test('server property has Locked attribute', function () {
-        $property = new ReflectionProperty(GetLogs::class, 'server');
-        $attributes = $property->getAttributes(Locked::class);
-
-        expect($attributes)->not->toBeEmpty();
-    });
-
-    test('resource property has Locked attribute', function () {
-        $property = new ReflectionProperty(GetLogs::class, 'resource');
-        $attributes = $property->getAttributes(Locked::class);
-
-        expect($attributes)->not->toBeEmpty();
-    });
-
-    test('servicesubtype property has Locked attribute', function () {
-        $property = new ReflectionProperty(GetLogs::class, 'servicesubtype');
-        $attributes = $property->getAttributes(Locked::class);
-
-        expect($attributes)->not->toBeEmpty();
-    });
+    test('rejects a client update of a locked property', function (string $property, mixed $value) {
+        Livewire::test(GetLogs::class, [
+            'server' => $this->server,
+            'resource' => $this->application,
+            'container' => 'test-container',
+        ])->set($property, $value);
+    })->with([
+        'container' => ['container', 'container;id'],
+        'server' => ['server', 1],
+        'resource' => ['resource', 1],
+        'servicesubtype' => ['servicesubtype', 1],
+    ])->throws(CannotUpdateLockedPropertyException::class);
 });
 
 describe('GetLogs Livewire action validation', function () {
+    test('getLogs requests all logs when the line count is minus one', function () {
+        $this->server->settings->fill([
+            'is_reachable' => true,
+            'is_usable' => true,
+            'force_disabled' => false,
+        ])->save();
+        $server = Server::with('settings')->findOrFail($this->server->id);
+
+        fakeRemoteProcesses(['*' => Process::result(output: 'all logs')]);
+
+        Livewire::test(GetLogs::class, [
+            'server' => $server,
+            'resource' => $this->application,
+            'container' => 'test-container',
+        ])
+            ->assertSee('All')
+            ->assertSeeHtml('title="Show all logs"')
+            ->call('showAllLogs')
+            ->assertSet('numberOfLines', -1)
+            ->assertReturned('all logs');
+
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker logs -n all -t test-container'));
+    });
+
+    test('getLogs marks ANSI-colored output truncated based on raw bytes', function () {
+        $this->server->settings->fill([
+            'is_reachable' => true,
+            'is_usable' => true,
+            'force_disabled' => false,
+        ])->save();
+        $server = Server::with('settings')->findOrFail($this->server->id);
+        $output = "\e[31m".str_repeat('a', GetLogs::MAX_DISPLAY_SIZE_BYTES - 4);
+
+        expect(strlen($output))->toBe(GetLogs::MAX_DISPLAY_SIZE_BYTES + 1);
+
+        fakeRemoteProcesses(['*' => Process::result(output: $output)]);
+
+        $component = new GetLogs;
+        $component->server = $server;
+        $component->resource = $this->application;
+        $component->container = 'test-container';
+        $component->showTimeStamps = false;
+
+        expect($component->getLogs())
+            ->toContain('[... Output truncated at 5MB limit ...]')
+            ->not->toContain("\e[31m");
+    });
+
     test('getLogs rejects invalid container name', function () {
         // Make server functional by setting settings directly
         $this->server->settings->fill([
@@ -75,7 +114,7 @@ describe('GetLogs Livewire action validation', function () {
             'force_disabled' => false,
         ])->save();
         // Reload server with fresh settings to ensure casted values
-        $server = Server::with('settings')->find($this->server->id);
+        $server = Server::with('settings')->findOrFail($this->server->id);
 
         Livewire::test(GetLogs::class, [
             'server' => $server,
@@ -83,7 +122,7 @@ describe('GetLogs Livewire action validation', function () {
             'container' => 'container;malicious-command',
         ])
             ->call('getLogs')
-            ->assertSet('outputs', 'Invalid container name.');
+            ->assertReturned('Invalid container name.');
     });
 
     test('getLogs rejects unauthorized server access', function () {
@@ -96,7 +135,7 @@ describe('GetLogs Livewire action validation', function () {
             'container' => 'test-container',
         ])
             ->call('getLogs')
-            ->assertSet('outputs', 'Unauthorized.');
+            ->assertReturned('Unauthorized.');
     });
 
     test('downloadAllLogs returns empty for invalid container name', function () {
@@ -105,7 +144,7 @@ describe('GetLogs Livewire action validation', function () {
             'is_usable' => true,
             'force_disabled' => false,
         ])->save();
-        $server = Server::with('settings')->find($this->server->id);
+        $server = Server::with('settings')->findOrFail($this->server->id);
 
         Livewire::test(GetLogs::class, [
             'server' => $server,
@@ -130,17 +169,117 @@ describe('GetLogs Livewire action validation', function () {
     });
 });
 
-describe('GetLogs stream polling', function () {
-    test('streaming logs polls when log panel is not collapsible', function () {
+describe('GetLogs browser-rendered output', function () {
+    beforeEach(function () {
+        $this->server->settings->fill([
+            'is_reachable' => true,
+            'is_usable' => true,
+            'force_disabled' => false,
+        ])->save();
+        $this->functionalServer = Server::with('settings')->findOrFail($this->server->id);
+    });
+
+    test('getLogs returns timestamped output without storing it in component state', function () {
+        fakeRemoteProcesses(['*' => Process::result(output: "2026-09-28T10:00:02Z second\n2026-09-28T10:00:01Z first")]);
+
+        $component = Livewire::test(GetLogs::class, [
+            'server' => $this->functionalServer,
+            'resource' => $this->application,
+            'container' => 'test-container',
+        ])
+            ->set('showTimeStamps', false)
+            ->call('getLogs')
+            ->assertReturned("2026-09-28T10:00:01Z first\n2026-09-28T10:00:02Z second");
+
+        expect($component->instance())->not->toHaveProperty('outputs');
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker logs -n 100 -t test-container'));
+    });
+
+    test('getLogs only requests new lines when streaming from a timestamp', function () {
+        fakeRemoteProcesses(['*' => Process::result(output: '2026-09-28T10:00:03Z new')]);
+
         Livewire::test(GetLogs::class, [
-            'server' => $this->server,
+            'server' => $this->functionalServer,
+            'resource' => $this->application,
+            'container' => 'test-container',
+        ])
+            ->call('getLogs', '2026-09-28T10:00:02.123456789Z')
+            ->assertReturned('2026-09-28T10:00:03Z new');
+
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker logs --since 2026-09-28T10:00:02.123456789Z -n 50000 -t test-container'));
+    });
+
+    test('getLogs prefixes the streaming command with sudo for non-root servers', function () {
+        $this->functionalServer->update(['user' => 'ubuntu']);
+        fakeRemoteProcesses(['*' => Process::result(output: '')]);
+
+        Livewire::test(GetLogs::class, [
+            'server' => $this->functionalServer->fresh(['settings']),
+            'resource' => $this->application,
+            'container' => 'test-container',
+        ])->call('getLogs', '2026-09-28T10:00:02Z');
+
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), '(sudo docker logs --since 2026-09-28T10:00:02Z -n 50000 -t test-container) 2>&1 | head -c'));
+    });
+
+    test('getLogs ignores a since value that is not a docker timestamp', function (string $since) {
+        fakeRemoteProcesses(['*' => Process::result(output: 'logs')]);
+
+        Livewire::test(GetLogs::class, [
+            'server' => $this->functionalServer,
+            'resource' => $this->application,
+            'container' => 'test-container',
+        ])->call('getLogs', $since);
+
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker logs -n 100 -t test-container')
+            && ! str_contains(remoteProcessScript($process), '--since'));
+    })->with([
+        'command substitution' => ['2026-09-28T10:00:02Z$(id)'],
+        'shell separator' => ['2026-09-28T10:00:02Z; id'],
+        'relative duration' => ['10m'],
+    ]);
+
+    test('copyLogs keeps line order and omits timestamps when timestamps are hidden', function () {
+        fakeRemoteProcesses(['*' => Process::result(output: "zeta\nalpha")]);
+
+        Livewire::test(GetLogs::class, [
+            'server' => $this->functionalServer,
+            'resource' => $this->application,
+            'container' => 'test-container',
+        ])
+            ->set('showTimeStamps', false)
+            ->call('copyLogs')
+            ->assertReturned("zeta\nalpha");
+
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'docker logs -n 100 test-container'));
+    });
+
+    test('copyLogs returns empty for unauthorized server', function () {
+        $otherServer = Server::factory()->create(['team_id' => Team::factory()->create()->id]);
+
+        Livewire::test(GetLogs::class, [
+            'server' => $otherServer,
+            'resource' => $this->application,
+            'container' => 'test-container',
+        ])
+            ->call('copyLogs')
+            ->assertReturned('');
+    });
+
+    test('streaming does not render log lines or poll through Livewire', function () {
+        fakeRemoteProcesses(['*' => Process::result(output: '2026-09-28T10:00:01Z secret-looking line')]);
+
+        Livewire::test(GetLogs::class, [
+            'server' => $this->functionalServer,
             'resource' => $this->application,
             'container' => 'coolify-sentinel',
             'collapsible' => false,
         ])
-            ->assertDontSeeHtml('wire:poll.2000ms="getLogs(true)"')
             ->call('toggleStreamLogs')
-            ->assertSeeHtml('wire:poll.2000ms="getLogs(true)"');
+            ->assertSet('streamLogs', true)
+            ->call('getLogs')
+            ->assertDontSeeHtml('wire:poll')
+            ->assertDontSee('secret-looking line');
     });
 });
 

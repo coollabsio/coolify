@@ -1,52 +1,29 @@
 <?php
 
+use App\Jobs\DatabaseBackupJob;
 use App\Livewire\Project\Database\CreateScheduledBackup;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Project;
-use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceDatabase;
+use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Process;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
-
-function createDatabaseForScheduledBackupTest(Team $team): StandalonePostgresql
-{
-    $server = Server::factory()->create(['team_id' => $team->id]);
-    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
-    $project = Project::factory()->create(['team_id' => $team->id]);
-    $environment = Environment::factory()->create(['project_id' => $project->id]);
-
-    return StandalonePostgresql::create([
-        'name' => 'pg-scheduled-backup-validation',
-        'image' => 'postgres:16-alpine',
-        'postgres_user' => 'postgres',
-        'postgres_password' => 'password',
-        'postgres_db' => 'postgres',
-        'environment_id' => $environment->id,
-        'destination_id' => $destination->id,
-        'destination_type' => $destination->getMorphClass(),
-    ]);
-}
-
-function createS3StorageForTeam(Team $team, string $name = 'Test S3'): S3Storage
-{
-    return S3Storage::create([
-        'name' => $name,
-        'region' => 'us-east-1',
-        'key' => 'test-key',
-        'secret' => 'test-secret',
-        'bucket' => 'test-bucket',
-        'endpoint' => 'https://s3.example.com',
-        'is_usable' => true,
-        'team_id' => $team->id,
-    ]);
-}
 
 beforeEach(function () {
     $this->team = Team::factory()->create();
@@ -54,85 +31,341 @@ beforeEach(function () {
     $this->user->teams()->attach($this->team, ['role' => 'owner']);
     $this->actingAs($this->user);
     session(['currentTeam' => $this->team]);
+
+    $this->server = Server::factory()->create(['team_id' => $this->team->id]);
+    $this->destination = StandaloneDocker::where('server_id', $this->server->id)->firstOrFail();
+    $this->project = Project::factory()->create(['team_id' => $this->team->id]);
+    $this->environment = Environment::factory()->create(['project_id' => $this->project->id]);
 });
 
-it('rejects enabling S3 backup without a selected S3 storage', function () {
-    $database = createDatabaseForScheduledBackupTest($this->team);
-
-    Livewire::test(CreateScheduledBackup::class, ['database' => $database])
-        ->set('frequency', '0 0 * * *')
-        ->set('saveToS3', true)
-        ->set('s3StorageId', null)
-        ->call('submit')
-        ->assertDispatched('error');
-
-    expect(ScheduledDatabaseBackup::count())->toBe(0);
-});
-
-it('rejects an S3 storage not owned by the current team', function () {
-    $database = createDatabaseForScheduledBackupTest($this->team);
-
-    $foreignS3 = createS3StorageForTeam(Team::factory()->create(), 'Foreign S3');
-
-    Livewire::test(CreateScheduledBackup::class, ['database' => $database])
-        ->set('frequency', '0 0 * * *')
-        ->set('saveToS3', true)
-        ->set('s3StorageId', $foreignS3->id)
-        ->call('submit')
-        ->assertDispatched('error');
-
-    expect(ScheduledDatabaseBackup::count())->toBe(0);
-});
-
-it('rejects an S3 storage that is reassigned after the component is mounted', function () {
-    $database = createDatabaseForScheduledBackupTest($this->team);
-    $s3 = createS3StorageForTeam($this->team);
+it('creates a standalone database backup without S3 and opens its configuration', function () {
+    $database = StandalonePostgresql::create([
+        'name' => 'postgres',
+        'image' => 'postgres:16-alpine',
+        'postgres_user' => 'postgres',
+        'postgres_password' => 'password',
+        'postgres_db' => 'postgres',
+        'environment_id' => $this->environment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
 
     $component = Livewire::test(CreateScheduledBackup::class, ['database' => $database])
-        ->set('frequency', '0 0 * * *')
-        ->set('saveToS3', true)
-        ->set('s3StorageId', $s3->id);
+        ->assertDontSee('Save to S3')
+        ->set('frequency', 'daily')
+        ->call('submit');
 
-    $s3->update(['team_id' => Team::factory()->create()->id]);
+    $backup = ScheduledDatabaseBackup::query()->sole();
 
-    $component
-        ->call('submit')
-        ->assertDispatched('error');
+    $component->assertRedirectToRoute('project.database.backup.execution', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'database_uuid' => $database->uuid,
+        'backup_uuid' => $backup->uuid,
+    ]);
 
-    expect(ScheduledDatabaseBackup::count())->toBe(0);
+    expect($backup->save_s3)->toBeFalsy()
+        ->and($backup->s3_storage_id)->toBeNull();
 });
 
-it('rejects an S3 storage that becomes unusable after the component is mounted', function () {
-    $database = createDatabaseForScheduledBackupTest($this->team);
-    $s3 = createS3StorageForTeam($this->team);
+it('creates a service database backup without S3 and opens its configuration', function () {
+    $service = Service::factory()->create([
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'environment_id' => $this->environment->id,
+    ]);
+    $database = ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'postgres',
+        'image' => 'postgres:16-alpine',
+        'custom_type' => 'postgresql',
+    ]);
 
     $component = Livewire::test(CreateScheduledBackup::class, ['database' => $database])
-        ->set('frequency', '0 0 * * *')
-        ->set('saveToS3', true)
-        ->set('s3StorageId', $s3->id);
+        ->assertDontSee('Save to S3')
+        ->set('frequency', 'daily')
+        ->call('submit');
 
-    $s3->update(['is_usable' => false]);
+    $backup = ScheduledDatabaseBackup::query()->sole();
 
-    $component
+    $component->assertRedirectToRoute('project.service.volume-backups.index', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'service_uuid' => $service->uuid,
+        'backup_uuid' => $backup->uuid,
+    ]);
+
+    expect($backup->save_s3)->toBeFalsy()
+        ->and($backup->s3_storage_id)->toBeNull();
+});
+
+it('backs up all databases by default for an Odoo service database', function (string $serviceType, bool $expectedDumpAll) {
+    $service = Service::factory()->create([
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'environment_id' => $this->environment->id,
+        'service_type' => $serviceType,
+    ]);
+    $database = ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'postgresql',
+        'image' => 'postgres:16-alpine',
+    ]);
+
+    Livewire::test(CreateScheduledBackup::class, ['database' => $database])
+        ->set('frequency', 'daily')
+        ->call('submit');
+
+    expect((bool) ScheduledDatabaseBackup::query()->sole()->dump_all)->toBe($expectedDumpAll);
+})->with([
+    'odoo' => ['odoo', true],
+    'other service' => ['drupal-with-postgresql', false],
+]);
+
+it('rejects an unsupported service database name during backup', function () {
+    $service = Service::factory()->create([
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'environment_id' => $this->environment->id,
+    ]);
+    $database = ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'postgres test',
+        'image' => 'postgres:16-alpine',
+        'custom_type' => 'postgresql',
+        'status' => 'running',
+    ]);
+    $backup = ScheduledDatabaseBackup::create([
+        'frequency' => '0 0 * * *',
+        'save_s3' => false,
+        'database_type' => ServiceDatabase::class,
+        'database_id' => $database->id,
+        'team_id' => $this->team->id,
+    ]);
+
+    expect(fn () => (new DatabaseBackupJob($backup))->handle())
+        ->toThrow(Exception::class, 'Invalid database container name.');
+});
+
+it('selects a service database when creating a backup from the unified backups page', function () {
+    $service = Service::factory()->create([
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+        'environment_id' => $this->environment->id,
+    ]);
+    ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'primary',
+        'image' => 'postgres:16-alpine',
+        'custom_type' => 'postgresql',
+    ]);
+    $analytics = ServiceDatabase::create([
+        'service_id' => $service->id,
+        'name' => 'analytics',
+        'image' => 'postgres:16-alpine',
+        'custom_type' => 'postgresql',
+    ]);
+
+    $component = Livewire::test(CreateScheduledBackup::class, ['service' => $service])
+        ->assertSee('Database')
+        ->assertSee('analytics')
+        ->set('selectedDatabaseUuid', $analytics->uuid)
+        ->set('frequency', 'daily')
+        ->call('submit');
+
+    $backup = ScheduledDatabaseBackup::query()->sole();
+    expect($backup->database->is($analytics))->toBeTrue();
+
+    $component->assertRedirectToRoute('project.service.volume-backups.index', [
+        'project_uuid' => $this->project->uuid,
+        'environment_uuid' => $this->environment->uuid,
+        'service_uuid' => $service->uuid,
+        'backup_uuid' => $backup->uuid,
+    ]);
+});
+
+it('creates a clickhouse backup for its configured database', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $database = StandaloneClickhouse::create([
+        'name' => 'clickhouse-scheduled-backup',
+        'clickhouse_admin_user' => 'default',
+        'clickhouse_admin_password' => 'password',
+        'clickhouse_db' => 'analytics',
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+
+    $component = Livewire::test(CreateScheduledBackup::class, ['database' => $database])
+        ->set('frequency', 'daily')
+        ->call('submit');
+
+    $backup = ScheduledDatabaseBackup::firstOrFail();
+
+    $component->assertRedirectToRoute('project.database.backup.execution', [
+        'project_uuid' => $project->uuid,
+        'environment_uuid' => $environment->uuid,
+        'database_uuid' => $database->uuid,
+        'backup_uuid' => $backup->uuid,
+    ]);
+
+    expect($backup->database_type)->toBe(StandaloneClickhouse::class)
+        ->and($backup->databases_to_backup)->toBe('analytics');
+});
+
+it('creates an influxdb backup for its configured bucket', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $database = StandaloneInfluxdb::create([
+        'name' => 'influxdb-scheduled-backup',
+        'influxdb_admin_user' => 'influx',
+        'influxdb_admin_password' => 'password',
+        'influxdb_admin_token' => 'token',
+        'influxdb_org' => 'coolify',
+        'influxdb_bucket' => 'metrics',
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+
+    $component = Livewire::test(CreateScheduledBackup::class, ['database' => $database])
+        ->set('frequency', 'daily')
+        ->call('submit');
+
+    $backup = ScheduledDatabaseBackup::firstOrFail();
+
+    $component->assertRedirectToRoute('project.database.backup.execution', [
+        'project_uuid' => $project->uuid,
+        'environment_uuid' => $environment->uuid,
+        'database_uuid' => $database->uuid,
+        'backup_uuid' => $backup->uuid,
+    ]);
+
+    expect($backup->database_type)->toBe(StandaloneInfluxdb::class)
+        ->and($backup->databases_to_backup)->toBe('metrics');
+});
+
+it('creates a sqlite backup for its configured database files', function () {
+    $database = create_standalone_sqlite($this->environment->id, $this->destination, ['sqlite_databases' => 'app.db,jobs.db']);
+
+    Livewire::test(CreateScheduledBackup::class, ['database' => $database])
+        ->set('frequency', 'daily')
+        ->call('submit');
+
+    $backup = ScheduledDatabaseBackup::firstOrFail();
+
+    expect($backup->database_type)->toBe(StandaloneSqlite::class)
+        ->and($backup->databases_to_backup)->toBeNull();
+});
+
+it('backs up sqlite files added to the database after the backup was scheduled', function () {
+    InstanceSettings::forceCreate(['id' => 0]);
+    Notification::fake();
+    $this->server->update(['private_key_id' => PrivateKey::factory()->create(['team_id' => $this->team->id])->id]);
+    $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+    $database = create_standalone_sqlite($this->environment->id, $this->destination, [
+        'sqlite_databases' => 'app.db',
+        'status' => 'running:healthy',
+    ]);
+
+    Livewire::test(CreateScheduledBackup::class, ['database' => $database])
+        ->set('frequency', 'daily')
+        ->call('submit');
+
+    $database->update(['sqlite_databases' => 'app.db,audit.db']);
+
+    $commands = collect();
+    Process::fake(function ($process) use ($commands) {
+        $commands->push(is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process));
+
+        return Process::result(output: '');
+    });
+
+    try {
+        (new DatabaseBackupJob(ScheduledDatabaseBackup::query()->sole()))->handle();
+    } catch (Throwable) {
+        // Faked remote commands return no backup size; only the files the job dumped matter here.
+    }
+
+    $dumpedFiles = $commands->filter(fn (string $command): bool => str_contains($command, 'VACUUM INTO'))->implode("\n");
+    expect($dumpedFiles)->toContain('/var/lib/sqlite/app.db')
+        ->toContain('/var/lib/sqlite/audit.db');
+});
+
+it('rejects scheduled backups for unsupported database types', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $database = StandaloneRedis::create([
+        'name' => 'redis-without-backups',
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+
+    Livewire::test(CreateScheduledBackup::class, ['database' => $database])
+        ->set('frequency', 'daily')
         ->call('submit')
         ->assertDispatched('error');
 
     expect(ScheduledDatabaseBackup::count())->toBe(0);
 });
 
-it('creates a scheduled backup with a valid team-owned S3 storage', function () {
-    $database = createDatabaseForScheduledBackupTest($this->team);
-    $s3 = createS3StorageForTeam($this->team);
+it('assigns a new database backup schedule to the team of the database, not the current team', function (string $databaseType, bool $rootTeam) {
+    if ($rootTeam) {
+        $rootTeamModel = Team::factory()->create(['id' => 0]);
+        $this->user->teams()->attach($rootTeamModel, ['role' => 'owner']);
+        $this->project->update(['team_id' => 0]);
+    }
+    $resourceTeamId = $this->project->fresh()->team_id;
+    $otherTeam = Team::factory()->create();
+    $this->user->teams()->attach($otherTeam, ['role' => 'owner']);
+    session(['currentTeam' => $otherTeam]);
+
+    if ($databaseType === 'service') {
+        $service = Service::factory()->create([
+            'server_id' => $this->server->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'environment_id' => $this->environment->id,
+        ]);
+        $database = ServiceDatabase::create([
+            'service_id' => $service->id,
+            'name' => 'postgres',
+            'image' => 'postgres:16-alpine',
+            'custom_type' => 'postgresql',
+        ]);
+    } else {
+        $database = StandalonePostgresql::create([
+            'name' => 'postgres',
+            'image' => 'postgres:16-alpine',
+            'postgres_user' => 'postgres',
+            'postgres_password' => 'password',
+            'postgres_db' => 'postgres',
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+    }
 
     Livewire::test(CreateScheduledBackup::class, ['database' => $database])
-        ->set('frequency', '0 0 * * *')
-        ->set('saveToS3', true)
-        ->set('s3StorageId', $s3->id)
+        ->set('frequency', 'daily')
         ->call('submit')
-        ->assertDispatched('refreshScheduledBackups');
+        ->assertHasNoErrors();
 
-    $backup = ScheduledDatabaseBackup::first();
-    expect($backup)->not->toBeNull();
-    expect($backup->save_s3)->toBeTruthy();
-    expect($backup->s3_storage_id)->toBe($s3->id);
-});
+    expect(ScheduledDatabaseBackup::query()->sole()->team_id)->toBe($resourceTeamId);
+})->with([
+    'standalone database' => ['standalone', false],
+    'service database' => ['service', false],
+    'standalone database in the root team' => ['standalone', true],
+]);

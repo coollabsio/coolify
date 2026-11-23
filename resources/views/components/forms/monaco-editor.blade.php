@@ -1,10 +1,15 @@
+@php
+    $isDiff = filter_var($attributes->get('diff', false), FILTER_VALIDATE_BOOLEAN);
+    // Undeclared component attributes come back already HTML-escaped from the bag,
+    // so decode once here and let the single {{ }} below re-escape it — otherwise
+    // quotes reach the editor double-escaped (e.g. ' shows as &#039;).
+    $originalContent = html_entity_decode((string) $attributes->get('original', ''), ENT_QUOTES);
+@endphp
 <div wire:key="{{ random_int(0, PHP_INT_MAX) }}" class="coolify-monaco-editor flex-1">
     <div x-ref="monacoRef" x-data="{
         monacoVersion: '0.52.2',
         monacoContent: @entangle($id),
         monacoLanguage: '',
-        monacoPlaceholder: true,
-        monacoPlaceholderText: 'Start typing here',
         monacoLoader: true,
         monacoFontSize: '15px',
         monacoId: $id('monaco-editor'),
@@ -14,20 +19,7 @@
         monacoEditor(editor) {
             editor.onDidChangeModelContent((e) => {
                 this.monacoContent = editor.getValue();
-                this.updatePlaceholder(editor.getValue());
             });
-            editor.onDidBlurEditorWidget(() => {
-                this.updatePlaceholder(editor.getValue());
-            });
-            editor.onDidFocusEditorWidget(() => {
-                this.updatePlaceholder(editor.getValue());
-            });
-        },
-        updatePlaceholder(value) {
-            this.monacoPlaceholder = value === '';
-        },
-        monacoEditorFocus() {
-            document.getElementById(this.monacoId).dispatchEvent(new CustomEvent('monaco-editor-focused', { detail: { monacoId: this.monacoId } }));
         },
         monacoEditorAddLoaderScriptToHead() {
             // Use a global flag to prevent duplicate script loading
@@ -55,27 +47,108 @@
                 let proxy = URL.createObjectURL(new Blob([`self.MonacoEnvironment={baseUrl:'${window.location.origin}/js/monaco-editor-${monacoVersion}/min'};importScripts('${window.location.origin}/js/monaco-editor-${monacoVersion}/min/vs/base/worker/workerMain.js');`], { type: 'text/javascript' }));
                 window.MonacoEnvironment = { getWorkerUrl: () => proxy };
                 require(['vs/editor/editor.main'], () => {
-                    const editor = monaco.editor.create($refs.monacoEditorElement, {
-                        value: monacoContent,
-                        theme: document.documentElement.classList.contains('dark') ? 'vs-dark' : 'vs',
+                    if (!window.__coolifyMonacoThemeDefined) {
+                        monaco.editor.defineTheme('coolify-dark', {
+                            base: 'vs-dark',
+                            inherit: true,
+                            rules: [],
+                            colors: {
+                                'editor.background': '#0b0b0c',
+                                'editorGutter.background': '#0b0b0c',
+                                'editorStickyScroll.background': '#0b0b0c',
+                                'minimap.background': '#0b0b0c',
+                                'scrollbarSlider.background': '#ffffff1a',
+                                'scrollbarSlider.hoverBackground': '#ffffff2e',
+                                'scrollbarSlider.activeBackground': '#ffffff40',
+                                'scrollbar.shadow': '#00000000'
+                            }
+                        });
+                        window.__coolifyMonacoThemeDefined = true;
+                    }
+                    @if ($language === 'nginx')
+                    if (!monaco.languages.getLanguages().some((registered) => registered.id === 'nginx')) {
+                        monaco.languages.register({ id: 'nginx' });
+                        monaco.languages.setLanguageConfiguration('nginx', {
+                            comments: { lineComment: '#' },
+                            brackets: [['{', '}']],
+                            autoClosingPairs: [
+                                { open: '{', close: '}' },
+                            ],
+                        });
+                        monaco.languages.setMonarchTokensProvider('nginx', {
+                            defaultToken: '',
+                            tokenizer: {
+                                root: [
+                                    [/#.*$/, 'comment'],
+                                    [/\$[A-Za-z_]\w*/, 'variable'],
+                                    [/^\s*(server|location|upstream|http|events|types|map|if|include|listen|server_name|root|index|alias|return|rewrite|try_files|proxy_pass|proxy_set_header|proxy_http_version|fastcgi_pass|fastcgi_param|add_header|expires|error_page|access_log|error_log|gzip|gzip_types|charset|sendfile|keepalive_timeout|client_max_body_size|default_type|worker_processes|worker_connections|ssl_certificate|ssl_certificate_key|allow|deny|autoindex|set|break|internal|limit_req|limit_conn|resolver)\b/, 'keyword'],
+                                    [/^\s*[A-Za-z_][\w.]*/, 'type'],
+                                    [/\u0022([^\u0022\\]|\\.)*\u0022/, 'string'],
+                                    [/'([^'\\]|\\.)*'/, 'string'],
+                                    [/\b\d+(\.\d+)?(ms|[smhdwMy]|[kKmMgG])?\b/, 'number'],
+                                    [/[{}();]/, 'delimiter'],
+                                    [/(~\*?|\^~|=|\!=)/, 'operator'],
+                                ],
+                            },
+                        });
+                    }
+                    @endif
+                    const sharedEditorOptions = {
+                        theme: document.documentElement.classList.contains('dark') ? 'coolify-dark' : 'vs',
                         wordWrap: 'on',
-                        readOnly: '{{ $readonly ?? false }}',
                         minimap: { enabled: false },
                         fontSize: monacoFontSize,
                         lineNumbersMinChars: 3,
                         automaticLayout: true,
                         language: '{{ $language }}',
+                        placeholder: 'Start typing here',
                         domReadOnly: '{{ $readonly ?? false }}',
                         contextmenu: '!{{ $readonly ?? false }}',
-                        renderLineHighlight: '{{ $readonly ?? false }} ? none : all',
-                        stickyScroll: { enabled: false }
+                        renderLineHighlight: 'none',
+                        stickyScroll: { enabled: false },
+                        padding: { top: 12, bottom: 12 },
+                        overviewRulerLanes: 0,
+                        overviewRulerBorder: false,
+                        hideCursorInOverviewRuler: true,
+                        scrollbar: {
+                            vertical: 'auto',
+                            horizontal: 'auto',
+                            verticalScrollbarSize: 8,
+                            horizontalScrollbarSize: 8,
+                            useShadows: false
+                        }
+                    };
+
+                    let editor;
+                    @if ($isDiff)
+                    const diffEditor = monaco.editor.createDiffEditor($refs.monacoEditorElement, {
+                        ...sharedEditorOptions,
+                        readOnly: '{{ $readonly ?? false }}',
+                        originalEditable: false,
+                        renderSideBySide: true,
+                        renderOverviewRuler: false,
+                        ignoreTrimWhitespace: false,
                     });
+                    const originalText = $refs.monacoOriginalData ? $refs.monacoOriginalData.dataset.content : '';
+                    diffEditor.setModel({
+                        original: monaco.editor.createModel(originalText, '{{ $language }}'),
+                        modified: monaco.editor.createModel(monacoContent ?? '', '{{ $language }}'),
+                    });
+                    editor = diffEditor.getModifiedEditor();
+                    document.getElementById(monacoId).diffEditor = diffEditor;
+                    @else
+                    editor = monaco.editor.create($refs.monacoEditorElement, {
+                        ...sharedEditorOptions,
+                        value: monacoContent ?? '',
+                        readOnly: '{{ $readonly ?? false }}',
+                    });
+                    @endif
         
                     const observer = new MutationObserver((mutations) => {
                         mutations.forEach((mutation) => {
                             if (mutation.attributeName === 'class') {
                                 const isDark = document.documentElement.classList.contains('dark');
-                                monaco.editor.setTheme(isDark ? 'vs-dark' : 'vs');
+                                monaco.editor.setTheme(isDark ? 'coolify-dark' : 'vs');
                             }
                         });
                     });
@@ -86,13 +159,8 @@
                     });
         
                     monacoEditor(editor);
-        
-                    document.getElementById(monacoId).editor = editor;
-                    document.getElementById(monacoId).addEventListener('monaco-editor-focused', (event) => {
-                        editor.focus();
-                    });
 
-                    updatePlaceholder(editor.getValue());
+                    document.getElementById(monacoId).editor = editor;
 
                     @if ($autofocus)
                     // Auto-focus the editor
@@ -100,8 +168,8 @@
                     @endif
         
                     $watch('monacoContent', value => {
-                        if (editor.getValue() !== value) {
-                            editor.setValue(value);
+                        if (editor.getValue() !== (value ?? '')) {
+                            editor.setValue(value ?? '');
                         }
                     });
         
@@ -114,11 +182,15 @@
         }, 5);" :id="monacoId">
         </div>
         <div class="relative z-10 w-full h-full">
-            <div x-ref="monacoEditorElement" class="w-full text-md {{ $readonly ? 'opacity-65' : '' }}" style="height: var(--editor-height, calc(100vh - 20rem)); min-height: 300px;"></div>
-            <div x-ref="monacoPlaceholderElement" x-show="monacoPlaceholder" @click="monacoEditorFocus()"
-                :style="'font-size: ' + monacoFontSize"
-                class="w-full text-sm font-mono absolute z-50 text-gray-500 ml-14 -translate-x-0.5 mt-0.5 left-0 top-0"
-                x-text="monacoPlaceholderText"></div>
+            @if ($isDiff)
+                <div x-ref="monacoOriginalData" class="hidden" data-content="{{ $originalContent }}"></div>
+            @endif
+            <div x-cloak x-show="monacoLoader"
+                class="absolute inset-0 z-50 flex items-center justify-center gap-2 bg-white/70 text-[13px] text-neutral-500 backdrop-blur-[1px] dark:bg-[#0b0b0c]/70 dark:text-fg-dim">
+                <span class="size-4 animate-spin rounded-full border-2 border-neutral-300 border-t-transparent dark:border-white/25 dark:border-t-transparent"></span>
+                Loading editor
+            </div>
+            <div x-ref="monacoEditorElement" class="w-full text-md {{ $readonly ? 'opacity-65' : '' }}" style="height: var(--editor-height, calc(100vh - 20rem)); min-height: 150px;"></div>
         </div>
     </div>
 </div>

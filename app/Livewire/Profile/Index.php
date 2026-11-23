@@ -2,15 +2,20 @@
 
 namespace App\Livewire\Profile;
 
+use App\Actions\User\DeleteUserAccount;
+use App\Services\AvatarStorageService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class Index extends Component
 {
+    use WithFileUploads;
+
     public int $userId;
 
     public string $email;
@@ -32,14 +37,55 @@ class Index extends Component
 
     public bool $show_verification = false;
 
+    public bool $uses_sso = false;
+
+    public ?string $sso_provider_label = null;
+
+    public $avatar;
+
+    public function uploadAvatar(AvatarStorageService $avatarStorage): bool
+    {
+        try {
+            $this->validate([
+                'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120', 'dimensions:max_width=6000,max_height=6000'],
+            ]);
+
+            $avatarStorage->store(Auth::user(), $this->avatar);
+            $this->reset('avatar');
+            $this->dispatch('avatar-updated', url: profile_avatar_url(Auth::user()->fresh()));
+            $this->dispatch('success', 'Profile picture updated.');
+
+            return true;
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return false;
+        }
+    }
+
+    public function removeAvatar(AvatarStorageService $avatarStorage): void
+    {
+        try {
+            $avatarStorage->delete(Auth::user());
+            $this->dispatch('avatar-updated', url: null);
+            $this->dispatch('success', 'Profile picture removed.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
     public function mount()
     {
         $this->userId = Auth::id();
         $this->name = Auth::user()->name;
         $this->email = Auth::user()->email;
 
+        $oauthIdentity = Auth::user()->oauthIdentities()->latest('id')->first();
+        $this->uses_sso = $oauthIdentity !== null;
+        $this->sso_provider_label = $oauthIdentity ? $this->providerLabel($oauthIdentity->provider) : null;
+
         // Check if there's a pending email change
-        if (Auth::user()->hasEmailChangeRequest()) {
+        if (! $this->uses_sso && Auth::user()->hasEmailChangeRequest()) {
             $this->new_email = Auth::user()->pending_email;
             $this->show_verification = true;
         }
@@ -54,6 +100,7 @@ class Index extends Component
             Auth::user()->update([
                 'name' => $this->name,
             ]);
+            auditLog('ui.user.profile_updated', $this->auditContext(['changed_fields' => ['name']]));
 
             $this->dispatch('success', 'Profile updated.');
         } catch (\Throwable $e) {
@@ -64,14 +111,15 @@ class Index extends Component
     public function requestEmailChange()
     {
         try {
-            // For self-hosted, check if email is enabled
-            if (! isCloud()) {
-                $settings = instanceSettings();
-                if (! $settings->smtp_enabled && ! $settings->resend_enabled) {
-                    $this->dispatch('error', 'Email functionality is not configured. Please contact your administrator.');
+            if ($this->rejectSsoEmailChange()) {
+                return;
+            }
 
-                    return;
-                }
+            // For self-hosted, check if email is enabled
+            if (! isCloud() && ! is_transactional_emails_enabled()) {
+                $this->dispatch('error', 'Email functionality is not configured. Please contact your administrator.');
+
+                return;
             }
 
             $this->validate([
@@ -100,7 +148,7 @@ class Index extends Component
                 }
 
                 // Additional rate limit by IP address (5 requests per hour)
-                $ipKey = 'email-change:ip:'.request()->ip();
+                $ipKey = 'email-change:ip:'.client_ip(request());
                 if (! RateLimiter::attempt($ipKey, 5, function () {}, 3600)) {
                     $this->dispatch('error', 'Too many requests from your IP address. Please try again later.');
 
@@ -109,6 +157,7 @@ class Index extends Component
             }
 
             Auth::user()->requestEmailChange($this->new_email);
+            auditLog('ui.user.email_change_requested', $this->auditContext());
 
             $this->show_email_change = false;
             $this->show_verification = true;
@@ -122,6 +171,10 @@ class Index extends Component
     public function verifyEmailChange()
     {
         try {
+            if ($this->rejectSsoEmailChange()) {
+                return;
+            }
+
             $this->validate([
                 'email_verification_code' => ['required', 'string', 'size:6'],
             ]);
@@ -167,6 +220,8 @@ class Index extends Component
                 $this->show_verification = false;
 
                 $this->dispatch('success', 'Email address updated successfully.');
+                $this->dispatch('close-email-change-modal');
+                auditLog('ui.user.email_changed', $this->auditContext());
             } else {
                 $this->dispatch('error', 'Failed to update email address.');
             }
@@ -178,6 +233,10 @@ class Index extends Component
     public function resendVerificationCode()
     {
         try {
+            if ($this->rejectSsoEmailChange()) {
+                return;
+            }
+
             // Check if there's a pending request
             if (! Auth::user()->hasEmailChangeRequest()) {
                 $this->dispatch('error', 'No pending email change request.');
@@ -233,8 +292,26 @@ class Index extends Component
 
     public function showEmailChangeForm()
     {
+        if ($this->rejectSsoEmailChange()) {
+            return;
+        }
+
         $this->show_email_change = true;
         $this->new_email = '';
+    }
+
+    private function rejectSsoEmailChange(): bool
+    {
+        if (! Auth::user()->hasSsoIdentity()) {
+            return false;
+        }
+
+        $this->uses_sso = true;
+        $this->show_email_change = false;
+        $this->show_verification = false;
+        $this->dispatch('error', 'Email addresses managed by SSO cannot be changed in Coolify.');
+
+        return true;
     }
 
     public function resetPassword()
@@ -257,6 +334,7 @@ class Index extends Component
             auth()->user()->update([
                 'password' => Hash::make($this->new_password),
             ]);
+            auditLog('ui.user.password_changed', $this->auditContext());
             $this->dispatch('success', 'Password updated.');
             $this->current_password = '';
             $this->new_password = '';
@@ -267,8 +345,55 @@ class Index extends Component
         }
     }
 
+    public function deleteAccount(string $password, array $selectedActions = []): mixed
+    {
+        try {
+            if (! verifyPasswordConfirmation($password, $this)) {
+                return 'The provided password is incorrect.';
+            }
+
+            $deleteUserAccount = app(DeleteUserAccount::class);
+            $deleteUserAccount->handle(Auth::user(), removeTeamResources: $deleteUserAccount->removesTeamResources(Auth::user()));
+            auditLog('ui.user.account_deleted', ['resource' => 'user']);
+
+            Auth::guard('web')->logout();
+            session()->invalidate();
+            session()->regenerateToken();
+
+            $this->redirect(route('login'));
+
+            return true;
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    private function providerLabel(string $provider): string
+    {
+        return match ($provider) {
+            'oidc' => 'OIDC',
+            default => str($provider)->headline()->toString(),
+        };
+    }
+
+    private function auditContext(array $context = []): array
+    {
+        $user = Auth::user();
+
+        return array_merge([
+            'team_id' => $user->currentTeam()?->id,
+            'resource' => 'user',
+            'user_name' => $user->name,
+        ], $context);
+    }
+
     public function render()
     {
-        return view('livewire.profile.index');
+        $deleteUserAccount = app(DeleteUserAccount::class);
+
+        return view('livewire.profile.index', [
+            'accountDeletionBlockers' => $deleteUserAccount->blockers(Auth::user(), $deleteUserAccount->removesTeamResources(Auth::user())),
+            'accountDeletionActions' => $deleteUserAccount->confirmationActions(Auth::user()),
+        ]);
     }
 }

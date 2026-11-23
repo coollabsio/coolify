@@ -1,5 +1,7 @@
 <?php
 
+use App\Events\ServiceChecked;
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Jobs\PushServerUpdateJob;
 use App\Models\Environment;
 use App\Models\Project;
@@ -8,6 +10,8 @@ use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -77,7 +81,7 @@ test('database status is updated when container status changes', function () {
     expect($database->status)->toBe('running:healthy');
 });
 
-test('database is not marked exited when containers list is empty', function () {
+test('database is not marked exited when an incomplete containers snapshot is empty', function () {
     $team = Team::factory()->create();
     $database = createPushUpdatePostgresql($team, [
         'status' => 'running:healthy',
@@ -88,6 +92,7 @@ test('database is not marked exited when containers list is empty', function () 
     // Empty containers = Sentinel might have failed, should NOT mark as exited
     $data = [
         'containers' => [],
+        'snapshot' => ['complete' => false],
     ];
 
     $job = new PushServerUpdateJob($server, $data);
@@ -97,6 +102,23 @@ test('database is not marked exited when containers list is empty', function () 
 
     // Status should remain running, NOT be set to exited
     expect($database->status)->toBe('running:healthy');
+});
+
+test('database is marked exited when a complete containers snapshot is empty', function () {
+    Queue::fake([NotifyResourceStoppedJob::class]);
+    $team = Team::factory()->create();
+    $database = createPushUpdatePostgresql($team, [
+        'status' => 'running:healthy',
+    ]);
+
+    $data = [
+        'containers' => [],
+        'snapshot' => ['complete' => true],
+    ];
+
+    (new PushServerUpdateJob($database->destination->server, $data))->handle();
+
+    expect($database->refresh()->status)->toBe('exited:unhealthy');
 });
 
 function createPushUpdatePostgresql(Team $team, array $attributes = []): StandalonePostgresql
@@ -126,3 +148,169 @@ function createPushUpdatePostgresql(Team $team, array $attributes = []): Standal
 
     return $database;
 }
+
+test('partial sentinel snapshots do not mark missing databases as exited', function () {
+    $team = Team::factory()->create();
+    $database = createPushUpdatePostgresql($team, [
+        'status' => 'running:healthy',
+        'is_public' => true,
+    ]);
+
+    $server = $database->destination->server;
+    Queue::fake();
+
+    $data = [
+        'snapshot' => [
+            'version' => 1,
+            'complete' => false,
+        ],
+        'containers' => [
+            [
+                'name' => 'unrelated-container',
+                'state' => 'running',
+                'health_status' => 'healthy',
+                'labels' => [
+                    'coolify.managed' => 'true',
+                ],
+            ],
+        ],
+    ];
+
+    $job = new PushServerUpdateJob($server, $data);
+    $job->handle();
+
+    $database->refresh();
+
+    expect($database->status)->toBe('running:healthy');
+});
+
+test('partial sentinel snapshots apply directly observed database status updates', function () {
+    $team = Team::factory()->create();
+    $database = createPushUpdatePostgresql($team, [
+        'status' => 'exited',
+    ]);
+
+    $server = $database->destination->server;
+    Queue::fake();
+
+    $data = [
+        'snapshot' => [
+            'version' => 1,
+            'complete' => false,
+        ],
+        'containers' => [
+            [
+                'name' => $database->uuid,
+                'state' => 'running',
+                'health_status' => 'healthy',
+                'labels' => [
+                    'coolify.managed' => 'true',
+                    'coolify.type' => 'database',
+                    'com.docker.compose.service' => $database->uuid,
+                ],
+            ],
+        ],
+    ];
+
+    $job = new PushServerUpdateJob($server, $data);
+    $job->handle();
+
+    $database->refresh();
+
+    expect($database->status)->toBe('running:healthy');
+});
+
+test('partial sentinel snapshots do not trigger missing tcp proxy recovery', function () {
+    $team = Team::factory()->create();
+    $database = createPushUpdatePostgresql($team, [
+        'status' => 'exited',
+        'is_public' => true,
+    ]);
+
+    $server = $database->destination->server;
+    Queue::fake();
+    Event::fake([ServiceChecked::class]);
+
+    $data = [
+        'snapshot' => [
+            'version' => 1,
+            'complete' => false,
+        ],
+        'containers' => [
+            [
+                'name' => $database->uuid,
+                'state' => 'running',
+                'health_status' => 'healthy',
+                'labels' => [
+                    'coolify.managed' => 'true',
+                    'coolify.type' => 'database',
+                    'com.docker.compose.service' => $database->uuid,
+                ],
+            ],
+        ],
+    ];
+
+    $job = new PushServerUpdateJob($server, $data);
+    $job->handle();
+
+    $database->refresh();
+
+    expect($database->status)->toBe('running:healthy');
+    Queue::assertNothingPushed();
+});
+
+test('sentinel push broadcasts ServiceChecked to the server team after updating statuses', function (bool $complete) {
+    $team = Team::factory()->create();
+    $database = createPushUpdatePostgresql($team, [
+        'status' => 'exited',
+    ]);
+
+    $server = $database->destination->server;
+    Event::fake([ServiceChecked::class]);
+
+    $data = [
+        'snapshot' => [
+            'version' => 1,
+            'complete' => $complete,
+        ],
+        'containers' => [
+            [
+                'name' => $database->uuid,
+                'state' => 'running',
+                'health_status' => 'healthy',
+                'labels' => [
+                    'coolify.managed' => 'true',
+                    'coolify.type' => 'database',
+                    'com.docker.compose.service' => $database->uuid,
+                ],
+            ],
+        ],
+    ];
+
+    $job = new PushServerUpdateJob($server, $data);
+    $job->handle();
+
+    expect($database->refresh()->status)->toBe('running:healthy');
+    Event::assertDispatched(ServiceChecked::class, fn (ServiceChecked $event) => $event->teamId === $team->id);
+})->with([
+    'complete snapshot' => true,
+    'partial snapshot' => false,
+]);
+
+test('sentinel push does not broadcast ServiceChecked for an empty partial snapshot', function () {
+    $team = Team::factory()->create();
+    $database = createPushUpdatePostgresql($team, [
+        'status' => 'running:healthy',
+    ]);
+
+    $server = $database->destination->server;
+    Event::fake([ServiceChecked::class]);
+
+    $job = new PushServerUpdateJob($server, [
+        'snapshot' => ['version' => 1, 'complete' => false],
+        'containers' => [],
+    ]);
+    $job->handle();
+
+    Event::assertNotDispatched(ServiceChecked::class);
+});

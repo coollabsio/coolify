@@ -9,6 +9,11 @@ class SwitchTeam extends Component
 {
     public string $selectedTeamId = 'default';
 
+    protected $listeners = [
+        'team-avatar-updated' => '$refresh',
+        'team-updated' => '$refresh',
+    ];
+
     public function mount()
     {
         $this->selectedTeamId = auth()->user()->currentTeam()->id;
@@ -30,6 +35,6 @@ class SwitchTeam extends Component
         }
         refreshSession($team_to_switch_to);
 
-        return redirect('dashboard');
+        return redirect()->route('dashboard');
     }
 }

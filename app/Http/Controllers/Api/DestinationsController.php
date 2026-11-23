@@ -10,9 +10,15 @@ use App\Models\SwarmDocker;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use OpenApi\Attributes as OA;
 
 class DestinationsController extends Controller
 {
+    /**
+     * Docker's built-in networks. A destination must not use them.
+     */
+    private const RESERVED_NETWORK_NAMES = ['bridge', 'host', 'none'];
+
     private function transform(StandaloneDocker|SwarmDocker $destination): array
     {
         return [
@@ -59,6 +65,22 @@ class DestinationsController extends Controller
             ?? SwarmDocker::with('server:id,uuid,team_id')->whereHas('server', fn ($query) => $query->whereTeamId($teamId))->whereUuid($uuid)->firstOrFail();
     }
 
+    #[OA\Get(
+        summary: 'List destinations',
+        description: 'List all Docker network destinations for the authenticated team.',
+        path: '/destinations',
+        operationId: 'list-destinations',
+        security: [['bearerAuth' => []]],
+        tags: ['Destinations'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Destinations for the authenticated team.',
+                content: new OA\JsonContent(type: 'array', items: new OA\Items(ref: '#/components/schemas/Destination')),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+        ],
+    )]
     public function index(Request $request): JsonResponse
     {
         $teamId = $this->teamIdOrAbort();
@@ -74,6 +96,26 @@ class DestinationsController extends Controller
         );
     }
 
+    #[OA\Get(
+        summary: 'List destinations by server',
+        description: 'List Docker network destinations attached to a server owned by the authenticated team.',
+        path: '/servers/{server_uuid}/destinations',
+        operationId: 'list-server-destinations',
+        security: [['bearerAuth' => []]],
+        tags: ['Destinations'],
+        parameters: [
+            new OA\Parameter(name: 'server_uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Destinations attached to the server.',
+                content: new OA\JsonContent(type: 'array', items: new OA\Items(ref: '#/components/schemas/Destination')),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ],
+    )]
     public function index_by_server(Request $request, string $server_uuid): JsonResponse
     {
         $teamId = $this->teamIdOrAbort();
@@ -89,6 +131,26 @@ class DestinationsController extends Controller
         return response()->json($list->map(fn ($destination) => $this->transform($destination))->values());
     }
 
+    #[OA\Get(
+        summary: 'Get destination',
+        description: 'Get a Docker network destination by UUID.',
+        path: '/destinations/{uuid}',
+        operationId: 'get-destination-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Destinations'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Destination UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Destination details.',
+                content: new OA\JsonContent(ref: '#/components/schemas/Destination'),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ],
+    )]
     public function show(Request $request, string $uuid): JsonResponse
     {
         $teamId = $this->teamIdOrAbort();
@@ -100,6 +162,40 @@ class DestinationsController extends Controller
         return response()->json($this->transform($destination));
     }
 
+    #[OA\Post(
+        summary: 'Create destination',
+        description: 'Create a Docker network destination on a server owned by the authenticated team. The network must be new: Docker\'s built-in networks (bridge, host, none) and networks that already exist on a standalone server are rejected, because Coolify connects the proxy to the destination network.',
+        path: '/servers/{server_uuid}/destinations',
+        operationId: 'create-server-destination',
+        security: [['bearerAuth' => []]],
+        tags: ['Destinations'],
+        parameters: [
+            new OA\Parameter(name: 'server_uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['network'],
+                properties: [
+                    new OA\Property(property: 'name', type: 'string', maxLength: 255),
+                    new OA\Property(property: 'network', type: 'string', maxLength: 255, pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]*$', description: 'Name of a new Docker network. Must not be bridge, host, none, or a network that already exists on the server.'),
+                    new OA\Property(property: 'type', type: 'string', enum: ['standalone', 'swarm']),
+                ],
+                type: 'object',
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Destination created.',
+                content: new OA\JsonContent(ref: '#/components/schemas/Destination'),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 409, description: 'A destination with this network already exists.'),
+            new OA\Response(response: 422, description: 'Validation failed, the network is reserved or already exists on the server, or the server could not be checked.'),
+        ],
+    )]
     public function create(Request $request, string $server_uuid): JsonResponse
     {
         $teamId = $this->teamIdOrAbort();
@@ -133,6 +229,13 @@ class DestinationsController extends Controller
             return response()->json(['message' => 'Validation failed.', 'errors' => $errors], 422);
         }
 
+        if (in_array(strtolower($request->input('network')), self::RESERVED_NETWORK_NAMES, true)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['network' => ['The network name is reserved by Docker. Use a different name.']],
+            ], 422);
+        }
+
         $expectedType = $server->isSwarm() ? 'swarm' : 'standalone';
         $type = $request->input('type', $expectedType);
         if ($type !== $expectedType) {
@@ -147,6 +250,11 @@ class DestinationsController extends Controller
         $exists = $class::where('server_id', $server->id)->where('network', $request->input('network'))->exists();
         if ($exists) {
             return response()->json(['message' => 'A destination with this network already exists on the server.'], 409);
+        }
+
+        // Creating a standalone destination connects the proxy to the network, so it must not be an existing network.
+        if ($class === StandaloneDocker::class && ($response = $this->existingServerNetworkResponse($server, $request->input('network')))) {
+            return $response;
         }
 
         try {
@@ -174,6 +282,31 @@ class DestinationsController extends Controller
         return response()->json($this->transform($destination->load('server:id,uuid')), 201);
     }
 
+    private function existingServerNetworkResponse(Server $server, string $network): ?JsonResponse
+    {
+        if (! $server->isFunctional()) {
+            return response()->json(['message' => 'Server is not functional.'], 400);
+        }
+
+        try {
+            $output = instant_remote_process(["docker network ls --format '{{.Name}}'"], $server);
+        } catch (\Throwable) {
+            return response()->json([
+                'message' => 'Could not read the Docker networks on the server. Check that the server is reachable and try again.',
+            ], 422);
+        }
+
+        $existingNetworks = array_map('trim', explode("\n", (string) $output));
+        if (in_array($network, $existingNetworks, true)) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => ['network' => ['A Docker network with this name already exists on the server. Use a new network name.']],
+            ], 422);
+        }
+
+        return null;
+    }
+
     private function isUniqueConstraintViolation(QueryException $exception): bool
     {
         $sqlState = $exception->errorInfo[0] ?? null;
@@ -183,6 +316,110 @@ class DestinationsController extends Controller
             || in_array($driverCode, ['19', '1062', '2067'], true);
     }
 
+    #[OA\Patch(
+        summary: 'Update destination',
+        description: 'Update a Docker network destination name. Network cannot be changed via the API.',
+        path: '/destinations/{uuid}',
+        operationId: 'update-destination-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Destinations'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Destination UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                properties: [
+                    new OA\Property(property: 'name', type: 'string', maxLength: 255),
+                ],
+                type: 'object',
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Destination updated.',
+                content: new OA\JsonContent(ref: '#/components/schemas/Destination'),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ],
+    )]
+    public function update(Request $request, string $uuid): JsonResponse
+    {
+        $teamId = $this->teamIdOrAbort();
+        if (! is_int($teamId)) {
+            return $teamId;
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $allowed = ['name'];
+
+        $validator = customApiValidator($request->all(), [
+            'name' => 'required|string|max:255',
+        ]);
+        $extra = array_diff(array_keys($request->all()), $allowed);
+        if ($validator->fails() || ! empty($extra)) {
+            $errors = $validator->errors();
+            if (! empty($extra)) {
+                foreach ($extra as $field) {
+                    $errors->add($field, 'This field is not allowed.');
+                }
+            }
+
+            return response()->json(['message' => 'Validation failed.', 'errors' => $errors], 422);
+        }
+
+        $destination = $this->findDestinationForTeam($teamId, $uuid);
+
+        $this->authorize('update', $destination);
+
+        $destination->update(['name' => $request->input('name')]);
+        $destination->load('server:id,uuid');
+
+        auditLog('api.destination.updated', [
+            'team_id' => $teamId,
+            'destination_uuid' => $destination->uuid,
+            'destination_name' => $destination->name,
+            'destination_type' => $destination instanceof SwarmDocker ? 'swarm' : 'standalone',
+            'server_uuid' => $destination->server?->uuid,
+            'changed_fields' => ['name'],
+        ]);
+
+        return response()->json($this->transform($destination));
+    }
+
+    #[OA\Delete(
+        summary: 'Delete destination',
+        description: 'Delete an unused Docker network destination.',
+        path: '/destinations/{uuid}',
+        operationId: 'delete-destination-by-uuid',
+        security: [['bearerAuth' => []]],
+        tags: ['Destinations'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Destination UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Destination deleted.',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'Deleted.'),
+                    ],
+                    type: 'object',
+                ),
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 409, description: 'Destination has attached resources.'),
+        ],
+    )]
     public function delete(Request $request, string $uuid): JsonResponse
     {
         $teamId = $this->teamIdOrAbort();
@@ -210,6 +447,8 @@ class DestinationsController extends Controller
                 || (method_exists($destination, 'keydbs') && $destination->keydbs()->exists())
                 || (method_exists($destination, 'dragonflies') && $destination->dragonflies()->exists())
                 || (method_exists($destination, 'clickhouses') && $destination->clickhouses()->exists())
+                || (method_exists($destination, 'influxdbs') && $destination->influxdbs()->exists())
+                || (method_exists($destination, 'sqlites') && $destination->sqlites()->exists())
                 || (method_exists($destination, 'services') && $destination->services()->exists());
             if ($hasAttached) {
                 return response()->json(['message' => 'Destination has attached resources, detach first.'], 409);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Concerns;
 
+use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
 use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Http\JsonResponse;
@@ -80,7 +81,7 @@ trait HandlesTerminalApi
         return new TerminalProcessResult($process->wait(), $output, $errorOutput);
     }
 
-    private function runConcurrentTerminalProcess(Server $server, int $teamId, string $command, int $timeout): ProcessResult|JsonResponse
+    private function runConcurrentTerminalProcess(Server $server, int $teamId, string $remoteCommand, int $timeout): ProcessResult|JsonResponse
     {
         $key = "terminal-api-exec:concurrent:team:{$teamId}:server:{$server->uuid}:";
 
@@ -96,7 +97,10 @@ trait HandlesTerminalApi
         }
 
         try {
-            return $this->runTerminalProcess($command, $timeout);
+            // Build the SSH command only inside a slot: it can open an SSH connection to scan the host key.
+            $sshCommand = SshMultiplexingHelper::generateSshCommand($server, $remoteCommand, disableMultiplexing: true, commandTimeout: $timeout);
+
+            return $this->runTerminalProcess($sshCommand, $timeout);
         } finally {
             $lock->release();
         }

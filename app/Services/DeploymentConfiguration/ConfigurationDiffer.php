@@ -17,6 +17,9 @@ class ConfigurationDiffer
      */
     private const IGNORED_KEYS = ['build.docker_compose'];
 
+    /** @var array<int, string> */
+    private const DYNAMIC_SECTIONS = ['environment', 'storage'];
+
     /**
      * @param  array<string, mixed>  $previousSnapshot
      * @param  array<string, mixed>  $currentSnapshot
@@ -36,13 +39,24 @@ class ConfigurationDiffer
             $previous = $previousItems[$key] ?? null;
             $current = $currentItems[$key] ?? null;
 
+            // Static settings missing from an older snapshot were newly tracked, not changed.
+            // Without any previous snapshot (legacy fallback), every setting is reported.
+            if ($previous === null && $previousItems !== [] && ! in_array(data_get($current, 'section'), self::DYNAMIC_SECTIONS, true)) {
+                continue;
+            }
+
             if (($previous['compare_value'] ?? null) === ($current['compare_value'] ?? null)) {
                 continue;
             }
 
             $item = $current ?? $previous;
-            $sensitive = (bool) data_get($item, 'sensitive', false);
             $type = $previous === null ? 'added' : ($current === null ? 'removed' : 'changed');
+            // A value is hidden when either snapshot hides it. A removed environment variable may
+            // have been locked after the previous deployment, which no snapshot records, so its
+            // old value is hidden too.
+            $sensitive = (bool) data_get($previous, 'sensitive', false)
+                || (bool) data_get($current, 'sensitive', false)
+                || ($type === 'removed' && data_get($item, 'section') === 'environment');
             $displaySummary = $sensitive && $type === 'changed' ? 'Changed' : null;
             $diffMode = data_get($item, 'diff_mode', 'default');
 

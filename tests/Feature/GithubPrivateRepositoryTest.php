@@ -53,9 +53,6 @@ beforeEach(function () {
 function fakeGithubHttp(array $repositories): void
 {
     Http::fake([
-        'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-            'Date' => now()->toRfc7231String(),
-        ]),
         'https://api.github.com/app/installations/67890/access_tokens' => Http::response([
             'token' => 'fake-installation-token',
         ], 201),
@@ -82,13 +79,6 @@ function githubPrivateRepositoryTestPrivateKeyForTeam(Team $team): PrivateKey
 }
 
 describe('GitHub Private Repository Component', function () {
-    test('github app selection uses coolbox loading border', function () {
-        Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app'])
-            ->assertSee('wire:loading.class="coolbox-loading"', false)
-            ->assertSee('wire:target="loadRepositories('.$this->githubApp->id.')"', false)
-            ->assertDontSee('loading-spinner', false);
-    });
-
     test('loadRepositories fetches and displays repositories', function () {
         $repos = [
             ['id' => 1, 'name' => 'alpha-repo', 'owner' => ['login' => 'testuser']],
@@ -103,6 +93,42 @@ describe('GitHub Private Repository Component', function () {
             ->assertSet('current_step', 'repository')
             ->assertSet('total_repositories_count', 2)
             ->assertSet('selected_repository_id', 1);
+    });
+
+    test('loadBranches fetches available branches and selects the repository default branch', function () {
+        $repository = [
+            'id' => 1,
+            'name' => 'alpha-repo',
+            'default_branch' => 'production',
+            'owner' => ['login' => 'testuser'],
+        ];
+
+        fakeGithubHttp([$repository]);
+        Http::fake([
+            'https://api.github.com/app/installations/67890/access_tokens' => Http::response([
+                'token' => 'fake-installation-token',
+            ], 201),
+            'https://api.github.com/installation/repositories*' => Http::response([
+                'total_count' => 1,
+                'repositories' => [$repository],
+            ], 200),
+            'https://api.github.com/repos/testuser/alpha-repo/branches*' => Http::response([
+                ['name' => 'main'],
+                ['name' => 'feature/login'],
+                ['name' => 'production'],
+            ], 200),
+        ]);
+
+        Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app'])
+            ->call('loadRepositories', $this->githubApp->id)
+            ->call('loadBranches')
+            ->assertSet('selected_branch_name', 'production')
+            ->assertSet('branches', collect([
+                ['name' => 'main'],
+                ['name' => 'feature/login'],
+                ['name' => 'production'],
+            ]))
+            ->assertSee('placeholder="Search branches…"', false);
     });
 
     test('loadRepositories rejects a github app owned by another team', function () {
@@ -194,7 +220,16 @@ describe('GitHub Private Repository Component', function () {
     });
 
     test('github installation token is not stored as public component state', function () {
-        expect((new ReflectionClass(GithubPrivateRepository::class))->hasProperty('token'))->toBeFalse();
+        fakeGithubHttp([
+            ['id' => 1, 'name' => 'alpha-repo', 'owner' => ['login' => 'testuser']],
+        ]);
+
+        $component = Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app'])
+            ->call('loadRepositories', $this->githubApp->id)
+            ->assertSet('current_step', 'repository');
+
+        expect(json_encode($component->snapshot))->not->toContain('fake-installation-token')
+            ->and($component->html())->not->toContain('fake-installation-token');
     });
 
     test('selected github app id cannot be tampered with from the client', function () {
@@ -215,9 +250,6 @@ describe('GitHub Private Repository Component', function () {
 
         $callCount = 0;
         Http::fake([
-            'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-                'Date' => now()->toRfc7231String(),
-            ]),
             'https://api.github.com/app/installations/67890/access_tokens' => Http::response([
                 'token' => 'fake-installation-token',
             ], 201),
@@ -275,11 +307,51 @@ describe('GitHub Private Repository Component', function () {
 
         Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app'])
             ->call('loadRepositories', $this->githubApp->id)
-            ->assertSee('Refresh Repository List');
+            ->assertSee('Refresh');
+    });
+
+    test('loadRepositories shows an error when the installation is not found', function () {
+        Http::fake([
+            'https://api.github.com/app/installations/67890/access_tokens' => Http::response(['message' => 'Not Found'], 404),
+        ]);
+
+        Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app'])
+            ->call('loadRepositories', $this->githubApp->id)
+            ->assertDispatched('error', fn (string $event, array $params) => str_contains($params[0], 'installation 67890 was not found'))
+            ->assertSet('current_step', 'github_apps');
+    });
+
+    test('loadRepositories shows the GitHub error when listing repositories fails', function () {
+        Http::fake([
+            'https://api.github.com/app/installations/67890/access_tokens' => Http::response([
+                'token' => 'fake-installation-token',
+            ], 201),
+            'https://api.github.com/installation/repositories*' => Http::response(['message' => 'Resource not accessible by integration'], 403),
+        ]);
+
+        Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app'])
+            ->call('loadRepositories', $this->githubApp->id)
+            ->assertDispatched('error', fn (string $event, array $params) => str_contains($params[0], 'Resource not accessible by integration'))
+            ->assertSet('current_step', 'github_apps');
+    });
+
+    test('loadBranches stops and shows the GitHub error when a later branch page fails', function () {
+        $repository = ['id' => 1, 'name' => 'alpha-repo', 'owner' => ['login' => 'testuser']];
+        fakeGithubHttp([$repository]);
+        Http::fake([
+            'https://api.github.com/repos/testuser/alpha-repo/branches*' => Http::sequence()
+                ->push(collect(range(1, 100))->map(fn (int $i) => ['name' => "branch-{$i}"])->all(), 200)
+                ->whenEmpty(Http::response(['message' => 'API rate limit exceeded'], 403)),
+        ]);
+
+        Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app'])
+            ->call('loadRepositories', $this->githubApp->id)
+            ->call('loadBranches')
+            ->assertDispatched('error', fn (string $event, array $params) => str_contains($params[0], 'API rate limit exceeded'));
     });
 
     test('refresh button is not visible before repositories are loaded', function () {
         Livewire::test(GithubPrivateRepository::class, ['type' => 'private-gh-app'])
-            ->assertDontSee('Refresh Repository List');
+            ->assertDontSee('Refresh');
     });
 });

@@ -36,7 +36,7 @@ describe('Application Model Buildpack Cleanup', function () {
         expect($application->dockerfile)->toBeNull();
         expect($application->dockerfile_location)->toBeNull();
         expect($application->dockerfile_target_build)->toBeNull();
-        expect($application->custom_healthcheck_found)->toBeFalse();
+        expect((bool) $application->custom_healthcheck_found)->toBeFalse();
     });
 
     test('model clears dockerfile fields when build_pack changes from dockerfile to static', function () {
@@ -61,7 +61,7 @@ describe('Application Model Buildpack Cleanup', function () {
         expect($application->dockerfile)->toBeNull();
         expect($application->dockerfile_location)->toBeNull();
         expect($application->dockerfile_target_build)->toBeNull();
-        expect($application->custom_healthcheck_found)->toBeFalse();
+        expect((bool) $application->custom_healthcheck_found)->toBeFalse();
     });
 
     test('model clears dockercompose fields when build_pack changes from dockercompose to nixpacks', function () {
@@ -142,7 +142,7 @@ describe('Application Model Buildpack Cleanup', function () {
         expect($application->dockerfile)->toBeNull();
         expect($application->dockerfile_location)->toBeNull();
         expect($application->dockerfile_target_build)->toBeNull();
-        expect($application->custom_healthcheck_found)->toBeFalse();
+        expect((bool) $application->custom_healthcheck_found)->toBeFalse();
     });
 
     test('model clears dockercompose fields when build_pack changes from dockercompose to railpack', function () {
@@ -283,6 +283,6 @@ describe('Application Model Buildpack Cleanup', function () {
         expect($application->build_pack)->toBe('dockerfile');
         expect($application->dockerfile)->toBe('FROM alpine:latest');
         expect($application->dockerfile_location)->toBe('/Dockerfile');
-        expect($application->custom_healthcheck_found)->toBeTrue();
+        expect((bool) $application->custom_healthcheck_found)->toBeTrue();
     });
 });

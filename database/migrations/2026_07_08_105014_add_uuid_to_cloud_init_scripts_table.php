@@ -15,7 +15,7 @@ return new class extends Migration
 
         DB::table('cloud_init_scripts')
             ->whereNull('uuid')
-            ->orderBy('id')
+            ->lazyById()
             ->each(function (object $script): void {
                 DB::table('cloud_init_scripts')
                     ->where('id', $script->id)

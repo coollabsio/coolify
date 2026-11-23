@@ -1,17 +1,48 @@
 <?php
 
 use App\Models\Application;
-use Illuminate\Support\Facades\DB;
+use App\Models\Environment;
+use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
+use App\Models\Project;
+use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\Team;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
+use phpseclib3\Crypt\EC;
 use Symfony\Component\Yaml\Yaml;
+use Tests\TestCase;
+
+uses(TestCase::class, RefreshDatabase::class);
 
 /**
  * Integration test to verify docker_compose_raw remains clean after parsing
  */
 it('verifies docker_compose_raw does not contain Coolify labels after parsing', function () {
-    // This test requires database, so skip if not available
-    if (! DB::connection()->getDatabaseName()) {
-        $this->markTestSkipped('Database not available');
-    }
+    // Keeps the ServerStorageSaveJob of the file volume from writing to the (fake) server.
+    Bus::fake();
+
+    InstanceSettings::unguarded(function () {
+        InstanceSettings::updateOrCreate(['id' => 0], []);
+    });
+
+    $team = Team::factory()->create();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $privateKey = PrivateKey::create([
+        'name' => 'test-key',
+        'private_key' => EC::createKey('Ed25519')->toString('OpenSSH'),
+        'team_id' => $team->id,
+    ]);
+    $server = Server::factory()->create([
+        'team_id' => $team->id,
+        'private_key_id' => $privateKey->id,
+    ]);
+    $destination = StandaloneDocker::factory()->create([
+        'server_id' => $server->id,
+        'network' => 'test-network-'.fake()->uuid(),
+    ]);
 
     // Create a simple compose file with volumes containing content
     $originalCompose = <<<'YAML'
@@ -20,8 +51,8 @@ services:
     image: nginx:latest
     volumes:
       - type: bind
-        source: ./config
-        target: /etc/nginx/conf.d
+        source: ./config/default.conf
+        target: /etc/nginx/conf.d/default.conf
         content: |
           server {
             listen 80;
@@ -30,23 +61,18 @@ services:
       - "my.custom.label=value"
 YAML;
 
-    // Create application with mocked data
-    $app = new Application;
-    $app->docker_compose_raw = $originalCompose;
-    $app->uuid = 'test-uuid-123';
-    $app->name = 'test-app';
-    $app->compose_parsing_version = 3;
-
-    // Mock the destination and server relationships
-    $app->setRelation('destination', (object) [
-        'server' => (object) [
-            'proxyType' => fn () => 'traefik',
-            'settings' => (object) [
-                'generate_exact_labels' => true,
-            ],
-        ],
-        'network' => 'coolify',
+    $app = Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => StandaloneDocker::class,
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $originalCompose,
+        'fqdn' => null,
+        'docker_compose_domains' => null,
     ]);
+
+    applicationParser($app);
+    $app->refresh();
 
     // Parse the YAML after running through the parser logic
     $yamlAfterParsing = Yaml::parse($app->docker_compose_raw);
@@ -82,9 +108,13 @@ YAML;
 
     // Check that content field is removed
     $volumes = data_get($yamlAfterParsing, 'services.web.volumes', []);
+    expect($volumes)->not->toBeEmpty();
     foreach ($volumes as $volume) {
         if (is_array($volume)) {
             expect($volume)->not->toHaveKey('content', 'content field should be removed from volumes');
         }
     }
+
+    // The processed compose file keeps the Coolify additions
+    expect($app->docker_compose)->toContain('coolify.managed');
 });

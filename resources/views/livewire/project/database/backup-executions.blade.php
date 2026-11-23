@@ -1,208 +1,217 @@
-<div wire:init='refreshBackupExecutions'>
+<div wire:init="refreshBackupExecutions" x-on:open-backup-download.window="window.location.href = $event.detail.url">
+    @if (count($pendingDownloads) > 0)
+        <div wire:poll.3s="checkDownloads" class="hidden"></div>
+    @endif
     @isset($backup)
-        <div class="flex flex-col gap-3 py-4 sm:flex-row sm:flex-wrap sm:items-center">
-            <h3 class="py-0">Executions <span class="text-xs">({{ $executions_count }})</span></h3>
-            @if ($executions_count > 0)
-                <div class="flex items-center gap-2">
-                    <x-forms.button disabled="{{ !$showPrev }}" wire:click="previousPage('{{ $defaultTake }}')">
-                        <svg class="w-4 h-4" viewBox="0 0 24 24">
-                            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                                stroke-width="2" d="m14 6l-6 6l6 6z" />
-                        </svg>
-                    </x-forms.button>
-                    <span class="text-sm text-gray-600 dark:text-gray-400 px-2">
-                        Page {{ $currentPage }} of {{ ceil($executions_count / $defaultTake) }}
-                    </span>
-                    <x-forms.button disabled="{{ !$showNext }}" wire:click="nextPage('{{ $defaultTake }}')">
-                        <svg class="w-4 h-4" viewBox="0 0 24 24">
-                            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                                stroke-width="2" d="m10 18l6-6l-6-6z" />
-                        </svg>
-                    </x-forms.button>
+        <section class="application-settings-section overflow-hidden">
+            <div class="application-settings-section-header">
+                <div>
+                    <h2>Executions</h2>
                 </div>
-            @endif
-            <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <x-forms.button wire:click='cleanupFailed' class="w-full sm:w-auto">Cleanup Failed Backups</x-forms.button>
-                <x-modal-confirmation title="Cleanup Deleted Backup Entries?" isErrorButton
-                    submitAction="cleanupDeleted()"
-                    :actions="['This will permanently delete all backup execution entries that are marked as deleted from local storage.', 'This only removes database entries, not actual backup files.']"
-                    confirmationText="cleanup deleted backups"
-                    confirmationLabel="Please confirm by typing 'cleanup deleted backups' below"
-                    shortConfirmationLabel="Confirmation">
-                    <x-slot:trigger>
-                        <x-forms.button isError class="w-full sm:w-auto">Cleanup Deleted</x-forms.button>
-                    </x-slot:trigger>
-                </x-modal-confirmation>
+                <div class="flex flex-wrap items-center gap-2">
+                    <x-forms.button wire:click="cleanupFailed">Clean failed backups</x-forms.button>
+                    <x-modal-confirmation title="Cleanup Deleted Backup Entries?" isErrorButton
+                        submitAction="cleanupDeleted()" :actions="[
+                            'Permanently delete execution records already removed from local storage.',
+                            'Actual backup files are not changed.',
+                        ]"
+                        confirmationText="cleanup deleted backups"
+                        confirmationLabel="Type cleanup deleted backups to confirm."
+                        shortConfirmationLabel="Confirmation">
+                        <x-slot:trigger>
+                            <x-forms.button isError>Clean deleted entries</x-forms.button>
+                        </x-slot:trigger>
+                    </x-modal-confirmation>
+                </div>
             </div>
-        </div>
-        <div @if (!$skip) wire:poll.5000ms="refreshBackupExecutions" @endif
-            class="flex flex-col gap-4">
-            @forelse($executions as $execution)
-                <div wire:key="{{ data_get($execution, 'id') }}" @class([
-                    'flex flex-col border-l-2 transition-colors p-4 bg-white dark:bg-coolgray-100 text-black dark:text-white',
-                    'border-blue-500/50 border-dashed' =>
-                        data_get($execution, 'status') === 'running',
-                    'border-error' => data_get($execution, 'status') === 'failed',
-                    'border-success' => data_get($execution, 'status') === 'success',
-                ])>
-                    @if (data_get($execution, 'status') === 'running')
-                        <div class="absolute top-2 right-2">
-                            <x-loading />
+
+            <div @if (! $skip) wire:poll.5000ms="refreshBackupExecutions" @endif
+                class="application-settings-section-body p-0!">
+                @if ($executions_count === 0)
+                    <div class="p-4">
+                        <x-empty size="sm" title="No backup executions"
+                            description="Execution history appears here after the schedule runs."
+                            icon-name="browser-terminal" />
+                    </div>
+                @else
+                    <div class="data-table deployment-table-scroll backup-executions-table-scroll">
+                        <div
+                            class="data-table-header backup-executions-table-grid h-auto rounded-none px-4 py-2.5 text-[11px]">
+                            <span>Status</span>
+                            <span>Database</span>
+                            <span>Archive</span>
+                            <span>Time</span>
+                            <span>Size</span>
+                            <span>Availability</span>
+                            <span class="text-right">Actions</span>
                         </div>
-                    @endif
-                    <div class="flex items-center gap-2 mb-2">
-                        <span @class([
-                            'px-3 py-1 rounded-md text-xs font-medium tracking-wide shadow-xs',
-                            'bg-blue-100/80 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 dark:shadow-blue-900/5' =>
-                                data_get($execution, 'status') === 'running',
-                            'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200 dark:shadow-red-900/5' =>
-                                data_get($execution, 'status') === 'failed',
-                            'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 dark:shadow-amber-900/5' =>
-                                data_get($execution, 'status') === 'success' && data_get($execution, 's3_uploaded') === false,
-                            'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200 dark:shadow-green-900/5' =>
-                                data_get($execution, 'status') === 'success' && data_get($execution, 's3_uploaded') !== false,
-                        ])>
-                            @php
-                                $statusText = match (data_get($execution, 'status')) {
-                                    'success' => data_get($execution, 's3_uploaded') === false ? 'Success (S3 Warning)' : 'Success',
-                                    'running' => 'In Progress',
-                                    'failed' => 'Failed',
-                                    default => ucfirst(data_get($execution, 'status')),
-                                };
-                            @endphp
-                            {{ $statusText }}
-                        </span>
-                    </div>
-                    <div class="text-gray-600 dark:text-gray-400 text-sm">
-                        @if (data_get($execution, 'status') === 'running')
-                            <span title="Started: {{ formatDateInServerTimezone(data_get($execution, 'created_at'), $this->server()) }}">
-                                Running for {{ calculateDuration(data_get($execution, 'created_at'), now()) }}
-                            </span>
-                        @else
-                            <span title="Started: {{ formatDateInServerTimezone(data_get($execution, 'created_at'), $this->server()) }}&#10;Ended: {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), $this->server()) }}">
-                                {{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->diffForHumans() }}
-                                ({{ calculateDuration(data_get($execution, 'created_at'), data_get($execution, 'finished_at')) }})
-                                • {{ \Carbon\Carbon::parse(data_get($execution, 'finished_at'))->format('M j, H:i') }}
-                            </span>
-                        @endif
-                        • Database: {{ data_get($execution, 'database_name', 'N/A') }}
-                        @if(data_get($execution, 'size'))
-                            • Size: {{ formatBytes(data_get($execution, 'size')) }}
-                        @endif
-                    </div>
-                    <div class="text-gray-600 dark:text-gray-400 text-sm">
-                        Location: {{ data_get($execution, 'filename', 'N/A') }}
-                    </div>
-                    <div class="flex flex-col gap-2 mt-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-                        <div class="text-gray-600 dark:text-gray-400 text-sm">
-                            Backup Availability:
-                        </div>
-                        <span @class([
-                            'px-2 py-1 rounded-sm text-xs font-medium',
-                            'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' => !data_get(
-                                $execution,
-                                'local_storage_deleted',
-                                false),
-                            'bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400' => data_get(
-                                $execution,
-                                'local_storage_deleted',
-                                false),
-                        ])>
-                            <span class="flex items-center gap-1">
-                                @if (!data_get($execution, 'local_storage_deleted', false))
-                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"
-                                        xmlns="http://www.w3.org/2000/svg">
-                                        <path fill-rule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                            clip-rule="evenodd"></path>
-                                    </svg>
-                                @else
-                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"
-                                        xmlns="http://www.w3.org/2000/svg">
-                                        <path fill-rule="evenodd"
-                                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                                            clip-rule="evenodd"></path>
-                                    </svg>
-                                @endif
-                                Local Storage
-                            </span>
-                        </span>
-                        @if (data_get($execution, 's3_uploaded') !== null)
-                            <span @class([
-                                'px-2 py-1 rounded-sm text-xs font-medium',
-                                'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200' => data_get($execution, 's3_uploaded') === false && !data_get($execution, 's3_storage_deleted', false),
-                                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' => data_get($execution, 's3_uploaded') === true && !data_get($execution, 's3_storage_deleted', false),
-                                'bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400' => data_get($execution, 's3_storage_deleted', false),
-                            ])>
-                                <span class="flex items-center gap-1">
-                                    @if (data_get($execution, 's3_uploaded') === true && !data_get($execution, 's3_storage_deleted', false))
-                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"
-                                            xmlns="http://www.w3.org/2000/svg">
-                                            <path fill-rule="evenodd"
-                                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                                clip-rule="evenodd"></path>
-                                        </svg>
-                                    @else
-                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"
-                                            xmlns="http://www.w3.org/2000/svg">
-                                            <path fill-rule="evenodd"
-                                                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                                                clip-rule="evenodd"></path>
-                                        </svg>
-                                    @endif
-                                    S3 Storage
-                                </span>
-                            </span>
-                        @endif
-                    </div>
-                    @if (data_get($execution, 'message'))
-                        <div class="mt-2 p-2 bg-gray-100 dark:bg-coolgray-200 rounded-sm">
-                            <pre class="whitespace-pre-wrap text-sm">{{ data_get($execution, 'message') }}</pre>
-                        </div>
-                    @endif
-                    <div class="grid grid-cols-2 gap-2 mt-4 sm:flex sm:flex-wrap">
-                        @if (data_get($execution, 'status') === 'success')
-                            <x-forms.button class="w-full dark:hover:bg-coolgray-400 sm:w-auto"
-                                x-on:click="download_file('{{ data_get($execution, 'id') }}')">Download</x-forms.button>
-                        @endif
                         @php
-                            $executionCheckboxes = [];
-                            $deleteActions = [];
-
-                            if (!data_get($execution, 'local_storage_deleted', false)) {
-                                $deleteActions[] = 'This backup will be permanently deleted from local storage.';
-                            }
-
-                            if (data_get($execution, 's3_uploaded') === true && !data_get($execution, 's3_storage_deleted', false)) {
-                                $executionCheckboxes[] = ['id' => 'delete_backup_s3', 'label' => 'Delete the selected backup permanently from S3 Storage'];
-                            }
-
-                            if (empty($deleteActions)) {
-                                $deleteActions[] = 'This backup execution record will be deleted.';
-                            }
+                            $server = $this->server();
                         @endphp
-                        <x-modal-confirmation title="Confirm Backup Deletion?" isErrorButton
-                            submitAction="deleteBackup({{ data_get($execution, 'id') }})" :checkboxes="$executionCheckboxes"
-                            :actions="$deleteActions" confirmationText="{{ data_get($execution, 'filename') }}"
-                            confirmationLabel="Please confirm the execution of the actions by entering the Backup Filename below"
-                            shortConfirmationLabel="Backup Filename">
-                            <x-slot:trigger>
-                                <x-forms.button isError class="w-full sm:w-auto">Delete</x-forms.button>
-                            </x-slot:trigger>
-                        </x-modal-confirmation>
+                        @foreach ($executions as $execution)
+                            @php
+                                $executionStatus = data_get($execution, 'status');
+                                [$executionStatusLabel, $executionStatusType] = match ($executionStatus) {
+                                    'success' => data_get($execution, 's3_uploaded') === false
+                                        ? ['S3 warning', 'warning']
+                                        : ['Success', 'success'],
+                                    'running' => ['In progress', 'warning'],
+                                    'failed' => ['Failed', 'error'],
+                                    default => [str($executionStatus)->headline(), 'neutral'],
+                                };
+                                $finishedAt = \Carbon\Carbon::parse(data_get($execution, 'finished_at') ?? data_get($execution, 'updated_at'));
+                                $s3Replicas = $execution->s3Replicas;
+                                $hasLiveS3Copies = $s3Replicas->isNotEmpty()
+                                    ? $s3Replicas->contains(fn ($replica) => $replica->s3_uploaded === true && ! $replica->s3_storage_deleted)
+                                    : data_get($execution, 's3_uploaded') === true && ! data_get($execution, 's3_storage_deleted', false);
+                                $executionCheckboxes = [];
+                                $deleteActions = [];
+
+                                if (! data_get($execution, 'local_storage_deleted', false)) {
+                                    $deleteActions[] = 'This backup will be permanently deleted from local storage.';
+                                }
+
+                                if ($hasLiveS3Copies) {
+                                    $executionCheckboxes[] = [
+                                        'id' => 'delete_backup_s3',
+                                        'label' => 'Delete the selected backup permanently from every S3 storage',
+                                    ];
+                                }
+
+                                if (empty($deleteActions)) {
+                                    $deleteActions[] = 'This backup execution record will be deleted.';
+                                }
+                            @endphp
+                            <div wire:key="{{ data_get($execution, 'id') }}"
+                                class="backup-execution-row border-b border-neutral-200 dark:border-white/[0.06]">
+                                <div class="data-table-row backup-executions-table-grid min-h-14 px-4 py-2.5">
+                                    <div class="flex items-center gap-2">
+                                        <x-status-badge :status="$executionStatusLabel"
+                                            :type="$executionStatusType" :pulse="$executionStatus === 'running'" />
+                                    </div>
+                                    <div class="truncate text-[12px] font-medium text-black dark:text-fg">
+                                        {{ data_get($execution, 'database_name') ?: ($backup->dump_all ? 'All databases' : '-') }}
+                                    </div>
+                                    <div class="flex min-w-0 items-center gap-1">
+                                        @if (filled(data_get($execution, 'filename')))
+                                            <span class="truncate font-mono text-[12px] text-black dark:text-fg"
+                                                title="{{ data_get($execution, 'filename') }}">{{ basename(data_get($execution, 'filename')) }}</span>
+                                            <x-copy-button :value="data_get($execution, 'filename')" label="Copy archive path" />
+                                        @else
+                                            <span class="text-neutral-500 dark:text-fg-faint">-</span>
+                                        @endif
+                                    </div>
+                                    <div class="text-[11px] text-neutral-500 dark:text-fg-faint"
+                                        title="Started: {{ formatDateInServerTimezone(data_get($execution, 'created_at'), $server) }}@if ($executionStatus !== 'running')&#10;Ended: {{ formatDateInServerTimezone(data_get($execution, 'finished_at'), $server) }}@endif">
+                                        @if ($executionStatus === 'running')
+                                            Running for {{ calculateDuration(data_get($execution, 'created_at'), now()) }}
+                                        @else
+                                            <div class="text-black dark:text-fg">
+                                                {{ formatDateInServerTimezone($finishedAt, $server) }}
+                                            </div>
+                                            <div>{{ $finishedAt->diffForHumans() }} · {{ calculateDuration(data_get($execution, 'created_at'), $finishedAt) }}</div>
+                                        @endif
+                                    </div>
+                                    <div class="tabular-nums text-neutral-500 dark:text-fg-dim">
+                                        {{ data_get($execution, 'size') ? formatBytes(data_get($execution, 'size')) : '-' }}
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        <x-status-badge
+                                            :status="data_get($execution, 'local_storage_deleted', false) ? 'Local deleted' : 'Local'"
+                                            :type="data_get($execution, 'local_storage_deleted', false) ? 'neutral' : 'success'" />
+                                        @foreach ($s3Replicas as $replica)
+                                            <x-status-badge wire:key="database-backup-replica-{{ $replica->id }}"
+                                                :label="$replica->s3?->name ?? 'Removed S3 storage'"
+                                                :status="$replica->s3_storage_deleted
+                                                    ? 'deleted'
+                                                    : match ($replica->s3_uploaded) {
+                                                        true => null,
+                                                        false => 'failed',
+                                                        default => $executionStatus === 'running' ? 'pending' : 'not uploaded',
+                                                    }"
+                                                :type="$replica->s3_storage_deleted || $replica->s3_uploaded === null
+                                                    ? 'neutral'
+                                                    : ($replica->s3_uploaded ? 'success' : 'error')"
+                                                :title="$replica->message" />
+                                        @endforeach
+                                        @if ($s3Replicas->isEmpty() && data_get($execution, 's3_uploaded') !== null)
+                                            <x-status-badge
+                                                :status="data_get($execution, 's3_storage_deleted', false)
+                                                    ? 'S3 deleted'
+                                                    : (data_get($execution, 's3_uploaded') ? 'S3' : 'S3 failed')"
+                                                :type="data_get($execution, 's3_storage_deleted', false)
+                                                    ? 'neutral'
+                                                    : (data_get($execution, 's3_uploaded') ? 'success' : 'error')" />
+                                        @endif
+                                    </div>
+                                    <div class="flex items-center justify-end gap-1">
+                                        @if ($executionStatus === 'success')
+                                            <button type="button" class="icon-button shrink-0"
+                                                x-on:click="download_file('{{ data_get($execution, 'id') }}')"
+                                                title="Download backup" aria-label="Download backup">
+                                                <x-reicon name="upload" class="size-3.5 rotate-180" />
+                                            </button>
+                                        @endif
+                                        <x-modal-confirmation title="Confirm Backup Deletion?" isErrorButton
+                                            submitAction="deleteBackup({{ data_get($execution, 'id') }})"
+                                            :checkboxes="$executionCheckboxes" :actions="$deleteActions"
+                                            confirmationText="{{ data_get($execution, 'filename') }}"
+                                        confirmationLabel="Enter the backup filename to confirm."
+                                        shortConfirmationLabel="Backup Filename">
+                                            <x-slot:trigger>
+                                                <button type="button"
+                                                    class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                                                    title="Delete backup" aria-label="Delete backup">
+                                                    <x-reicon name="trash" class="size-3.5" />
+                                                </button>
+                                            </x-slot:trigger>
+                                        </x-modal-confirmation>
+                                    </div>
+                                </div>
+                                @if (data_get($execution, 'message'))
+                                    <div class="px-4 pb-3">
+                                        <pre @class([
+                                            'max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-5',
+                                            'text-red-600 dark:text-red-400' => $executionStatus === 'failed',
+                                            'text-neutral-500 dark:text-fg-faint' => $executionStatus !== 'failed',
+                                        ])>{{ data_get($execution, 'message') }}</pre>
+                                    </div>
+                                @endif
+                            </div>
+                        @endforeach
+                        </div>
+
+                    <div
+                        class="flex min-h-11 items-center justify-between border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
+                        <span>
+                            {{ $skip + 1 }}-{{ min($skip + $defaultTake, $executions_count) }} of
+                            {{ $executions_count }}
+                        </span>
+                        <div class="flex items-center gap-1">
+                            <button type="button" class="icon-button" @disabled(! $showPrev)
+                                wire:click="previousPage('{{ $defaultTake }}')" aria-label="Previous page">
+                                <x-reicon name="arrow-right" class="size-3.5 rotate-180" />
+                            </button>
+                            <button type="button" class="icon-button" @disabled(! $showNext)
+                                wire:click="nextPage('{{ $defaultTake }}')" aria-label="Next page">
+                                <x-reicon name="arrow-right" class="size-3.5" />
+                            </button>
+                        </div>
                     </div>
-                </div>
-            @empty
-                <div class="p-4 bg-gray-100 dark:bg-coolgray-100 rounded-sm">No executions found.</div>
-            @endforelse
-        </div>
+                @endif
+            </div>
+        </section>
     @endisset
 </div>
 
 @script
-<script>
-    window.download_file = function(executionId) {
-        window.open('/download/backup/' + executionId, '_blank');
-    }
-</script>
+    <script>
+        window.download_file = function(executionId) {
+            @if ($s3Downloads)
+                $wire.download_file(executionId);
+            @else
+                window.open('/download/backup/' + executionId, '_blank');
+            @endif
+        }
+    </script>
 @endscript

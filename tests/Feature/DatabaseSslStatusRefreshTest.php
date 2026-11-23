@@ -25,6 +25,7 @@ use App\Livewire\Project\Service\ResourceCard as ServiceResourceCard;
 use App\Livewire\Server\Sentinel;
 use App\Livewire\Server\Show;
 use App\Models\Environment;
+use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -40,6 +41,8 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
+
     $this->team = Team::factory()->create();
     $this->user = User::factory()->create();
     $this->team->members()->attach($this->user->id, ['role' => 'owner']);
@@ -47,6 +50,15 @@ beforeEach(function () {
     $this->actingAs($this->user);
     session(['currentTeam' => $this->team]);
 });
+
+function sslToggleIsDisabled(string $html): bool
+{
+    preg_match('/<button[^>]*id="enableSsl-trigger"[^>]*>/s', $html, $matches);
+
+    expect($matches)->not->toBeEmpty();
+
+    return (bool) preg_match('/\sdisabled(\s|=|>)/', $matches[0]);
+}
 
 dataset('database-general-forms-without-broadcasts', [
     // Status-derived display moved into a sibling StatusInfo component for each DB,
@@ -222,12 +234,43 @@ it('reloads the mysql status-info model when refresh is called so ssl controls f
     ]);
 
     $component = Livewire::test(MysqlStatusInfo::class, ['database' => $database])
-        ->assertDontSee('Database should be stopped to change this settings.');
+        ->assertSee('Encryption settings can only be changed while the database is stopped.');
+
+    expect(sslToggleIsDisabled($component->html()))->toBeFalse();
 
     $database->fill(['status' => 'running:healthy'])->save();
 
-    $component->call('refresh')
-        ->assertSee('Database should be stopped to change this settings.');
+    $component->call('refresh');
+
+    expect(sslToggleIsDisabled($component->html()))->toBeTrue();
+});
+
+it('shows ssl mode even when ssl is disabled, as a disabled control', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first();
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+
+    $database = StandaloneMysql::create([
+        'name' => 'ssl-disabled-mysql',
+        'image' => 'mysql:8',
+        'mysql_root_password' => 'password',
+        'mysql_user' => 'coolify',
+        'mysql_password' => 'password',
+        'mysql_database' => 'coolify',
+        'status' => 'exited:unhealthy',
+        'enable_ssl' => false,
+        'ssl_mode' => 'REQUIRED',
+        'is_log_drain_enabled' => false,
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+
+    Livewire::test(MysqlStatusInfo::class, ['database' => $database])
+        ->assertSet('enableSsl', false)
+        ->assertSee('SSL mode')
+        ->assertSeeHtml('id="sslMode-trigger"');
 });
 
 it('does not clobber server form text inputs when sentinel restarts', function () {
@@ -236,7 +279,7 @@ it('does not clobber server form text inputs when sentinel restarts', function (
         'name' => 'persisted-server-name',
     ]);
 
-    $component = Livewire::test(Sentinel::class, ['server_uuid' => $server->uuid])
+    $component = Livewire::test(Sentinel::class, ['server' => $server])
         ->set('sentinelToken', 'user-was-typing-this-token');
 
     $component->call('handleSentinelRestarted', ['serverUuid' => $server->uuid]);
@@ -280,10 +323,13 @@ it('shows the redis ssl gate hint after the sibling is refreshed', function () {
     ]);
 
     $component = Livewire::test(RedisStatusInfo::class, ['database' => $database])
-        ->assertDontSee('Database should be stopped to change this settings.');
+        ->assertSee('Encryption settings can only be changed while the database is stopped.');
+
+    expect(sslToggleIsDisabled($component->html()))->toBeFalse();
 
     $database->fill(['status' => 'running:healthy'])->save();
 
-    $component->call('refresh')
-        ->assertSee('Database should be stopped to change this settings.');
+    $component->call('refresh');
+
+    expect(sslToggleIsDisabled($component->html()))->toBeTrue();
 });

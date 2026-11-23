@@ -32,6 +32,7 @@ test('destination creation modal can mount with selected team server even when g
     $server->settings()->update([
         'is_reachable' => true,
         'is_usable' => true,
+        'server_role' => 'build',
         'is_build_server' => true,
     ]);
 
@@ -47,6 +48,7 @@ test('server destinations page renders when selected server has no destinations'
     $server->settings()->update([
         'is_reachable' => true,
         'is_usable' => true,
+        'server_role' => 'build',
         'is_build_server' => true,
     ]);
 
@@ -55,7 +57,8 @@ test('server destinations page renders when selected server has no destinations'
     $this->get(route('server.destinations', ['server_uuid' => $server->uuid]))
         ->assertSuccessful()
         ->assertSee('Destinations')
-        ->assertSee('No destinations configured for this server yet.')
+        ->assertSee('No destinations')
+        ->assertSee('Add a destination or scan the server for existing Docker networks.')
         ->assertDontSee('Server not found.');
 });
 
@@ -76,7 +79,7 @@ test('global destinations page does not render per-server empty states beside ex
     $this->get(route('destination.index'))
         ->assertSuccessful()
         ->assertSee($serverWithDestination->standaloneDockers()->first()->name)
-        ->assertDontSee('No destinations found.');
+        ->assertDontSee('No destinations yet');
 });
 
 test('global destinations page renders a single empty state when no usable servers have destinations', function () {
@@ -89,7 +92,7 @@ test('global destinations page renders a single empty state when no usable serve
 
     $this->get(route('destination.index'))
         ->assertSuccessful()
-        ->assertSee('No destinations found.');
+        ->assertSee('No destinations yet');
 });
 
 test('adding a discovered swarm destination stores the selected network name', function () {
@@ -104,4 +107,45 @@ test('adding a discovered swarm destination stores the selected network name', f
         ->call('add', 'customer-network');
 
     expect(SwarmDocker::where('server_id', $server->id)->where('network', 'customer-network')->exists())->toBeTrue();
+});
+
+/**
+ * Makes the user a member of a new team that owns a usable server, with the session on that team.
+ */
+function destinationsMemberTeamServer(User $user, bool $swarm = false): Server
+{
+    $memberTeam = Team::factory()->create();
+    $user->teams()->attach($memberTeam, ['role' => 'member']);
+    $user->load('teams');
+    session(['currentTeam' => $memberTeam]);
+
+    $server = Server::factory()->create(['team_id' => $memberTeam->id]);
+    $server->settings()->update(['is_reachable' => true, 'is_usable' => true, 'is_swarm_manager' => $swarm]);
+
+    return $server;
+}
+
+test('member cannot add a destination on the owning team server after switching to an owned team', function (bool $swarm) {
+    $server = destinationsMemberTeamServer($this->user, $swarm);
+
+    $component = Livewire::test(Destinations::class, ['server_uuid' => $server->uuid]);
+    session(['currentTeam' => $this->team]);
+
+    $component->call('add', 'customer-network')->assertForbidden();
+
+    expect(StandaloneDocker::where('network', 'customer-network')->exists())->toBeFalse()
+        ->and(SwarmDocker::where('network', 'customer-network')->exists())->toBeFalse();
+})->with(['standalone' => false, 'swarm' => true]);
+
+test('member cannot create a docker network on the owning team server after switching to an owned team', function () {
+    $server = destinationsMemberTeamServer($this->user);
+
+    $component = Livewire::test(Docker::class, ['server_id' => (string) $server->id]);
+    session(['currentTeam' => $this->team]);
+
+    $component->set('network', 'customer-network')
+        ->call('submit')
+        ->assertDispatched('error');
+
+    expect(StandaloneDocker::where('network', 'customer-network')->exists())->toBeFalse();
 });

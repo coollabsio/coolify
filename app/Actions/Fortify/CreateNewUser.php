@@ -2,14 +2,16 @@
 
 namespace App\Actions\Fortify;
 
+use App\Jobs\SendVerificationEmailJob;
 use App\Models\Team;
 use App\Models\User;
-use Illuminate\Http\Request;
+use App\Support\RootSetupWindow;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 
 class CreateNewUser implements CreatesNewUsers
@@ -22,8 +24,6 @@ class CreateNewUser implements CreatesNewUsers
 
     private const REGISTRATION_EMAIL_IDENTITY_DECAY_SECONDS = 3600;
 
-    public function __construct(private readonly Request $request) {}
-
     /**
      * Validate and create a newly registered user.
      *
@@ -32,8 +32,16 @@ class CreateNewUser implements CreatesNewUsers
     public function create(array $input): User
     {
         $settings = instanceSettings();
-        if (! $settings->is_registration_enabled) {
+        if (! $settings->isPasswordRegistrationAllowed()) {
             abort(403);
+        }
+
+        if (! User::query()->exists() && ! RootSetupWindow::isOpen()) {
+            throw ValidationException::withMessages([
+                'email' => RootSetupWindow::isPending()
+                    ? 'Coolify has not finished starting. Wait a few seconds, then try again.'
+                    : 'The setup window for the root account is closed. Restart Coolify on the server (docker restart coolify) to open it again.',
+            ]);
         }
 
         $this->ensureRegistrationIsNotRateLimited($input);
@@ -77,13 +85,13 @@ class CreateNewUser implements CreatesNewUsers
             ]);
             $team = $user->teams()->first();
             if (isCloud()) {
-                $user->sendVerificationEmail();
+                SendVerificationEmailJob::dispatch($user);
             } else {
                 $user->markEmailAsVerified();
             }
         }
         // Set session variable
-        session(['currentTeam' => $user->currentTeam = $team]);
+        session(['currentTeam' => $team]);
 
         return $user;
     }
@@ -95,7 +103,7 @@ class CreateNewUser implements CreatesNewUsers
     {
         $keys = [
             [
-                'key' => 'registration:ip:'.sha1($this->realIp()),
+                'key' => 'registration:ip:'.sha1(client_ip(request())),
                 'max' => self::REGISTRATION_IP_MAX_ATTEMPTS,
                 'decay' => self::REGISTRATION_IP_DECAY_SECONDS,
             ],
@@ -119,10 +127,5 @@ class CreateNewUser implements CreatesNewUsers
         foreach ($keys as $limit) {
             RateLimiter::hit($limit['key'], $limit['decay']);
         }
-    }
-
-    private function realIp(): string
-    {
-        return $this->request->server('REMOTE_ADDR') ?? $this->request->ip();
     }
 }

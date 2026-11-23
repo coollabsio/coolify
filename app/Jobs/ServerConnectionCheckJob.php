@@ -5,9 +5,9 @@ namespace App\Jobs;
 use App\Events\ServerReachabilityChanged;
 use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
-use App\Services\ConfigurationRepository;
-use App\Services\HetznerService;
+use App\Services\ServerTransfer\ServerTransferClaimer;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -17,6 +17,8 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Sleep;
+use Illuminate\Support\Str;
 
 class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -24,27 +26,51 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 
     public $tries = 1;
 
-    public $timeout = 15;
+    public $timeout = 60;
+
+    /**
+     * Consecutive failed SSH checks before the server is marked unreachable.
+     * One failed attempt is often a short network problem, not an offline server.
+     */
+    public const UNREACHABLE_THRESHOLD = 2;
+
+    /** Each check makes this many SSH attempts before it counts as failed. */
+    public const SSH_ATTEMPTS = 2;
+
+    public const SSH_TIMEOUT_SECONDS = 10;
+
+    public const SSH_RETRY_DELAY_SECONDS = 3;
+
+    /** Docker and Compose version commands each get one attempt with this timeout. */
+    public const DOCKER_TIMEOUT_SECONDS = 15;
+
+    private ?string $connectionError = null;
+
+    /** Owner marker that the SSH probe read from the host; empty when the host has none. */
+    private ?string $ownerMarker = null;
+
+    /** The server sent a host key that does not match the pinned key. */
+    private bool $hostKeyChanged = false;
+
+    private string $sshErrorOutput = '';
 
     public function __construct(
-        public Server $server,
-        public bool $disableMux = true
+        public Server $server
     ) {}
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping('server-connection-check-'.$this->server->uuid))->expireAfter(25)->dontRelease()];
+        return [(new WithoutOverlapping('server-connection-check-'.$this->server->uuid))->expireAfter($this->timeout + 30)->dontRelease()];
     }
 
-    private function disableSshMux(): void
+    public function handle(): void
     {
-        $configRepository = app(ConfigurationRepository::class);
-        $configRepository->disableSshMux();
-    }
+        if ($this->server->hasPlaceholderIp()) {
+            return;
+        }
 
-    public function handle()
-    {
         $wasReachable = (bool) $this->server->settings->is_reachable;
+        $wasUsable = (bool) $this->server->settings->is_usable;
         $wasNotified = (bool) $this->server->unreachable_notification_sent;
 
         try {
@@ -58,48 +84,66 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                     'server_id' => $this->server->id,
                     'server_name' => $this->server->name,
                 ]);
+                $this->logConnectionStateChange($wasReachable, $wasUsable, false, false, 'force_disabled');
 
                 return;
             }
 
-            // Check Hetzner server status if applicable
-            if ($this->server->hetzner_server_id && $this->server->cloudProviderToken) {
-                $this->checkHetznerStatus();
-            }
-
-            if ($this->server->vultr_instance_id && $this->server->cloudProviderToken) {
-                $this->checkVultrStatus();
-            }
-
-            if ($this->server->digitalocean_droplet_id && $this->server->cloudProviderToken) {
-                $this->checkDigitalOceanStatus();
-            }
-
-            // Temporarily disable mux if requested
-            if ($this->disableMux) {
-                $this->disableSshMux();
+            // Enforce mode cannot connect without the key, so the check reads the key also of an unreachable server.
+            if (SshMultiplexingHelper::hostKeyCheckingMode($this->server) === 'enforce') {
+                SshMultiplexingHelper::learnHostKey($this->server, evenIfUnreachable: true);
             }
 
             // Check basic connectivity first
             $isReachable = $this->checkConnection();
 
-            if (! $isReachable) {
+            if ($this->hostKeyChanged) {
+                // A failed host key check with the pinned key (an unreadable known_hosts file) is a normal connection error.
+                $this->hostKeyChanged = $this->server->recordHostKeyMismatch($this->sshErrorOutput);
+            }
+
+            if (! $isReachable && $this->hostKeyChanged && SshMultiplexingHelper::hostKeyCheckingMode($this->server) === 'enforce') {
+                // In enforce mode a changed host key blocks every connection: stop at once, without the retry threshold.
                 $this->server->settings->update([
                     'is_reachable' => false,
                     'is_usable' => false,
                 ]);
+                $this->logConnectionStateChange($wasReachable, $wasUsable, false, false, 'ssh_host_key_changed');
+
+                return;
+            }
+
+            if (! $isReachable) {
                 $this->server->increment('unreachable_count');
 
                 Log::warning('ServerConnectionCheck: Server not reachable', [
                     'server_id' => $this->server->id,
                     'server_name' => $this->server->name,
                     'server_ip' => $this->server->ip,
+                    'unreachable_count' => $this->server->unreachable_count,
                 ]);
+
+                if ($this->server->unreachable_count < self::UNREACHABLE_THRESHOLD) {
+                    return;
+                }
+
+                $this->server->settings->update([
+                    'is_reachable' => false,
+                    'is_usable' => false,
+                ]);
+                $this->logConnectionStateChange($wasReachable, $wasUsable, false, false, $this->connectionError);
 
                 $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, false);
 
                 return;
             }
+
+            if ($this->releasedToAnotherInstance()) {
+                return;
+            }
+
+            // Warn mode connects without a pinned key. Commands do not scan an unreachable server, so learn the key now.
+            SshMultiplexingHelper::learnHostKey($this->server, evenIfUnreachable: true);
 
             // Server is reachable, check if Docker is available
             $isUsable = $this->checkDockerAvailability();
@@ -108,52 +152,60 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
                 'is_reachable' => true,
                 'is_usable' => $isUsable,
             ]);
+            $this->logConnectionStateChange($wasReachable, $wasUsable, true, $isUsable, $isUsable ? null : 'docker_not_available');
 
             if ($this->server->unreachable_count > 0) {
-                $this->server->update(['unreachable_count' => 0]);
+                // Direct assignment: unreachable_count is not mass-assignable,
+                // so update() would silently drop the reset.
+                $this->server->unreachable_count = 0;
+                $this->server->save();
             }
 
             $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, true);
 
         } catch (\Throwable $e) {
-
+            // SSH and Docker failures are handled above. An error here (database, cache, a bug)
+            // says nothing about the server, so the stored connection state stays as it is.
             Log::error('ServerConnectionCheckJob failed', [
                 'error' => $e->getMessage(),
                 'server_id' => $this->server->id,
             ]);
-            $this->server->settings->update([
-                'is_reachable' => false,
-                'is_usable' => false,
-            ]);
-            $this->server->increment('unreachable_count');
+        }
+    }
 
-            $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, false);
-
+    /**
+     * Log a change of the state that scheduled jobs use to skip a server, with the node that ran
+     * the check. On a multi-node instance this shows when only one node cannot reach a server.
+     */
+    private function logConnectionStateChange(bool $wasReachable, bool $wasUsable, bool $isReachable, bool $isUsable, ?string $reason): void
+    {
+        if ($wasReachable === $isReachable && $wasUsable === $isUsable) {
             return;
         }
+
+        Log::channel('scheduled')->info('Server connection state changed', [
+            'server_id' => $this->server->id,
+            'is_reachable' => $isReachable,
+            'is_usable' => $isUsable,
+            'was_reachable' => $wasReachable,
+            'was_usable' => $wasUsable,
+            'unreachable_count' => $this->server->unreachable_count,
+            'reason' => $reason,
+            'host' => gethostname(),
+            'pid' => getmypid(),
+        ]);
     }
 
     public function failed(?\Throwable $exception): void
     {
         if ($exception instanceof TimeoutExceededException) {
-            $wasReachable = (bool) $this->server->settings->is_reachable;
-            $wasNotified = (bool) $this->server->unreachable_notification_sent;
-
-            $this->server->settings->update([
-                'is_reachable' => false,
-                'is_usable' => false,
-            ]);
-            $this->server->increment('unreachable_count');
-
-            $this->dispatchReachabilityChangedIfNeeded($wasReachable, $wasNotified, false);
-
             // Delete the queue job so it doesn't appear in Horizon's failed list.
             $this->job?->delete();
         }
     }
 
     /**
-     * Fire ServerReachabilityChanged when state crosses the unreachable threshold (count >= 2)
+     * Fire ServerReachabilityChanged when state crosses UNREACHABLE_THRESHOLD
      * or when a previously-notified server recovers. Skips noise from single transient flaps.
      */
     private function dispatchReachabilityChangedIfNeeded(bool $wasReachable, bool $wasNotified, bool $isReachable): void
@@ -166,84 +218,57 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        if ($this->server->unreachable_count >= 2 && ! $wasNotified) {
+        if ($this->server->unreachable_count >= self::UNREACHABLE_THRESHOLD && ! $wasNotified) {
             ServerReachabilityChanged::dispatch($this->server);
         }
     }
 
-    private function checkHetznerStatus(): void
+    /**
+     * Worst-case run time of one check: every SSH attempt and delay, then the Docker and Compose commands.
+     */
+    public static function maximumCheckSeconds(): int
     {
-        $status = null;
-
-        try {
-            $hetznerService = new HetznerService($this->server->cloudProviderToken->token);
-            $serverData = $hetznerService->getServer($this->server->hetzner_server_id);
-            $status = $serverData['status'] ?? null;
-
-        } catch (\Throwable) {
-            // Silently ignore — server may have been deleted from Hetzner.
-        }
-        if ($this->server->hetzner_server_status !== $status) {
-            $this->server->update(['hetzner_server_status' => $status]);
-            $this->server->hetzner_server_status = $status;
-            if ($status === 'off') {
-                throw new \Exception('Server is powered off');
-            }
-        }
-
+        return self::SSH_ATTEMPTS * self::SSH_TIMEOUT_SECONDS
+            + (self::SSH_ATTEMPTS - 1) * self::SSH_RETRY_DELAY_SECONDS
+            + 2 * self::DOCKER_TIMEOUT_SECONDS;
     }
 
-    private function checkVultrStatus(): void
-    {
-        try {
-            $status = $this->server->refreshVultrState();
-        } catch (\Throwable) {
-            // Silently ignore transient Vultr API errors.
-
-            return;
-        }
-
-        if (in_array($status, ['stopped', 'suspended', 'deleted'], true)) {
-            throw new \Exception('Vultr instance is not running');
-        }
-    }
-
-    private function checkDigitalOceanStatus(): void
-    {
-        try {
-            $status = $this->server->refreshDigitalOceanState();
-        } catch (\Throwable $e) {
-            Log::debug('ServerConnectionCheck: DigitalOcean status check failed', [
-                'server_id' => $this->server->id,
-                'error' => $e->getMessage(),
-            ]);
-
-            return;
-        }
-
-        $this->server->digitalocean_droplet_status = $status;
-
-        if (in_array($status, ['off', 'archive', 'deleted'], true)) {
-            throw new \Exception('DigitalOcean droplet is not running');
-        }
-    }
-
+    /**
+     * A short retry inside the check absorbs brief network problems. Longer outages are
+     * handled across checks with unreachable_count and UNREACHABLE_THRESHOLD.
+     */
     private function checkConnection(): bool
     {
-        try {
-            // Single SSH attempt without SshRetryHandler — retries waste time for connectivity checks.
-            // Backoff is managed at the dispatch level via unreachable_count.
-            $commands = ['ls -la /'];
-            if ($this->server->isNonRoot()) {
-                $commands = parseCommandsByLineForSudo(collect($commands), $this->server);
+        for ($attempt = 1; $attempt <= self::SSH_ATTEMPTS; $attempt++) {
+            if ($attempt > 1) {
+                Sleep::for(self::SSH_RETRY_DELAY_SECONDS)->seconds();
             }
-            $commandString = implode("\n", $commands);
+            if ($this->attemptConnection()) {
+                return true;
+            }
+            if ($this->hostKeyChanged) {
+                return false;
+            }
+        }
 
-            $sshCommand = SshMultiplexingHelper::generateSshCommand($this->server, $commandString, true);
-            $process = Process::timeout(10)->run($sshCommand);
+        return false;
+    }
+
+    private function attemptConnection(): bool
+    {
+        try {
+            $process = $this->runSsh(self::probeCommand(), self::SSH_TIMEOUT_SECONDS, disableMultiplexing: true);
+            $this->sshErrorOutput = $process->errorOutput();
+            $this->hostKeyChanged = SshMultiplexingHelper::isHostKeyMismatch($this->sshErrorOutput);
+            if ($process->exitCode() !== 0) {
+                $this->connectionError = 'ssh exit '.$process->exitCode().': '.Str::limit(trim($process->errorOutput()), 300);
+            } else {
+                $this->ownerMarker = trim($process->output());
+            }
 
             return $process->exitCode() === 0;
         } catch (\Throwable $e) {
+            $this->connectionError = $e->getMessage();
             Log::debug('ServerConnectionCheck: Connection check failed', [
                 'server_id' => $this->server->id,
                 'error' => $e->getMessage(),
@@ -253,16 +278,29 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    /**
+     * The SSH probe also reads the owner marker, so the marker check needs no extra SSH connection.
+     * The remote shell runs with `set -e` and most servers have no marker, so a missing file must not fail the probe.
+     */
+    public static function probeCommand(): string
+    {
+        return 'cat '.ServerTransferClaimer::OWNER_MARKER_PATH.' 2>/dev/null || true; ls -la / > /dev/null';
+    }
+
+    /**
+     * After a transfer, another instance can claim this server. Its owner marker on the host is the only
+     * record that both instances share, so this instance stops managing the server when the marker names
+     * another claim.
+     */
+    private function releasedToAnotherInstance(): bool
+    {
+        return app(ServerTransferClaimer::class)->releaseIfClaimedElsewhere($this->server, $this->ownerMarker);
+    }
+
     private function checkDockerAvailability(): bool
     {
         try {
-            // Use instant_remote_process to check Docker
-            // The function will automatically handle sudo for non-root users
-            $output = instant_remote_process_with_timeout(
-                ['docker version --format json'],
-                $this->server,
-                false // don't throw error
-            );
+            $output = $this->runDockerCommand('docker version --format json');
 
             if ($output === null) {
                 return false;
@@ -272,6 +310,16 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
             $output = trim($output);
             if (! empty($output)) {
                 $dockerInfo = json_decode($output, true);
+                $dockerVersion = dockerEngineVersionFromJson($output);
+                if ($dockerVersion !== null) {
+                    $this->server->rememberDockerVersion($dockerVersion);
+                }
+
+                $composeOutput = $this->runDockerCommand('docker compose version --short');
+                $composeVersion = parseDockerEngineVersion($composeOutput);
+                if ($composeVersion !== null) {
+                    $this->server->rememberComposeVersion($composeVersion);
+                }
 
                 return isset($dockerInfo['Server']['Version']);
             }
@@ -285,5 +333,40 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
 
             return false;
         }
+    }
+
+    /**
+     * Run one Docker command with a single attempt. Returns null when it fails or times out.
+     * The command goes through the multiplexed connection: the probe already proved a fresh login,
+     * and each new SSH connection opens a systemd-logind session on the host. Some systemd versions
+     * leak closed sessions until the host refuses new logins at 8192 sessions.
+     */
+    private function runDockerCommand(string $command): ?string
+    {
+        try {
+            $process = $this->runSsh($command, self::DOCKER_TIMEOUT_SECONDS);
+        } catch (\Throwable $e) {
+            Log::debug('ServerConnectionCheck: Docker command failed', [
+                'server_id' => $this->server->id,
+                'command' => $command,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        return $process->successful() ? sanitize_utf8_text(trim($process->output())) : null;
+    }
+
+    private function runSsh(string $command, int $timeout, bool $disableMultiplexing = false): ProcessResult
+    {
+        $commands = [$command];
+        if ($this->server->isNonRoot()) {
+            $commands = parseCommandsByLineForSudo(collect($commands), $this->server);
+        }
+
+        return Process::timeout($timeout)
+            ->input(SshMultiplexingHelper::sshBatchInput(implode("\n", $commands)))
+            ->run(SshMultiplexingHelper::generateSshBatchCommand($this->server, $disableMultiplexing));
     }
 }

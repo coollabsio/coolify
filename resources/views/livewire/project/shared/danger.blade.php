@@ -1,18 +1,73 @@
 <div>
-    <h2>Danger Zone</h2>
-    <div class="">Woah. I hope you know what are you doing.</div>
-    <h4 class="pt-4">Delete Resource</h4>
-    <div class="pb-4">This will stop your containers, delete all related data, etc. Beware! There is no coming back!
-    </div>
-
-    @if ($canDelete)
-        <x-modal-confirmation title="Confirm Resource Deletion?" buttonTitle="Delete" isErrorButton submitAction="delete"
-            buttonTitle="Delete" :checkboxes="$checkboxes" :actions="['Permanently delete all containers of this resource.']" confirmationText="{{ $resourceName }}"
-            confirmationLabel="Please confirm the execution of the actions by entering the Resource Name below"
-            shortConfirmationLabel="Resource Name" />
-    @else
-        <x-callout type="danger" title="Insufficient Permissions">
-            You don't have permission to delete this resource. Contact your team administrator for access.
+    @php
+        $resourceLabel = match ($resource?->type()) {
+            'application' => 'application',
+            'service' => 'service',
+            'service-application' => 'service application',
+            'service-database' => 'service database',
+            default => 'resource',
+        };
+    @endphp
+    @if ($resource && !data_get($resource, 'destination.server')?->isFunctional())
+        <x-callout type="warning" title="Server is not reachable" class="mb-4">
+            Coolify cannot stop or remove Docker resources on this server. Deleting removes this {{ $resourceLabel }}
+            from Coolify only. Its containers, volumes, networks, and configuration files remain on the server and can
+            start again when the server is back.
         </x-callout>
     @endif
+    <x-application.settings-section id="danger-zone-section" title="Danger zone"
+        helper="Destructive resource actions cannot be undone.">
+        @if (in_array($resource?->type(), ['standalone-redis', 'standalone-keydb', 'standalone-dragonfly']))
+            <x-danger-zone title="Flush all data" class="mb-4">
+                <p>
+                    Permanently remove every key from
+                    <strong class="font-semibold text-black dark:text-fg">{{ $resourceName }}</strong>.
+                    The database keeps running.
+                </p>
+                <x-slot:action>
+                    <x-modal-confirmation title="Flush all data?" buttonTitle="Flush all data" isErrorButton
+                        submitAction="flush" :actions="['Permanently remove every key from every logical database.']"
+                        confirmationText="{{ $resourceName }}"
+                        confirmationLabel="Enter the database name to confirm flushing all data"
+                        shortConfirmationLabel="Database name" :disabled="auth()->user()->cannot('manage', $resource)"
+                        disabledTooltip="You do not have permission to flush this database." />
+                </x-slot:action>
+            </x-danger-zone>
+        @endif
+        <x-danger-zone title="Delete {{ $resourceLabel }}">
+                    <p>
+                        Permanently delete
+                        <strong class="font-semibold text-black dark:text-fg">{{ $resourceName }}</strong>,
+                        stop its containers, and remove the selected Docker resources and configuration.
+                    </p>
+                    <ul class="space-y-1 text-xs">
+                        <li>• Active deployments will be stopped.</li>
+                        <li>• Selected volumes and stored data may be permanently removed.</li>
+                        <li>• This {{ $resourceLabel }} cannot be restored from Coolify after deletion.</li>
+                    </ul>
+                <x-slot:action>
+                    @if ($canDelete)
+                        <x-modal-confirmation title="Delete {{ $resourceLabel }}?"
+                            buttonTitle="Delete {{ $resourceLabel }}"
+                            isErrorButton submitAction="delete" :checkboxes="$checkboxes"
+                            :actions="['Permanently delete this resource and its selected Docker resources.']"
+                            confirmationText="{{ $resourceName }}"
+                            confirmationLabel="Enter the resource name to confirm permanent deletion"
+                            shortConfirmationLabel="Resource name" />
+                    @else
+                        <x-forms.button isError disabled tooltip="You do not have permission to delete this resource.">
+                            Delete {{ $resourceLabel }}
+                        </x-forms.button>
+                    @endif
+                </x-slot:action>
+        </x-danger-zone>
+
+        @if (!$canDelete)
+            <div class="mt-4">
+                <x-callout type="danger" title="Insufficient permissions">
+                    Contact a team administrator if this resource must be deleted.
+                </x-callout>
+            </div>
+        @endif
+    </x-application.settings-section>
 </div>

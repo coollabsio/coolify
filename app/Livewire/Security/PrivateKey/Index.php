@@ -10,6 +10,38 @@ class Index extends Component
 {
     use AuthorizesRequests;
 
+    public ?string $selectedPrivateKeyUuid = null;
+
+    public function getListeners(): array
+    {
+        return [
+            'securityResourceChanged' => '$refresh',
+            'privateKeyCreated' => 'refreshResources',
+            'privateKeyDeleted' => 'refreshResources',
+            'privateKeyUpdated' => 'refreshResources',
+            'modalClosed' => 'closeEditor',
+        ];
+    }
+
+    public function openEditor(string $privateKeyUuid): void
+    {
+        $privateKey = PrivateKey::ownedByCurrentTeam()->whereUuid($privateKeyUuid)->firstOrFail();
+        $this->authorize('view', $privateKey);
+
+        $this->selectedPrivateKeyUuid = $privateKey->uuid;
+    }
+
+    public function closeEditor(): void
+    {
+        $this->selectedPrivateKeyUuid = null;
+    }
+
+    public function refreshResources(): void
+    {
+        $this->closeEditor();
+        $this->dispatch('close-modal');
+    }
+
     public function generatePrivateKey(string $type)
     {
         try {
@@ -29,7 +61,7 @@ class Index extends Component
                 'team_id' => currentTeam()->id,
             ]);
 
-            return redirectRoute($this, 'security.private-key.show', ['private_key_uuid' => $privateKey->uuid]);
+            $this->dispatch('success', 'Private key generated successfully.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

@@ -14,6 +14,8 @@ class Show extends Component
 
     public CloudInitScript $cloudInitScript;
 
+    public bool $modalMode = false;
+
     public string $name = '';
 
     public string $script = '';
@@ -35,8 +37,9 @@ class Show extends Component
         ];
     }
 
-    public function mount(string $cloud_init_script_uuid): void
+    public function mount(string $cloud_init_script_uuid, bool $modalMode = false): void
     {
+        $this->modalMode = $modalMode;
         try {
             $this->cloudInitScript = CloudInitScript::ownedByCurrentTeam()
                 ->whereUuid($cloud_init_script_uuid)
@@ -64,12 +67,13 @@ class Show extends Component
         ]);
 
         auditLog('ui.cloud_init_script.updated', [
-            'team_id' => currentTeam()->id,
+            'team_id' => $this->cloudInitScript->team_id,
             'cloud_init_script_id' => $this->cloudInitScript->id,
             'cloud_init_script_name' => $this->cloudInitScript->name,
         ]);
 
         $this->dispatch('success', 'Cloud-init script updated successfully.');
+        $this->dispatch('securityResourceChanged');
     }
 
     public function delete(): mixed
@@ -82,10 +86,17 @@ class Show extends Component
         $this->cloudInitScript->delete();
 
         auditLog('ui.cloud_init_script.deleted', [
-            'team_id' => currentTeam()->id,
+            'team_id' => $this->cloudInitScript->team_id,
             'cloud_init_script_id' => $scriptId,
             'cloud_init_script_name' => $scriptName,
         ]);
+
+        if ($this->modalMode) {
+            $this->dispatch('securityResourceChanged');
+            $this->dispatch('close-modal');
+
+            return null;
+        }
 
         return redirectRoute($this, 'security.cloud-init-scripts');
     }

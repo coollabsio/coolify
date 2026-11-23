@@ -8,6 +8,8 @@ body:
       value: |
         > [!IMPORTANT]
         > **Please ensure you are using the latest version of Coolify before submitting an issue, as the bug may have already been fixed in a recent update.** (Of course, if you're experiencing an issue on the latest version that wasn't present in a previous version, please let us know.)
+        >
+        > If you plan to submit a fix, branch from `main` and target `main` with your pull request.
 
   - type: textarea
     attributes:

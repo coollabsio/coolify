@@ -1,10 +1,13 @@
 # Caching Best Practices
 
-## Use `Cache::remember()` Instead of Manual Get/Put
+## Use `Cache::remember()` for Cache-Aside Reads
 
-Cleaner cache-aside pattern that removes boilerplate. use `Cache::lock()` for race conditions.
+`Cache::remember()` implements a cache-aside read without a separate truthiness check. It does not prevent concurrent requests from computing the same missing value; use an atomic lock when duplicate computation must be prevented.
+
+The manual version below incorrectly treats valid falsy values, such as `false` or `0`, as cache misses.
 
 Incorrect:
+
 ```php
 $val = Cache::get('stats');
 if (! $val) {
@@ -14,27 +17,42 @@ if (! $val) {
 ```
 
 Correct:
+
 ```php
 $val = Cache::remember('stats', 60, fn () => $this->computeStats());
 ```
 
-## Use `Cache::flexible()` for Stale-While-Revalidate
+## Consider `Cache::flexible()` for Stale-While-Revalidate
 
-On high-traffic keys, one user always gets a slow response when the cache expires. `flexible()` serves slightly stale data while refreshing in the background.
+For frequently read keys, `Cache::flexible()` can serve stale data during a defined stale period and register a deferred refresh. During an HTTP request, that refresh normally runs after the response; it is not a durable background job. Once the stale period has elapsed, the request recomputes the value synchronously.
 
-Incorrect: `Cache::remember('users', 300, fn () => User::all());`
+Synchronous expiration:
 
-Correct: `Cache::flexible('users', [300, 600], fn () => User::all());` — fresh for 5 min, stale-but-served up to 10 min, refreshes via deferred function.
+```php
+Cache::remember('users', 300, fn () => User::all());
+```
 
-## Use `Cache::memo()` to Avoid Redundant Hits Within a Request
+Stale-while-revalidate tradeoff:
 
-If the same cache key is read multiple times per request (e.g., a service called from multiple places), `memo()` stores the resolved value in memory.
+```php
+Cache::flexible('users', [300, 600], fn () => User::all());
+```
 
-`Cache::memo()->get('settings');` — 5 calls = 1 Redis round-trip instead of 5.
+This value is fresh for five minutes and may be served stale until ten minutes after it was cached.
+
+## Use `Cache::memo()` to Avoid Redundant Hits Within an Execution
+
+If the same cache key is read repeatedly during one request or job, `memo()` decorates a cache store and retains resolved values in memory for that execution.
+
+```php
+$settings = Cache::memo()->get('settings');
+```
+
+Repeated reads through the same memoized store avoid additional store lookups. Writes through the memoized store update or invalidate its in-memory values as appropriate.
 
 ## Use Cache Tags to Invalidate Related Groups
 
-Without tags, invalidating a group of entries requires tracking every key. Tags let you flush atomically. Only works with `redis`, `memcached`, `dynamodb` — not `file` or `database`.
+Tags group related entries for invalidation without tracking each key. Cache tags are not supported by the `file`, `dynamodb`, or `database` drivers; confirm support before choosing a store.
 
 ```php
 Cache::tags(['user-1'])->flush();
@@ -42,15 +60,27 @@ Cache::tags(['user-1'])->flush();
 
 ## Use `Cache::add()` for Atomic Conditional Writes
 
-`add()` only writes if the key does not exist — atomic, no race condition between checking and writing.
+`add()` atomically writes a value only when the key does not already exist.
 
-Incorrect: `if (! Cache::has('lock')) { Cache::put('lock', true, 10); }`
+Incorrect:
 
-Correct: `Cache::add('lock', true, 10);`
+```php
+if (! Cache::has('lock')) {
+    Cache::put('lock', true, 10);
+}
+```
 
-## Use `once()` for Per-Request Memoization
+Correct:
 
-`once()` memoizes a function's return value for the lifetime of the object (or request for closures). Unlike `Cache::memo()`, it doesn't hit the cache store at all — pure in-memory.
+```php
+Cache::add('lock', true, 10);
+```
+
+Use `Cache::lock()` rather than an ordinary cache key when lock ownership and safe release are required.
+
+## Use `once()` for In-Process Memoization
+
+`once()` memoizes a callback's return value for the current request or job. Calls made from an object instance are scoped to that instance. Unlike `Cache::memo()`, `once()` does not read from an external cache store.
 
 ```php
 public function roles(): Collection
@@ -59,11 +89,11 @@ public function roles(): Collection
 }
 ```
 
-Multiple calls return the cached result without re-executing. Use `once()` for expensive computations called multiple times per request. Use `Cache::memo()` when you also want cross-request caching.
+Repeated calls return the memoized result without rerunning the callback. Use `once()` for repeated computation within one execution. Use `Cache::memo()` to memoize access to an underlying store that can also persist values across executions.
 
 ## Configure Failover Cache Stores in Production
 
-If Redis goes down, the app falls back to a secondary store automatically.
+The failover driver tries each configured store in order when a store operation throws an exception. It does not consult later stores for an ordinary cache miss, and data is not replicated between stores.
 
 ```php
 'failover' => ['driver' => 'failover', 'stores' => ['redis', 'database']],

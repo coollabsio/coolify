@@ -1,10 +1,58 @@
 <?php
 
+use App\Exceptions\RateLimitException;
 use App\Services\DigitalOceanService;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 uses(TestCase::class);
+
+it('maps final DigitalOcean API error responses', function (int $status, string $message) {
+    Http::fake([
+        'https://api.digitalocean.com/v2/droplets' => Http::response(['message' => $message], $status),
+    ]);
+
+    $exception = null;
+
+    try {
+        (new DigitalOceanService('test-token'))->createDroplet([]);
+    } catch (Throwable $caught) {
+        $exception = $caught;
+    }
+
+    expect($exception)->toBeInstanceOf(Exception::class)
+        ->and($exception)->not->toBeInstanceOf(RequestException::class)
+        ->and($exception->getMessage())->toBe('DigitalOcean API error: '.$message)
+        ->and($exception->getCode())->toBe($status);
+
+    Http::assertSentCount(3);
+})->with([
+    'unauthorized' => [401, 'Unable to authenticate you'],
+    'unprocessable entity' => [422, 'Droplet name is invalid'],
+]);
+
+it('maps a final DigitalOcean rate-limit response with Retry-After', function () {
+    Http::fake([
+        'https://api.digitalocean.com/v2/droplets' => Http::sequence()
+            ->push(['message' => 'Temporary provider error'], 500)
+            ->push(['message' => 'Temporary provider error'], 500)
+            ->push(['message' => 'Too many requests'], 429, ['Retry-After' => '45']),
+    ]);
+
+    try {
+        (new DigitalOceanService('test-token'))->createDroplet([]);
+    } catch (RateLimitException $exception) {
+        expect($exception->getMessage())->toBe('Rate limit exceeded. Please try again later.')
+            ->and($exception->retryAfter)->toBe(45);
+
+        Http::assertSentCount(3);
+
+        return;
+    }
+
+    test()->fail('Expected a RateLimitException to be thrown.');
+});
 
 it('fetches paginated regions from DigitalOcean', function () {
     Http::fake([

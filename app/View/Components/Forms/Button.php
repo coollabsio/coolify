@@ -22,6 +22,8 @@ class Button extends Component
         public ?string $canGate = null,
         public mixed $canResource = null,
         public bool $autoDisable = true,
+        public bool $isHighlighted = false,
+        public bool $isError = false,
         public ?string $tooltip = null,
     ) {
         // Handle authorization-based disabling
@@ -36,6 +38,8 @@ class Button extends Component
 
         if ($this->noStyle) {
             $this->defaultClass = '';
+        } elseif ($this->isError) {
+            $this->defaultClass .= ' button-error';
         }
     }
 

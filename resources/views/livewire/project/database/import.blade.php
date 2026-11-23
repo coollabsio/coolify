@@ -1,10 +1,13 @@
 <div>
-    <h2>Import Backup</h2>
     @if ($unsupported)
-        <div>Database restore is not supported.</div>
+        <x-empty title="Restore is not supported"
+            description="This database type does not currently support backup imports."
+            icon-name="database" size="sm" />
     @elseif (str($resourceStatus)->startsWith('running'))
-        <livewire:project.database.import-form wire:key="database-import-form-{{ $resourceUuid }}" />
+        <livewire:project.database.import-form :resource="$resource" wire:key="database-import-form-{{ $resourceUuid }}" />
     @else
-        <div>Database must be running to restore a backup.</div>
+        <x-empty title="Start the database first"
+            description="The database must be running before Coolify can restore a backup."
+            icon-name="database" size="sm" />
     @endif
 </div>

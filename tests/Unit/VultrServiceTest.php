@@ -1,6 +1,8 @@
 <?php
 
+use App\Exceptions\RateLimitException;
 use App\Services\VultrService;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -8,6 +10,52 @@ uses(TestCase::class);
 
 beforeEach(function () {
     Http::preventStrayRequests();
+});
+
+it('maps final Vultr API error responses', function (int $status, string $message) {
+    Http::fake([
+        'https://api.vultr.com/v2/instances' => Http::response(['error' => $message], $status),
+    ]);
+
+    $exception = null;
+
+    try {
+        (new VultrService('fake-token'))->createInstance([]);
+    } catch (Throwable $caught) {
+        $exception = $caught;
+    }
+
+    expect($exception)->toBeInstanceOf(Exception::class)
+        ->and($exception)->not->toBeInstanceOf(RequestException::class)
+        ->and($exception->getMessage())->toBe('Vultr API error: '.$message)
+        ->and($exception->getCode())->toBe($status);
+
+    Http::assertSentCount(3);
+})->with([
+    'unauthorized' => [401, 'Unauthorized'],
+    'unprocessable entity' => [422, 'Invalid instance parameters'],
+]);
+
+it('maps a final Vultr rate-limit response with Retry-After', function () {
+    Http::fake([
+        'https://api.vultr.com/v2/instances' => Http::sequence()
+            ->push(['error' => 'Temporary provider error'], 500)
+            ->push(['error' => 'Temporary provider error'], 500)
+            ->push(['error' => 'Too many requests'], 429, ['Retry-After' => '30']),
+    ]);
+
+    try {
+        (new VultrService('fake-token'))->createInstance([]);
+    } catch (RateLimitException $exception) {
+        expect($exception->getMessage())->toBe('Rate limit exceeded. Please try again later.')
+            ->and($exception->retryAfter)->toBe(30);
+
+        Http::assertSentCount(3);
+
+        return;
+    }
+
+    test()->fail('Expected a RateLimitException to be thrown.');
 });
 
 it('gets instances from Vultr API', function () {

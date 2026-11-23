@@ -2,6 +2,7 @@
 
 use App\Actions\Destination\RemoveStandaloneDockerNetwork;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -11,6 +12,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
@@ -21,7 +23,10 @@ beforeEach(function () {
         'session.driver' => 'array',
         'queue.default' => 'sync',
         'app.maintenance.driver' => 'file',
+        'constants.ssh.mux_enabled' => false,
     ]);
+    // Creating a standalone destination lists the Docker networks on the server first.
+    Process::fake();
 
     InstanceSettings::unguarded(fn () => InstanceSettings::firstOrCreate(
         ['id' => 0],
@@ -34,8 +39,12 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 
     $this->bearerToken = destinationsApiToken($this->user, $this->team, ['*']);
-    $this->server = Server::factory()->create(['team_id' => $this->team->id]);
+    $this->server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => PrivateKey::factory()->create(['team_id' => $this->team->id])->id,
+    ]);
     $this->destination = StandaloneDocker::where('server_id', $this->server->id)->first();
+    $this->server->settings->update(['is_reachable' => true, 'is_usable' => true]);
 });
 
 function destinationsApiHeaders(string $bearerToken): array
@@ -102,6 +111,38 @@ describe('GET /api/v1/servers/{server_uuid}/destinations', function () {
 });
 
 describe('POST /api/v1/servers/{server_uuid}/destinations', function () {
+    test('creates a standalone destination', function () {
+        $response = $this->withHeaders(destinationsApiHeaders($this->bearerToken))
+            ->postJson("/api/v1/servers/{$this->server->uuid}/destinations", [
+                'name' => 'API Standalone',
+                'network' => 'api-standalone-network',
+            ]);
+
+        $response->assertCreated()
+            ->assertJson([
+                'name' => 'API Standalone',
+                'network' => 'api-standalone-network',
+                'type' => 'standalone',
+                'server_uuid' => $this->server->uuid,
+            ]);
+
+        expect(StandaloneDocker::where('server_id', $this->server->id)
+            ->where('network', 'api-standalone-network')
+            ->exists())->toBeTrue();
+    });
+
+    test('does not connect to a server that is not validated', function () {
+        $this->server->settings->update(['is_reachable' => false, 'is_usable' => false]);
+
+        $this->withHeaders(destinationsApiHeaders($this->bearerToken))
+            ->postJson("/api/v1/servers/{$this->server->uuid}/destinations", ['network' => 'api-standalone-network'])
+            ->assertStatus(400)
+            ->assertJsonPath('message', 'Server is not functional.');
+
+        Process::assertNothingRan();
+        expect(StandaloneDocker::where('network', 'api-standalone-network')->exists())->toBeFalse();
+    });
+
     test('requires a write token', function () {
         $readOnlyToken = destinationsApiToken($this->user, $this->team, ['read']);
 
@@ -222,6 +263,79 @@ describe('POST /api/v1/servers/{server_uuid}/destinations', function () {
             ->assertJson(['message' => 'A destination with this network already exists on the server.']);
 
         expect(StandaloneDocker::where('server_id', $this->server->id)->where('network', $network)->count())->toBe(1);
+    });
+});
+
+describe('PATCH /api/v1/destinations/{uuid}', function () {
+    test('updates destination name only', function () {
+        $originalNetwork = $this->destination->network;
+
+        $response = $this->withHeaders(destinationsApiHeaders($this->bearerToken))
+            ->patchJson("/api/v1/destinations/{$this->destination->uuid}", [
+                'name' => 'Renamed Destination',
+            ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'uuid' => $this->destination->uuid,
+                'name' => 'Renamed Destination',
+                'network' => $originalNetwork,
+                'type' => 'standalone',
+                'server_uuid' => $this->server->uuid,
+            ]);
+
+        $this->destination->refresh();
+        expect($this->destination->name)->toBe('Renamed Destination')
+            ->and($this->destination->network)->toBe($originalNetwork);
+    });
+
+    test('requires a write token', function () {
+        $readOnlyToken = destinationsApiToken($this->user, $this->team, ['read']);
+
+        $response = $this->withHeaders(destinationsApiHeaders($readOnlyToken))
+            ->patchJson("/api/v1/destinations/{$this->destination->uuid}", [
+                'name' => 'Should Fail',
+            ]);
+
+        $response->assertForbidden();
+    });
+
+    test('rejects update requests from non-admin team members', function () {
+        $member = User::factory()->create();
+        $this->team->members()->attach($member->id, ['role' => 'member']);
+        $memberToken = destinationsApiToken($member, $this->team, ['*']);
+
+        $response = $this->withHeaders(destinationsApiHeaders($memberToken))
+            ->patchJson("/api/v1/destinations/{$this->destination->uuid}", [
+                'name' => 'Member Rename',
+            ]);
+
+        $response->assertForbidden();
+    });
+
+    test('rejects network changes and unknown fields', function () {
+        $response = $this->withHeaders(destinationsApiHeaders($this->bearerToken))
+            ->patchJson("/api/v1/destinations/{$this->destination->uuid}", [
+                'name' => 'Valid Name',
+                'network' => 'new-network',
+            ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['network']);
+    });
+
+    test('does not update another team destination', function () {
+        $otherTeam = Team::factory()->create();
+        $otherServer = Server::factory()->create(['team_id' => $otherTeam->id]);
+        $otherDestination = StandaloneDocker::where('server_id', $otherServer->id)->first();
+
+        $response = $this->withHeaders(destinationsApiHeaders($this->bearerToken))
+            ->patchJson("/api/v1/destinations/{$otherDestination->uuid}", [
+                'name' => 'Stolen Name',
+            ]);
+
+        $response->assertNotFound();
+        expect($otherDestination->fresh()->name)->not->toBe('Stolen Name');
     });
 });
 

@@ -20,12 +20,14 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Subscription;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
@@ -86,6 +88,8 @@ it('creates Server with all fillable attributes', function () {
         'hetzner_server_status' => 'running',
         'digitalocean_droplet_id' => 987654,
         'digitalocean_droplet_status' => 'active',
+        'hostinger_virtual_machine_id' => 17923,
+        'hostinger_virtual_machine_status' => 'running',
         'is_validating' => false,
         'detected_traefik_version' => 'v2.10.0',
         'traefik_outdated_info' => 'Up to date',
@@ -105,6 +109,8 @@ it('creates Server with all fillable attributes', function () {
     expect($server->hetzner_server_status)->toBe('running');
     expect($server->digitalocean_droplet_id)->toBe(987654);
     expect($server->digitalocean_droplet_status)->toBe('active');
+    expect($server->hostinger_virtual_machine_id)->toBe(17923);
+    expect($server->hostinger_virtual_machine_status)->toBe('running');
     expect($server->ip_previous)->toBe('10.0.0.1');
 });
 
@@ -333,8 +339,6 @@ it('creates ServerSetting with all fillable attributes', function () {
         'is_logdrain_newrelic_enabled' => true,
         'logdrain_newrelic_license_key' => 'nr-license-key-123',
         'logdrain_newrelic_base_uri' => 'https://log-api.newrelic.com',
-        'is_logdrain_highlight_enabled' => false,
-        'logdrain_highlight_project_id' => 'hl-proj-123',
         'is_logdrain_axiom_enabled' => true,
         'logdrain_axiom_dataset_name' => 'coolify-logs',
         'logdrain_axiom_api_key' => 'axiom-key-456',
@@ -463,6 +467,7 @@ it('creates ServiceApplication with all fillable attributes', function () {
         'is_include_timestamps' => true,
         'is_gzip_enabled' => true,
         'is_stripprefix_enabled' => true,
+        'is_force_https_enabled' => false,
         'last_online_at' => now()->toISOString(),
         'is_migrated' => false,
     ]);
@@ -473,6 +478,26 @@ it('creates ServiceApplication with all fillable attributes', function () {
     expect($svcApp->human_name)->toBe('Web Server');
     expect($svcApp->image)->toBe('nginx:latest');
     expect($svcApp->is_log_drain_enabled)->toBeTrue();
+    expect($svcApp->is_force_https_enabled)->toBeFalse();
+    expect($svcApp->isForceHttpsEnabled())->toBeFalse();
+});
+
+it('enables HTTPS redirects for service applications by default', function () {
+    $service = Service::create([
+        'docker_compose_raw' => 'services: {}',
+        'environment_id' => $this->environment->id,
+        'server_id' => $this->server->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    $serviceApplication = ServiceApplication::create([
+        'service_id' => $service->id,
+        'name' => 'web-default-redirect',
+    ]);
+
+    expect($serviceApplication->is_force_https_enabled)->toBeTrue();
+    expect($serviceApplication->isForceHttpsEnabled())->toBeTrue();
 });
 
 it('creates ServiceDatabase with all fillable attributes', function () {
@@ -816,6 +841,40 @@ it('creates StandaloneDragonfly with all fillable attributes', function () {
     expect($db->environment_id)->toBe($this->environment->id);
 });
 
+it('creates StandaloneSqlite with all fillable attributes', function () {
+    $db = StandaloneSqlite::create([
+        'uuid' => 'custom-sqlite-uuid',
+        'name' => 'Full Fillable SQLite',
+        'description' => 'SQLite with all attrs',
+        'sqlite_databases' => 'app.db,jobs.db',
+        'is_log_drain_enabled' => false,
+        'is_include_timestamps' => false,
+        'status' => 'running',
+        'image' => 'peakimages/sqlite:3.54.1-v0.3.0',
+        'limits_memory' => '1g',
+        'limits_memory_swap' => '2g',
+        'limits_memory_swappiness' => 30,
+        'limits_memory_reservation' => '512m',
+        'limits_cpus' => '2',
+        'limits_cpuset' => '0-1',
+        'limits_cpu_shares' => 512,
+        'started_at' => now()->subDay()->toISOString(),
+        'restart_count' => 0,
+        'last_restart_at' => null,
+        'last_restart_type' => null,
+        'last_online_at' => now()->toISOString(),
+        'custom_docker_run_options' => '',
+        'destination_type' => $this->destination->getMorphClass(),
+        'destination_id' => $this->destination->id,
+        'environment_id' => $this->environment->id,
+    ]);
+
+    expect($db->exists)->toBeTrue();
+    expect($db->uuid)->toBe('custom-sqlite-uuid');
+    expect($db->sqlite_databases)->toBe('app.db,jobs.db');
+    expect($db->environment_id)->toBe($this->environment->id);
+});
+
 it('creates StandaloneClickhouse with all fillable attributes', function () {
     $db = StandaloneClickhouse::create([
         'uuid' => 'custom-ch-uuid',
@@ -854,6 +913,57 @@ it('creates StandaloneClickhouse with all fillable attributes', function () {
     expect($db->uuid)->toBe('custom-ch-uuid');
     expect($db->clickhouse_admin_user)->toBe('chadmin');
     expect($db->clickhouse_db)->toBe('testdb');
+    expect($db->environment_id)->toBe($this->environment->id);
+});
+
+it('creates StandaloneInfluxdb with all fillable attributes', function () {
+    $db = StandaloneInfluxdb::create([
+        'uuid' => 'custom-influx-uuid',
+        'name' => 'Full Fillable InfluxDB',
+        'description' => 'InfluxDB with all attrs',
+        'influxdb_admin_user' => 'influxadmin',
+        'influxdb_admin_password' => 'influxpass123',
+        'influxdb_admin_token' => 'influxtoken123',
+        'influxdb_org' => 'testorg',
+        'influxdb_bucket' => 'testbucket',
+        'is_log_drain_enabled' => false,
+        'is_include_timestamps' => false,
+        'status' => 'running',
+        'image' => 'influxdb:2.10-alpine',
+        'is_public' => false,
+        'public_port' => 28086,
+        'ports_mappings' => '28086:8086',
+        'limits_memory' => '2g',
+        'limits_memory_swap' => '4g',
+        'limits_memory_swappiness' => 30,
+        'limits_memory_reservation' => '1g',
+        'limits_cpus' => '4',
+        'limits_cpuset' => '0-3',
+        'limits_cpu_shares' => 2048,
+        'started_at' => now()->subDay()->toISOString(),
+        'restart_count' => 0,
+        'last_restart_at' => null,
+        'last_restart_type' => null,
+        'last_online_at' => now()->toISOString(),
+        'public_port_timeout' => 3600,
+        'custom_docker_run_options' => '',
+        'destination_type' => $this->destination->getMorphClass(),
+        'destination_id' => $this->destination->id,
+        'environment_id' => $this->environment->id,
+        'health_check_enabled' => true,
+        'health_check_interval' => 30,
+        'health_check_timeout' => 10,
+        'health_check_retries' => 3,
+        'health_check_start_period' => 10,
+    ]);
+
+    expect($db->exists)->toBeTrue();
+    expect($db->uuid)->toBe('custom-influx-uuid');
+    expect($db->influxdb_admin_user)->toBe('influxadmin');
+    expect($db->influxdb_admin_password)->toBe('influxpass123');
+    expect($db->influxdb_admin_token)->toBe('influxtoken123');
+    expect($db->influxdb_org)->toBe('testorg');
+    expect($db->influxdb_bucket)->toBe('testbucket');
     expect($db->environment_id)->toBe($this->environment->id);
 });
 
@@ -1026,14 +1136,15 @@ it('creates ScheduledTaskExecution with all fillable attributes', function () {
         'finished_at' => now()->toISOString(),
         'started_at' => now()->subMinute()->toISOString(),
         'retry_count' => 0,
-        'duration' => 60,
+        'duration' => '60.25',
         'error_details' => null,
     ]);
 
     expect($execution->exists)->toBeTrue();
     expect($execution->scheduled_task_id)->toBe($task->id);
     expect($execution->status)->toBe('success');
-    expect((float) $execution->duration)->toBe(60.0);
+    expect($execution->duration)->toBe(60.25);
+    expect($execution->toArray()['duration'])->toBe(60.25);
     expect($execution->retry_count)->toBe(0);
 });
 

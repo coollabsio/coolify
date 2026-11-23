@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\OauthSetting;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class OauthSettingSeeder extends Seeder
@@ -22,6 +23,7 @@ class OauthSettingSeeder extends Seeder
                 'github',
                 'gitlab',
                 'google',
+                'oidc',
                 'authentik',
                 'infomaniak',
                 'zitadel',
@@ -43,27 +45,27 @@ class OauthSettingSeeder extends Seeder
                 return;
             }
 
-            $allProviders = OauthSetting::all();
-            $notFoundProviders = $providers->diff($allProviders->pluck('provider'));
+            DB::transaction(function () use ($providers) {
+                $allProviders = OauthSetting::all();
+                $notFoundProviders = $providers->diff($allProviders->pluck('provider'));
 
-            $allProviders->each(function ($provider) {
-                $provider->delete();
-            });
-            $allProviders->each(function ($provider) {
-                $provider = new OauthSetting;
-                $provider->provider = $provider->provider;
-                unset($provider->id);
-                $provider->save();
-            });
+                $allProviders->each(function ($provider) {
+                    $provider->delete();
+                });
+                $allProviders->each(function ($provider) {
+                    $newProvider = $provider->replicate();
+                    $newProvider->save();
+                });
 
-            foreach ($notFoundProviders as $provider) {
-                OauthSetting::create([
-                    'provider' => $provider,
-                ]);
-            }
+                foreach ($notFoundProviders as $provider) {
+                    OauthSetting::create([
+                        'provider' => $provider,
+                    ]);
+                }
+            });
 
         } catch (\Exception $e) {
-            Log::error($e->getMessage());
+            Log::error('OauthSettingSeeder failed: '.$e->getMessage());
         }
     }
 }

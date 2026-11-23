@@ -5,6 +5,7 @@ namespace App\Actions\Proxy;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
 use App\Services\ProxyDashboardCacheService;
+use App\Services\ProxyPortParser;
 use Illuminate\Support\Facades\Log;
 use Lorisleiva\Actions\Concerns\AsAction;
 use Symfony\Component\Yaml\Yaml;
@@ -12,6 +13,8 @@ use Symfony\Component\Yaml\Yaml;
 class GetProxyConfiguration
 {
     use AsAction;
+
+    public const MAX_CONFIGURATION_SIZE_BYTES = 5 * 1024 * 1024;
 
     public function handle(Server $server, bool $forceRegenerate = false): string
     {
@@ -40,6 +43,14 @@ class GetProxyConfiguration
             // Backfill: existing servers may not have DB config yet — read from disk once
             if (empty(trim($proxy_configuration ?? ''))) {
                 $proxy_configuration = $this->backfillFromDisk($server);
+            }
+
+            if (! empty(trim($proxy_configuration ?? '')) && removeLegacyTraefikDashboardExposure($server)) {
+                $proxy_configuration = $server->proxy->get('last_saved_proxy_configuration');
+            }
+
+            if (! empty(trim($proxy_configuration ?? '')) && replaceDevHostDockerProxyPaths($server)) {
+                $proxy_configuration = $server->proxy->get('last_saved_proxy_configuration');
             }
         }
 
@@ -98,12 +109,26 @@ class GetProxyConfiguration
     private function backfillFromDisk(Server $server): ?string
     {
         $proxy_path = $server->proxyPath();
+        $configurationPath = escapeshellarg("$proxy_path/docker-compose.yml");
+        $readLimit = self::MAX_CONFIGURATION_SIZE_BYTES + 1;
         $result = instant_remote_process([
             "mkdir -p $proxy_path",
-            "cat $proxy_path/docker-compose.yml 2>/dev/null",
+            // One command per line: the non-root sudo parser adds sudo to line starts, not to `then`/`else` branches.
+            "if [ -f {$configurationPath} ]; then",
+            "    if [ \"$(stat -c %s {$configurationPath})\" -gt ".self::MAX_CONFIGURATION_SIZE_BYTES.' ]; then',
+            "        echo '__COOLIFY_PROXY_CONFIG_TOO_LARGE__'",
+            '    else',
+            "        head -c {$readLimit} {$configurationPath}",
+            '    fi',
+            'fi',
         ], $server, false);
 
+        if ($result === '__COOLIFY_PROXY_CONFIG_TOO_LARGE__' || strlen($result ?? '') > self::MAX_CONFIGURATION_SIZE_BYTES) {
+            throw new \RuntimeException('Proxy configuration exceeds the 5 MiB size limit.');
+        }
+
         if (! empty(trim($result ?? ''))) {
+            ProxyPortParser::fromConfiguration($result);
             $server->proxy->last_saved_proxy_configuration = $result;
             $server->save();
 
