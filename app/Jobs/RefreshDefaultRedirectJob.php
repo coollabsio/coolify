@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -26,10 +27,21 @@ class RefreshDefaultRedirectJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
-        if ($this->server->isTransferredAway() || ! $this->server->isFunctional()) {
+        if ($this->server->isTransferredAway() || ! $this->server->isFunctional() || ! $this->proxyIsStillRunning()) {
             return;
         }
 
         $this->server->setupDefaultRedirect();
+    }
+
+    /**
+     * The proxy can be stopped or changed after the dispatch. Then the refresh must not start the page container again.
+     */
+    private function proxyIsStillRunning(): bool
+    {
+        return $this->server->proxy->get('status') === 'running'
+            && ! $this->server->proxy->get('force_stop')
+            && ! $this->server->isProxyTransitionInProgress()
+            && in_array($this->server->proxyType(), [ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value], true);
     }
 }

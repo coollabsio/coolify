@@ -5,9 +5,13 @@ use App\Enums\ProxyTypes;
 use App\Events\ProxyStatusChanged;
 use App\Events\ProxyStatusChangedUI;
 use App\Jobs\RefreshDefaultRedirectJob;
+use App\Models\Application;
+use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
+use App\Models\Project;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -105,6 +109,98 @@ it('serves the error page through the 404 script on Caddy', function () {
         ->not->toContain('respond 404');
 });
 
+function stoppedErrorPageApplication(Server $server, string $fqdn): Application
+{
+    $destination = StandaloneDocker::where('server_id', $server->id)->first()
+        ?? StandaloneDocker::factory()->create(['server_id' => $server->id]);
+    $environment = Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $server->team_id])->id]);
+
+    return Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'fqdn' => $fqdn,
+        'status' => 'exited:unhealthy',
+    ]);
+}
+
+it('answers 503 for the domain of a stopped resource and 404 for other hosts', function () {
+    $server = useErrorPageProxy($this->server, ProxyTypes::TRAEFIK->value);
+    stoppedErrorPageApplication($server, 'https://App.example.com');
+
+    $config = Yaml::parse($server->defaultRedirectConfiguration())['http'];
+
+    foreach (['catchall-resources', 'catchall-resources-http'] as $name) {
+        expect($config['routers'][$name])->toMatchArray([
+            'service' => 'noop',
+            'rule' => 'HostRegexp(`^(?:app\.example\.com)$`)',
+            'priority' => -999,
+            'middlewares' => ['error-page-503'],
+        ]);
+    }
+    expect($config['routers']['catchall']['middlewares'])->toBe(['error-page-404'])
+        ->and($config['routers']['catchall-http']['middlewares'])->toBe(['error-page-404'])
+        // Higher priority than the 404 catch-all, so the resource domain gets the 503.
+        ->and($config['routers']['catchall-resources']['priority'])->toBeGreaterThan($config['routers']['catchall']['priority'])
+        ->and($config['middlewares']['error-page-503'])->toBe(['errors' => ['status' => ['503'], 'service' => 'error-pages', 'query' => '/503.html']])
+        ->and($config['middlewares']['error-page-404'])->toBe(['replacePath' => ['path' => '/cgi-bin/404']])
+        ->and($config['services']['noop'])->toBe(['loadBalancer' => ['servers' => []]]);
+});
+
+it('answers 503 for the domain of a stopped resource and 404 for other hosts on Caddy', function () {
+    $server = useErrorPageProxy($this->server, ProxyTypes::CADDY->value);
+    stoppedErrorPageApplication($server, 'https://app.example.com');
+
+    expect($server->defaultRedirectConfiguration())->toBe(<<<'CADDY'
+        :80, :443 {
+            @resources host app.example.com
+            handle @resources {
+                reverse_proxy coolify-proxy-error-pages:80 {
+                    method GET
+                    rewrite /cgi-bin/503
+                }
+            }
+            handle {
+                reverse_proxy coolify-proxy-error-pages:80 {
+                    method GET
+                    rewrite /cgi-bin/404
+                }
+            }
+        }
+        CADDY);
+});
+
+it('keeps the 503 for every host on servers without a stored unknown host status', function (string $proxyType) {
+    $server = useErrorPageProxy($this->server, $proxyType);
+    stoppedErrorPageApplication($server, 'https://app.example.com');
+    // Servers created before the 404 option have no unknown_host_status key.
+    $server->proxy->forget('unknown_host_status');
+    $server->save();
+    $server->refresh();
+
+    $configuration = $server->defaultRedirectConfiguration();
+    $server->setupDefaultRedirect();
+    $lines = errorPageScriptLines();
+
+    expect($server->proxy->get('unknown_host_status'))->toBeNull()
+        ->and($server->unknownHostStatus())->toBe(503)
+        ->and($configuration)->not->toContain('404')->not->toContain('app.example.com')
+        ->and($server->claimOutdatedDefaultRedirectRefresh())->toBeNull();
+
+    if ($proxyType === ProxyTypes::TRAEFIK->value) {
+        $routers = Yaml::parse($configuration)['http']['routers'];
+        expect(array_keys($routers))->toBe(['catchall', 'catchall-http'])
+            ->and($routers['catchall']['service'])->toBe('noop')
+            ->and($routers['catchall']['middlewares'])->toBe(['error-page-503'])
+            ->and(writtenProxyFile($lines, '/data/coolify/proxy//dynamic/default_redirect_503.yaml'))->toContain('error-page-503')
+            ->and($lines)->toContain('sudo rm -f /data/coolify/proxy//dynamic/default_redirect_404.yaml');
+    } else {
+        expect($configuration)->toContain('rewrite /cgi-bin/503')->not->toContain('@resources')
+            ->and(writtenProxyFile($lines, '/data/coolify/proxy/caddy/dynamic/default_redirect_503.caddy'))->toContain('rewrite /cgi-bin/503')
+            ->and($lines)->toContain('sudo rm -f /data/coolify/proxy/caddy/dynamic/default_redirect_404.caddy');
+    }
+})->with([ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value]);
+
 it('keeps the redirect URL ahead of the error page', function (string $proxyType) {
     $server = useErrorPageProxy($this->server, $proxyType, ['redirect_url' => 'https://example.com']);
     $server->proxy_error_page = '<h1>custom</h1>';
@@ -173,7 +269,7 @@ it('starts the page container through sudo before it writes the catch-all', func
 ]);
 
 it('writes the current catch-all and its hash when the refresh job runs', function () {
-    $server = useErrorPageProxy($this->server, ProxyTypes::TRAEFIK->value);
+    $server = useErrorPageProxy($this->server, ProxyTypes::TRAEFIK->value, ['status' => 'running']);
     $server->proxy->set('default_redirect_hash', null);
     $server->save();
 
@@ -185,6 +281,20 @@ it('writes the current catch-all and its hash when the refresh job runs', functi
         ->and($server->fresh()->proxy->get('default_redirect_hash'))->toBe(md5($server->defaultRedirectConfiguration()))
         ->and($server->fresh()->claimOutdatedDefaultRedirectRefresh())->toBeFalse();
 });
+
+it('skips the queued refresh when the proxy is not running anymore', function (array $proxy) {
+    $server = useErrorPageProxy($this->server, ProxyTypes::TRAEFIK->value, $proxy);
+    $server->proxy->set('default_redirect_hash', null);
+    $server->save();
+
+    (new RefreshDefaultRedirectJob($server))->handle();
+
+    Process::assertNothingRan();
+    expect($server->fresh()->proxy->get('default_redirect_hash'))->toBeNull();
+})->with([
+    'stopped by the operator' => [['status' => 'exited', 'force_stop' => true]],
+    'stopping' => [['status' => 'stopping']],
+]);
 
 it('pushes the custom page and falls back to the default page after a reset', function () {
     $server = useErrorPageProxy($this->server, ProxyTypes::TRAEFIK->value);
