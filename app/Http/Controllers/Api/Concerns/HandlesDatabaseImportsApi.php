@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Concerns;
 
 use App\Actions\CoolifyTask\RunRemoteProcess;
 use App\Actions\Database\StartDatabaseImport;
+use App\Support\ChunkedUploadGuard;
 use App\Support\DatabaseBackupFileValidator;
 use App\Support\DatabaseImport\DatabaseImportException;
 use App\Support\DatabaseImport\DatabaseImportSource;
@@ -11,10 +12,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
-use Pion\Laravel\ChunkUpload\Handler\HandlerFactory;
 use Pion\Laravel\ChunkUpload\Receiver\FileReceiver;
 use Spatie\Activitylog\Models\Activity;
 
@@ -33,12 +34,16 @@ trait HandlesDatabaseImportsApi
         if (! $originalName || ! DatabaseBackupFileValidator::hasAllowedExtension($originalName)) {
             return response()->json(['message' => 'Validation failed.', 'errors' => ['file' => ['Unsupported backup file extension.']]], 422);
         }
-        if ((int) $request->input('dzTotalFilesize', 0) > StartDatabaseImport::MAX_BYTES) {
+        if ((int) $request->input('dztotalfilesize', 0) > StartDatabaseImport::MAX_BYTES) {
             return response()->json(['message' => 'Validation failed.', 'errors' => ['file' => ['The backup exceeds the 10 GiB limit.']]], 422);
         }
 
-        $request->merge(['dzuuid' => $request->input('dzuuid', $request->string('upload_id')->value())]);
-        $receiver = new FileReceiver('file', $request, HandlerFactory::classFromRequest($request));
+        if ($error = ChunkedUploadGuard::consume($request, $teamId)) {
+            return response()->json(['message' => $error, 'errors' => ['file' => [$error]]], 429);
+        }
+
+        $request->merge(['dzuuid' => $request->string('upload_id')->value()]);
+        $receiver = new FileReceiver('file', $request, ChunkedUploadGuard::handler($request));
         $save = $receiver->receive();
         if (! $save->isFinished()) {
             return response()->json(['upload_id' => $request->string('upload_id')->value(), 'done' => $save->handler()->getPercentageDone(), 'status' => true]);
@@ -55,8 +60,32 @@ trait HandlesDatabaseImportsApi
         $directory = "upload/imports/{$teamId}/{$resource->uuid}/{$request->string('upload_id')->value()}";
         Storage::makeDirectory($directory);
         $file->move(Storage::path($directory), 'restore');
+        $this->deleteOldStagedDatabaseImports($teamId);
 
         return response()->json(['upload_id' => $request->string('upload_id')->value(), 'filename' => $originalName, 'mime_type' => $mimeType, 'size' => $size], 201);
+    }
+
+    /**
+     * Keeps the newest staged uploads of the team. An upload is deleted only while this holds the
+     * import lock of its database, as in CleanupDatabaseImportUploads.
+     */
+    private function deleteOldStagedDatabaseImports(int $teamId): void
+    {
+        collect(Storage::directories("upload/imports/{$teamId}"))
+            ->flatMap(fn (string $databaseDirectory): array => Storage::directories($databaseDirectory))
+            ->sortByDesc(fn (string $upload): int => (int) filemtime(Storage::path($upload)))
+            ->skip(ChunkedUploadGuard::MAX_STAGED_UPLOADS_PER_TEAM)
+            ->each(function (string $upload): void {
+                $lock = Cache::lock(StartDatabaseImport::lockKey(basename(dirname($upload))), 60);
+                if (! $lock->get()) {
+                    return;
+                }
+                try {
+                    Storage::deleteDirectory($upload);
+                } finally {
+                    $lock->release();
+                }
+            });
     }
 
     protected function startDatabaseImport(Request $request, Model $resource, int $teamId, string $statusRoute, array $routeParameters): JsonResponse

@@ -34,6 +34,7 @@ class ServiceDatabasesController extends Controller
         responses: [
             new OA\Response(response: 201, description: 'Upload completed'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
+            new OA\Response(response: 429, description: 'The team uploaded more than 20 GiB in the last hour.'),
         ]
     )]
     public function upload_import(Request $request): JsonResponse

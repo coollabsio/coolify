@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\ChunkedUploadGuard;
 use App\Support\DatabaseBackupFileValidator;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller as BaseController;
 use Pion\Laravel\ChunkUpload\Exceptions\UploadMissingFileException;
-use Pion\Laravel\ChunkUpload\Handler\HandlerFactory;
 use Pion\Laravel\ChunkUpload\Receiver\FileReceiver;
 
 class UploadController extends BaseController
@@ -37,14 +37,18 @@ class UploadController extends BaseController
             ], 422);
         }
 
-        $declaredTotalSize = (int) $request->input('dzTotalFilesize', 0);
+        $declaredTotalSize = (int) $request->input('dztotalfilesize', 0);
         if ($declaredTotalSize > self::MAX_BYTES) {
             return response()->json([
                 'error' => 'File exceeds maximum allowed size of '.self::formatMaxSize().'.',
             ], 422);
         }
 
-        $receiver = new FileReceiver('file', $request, HandlerFactory::classFromRequest($request));
+        if ($error = ChunkedUploadGuard::consume($request, (int) $resource->team()->id)) {
+            return response()->json(['error' => $error], 429);
+        }
+
+        $receiver = new FileReceiver('file', $request, ChunkedUploadGuard::handler($request));
 
         if ($receiver->isUploaded() === false) {
             throw new UploadMissingFileException;

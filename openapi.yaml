@@ -4970,6 +4970,8 @@ paths:
           description: 'Upload completed'
         '422':
           $ref: '#/components/responses/422'
+        '429':
+          description: 'The team uploaded more than 20 GiB in the last hour.'
       security:
         -
           bearerAuth: []
@@ -14066,6 +14068,8 @@ paths:
           description: 'Upload completed'
         '422':
           $ref: '#/components/responses/422'
+        '429':
+          description: 'The team uploaded more than 20 GiB in the last hour.'
       security:
         -
           bearerAuth: []
