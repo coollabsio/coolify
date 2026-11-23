@@ -71,9 +71,9 @@ paths:
               properties:
                 pull_request_id:
                   type: integer
-                  example: 42
                   maximum: 2147483647
                   minimum: 1
+                  example: 42
                 pull_request_html_url:
                   type: [string, 'null']
                   example: 'https://github.com/org/repo/pull/42'
@@ -799,6 +799,10 @@ paths:
                   maximum: 12
                   default: 4
                   description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
+                ip_allowlist:
+                  type: string
+                  nullable: true
+                  description: 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -1254,6 +1258,10 @@ paths:
                   maximum: 12
                   default: 4
                   description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
+                ip_allowlist:
+                  type: string
+                  nullable: true
+                  description: 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -1706,6 +1714,10 @@ paths:
                   maximum: 12
                   default: 4
                   description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
+                ip_allowlist:
+                  type: string
+                  nullable: true
+                  description: 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -2161,6 +2173,10 @@ paths:
                   maximum: 12
                   default: 4
                   description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
+                ip_allowlist:
+                  type: string
+                  nullable: true
+                  description: 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -2553,6 +2569,10 @@ paths:
                   maximum: 12
                   default: 4
                   description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
+                ip_allowlist:
+                  type: string
+                  nullable: true
+                  description: 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -2931,6 +2951,10 @@ paths:
                   maximum: 12
                   default: 4
                   description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
+                ip_allowlist:
+                  type: string
+                  nullable: true
+                  description: 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -3274,6 +3298,10 @@ paths:
                   nullable: true
                   description: 'How to set redirect with Traefik / Caddy. www<->non-www.'
                   enum: [www, non-www, both]
+                ip_allowlist:
+                  type: string
+                  nullable: true
+                  description: 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'
                 instant_deploy:
                   type: boolean
                   description: 'The flag to indicate if the application should be deployed instantly.'
@@ -8218,8 +8246,8 @@ paths:
                 network:
                   description: 'Name of a new Docker network. Must not be bridge, host, none, or a network that already exists on the server.'
                   type: string
-                  pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
                   maxLength: 255
+                  pattern: '^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
                 type:
                   type: string
                   enum: [standalone, swarm]
@@ -19557,8 +19585,8 @@ components:
       properties:
         frequency:
           type: string
-          example: '0 2 * * *'
           maxLength: 255
+          example: '0 2 * * *'
         enabled:
           type: boolean
           default: true
@@ -20043,6 +20071,10 @@ components:
           minimum: 1
           maximum: 12
           description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
+        ip_allowlist:
+          type: string
+          nullable: true
+          description: 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'
         settings:
           $ref: '#/components/schemas/ApplicationSetting'
       type: object
