@@ -738,20 +738,20 @@ class DeployController extends Controller
     )]
     public function get_application_deployments(Request $request)
     {
-        $request->validate([
-            'page' => ['nullable', 'integer', 'min:1'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        // page and per_page take precedence, so skip and take are validated only when neither is given.
+        $usesPages = $request->filled('page') || $request->filled('per_page');
+        $request->validate($usesPages ? apiPaginationRules() : [
             'skip' => ['nullable', 'integer', 'min:0'],
             'take' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $app_uuid = $request->route('uuid', null);
-        if ($request->filled('page') || $request->filled('per_page')) {
-            $take = (int) $request->get('per_page', 10);
-            $skip = ((int) $request->get('page', 1) - 1) * $take;
+        if ($usesPages) {
+            $take = (int) ($request->query('per_page') ?: 10);
+            $skip = ((int) ($request->query('page') ?: 1) - 1) * $take;
         } else {
-            $skip = (int) $request->get('skip', 0);
-            $take = (int) $request->get('take', 10);
+            $skip = (int) ($request->query('skip') ?: 0);
+            $take = (int) ($request->query('take') ?: 10);
         }
 
         $teamId = getTeamIdFromToken();

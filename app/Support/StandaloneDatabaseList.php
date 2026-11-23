@@ -6,6 +6,7 @@ use App\Models\Environment;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -57,6 +58,29 @@ class StandaloneDatabaseList
         }
 
         return DB::query()->fromSub($union->toBase(), 'databases')->orderBy('name')->orderBy('uuid');
+    }
+
+    /**
+     * Run the callback in one database snapshot, so the count, the page rows, and the hydrated models agree
+     * when a database changes (for example, moves to another environment) between the queries.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $callback
+     * @return T
+     */
+    public static function inSnapshot(Closure $callback): mixed
+    {
+        // PostgreSQL accepts the isolation level only as the first statement of a top-level transaction.
+        if (DB::getDriverName() !== 'pgsql' || DB::transactionLevel() > 0) {
+            return $callback();
+        }
+
+        return DB::transaction(function () use ($callback) {
+            DB::statement('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+
+            return $callback();
+        });
     }
 
     /**
@@ -121,7 +145,7 @@ class StandaloneDatabaseList
                     }
                 });
             })
-            ->when($name !== null, fn (Builder $query) => $query->whereRaw("LOWER({$table}.name) LIKE ?", ['%'.strtolower($name).'%']))
-            ->when($status !== null, fn (Builder $query) => $query->whereRaw("LOWER({$table}.status) LIKE ?", ['%'.strtolower($status).'%']));
+            ->when($name !== null, fn (Builder $query) => apiWhereContains($query, "{$table}.name", $name))
+            ->when($status !== null, fn (Builder $query) => apiWhereContains($query, "{$table}.status", $status));
     }
 }

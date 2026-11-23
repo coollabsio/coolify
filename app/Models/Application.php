@@ -560,7 +560,7 @@ class Application extends BaseModel
     /**
      * Filter the applications of a team (API and MCP listings).
      * A project, environment, or server UUID that the team does not own matches no application.
-     * Status and name are case-insensitive substring matches.
+     * Status and name are case-insensitive substring matches. Status matches the aggregated status of multi-server applications.
      *
      * @param  array{tag?: ?string, project_uuid?: ?string, environment_uuid?: ?string, server_uuid?: ?string, status?: ?string, name?: ?string}  $filters
      */
@@ -608,8 +608,28 @@ class Application extends BaseModel
                         ->orWhereHas('additional_servers', fn (Builder $inner) => $inner->where('servers.id', $server->id));
                 });
             })
-            ->when($status !== null, fn (Builder $query) => $query->whereRaw('LOWER(status) LIKE ?', ['%'.strtolower($status).'%']))
-            ->when($name !== null, fn (Builder $query) => $query->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($name).'%']));
+            ->when($name !== null, fn (Builder $query) => apiWhereContains($query, 'name', $name))
+            ->when($status !== null, fn (Builder $query) => $query->whereStatusContains($status));
+    }
+
+    /**
+     * Match the status that the application returns: the stored status for one server,
+     * and the status aggregated with the additional servers (for example `degraded:unhealthy`) for more servers.
+     */
+    public function scopeWhereStatusContains(Builder $query, string $status): Builder
+    {
+        $needle = mb_strtolower($status);
+        $multiServerIds = (clone $query)
+            ->setEagerLoads([])
+            ->with('additional_servers')
+            ->has('additional_servers')
+            ->get(['applications.id', 'applications.status'])
+            ->filter(fn (Application $application) => str_contains(mb_strtolower($application->status), $needle))
+            ->modelKeys();
+
+        return $query->where(fn (Builder $q) => $q
+            ->where(fn (Builder $single) => apiWhereContains($single->doesntHave('additional_servers'), 'status', $status))
+            ->orWhereIn('id', $multiServerIds));
     }
 
     /**

@@ -16,6 +16,7 @@ use App\Traits\HasStars;
 use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -74,6 +75,11 @@ class Service extends BaseModel
     ];
 
     protected $appends = ['server_status', 'status'];
+
+    /**
+     * The status that admitted the service to a status-filtered listing (see pageByStatus()).
+     */
+    private ?string $listedStatus = null;
 
     protected $casts = [
         'include_coolify_default_variables' => 'boolean',
@@ -259,43 +265,56 @@ class Service extends BaseModel
                         ->orWhere(fn (Builder $inner) => $inner->where('destination_type', SwarmDocker::class)->whereIn('destination_id', $swarmDockerIds));
                 });
             })
-            ->when($name !== null, fn (Builder $query) => $query->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($name).'%']));
+            ->when($name !== null, fn (Builder $query) => apiWhereContains($query, 'name', $name));
     }
 
     /**
      * Filter services by their computed status (case-insensitive substring), ordered by name and id.
-     * Scans in chunks so large teams never hydrate every service at once.
-     * The returned services have their applications and databases loaded (status columns only).
+     * Reads the ordered ids in one query, so a rename or a new service during the scan cannot shift the set.
+     * Then loads the services in chunks of these ids, so large teams never hydrate every service at once.
+     * Each returned service keeps the status that admitted it, so a start activity that ends
+     * during the request cannot change the status in the response.
      *
-     * @return array{0: int, 1: Collection<int, Service>} total matches and the services of the page
+     * @return array{0: int, 1: EloquentCollection<int, Service>} total matches and the services of the page
      */
     public static function pageByStatus(Builder $query, string $status, int $offset = 0, ?int $limit = null): array
     {
         $statusNeedle = strtolower(trim($status));
-        $matched = collect();
+        $matched = new EloquentCollection;
         $total = 0;
 
-        $query
-            ->with([
-                'applications:id,service_id,status,exclude_from_status',
-                'databases:id,service_id,status,exclude_from_status',
-            ])
-            ->reorder()
-            ->orderBy('name')
-            ->orderBy('id')
-            ->chunk(100, function ($chunk) use ($statusNeedle, $offset, $limit, &$matched, &$total) {
-                foreach ($chunk as $service) {
-                    if (! str_contains(strtolower((string) $service->status), $statusNeedle)) {
-                        continue;
-                    }
+        $orderedIds = (clone $query)->reorder()->orderBy('name')->orderBy('id')->pluck('id');
 
-                    if ($total >= $offset && ($limit === null || $total < $offset + $limit)) {
-                        $matched->push($service);
-                    }
+        foreach ($orderedIds->chunk(100) as $idChunk) {
+            $services = (clone $query)
+                ->with([
+                    'applications:id,service_id,status,exclude_from_status,is_removed_from_compose',
+                    'databases:id,service_id,status,exclude_from_status,is_removed_from_compose',
+                ])
+                ->whereIn('id', $idChunk)
+                ->get()
+                ->keyBy('id');
+            $startingUuids = ResourceStartActivity::runningTypeUuids($services->pluck('uuid')->all());
 
-                    $total++;
+            foreach ($idChunk as $id) {
+                $service = $services->get($id);
+                $serviceStatus = match (true) {
+                    $service === null => null,
+                    in_array($service->uuid, $startingUuids, true) => 'starting:unhealthy',
+                    default => $service->containerStatus(),
+                };
+                if (! $service || ! str_contains(strtolower((string) $serviceStatus), $statusNeedle)) {
+                    continue;
                 }
-            });
+
+                if ($total >= $offset && ($limit === null || $total < $offset + $limit)) {
+                    $service->listedStatus = $serviceStatus;
+                    $matched->push($service);
+                }
+
+                $total++;
+            }
+        }
 
         return [$total, $matched->values()];
     }
@@ -348,6 +367,10 @@ class Service extends BaseModel
      */
     public function getStatusAttribute()
     {
+        if ($this->listedStatus !== null) {
+            return $this->listedStatus;
+        }
+
         if ($this->isStarting()) {
             return 'starting:unhealthy';
         }
@@ -406,8 +429,8 @@ class Service extends BaseModel
      * This helper method consolidates status aggregation logic using ContainerStatusAggregator.
      * It processes container status strings stored in the database (not live Docker data).
      *
-     * @param  \Illuminate\Database\Eloquent\Collection  $applications  Collection of Application models
-     * @param  \Illuminate\Database\Eloquent\Collection  $databases  Collection of Database models
+     * @param  EloquentCollection  $applications  Collection of Application models
+     * @param  EloquentCollection  $databases  Collection of Database models
      * @param  bool  $excludedOnly  If true, only process excluded containers; if false, only process non-excluded
      * @return array{0: string|null, 1: string|null, 2?: bool} [status, health, hasNonExcluded (only when excludedOnly=false)]
      */

@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ProcessStatus;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -10,8 +11,10 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use Spatie\Activitylog\Models\Activity;
 
 uses(RefreshDatabase::class);
 
@@ -88,10 +91,11 @@ test('it filters by computed status and returns the same items as the unfiltered
     expect(listedServiceNames($response))->toBe(['Ghost Blog', 'Umami'])
         ->and($response->json('0'))->toBe(listServices()->json('0'));
 
-    listServices(['status' => 'running', 'page' => 2, 'per_page' => 1])
+    $page = listServices(['status' => 'running', 'page' => 2, 'per_page' => 1])
         ->assertOk()
-        ->assertHeader('X-Total-Count', '2')
-        ->assertJsonPath('0.name', 'Umami');
+        ->assertHeader('X-Total-Count', '2');
+
+    expect(listedServiceNames($page))->toBe(['Umami']);
 });
 
 test('unknown uuids and uuids of another team give an empty list', function () {
@@ -121,4 +125,56 @@ test('it paginates with a total count header', function () {
         ->and(listedServiceNames($second))->toBe(['Umami']);
 
     listServices(['per_page' => 101])->assertStatus(422)->assertJsonValidationErrors(['per_page']);
+});
+
+test('it rejects a page whose offset does not fit in an integer and keeps pages after the last result empty', function () {
+    listServices(['status' => 'running', 'page' => intdiv(PHP_INT_MAX, 2) + 2, 'per_page' => 2])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['page']);
+
+    listServices(['status' => 'running', 'page' => 50, 'per_page' => 2])
+        ->assertOk()
+        ->assertHeader('X-Total-Count', '2')
+        ->assertExactJson([]);
+});
+
+test('the status filter skips components removed from compose', function () {
+    $this->umami->applications()->update(['is_removed_from_compose' => true]);
+
+    expect(listedServiceNames(listServices(['status' => 'running'])->assertOk()))->toBe(['Ghost Blog']);
+});
+
+test('the status filter returns the status that admitted each service', function () {
+    $query = Service::whereRelation('environment.project', 'team_id', $this->team->id);
+
+    [$total, $services] = Service::pageByStatus($query, 'running');
+    ServiceApplication::query()->update(['status' => 'exited']);
+    $services->load(['applications', 'databases']);
+
+    expect($total)->toBe(2)
+        ->and($services->map(fn (Service $service) => $service->toArray()['status'])->all())
+        ->toBe(['running:healthy', 'running:healthy']);
+});
+
+test('the status filter reads the start activities of each chunk in one query and ignores stale starts', function () {
+    $logStart = function (Service $service, int $minutesAgo) {
+        $activity = activity()
+            ->withProperties(['type_uuid' => $service->uuid, 'status' => ProcessStatus::IN_PROGRESS->value])
+            ->log('[]');
+        Activity::query()->whereKey($activity->id)->update([
+            'created_at' => now()->subMinutes($minutesAgo),
+            'updated_at' => now()->subMinutes($minutesAgo),
+        ]);
+    };
+    $logStart($this->ghost, 1);
+    $logStart($this->umami, 60);
+
+    DB::enableQueryLog();
+    $response = listServices(['status' => 'starting', 'per_page' => 1])->assertOk();
+    $activityQueries = collect(DB::getQueryLog())->filter(fn (array $query) => str_contains($query['query'], 'activity_log'));
+
+    expect(listedServiceNames($response))->toBe(['Ghost Blog'])
+        ->and($response->headers->get('X-Total-Count'))->toBe('1')
+        ->and($activityQueries)->toHaveCount(1)
+        ->and(listedServiceNames(listServices(['status' => 'running'])->assertOk()))->toBe(['Umami']);
 });

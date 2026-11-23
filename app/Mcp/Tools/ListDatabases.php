@@ -66,20 +66,19 @@ class ListDatabases extends Tool
             'name' => $name,
         ], fn ($v) => $v !== null);
 
-        $databases = StandaloneDatabaseList::query($teamId, [
-            'project_uuid' => $projectUuid,
-            'environment_uuid' => $environmentUuid,
-            'server_uuid' => $serverUuid,
-            'status' => $status,
-            'name' => $name,
-        ]);
+        [$total, $rows] = StandaloneDatabaseList::inSnapshot(function () use ($teamId, $projectUuid, $environmentUuid, $serverUuid, $status, $name, $args) {
+            $databases = StandaloneDatabaseList::query($teamId, [
+                'project_uuid' => $projectUuid,
+                'environment_uuid' => $environmentUuid,
+                'server_uuid' => $serverUuid,
+                'status' => $status,
+                'name' => $name,
+            ]);
 
-        $total = (clone $databases)->count();
+            return [(clone $databases)->count(), $databases->offset($args['offset'])->limit($args['per_page'])->get()];
+        });
 
-        $summaries = $databases
-            ->offset($args['offset'])
-            ->limit($args['per_page'])
-            ->get()
+        $summaries = $rows
             ->map(fn ($row) => [
                 'uuid' => $row->uuid,
                 'name' => $row->name,

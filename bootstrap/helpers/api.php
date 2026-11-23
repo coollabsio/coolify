@@ -54,7 +54,7 @@ function invalidTokenResponse()
 function apiPaginationRules(int $maxPerPage = 100): array
 {
     return [
-        'page' => ['nullable', 'integer', 'min:1'],
+        'page' => ['nullable', 'integer', 'min:1', 'max:'.(intdiv(PHP_INT_MAX, $maxPerPage) + 1)],
         'per_page' => ['nullable', 'integer', 'min:1', 'max:'.$maxPerPage],
     ];
 }
@@ -72,9 +72,18 @@ function apiPaginate(EloquentBuilder|QueryBuilder|Relation $query, Request $requ
     }
 
     $total = (clone $query)->count();
-    $items = $query->forPage((int) $request->query('page', 1), (int) $request->query('per_page', $defaultPerPage))->get();
+    $items = $query->forPage((int) ($request->query('page') ?: 1), (int) ($request->query('per_page') ?: $defaultPerPage))->get();
 
     return [$items, ['X-Total-Count' => $total]];
+}
+
+/**
+ * Filter a list query by a case-insensitive literal substring of a column.
+ * Both operands are lowercased, and the LIKE wildcards in $value (%, _, \) match only themselves.
+ */
+function apiWhereContains(EloquentBuilder $query, string $column, string $value): EloquentBuilder
+{
+    return $query->whereRaw("LOWER({$column}) LIKE ? ESCAPE '\\'", ['%'.addcslashes(mb_strtolower($value), '%_\\').'%']);
 }
 
 function serializeApiResponse($data)

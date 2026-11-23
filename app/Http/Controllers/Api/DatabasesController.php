@@ -356,7 +356,7 @@ class DatabasesController extends Controller
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
-    public function databases(Request $request)
+    public function databases(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
@@ -382,9 +382,12 @@ class DatabasesController extends Controller
             ? ['destination.server.settings']
             : [];
 
-        $rows = StandaloneDatabaseList::query($teamId, Arr::only($validated, ['project_uuid', 'environment_uuid', 'server_uuid', 'status', 'name']));
-        [$rows, $headers] = apiPaginate($rows, $request);
-        $databases = StandaloneDatabaseList::models($rows, $databaseRelations);
+        [$databases, $headers] = StandaloneDatabaseList::inSnapshot(function () use ($teamId, $validated, $request, $databaseRelations) {
+            $rows = StandaloneDatabaseList::query($teamId, Arr::only($validated, ['project_uuid', 'environment_uuid', 'server_uuid', 'status', 'name']));
+            [$rows, $headers] = apiPaginate($rows, $request);
+
+            return [StandaloneDatabaseList::models($rows, $databaseRelations), $headers];
+        });
 
         if ($request->attributes->get('can_read_sensitive', false) === true) {
             // Their connection URLs read REDIS_PASSWORD; load the variables once per type instead of per database.

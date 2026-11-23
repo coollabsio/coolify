@@ -112,7 +112,7 @@ class VulnerabilitiesController extends Controller
         $headers = [];
         if ($request->filled('page') || $request->filled('per_page')) {
             $headers['X-Total-Count'] = $resources->count();
-            $resources = $resources->forPage((int) $request->query('page', 1), (int) $request->query('per_page', 50))->values();
+            $resources = $resources->forPage((int) ($request->query('page') ?: 1), (int) ($request->query('per_page') ?: 50))->values();
         }
 
         return response()->json($resources, 200, $headers);
@@ -217,9 +217,7 @@ class VulnerabilitiesController extends Controller
             'severity' => 'nullable|string',
             'image' => 'nullable|string|max:1000',
             'search' => 'nullable|string|max:200',
-            'page' => 'nullable|integer|min:1',
-            'per_page' => 'nullable|integer|min:1|max:200',
-        ]);
+        ] + apiPaginationRules(200));
         if ($validator->fails()) {
             return response()->json(['message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
         }
@@ -254,8 +252,8 @@ class VulnerabilitiesController extends Controller
             && ($image === '' || $row['image_ref'] === $image)
             && ($search === '' || str_contains(mb_strtolower(implode(' ', [$row['id'], ...$row['aliases'], $row['package'], $row['version']])), $search))));
 
-        $perPage = (int) $request->query('per_page', 50);
-        $page = (int) $request->query('page', 1);
+        $perPage = (int) ($request->query('per_page') ?: 50);
+        $page = (int) ($request->query('page') ?: 1);
 
         return response()->json([
             'uuid' => (string) $resource->getAttribute('uuid'),

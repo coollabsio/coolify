@@ -92,7 +92,7 @@ test('unknown uuids and uuids of another team give an empty list', function () {
     listDatabases(['project_uuid' => $foreignProject->uuid])->assertOk()->assertExactJson([]);
     listDatabases(['environment_uuid' => $foreignProject->environments()->first()->uuid])->assertOk()->assertExactJson([]);
     listDatabases(['server_uuid' => $foreignServer->uuid])->assertOk()->assertExactJson([]);
-    listDatabases(['server_uuid' => $foreignServer->uuid, 'per_page' => 10])->assertOk()->assertHeader('X-Total-Count', '0');
+    listDatabases(['server_uuid' => $foreignServer->uuid, 'per_page' => 10])->assertOk()->assertExactJson([])->assertHeader('X-Total-Count', '0');
     expect(listedDatabaseNames(listDatabases()))->not->toContain('Foreign Postgres');
 });
 

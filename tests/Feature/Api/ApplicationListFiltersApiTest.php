@@ -150,3 +150,14 @@ test('it rejects invalid pagination parameters', function (array $query, string 
     'per_page too large' => [['per_page' => 101], 'per_page'],
     'per_page not an integer' => [['per_page' => 'abc'], 'per_page'],
 ]);
+
+test('the status filter matches the aggregated status of multi-server applications', function () {
+    $this->api->additional_servers()->attach($this->otherServer->id, [
+        'standalone_docker_id' => $this->otherDestination->id,
+        'status' => 'exited:unhealthy',
+    ]);
+
+    expect(listedNames(listApplications(['status' => 'degraded'])->assertOk()))->toBe(['Api Backend'])
+        ->and(listedNames(listApplications(['status' => 'running'])->assertOk()))->toBe(['Worker'])
+        ->and(listedNames(listApplications(['status' => 'running', 'per_page' => 10])->assertOk()->assertHeader('X-Total-Count', '1')))->toBe(['Worker']);
+});

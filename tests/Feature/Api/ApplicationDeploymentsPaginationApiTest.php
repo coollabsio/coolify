@@ -67,8 +67,37 @@ test('page and per_page take precedence over skip and take', function () {
         ->toBe(collect(listApplicationDeployments(['skip' => 0, 'take' => 3])['deployments'])->pluck('deployment_uuid')->all());
 });
 
-test('per_page above 100 is rejected', function () {
+test('page or per_page alone uses the default of the other', function () {
+    expect(collect(listApplicationDeployments(['page' => 2, 'per_page' => ''])['deployments']))->toBeEmpty()
+        ->and(collect(listApplicationDeployments(['page' => '', 'per_page' => 2])['deployments'])->pluck('deployment_uuid')->all())
+        ->toBe(collect(listApplicationDeployments(['skip' => 0, 'take' => 2])['deployments'])->pluck('deployment_uuid')->all())
+        ->and(collect(listApplicationDeployments(['page' => 1, 'per_page' => ''])['deployments']))->toHaveCount(5);
+});
+
+test('per_page of 100 is accepted', function () {
+    expect(listApplicationDeployments(['per_page' => 100])['deployments'])->toHaveCount(5);
+});
+
+test('invalid pagination values are rejected', function (array $query, string $field) {
     test()->withHeaders(['Authorization' => 'Bearer '.test()->bearerToken])
-        ->getJson('/api/v1/deployments/applications/'.test()->application->uuid.'?per_page=101')
-        ->assertStatus(422);
+        ->getJson('/api/v1/deployments/applications/'.test()->application->uuid.'?'.http_build_query($query))
+        ->assertStatus(422)
+        ->assertJsonValidationErrors([$field]);
+})->with([
+    'per_page above 100' => [['per_page' => 101], 'per_page'],
+    'per_page of 0' => [['per_page' => 0], 'per_page'],
+    'page of 0' => [['page' => 0], 'page'],
+    'page that is not an integer' => [['page' => 'abc'], 'page'],
+    'page with an offset above the integer range' => [['page' => PHP_INT_MAX, 'per_page' => 100], 'page'],
+]);
+
+test('invalid skip and take are ignored when page and per_page are given', function () {
+    expect(listApplicationDeployments(['page' => 2, 'per_page' => 3, 'take' => 0, 'skip' => -1])['deployments'])->toHaveCount(2);
+});
+
+test('take of zero is rejected without page and per_page', function () {
+    test()->withHeaders(['Authorization' => 'Bearer '.test()->bearerToken])
+        ->getJson('/api/v1/deployments/applications/'.test()->application->uuid.'?take=0')
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['take']);
 });
