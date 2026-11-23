@@ -14,7 +14,7 @@
                 <x-application.settings-section id="github-runners-section" title="GitHub Actions runners"
                     helper="Each workflow job runs in a new container that is deleted after the job.">
                     <x-slot:actions>
-                        <x-beta-badge />
+                        <x-experimental-badge />
                         <a class="button" href="{{ route('server.show', ['server_uuid' => $server->uuid]) }}"
                             {{ wireNavigate() }}>
                             General settings
@@ -34,7 +34,7 @@
                 <x-application.settings-section id="github-runners-section" title="GitHub Actions runners"
                     helper="Each workflow job runs in a new container that is deleted after the job.">
                     <x-slot:actions>
-                        <x-beta-badge />
+                        <x-experimental-badge />
                     </x-slot:actions>
                     <x-empty size="sm" title="Runners are disabled"
                         description="Enable runners to take GitHub Actions workflow jobs on this server."
@@ -68,7 +68,7 @@
                     <x-application.settings-section id="github-runners-section" title="GitHub Actions runners"
                         helper="Each workflow job runs in a new container that is deleted after the job. Use runs-on: [self-hosted, <your label>] in the workflow.">
                         <x-slot:actions>
-                            <x-beta-badge />
+                            <x-experimental-badge />
                             @can('update', $server)
                                 <x-forms.button wire:click="toggleEnabled" wire:loading.attr="disabled"
                                     wire:target="toggleEnabled">

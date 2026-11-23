@@ -31,40 +31,32 @@ class AuditEventsController extends Controller
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'A page of audit events, newest first.',
+                headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')],
+                description: 'A page of audit events, newest first. The X-Total-Count header gives the total.',
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',
                         schema: new OA\Schema(
-                            type: 'object',
-                            properties: [
-                                'current_page' => ['type' => 'integer'],
-                                'data' => [
-                                    'type' => 'array',
-                                    'items' => [
-                                        'type' => 'object',
-                                        'properties' => [
-                                            'id' => ['type' => 'integer'],
-                                            'team_id' => ['type' => 'integer', 'nullable' => true],
-                                            'event' => ['type' => 'string'],
-                                            'source' => ['type' => 'string'],
-                                            'action' => ['type' => 'string'],
-                                            'level' => ['type' => 'string'],
-                                            'actor_type' => ['type' => 'string', 'nullable' => true],
-                                            'actor_id' => ['type' => 'integer', 'nullable' => true],
-                                            'actor_name' => ['type' => 'string', 'nullable' => true],
-                                            'resource_type' => ['type' => 'string', 'nullable' => true],
-                                            'resource_uuid' => ['type' => 'string', 'nullable' => true],
-                                            'resource_name' => ['type' => 'string', 'nullable' => true],
-                                            'description' => ['type' => 'string', 'nullable' => true],
-                                            'created_at' => ['type' => 'string', 'format' => 'date-time'],
-                                        ],
-                                    ],
+                            type: 'array',
+                            items: new OA\Items(
+                                type: 'object',
+                                properties: [
+                                    new OA\Property(property: 'id', type: 'integer'),
+                                    new OA\Property(property: 'team_id', type: 'integer', nullable: true),
+                                    new OA\Property(property: 'event', type: 'string'),
+                                    new OA\Property(property: 'source', type: 'string'),
+                                    new OA\Property(property: 'action', type: 'string'),
+                                    new OA\Property(property: 'level', type: 'string'),
+                                    new OA\Property(property: 'actor_type', type: 'string', nullable: true),
+                                    new OA\Property(property: 'actor_id', type: 'integer', nullable: true),
+                                    new OA\Property(property: 'actor_name', type: 'string', nullable: true),
+                                    new OA\Property(property: 'resource_type', type: 'string', nullable: true),
+                                    new OA\Property(property: 'resource_uuid', type: 'string', nullable: true),
+                                    new OA\Property(property: 'resource_name', type: 'string', nullable: true),
+                                    new OA\Property(property: 'description', type: 'string', nullable: true),
+                                    new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
                                 ],
-                                'per_page' => ['type' => 'integer'],
-                                'last_page' => ['type' => 'integer'],
-                                'total' => ['type' => 'integer'],
-                            ]
+                            )
                         )
                     ),
                 ]),
@@ -94,12 +86,10 @@ class AuditEventsController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
-            'page' => ['sometimes', 'integer', 'min:1'],
             'search' => ['sometimes', 'nullable', 'string', 'max:255'],
             'action' => ['sometimes', 'nullable', 'string', 'max:255'],
             'source' => ['sometimes', 'nullable', 'string', Rule::in(['all', 'ui', 'api', 'mcp', 'webhook', 'system', 'scheduler'])],
-        ]);
+        ] + apiPaginationRules());
 
         if ($validator->fails()) {
             return response()->json([
@@ -109,10 +99,9 @@ class AuditEventsController extends Controller
         }
 
         $validated = $validator->validated();
-        $perPage = (int) ($validated['per_page'] ?? 25);
         $search = trim((string) ($validated['search'] ?? ''));
         $canReadSensitive = $request->attributes->get('can_read_sensitive', false) === true;
-        $events = AuditEvent::query()
+        $query = AuditEvent::query()
             ->select([
                 'id',
                 'team_id',
@@ -145,9 +134,9 @@ class AuditEventsController extends Controller
                 source: (string) ($validated['source'] ?? 'all'),
                 searchSensitiveFields: $canReadSensitive,
             )
-            ->latestFirst()
-            ->paginate($perPage);
+            ->latestFirst();
+        [$events, $headers] = apiPaginate($query, $request, 25, alwaysPaginate: true);
 
-        return response()->json(serializeApiResponse($events));
+        return response()->json(serializeApiResponse($events), 200, $headers);
     }
 }

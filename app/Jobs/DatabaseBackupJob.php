@@ -12,6 +12,7 @@ use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -22,12 +23,14 @@ use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
 use App\Notifications\ScheduledJobRecovered;
+use App\Services\HorizonNodeDrainer;
 use App\Services\RcloneTransfer;
 use App\Services\ScheduledJobDeliveryService;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\BackupCompression;
 use App\Support\ClickhouseBackupCommand;
 use App\Support\DatabaseOperationReservation;
+use App\Support\InfluxdbBackupCommand;
 use App\Support\PostgresUser;
 use App\Support\ResourceStartActivity;
 use App\Support\ValidationPatterns;
@@ -59,7 +62,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public Server $server;
 
-    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneClickhouse|StandaloneSqlite|ServiceDatabase $database;
+    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite|ServiceDatabase $database;
 
     public ?string $container_name = null;
 
@@ -307,6 +310,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $databasesToBackup = [$this->database->mariadb_database];
                 } elseif ($this->database instanceof StandaloneClickhouse) {
                     $databasesToBackup = [$this->database->clickhouse_db];
+                } elseif ($this->database instanceof StandaloneInfluxdb) {
+                    $databasesToBackup = [$this->database->influxdb_bucket];
                 } elseif ($this->database instanceof StandaloneSqlite) {
                     $databasesToBackup = $this->database->sqlite_databases;
                 } else {
@@ -438,6 +443,18 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         ]);
                         BackupCreated::dispatch($this->team->id);
                         $this->backup_standalone_clickhouse($database);
+                    } elseif ($this->database instanceof StandaloneInfluxdb) {
+                        $this->backup_file = '/influxdb-backup-'.Carbon::now()->timestamp."-{$this->backup_log_uuid}.tar.gz";
+                        $this->backup_location = $this->backup_dir.$this->backup_file;
+                        $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                            'uuid' => $this->backup_log_uuid,
+                            'database_name' => $database,
+                            'filename' => $this->backup_location,
+                            'scheduled_database_backup_id' => $this->backup->id,
+                            'local_storage_deleted' => false,
+                        ]);
+                        BackupCreated::dispatch($this->team->id);
+                        $this->backup_standalone_influxdb($database);
                     } elseif ($this->database instanceof StandaloneSqlite) {
                         $this->backup_file = "/sqlite-backup-$database-".Carbon::now()->timestamp."-{$this->backup_log_uuid}.gz";
                         $this->backup_location = $this->backup_dir.$this->backup_file;
@@ -480,6 +497,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                             's3_uploaded' => null,
                             'finished_at' => Carbon::now()->toImmutable(),
                         ]);
+                    }
+                    if (HorizonNodeDrainer::wasMoved(HorizonNodeDrainer::DATABASE_BACKUP, $this->backup->id)) {
+                        return;
                     }
                     try {
                         $this->team?->notify(new BackupFailed($this->backup, $this->database, $failureMessage, $database));
@@ -714,7 +734,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             return array_map('trim', explode('|', $databases));
         }
 
-        if ($type->contains(['postgres', 'mysql', 'mariadb', 'clickhouse', 'sqlite'])) {
+        if ($type->contains(['postgres', 'mysql', 'mariadb', 'clickhouse', 'influxdb', 'sqlite'])) {
             return array_map('trim', explode(',', $databases));
         }
 
@@ -816,6 +836,28 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             throw $e;
         } finally {
             $cleanupCommand = ClickhouseBackupCommand::cleanup($this->container_name, $archiveName);
+            instant_remote_process([$cleanupCommand], $this->server, false, false, null, disableMultiplexing: true);
+        }
+    }
+
+    private function backup_standalone_influxdb(string $bucket): void
+    {
+        $archiveName = ltrim($this->backup_file, '/');
+
+        try {
+            $commands = [...$this->backupDirectoryCommands(), ...InfluxdbBackupCommand::make(
+                containerName: $this->container_name,
+                bucket: $bucket,
+                archiveName: $archiveName,
+                backupDirectory: $this->backup_dir,
+            )];
+
+            $this->runBackupCommands($commands);
+        } catch (Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
+        } finally {
+            $cleanupCommand = InfluxdbBackupCommand::cleanup($this->container_name, $archiveName);
             instant_remote_process([$cleanupCommand], $this->server, false, false, null, disableMultiplexing: true);
         }
     }

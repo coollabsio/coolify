@@ -17,6 +17,7 @@ class InstanceSettings extends Model
     ];
 
     protected $fillable = [
+        'custom_theme',
         'public_ipv4',
         'public_ipv6',
         'fqdn',

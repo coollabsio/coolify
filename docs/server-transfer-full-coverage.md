@@ -40,7 +40,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Image retention | "disable application image retention" on |
 | ✅ | Labels / Traefik | generate exact labels on, Traefik certificate resolver `custom` |
 | ✅ | Backup compression | CPU percentage 50 |
-| ✅ | Metrics / Sentinel | metrics on, refresh rate 10 s, history 14 days, push interval 30 s |
+| ✅ | Metrics / Sentinel | metrics on, refresh rate 10 s, history 14 days, push interval 30 s, `Keep logs of removed containers` disabled |
 | ✅ | Traffic analytics | on, top N 20, sample threshold, retention 1h=3 / 1d=60 days, IP mode `anonymized` |
 | ✅ | GeoIP | on, MaxMind license key, refresh 14 days |
 | ✅ | Log drains | New Relic (key + base URI), Axiom (dataset, key + edge domain), custom (config + parser), one of them enabled |
@@ -137,7 +137,7 @@ Database backups (✅ one exists): add S3 on, dump all, databases list, local an
 | ✅ | Custom compose service with an app and a database part | |
 | ✅ | Service app settings | domain, gzip off, strip prefix off, force HTTPS, exclude from status, redirect, port overrides, log drain, custom image, Traefik resolver |
 | ✅ | Service database settings | public port + public on, custom type |
-| ✅ | Service level | connect to network, label escape off, redact env values, Coolify default variables off, maintenance mode + page, environment variables, scheduled task, tags, volume backup on a service volume |
+| ✅ | Service level | connect to network, label escape off, redact env values, Coolify default variables off, maintenance mode + page, environment variables (one limited to some Compose services), scheduled task, tags, volume backup on a service volume |
 
 ## 9. After the transfer, check
 

@@ -28,11 +28,22 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/Page"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/PerPage"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "List of preview deployments.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -49,6 +60,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -526,11 +540,67 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "project_uuid",
+                        "in": "query",
+                        "description": "Filter applications by project UUID.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "environment_uuid",
+                        "in": "query",
+                        "description": "Filter applications by environment UUID.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "server_uuid",
+                        "in": "query",
+                        "description": "Filter applications by the UUID of the server they are deployed to.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter applications by status (case-insensitive substring, for example running or exited).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "name",
+                        "in": "query",
+                        "description": "Filter applications by name (case-insensitive substring).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/Page"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/PerPage"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Get all applications.",
+                        "description": "Get all applications. An unknown project, environment, or server UUID gives an empty list.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -547,6 +617,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -5476,6 +5549,14 @@
                                     "copy_value_to_preview": {
                                         "type": "boolean",
                                         "description": "Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false."
+                                    },
+                                    "compose_services": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "nullable": true,
+                                        "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                     }
                                 },
                                 "type": "object"
@@ -5568,6 +5649,14 @@
                                     "is_shown_once": {
                                         "type": "boolean",
                                         "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
+                                    },
+                                    "compose_services": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "nullable": true,
+                                        "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                     }
                                 },
                                 "type": "object"
@@ -5663,6 +5752,14 @@
                                                 "copy_value_to_preview": {
                                                     "type": "boolean",
                                                     "description": "Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false."
+                                                },
+                                                "compose_services": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "nullable": true,
+                                                    "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                                 }
                                             },
                                             "type": "object"
@@ -7003,6 +7100,89 @@
                 ]
             }
         },
+        "\/applications\/{uuid}\/destinations\/{destination_uuid}\/deploy": {
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Deploy to Destination",
+                "description": "Queue a deployment of the application to a single destination (primary or attached) without redeploying the other destinations.",
+                "operationId": "deploy-application-destination",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "destination_uuid",
+                        "in": "path",
+                        "description": "UUID of the destination.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "force",
+                        "in": "query",
+                        "description": "Force rebuild.",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Deployment queued.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Deployment request queued.",
+                                            "description": "Message."
+                                        },
+                                        "deployment_uuid": {
+                                            "type": "string",
+                                            "example": "doogksw",
+                                            "description": "UUID of the deployment."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "409": {
+                        "description": "A deployment of this application is already queued or in progress on the server of this destination."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/audit-events": {
             "get": {
                 "tags": [
@@ -7076,84 +7256,88 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "A page of audit events, newest first.",
+                        "description": "A page of audit events, newest first. The X-Total-Count header gives the total.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
-                                    "properties": {
-                                        "current_page": {
-                                            "type": "integer"
-                                        },
-                                        "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "team_id": {
-                                                        "type": "integer",
-                                                        "nullable": true
-                                                    },
-                                                    "event": {
-                                                        "type": "string"
-                                                    },
-                                                    "source": {
-                                                        "type": "string"
-                                                    },
-                                                    "action": {
-                                                        "type": "string"
-                                                    },
-                                                    "level": {
-                                                        "type": "string"
-                                                    },
-                                                    "actor_type": {
-                                                        "type": "string",
-                                                        "nullable": true
-                                                    },
-                                                    "actor_id": {
-                                                        "type": "integer",
-                                                        "nullable": true
-                                                    },
-                                                    "actor_name": {
-                                                        "type": "string",
-                                                        "nullable": true
-                                                    },
-                                                    "resource_type": {
-                                                        "type": "string",
-                                                        "nullable": true
-                                                    },
-                                                    "resource_uuid": {
-                                                        "type": "string",
-                                                        "nullable": true
-                                                    },
-                                                    "resource_name": {
-                                                        "type": "string",
-                                                        "nullable": true
-                                                    },
-                                                    "description": {
-                                                        "type": "string",
-                                                        "nullable": true
-                                                    },
-                                                    "created_at": {
-                                                        "type": "string",
-                                                        "format": "date-time"
-                                                    }
-                                                }
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer"
+                                            },
+                                            "team_id": {
+                                                "type": [
+                                                    "integer",
+                                                    "null"
+                                                ]
+                                            },
+                                            "event": {
+                                                "type": "string"
+                                            },
+                                            "source": {
+                                                "type": "string"
+                                            },
+                                            "action": {
+                                                "type": "string"
+                                            },
+                                            "level": {
+                                                "type": "string"
+                                            },
+                                            "actor_type": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "actor_id": {
+                                                "type": [
+                                                    "integer",
+                                                    "null"
+                                                ]
+                                            },
+                                            "actor_name": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "resource_type": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "resource_uuid": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "resource_name": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "description": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "created_at": {
+                                                "type": "string",
+                                                "format": "date-time"
                                             }
                                         },
-                                        "per_page": {
-                                            "type": "integer"
-                                        },
-                                        "last_page": {
-                                            "type": "integer"
-                                        },
-                                        "total": {
-                                            "type": "integer"
-                                        }
-                                    },
-                                    "type": "object"
+                                        "type": "object"
+                                    }
                                 }
                             }
                         }
@@ -7927,9 +8111,67 @@
                 "summary": "List",
                 "description": "List all databases.",
                 "operationId": "list-databases",
+                "parameters": [
+                    {
+                        "name": "project_uuid",
+                        "in": "query",
+                        "description": "Filter databases by project UUID.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "environment_uuid",
+                        "in": "query",
+                        "description": "Filter databases by environment UUID.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "server_uuid",
+                        "in": "query",
+                        "description": "Filter databases by the UUID of the server they are deployed to.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter databases by status (case-insensitive substring, for example running or exited).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "name",
+                        "in": "query",
+                        "description": "Filter databases by name (case-insensitive substring).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/Page"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/PerPage"
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "Get all databases",
+                        "description": "Get all databases. An unknown project, environment, or server UUID gives an empty list.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -7946,6 +8188,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -8412,6 +8657,26 @@
                                     "clickhouse_admin_password": {
                                         "type": "string",
                                         "description": "Clickhouse admin password"
+                                    },
+                                    "influxdb_admin_user": {
+                                        "type": "string",
+                                        "description": "InfluxDB admin user. Only before the first start."
+                                    },
+                                    "influxdb_admin_password": {
+                                        "type": "string",
+                                        "description": "InfluxDB admin password. Only before the first start."
+                                    },
+                                    "influxdb_admin_token": {
+                                        "type": "string",
+                                        "description": "InfluxDB admin API token. Only before the first start."
+                                    },
+                                    "influxdb_org": {
+                                        "type": "string",
+                                        "description": "InfluxDB initial organization. Only before the first start."
+                                    },
+                                    "influxdb_bucket": {
+                                        "type": "string",
+                                        "description": "InfluxDB initial bucket. Only before the first start."
                                     },
                                     "dragonfly_password": {
                                         "type": "string",
@@ -8985,6 +9250,155 @@
                                     "clickhouse_admin_password": {
                                         "type": "string",
                                         "description": "Clickhouse admin password"
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "Name of the database"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "Description of the database"
+                                    },
+                                    "image": {
+                                        "type": "string",
+                                        "description": "Docker Image of the database"
+                                    },
+                                    "is_public": {
+                                        "type": "boolean",
+                                        "description": "Is the database public?"
+                                    },
+                                    "public_port": {
+                                        "type": "integer",
+                                        "description": "Public port of the database"
+                                    },
+                                    "public_port_timeout": {
+                                        "type": "integer",
+                                        "description": "Public port timeout in seconds (default: 3600)"
+                                    },
+                                    "limits_memory": {
+                                        "type": "string",
+                                        "description": "Memory limit of the database"
+                                    },
+                                    "limits_memory_swap": {
+                                        "type": "string",
+                                        "description": "Memory swap limit of the database"
+                                    },
+                                    "limits_memory_swappiness": {
+                                        "type": "integer",
+                                        "description": "Memory swappiness of the database"
+                                    },
+                                    "limits_memory_reservation": {
+                                        "type": "string",
+                                        "description": "Memory reservation of the database"
+                                    },
+                                    "limits_cpus": {
+                                        "type": "string",
+                                        "description": "CPU limit of the database"
+                                    },
+                                    "limits_cpuset": {
+                                        "type": "string",
+                                        "description": "CPU set of the database"
+                                    },
+                                    "limits_cpu_shares": {
+                                        "type": "integer",
+                                        "description": "CPU shares of the database"
+                                    },
+                                    "instant_deploy": {
+                                        "type": "boolean",
+                                        "description": "Instant deploy the database"
+                                    },
+                                    "tags": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "description": "Tags to assign to the database."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Database updated"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/influxdb": {
+            "post": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Create (InfluxDB)",
+                "description": "Create a new InfluxDB 2.x database.",
+                "operationId": "create-database-influxdb",
+                "requestBody": {
+                    "description": "Database data",
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "server_uuid",
+                                    "project_uuid"
+                                ],
+                                "properties": {
+                                    "server_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the server"
+                                    },
+                                    "project_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the project"
+                                    },
+                                    "environment_name": {
+                                        "type": "string",
+                                        "description": "Name of the environment. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the environment. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "destination_uuid": {
+                                        "type": "string",
+                                        "description": "UUID of the destination if the server has multiple destinations"
+                                    },
+                                    "influxdb_admin_user": {
+                                        "type": "string",
+                                        "description": "InfluxDB admin user."
+                                    },
+                                    "influxdb_admin_password": {
+                                        "type": "string",
+                                        "description": "InfluxDB admin password."
+                                    },
+                                    "influxdb_admin_token": {
+                                        "type": "string",
+                                        "description": "InfluxDB admin API token."
+                                    },
+                                    "influxdb_org": {
+                                        "type": "string",
+                                        "description": "InfluxDB initial organization."
+                                    },
+                                    "influxdb_bucket": {
+                                        "type": "string",
+                                        "description": "InfluxDB initial bucket."
                                     },
                                     "name": {
                                         "type": "string",
@@ -10239,53 +10653,62 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/Page"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/PerPage"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "List of backup executions",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
-                                    "properties": {
-                                        "executions": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "uuid": {
-                                                        "type": "string"
-                                                    },
-                                                    "filename": {
-                                                        "type": "string"
-                                                    },
-                                                    "size": {
-                                                        "type": "integer"
-                                                    },
-                                                    "created_at": {
-                                                        "type": "string"
-                                                    },
-                                                    "message": {
-                                                        "description": "Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.",
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "status": {
-                                                        "type": "string"
-                                                    }
-                                                },
-                                                "type": "object"
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "uuid": {
+                                                "type": "string"
+                                            },
+                                            "filename": {
+                                                "type": "string"
+                                            },
+                                            "size": {
+                                                "type": "integer"
+                                            },
+                                            "created_at": {
+                                                "type": "string"
+                                            },
+                                            "message": {
+                                                "description": "Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.",
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "status": {
+                                                "type": "string"
                                             }
-                                        }
-                                    },
-                                    "type": "object"
+                                        },
+                                        "type": "object"
+                                    }
                                 }
                             }
                         }
                     },
                     "404": {
                         "description": "Backup configuration not found."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -11889,10 +12312,34 @@
                         }
                     },
                     {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number. page and per_page take precedence over skip and take.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Items per page.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 10,
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    },
+                    {
                         "name": "skip",
                         "in": "query",
-                        "description": "Number of records to skip.",
+                        "description": "Number of records to skip. Deprecated: use page and per_page.",
                         "required": false,
+                        "deprecated": true,
                         "schema": {
                             "type": "integer",
                             "default": 0,
@@ -11902,8 +12349,9 @@
                     {
                         "name": "take",
                         "in": "query",
-                        "description": "Number of records to take.",
+                        "description": "Number of records to take. Deprecated: use page and per_page.",
                         "required": false,
+                        "deprecated": true,
                         "schema": {
                             "type": "integer",
                             "default": 10,
@@ -16615,6 +17063,318 @@
                 ]
             }
         },
+        "\/applications\/{uuid}\/metrics": {
+            "get": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Get application metrics",
+                "description": "Get the CPU and memory history that Sentinel collects for the container of an application. Send minutes, or from with an optional to. The retention period is the one of the server of the application.",
+                "operationId": "get-application-metrics-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsMinutes"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsFrom"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsTo"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Container CPU and memory metrics.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ContainerMetrics"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "502": {
+                        "description": "Sentinel did not return metrics.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to fetch metrics from Sentinel."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/databases\/{uuid}\/metrics": {
+            "get": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Get database metrics",
+                "description": "Get the CPU and memory history that Sentinel collects for the container of a database. Send minutes, or from with an optional to. The retention period is the one of the server of the database.",
+                "operationId": "get-database-metrics-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the database.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsMinutes"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsFrom"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsTo"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Container CPU and memory metrics.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ContainerMetrics"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "502": {
+                        "description": "Sentinel did not return metrics.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to fetch metrics from Sentinel."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/applications\/{uuid}\/traffic": {
+            "get": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Get application traffic",
+                "description": "Get the traffic analytics of an application.",
+                "operationId": "get-application-traffic-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "range",
+                        "in": "query",
+                        "description": "Time range of the traffic analytics.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "24h",
+                            "enum": [
+                                "24h",
+                                "7d",
+                                "30d"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Traffic analytics of the application.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ResourceTraffic"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "502": {
+                        "description": "Sentinel did not return traffic analytics.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to fetch traffic analytics from Sentinel."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/traffic": {
+            "get": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Get service traffic",
+                "description": "Get the traffic analytics of a service.",
+                "operationId": "get-service-traffic-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "range",
+                        "in": "query",
+                        "description": "Time range of the traffic analytics.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "24h",
+                            "enum": [
+                                "24h",
+                                "7d",
+                                "30d"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Traffic analytics of the service.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/ResourceTraffic"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "502": {
+                        "description": "Sentinel did not return traffic analytics.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to fetch traffic analytics from Sentinel."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/resources": {
             "get": {
                 "tags": [
@@ -17552,11 +18312,22 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/Page"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/PerPage"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "Get all executions for a scheduled task.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -17573,6 +18344,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -17916,11 +18690,22 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/Page"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/PerPage"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "Get all executions for a scheduled task.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -17937,6 +18722,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -19282,11 +20070,39 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Items per page.",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 20,
+                            "maximum": 100,
+                            "minimum": 1
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "Recent Docker cleanup executions.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -19332,6 +20148,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -20129,6 +20948,153 @@
                 ]
             }
         },
+        "\/servers\/{uuid}\/metrics": {
+            "get": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Get server metrics",
+                "description": "Get the metric history that Sentinel collects for a server owned by the authenticated team. Send minutes, or from with an optional to. The response has only the requested types. Each type is null when metrics are disabled for the server.",
+                "operationId": "get-server-metrics",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsMinutes"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsFrom"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/MetricsTo"
+                    },
+                    {
+                        "name": "types",
+                        "in": "query",
+                        "description": "Comma-separated metric types: cpu, memory, disk, network, load.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "cpu,memory,disk",
+                            "default": "cpu,memory"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Server metrics of the requested types.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "cpu": {
+                                            "$ref": "#\/components\/schemas\/MetricSeries",
+                                            "description": "CPU usage in percent."
+                                        },
+                                        "memory": {
+                                            "$ref": "#\/components\/schemas\/MetricSeries",
+                                            "description": "Memory usage in percent."
+                                        },
+                                        "disk": {
+                                            "description": "Disk usage in percent, keyed by mount path.",
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ],
+                                            "example": {
+                                                "\/": [
+                                                    [
+                                                        1787259000000,
+                                                        41.2
+                                                    ]
+                                                ]
+                                            },
+                                            "additionalProperties": {
+                                                "$ref": "#\/components\/schemas\/MetricSeries"
+                                            }
+                                        },
+                                        "network": {
+                                            "description": "Received and sent bytes per second.",
+                                            "properties": {
+                                                "rx": {
+                                                    "$ref": "#\/components\/schemas\/MetricSeries"
+                                                },
+                                                "tx": {
+                                                    "$ref": "#\/components\/schemas\/MetricSeries"
+                                                }
+                                            },
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ]
+                                        },
+                                        "load": {
+                                            "description": "Load averages over 1, 5, and 15 minutes.",
+                                            "properties": {
+                                                "load1": {
+                                                    "$ref": "#\/components\/schemas\/MetricSeries"
+                                                },
+                                                "load5": {
+                                                    "$ref": "#\/components\/schemas\/MetricSeries"
+                                                },
+                                                "load15": {
+                                                    "$ref": "#\/components\/schemas\/MetricSeries"
+                                                }
+                                            },
+                                            "type": [
+                                                "object",
+                                                "null"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "502": {
+                        "description": "Sentinel did not return metrics.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Failed to fetch metrics from Sentinel."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/servers\/{uuid}\/proxy": {
             "get": {
                 "tags": [
@@ -20179,6 +21145,15 @@
                                                 "null"
                                             ],
                                             "example": "https:\/\/example.com"
+                                        },
+                                        "unknown_host_status": {
+                                            "description": "Saved status of the catch-all for hosts that no resource on the server uses. Traefik and Caddy use it only when redirect_enabled is true and redirect_url is empty. In that mode, the domains of resources on the server get 503 while the resource is down.",
+                                            "type": "integer",
+                                            "example": 404,
+                                            "enum": [
+                                                404,
+                                                503
+                                            ]
                                         },
                                         "proxy_error_page": {
                                             "type": [
@@ -20261,6 +21236,14 @@
                                             "null"
                                         ]
                                     },
+                                    "unknown_host_status": {
+                                        "description": "Status of the catch-all for hosts that no resource on the server uses. Traefik and Caddy use it only when redirect_enabled is true and redirect_url is empty. In that mode, the domains of resources on the server get 503 while the resource is down.",
+                                        "type": "integer",
+                                        "enum": [
+                                            404,
+                                            503
+                                        ]
+                                    },
                                     "proxy_error_page": {
                                         "description": "Custom HTML error page that the proxy shows for unknown hosts (when redirect_url is empty) and for resources in maintenance mode. Null restores the default page.",
                                         "type": [
@@ -20320,6 +21303,13 @@
                                             "type": [
                                                 "string",
                                                 "null"
+                                            ]
+                                        },
+                                        "unknown_host_status": {
+                                            "type": "integer",
+                                            "enum": [
+                                                404,
+                                                503
                                             ]
                                         },
                                         "proxy_error_page": {
@@ -20440,6 +21430,13 @@
                                             "type": [
                                                 "string",
                                                 "null"
+                                            ]
+                                        },
+                                        "unknown_host_status": {
+                                            "type": "integer",
+                                            "enum": [
+                                                404,
+                                                503
                                             ]
                                         },
                                         "proxy_error_page": {
@@ -23130,9 +24127,67 @@
                 "summary": "List",
                 "description": "List all services.",
                 "operationId": "list-services",
+                "parameters": [
+                    {
+                        "name": "project_uuid",
+                        "in": "query",
+                        "description": "Filter services by project UUID.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "environment_uuid",
+                        "in": "query",
+                        "description": "Filter services by environment UUID.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "server_uuid",
+                        "in": "query",
+                        "description": "Filter services by the UUID of the server they are deployed to.",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter services by status (case-insensitive substring, for example running or exited).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "name",
+                        "in": "query",
+                        "description": "Filter services by name (case-insensitive substring).",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/Page"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/PerPage"
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "Get all services",
+                        "description": "Get all services. An unknown project, environment, or server UUID gives an empty list.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -23149,6 +24204,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -23881,6 +24939,14 @@
                                     "is_shown_once": {
                                         "type": "boolean",
                                         "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
+                                    },
+                                    "compose_services": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "nullable": true,
+                                        "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                     }
                                 },
                                 "type": "object"
@@ -23972,6 +25038,14 @@
                                     "is_shown_once": {
                                         "type": "boolean",
                                         "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
+                                    },
+                                    "compose_services": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "nullable": true,
+                                        "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                     }
                                 },
                                 "type": "object"
@@ -24062,6 +25136,14 @@
                                                 "is_shown_once": {
                                                     "type": "boolean",
                                                     "description": "If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values."
+                                                },
+                                                "compose_services": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    },
+                                                    "nullable": true,
+                                                    "description": "Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources."
                                                 }
                                             },
                                             "type": "object"
@@ -24350,6 +25432,11 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Service starting request queued."
+                                        },
+                                        "activity_id": {
+                                            "type": "integer",
+                                            "description": "ID of the activity running the start. Poll it with GET \/services\/{uuid}\/activities\/{activity_id}.",
+                                            "example": 1234
                                         }
                                     },
                                     "type": "object"
@@ -24473,7 +25560,103 @@
                                     "properties": {
                                         "message": {
                                             "type": "string",
-                                            "example": "Service restaring request queued."
+                                            "example": "Service restarting request queued."
+                                        },
+                                        "activity_id": {
+                                            "type": "integer",
+                                            "description": "ID of the activity running the restart. Poll it with GET \/services\/{uuid}\/activities\/{activity_id}.",
+                                            "example": 1234
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/services\/{uuid}\/activities\/{activity_id}": {
+            "get": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Get activity",
+                "description": "Get the status and output of a start or restart activity of a service.",
+                "operationId": "get-service-activity-by-id",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the service.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "activity_id",
+                        "in": "path",
+                        "description": "ID of the activity, as returned by the start or restart endpoints.",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Activity status and output.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer",
+                                            "example": 1234
+                                        },
+                                        "status": {
+                                            "type": "string",
+                                            "description": "One of queued, in_progress, finished, error, killed, cancelled, closed.",
+                                            "example": "finished"
+                                        },
+                                        "exit_code": {
+                                            "type": "integer",
+                                            "nullable": true,
+                                            "example": 0
+                                        },
+                                        "output": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "description": "Combined output of the executed commands. Null unless the token has the read:sensitive ability and its user is an admin or owner of the team."
+                                        },
+                                        "created_at": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        },
+                                        "updated_at": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        },
+                                        "finished_at": {
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "nullable": true,
+                                            "description": "Null while the activity is still running."
                                         }
                                     },
                                     "type": "object"
@@ -26851,71 +28034,77 @@
                             "type": "string",
                             "example": "update_now,update_available"
                         }
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/Page"
+                    },
+                    {
+                        "$ref": "#\/components\/parameters\/PerPage"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "Resources with their security status, worst first.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
-                                    "properties": {
-                                        "resources": {
-                                            "type": "array",
-                                            "items": {
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "uuid": {
+                                                "type": "string"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            },
+                                            "type": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "application",
+                                                    "service",
+                                                    "database"
+                                                ]
+                                            },
+                                            "project_uuid": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "environment_uuid": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "server_uuid": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "images": {
                                                 "properties": {
-                                                    "uuid": {
-                                                        "type": "string"
+                                                    "update": {
+                                                        "type": "integer"
                                                     },
-                                                    "name": {
-                                                        "type": "string"
-                                                    },
-                                                    "type": {
-                                                        "type": "string",
-                                                        "enum": [
-                                                            "application",
-                                                            "service",
-                                                            "database"
-                                                        ]
-                                                    },
-                                                    "project_uuid": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "environment_uuid": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "server_uuid": {
-                                                        "type": [
-                                                            "string",
-                                                            "null"
-                                                        ]
-                                                    },
-                                                    "images": {
-                                                        "properties": {
-                                                            "update": {
-                                                                "type": "integer"
-                                                            },
-                                                            "total": {
-                                                                "type": "integer"
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    },
-                                                    "security": {
-                                                        "$ref": "#\/components\/schemas\/SecurityStatus"
+                                                    "total": {
+                                                        "type": "integer"
                                                     }
                                                 },
                                                 "type": "object"
+                                            },
+                                            "security": {
+                                                "$ref": "#\/components\/schemas\/SecurityStatus"
                                             }
-                                        }
-                                    },
-                                    "type": "object"
+                                        },
+                                        "type": "object"
+                                    }
                                 }
                             }
                         }
@@ -26925,6 +28114,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
                     }
                 },
                 "security": [
@@ -26973,7 +28165,12 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Scan results.",
+                        "description": "Scan results. The X-Total-Count header gives the total number of matching findings.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -27041,7 +28238,12 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Scan results.",
+                        "description": "Scan results. The X-Total-Count header gives the total number of matching findings.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -27109,7 +28311,12 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Scan results.",
+                        "description": "Scan results. The X-Total-Count header gives the total number of matching findings.",
+                        "headers": {
+                            "X-Total-Count": {
+                                "$ref": "#\/components\/headers\/X-Total-Count"
+                            }
+                        },
                         "content": {
                             "application\/json": {
                                 "schema": {
@@ -27490,6 +28697,7 @@
                             "standalone-keydb",
                             "standalone-dragonfly",
                             "standalone-clickhouse",
+                            "standalone-influxdb",
                             "standalone-sqlite"
                         ]
                     },
@@ -27836,6 +29044,23 @@
                     "clickhouse_db": {
                         "type": "string"
                     },
+                    "influxdb_admin_user": {
+                        "type": "string"
+                    },
+                    "influxdb_admin_password": {
+                        "type": "string",
+                        "format": "password"
+                    },
+                    "influxdb_admin_token": {
+                        "type": "string",
+                        "format": "password"
+                    },
+                    "influxdb_org": {
+                        "type": "string"
+                    },
+                    "influxdb_bucket": {
+                        "type": "string"
+                    },
                     "sqlite_databases": {
                         "description": "Comma-separated SQLite database file names.",
                         "type": "string"
@@ -28138,20 +29363,6 @@
                             },
                             "type": "object"
                         }
-                    },
-                    "pagination": {
-                        "properties": {
-                            "page": {
-                                "type": "integer"
-                            },
-                            "per_page": {
-                                "type": "integer"
-                            },
-                            "total": {
-                                "type": "integer"
-                            }
-                        },
-                        "type": "object"
                     }
                 },
                 "type": "object"
@@ -28505,6 +29716,245 @@
                     },
                     "updated_at": {
                         "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "MetricSeries": {
+                "description": "Data points as [unix_timestamp_ms, value].",
+                "type": [
+                    "array",
+                    "null"
+                ],
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "example": [
+                    [
+                        1787259000000,
+                        12.5
+                    ],
+                    [
+                        1787259060000,
+                        17.25
+                    ]
+                ]
+            },
+            "ContainerMetrics": {
+                "properties": {
+                    "cpu": {
+                        "$ref": "#\/components\/schemas\/MetricSeries",
+                        "description": "CPU usage of the container in percent. Null when metrics are disabled for the server."
+                    },
+                    "memory": {
+                        "$ref": "#\/components\/schemas\/MetricSeries",
+                        "description": "Memory usage of the container in MB. Null when metrics are disabled for the server."
+                    }
+                },
+                "type": "object"
+            },
+            "ResourceTraffic": {
+                "description": "Traffic analytics that Sentinel records from the proxy access log. When traffic analytics is disabled on the server, enabled is false and every field except range is null.",
+                "properties": {
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "range": {
+                        "type": "string",
+                        "enum": [
+                            "24h",
+                            "7d",
+                            "30d"
+                        ]
+                    },
+                    "overview": {
+                        "properties": {
+                            "requests": {
+                                "type": "integer"
+                            },
+                            "unique_visitors": {
+                                "type": "integer"
+                            },
+                            "bytes_in": {
+                                "type": "integer"
+                            },
+                            "bytes_out": {
+                                "type": "integer"
+                            },
+                            "error_rate": {
+                                "description": "Share of 4xx and 5xx responses in percent.",
+                                "type": "number"
+                            },
+                            "latency": {
+                                "description": "Response time percentiles in milliseconds.",
+                                "properties": {
+                                    "p50": {
+                                        "type": "number"
+                                    },
+                                    "p95": {
+                                        "type": "number"
+                                    },
+                                    "p99": {
+                                        "type": "number"
+                                    }
+                                },
+                                "type": "object"
+                            },
+                            "status": {
+                                "properties": {
+                                    "s2xx": {
+                                        "type": "integer"
+                                    },
+                                    "s3xx": {
+                                        "type": "integer"
+                                    },
+                                    "s4xx": {
+                                        "type": "integer"
+                                    },
+                                    "s5xx": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        },
+                        "type": [
+                            "object",
+                            "null"
+                        ]
+                    },
+                    "latency_approximate": {
+                        "description": "True when the latency merges several sources and takes the worst value.",
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    },
+                    "uniques_approximate": {
+                        "description": "True when unique visitors are summed over several sources.",
+                        "type": [
+                            "boolean",
+                            "null"
+                        ]
+                    },
+                    "series": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "properties": {
+                                "bucket": {
+                                    "description": "Bucket start as a unix timestamp in milliseconds.",
+                                    "type": "integer"
+                                },
+                                "s2xx": {
+                                    "type": "integer"
+                                },
+                                "s3xx": {
+                                    "type": "integer"
+                                },
+                                "s4xx": {
+                                    "type": "integer"
+                                },
+                                "s5xx": {
+                                    "type": "integer"
+                                },
+                                "requests": {
+                                    "type": "integer"
+                                },
+                                "bytes_in": {
+                                    "type": "integer"
+                                },
+                                "bytes_out": {
+                                    "type": "integer"
+                                },
+                                "unique_visitors": {
+                                    "type": "integer"
+                                },
+                                "p95": {
+                                    "type": "number"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "top_paths": {
+                        "type": [
+                            "array",
+                            "null"
+                        ],
+                        "items": {
+                            "properties": {
+                                "path": {
+                                    "type": "string"
+                                },
+                                "domain": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "requests": {
+                                    "type": "integer"
+                                },
+                                "bytes_out": {
+                                    "type": "integer"
+                                },
+                                "s4xx": {
+                                    "type": "integer"
+                                },
+                                "s5xx": {
+                                    "type": "integer"
+                                },
+                                "p95": {
+                                    "type": "number"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "breakdowns": {
+                        "description": "Top values per dimension: country, city, referer, browser, os, device, protocol, cache, status, agent, ip, useragent. ip and useragent need the `read:sensitive` or `root` token ability. ip and city are left out when the server does not record IPs.",
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                                "properties": {
+                                    "value": {
+                                        "type": "string"
+                                    },
+                                    "requests": {
+                                        "type": "integer"
+                                    },
+                                    "bytes_out": {
+                                        "type": "integer"
+                                    },
+                                    "lat": {
+                                        "description": "Only for city.",
+                                        "type": "number"
+                                    },
+                                    "lon": {
+                                        "description": "Only for city.",
+                                        "type": "number"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    },
+                    "attribution": {
+                        "description": "GeoIP data attribution to show with country and city data.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
                     }
                 },
                 "type": "object"
@@ -29590,6 +31040,14 @@
                         "type": "string",
                         "nullable": true
                     },
+                    "compose_services": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "nullable": true,
+                        "description": "Docker Compose services that get this variable. Null means all services."
+                    },
                     "version": {
                         "type": "string"
                     },
@@ -30541,6 +31999,62 @@
             }
         },
         "parameters": {
+            "Page": {
+                "name": "page",
+                "in": "query",
+                "description": "Page number. With page or per_page, the list is paginated and the X-Total-Count header gives the total.",
+                "required": false,
+                "schema": {
+                    "type": "integer",
+                    "default": 1,
+                    "minimum": 1
+                }
+            },
+            "PerPage": {
+                "name": "per_page",
+                "in": "query",
+                "description": "Items per page. With page or per_page, the list is paginated and the X-Total-Count header gives the total.",
+                "required": false,
+                "schema": {
+                    "type": "integer",
+                    "default": 50,
+                    "maximum": 100,
+                    "minimum": 1
+                }
+            },
+            "MetricsMinutes": {
+                "name": "minutes",
+                "in": "query",
+                "description": "Number of minutes of metric history before now. Cannot be sent with from or to. Cannot exceed the Sentinel metrics retention period of the server.",
+                "required": false,
+                "schema": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 1
+                }
+            },
+            "MetricsFrom": {
+                "name": "from",
+                "in": "query",
+                "description": "Start of the metric history, as an ISO 8601 date. Cannot be older than the Sentinel metrics retention period of the server. The window length is rounded up to whole minutes, so the history can start up to a minute before from.",
+                "required": false,
+                "schema": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-11-20T08:00:00Z"
+                }
+            },
+            "MetricsTo": {
+                "name": "to",
+                "in": "query",
+                "description": "End of the metric history, as an ISO 8601 date after from. Needs from. Defaults to now.",
+                "required": false,
+                "schema": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2026-11-20T09:00:00Z"
+                }
+            },
             "VulnerabilityState": {
                 "name": "state",
                 "in": "query",
@@ -30596,6 +32110,14 @@
                     "default": 50,
                     "maximum": 200,
                     "minimum": 1
+                }
+            }
+        },
+        "headers": {
+            "X-Total-Count": {
+                "description": "Total number of items that match the filters, on all pages. Sent when the list is paginated.",
+                "schema": {
+                    "type": "integer"
                 }
             }
         },
@@ -30681,6 +32203,10 @@
             "description": "Projects"
         },
         {
+            "name": "Services",
+            "description": "Services"
+        },
+        {
             "name": "Resources",
             "description": "Resources"
         },
@@ -30711,10 +32237,6 @@
         {
             "name": "Service databases",
             "description": "Service databases"
-        },
-        {
-            "name": "Services",
-            "description": "Services"
         },
         {
             "name": "Shared Environment Variables",

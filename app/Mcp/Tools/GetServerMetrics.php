@@ -4,7 +4,6 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesTeam;
-use App\Models\Server;
 use App\Services\SentinelMetricsClient;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
@@ -48,7 +47,7 @@ class GetServerMetrics extends Tool
         }
         $minutes = min($minutes, self::MAX_MINUTES);
 
-        $server = Server::whereTeamId($teamId)->where('uuid', $uuid)->with('settings')->first();
+        $server = $this->visibleServers($request, $teamId)->where('uuid', $uuid)->with('settings')->first();
         if (! $server) {
             return $this->mcpError($request, "Server [{$uuid}] not found.", ['resource_uuid' => $uuid]);
         }

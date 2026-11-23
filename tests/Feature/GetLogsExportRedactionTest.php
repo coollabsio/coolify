@@ -14,6 +14,7 @@ use App\Models\ServiceApplication;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -215,6 +216,7 @@ it('redacts stored database credentials even without environment variables', fun
     'mariadb' => [StandaloneMariadb::class, ['mariadb_password' => 'xy', 'mariadb_root_password' => 'zw']],
     'mongodb' => [StandaloneMongodb::class, ['mongo_initdb_root_password' => 'xy']],
     'clickhouse' => [StandaloneClickhouse::class, ['clickhouse_admin_password' => 'xy']],
+    'influxdb' => [StandaloneInfluxdb::class, ['influxdb_admin_password' => 'xy', 'influxdb_admin_token' => 'zw']],
     'keydb' => [StandaloneKeydb::class, ['keydb_password' => 'xy']],
     'dragonfly' => [StandaloneDragonfly::class, ['dragonfly_password' => 'xy']],
 ]);

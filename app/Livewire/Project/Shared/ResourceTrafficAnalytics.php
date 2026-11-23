@@ -63,8 +63,11 @@ abstract class ResourceTrafficAnalytics extends Component
      */
     public array $series = [];
 
+    /** Breakdown dimensions of a resource, also read by the traffic API. */
+    public const BREAKDOWN_DIMENSIONS = ['country', 'city', 'referer', 'browser', 'os', 'device', 'protocol', 'cache', 'status', 'agent', 'ip', 'useragent'];
+
     /** @var array<int, string> */
-    protected array $breakdownDimensions = ['country', 'city', 'referer', 'browser', 'os', 'device', 'protocol', 'cache', 'status', 'agent', 'ip', 'useragent'];
+    protected array $breakdownDimensions = self::BREAKDOWN_DIMENSIONS;
 
     /**
      * Name of the public model property and lazy-load parameter ('application' / 'service').

@@ -34,6 +34,7 @@ use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
@@ -307,20 +308,20 @@ class ApplicationsController extends Controller
         ],
         tags: ['Applications'],
         parameters: [
-            new OA\Parameter(
-                name: 'tag',
-                in: 'query',
-                description: 'Filter applications by tag name.',
-                required: false,
-                schema: new OA\Schema(
-                    type: 'string',
-                )
-            ),
+            new OA\Parameter(name: 'tag', in: 'query', description: 'Filter applications by tag name.', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'project_uuid', in: 'query', description: 'Filter applications by project UUID.', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'environment_uuid', in: 'query', description: 'Filter applications by environment UUID.', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'server_uuid', in: 'query', description: 'Filter applications by the UUID of the server they are deployed to.', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'status', in: 'query', description: 'Filter applications by status (case-insensitive substring, for example running or exited).', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'name', in: 'query', description: 'Filter applications by name (case-insensitive substring).', required: false, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(ref: '#/components/parameters/Page'),
+            new OA\Parameter(ref: '#/components/parameters/PerPage'),
         ],
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Get all applications.',
+                description: 'Get all applications. An unknown project, environment, or server UUID gives an empty list.',
+                headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')],
                 content: [
                     new OA\MediaType(
                         mediaType: 'application/json',
@@ -339,33 +340,44 @@ class ApplicationsController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
-    public function applications(Request $request)
+    public function applications(Request $request): JsonResponse
     {
         $teamId = getTeamIdFromToken();
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
 
-        $tagName = $request->query('tag');
+        $validator = Validator::make($request->query(), [
+            'tag' => ['nullable', 'string', 'max:255'],
+            'project_uuid' => ['nullable', 'string', 'max:255'],
+            'environment_uuid' => ['nullable', 'string', 'max:255'],
+            'server_uuid' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', 'string', 'max:255'],
+            'name' => ['nullable', 'string', 'max:255'],
+        ] + apiPaginationRules());
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+        $validated = $validator->validated();
+
         $applicationRelations = canReadServerSecretsFromApi()
             ? ['destination.server.settings']
             : [];
 
-        $applications = Application::ownedByCurrentTeamAPI($teamId)
+        $query = Application::ownedByCurrentTeamAPI($teamId)
             ->with($applicationRelations)
-            ->when($tagName, function ($query, $tagName) {
-                $query->whereHas('tags', function ($query) use ($tagName) {
-                    $query->where('name', $tagName);
-                });
-            })
-            ->get()
-            ->map(function ($application) {
-                return $this->removeSensitiveData($application);
-            });
+            ->applyListFilters($teamId, Arr::only($validated, ['tag', 'project_uuid', 'environment_uuid', 'server_uuid', 'status', 'name']))
+            ->orderBy('id');
 
-        return response()->json($applications);
+        [$applications, $headers] = apiPaginate($query, $request);
+
+        return response()->json($applications->map(fn ($application) => $this->removeSensitiveData($application)), 200, $headers);
     }
 
     #[OA\Post(
@@ -4277,6 +4289,7 @@ class ApplicationsController extends Controller
                             'is_literal' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is a literal, nothing espaced.'],
                             'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                             'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
+                            'compose_services' => ['type' => 'array', 'items' => ['type' => 'string'], 'nullable' => true, 'description' => 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'],
                         ],
                     ),
                 ),
@@ -4311,7 +4324,7 @@ class ApplicationsController extends Controller
     )]
     public function update_env_by_uuid(Request $request)
     {
-        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment'];
+        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'compose_services'];
         $teamId = getTeamIdFromToken();
 
         if (is_null($teamId)) {
@@ -4346,6 +4359,7 @@ class ApplicationsController extends Controller
             'is_runtime' => 'boolean',
             'is_buildtime' => 'boolean',
             'comment' => 'string|nullable|max:256',
+            ...composeServicesValidationRules($application),
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -4375,7 +4389,7 @@ class ApplicationsController extends Controller
         if ($request->has('value')) {
             $env->value = $request->value;
         }
-        $env->fill($request->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment']));
+        $env->fill($request->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'compose_services']));
         // One audit row with the application context, instead of a second row from the model.
         $env->withoutAuditLogging(fn () => $env->save());
         $changedFields = auditSavedFields($env);
@@ -4436,6 +4450,7 @@ class ApplicationsController extends Controller
                                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                                         'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                                         'copy_value_to_preview' => ['type' => 'boolean', 'description' => 'Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false.'],
+                                        'compose_services' => ['type' => 'array', 'items' => ['type' => 'string'], 'nullable' => true, 'description' => 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'],
                                     ],
                                 ),
                             ],
@@ -4501,7 +4516,7 @@ class ApplicationsController extends Controller
             ], 400);
         }
         $bulk_data = collect($bulk_data)->map(function ($item) {
-            $item = collect($item)->only(['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'copy_value_to_preview']);
+            $item = collect($item)->only(['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'copy_value_to_preview', 'compose_services']);
 
             if ($item->has('key')) {
                 $item->put('key', ValidationPatterns::normalizeEnvironmentVariableKey((string) $item->get('key')));
@@ -4522,6 +4537,7 @@ class ApplicationsController extends Controller
                 'is_buildtime' => 'boolean',
                 'comment' => 'string|nullable|max:256',
                 'copy_value_to_preview' => 'boolean|nullable',
+                ...composeServicesValidationRules($application),
             ]);
             if ($validator->fails()) {
                 return response()->json([
@@ -4540,7 +4556,7 @@ class ApplicationsController extends Controller
                     if ($item->has('value')) {
                         $env->value = $item->get('value');
                     }
-                    $env->fill($item->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment'])->all());
+                    $env->fill($item->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'compose_services'])->all());
                     $env->save();
                 } else {
                     $env = $application->environment_variables()->create([
@@ -4553,6 +4569,7 @@ class ApplicationsController extends Controller
                         'is_runtime' => $item->get('is_runtime', true),
                         'is_buildtime' => $item->get('is_buildtime', true),
                         'comment' => $item->get('comment'),
+                        'compose_services' => $item->get('compose_services'),
                         'resourceable_type' => get_class($application),
                         'resourceable_id' => $application->id,
                     ]);
@@ -4563,7 +4580,7 @@ class ApplicationsController extends Controller
                     if ($item->has('value')) {
                         $env->value = $item->get('value');
                     }
-                    $env->fill($item->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment'])->all());
+                    $env->fill($item->only(['is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'compose_services'])->all());
                     $env->save();
                 } else {
                     $env = $application->environment_variables()->make([
@@ -4576,6 +4593,7 @@ class ApplicationsController extends Controller
                         'is_runtime' => $item->get('is_runtime', true),
                         'is_buildtime' => $item->get('is_buildtime', true),
                         'comment' => $item->get('comment'),
+                        'compose_services' => $item->get('compose_services'),
                         'resourceable_type' => get_class($application),
                         'resourceable_id' => $application->id,
                     ]);
@@ -4632,6 +4650,7 @@ class ApplicationsController extends Controller
                         'is_multiline' => ['type' => 'boolean', 'description' => 'The flag to indicate if the environment variable is multiline.'],
                         'is_shown_once' => ['type' => 'boolean', 'description' => 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'],
                         'copy_value_to_preview' => ['type' => 'boolean', 'description' => 'Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false.'],
+                        'compose_services' => ['type' => 'array', 'items' => ['type' => 'string'], 'nullable' => true, 'description' => 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'],
                     ],
                 ),
             ),
@@ -4668,7 +4687,7 @@ class ApplicationsController extends Controller
     )]
     public function create_env(Request $request)
     {
-        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'copy_value_to_preview'];
+        $allowedFields = ['key', 'value', 'is_preview', 'is_literal', 'is_multiline', 'is_shown_once', 'is_runtime', 'is_buildtime', 'comment', 'copy_value_to_preview', 'compose_services'];
         $teamId = getTeamIdFromToken();
 
         if (is_null($teamId)) {
@@ -4699,6 +4718,7 @@ class ApplicationsController extends Controller
             'is_buildtime' => 'boolean',
             'comment' => 'string|nullable|max:256',
             'copy_value_to_preview' => 'boolean|nullable',
+            ...composeServicesValidationRules($application),
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), $allowedFields);
@@ -4735,6 +4755,7 @@ class ApplicationsController extends Controller
                     'is_runtime' => $request->is_runtime ?? true,
                     'is_buildtime' => $request->is_buildtime ?? true,
                     'comment' => $request->comment ?? null,
+                    'compose_services' => $request->compose_services,
                     'resourceable_type' => get_class($application),
                     'resourceable_id' => $application->id,
                 ]);
@@ -4768,6 +4789,7 @@ class ApplicationsController extends Controller
                     'is_runtime' => $request->is_runtime ?? true,
                     'is_buildtime' => $request->is_buildtime ?? true,
                     'comment' => $request->comment ?? null,
+                    'compose_services' => $request->compose_services,
                     'resourceable_type' => get_class($application),
                     'resourceable_id' => $application->id,
                 ]);
@@ -6511,6 +6533,14 @@ class ApplicationsController extends Controller
         }
         $this->authorize('placeResource', $destination->server);
 
+        try {
+            foreach ($application->persistentStorages()->get() as $volume) {
+                $volume->ensureCloneTargetIsAvailable($application->destination->server, $destination->server);
+            }
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
         $overrides = ['uuid' => new_public_id()];
         if ($request->filled('name')) {
             $overrides['name'] = $request->string('name')->toString();
@@ -6925,6 +6955,113 @@ class ApplicationsController extends Controller
         ]);
 
         return response()->json(['message' => 'Destination detached.']);
+    }
+
+    #[OA\Post(
+        summary: 'Deploy to Destination',
+        description: 'Queue a deployment of the application to a single destination (primary or attached) without redeploying the other destinations.',
+        path: '/applications/{uuid}/destinations/{destination_uuid}/deploy',
+        operationId: 'deploy-application-destination',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'UUID of the application.', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'destination_uuid', in: 'path', required: true, description: 'UUID of the destination.', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'force', in: 'query', description: 'Force rebuild.', schema: new OA\Schema(type: 'boolean', default: false)),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Deployment queued.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'message' => ['type' => 'string', 'example' => 'Deployment request queued.', 'description' => 'Message.'],
+                                'deployment_uuid' => ['type' => 'string', 'example' => 'doogksw', 'description' => 'UUID of the deployment.'],
+                            ]
+                        )
+                    ),
+                ]
+            ),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 409, description: 'A deployment of this application is already queued or in progress on the server of this destination.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function deploy_destination(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $force = $request->boolean('force', false);
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $this->authorize('deploy', $application);
+
+        $destination = StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('destination_uuid'))->first();
+        if (! $destination) {
+            return response()->json(['message' => 'Destination not found.'], 404);
+        }
+
+        $isPrimary = $application->destination_id === $destination->id && $application->destination_type === $destination->getMorphClass();
+        if (! $isPrimary && ! $application->additional_networks()->where('standalone_dockers.id', $destination->id)->exists()) {
+            return response()->json(['message' => 'Destination is not attached to this application.'], 422);
+        }
+
+        if ($application->additional_servers()->exists() && str($application->docker_registry_image_name)->isEmpty()) {
+            return response()->json(['message' => 'A Docker registry image is required to deploy to multiple destinations.'], 422);
+        }
+
+        if (! $destination->server?->canHostResources()) {
+            return response()->json(['message' => 'The server of this destination cannot host resources.'], 422);
+        }
+
+        $deploymentUuid = new_public_id();
+
+        $result = queue_application_deployment(
+            application: $application,
+            deployment_uuid: $deploymentUuid,
+            force_rebuild: $force,
+            is_api: true,
+            no_questions_asked: true,
+            server: $destination->server,
+            destination: $destination,
+            only_this_server: true,
+            reject_if_server_busy: true,
+        );
+
+        if ($result['status'] === 'server_busy') {
+            return response()->json(['message' => 'A deployment of this application is already queued or in progress on the server of this destination.'], 409);
+        }
+
+        if ($result['status'] === 'queue_full') {
+            return response()->json(['message' => $result['message']], 400);
+        }
+
+        auditLog('api.application.destination_deployed', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'application_name' => $application->name,
+            'destination_uuid' => $destination->uuid,
+            'deployment_uuid' => $deploymentUuid,
+            'force_rebuild' => $force,
+        ]);
+
+        return response()->json([
+            'message' => 'Deployment request queued.',
+            'deployment_uuid' => $deploymentUuid,
+        ]);
     }
 
     /**

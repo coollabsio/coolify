@@ -11,6 +11,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -18,6 +19,7 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
+use App\Support\ContainerLogArchive;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -42,7 +44,7 @@ class GetLogs extends Component
     public string $errors = '';
 
     #[Locked]
-    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|null $resource = null;
+    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite|null $resource = null;
 
     #[Locked]
     public ServiceApplication|ServiceDatabase|null $servicesubtype = null;
@@ -60,6 +62,12 @@ class GetLogs extends Component
      */
     #[Locked]
     public array $sources = [];
+
+    /**
+     * Sentinel archive file of a removed container. Set, it replaces `docker logs` for $container.
+     */
+    #[Locked]
+    public ?string $archiveFile = null;
 
     public ?string $displayName = null;
 
@@ -471,16 +479,33 @@ class GetLogs extends Component
         $server ??= $this->server;
         $container ??= (string) $this->container;
         $options = trim($options);
-        $options = $options === '' ? '' : "{$options} ";
-        $command = $server->isSwarm()
-            ? "docker service logs {$options}{$container}"
-            : "docker logs {$options}{$container}";
+        if ($this->archiveFile !== null) {
+            $command = $this->archiveLogCommand($options);
+        } else {
+            $options = $options === '' ? '' : "{$options} ";
+            $command = $server->isSwarm()
+                ? "docker service logs {$options}{$container}"
+                : "docker logs {$options}{$container}";
+        }
 
         if ($server->isNonRoot()) {
             $command = parseCommandsByLineForSudo(collect($command), $server)[0];
         }
 
         return $command;
+    }
+
+    /**
+     * Translates the `docker logs` options to a read of the archive. A removed container gets no new lines, so `--since` reads nothing.
+     */
+    private function archiveLogCommand(string $options): string
+    {
+        if (str_contains($options, '--since')) {
+            return 'true';
+        }
+        $tail = preg_match('/-n (\d+)/', $options, $matches) === 1 ? (int) $matches[1] : null;
+
+        return ContainerLogArchive::readCommand((string) $this->resource?->uuid, (string) $this->archiveFile, $tail, str_contains($options, '-t')) ?? 'true';
     }
 
     private function runLogCommand(string $command, int $maxBytes, string $limitLabel, bool $timestamped = true): string

@@ -35,6 +35,7 @@ use App\Models\SslCertificate;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -240,7 +241,7 @@ test('every exported value arrives unchanged on the target', function () {
         Environment::class => ['canvas_positions'],
     ];
     $values = [
-        Server::class => ['proxy' => ['type' => 'TRAEFIK', 'status' => 'running', 'redirect_enabled' => false, 'redirect_url' => 'https://fuzz.example.test']],
+        Server::class => ['proxy' => ['type' => 'TRAEFIK', 'status' => 'running', 'redirect_enabled' => false, 'redirect_url' => 'https://fuzz.example.test', 'unknown_host_status' => 404]],
         // The import accepts only valid host key lines.
         ServerSetting::class => ['ssh_host_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKgKlP9E2JBLjQ8DDxZUaI5vOJlvo8Uv06UAyqDbyC2I'],
         Application::class => ['fqdn' => 'https://fuzz-a.example.test,https://fuzz-b.example.test', 'domain_port_overrides' => null, 'noindex_domains' => ['https://fuzz-b.example.test']],
@@ -260,6 +261,7 @@ test('every exported value arrives unchanged on the target', function () {
         StandaloneMysql::class => ['mysql_user' => 'fuzz_user', 'mysql_database' => 'fuzz_db', 'ports_mappings' => '13306:3306', 'public_port' => 13306],
         StandaloneMariadb::class => ['mariadb_user' => 'fuzz_user', 'mariadb_database' => 'fuzz_db', 'ports_mappings' => '13307:3306', 'public_port' => 13307],
         StandaloneClickhouse::class => ['clickhouse_admin_user' => 'fuzz_user', 'ports_mappings' => '18123:8123', 'public_port' => 18123],
+        StandaloneInfluxdb::class => ['influxdb_admin_user' => 'fuzz_user', 'influxdb_org' => 'fuzz_org', 'influxdb_bucket' => 'fuzz_bucket', 'ports_mappings' => '18086:8086', 'public_port' => 18086],
         StandaloneRedis::class => ['ports_mappings' => '16379:6379', 'public_port' => 16379],
         StandaloneKeydb::class => ['ports_mappings' => '16380:6379', 'public_port' => 16380],
         StandaloneDragonfly::class => ['ports_mappings' => '16381:6379', 'public_port' => 16381],

@@ -7,6 +7,7 @@ use App\Models\Service;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -86,6 +87,7 @@ describe('public database urls', function () {
         'keydb' => [StandaloneKeydb::class, ['keydb_password' => 'pass'], 'redis://:pass@%s:15432/0'],
         'dragonfly' => [StandaloneDragonfly::class, ['dragonfly_password' => 'pass'], 'redis://:pass@%s:15432/0'],
         'clickhouse' => [StandaloneClickhouse::class, ['clickhouse_admin_user' => 'user', 'clickhouse_admin_password' => 'pass', 'clickhouse_db' => 'app'], 'clickhouse://user:pass@%s:15432/app'],
+        'influxdb' => [StandaloneInfluxdb::class, ['influxdb_admin_user' => 'user', 'influxdb_admin_password' => 'pass'], 'http://%s:15432'],
     ];
 
     it('brackets an IPv6 server address', function (string $modelClass, array $attributes, string $expected) {

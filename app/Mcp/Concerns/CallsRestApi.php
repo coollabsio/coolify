@@ -37,7 +37,7 @@ trait CallsRestApi
     /**
      * Response keys that are never returned to MCP clients, whatever the token abilities are.
      */
-    private string $neverReturnKeyPattern = '/(private_key|secret|api_key|license_key|user_key|webhook_url|password|^(internal|external)_db_url$|(^|_)token$)/i';
+    private string $neverReturnKeyPattern = '/(private_key|secret|api_key|license_key|user_key|webhook_url|authorization_header|password|^(internal|external)_db_url$|(^|_)token$)/i';
 
     private const MAX_BODY_BYTES = 1_048_576;
 
@@ -138,6 +138,7 @@ trait CallsRestApi
         return [
             'status' => $response->getStatusCode(),
             'body' => is_array($decoded) ? $decoded : ['message' => (string) $response->getContent()],
+            'total' => $response->headers->has('X-Total-Count') ? (int) $response->headers->get('X-Total-Count') : null,
         ];
     }
 

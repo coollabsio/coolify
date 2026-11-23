@@ -93,6 +93,45 @@ policy deletes queued jobs without an error.
 | Application code (jobs, queues, middleware)               | New image, then `horizon:terminate`              |
 | New database migration                                    | `php artisan migrate` before new workers start   |
 
+## Drain a node
+
+Use `horizon:drain` before you stop or restart one node and do not want to
+wait for its long deployments and backups. Run it on the node to drain. The
+other node must run Horizon and must not be paused. The command refuses to
+run if it is not.
+
+```bash
+docker exec coolify php artisan horizon:drain --dry-run
+docker exec coolify php artisan horizon:drain --timeout=120
+```
+
+- `--dry-run` lists the running work of this node. It does not pause Horizon
+  and changes nothing.
+- The command pauses Horizon on this node. Workers finish the current job
+  and take no new job. Workers are not killed, because Horizon starts a
+  killed worker again unpaused.
+- Deployments: the command cancels the old deployment and removes its
+  helper container. Then it queues a new deployment with the same settings
+  (commit, pull request, server, build server, restart, rollback, image tag).
+  The new deployment obeys the concurrent build limit of the server. The log
+  of the old deployment shows the UUID of the new deployment. If a deployment
+  of the same commit is already queued, the command does not queue a copy.
+- Scheduled tasks, database backups, and storage backups: the command stops
+  the SSH commands of the job and removes the backup helper containers on
+  the server. A stopped storage backup starts the containers that it stopped
+  again. The execution shows "Stopped: moved to another worker node." The
+  team gets no failure notification for it.
+- After the old job has ended, the command queues the same task or backup
+  again. The other node runs it. If the old job still runs after
+  `--timeout` seconds, the command does not queue it again and shows it in
+  the result. Run the command again to retry.
+- The node stays paused until you run `php artisan horizon:continue` or
+  restart Horizon.
+
+A stopped scheduled task command can still finish inside the container on
+the server. The new run can then do the same work a second time. A stopped
+database dump can also finish on the server, but its file is not used.
+
 ## Rollout
 
 Do these steps on one node at a time. Do not flush Redis or clear queues.
