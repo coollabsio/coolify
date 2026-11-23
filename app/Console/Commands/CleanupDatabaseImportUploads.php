@@ -72,7 +72,7 @@ class CleanupDatabaseImportUploads extends Command
             ->flatMap(fn (string $directory): array => Storage::files("{$directory}/static-archives"))
             ->filter(fn (string $file): bool => Storage::lastModified($file) < $cutoff)
             ->mapWithKeys(fn (string $file): array => [$file => basename($file, '.json')]);
-        $pending = ApplicationDeploymentQueue::query()
+        $pending = $orphans->isEmpty() ? [] : ApplicationDeploymentQueue::query()
             ->whereIn('deployment_uuid', $orphans->values()->all())
             ->whereIn('status', [ApplicationDeploymentStatus::QUEUED->value, ApplicationDeploymentStatus::IN_PROGRESS->value])
             ->pluck('deployment_uuid')
