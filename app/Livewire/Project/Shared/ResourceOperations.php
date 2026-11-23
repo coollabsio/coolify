@@ -135,10 +135,12 @@ class ResourceOperations extends Component
                     $volume->ensureCloneTargetIsAvailable($this->resource->destination->server, $server);
                 }
                 $uuid = new_public_id();
+                // A clone is not managed by coolify.json: config_key is unique per environment.
                 $new_resource = $this->resource->replicate([
                     'id',
                     'created_at',
                     'updated_at',
+                    'config_key',
                 ])->fill([
                     'uuid' => $uuid,
                     'name' => clone_resource_name($this->resource->name, $uuid),
@@ -257,6 +259,7 @@ class ResourceOperations extends Component
                         'id',
                         'created_at',
                         'updated_at',
+                        'config_meta',
                     ])->fill($payload);
                     $newEnvironmentVariable->save();
                 }

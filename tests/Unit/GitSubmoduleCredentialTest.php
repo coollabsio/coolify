@@ -59,7 +59,7 @@ describe('Git submodule credential propagation', function () {
         );
 
         expect($result)
-            ->toContain('GIT_SSH_COMMAND="'.$sshCommand.'" git -c advice.detachedHead=false checkout');
+            ->toContain("(git -c advice.detachedHead=false checkout 'abc123def456' >/dev/null 2>&1 || (GIT_SSH_COMMAND=\"{$sshCommand}\" git fetch origin 'abc123def456' && git -c advice.detachedHead=false checkout 'abc123def456' >/dev/null 2>&1))");
     });
 
     test('setGitImportSettings uses provided gitSshCommand for shallow fetch', function () {

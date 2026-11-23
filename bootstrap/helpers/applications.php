@@ -16,6 +16,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Services\Dns\ResourceDnsRecords;
+use App\Services\ProjectConfig\ConfigPushRouter;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +26,9 @@ use Spatie\Url\Url;
 
 function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null, ?string $parent_deployment_uuid = null, ?int $scan_gate_bypassed_by = null, ?string $scan_gate_pinned_image = null, bool $is_mcp = false, ?CancelPreviousDeployments $cancel_previous = null, bool $reject_if_server_busy = false)
 {
+    if ($is_webhook && (int) $pull_request_id === 0 && ! $rollback && app(ConfigPushRouter::class)->hold($application)) {
+        return ['status' => 'skipped', 'message' => 'The deployment waits until coolify.json of this push is applied.', 'deployment_uuid' => null];
+    }
     $commit = $commit ?: ($application->git_commit_sha ?: 'HEAD');
     $commit = validateGitRef($commit, 'deployment commit');
     $application_id = $application->id;
@@ -78,7 +82,10 @@ function queue_application_deployment(Application $application, string $deployme
             ->where('commit', $commit)
             ->where('pull_request_id', $pull_request_id)
             ->where('docker_registry_image_tag', $docker_registry_image_tag)
-            ->whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])
+            // A deployment with finished_at only cleans up (for example, it stopped for a fork approval),
+            // so it does not deploy this commit anymore.
+            ->where(fn ($query) => $query->where('status', ApplicationDeploymentStatus::QUEUED->value)
+                ->orWhere(fn ($query) => $query->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->whereNull('finished_at')))
             ->first();
 
         if ($existing_deployment && ! $force_rebuild && ! $rollback && ! $no_questions_asked) {
@@ -536,12 +543,14 @@ function clone_application(Application $source, $destination, array $overrides =
     }
 
     // Clone the application
+    // A clone is not managed by coolify.json: config_key is unique per environment.
     $newApplication = $source->replicate([
         'id',
         'created_at',
         'updated_at',
         'additional_servers_count',
         'additional_networks_count',
+        'config_key',
     ])->fill(array_merge([
         'uuid' => $uuid,
         'name' => $name,
@@ -667,6 +676,7 @@ function clone_application(Application $source, $destination, array $overrides =
                 'id',
                 'created_at',
                 'updated_at',
+                'config_meta',
             ])->fill([
                 'resourceable_id' => $newApplication->id,
                 'resourceable_type' => $newApplication->getMorphClass(),
@@ -685,6 +695,7 @@ function clone_application(Application $source, $destination, array $overrides =
                 'id',
                 'created_at',
                 'updated_at',
+                'config_meta',
             ])->fill([
                 'resourceable_id' => $newApplication->id,
                 'resourceable_type' => $newApplication->getMorphClass(),

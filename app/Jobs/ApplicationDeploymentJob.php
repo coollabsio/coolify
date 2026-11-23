@@ -10,6 +10,7 @@ use App\Enums\StaticImageTypes;
 use App\Events\ApplicationConfigurationChanged;
 use App\Events\ServiceStatusChanged;
 use App\Exceptions\DeploymentException;
+use App\Exceptions\PreviewApprovalRequiredException;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -23,8 +24,10 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Notifications\Application\PreviewApprovalRequired;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\ImageScan\DeploymentImageScan;
+use App\Services\ProjectConfig\UnlinkedConfigFileHint;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use App\Support\StaticSiteArchive;
@@ -43,6 +46,7 @@ use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
@@ -498,6 +502,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             return;
         }
+        $waitsForApproval = false;
         try {
             // Make sure the private key is stored in the filesystem
             $this->server->privateKey->storeInFileSystem();
@@ -516,6 +521,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->addHosts = $this->networkHostFlags();
             $this->detectBuildKitCapabilities();
             $this->decide_what_to_do();
+        } catch (PreviewApprovalRequiredException) {
+            // The status changes after the cleanup below: commands stop when the deployment is cancelled.
+            $waitsForApproval = true;
         } catch (Exception $e) {
             if ($this->pull_request_id !== 0 && $this->application->isGithubAppSource()) {
                 ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::ERROR);
@@ -537,7 +545,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             try {
                 if ($this->use_build_server) {
                     $this->server = $this->build_server;
-                } else {
+                } elseif (! $waitsForApproval) {
+                    // An unapproved checkout must not reach the configuration directory.
                     $this->write_deployment_configurations();
                 }
             } catch (Exception $e) {
@@ -558,6 +567,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             } catch (Exception $e) {
                 // Log but don't fail - event dispatch errors shouldn't prevent status updates
                 \Log::warning('Failed to dispatch ServiceStatusChanged for deployment '.$this->deployment_uuid.': '.$e->getMessage());
+            }
+
+            if ($waitsForApproval) {
+                $this->transitionToStatus(ApplicationDeploymentStatus::CANCELLED_BY_USER);
             }
         }
     }
@@ -4104,6 +4117,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
         $this->withGitHostKeyHint(fn () => $this->import_repository());
         $this->save_git_ssh_known_hosts();
+        $this->ensureForkPreviewCommitIsApproved();
         $this->create_workdir();
         $this->execute_remote_command(
             [
@@ -4119,6 +4133,76 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 ['commit_message' => $commit_message->value()]
             );
         }
+        $this->detectUnlinkedConfigFile();
+    }
+
+    private function detectUnlinkedConfigFile(): void
+    {
+        $hint = app(UnlinkedConfigFileHint::class);
+        if (! $hint->shouldCheck($this->application, $this->pull_request_id)) {
+            return;
+        }
+        $this->execute_remote_command([$hint->command($this->deployment_uuid, $this->basedir), 'hidden' => true, 'save' => 'coolify_json_file']);
+        $hint->record($this->application, $this->application_deployment_queue, $this->saved_outputs->get('coolify_json_file'));
+    }
+
+    /**
+     * A fork pull request can change everything that the build and the containers run. Coolify
+     * reads the commit that the clone checked out (the pull request can get new commits after the
+     * webhook) and deploys it only when an admin approved that commit.
+     *
+     * @throws PreviewApprovalRequiredException
+     */
+    private function ensureForkPreviewCommitIsApproved(): void
+    {
+        if ($this->pull_request_id === 0 || ! $this->preview || $this->preview->refresh()->is_fork_pull_request === false) {
+            return;
+        }
+
+        $this->execute_remote_command([
+            executeInDocker($this->deployment_uuid, 'git -C '.escapeshellarg($this->basedir).' rev-parse HEAD'),
+            'hidden' => true,
+            'save' => 'checked_out_commit',
+        ]);
+        $commit = $this->trimmedSavedOutput('checked_out_commit')->value();
+        if (! preg_match('/\A[0-9a-f]{40}([0-9a-f]{24})?\z/', $commit)) {
+            throw new DeploymentException('Coolify cannot read the commit of this fork pull request, so it cannot check the approval.');
+        }
+
+        if (! $this->preview->forkCommitNeedsApproval($commit)) {
+            if (filled($this->preview->approved_commit) && hash_equals($this->preview->approved_commit, $commit)) {
+                $this->application_deployment_queue->addLogEntry("An admin approved commit {$commit} of this fork pull request.");
+            }
+
+            return;
+        }
+
+        // One transaction: an approval that sees the pending commit also sees that this
+        // deployment stops, so admission queues a new deployment instead of reusing this one.
+        DB::transaction(function () use ($commit): void {
+            $this->preview->markWaitingForApproval($commit);
+            $this->application_deployment_queue->update(['commit' => $commit, 'finished_at' => Carbon::now()->toImmutable()]);
+        });
+        $this->commit = $commit;
+        $origin = $this->preview->is_fork_pull_request
+            ? 'comes from a fork'
+            : 'has an unknown origin (Coolify got no webhook event of it yet), so Coolify handles it as a fork';
+        $this->application_deployment_queue->addLogEntry("Commit {$commit} of this pull request {$origin}. An admin must approve it on the Preview Deployments page before Coolify deploys it.", 'stderr');
+
+        try {
+            $this->application->environment->project->team?->notify(new PreviewApprovalRequired($this->application, $this->preview, $this->deployment_uuid));
+        } catch (Throwable $e) {
+            $this->logStatusTransitionSideEffectFailure('Sending the approval notification failed', $e);
+        }
+        if ($this->application->isGithubAppSource()) {
+            try {
+                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::WAITING_FOR_APPROVAL);
+            } catch (Throwable $e) {
+                $this->logStatusTransitionSideEffectFailure('Queueing the GitHub approval status failed', $e);
+            }
+        }
+
+        throw new PreviewApprovalRequiredException('The commit of this fork pull request waits for an admin approval.');
     }
 
     /**
@@ -6398,6 +6482,35 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             ]);
     }
 
+    /**
+     * Build secrets reach a build only as environment variables inside RUN, and the env= mount
+     * option needs Dockerfile frontend 1.10+. Warn about the two cases that then build without values.
+     *
+     * @param  Collection<int, string>  $dockerfile
+     * @param  Collection<string, mixed>  $variables
+     */
+    private function warnAboutDockerfileBuildSecretsCompatibility(Collection $dockerfile, Collection $variables): void
+    {
+        if (preg_match('~^#\s*syntax\s*=\s*\S*docker/dockerfile:1\.(\d+)~i', (string) $dockerfile->first(), $matches) === 1 && (int) $matches[1] < 10) {
+            $this->application_deployment_queue->addLogEntry("⚠️ The Dockerfile pins docker/dockerfile:1.{$matches[1]}. Build secrets need docker/dockerfile:1.10 or later. Remove the syntax line or update it, or switch Build secrets off.", 'stderr');
+        }
+
+        $keysUsedOutsideRun = $variables->keys()
+            ->map(fn ($key): string => (string) $key)
+            ->filter(fn (string $key): bool => ValidationPatterns::isValidEnvironmentVariableKey($key))
+            ->filter(fn (string $key): bool => $dockerfile->contains(function (string $line) use ($key): bool {
+                $trimmed = ltrim($line);
+
+                return preg_match('/^(RUN|ARG|ENV|#)/i', $trimmed) !== 1
+                    && preg_match('/\$\{?'.preg_quote($key, '/').'\b/', $trimmed) === 1;
+            }))
+            ->values();
+
+        if ($keysUsedOutsideRun->isNotEmpty()) {
+            $this->application_deployment_queue->addLogEntry('⚠️ The Dockerfile uses build-time variables outside RUN instructions: '.$keysUsedOutsideRun->implode(', ').'. With build secrets, these values are only available inside RUN, so these instructions get empty values. Switch Build secrets off on the Environment Variables page if the build needs them.', 'stderr');
+        }
+    }
+
     private function modify_dockerfile_for_secrets($dockerfile_path, ?string $composeServiceName = null)
     {
         // Only process if build secrets are enabled and we have secrets to mount
@@ -6447,6 +6560,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $instructions = collect($this->dockerfileInstructions($dockerfile));
         $runLines = $instructions->where('keyword', 'RUN')->pluck('start')->all();
         $fromEndLines = $instructions->where('keyword', 'FROM')->pluck('end')->all();
+
+        $this->warnAboutDockerfileBuildSecretsCompatibility($dockerfile, $variables);
 
         $modified = false;
         $dockerfile = $dockerfile->flatMap(function ($line, $index) use ($mountStrings, $runLines, $fromEndLines, &$modified) {

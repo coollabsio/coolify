@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Exceptions\RemoteSecretException;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
+use App\Services\ProjectConfig\ManagedResources;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
@@ -114,6 +115,7 @@ class EnvironmentVariable extends BaseModel
         // Metadata
         'version',
         'order',
+        'config_meta',
     ];
 
     protected $casts = [
@@ -129,6 +131,7 @@ class EnvironmentVariable extends BaseModel
         'uses_legacy_escaping' => 'boolean',
         'compose_services' => 'array',
         'version' => 'string',
+        'config_meta' => 'array',
         'resourceable_type' => 'string',
         'resourceable_id' => 'integer',
     ];
@@ -155,6 +158,7 @@ class EnvironmentVariable extends BaseModel
 
     protected static function booted()
     {
+        static::deleting(fn (ModelsEnvironmentVariable $environmentVariable) => ManagedResources::guardVariable($environmentVariable, deleting: true));
         static::creating(function (ModelsEnvironmentVariable $environment_variable) {
             $environment_variable->version = config('constants.coolify.version');
         });
@@ -198,6 +202,7 @@ class EnvironmentVariable extends BaseModel
         });
 
         static::saving(function (ModelsEnvironmentVariable $environmentVariable) {
+            ManagedResources::guardVariable($environmentVariable);
             // A lock is permanent: no UI, API, or MCP path can unlock a variable and show its value again.
             if ($environmentVariable->exists && $environmentVariable->getOriginal('is_shown_once')) {
                 $environmentVariable->is_shown_once = true;

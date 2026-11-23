@@ -83,6 +83,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Canvas positions | drag the nodes on the environment canvas |
 | ✅ | Resource links | a link between 2 resources on this server, and a link to a resource on another server. Expected: the first moves, the second does not, and the export warns |
 | ✅ | Environment with resources only on another server | Expected: it is not exported, and the prechecks show a `NOTE:` line |
+| ☐ | coolify.json link | link one environment (`POST /api/v1/config/links`) and apply a file with an application, a database, and a service. Expected: `config_key`, variable forms, and service domain ownership move; the link and revisions do not; the target finish list has a "coolify.json of environment" step |
 
 ## 6. Applications (one per build pack and source)
 
@@ -102,14 +103,16 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Limits | memory, swap, swappiness, reservation, CPUs, cpuset, CPU shares |
 | ➕ | Advanced | custom labels, custom docker run options, pre/post deployment command + container, manual webhook secrets |
 | ✅ | Maintenance | maintenance mode on + custom maintenance page |
-| ✅ | All application settings that are not the default | git submodules, LFS, shallow clone, auto deploy off, force HTTPS, debug, preview deployments on, PR deployments public, log drain, GPU (driver, count, device IDs, options), include timestamps, swarm-only worker nodes, build server, consistent container name, gzip off, strip prefix off, connect to Docker network, custom internal name, container label escape off, env sorting, read-only labels, preserve repository, disable build cache, use build secrets, stop grace period 30, rolling update drain time 12, inject build args off, include source commit, Docker images to keep 5, custom container name prefix, redact env values in logs, Coolify default variables off, use production values in previews off, Traefik certificate resolver, auto-cancel queued webhook deployments off, auto-cancel building webhook deployments on |
+| ✅ | All application settings that are not the default | git submodules, LFS, shallow clone, auto deploy off, force HTTPS, debug, preview deployments on, PR deployments public, log drain, GPU (driver, count, device IDs, options), include timestamps, swarm-only worker nodes, build server, consistent container name, gzip off, strip prefix off, connect to Docker network, custom internal name, container label escape off, env sorting, read-only labels, preserve repository, disable build cache, build secrets off, a dismissed recommendation (Recommendations), stop grace period 30, rolling update drain time 12, inject build args off, include source commit, Docker images to keep 5, custom container name prefix, redact env values in logs, Coolify default variables off, use production values in previews off, Traefik certificate resolver, auto-cancel queued webhook deployments off, auto-cancel building webhook deployments on |
 | ✅ | Environment variables | normal, multiline, literal, shown once, build time only, runtime only, required, with comment, preview-only, and references to `{{team.*}}`, `{{project.*}}`, `{{environment.*}}`, `{{server.*}}` |
-| ✅ | Persistent volume | the seed has one; add a host-path bind mount and preview suffix on |
+| ✅ | Persistent volume | the seed has one; add a host-path bind mount and preview suffix on, and one existing Docker volume (`is_external`) |
 | ✅ | File mount + directory mount | content, chown, chmod |
 | ✅ | Volume backup | on the persistent volume: S3 on, stop during backup, all retention values, timeout, missing-backup days |
 | ✅ | Scheduled tasks | the seed has one; add a disabled one with container + timeout + "Run in a shell" off; an auto-disabled task keeps its disabled reason |
 | ✅ | Tag | |
 | ✅ | Preview deployment | PR preview with domain port overrides + max restart count + keeps production values (previews from before v4.5.1) (needs the GitHub App, or create it in the database) |
+| ✅ | Fork PR approval off | on a git application (the seed uses `deploykey-app`, `gitlab-app`, `static-site`): fork PR approval not required (`is_pr_deployments_public_approval_required` off). Expected: still off on the target |
+| ✅ | Fork PR preview approval | on another application with PR deployments public and fork PR approval required, the default (the seed uses `whoami2`). Do not use an application of the row above, because there a new commit does not wait. A fork PR preview with an approved commit and a newer commit that waits for approval (`is_fork_pull_request`, `approved_commit`, `approved_at`, `pending_approval_commit`). Expected: on the target the approved commit still deploys and the pending one still waits |
 | ✅ | Secret manager link | the app loads variables from the secret manager token |
 | ✅ | Managed DNS record | owned record in the Cloudflare zone for the app domain. Expected: the target takes ownership (provider comment changes) |
 

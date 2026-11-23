@@ -1,4 +1,6 @@
-<span role="img" aria-label="Experimental" data-tooltip="Experimental"
+@props(['label' => 'Experimental'])
+
+<span role="img" aria-label="{{ $label }}" data-tooltip="{{ $label }}"
     {{ $attributes->class('inline-flex cursor-help text-coollabs dark:text-brand-light') }}>
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
         class="size-3.5" aria-hidden="true">

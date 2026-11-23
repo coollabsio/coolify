@@ -3,17 +3,27 @@
 namespace App\Traits;
 
 use App\Data\RepositoryDetectionResult;
+use App\Jobs\PlanEnvironmentConfigJob;
 use App\Models\Application;
 use App\Models\ApplicationSetting;
+use App\Models\Environment;
+use App\Models\EnvironmentConfigLink;
 use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
+use App\Models\Project;
+use App\Policies\ResourceCreatePolicy;
 use App\Rules\ValidGitBranch;
+use App\Services\ProjectConfig\ConfigLinkPreview;
+use App\Services\ProjectConfig\ConfigLinks;
+use App\Services\ProjectConfig\ConfigTemplate;
 use App\Services\RepositoryDetector;
 use App\Support\ValidationPatterns;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 
 /**
@@ -63,6 +73,32 @@ trait HasRepositoryDetection
     public bool $envImported = false;
 
     /**
+     * Path of a coolify.json file that the scan found, relative to the scanned directory.
+     */
+    #[Locked]
+    public ?string $detectedConfigFile = null;
+
+    #[Locked]
+    public ?array $configPlan = null;
+
+    #[Locked]
+    public ?string $configPlanError = null;
+
+    /**
+     * Plans of this scan by choice and form, so a switch between the choices does not read the repository again.
+     *
+     * @var array<string, array{plan: ?array, error: ?string}>
+     */
+    #[Locked]
+    public array $configPlans = [];
+
+    /**
+     * How to create the resources when the scan found coolify.json: 'template' (the file sets the defaults one time),
+     * 'file' (the file manages the environment), or 'manual'.
+     */
+    public string $configSource = 'template';
+
+    /**
      * Unsaved application with the repository, branch, and Git source or deploy key to scan.
      */
     abstract protected function applicationForDetection(): Application;
@@ -106,6 +142,178 @@ trait HasRepositoryDetection
             $this->dispatch('error', 'Smart Scan could not read the repository. Check the repository access and the branch.');
         }
         $this->detectionRan = true;
+        if ($this->detectedConfigFile !== null) {
+            $this->configSource = 'template';
+            $this->previewConfigFile();
+        }
+    }
+
+    public function usesConfigFile(): bool
+    {
+        return $this->detectedConfigFile !== null && in_array($this->configSource, ['template', 'file'], true);
+    }
+
+    public function updatedConfigSource(): void
+    {
+        $this->configSource = in_array($this->configSource, ['template', 'file', 'manual'], true) ? $this->configSource : 'template';
+        if ($this->usesConfigFile()) {
+            $this->previewConfigFile(fromScan: true);
+        }
+    }
+
+    /**
+     * A template needs only the right to create resources. A link needs a team admin.
+     */
+    public function canCreateFromConfigFile(): bool
+    {
+        if ($this->configSource !== 'template') {
+            return $this->canLinkConfigFile();
+        }
+        try {
+            return app(ResourceCreatePolicy::class)->createAny(auth()->user(), $this->detectionEnvironment());
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    public function canLinkConfigFile(): bool
+    {
+        try {
+            return auth()->user()->isAdminOfTeam((int) $this->detectionEnvironment()->project->team_id);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Reads the found coolify.json and shows its plan for this environment. Nothing is saved.
+     */
+    public function previewConfigFile(bool $fromScan = false): void
+    {
+        $this->authorize('create', Application::class);
+        $this->configPlan = null;
+        $this->configPlanError = null;
+        try {
+            $data = $this->configLinkData();
+            $cacheKey = $this->configSource.':'.hash('sha256', json_encode($data));
+            if (! $fromScan || ! isset($this->configPlans[$cacheKey])) {
+                $link = $this->unsavedConfigLink($data);
+                $result = $this->configSource === 'template'
+                    ? app(ConfigTemplate::class)->plan($link, auth()->user())
+                    : app(ConfigLinkPreview::class)->plan($link, auth()->user());
+                $this->configPlans[$cacheKey] = [
+                    'plan' => $result['plan'] === null ? null
+                        : $result['plan'] + ['link' => ['repository' => $data['repository'], 'branch' => $data['branch'], 'file_path' => $data['file_path']]],
+                    'error' => $result['error'],
+                ];
+            }
+            ['plan' => $this->configPlan, 'error' => $this->configPlanError] = $this->configPlans[$cacheKey];
+        } catch (\Throwable $e) {
+            $this->configPlanError = $e instanceof \RuntimeException || $e instanceof AuthorizationException || $e instanceof ValidationException
+                ? $e->getMessage()
+                : 'Coolify could not read coolify.json.';
+        }
+    }
+
+    /**
+     * Creates the resources from coolify.json one time. They are normal resources after that.
+     */
+    public function useConfigTemplate(): void
+    {
+        try {
+            $environment = $this->detectionEnvironment();
+            $created = app(ConfigTemplate::class)->create($this->unsavedConfigLink($this->configLinkData()), auth()->user(), $this->configPlan['commit'] ?? null);
+
+            $parameters = ['project_uuid' => $environment->project->uuid, 'environment_uuid' => $environment->uuid];
+            if (count($created) === 1 && $created[0] instanceof Application) {
+                $this->redirectRoute('project.application.configuration', $parameters + ['application_uuid' => $created[0]->uuid]);
+
+                return;
+            }
+            $this->redirectRoute('project.resource.index', $parameters);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /**
+     * A link that is not saved, to read and plan the file of the form.
+     *
+     * @param  array{repository: string, branch: string, file_path: string, source_type: string, source_uuid: ?string}  $data
+     */
+    private function unsavedConfigLink(array $data): EnvironmentConfigLink
+    {
+        $destination = find_resource_destination_for_current_team(data_get($this->query, 'destination'))
+            ?? throw new \RuntimeException('Destination not found.');
+
+        return app(ConfigLinks::class)->unsavedGitLink(auth()->user(), $this->detectionEnvironment(), $data + [
+            'server_uuid' => $destination->server->uuid,
+            'destination_uuid' => $destination->uuid,
+        ]);
+    }
+
+    /**
+     * Links this environment to coolify.json on the branch. Only a team admin can do this.
+     */
+    public function useConfigFile(): void
+    {
+        try {
+            $environment = $this->detectionEnvironment();
+            $teamId = (int) $environment->project->team_id;
+            abort_unless(auth()->user()->isAdminOfTeam($teamId), 403, 'Only a team admin can link coolify.json.');
+            $destination = find_resource_destination_for_current_team(data_get($this->query, 'destination'))
+                ?? throw new \RuntimeException('Destination not found.');
+
+            $link = app(ConfigLinks::class)->create(auth()->user(), $teamId, $this->configLinkData() + [
+                'project' => $environment->project->name,
+                'environment' => $environment->name,
+                'mode' => EnvironmentConfigLink::MODE_GIT,
+                'server_uuid' => $destination->server->uuid,
+                'destination_uuid' => $destination->uuid,
+            ]);
+            PlanEnvironmentConfigJob::dispatch($link, 'link');
+
+            $this->redirectRoute('project.environment.configuration', [
+                'project_uuid' => $environment->project->uuid,
+                'environment_uuid' => $environment->uuid,
+            ]);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /**
+     * Repository, branch, and git source of the form, in the shape of a link request.
+     *
+     * @return array{repository: string, branch: string, file_path: string, source_type: string, source_uuid: ?string}
+     */
+    private function configLinkData(): array
+    {
+        $application = $this->applicationForDetection();
+        $source = $application->getRelation('source');
+        [$type, $uuid] = match (true) {
+            $application->private_key_id !== null => ['deploy_key', PrivateKey::query()->find($application->private_key_id)?->uuid],
+            $source instanceof GitlabApp => ['gitlab_app', $source->uuid],
+            $source instanceof GiteaApp => ['gitea_app', $source->uuid],
+            $source instanceof GithubApp && (int) $source->id !== 0 => ['github_app', $source->uuid],
+            default => ['public', null],
+        };
+        $directory = trim((string) ($this->base_directory ?? '/'), '/');
+
+        return [
+            'repository' => (string) $application->git_repository,
+            'branch' => (string) $application->git_branch,
+            'file_path' => ltrim(($directory === '' ? '' : $directory.'/').($this->detectedConfigFile ?? 'coolify.json'), '/'),
+            'source_type' => $type,
+            'source_uuid' => $uuid,
+        ];
+    }
+
+    private function detectionEnvironment(): Environment
+    {
+        $project = Project::ownedByCurrentTeam()->where('uuid', data_get($this->parameters, 'project_uuid'))->firstOrFail();
+
+        return $project->environments()->where('uuid', data_get($this->parameters, 'environment_uuid'))->firstOrFail();
     }
 
     /**
@@ -156,6 +364,10 @@ trait HasRepositoryDetection
 
     protected function applyDetectionResult(RepositoryDetectionResult $result): void
     {
+        $this->detectedConfigFile = $result->configFile;
+        $this->configPlans = [];
+        $this->configPlan = null;
+        $this->configPlanError = null;
         $this->detectedDockerfiles = $result->dockerfiles;
         $this->detectedDockerComposeFiles = $result->dockerComposeFiles;
         $this->dockerfilePorts = $result->dockerfilePorts;

@@ -165,6 +165,9 @@ class ServerTransferExporter
         if (ImageScanIgnore::query()->where('team_id', $server->team_id)->whereNull('resource_type')->exists()) {
             $warnings[] = 'Team-wide vulnerability ignores stay on this instance.';
         }
+        if ($server->proxyConfigurationVersions()->exists()) {
+            $warnings[] = 'The proxy configuration history stays on this instance. The current proxy configuration is transferred.';
+        }
         if ($leftOutLinks > 0) {
             $warnings[] = $leftOutLinks.' '.Str::plural('link', $leftOutLinks).' between resources on the environment canvas '
                 .($leftOutLinks === 1 ? 'is' : 'are').' not transferred, because one of the linked resources stays on this instance.';
@@ -177,7 +180,7 @@ class ServerTransferExporter
             ],
             'warnings' => $warnings,
             // Manual steps after the transfer. The source replaces {target_url} with the URL of the target.
-            'post_transfer_checklist' => $this->postTransferChecklist($dependencies, $runnerConfig, $applications),
+            'post_transfer_checklist' => $this->postTransferChecklist($dependencies, $runnerConfig, $applications, $applications->concat($databases)->concat($services)),
             // Back-compat: single server key
             'private_key' => $this->exportPrivateKey($privateKey),
             // All keys needed by server, apps, and git sources
@@ -578,11 +581,15 @@ class ServerTransferExporter
      *
      * @param  array{github_apps: Collection<int, GithubApp>, gitlab_apps: Collection<int, GitlabApp>, gitea_apps: Collection<int, GiteaApp>}  $dependencies
      * @param  Collection<int, Application>  $applications
+     * @param  Collection<int, Model>  $resources  applications, databases, and services
      * @return list<string>
      */
-    private function postTransferChecklist(array $dependencies, ?GithubRunnerConfig $runnerConfig, Collection $applications): array
+    private function postTransferChecklist(array $dependencies, ?GithubRunnerConfig $runnerConfig, Collection $applications, Collection $resources): array
     {
         $steps = [];
+        if ($resources->contains(fn (Model $resource) => filled($resource->config_key))) {
+            $steps[] = 'Some resources were managed by coolify.json. Link their environments again on {target_url}: the link does not move with the server.';
+        }
         // A manual webhook is set in the repository itself, so its URL still points to this instance. Every
         // application has the secrets, so list the git applications that do not deploy through a private App.
         $manualWebhookApps = $applications
@@ -956,6 +963,7 @@ class ServerTransferExporter
             'custom_labels',
             'is_maintenance_enabled',
             'maintenance_page',
+            'config_key',
         ] as $hidden) {
             if (in_array($hidden, $columns, true)) {
                 $attrs[$hidden] = $application->{$hidden};
@@ -1030,6 +1038,7 @@ class ServerTransferExporter
             }
             $attrs[$field] = $database->{$field};
         }
+        $attrs['config_key'] = $database->config_key;
 
         // Secrets are often $hidden and sometimes omitted from $fillable (e.g. redis_password).
         foreach ($columns as $column) {
@@ -1102,6 +1111,8 @@ class ServerTransferExporter
             }
             $attrs[$field] = $service->{$field};
         }
+        $attrs['config_key'] = $service->config_key;
+        $attrs['config_meta'] = $service->config_meta;
 
         // Hidden compose fields, maintenance mode and the Coolify default variables switch (not fillable)
         foreach (['docker_compose', 'docker_compose_raw', 'is_maintenance_enabled', 'maintenance_page', 'include_coolify_default_variables'] as $hidden) {
@@ -1302,6 +1313,7 @@ class ServerTransferExporter
                 'comment' => $variable->comment,
                 'compose_services' => $variable->compose_services,
                 'order' => $variable->order,
+                'config_meta' => $variable->config_meta,
                 // The Coolify version that created the variable.
                 'version' => $variable->version,
             ];
@@ -1324,6 +1336,7 @@ class ServerTransferExporter
                 'mount_path' => $volume->mount_path,
                 'host_path' => $volume->host_path,
                 'is_preview_suffix_enabled' => (bool) ($volume->is_preview_suffix_enabled ?? false),
+                'is_external' => (bool) $volume->is_external,
                 'ignores_compose_driver_options' => (bool) $volume->ignores_compose_driver_options,
                 'standalone_sqlite_uuid' => $volume->standaloneSqlite?->uuid,
             ];
@@ -1797,6 +1810,10 @@ class ServerTransferExporter
                 'docker_registry_image_tag' => $preview->docker_registry_image_tag,
                 'domain_port_overrides' => $preview->domain_port_overrides,
                 'max_restart_count' => $preview->max_restart_count,
+                'is_fork_pull_request' => $preview->is_fork_pull_request,
+                'pending_approval_commit' => $preview->pending_approval_commit,
+                'approved_commit' => $preview->approved_commit,
+                'approved_at' => $preview->approved_at?->toIso8601String(),
                 'keeps_production_values' => $preview->keeps_production_values,
                 'persistent_storages' => method_exists($preview, 'persistentStorages')
                     ? $this->exportPersistentStorages($preview->persistentStorages)

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Application\CleanupPreviewDeployment;
 use App\Actions\Application\GetRollbackImages;
 use App\Actions\Application\LoadComposeFile;
+use App\Actions\Application\LookupGitAppRepository;
 use App\Actions\Application\StopApplication;
 use App\Enums\BuildPackTypes;
 use App\Enums\HttpBasicAuthHashAlgorithm;
@@ -36,9 +37,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
 use Spatie\Url\Url;
@@ -63,6 +62,7 @@ class ApplicationsController extends Controller
         'redact_all_env_values_in_logs',
         'include_coolify_default_variables',
         'is_pr_deployments_public_enabled',
+        'is_pr_deployments_public_approval_required',
         'use_production_values_in_previews',
         'stop_grace_period',
         'rolling_update_drain_seconds',
@@ -99,6 +99,7 @@ class ApplicationsController extends Controller
         'redact_all_env_values_in_logs',
         'include_coolify_default_variables',
         'is_pr_deployments_public_enabled',
+        'is_pr_deployments_public_approval_required',
         'use_production_values_in_previews',
         'is_gzip_enabled',
         'is_stripprefix_enabled',
@@ -511,7 +512,7 @@ class ApplicationsController extends Controller
                             ],
                             'watch_paths' => ['type' => 'string', 'description' => 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
-                            'use_build_secrets' => ['type' => 'boolean', 'default' => false, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'default' => true, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
                             'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
                             'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
                             'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
@@ -525,6 +526,7 @@ class ApplicationsController extends Controller
                             'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
                             'include_coolify_default_variables' => ['type' => 'boolean', 'default' => true, 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'],
                             'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'is_pr_deployments_public_approval_required' => ['type' => 'boolean', 'default' => true, 'description' => 'With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval.'],
                             'use_production_values_in_previews' => ['type' => 'boolean', 'description' => 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'],
                             'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
                             'rolling_update_drain_seconds' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 300, 'description' => 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'],
@@ -726,7 +728,7 @@ class ApplicationsController extends Controller
                             ],
                             'watch_paths' => ['type' => 'string', 'description' => 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
-                            'use_build_secrets' => ['type' => 'boolean', 'default' => false, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'default' => true, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
                             'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
                             'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
                             'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
@@ -740,6 +742,7 @@ class ApplicationsController extends Controller
                             'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
                             'include_coolify_default_variables' => ['type' => 'boolean', 'default' => true, 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'],
                             'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'is_pr_deployments_public_approval_required' => ['type' => 'boolean', 'default' => true, 'description' => 'With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval.'],
                             'use_production_values_in_previews' => ['type' => 'boolean', 'description' => 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'],
                             'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
                             'rolling_update_drain_seconds' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 300, 'description' => 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'],
@@ -955,6 +958,7 @@ class ApplicationsController extends Controller
                             'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
                             'include_coolify_default_variables' => ['type' => 'boolean', 'default' => true, 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'],
                             'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'is_pr_deployments_public_approval_required' => ['type' => 'boolean', 'default' => true, 'description' => 'With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval.'],
                             'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
                             'rolling_update_drain_seconds' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 300, 'description' => 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'],
                             'docker_images_to_keep' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 100, 'description' => 'Number of Docker images to retain.'],
@@ -1155,7 +1159,7 @@ class ApplicationsController extends Controller
                             ],
                             'watch_paths' => ['type' => 'string', 'description' => 'Watch path patterns, one per line (newline-separated). Commas do not separate patterns.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
-                            'use_build_secrets' => ['type' => 'boolean', 'default' => false, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'default' => true, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
                             'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
                             'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
                             'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
@@ -1169,6 +1173,7 @@ class ApplicationsController extends Controller
                             'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
                             'include_coolify_default_variables' => ['type' => 'boolean', 'default' => true, 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'],
                             'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'is_pr_deployments_public_approval_required' => ['type' => 'boolean', 'default' => true, 'description' => 'With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval.'],
                             'use_production_values_in_previews' => ['type' => 'boolean', 'description' => 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'],
                             'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
                             'rolling_update_drain_seconds' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 300, 'description' => 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'],
@@ -1340,7 +1345,7 @@ class ApplicationsController extends Controller
                             'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
                             'is_preview_deployments_enabled' => ['type' => 'boolean', 'description' => 'Enable preview deployments for pull requests.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
-                            'use_build_secrets' => ['type' => 'boolean', 'default' => false, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'default' => true, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
                             'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
                             'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
                             'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
@@ -1354,6 +1359,7 @@ class ApplicationsController extends Controller
                             'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
                             'include_coolify_default_variables' => ['type' => 'boolean', 'default' => true, 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'],
                             'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'is_pr_deployments_public_approval_required' => ['type' => 'boolean', 'default' => true, 'description' => 'With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval.'],
                             'use_production_values_in_previews' => ['type' => 'boolean', 'description' => 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'],
                             'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
                             'rolling_update_drain_seconds' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 300, 'description' => 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'],
@@ -1521,7 +1527,7 @@ class ApplicationsController extends Controller
                             'is_force_https_enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if HTTPS is forced. Defaults to true.'],
                             'is_preview_deployments_enabled' => ['type' => 'boolean', 'description' => 'Enable preview deployments for pull requests.'],
                             'use_build_server' => ['type' => 'boolean', 'nullable' => true, 'description' => 'Use build server.'],
-                            'use_build_secrets' => ['type' => 'boolean', 'default' => false, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
+                            'use_build_secrets' => ['type' => 'boolean', 'default' => true, 'description' => 'Use Docker Build Secrets for build-time environment variables.'],
                             'is_git_submodules_enabled' => ['type' => 'boolean', 'description' => 'Clone Git submodules.'],
                             'is_git_lfs_enabled' => ['type' => 'boolean', 'description' => 'Enable Git LFS.'],
                             'is_git_shallow_clone_enabled' => ['type' => 'boolean', 'description' => 'Use a shallow Git clone.'],
@@ -1535,6 +1541,7 @@ class ApplicationsController extends Controller
                             'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
                             'include_coolify_default_variables' => ['type' => 'boolean', 'default' => true, 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'],
                             'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'is_pr_deployments_public_approval_required' => ['type' => 'boolean', 'default' => true, 'description' => 'With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval.'],
                             'use_production_values_in_previews' => ['type' => 'boolean', 'description' => 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'],
                             'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
                             'rolling_update_drain_seconds' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 300, 'description' => 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'],
@@ -3577,6 +3584,7 @@ class ApplicationsController extends Controller
                             'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Redact all environment variable values in logs. When false, only locked (shown once) values are redacted. Requires team admin permissions.'],
                             'include_coolify_default_variables' => ['type' => 'boolean', 'default' => true, 'description' => 'Add the predefined COOLIFY_* variables (COOLIFY_URL, COOLIFY_FQDN, ...) to the environment. Requires team admin permissions. Redeploy to apply it.'],
                             'is_pr_deployments_public_enabled' => ['type' => 'boolean', 'description' => 'Make pull request deployments public.'],
+                            'is_pr_deployments_public_approval_required' => ['type' => 'boolean', 'description' => 'With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval. If you omit it, the current value stays.'],
                             'use_production_values_in_previews' => ['type' => 'boolean', 'description' => 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'],
                             'stop_grace_period' => ['type' => 'integer', 'nullable' => true, 'minimum' => 1, 'maximum' => 3600, 'description' => 'Container stop grace period in seconds.'],
                             'rolling_update_drain_seconds' => ['type' => 'integer', 'minimum' => 0, 'maximum' => 300, 'description' => 'Seconds to wait after the new container is healthy before old containers stop during a rolling update. 0 turns the wait off. Default: 5.'],
@@ -5437,29 +5445,12 @@ class ApplicationsController extends Controller
         if (! $githubApp) {
             return response()->json(['message' => 'Github App not found.'], 404);
         }
-        $token = generateGithubInstallationToken($githubApp);
-        if (! $token) {
-            return response()->json(['message' => 'Failed to generate Github App token.'], 400);
+
+        try {
+            return app(LookupGitAppRepository::class)->github($githubApp, $gitRepository);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], $e->getCode() ?: 400);
         }
-
-        $gitRepository = gitRepositorySlug($gitRepository);
-
-        // Use direct API call to verify repository access instead of loading all repositories
-        // This is much faster and avoids timeouts for GitHub Apps with many repositories
-        $response = Http::GitHub($githubApp->api_url, $token)
-            ->timeout(20)
-            ->retry(3, 200, throw: false)
-            ->get("/repos/{$gitRepository}");
-
-        if ($response->status() === 404 || $response->status() === 403) {
-            return response()->json(['message' => 'Repository not found or not accessible by the GitHub App.'], 404);
-        }
-
-        if (! $response->successful()) {
-            return response()->json(['message' => 'Failed to verify repository access: '.($response->json()['message'] ?? 'Unknown error')], 400);
-        }
-
-        return ['source' => $githubApp, 'repository' => $gitRepository, 'repository_project_id' => data_get($response->json(), 'id')];
     }
 
     /**
@@ -5469,60 +5460,15 @@ class ApplicationsController extends Controller
      */
     private function giteaAppRepository(?GiteaApp $giteaApp, string $gitRepository): array|JsonResponse
     {
-        if (! $giteaApp?->isConnected()) {
-            return response()->json(['message' => 'Gitea App not found.'], 404);
-        }
-
-        $repositoryPath = $this->giteaRepositoryPath($giteaApp, $gitRepository);
-        if ($repositoryPath === null) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => ['git_repository' => 'The git_repository must be owner/name or a repository URL on the Gitea instance of the source.'],
-            ], 422);
-        }
-
         try {
-            refreshGiteaToken($giteaApp);
+            return app(LookupGitAppRepository::class)->gitea($giteaApp, $gitRepository);
         } catch (\RuntimeException $e) {
-            return response()->json(['message' => $e->getMessage()], 400);
-        }
-
-        $response = Http::Gitea($giteaApp->apiUrlBase(), $giteaApp->access_token)
-            ->timeout(20)
-            ->retry(3, 200, throw: false)
-            ->get('/repos/'.collect(explode('/', $repositoryPath))->map(fn (string $part) => rawurlencode($part))->implode('/'));
-
-        if ($response->status() === 404 || $response->status() === 403
-            || ($response->successful() && ! $giteaApp->allowsRepositoryOwner(data_get($response->json(), 'owner.login')))) {
-            return response()->json(['message' => 'Repository not found or not accessible by the Gitea App.'], 404);
-        }
-
-        if (! $response->successful()) {
-            return response()->json(['message' => 'Failed to verify repository access: '.data_get($response->json(), 'message', 'Unknown error')], 400);
-        }
-
-        return ['source' => $giteaApp, 'repository' => $repositoryPath, 'repository_project_id' => data_get($response->json(), 'id')];
-    }
-
-    /**
-     * Get owner/name from owner/name, or from an HTTPS or SSH URL on the Gitea instance of the source.
-     */
-    private function giteaRepositoryPath(GiteaApp $giteaApp, string $gitRepository): ?string
-    {
-        $repository = sshGitUrlToHttps($gitRepository) ?? $gitRepository;
-        if (str_contains($repository, '://')) {
-            if (strtolower((string) parse_url($repository, PHP_URL_HOST)) !== strtolower((string) parse_url($giteaApp->html_url, PHP_URL_HOST))) {
-                return null;
+            if ($e->getCode() === 422) {
+                return response()->json(['message' => 'Validation failed.', 'errors' => ['git_repository' => $e->getMessage()]], 422);
             }
-            $repository = Str::chopStart((string) parse_url($repository, PHP_URL_PATH), rtrim((string) parse_url($giteaApp->html_url, PHP_URL_PATH), '/'));
-        }
-        $repository = str($repository)->trim('/')->replaceEnd('.git', '')->toString();
 
-        if (! preg_match('#^[\w.-]+/[\w.-]+$#', $repository) || array_intersect(explode('/', $repository), ['.', '..']) !== []) {
-            return null;
+            return response()->json(['message' => $e->getMessage()], $e->getCode() ?: 400);
         }
-
-        return $repository;
     }
 
     private function validateDataApplications(Request $request, Server $server)

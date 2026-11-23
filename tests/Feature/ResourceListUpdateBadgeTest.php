@@ -42,7 +42,9 @@ it('marks services with an available template update in the serialized payload',
 
     $method = new ReflectionMethod(Index::class, 'toSearchableArray');
     $method->setAccessible(true);
-    $payload = $method->invoke(new Index, collect([$service->load('destination.server')]), 'service', 'Service');
+    $component = new Index;
+    $component->environment = $this->environment;
+    $payload = $method->invoke($component, collect([$service->load('destination.server')]), 'service', 'Service');
 
     expect($payload[0]['updateAvailable'])->toBeTrue();
 });

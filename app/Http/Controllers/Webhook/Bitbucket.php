@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Bitbucket\BitbucketWebhookContext;
 use App\Http\Controllers\Webhook\Bitbucket\BitbucketWebhookVariantRegistry;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
+use App\Http\Controllers\Webhook\Concerns\RoutesConfigPushes;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -20,6 +21,7 @@ use Illuminate\Support\Collection;
 class Bitbucket extends Controller
 {
     use MatchesManualWebhookApplications;
+    use RoutesConfigPushes;
     use ValidatesPreviewDeploymentRepository;
 
     public function manual(Request $request, ?BitbucketWebhookVariantRegistry $registry = null)
@@ -60,6 +62,13 @@ class Bitbucket extends Controller
             $repositoryLabel = $full_names->implode(', ');
 
             $x_bitbucket_token = (string) $request->header('X-Hub-Signature', '');
+            if ($context->action === 'push') {
+                $this->beginConfigPush(null, $full_names->all(), $context->branch, $context->commit, function (string $secret) use ($request, $x_bitbucket_token): bool {
+                    $parts = explode('=', $x_bitbucket_token, 2);
+
+                    return count($parts) === 2 && $parts[0] === 'sha256' && hash_equals(hash_hmac('sha256', $request->getContent(), $secret), $parts[1]);
+                });
+            }
             $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'bitbucket', $full_names->first(), $context->branch);
             // A redelivery of the same signed payload is one guess.
             $failure_attempt = $this->manualWebhookSignedPayloadAttempt($request, $x_bitbucket_token);
@@ -295,6 +304,10 @@ class Bitbucket extends Controller
                 $pr_app->generate_preview_fqdn();
             }
         }
+        ($found ?? $pr_app)->markForkPullRequest($this->isForkPreviewRepository(
+            $context->sourceRepository,
+            $context->targetRepository,
+        ), $context->commit);
 
         $result = queue_application_deployment(
             application: $application,

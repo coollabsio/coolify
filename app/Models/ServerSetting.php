@@ -39,6 +39,9 @@ use OpenApi\Attributes as OA;
         'is_geoip_enabled' => ['type' => 'boolean'],
         'geoip_refresh_days' => ['type' => 'integer'],
         'traffic_ip_mode' => ['type' => 'string', 'enum' => ['full', 'anonymized', 'off']],
+        'log_archive_max_file_mb' => ['type' => 'integer'],
+        'log_archive_max_total_mb' => ['type' => 'integer'],
+        'log_archive_retention_days' => ['type' => 'integer'],
         'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'],
         'is_reachable' => ['type' => 'boolean'],
         'ssh_host_key' => ['type' => 'string', 'nullable' => true, 'description' => 'Pinned SSH host key(s) of the server, one "type base64" line per key.'],
@@ -50,6 +53,7 @@ use OpenApi\Attributes as OA;
         'ssh_host_key_fingerprints' => ['type' => 'array', 'items' => ['type' => 'string'], 'readOnly' => true, 'description' => 'SHA256 fingerprints of the pinned host keys, as `ssh-keygen -lf` shows them.'],
         'ssh_host_key_pending_fingerprints' => ['type' => 'array', 'items' => ['type' => 'string'], 'readOnly' => true, 'description' => 'SHA256 fingerprints of the host key that did not match.'],
         'is_sentinel_enabled' => ['type' => 'boolean'],
+        'is_sentinel_pull_enabled' => ['type' => 'boolean', 'description' => 'Coolify reads Sentinel reports over SSH instead of Sentinel pushing them.'],
         'is_swarm_manager' => ['type' => 'boolean'],
         'is_swarm_worker' => ['type' => 'boolean'],
         'is_terminal_enabled' => ['type' => 'boolean'],
@@ -164,6 +168,7 @@ class ServerSetting extends Model
         'sentinel_metrics_history_days',
         'sentinel_push_interval_seconds',
         'sentinel_custom_url',
+        'is_sentinel_pull_enabled',
         'server_disk_usage_notification_threshold',
         'is_sentinel_debug_enabled',
         'is_container_log_archive_enabled',
@@ -183,6 +188,9 @@ class ServerSetting extends Model
         'geoip_refresh_days',
         'geoip_maxmind_license_key',
         'traffic_ip_mode',
+        'log_archive_max_file_mb',
+        'log_archive_max_total_mb',
+        'log_archive_retention_days',
         'traefik_certificate_resolver',
         'docker_version',
         'docker_version_checked_at',
@@ -205,6 +213,7 @@ class ServerSetting extends Model
      */
     protected $attributes = [
         'is_traffic_analytics_enabled' => false,
+        'is_sentinel_pull_enabled' => false,
         'is_image_scan_enabled' => false,
         'image_scan_memory_mb' => self::DEFAULT_IMAGE_SCAN_MEMORY_MB,
         'image_candidate_scans_today' => 0,
@@ -221,6 +230,7 @@ class ServerSetting extends Model
         'force_docker_cleanup' => 'boolean',
         'docker_cleanup_threshold' => 'integer',
         'sentinel_token' => 'encrypted',
+        'is_sentinel_pull_enabled' => 'boolean',
         'is_reachable' => 'boolean',
         'is_usable' => 'boolean',
         'is_build_server' => 'boolean',
@@ -240,6 +250,9 @@ class ServerSetting extends Model
         'logdrain_type' => LogDrainType::class,
         'logdrain_config' => 'encrypted:array',
         'traffic_ip_mode' => TrafficIpMode::class,
+        'log_archive_max_file_mb' => 'integer',
+        'log_archive_max_total_mb' => 'integer',
+        'log_archive_retention_days' => 'integer',
         'docker_version_checked_at' => 'datetime',
         'compose_version_checked_at' => 'datetime',
         'backup_compression_cpu_percentage' => 'integer',
@@ -298,6 +311,7 @@ class ServerSetting extends Model
             if (
                 $settings->wasChanged('sentinel_token') ||
                 $settings->wasChanged('sentinel_custom_url') ||
+                $settings->wasChanged('is_sentinel_pull_enabled') ||
                 $settings->wasChanged('is_metrics_enabled') ||
                 $settings->wasChanged('is_sentinel_debug_enabled') ||
                 $settings->wasChanged('is_container_log_archive_enabled') ||
@@ -311,7 +325,10 @@ class ServerSetting extends Model
                 $settings->wasChanged('is_geoip_enabled') ||
                 $settings->wasChanged('geoip_refresh_days') ||
                 $settings->wasChanged('geoip_maxmind_license_key') ||
-                $settings->wasChanged('traffic_ip_mode')
+                $settings->wasChanged('traffic_ip_mode') ||
+                $settings->wasChanged('log_archive_max_file_mb') ||
+                $settings->wasChanged('log_archive_max_total_mb') ||
+                $settings->wasChanged('log_archive_retention_days')
             ) {
                 // Only recreate Sentinel when it is already enabled. Otherwise a change to a
                 // traffic/geoip tuning knob would turn Sentinel on as a side effect, because

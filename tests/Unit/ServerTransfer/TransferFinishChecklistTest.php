@@ -5,6 +5,7 @@ use App\Jobs\CheckTransferFinishStepsJob;
 use App\Livewire\Server\TransferFinish;
 use App\Models\Application;
 use App\Models\DnsProviderZone;
+use App\Models\EnvironmentConfigLink;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
@@ -309,4 +310,21 @@ test('a GitHub App link that is not a web URL, or a saved link to another host, 
     expect($this->checklist->linkOf($items->firstWhere('key', "github_app_webhook:{$this->githubApp->uuid}")))->toBeNull()
         ->and($this->checklist->linkOf(['type' => 'git_source', 'link' => '//evil.example/x']))->toBeNull()
         ->and($this->checklist->linkOf(['type' => 'git_source', 'link' => 'javascript:alert(1)']))->toBeNull();
+});
+
+test('an environment with coolify.json resources gets a step to link the file again', function () {
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = $project->environments()->first();
+    $application = finishTestApplication($this, ['source_type' => GithubApp::class, 'source_id' => $this->githubApp->id, 'environment_id' => $environment->id]);
+    $application->forceFill(['config_key' => 'api'])->save();
+
+    $keys = array_column($this->checklist->start($this->server), 'key');
+    expect($keys)->toContain("project_config:{$environment->uuid}");
+
+    $this->checklist->check($this->server, "project_config:{$environment->uuid}");
+    expect(finishTestItem($this->server, "project_config:{$environment->uuid}")['status'])->toBe('action');
+
+    EnvironmentConfigLink::factory()->create(['environment_id' => $environment->id]);
+    $this->checklist->check($this->server->fresh(), "project_config:{$environment->uuid}");
+    expect(finishTestItem($this->server, "project_config:{$environment->uuid}")['status'])->toBe('ok');
 });

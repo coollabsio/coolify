@@ -1259,6 +1259,25 @@ test('transfer keeps whether a volume ignores the Compose driver options', funct
     'bundle without the flag' => [null, true],
 ]);
 
+test('transfer keeps whether a volume is an existing Docker volume', function () {
+    LocalPersistentVolume::query()->where('resource_id', $this->application->id)->update(['is_external' => true]);
+    $bundle = $this->exporter->export($this->server);
+    $originalAppUuid = $this->application->uuid;
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    Tag::query()->delete();
+    ScheduledDatabaseBackup::query()->delete();
+    ScheduledTask::query()->delete();
+    $this->privateKey->delete();
+
+    $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: true, adoptMode: true);
+
+    expect(Application::where('uuid', $originalAppUuid)->sole()->persistentStorages()->sole()->is_external)->toBeTrue();
+});
+
 test('transfer keeps the link between an application volume and its sqlite database', function () {
     $sqlite = StandaloneSqlite::create([
         'name' => 'app-sqlite',
@@ -1374,6 +1393,21 @@ test('transfer keeps the Traefik certificate resolver of applications and servic
 
     expect(Application::where('uuid', $originalAppUuid)->firstOrFail()->settings->traefik_certificate_resolver)->toBe('none')
         ->and(ServiceApplication::where('uuid', 'svc-app-resolver')->firstOrFail()->traefik_certificate_resolver)->toBe('cloudflare');
+});
+
+test('transfer keeps the build secrets setting and the dismissed recommendations of an application', function () {
+    $this->application->settings->update([
+        'use_build_secrets' => false,
+        'dismissed_recommendations' => ['use-build-secrets'],
+    ]);
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    removeTransferSourceResources($this);
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    $settings = Application::where('uuid', $this->application->uuid)->sole()->settings;
+    expect($settings->use_build_secrets)->toBeFalse()
+        ->and($settings->dismissed_recommendations)->toBe(['use-build-secrets']);
 });
 
 test('transfer keeps the cloud provider instance id of the server', function () {
@@ -2001,6 +2035,14 @@ test('the checklist asks to move manual webhooks of git applications without a p
         ->toContain('{target_url}/webhooks/source/gitea/events/manual');
 });
 
+test('the checklist asks to link the environment again when only a database or service is managed by coolify.json', function () {
+    $this->service->forceFill(['config_key' => 'cache'])->saveQuietly();
+
+    $checklist = implode("\n", $this->exporter->export($this->server)['post_transfer_checklist']);
+
+    expect($checklist)->toContain('Some resources were managed by coolify.json.');
+});
+
 test('the checklist does not ask about manual webhooks for an application that deploys through a private GitHub App', function () {
     $githubApp = GithubApp::create([
         'name' => 'private-app', 'api_url' => 'https://api.github.com', 'html_url' => 'https://github.com',
@@ -2442,6 +2484,44 @@ test('the image scanner limits move with the server', function () {
         ->and($settings->image_scan_grype_timeout)->toBe(1200)
         ->and($settings->image_scan_cpus)->toBe(2.0)
         ->and($settings->image_scan_memory_mb)->toBe(4096);
+});
+
+test('transfer keeps the fork pull request approval state of previews and the approval setting', function () {
+    $this->application->settings->forceFill(['is_pr_deployments_public_approval_required' => false])->save();
+
+    $preview = new ApplicationPreview;
+    $preview->forceFill([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 9,
+        'pull_request_html_url' => 'https://github.com/example/app/pull/9',
+        'fqdn' => 'https://pr-9.app.example.com',
+        'is_fork_pull_request' => true,
+        'pending_approval_commit' => 'b2c3d4e5f6',
+        'approved_commit' => 'a1b2c3d4e5',
+        'approved_at' => '2031-02-03 04:05:06',
+    ]);
+    $preview->uuid = 'preview-pr-9';
+    $preview->saveQuietly();
+
+    $bundle = $this->exporter->export($this->server);
+
+    ApplicationPreview::withoutEvents(fn () => ApplicationPreview::withTrashed()->get()->each->forceDelete());
+    DB::table('scheduled_volume_backups')->delete();
+    DB::table('scheduled_database_backups')->delete();
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $this->importer->import($bundle, teamId: $this->team->id, preserveUuids: false, adoptMode: false);
+
+    $application = Application::where('name', 'my-app')->sole();
+    $importedPreview = $application->previews()->sole();
+    expect($application->settings->is_pr_deployments_public_approval_required)->toBeFalse()
+        ->and($importedPreview->is_fork_pull_request)->toBeTrue()
+        ->and($importedPreview->pending_approval_commit)->toBe('b2c3d4e5f6')
+        ->and($importedPreview->approved_commit)->toBe('a1b2c3d4e5')
+        ->and($importedPreview->approved_at->toDateTimeString())->toBe('2031-02-03 04:05:06');
 });
 
 test('an imported server keeps the status for unknown hosts, and a bundle without it gets the legacy status', function (?array $proxy, int $expected) {

@@ -47,6 +47,7 @@ use Symfony\Component\Yaml\Yaml;
         'is_spa' => ['type' => 'boolean'],
         'is_git_shallow_clone_enabled' => ['type' => 'boolean'],
         'is_pr_deployments_public_enabled' => ['type' => 'boolean'],
+        'is_pr_deployments_public_approval_required' => ['type' => 'boolean', 'description' => 'Fork pull request previews wait for an admin to approve each commit.'],
         'use_production_values_in_previews' => ['type' => 'boolean', 'description' => 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value.'],
         'use_build_secrets' => ['type' => 'boolean'],
         'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Hide every environment variable value in logs. When false, only locked values are hidden.'],
@@ -73,6 +74,7 @@ class ApplicationSetting extends Model
     ];
 
     protected $casts = [
+        'has_unlinked_config_file' => 'boolean',
         'is_static' => 'boolean',
         'is_spa' => 'boolean',
         'is_build_server_enabled' => 'boolean',
@@ -80,6 +82,7 @@ class ApplicationSetting extends Model
         'is_container_label_escape_enabled' => 'boolean',
         'is_container_label_readonly_enabled' => 'boolean',
         'use_build_secrets' => 'boolean',
+        'dismissed_recommendations' => 'array',
         'inject_build_args_to_dockerfile' => 'boolean',
         'include_source_commit_in_build' => 'boolean',
         'include_network_hosts_in_build' => 'boolean',
@@ -88,6 +91,7 @@ class ApplicationSetting extends Model
         'is_debug_enabled' => 'boolean',
         'is_preview_deployments_enabled' => 'boolean',
         'is_pr_deployments_public_enabled' => 'boolean',
+        'is_pr_deployments_public_approval_required' => 'boolean',
         'use_production_values_in_previews' => 'boolean',
         'is_git_submodules_enabled' => 'boolean',
         'is_git_lfs_enabled' => 'boolean',
@@ -153,8 +157,10 @@ class ApplicationSetting extends Model
         'is_spa',
         'is_git_shallow_clone_enabled',
         'is_pr_deployments_public_enabled',
+        'is_pr_deployments_public_approval_required',
         'use_production_values_in_previews',
         'use_build_secrets',
+        'dismissed_recommendations',
         'redact_all_env_values_in_logs',
         'inject_build_args_to_dockerfile',
         'include_source_commit_in_build',
