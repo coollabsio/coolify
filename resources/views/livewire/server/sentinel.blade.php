@@ -52,7 +52,9 @@
                             <li>Confirm that the Coolify URL and Sentinel token match this configuration.</li>
                         </ul>
 
-                        @if ($server->isLocalhost())
+                        @if ($isSentinelPullEnabled)
+                            <p>Coolify reads Sentinel reports over SSH. Confirm that the SSH connection works and that Sentinel is up to date.</p>
+                        @elseif ($server->isLocalhost())
                             <p>Sync Sentinel to recreate it on the Coolify Docker network.</p>
                         @else
                             <div class="space-y-2">
@@ -112,9 +114,18 @@
                         </x-callout>
                     @endif
                     <div class="grid gap-4 lg:grid-cols-2">
-                        <x-forms.input canGate="update" :canResource="$server" id="sentinelCustomUrl"
-                            required label="Coolify URL"
-                            helper="Public URL used by Sentinel to reach this Coolify instance." />
+                        <x-forms.listbox canGate="update" :canResource="$server" id="isSentinelPullEnabled"
+                            label="Report mode" onChange="instantSave"
+                            helper="Pull: Coolify reads Sentinel data over SSH. Use this when the server cannot reach Coolify (for example, Coolify is on a private network)."
+                            :options="[
+                                ['value' => false, 'label' => 'Push: Sentinel sends reports to Coolify'],
+                                ['value' => true, 'label' => 'Pull: Coolify reads reports over SSH'],
+                            ]" />
+                        @unless ($isSentinelPullEnabled)
+                            <x-forms.input canGate="update" :canResource="$server" id="sentinelCustomUrl"
+                                required label="Coolify URL"
+                                helper="Public URL used by Sentinel to reach this Coolify instance." />
+                        @endunless
                         <x-forms.input canGate="update" :canResource="$server" type="password"
                             id="sentinelToken" label="Sentinel token" required
                             helper="Authentication token used by Sentinel." />

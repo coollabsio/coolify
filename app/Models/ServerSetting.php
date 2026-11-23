@@ -53,6 +53,7 @@ use OpenApi\Attributes as OA;
         'ssh_host_key_fingerprints' => ['type' => 'array', 'items' => ['type' => 'string'], 'readOnly' => true, 'description' => 'SHA256 fingerprints of the pinned host keys, as `ssh-keygen -lf` shows them.'],
         'ssh_host_key_pending_fingerprints' => ['type' => 'array', 'items' => ['type' => 'string'], 'readOnly' => true, 'description' => 'SHA256 fingerprints of the host key that did not match.'],
         'is_sentinel_enabled' => ['type' => 'boolean'],
+        'is_sentinel_pull_enabled' => ['type' => 'boolean', 'description' => 'Coolify reads Sentinel reports over SSH instead of Sentinel pushing them.'],
         'is_swarm_manager' => ['type' => 'boolean'],
         'is_swarm_worker' => ['type' => 'boolean'],
         'is_terminal_enabled' => ['type' => 'boolean'],
@@ -167,6 +168,7 @@ class ServerSetting extends Model
         'sentinel_metrics_history_days',
         'sentinel_push_interval_seconds',
         'sentinel_custom_url',
+        'is_sentinel_pull_enabled',
         'server_disk_usage_notification_threshold',
         'is_sentinel_debug_enabled',
         'is_container_log_archive_enabled',
@@ -211,6 +213,7 @@ class ServerSetting extends Model
      */
     protected $attributes = [
         'is_traffic_analytics_enabled' => false,
+        'is_sentinel_pull_enabled' => false,
         'is_image_scan_enabled' => false,
         'image_scan_memory_mb' => self::DEFAULT_IMAGE_SCAN_MEMORY_MB,
         'image_candidate_scans_today' => 0,
@@ -227,6 +230,7 @@ class ServerSetting extends Model
         'force_docker_cleanup' => 'boolean',
         'docker_cleanup_threshold' => 'integer',
         'sentinel_token' => 'encrypted',
+        'is_sentinel_pull_enabled' => 'boolean',
         'is_reachable' => 'boolean',
         'is_usable' => 'boolean',
         'is_build_server' => 'boolean',
@@ -307,6 +311,7 @@ class ServerSetting extends Model
             if (
                 $settings->wasChanged('sentinel_token') ||
                 $settings->wasChanged('sentinel_custom_url') ||
+                $settings->wasChanged('is_sentinel_pull_enabled') ||
                 $settings->wasChanged('is_metrics_enabled') ||
                 $settings->wasChanged('is_sentinel_debug_enabled') ||
                 $settings->wasChanged('is_container_log_archive_enabled') ||
