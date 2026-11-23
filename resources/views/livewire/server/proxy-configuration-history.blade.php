@@ -95,7 +95,7 @@
                                 <button type="button" class="icon-button shrink-0" title="Compare with current"
                                     aria-label="Compare version {{ substr($version->hash, 0, 8) }} with the current configuration"
                                     @click="openDiff(@js($version->uuid))">
-                                    <x-reicon name="code" class="size-3.5" />
+                                    <x-reicon name="compare" class="size-3.5" />
                                 </button>
                                 <x-modal-confirmation title="Restore Proxy Configuration?"
                                     submitAction="restoreConfigurationVersion('{{ $version->uuid }}')" :actions="[
