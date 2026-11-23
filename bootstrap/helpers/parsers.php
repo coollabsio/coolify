@@ -77,7 +77,7 @@ function validateDockerComposeForInjection(string $composeYaml): void
                     if (isset($volume['source'])) {
                         $source = $volume['source'];
                         if (is_string($source)) {
-                            validateComposeArrayVolumeSource($source);
+                            validateComposeBindSource($source);
                         }
                     }
                     if (isset($volume['target'])) {
@@ -326,7 +326,7 @@ function validateComposeContentVolumeSource(array $volume): void
         throw new Exception('Invalid Docker volume definition (array syntax): A bind volume with content needs a source path.');
     }
 
-    validateComposeArrayVolumeSource($source);
+    validateComposeBindSource($source);
 }
 
 /**
@@ -378,37 +378,6 @@ function resolveComposeLongBindSource(string $source, Application|Service $resou
     }
 
     return $value;
-}
-
-/**
- * Keep the existing array-source forms, but inspect the default that was previously skipped.
- */
-function validateComposeArrayVolumeSource(string $source): void
-{
-    try {
-        if (preg_match('/[\x00-\x1F\x7F]/', $source)) {
-            throw new Exception('Invalid volume source: contains a control character.');
-        }
-
-        if (preg_match('/^\$\{[A-Za-z_][A-Za-z0-9_]*\}[\/\w.\-]*$/', $source)) {
-            return;
-        }
-
-        if (preg_match('/^\$\{[A-Za-z_][A-Za-z0-9_]*:-([^}]*)\}$/', $source, $matches)) {
-            validateShellSafePath($matches[1], 'volume source');
-
-            return;
-        }
-
-        validateShellSafePath($source, 'volume source');
-    } catch (Exception $e) {
-        throw new Exception(
-            'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-            ' Please use safe path names without shell metacharacters.',
-            0,
-            $e
-        );
-    }
 }
 
 /**
@@ -899,6 +868,75 @@ function validateVolumeStringForInjection(string $volumeString): void
 {
     // Canonical parsing also validates and throws on unsafe input
     parseDockerVolumeString($volumeString);
+}
+
+function validateComposeBindSource(string $source): void
+{
+    if (str_contains($source, '`')) {
+        throw new Exception('Invalid Docker volume definition: volume source contains backtick.');
+    }
+    if (str_contains($source, '$(')) {
+        throw new Exception('Invalid Docker volume definition: volume source contains command substitution.');
+    }
+    if ($source === '' || preg_match('/[\x00-\x1F\x7F]|[\x60;|&<>]/', $source)) {
+        throw new Exception('Invalid Docker volume definition: volume source contains a forbidden character.');
+    }
+
+    $length = strlen($source);
+    for ($i = 0; $i < $length; $i++) {
+        if ($source[$i] === '}' || ($source[$i] === '{' && ($i === 0 || $source[$i - 1] !== '$'))) {
+            throw new Exception('Invalid Docker volume source: malformed interpolation.');
+        }
+        if ($source[$i] !== '$') {
+            continue;
+        }
+        if ($i + 1 >= $length) {
+            throw new Exception('Invalid Docker volume source: malformed interpolation.');
+        }
+        if ($source[$i + 1] === '$') {
+            $i++;
+
+            continue;
+        }
+        if ($source[$i + 1] === '{') {
+            $start = $i + 2;
+            $depth = 1;
+            $j = $start;
+            while ($j < $length && $depth > 0) {
+                if ($source[$j] === '$' && ($source[$j + 1] ?? '') === '{') {
+                    $depth++;
+                    $j += 2;
+
+                    continue;
+                }
+                if ($source[$j] === '}') {
+                    $depth--;
+                }
+                $j++;
+            }
+            if ($depth !== 0) {
+                throw new Exception('Invalid Docker volume source: malformed interpolation.');
+            }
+            $expression = substr($source, $start, $j - $start - 1);
+            if (! preg_match('/^[A-Za-z_][A-Za-z0-9_]*(?:(:-|-|:\\+|\\+|:\\?|\\?)([\\s\\S]*))?$/', $expression, $parts)) {
+                throw new Exception('Invalid Docker volume source: malformed interpolation.');
+            }
+            if (isset($parts[2]) && $parts[2] !== '') {
+                validateComposeBindSource($parts[2]);
+            }
+            $i = $j - 1;
+
+            continue;
+        }
+        if (preg_match('/[A-Za-z_]/', $source[$i + 1])) {
+            while ($i + 1 < $length && preg_match('/[A-Za-z0-9_]/', $source[$i + 1])) {
+                $i++;
+            }
+
+            continue;
+        }
+        throw new Exception('Invalid Docker volume source: malformed interpolation.');
+    }
 }
 
 function parseDockerVolumeString(string $volumeString): array
@@ -1628,7 +1666,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
                     $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
-                    if (sourceIsLocal($source)) {
+                    if (composeShortSyntaxIsBind($source, $originalResource, $uuid)) {
                         $type = str('bind');
                         if ($foundConfig) {
                             $content = data_get($foundConfig, 'content');
@@ -1649,7 +1687,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
-                        validateComposeArrayVolumeSource($source->value());
+                        validateComposeBindSource($source->value());
                         // A named volume keeps its source as written, so its volume name does not change.
                         if ($type->value() === 'bind') {
                             $source = str(resolveComposeLongBindSource($source->value(), $resource, $isPullRequest));
@@ -1735,6 +1773,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
                 } elseif ($type->value() === 'volume') {
+                    if (is_string($volume)) {
+                        $source = composeNamedVolumeSource($source);
+                    }
                     // A preview never mounts an external or network (NFS, CIFS) volume: two deployments
                     // that write into the same data directory (for example two databases) can corrupt it.
                     // The preview gets its own volume with the name that older Coolify versions gave
@@ -3076,7 +3117,7 @@ function serviceParser(Service $resource): Collection
                     $target = $parsed['target'];
                     // Mode is available in $parsed['mode'] if needed
                     $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
-                    if (sourceIsLocal($source)) {
+                    if (composeShortSyntaxIsBind($source, $originalResource, $uuid)) {
                         $type = str('bind');
                         if ($foundConfig) {
                             $content = data_get($foundConfig, 'content');
@@ -3097,7 +3138,7 @@ function serviceParser(Service $resource): Collection
 
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
-                        validateComposeArrayVolumeSource($source->value());
+                        validateComposeBindSource($source->value());
                         // A named volume keeps its source as written, so its volume name does not change.
                         if ($type->value() === 'bind') {
                             $source = str(resolveComposeLongBindSource($source->value(), $resource));
@@ -3175,6 +3216,9 @@ function serviceParser(Service $resource): Collection
                         }
                     }
                 } elseif ($type->value() === 'volume') {
+                    if (is_string($volume)) {
+                        $source = composeNamedVolumeSource($source);
+                    }
                     if (useComposeExternalVolumeAsWritten($resource, $originalResource, $topLevel->get('volumes'), $source->value(), "{$uuid}_".Str::slug($source, '-'))) {
                         // The external volume gets no row, so Coolify never removes it.
                         $volumesParsed->put($index, $volume);

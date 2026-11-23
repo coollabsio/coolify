@@ -38,7 +38,7 @@ beforeEach(function () {
         'server_id' => $server->id,
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),
-        'docker_compose_raw' => "services:\n  app:\n    image: nginx:alpine\n",
+        'docker_compose_raw' => '',
     ]);
     $this->serviceApplication = ServiceApplication::create(['name' => 'app', 'service_id' => $this->service->id]);
 

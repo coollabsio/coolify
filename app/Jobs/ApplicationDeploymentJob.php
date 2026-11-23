@@ -19,6 +19,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\LocalFileVolume;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -1420,7 +1421,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     "{$server_workdir}/.env"
                 );
 
-                $this->write_deployment_configurations();
+                $this->write_deployment_configurations(initializeStorage: true);
 
                 try {
                     $this->execute_remote_command(
@@ -1434,7 +1435,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     throw $e;
                 }
             } else {
-                $this->write_deployment_configurations();
+                $this->write_deployment_configurations(initializeStorage: true);
                 $this->docker_compose_location = '/docker-compose.yaml';
 
                 $command = "{$this->coolify_variables} docker compose";
@@ -1456,7 +1457,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     "{$workdir_path}/.env"
                 );
 
-                $this->write_deployment_configurations();
+                $this->write_deployment_configurations(initializeStorage: true);
                 if ($this->preserveRepository) {
                     $start_in_workdir = "cd {$server_workdir} && {$start_command}";
                     if ($this->server->isNonRoot()) {
@@ -1478,7 +1479,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     // Always use .env file
                     $command .= " --env-file {$server_workdir}/.env";
                     $command .= " --project-name {$this->composeProjectName()} --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d";
-                    $this->write_deployment_configurations();
+                    $this->write_deployment_configurations(initializeStorage: true);
 
                     $this->execute_remote_command(
                         ['command' => $command, 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
@@ -1487,10 +1488,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     // Always use .env file
                     $command .= " --env-file {$this->workdir}/.env";
                     $command .= " --project-name {$this->composeProjectName()} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d";
+                    $this->write_deployment_configurations(initializeStorage: true);
                     $this->execute_remote_command(
                         [executeInDocker($this->deployment_uuid, $this->withoutHelperBuildSecretEnvironment($command)), 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
                     );
-                    $this->write_deployment_configurations();
                 }
             }
         }
@@ -1667,7 +1668,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->rolling_update();
     }
 
-    private function write_deployment_configurations()
+    private function write_deployment_configurations(bool $initializeStorage = false)
     {
         if ($this->preserveRepository) {
             if ($this->use_build_server) {
@@ -1682,11 +1683,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         "docker cp {$this->deployment_uuid}:{$this->workdir}/. {$this->configuration_dir}",
                     ],
                 );
-            }
-            foreach ($this->application->fileStorages as $fileStorage) {
-                if (! $fileStorage->is_host_file && ! $fileStorage->is_based_on_git && ! $fileStorage->is_directory) {
-                    $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->saveStorageOnServer($this->mainServer);
-                }
             }
             if ($this->use_build_server) {
                 $this->server = $this->build_server;
@@ -1726,10 +1722,85 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     "echo '{$readme}' | tee $mainDir/README.md > /dev/null",
                 ]
             );
+            if ($initializeStorage && $this->application->build_pack === 'dockercompose') {
+                $projectDirectory = ! $this->preserveRepository && ! $this->application->settings->is_raw_compose_deployment_enabled
+                    ? $this->workdir
+                    : $this->application->workdir();
+                $envFile = $this->application->workdir().'/.env';
+                $this->inspectComposeRepositoryFiles($composeFileName, $projectDirectory, $envFile);
+                foreach ($this->application->fileStorages()->get() as $fileStorage) {
+                    if ($fileStorage->is_host_file || (! $fileStorage->pending_initialization && $this->pull_request_id === 0 && (! $this->preserveRepository || $fileStorage->is_based_on_git || $fileStorage->is_directory))) {
+                        continue;
+                    }
+                    $error = $fileStorage->forPullRequest($this->previewFileStoragePullRequestId())->initializeOnServer($composeFileName, $projectDirectory, $envFile, $this->mainServer);
+                    if ($error !== null) {
+                        $this->logStorageWarning($fileStorage, $error);
+                    }
+                }
+            }
             if ($this->use_build_server) {
                 $this->server = $this->build_server;
             }
         }
+    }
+
+    private function inspectComposeRepositoryFiles(string $composeFileName, string $projectDirectory, string $envFile): void
+    {
+        if (! $this->preserveRepository) {
+            return;
+        }
+
+        foreach ($this->application->fileStorages()->get() as $fileStorage) {
+            if ($fileStorage->is_host_file) {
+                continue;
+            }
+            try {
+                $path = $fileStorage->resolvedStoragePath($this->application->workdir(), $this->mainServer, $composeFileName, $projectDirectory, $envFile);
+            } catch (Throwable $e) {
+                $this->logStorageWarning($fileStorage, $e->getMessage());
+
+                continue;
+            }
+            $base = $this->application->workdir();
+            if (! str_starts_with($path, $base.'/')) {
+                continue;
+            }
+            $repositoryPath = $this->workdir.substr($path, strlen($base));
+            $saveName = 'file_stat_'.$fileStorage->id;
+            if ($this->use_build_server) {
+                $this->server = $this->build_server;
+            }
+            $this->execute_remote_command(
+                [executeInDocker($this->deployment_uuid, "stat -c '%F' -- ".escapeshellarg($repositoryPath)), 'hidden' => true, 'ignore_errors' => true, 'save' => $saveName]
+            );
+            if ($this->use_build_server) {
+                $this->server = $this->mainServer;
+            }
+            if (! $this->saved_outputs->has($saveName)) {
+                continue;
+            }
+            $type = $this->trimmedSavedOutput($saveName)->value();
+            if ($type === 'directory' && ! $fileStorage->is_directory) {
+                $fileStorage->is_directory = true;
+                $fileStorage->content = null;
+            } elseif ($type === 'regular file' && $fileStorage->is_directory) {
+                $fileStorage->is_directory = false;
+                $fileStorage->is_based_on_git = true;
+            } else {
+                continue;
+            }
+            /** The repository copy already put the Git file or directory at this path; do not delete or write it. */
+            $fileStorage->pending_initialization = false;
+            $fileStorage->save();
+        }
+    }
+
+    /**
+     * Storage errors do not stop the deployment; Docker Compose still starts the containers.
+     */
+    private function logStorageWarning(LocalFileVolume $fileStorage, string $error): void
+    {
+        $this->application_deployment_queue->addLogEntry("Warning: Could not prepare storage for {$fileStorage->mount_path}: {$error}", 'stderr');
     }
 
     private function push_to_docker_registry()
@@ -2434,6 +2505,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         // Generate runtime environment variables locally
         $environment_variables = $this->generate_runtime_environment_variables();
+        $mainComposeEnvFile = "{$this->configuration_dir}/.env-main";
 
         // Each .env write first removes the file: with "Preserve repository", `docker cp` can copy a symlink
         // from the repository to this name. Coolify writes a regular file instead of the link target.
@@ -2464,6 +2536,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                             "touch $this->configuration_dir/.env",
                         ]
                     );
+                    if ($this->build_pack === 'dockercompose' && $this->pull_request_id === 0) {
+                        $this->execute_remote_command(["rm -f -- {$mainComposeEnvFile} && touch -- {$mainComposeEnvFile}"]);
+                    }
                     $this->server = $this->build_server;
                 } else {
                     $this->execute_remote_command(
@@ -2475,6 +2550,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                             "touch $this->configuration_dir/.env",
                         ]
                     );
+                    if ($this->build_pack === 'dockercompose' && $this->pull_request_id === 0) {
+                        $this->execute_remote_command(["rm -f -- {$mainComposeEnvFile} && touch -- {$mainComposeEnvFile}"]);
+                    }
                 }
             } else {
                 // For non-Docker Compose deployments, clean up any existing .env files
@@ -2538,6 +2616,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     'skip_command_log' => true,
                 ]
             );
+            if ($this->build_pack === 'dockercompose' && $this->pull_request_id === 0) {
+                $this->execute_remote_command(["rm -f -- {$mainComposeEnvFile} && cp -- {$this->configuration_dir}/.env {$mainComposeEnvFile}"]);
+            }
             $this->server = $this->build_server;
         } else {
             $this->execute_remote_command(
@@ -2550,6 +2631,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                     'skip_command_log' => true,
                 ]
             );
+            if ($this->build_pack === 'dockercompose' && $this->pull_request_id === 0) {
+                $this->execute_remote_command(["rm -f -- {$mainComposeEnvFile} && cp -- {$this->configuration_dir}/.env {$mainComposeEnvFile}"]);
+            }
         }
 
         return $environment_variables;

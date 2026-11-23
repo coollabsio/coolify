@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -1829,6 +1830,16 @@ class Service extends BaseModel
             $moves[] = 'mv '.escapeshellarg($serviceEnvironmentFile).' '.escapeshellarg("$workdir/".composeServiceEnvironmentFile($serviceName));
         }
         instant_remote_process($moves, $this->server);
+
+        /** Write new file mounts now, so `docker compose up` does not create directories in their place. */
+        foreach ($this->applications()->get()->concat($this->databases()->get()) as $resource) {
+            foreach ($resource->fileStorages()->where('pending_initialization', true)->get() as $fileStorage) {
+                $error = $fileStorage->initializeOnServer();
+                if ($error !== null) {
+                    Log::warning("Could not prepare storage {$fileStorage->mount_path} for service {$this->uuid}: {$error}");
+                }
+            }
+        }
     }
 
     /**
