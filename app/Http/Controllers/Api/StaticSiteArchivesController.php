@@ -59,6 +59,7 @@ class StaticSiteArchivesController extends Controller
             new OA\Response(response: 403, description: 'The token user cannot create applications or update and deploy the application.'),
             new OA\Response(response: 404, description: 'Application not found.'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
+            new OA\Response(response: 409, description: 'The instance sends uploads to its S3 upload storage. Use /applications/archive/uploads/s3.'),
             new OA\Response(response: 429, description: 'The team uploaded more than 5 GiB of archives in the last hour.'),
         ],
     )]
@@ -87,16 +88,14 @@ class StaticSiteArchivesController extends Controller
         path: '/applications/archive/uploads/s3',
         operationId: 'prepare-static-site-archive-s3-upload',
         summary: 'Prepare static site archive upload to S3',
-        description: 'Return a presigned URL that uploads an archive straight to an S3 storage of the team, so the archive does not use the disk of the Coolify instance. Send the archive with one PUT request to the URL, with the returned headers, before expires_at. Then use the upload_id like the upload_id of a direct upload. Creating or deploying the site reads the archive from the bucket to check it (at most 1 GiB), and the deployment deletes it from the bucket. The upload is kept for 24 hours, and a team keeps its 3 newest uploads.',
+        description: 'Return a presigned URL that uploads an archive straight to the upload storage that the instance admin selected, so the archive does not use the disk of the Coolify instance. When the instance has an upload storage, use this instead of /applications/archive/uploads, which then returns 409. Send the archive with one PUT request to the URL, with the returned headers, before expires_at. Then use the upload_id like the upload_id of a direct upload. Creating or deploying the site reads the archive from the bucket to check it (at most 1 GiB), and the deployment deletes it from the bucket. The upload is kept for 24 hours, and a team keeps its 3 newest uploads.',
         security: [['bearerAuth' => []]],
         tags: ['Applications'],
         requestBody: new OA\RequestBody(
-            required: true,
+            required: false,
             content: new OA\JsonContent(
                 type: 'object',
-                required: ['s3_storage_uuid'],
                 properties: [
-                    's3_storage_uuid' => ['type' => 'string', 'description' => 'The UUID of a usable S3 storage of the team.'],
                     'application_uuid' => ['type' => 'string', 'description' => 'The archive site that this upload is a new version of.'],
                 ],
             ),
@@ -118,7 +117,7 @@ class StaticSiteArchivesController extends Controller
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 403, description: 'The token user cannot create applications or update and deploy the application.'),
             new OA\Response(response: 404, description: 'Application not found.'),
-            new OA\Response(response: 422, ref: '#/components/responses/422'),
+            new OA\Response(response: 422, description: 'The instance has no upload storage.'),
         ],
     )]
     public function prepareS3Upload(Request $request): JsonResponse
@@ -128,7 +127,6 @@ class StaticSiteArchivesController extends Controller
             return invalidTokenResponse();
         }
         $validator = customApiValidator($request->all(), [
-            's3_storage_uuid' => ['required', 'string'],
             'application_uuid' => ['nullable', 'string'],
         ]);
         if ($validator->fails()) {
@@ -147,7 +145,7 @@ class StaticSiteArchivesController extends Controller
         }
 
         try {
-            return response()->json(StaticSiteArchive::prepareS3Upload((int) $teamId, (string) $request->input('s3_storage_uuid')), 201);
+            return response()->json(StaticSiteArchive::prepareS3Upload((int) $teamId), 201);
         } catch (ValidationException $exception) {
             return response()->json(['message' => $exception->getMessage(), 'errors' => $exception->errors()], 422);
         }

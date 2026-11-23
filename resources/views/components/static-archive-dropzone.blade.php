@@ -1,20 +1,22 @@
 @props([
     'action',
     'prepareS3Action' => null,
-    'storages' => collect(),
     'applicationUuid' => null,
     'message' => 'Select or drop a .tar, .tar.gz, or .tgz archive here.',
 ])
-{{-- Uploads the archive in chunks to the team staging area, or with one presigned PUT straight to an S3 storage of the
-     team ($prepareS3Action returns the URL), then calls the Livewire $action with the upload ID. --}}
+@php
+    $toS3 = $prepareS3Action && App\Services\UploadStorageService::configuredStorage() !== null;
+@endphp
+{{-- Uploads the archive in chunks to the team staging area, or, when the instance has an upload storage, with one
+     presigned PUT straight to that bucket ($prepareS3Action returns the URL). Then calls the Livewire $action with the upload ID. --}}
 <div x-data="{
     uploading: false,
     progress: 0,
-    storage: '',
+    toS3: @js($toS3),
     async uploadToS3(file, dropzone) {
         const wire = this.$wire;
         try {
-            const upload = await wire.call(@js($prepareS3Action), this.storage);
+            const upload = await wire.call(@js($prepareS3Action));
             if (! upload) {
                 return;
             }
@@ -30,7 +32,7 @@
                 xhr.onload = () => xhr.status >= 200 && xhr.status < 300
                     ? resolve()
                     : reject(new Error(`The S3 storage refused the upload (HTTP ${xhr.status}).`));
-                xhr.onerror = () => reject(new Error(`The upload to the S3 storage failed. The bucket must have a CORS rule that allows PUT from ${window.location.origin}.`));
+                xhr.onerror = () => reject(new Error(`The upload to the S3 storage of this instance failed. Ask the instance admin to check the CORS rule of the bucket (PUT from ${window.location.origin}).`));
                 xhr.send(file);
             });
             await wire.call(@js($action), upload.upload_id);
@@ -62,7 +64,7 @@
                 parallelChunkUploads: false,
                 dictDefaultMessage: @js($message),
                 accept(file, done) {
-                    if (! state.storage) {
+                    if (! state.toS3) {
                         done();
                         return;
                     }
@@ -109,20 +111,6 @@
         script.addEventListener('load', attach, { once: true });
     },
 }" {{ $attributes }}>
-    @if ($prepareS3Action && $storages->isNotEmpty())
-        <div class="mb-3 flex w-full flex-col gap-1 sm:w-96">
-            <x-forms.listbox htmlId="static-archive-upload-target" label="Upload to" :wire="false" x-model="storage"
-                :value="''" :options="[
-                    ['value' => '', 'label' => 'This Coolify instance'],
-                    ...$storages->map(fn ($storage) => ['value' => $storage->uuid, 'label' => 'S3 storage: '.$storage->name])->values()->all(),
-                ]" />
-            <p x-cloak x-show="storage" class="text-xs text-neutral-500 dark:text-fg-dim">
-                The browser sends the archive straight to the bucket, so the bucket needs a CORS rule that allows
-                <span class="font-mono">PUT</span> from <span class="font-mono" x-text="window.location.origin"></span>.
-                Coolify reads the archive from the bucket to check it, and deletes it after the deployment.
-            </p>
-        </div>
-    @endif
     {{-- A div, not a form: this component can sit inside another form, where a nested form is dropped by the browser. --}}
     <div class="dropzone rounded-lg! border! border-dashed! border-neutral-300! bg-white! dark:border-white/[0.12]! dark:bg-white/[0.05]!"
         x-init="mountDropzone($el)" wire:ignore></div>

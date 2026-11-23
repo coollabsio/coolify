@@ -17559,6 +17559,8 @@ paths:
           description: 'Application not found.'
         '422':
           $ref: '#/components/responses/422'
+        '409':
+          description: 'The instance sends uploads to its S3 upload storage. Use /applications/archive/uploads/s3.'
         '429':
           description: 'The team uploaded more than 5 GiB of archives in the last hour.'
       security:
@@ -17569,19 +17571,14 @@ paths:
       tags:
         - Applications
       summary: 'Prepare static site archive upload to S3'
-      description: 'Return a presigned URL that uploads an archive straight to an S3 storage of the team, so the archive does not use the disk of the Coolify instance. Send the archive with one PUT request to the URL, with the returned headers, before expires_at. Then use the upload_id like the upload_id of a direct upload. Creating or deploying the site reads the archive from the bucket to check it (at most 1 GiB), and the deployment deletes it from the bucket. The upload is kept for 24 hours, and a team keeps its 3 newest uploads.'
+      description: 'Return a presigned URL that uploads an archive straight to the upload storage that the instance admin selected, so the archive does not use the disk of the Coolify instance. When the instance has an upload storage, use this instead of /applications/archive/uploads, which then returns 409. Send the archive with one PUT request to the URL, with the returned headers, before expires_at. Then use the upload_id like the upload_id of a direct upload. Creating or deploying the site reads the archive from the bucket to check it (at most 1 GiB), and the deployment deletes it from the bucket. The upload is kept for 24 hours, and a team keeps its 3 newest uploads.'
       operationId: prepare-static-site-archive-s3-upload
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
-              required:
-                - s3_storage_uuid
               properties:
-                s3_storage_uuid:
-                  type: string
-                  description: 'The UUID of a usable S3 storage of the team.'
                 application_uuid:
                   type: string
                   description: 'The archive site that this upload is a new version of.'
@@ -17605,7 +17602,7 @@ paths:
         '404':
           description: 'Application not found.'
         '422':
-          $ref: '#/components/responses/422'
+          description: 'The instance has no upload storage.'
       security:
         -
           bearerAuth: []

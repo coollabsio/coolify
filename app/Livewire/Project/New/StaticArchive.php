@@ -5,11 +5,8 @@ namespace App\Livewire\Project\New;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\Project;
-use App\Models\S3Storage;
 use App\Support\StaticSiteArchive;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Collection;
-use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 class StaticArchive extends Component
@@ -27,27 +24,16 @@ class StaticArchive extends Component
     }
 
     /**
-     * The S3 storages that the dropzone can upload to.
-     *
-     * @return Collection<int, S3Storage>
-     */
-    #[Computed]
-    public function s3Storages(): Collection
-    {
-        return StaticSiteArchive::s3Storages((int) currentTeam()->id);
-    }
-
-    /**
-     * Returns a presigned URL that uploads the archive straight to an S3 storage of the team.
+     * Returns a presigned URL that uploads the archive straight to the upload storage of the instance.
      *
      * @return array{upload_id: string, url: string, headers: array<string, string>, expires_at: string}|null
      */
-    public function prepareS3Upload(string $s3StorageUuid): ?array
+    public function prepareS3Upload(): ?array
     {
         try {
             $environment = $this->environment();
 
-            return StaticSiteArchive::prepareS3Upload((int) $environment->project->team_id, $s3StorageUuid);
+            return StaticSiteArchive::prepareS3Upload((int) $environment->project->team_id);
         } catch (\Throwable $e) {
             handleError($e, $this);
 

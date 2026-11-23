@@ -17,7 +17,8 @@ readonly class DatabaseImportSource
         public ?string $sqliteDatabase = null,
         public bool $restoreMysqlUsers = false,
     ) {
-        if (! in_array($type, ['upload', 's3', 'server'], true)) {
+        // 's3-upload' is a browser upload to the instance's import storage (only the import form uses it).
+        if (! in_array($type, ['upload', 's3', 'server', 's3-upload'], true)) {
             throw new InvalidArgumentException('Invalid database import source.');
         }
     }

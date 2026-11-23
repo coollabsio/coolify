@@ -8,11 +8,11 @@ use App\Models\GithubApp;
 use App\Models\S3Storage;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Services\UploadStorageService;
 use Aws\S3\Exception\S3Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
@@ -254,6 +254,11 @@ final class StaticSiteArchive
      */
     public static function receiveUpload(Request $request, int $teamId): JsonResponse
     {
+        if (UploadStorageService::configuredStorage() !== null) {
+            $message = 'Uploads go to the S3 storage of this instance. Reload the page, or use POST /api/v1/applications/archive/uploads/s3.';
+
+            return response()->json(['message' => $message, 'errors' => ['file' => [$message]]], 409);
+        }
         $uploadId = (string) $request->input('upload_id', $request->input('dzuuid', ''));
         $request->merge(['upload_id' => $uploadId, 'dzuuid' => $uploadId]);
         $validator = Validator::make($request->all(), ['upload_id' => ['required', 'uuid'], 'file' => ['required', 'file']]);
@@ -313,18 +318,21 @@ final class StaticSiteArchive
     }
 
     /**
-     * Stages an upload that the client sends straight to an S3 storage of the team, so the archive does not use
-     * the disk of the Coolify instance. Publishing it inspects the archive in the bucket.
+     * Stages an upload that the client sends straight to the upload storage of the instance, so the archive does
+     * not use the disk of the Coolify instance. Publishing it inspects the archive in the bucket.
      *
      * @return array{upload_id: string, url: string, headers: array<string, string>, expires_at: string}
      *
-     * @throws ValidationException when the team has no usable S3 storage with this UUID
+     * @throws ValidationException when the instance has no upload storage
      */
-    public static function prepareS3Upload(int $teamId, string $s3StorageUuid): array
+    public static function prepareS3Upload(int $teamId): array
     {
-        $storage = self::findS3Storage($teamId, ['uuid' => $s3StorageUuid]);
+        $storage = UploadStorageService::configuredStorage();
+        if (! $storage) {
+            self::fail('This instance has no upload storage. Upload the archive to Coolify instead.', 'upload_id');
+        }
         $uploadId = (string) Str::uuid();
-        $key = "coolify-uploads/static-archives/{$teamId}/{$uploadId}";
+        $key = UploadStorageService::PREFIX."static-archives/{$teamId}/{$uploadId}";
         $directory = self::stagingDirectory($teamId, $uploadId);
         Storage::put("{$directory}/s3.json", json_encode(['s3_storage_id' => $storage->id, 'key' => $key]));
         self::deleteOldStagedUploads($teamId);
@@ -344,25 +352,16 @@ final class StaticSiteArchive
     }
 
     /**
-     * The S3 storages of the team that can hold uploads: S3 only, because uploads need presigned URLs.
-     *
-     * @return Collection<int, S3Storage>
-     */
-    public static function s3Storages(int $teamId): Collection
-    {
-        return S3Storage::query()->where('team_id', $teamId)->s3Only()->where('is_usable', true)->orderBy('name')->get();
-    }
-
-    /**
-     * @param  array<string, int|string>  $attributes
+     * The upload storage of a staged upload or deployment archive. It can differ from the storage that is selected
+     * now, when the admin changed the setting after the upload.
      *
      * @throws ValidationException
      */
-    private static function findS3Storage(int $teamId, array $attributes): S3Storage
+    private static function referencedStorage(?array $reference): S3Storage
     {
-        $storage = self::s3Storages($teamId)->first(fn (S3Storage $storage): bool => collect($attributes)->every(fn ($value, string $column): bool => (string) $storage->{$column} === (string) $value));
+        $storage = UploadStorageService::findStorage((int) ($reference['s3_storage_id'] ?? 0));
         if (! $storage) {
-            self::fail('The S3 storage was not found, is not usable, or is not an S3 storage.', 's3_storage_uuid');
+            self::fail('The S3 storage of the upload was deleted. Upload the archive again.', 'upload_id');
         }
 
         return $storage;
@@ -399,8 +398,11 @@ final class StaticSiteArchive
         if (! is_array($reference) || ! isset($reference['s3_storage_id'], $reference['key'])) {
             return;
         }
+        if (! str_starts_with((string) $reference['key'], UploadStorageService::PREFIX."static-archives/{$teamId}/")) {
+            return;
+        }
         try {
-            $storage = S3Storage::query()->where('team_id', $teamId)->find($reference['s3_storage_id']);
+            $storage = UploadStorageService::findStorage((int) $reference['s3_storage_id']);
             $storage?->filesystem()->delete($reference['key']);
         } catch (\Throwable $exception) {
             Log::warning('Could not delete a static site archive from S3 storage.', ['key' => $reference['key'], 'error' => $exception->getMessage()]);
@@ -450,7 +452,7 @@ final class StaticSiteArchive
         if (isset($reference['sha'])) {
             return $reference;
         }
-        $storage = self::findS3Storage($teamId, ['id' => $reference['s3_storage_id'] ?? 0]);
+        $storage = self::referencedStorage($reference);
         try {
             $archive = self::inspectS3($storage, (string) $reference['key']);
         } catch (ValidationException $exception) {
@@ -505,7 +507,7 @@ final class StaticSiteArchive
         if (! is_array($reference)) {
             return null;
         }
-        $storage = S3Storage::query()->where('team_id', $application->team()->id)->find($reference['s3_storage_id'] ?? null);
+        $storage = UploadStorageService::findStorage((int) ($reference['s3_storage_id'] ?? 0));
         if (! $storage) {
             throw new \RuntimeException('The S3 storage of the site archive was deleted. Upload the archive again.');
         }

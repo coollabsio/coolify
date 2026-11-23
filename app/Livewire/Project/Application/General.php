@@ -8,7 +8,6 @@ use App\Jobs\ApplicationDeploymentJob;
 use App\Livewire\Project\Service\Storage;
 use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Application;
-use App\Models\S3Storage;
 use App\Rules\ValidGitBranch;
 use App\Rules\ValidGitRepositoryUrl;
 use App\Services\Dns\ManagedDnsRecordCleanup;
@@ -22,7 +21,6 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
-use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Livewire\Features\SupportEvents\Event;
 
@@ -744,22 +742,11 @@ class General extends Component
     }
 
     /**
-     * The S3 storages that the archive dropzone can upload to.
-     *
-     * @return Collection<int, S3Storage>
-     */
-    #[Computed]
-    public function archiveS3Storages(): Collection
-    {
-        return $this->application->is_archive_source ? StaticSiteArchive::s3Storages((int) $this->application->team()->id) : collect();
-    }
-
-    /**
-     * Returns a presigned URL that uploads a new version of this archive site straight to an S3 storage of its team.
+     * Returns a presigned URL that uploads a new version of this archive site straight to the upload storage of the instance.
      *
      * @return array{upload_id: string, url: string, headers: array<string, string>, expires_at: string}|null
      */
-    public function prepareS3ArchiveUpload(string $s3StorageUuid): ?array
+    public function prepareS3ArchiveUpload(): ?array
     {
         try {
             $this->authorize('update', $this->application);
@@ -768,7 +755,7 @@ class General extends Component
                 throw new Exception('This application is not deployed from an uploaded archive.');
             }
 
-            return StaticSiteArchive::prepareS3Upload((int) $this->application->team()->id, $s3StorageUuid);
+            return StaticSiteArchive::prepareS3Upload((int) $this->application->team()->id);
         } catch (\Throwable $e) {
             handleError($e, $this);
 
