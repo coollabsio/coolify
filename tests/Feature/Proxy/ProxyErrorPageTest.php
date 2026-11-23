@@ -279,7 +279,7 @@ it('writes the current catch-all and its hash when the refresh job runs', functi
     expect($lines)->toContain('sudo rm -f /data/coolify/proxy//dynamic/default_redirect_503.yaml')
         ->and(writtenProxyFile($lines, '/data/coolify/proxy//dynamic/default_redirect_404.yaml'))->toContain('/cgi-bin/404')
         ->and($server->fresh()->proxy->get('default_redirect_hash'))->toBe(md5($server->defaultRedirectConfiguration()))
-        ->and($server->fresh()->claimOutdatedDefaultRedirectRefresh())->toBeFalse();
+        ->and($server->fresh()->claimOutdatedDefaultRedirectRefresh())->toBeNull();
 });
 
 it('skips the queued refresh when the proxy is not running anymore', function (array $proxy) {

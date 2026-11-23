@@ -23,7 +23,10 @@ class RefreshDefaultRedirectJob implements ShouldBeEncrypted, ShouldQueue
 
     public $timeout = 120;
 
-    public function __construct(public Server $server) {}
+    /**
+     * @param  string|null  $claimedHash  The hash claimed by Server::claimOutdatedDefaultRedirectRefresh().
+     */
+    public function __construct(public Server $server, public ?string $claimedHash = null) {}
 
     public function handle(): void
     {
@@ -32,6 +35,11 @@ class RefreshDefaultRedirectJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $this->server->setupDefaultRedirect();
+
+        // Only after success: a kept claim is the backoff for a failed refresh.
+        if ($this->claimedHash !== null) {
+            $this->server->releaseDefaultRedirectRefresh($this->claimedHash);
+        }
     }
 
     /**
