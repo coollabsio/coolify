@@ -8,7 +8,7 @@ use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 /**
- * Team settings page for image scanning. Members see the values, admins edit them (authorized in ScanSettings).
+ * Team settings page for image scanning. Members see the values; users with team-wide write edit them (authorized in ScanSettings).
  */
 class TeamImageScanning extends Component
 {

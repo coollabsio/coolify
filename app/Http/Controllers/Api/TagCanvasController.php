@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\AccessLevel;
 use App\Http\Controllers\Controller;
 use App\Models\Tag;
+use App\Services\Access\AccessResolver;
 use App\Services\TagCanvas;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,7 +29,7 @@ class TagCanvasController extends Controller
 
         $user = $request->user();
         $token = $user->currentAccessToken();
-        $canEdit = $user->isAdminOfTeam((int) $teamId) && ($token->can('root') || $token->can('write'));
+        $canEdit = app(AccessResolver::class)->allowsTeamWide($user, AccessLevel::Write, (int) $teamId) && ($token->can('root') || $token->can('write'));
 
         return response()->json($this->canvas->payload((int) $teamId, $canEdit));
     }

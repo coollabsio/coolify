@@ -1033,8 +1033,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $commands[] = "docker run -d --network {$safeNetwork} --name backup-of-{$this->backup_log_uuid} --rm {$s3->minioClientEnvOptions()} {$mount} {$fullImageName}";
 
             instant_remote_process($commands, $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
+            $container = "backup-of-{$this->backup_log_uuid}";
+            $key = ltrim($this->backup_dir, '/').'/'.basename($this->backup_location);
+            $isUploaded = fn (): bool => false;
             if ($s3->usesCurlTransfer()) {
-                $uploadCommand = $s3->prepareCurlUpload($this->server, "backup-of-{$this->backup_log_uuid}", $this->backup_location, ltrim($this->backup_dir, '/').'/'.basename($this->backup_location));
+                $uploadCommand = $s3->prepareCurlUpload($this->server, $container, $this->backup_location, $key);
             } else {
                 $escapedBackupLocation = escapeshellarg($this->backup_location);
                 $escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");
@@ -1042,11 +1045,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $partSizeOption = S3Storage::minioClientPartSizeOption($this->size);
                 $this->setMinioClientAlias($this->server, "backup-of-{$this->backup_log_uuid}", $s3, $resolveOptions);
                 $uploadCommand = "docker exec {$partSizeOption} backup-of-{$this->backup_log_uuid} mc cp{$resolveOptions} {$escapedBackupLocation} {$escapedS3Destination}";
+                $size = (int) $this->size;
+                $isUploaded = fn (): bool => $s3->minioClientObjectHasSize($this->server, $container, $key, $size, $resolveOptions);
             }
             S3Storage::retryMinioClientUpload(fn () => instant_remote_process(
                 [$uploadCommand],
                 $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true,
-            ));
+            ), $isUploaded);
 
         } catch (Throwable $e) {
             $e = $this->backupTimeoutError($e);

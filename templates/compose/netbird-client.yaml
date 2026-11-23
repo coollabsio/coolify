@@ -6,23 +6,36 @@
 
 services:
   netbird-client:
-    image: 'netbirdio/netbird:0.83.1'
+    image: 'netbirdio/netbird:0.83.1' # Released on 13 November 2026
     network_mode: host
+    # Share the host UTS namespace, so the peer gets the hostname of the server, not of the container.
+    uts: host
     environment:
-      - 'NB_SETUP_KEY=${NB_SETUP_KEY}'
+      - 'NB_SETUP_KEY=${NB_SETUP_KEY:?}'
+      # For a self-hosted NetBird server, set its URL, for example https://netbird.example.com:443
+      - 'NB_MANAGEMENT_URL=${NB_MANAGEMENT_URL:-https://api.netbird.io:443}'
       - 'NB_ENABLE_ROSENPASS=${NB_ENABLE_ROSENPASS:-false}'
-      - 'NB_ENABLE_EXPERIMENTAL_LAZY_CONN=${NB_ENABLE_EXPERIMENTAL_LAZY_CONN:-false}'
+      - 'NB_LAZY_CONN=${NB_LAZY_CONN:-off}'
+      - 'NB_LOG_LEVEL=${NB_LOG_LEVEL:-info}'
+      - 'NB_DISABLE_DNS=${NB_DISABLE_DNS:-false}'
+      - 'NB_ALLOW_SERVER_SSH=${NB_ALLOW_SERVER_SSH:-false}'
     volumes:
       - 'netbird-client:/var/lib/netbird'
+      # NetBird reads the OS name and version only from /etc/os-release, so show the OS of the server.
+      - '/etc/os-release:/etc/os-release:ro'
     cap_add:
       - NET_ADMIN
       - SYS_ADMIN
       - SYS_RESOURCE
+    # "ready" fails when the client is not logged in (for example a wrong setup key).
     healthcheck:
       test:
         - CMD
         - netbird
-        - 'version'
-      interval: 5s
-      timeout: 20s
+        - status
+        - '--check'
+        - ready
+      interval: 10s
+      timeout: 10s
       retries: 10
+      start_period: 30s

@@ -26,7 +26,7 @@ class DeployController extends Controller
 {
     private function removeSensitiveData($deployment)
     {
-        if (request()->attributes->get('can_read_sensitive', false) === false) {
+        if (! canReadResourceSecretsFromApi($deployment->application)) {
             $deployment->makeHidden([
                 'logs',
             ]);
@@ -771,7 +771,7 @@ class DeployController extends Controller
         $this->authorize('view', $application);
 
         $deployments = $application->deployments($skip, $take);
-        if ($request->attributes->get('can_read_sensitive', false) === true) {
+        if (canReadResourceSecretsFromApi($application)) {
             $deployments['deployments']->each->makeVisible(['logs']);
         }
 

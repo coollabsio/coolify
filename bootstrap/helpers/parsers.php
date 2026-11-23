@@ -1370,17 +1370,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     if (! $keepsApplicationRows) {
         ensureComposeNetworkNameVariables($resource, $topLevel->get('networks'));
     }
-    // If there are predefined volumes, make sure they are not null
-    if ($topLevel->get('volumes')->count() > 0) {
-        $temp = collect([]);
-        foreach ($topLevel['volumes'] as $volumeName => $volume) {
-            if (is_null($volume)) {
-                continue;
-            }
-            $temp->put($volumeName, $volume);
-        }
-        $topLevel['volumes'] = $temp;
-    }
+    // A volume without options ("data:") stays declared: a service from `extends` can mount it as written.
+    $topLevel->put('volumes', $topLevel->get('volumes')->map(fn ($volume) => $volume ?? []));
     // Get the base docker network
     $baseNetwork = collect([$uuid]);
     if ($isPullRequest) {
@@ -1967,10 +1958,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     // networks:
                     //  - appwrite
                     $networks_temp->put($network, null);
-                } elseif (gettype($network) === 'array') {
+                } elseif (is_array($network) || is_null($network)) {
                     // networks:
                     //   default:
                     //     ipv4_address: 192.168.203.254
+                    //   internal: null
                     $networks_temp->put($key, $network);
                 }
             }
@@ -3045,9 +3037,10 @@ function serviceParser(Service $resource): Collection
         }
     }
 
-    $serviceAppsLogDrainEnabledMap = $resource->applications()->get()->keyBy('name')->map(function ($app) {
-        return $app->isLogDrainEnabled();
-    });
+    $serviceLogDrainEnabledMap = $resource->applications()->get()
+        ->concat($resource->databases()->get())
+        ->keyBy('name')
+        ->map(fn (ServiceApplication|ServiceDatabase $servicePart) => $servicePart->isLogDrainEnabled());
 
     // Parse the rest of the services
     foreach ($services as $serviceName => $service) {
@@ -3056,7 +3049,7 @@ function serviceParser(Service $resource): Collection
         $logging = data_get($service, 'logging');
 
         if ($server->isLogDrainEnabled()) {
-            if ($serviceAppsLogDrainEnabledMap->get($serviceName)) {
+            if ($serviceLogDrainEnabledMap->get($serviceName)) {
                 $logging = generate_log_drain_configuration($server);
             }
         }
@@ -3317,10 +3310,11 @@ function serviceParser(Service $resource): Collection
                     // networks:
                     //  - appwrite
                     $networks_temp->put($network, null);
-                } elseif (gettype($network) === 'array') {
+                } elseif (is_array($network) || is_null($network)) {
                     // networks:
                     //   default:
                     //     ipv4_address: 192.168.203.254
+                    //   internal: null
                     $networks_temp->put($key, $network);
                 }
             }

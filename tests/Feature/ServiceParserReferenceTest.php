@@ -125,6 +125,9 @@ it('parses the compose exactly as recorded', function (string $composePath, ?str
             }
             $application->save();
         }
+        foreach ($options['databases'] ?? [] as $name => $settings) {
+            $service->databases()->where('name', $name)->firstOrFail()->update($settings);
+        }
     });
 
     if ($deployed) {
@@ -332,6 +335,9 @@ function serviceParserReferenceCases(): array
                 'web' => ['is_gzip_enabled' => false, 'is_force_https_enabled' => false, 'redirect' => 'www', 'noindex' => true, 'is_log_drain_enabled' => true],
                 'api' => ['is_stripprefix_enabled' => false],
                 'www' => ['redirect' => 'non-www'],
+            ],
+            'databases' => [
+                'db' => ['is_log_drain_enabled' => true],
             ],
         ]],
         'reference with migrated services' => [$reference, null, ['migrated' => ['db' => 'application', 'sidecar' => 'database']]],

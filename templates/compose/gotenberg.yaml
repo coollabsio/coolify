@@ -21,7 +21,7 @@ services:
       # - --api-timeout=60s
       # - --chromium-auto-start
       - --api-enable-basic-auth
-      - --api-disable-health-check-logging
+      - --api-disable-health-check-route-telemetry
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/health"]
       interval: 5s

@@ -3556,7 +3556,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->application_deployment_queue->addLogEntry('Container logs:');
         $this->execute_remote_command(
             [
-                'command' => "docker logs -n 100 {$escapedContainerName}",
+                'command' => remoteCommandWithTimeout("docker logs -n 100 {$escapedContainerName}", 30),
                 'type' => 'stderr',
                 'ignore_errors' => true,
             ],
@@ -4104,11 +4104,13 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->withGitHints(fn () => $this->import_repository());
         $this->save_git_ssh_known_hosts();
         $this->create_workdir();
+        // The commit belongs to the root repository, which is not the base directory when it is a submodule.
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "cd {$this->workdir} && git log -1 ".escapeshellarg($this->commit).' --pretty=%B'),
+                executeInDocker($this->deployment_uuid, "cd {$this->basedir} && git log -1 ".escapeshellarg($this->commit).' --pretty=%B'),
                 'hidden' => true,
                 'save' => 'commit_message',
+                'ignore_errors' => true,
             ]
         );
         if ($this->saved_outputs->get('commit_message')) {

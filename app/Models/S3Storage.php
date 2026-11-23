@@ -23,6 +23,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use League\Flysystem\Filesystem;
@@ -52,6 +53,8 @@ class S3Storage extends BaseModel
      * Waits before the second and the third attempt of an upload with the MinIO client.
      */
     private const MINIO_CLIENT_UPLOAD_RETRY_DELAYS_MS = [10_000, 30_000];
+
+    private const MINIO_CLIENT_STAT_TIMEOUT_SECONDS = 60;
 
     /**
      * The most parts that an upload with the MinIO client uses. Most providers accept 10000 parts, but some, like
@@ -962,14 +965,67 @@ class S3Storage extends BaseModel
     /**
      * Runs an upload of a local file with the MinIO client again when it fails, for example after a short network
      * outage. A timeout is not retried, because another full attempt can pass the timeout of the backup job.
+     *
+     * An upload can fail after the object is complete in the bucket, for example when the provider answers a
+     * repeated `CompleteMultipartUpload` with "multipart completion is already in progress". So after each failure,
+     * and again before each new attempt, $isUploaded checks the bucket, and a complete object ends the upload.
+     *
+     * @param  callable(): bool  $isUploaded
      */
-    public static function retryMinioClientUpload(callable $upload): mixed
+    public static function retryMinioClientUpload(callable $upload, callable $isUploaded): void
     {
-        return retry(
-            self::MINIO_CLIENT_UPLOAD_RETRY_DELAYS_MS,
-            $upload,
-            when: fn (\Throwable $exception): bool => $exception->getCode() !== self::REMOTE_COMMAND_TIMEOUT_EXIT_CODE,
-        );
+        $delays = self::MINIO_CLIENT_UPLOAD_RETRY_DELAYS_MS;
+        while (true) {
+            try {
+                $upload();
+
+                return;
+            } catch (\Throwable $exception) {
+                if ($isUploaded()) {
+                    return;
+                }
+                $delay = array_shift($delays);
+                if ($delay === null || $exception->getCode() === self::REMOTE_COMMAND_TIMEOUT_EXIT_CODE) {
+                    throw $exception;
+                }
+                Sleep::for($delay)->milliseconds();
+                if ($isUploaded()) {
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * Whether $key exists in the bucket with $size bytes. It runs `mc stat` with the alias `temporary` in $container,
+     * so it works only after the alias is set. Any error counts as "not uploaded".
+     */
+    public function minioClientObjectHasSize(Server $server, string $container, string $key, int $size, string $resolveOptions): bool
+    {
+        try {
+            $output = instant_remote_process(
+                ['docker exec '.escapeshellarg($container).' mc stat --json'.$resolveOptions.' '.escapeshellarg('temporary/'.$this->bucket.'/'.ltrim($key, '/'))],
+                $server,
+                throwError: false,
+                timeout: self::MINIO_CLIENT_STAT_TIMEOUT_SECONDS,
+                disableMultiplexing: true,
+                maxAttempts: 1,
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return self::minioClientStatHasSize((string) $output, $size);
+    }
+
+    /**
+     * Whether the `mc stat --json` output describes one object of $size bytes.
+     */
+    public static function minioClientStatHasSize(string $statOutput, int $size): bool
+    {
+        $stat = json_decode(trim($statOutput), true);
+
+        return is_array($stat) && data_get($stat, 'status') === 'success' && data_get($stat, 'type') === 'file' && data_get($stat, 'size') === $size;
     }
 
     /**

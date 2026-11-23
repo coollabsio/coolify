@@ -108,6 +108,13 @@ services:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 5s
 
+  # Map-form networks with a null value (the output of `docker compose config`).
+  cache:
+    image: redis:7-alpine
+    networks:
+      internal: null
+      default:
+
   # restart "no", network_mode and a worker without a domain.
   sidecar:
     image: busybox

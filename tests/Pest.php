@@ -149,6 +149,21 @@ function loginAndSkipBoarding(string $email = 'test@example.com', string $passwo
 // }
 
 /**
+ * The variables that StartSentinel writes to sentinel.env, decoded from its remote script.
+ *
+ * @return array<string, string>
+ */
+function sentinelEnvFile(string $script): array
+{
+    preg_match("#([A-Za-z0-9+/=]+)'\\\\'' \\| base64 -d \\| tee \\S*sentinel\\.env#", $script, $matches);
+    expect($matches)->not->toBeEmpty('The script does not write sentinel.env.');
+
+    return collect(explode("\n", trim(base64_decode($matches[1]))))
+        ->mapWithKeys(fn (string $line): array => [str($line)->before('=')->toString() => str($line)->after('=')->toString()])
+        ->all();
+}
+
+/**
  * Fakes all processes and keeps the content of every file that Server::uploadProxyFile()
  * copies with scp, keyed by the remote upload path.
  */

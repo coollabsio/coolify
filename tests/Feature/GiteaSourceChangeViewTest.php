@@ -201,3 +201,28 @@ describe('Gitea source authorization', function () {
         expect($this->giteaApp->refresh()->name)->toBe('My Gitea');
     });
 });
+
+test('saves a changed webhook secret', function () {
+    $this->giteaApp->forceFill(['webhook_secret' => str_repeat('a', 32)])->save();
+
+    Livewire::withQueryParams(['gitea_app_uuid' => $this->giteaApp->uuid])
+        ->test(Change::class)
+        ->set('webhookSecret', str_repeat('b', 64))
+        ->call('submit')
+        ->assertDispatched('success');
+
+    expect($this->giteaApp->refresh()->webhook_secret)->toBe(str_repeat('b', 64));
+});
+
+test('the system wide checkbox also saves the other pending edits', function () {
+    $this->giteaApp->forceFill(['webhook_secret' => str_repeat('a', 32)])->save();
+
+    Livewire::withQueryParams(['gitea_app_uuid' => $this->giteaApp->uuid])
+        ->test(Change::class)
+        ->set('webhookSecret', str_repeat('b', 64))
+        ->set('isSystemWide', false)
+        ->call('instantSave')
+        ->assertDispatched('success');
+
+    expect($this->giteaApp->refresh()->webhook_secret)->toBe(str_repeat('b', 64));
+});

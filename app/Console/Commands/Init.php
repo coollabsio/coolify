@@ -246,10 +246,14 @@ class Init extends Command
 
     private function pullTemplatesFromCDN()
     {
+        $url = service_templates_cdn_url();
+        if ($url === null) {
+            return;
+        }
         $response = Http::retry(3, 1000, throw: false)
             ->timeout(60)
             ->connectTimeout(10)
-            ->get(config('constants.services.official'));
+            ->get($url);
         if ($response->successful()) {
             store_service_templates_bundle($response->body());
         }

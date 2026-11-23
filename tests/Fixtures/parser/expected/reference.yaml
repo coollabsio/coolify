@@ -67,6 +67,8 @@
       exclude_from_status: false
       ports: ''
   databases:
+    cache:
+      exclude_from_status: false
     db:
       exclude_from_status: false
       volumes:
@@ -204,6 +206,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         labels:
           - com.example.team=platform
@@ -267,6 +270,7 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
+          internal: null
           referenceservice00000001: null
       api:
         image: 'node:22-alpine'
@@ -298,6 +302,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         ports:
           - '3000:3000'
@@ -356,6 +361,7 @@
           - 'caddy_0=http://api-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -381,6 +387,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: my-app-referenceservice00000001
         restart: unless-stopped
@@ -416,6 +423,7 @@
           - 'caddy_0=http://my_app-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -441,6 +449,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: www-referenceservice00000001
         restart: unless-stopped
@@ -474,6 +483,7 @@
           - 'caddy_0=http://www-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -499,6 +509,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: blog-referenceservice00000001
         restart: unless-stopped
@@ -539,6 +550,7 @@
           - 'caddy_0=http://blog-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -564,6 +576,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: gateway-referenceservice00000001
         restart: unless-stopped
@@ -597,6 +610,7 @@
           - 'caddy_0=http://gateway-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -622,6 +636,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: gateway-ws-referenceservice00000001
         restart: unless-stopped
@@ -656,6 +671,7 @@
           - 'caddy_0=http://gateway-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -683,6 +699,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: worker-referenceservice00000001
         restart: unless-stopped
@@ -701,6 +718,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=worker
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -726,6 +744,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: scheduler-referenceservice00000001
         restart: unless-stopped
@@ -744,6 +763,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=scheduler
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -770,6 +790,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         volumes:
           - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
@@ -798,6 +819,49 @@
           - 'coolify.service.subUuid=<uuid:db>'
           - coolify.service.subType=database
           - coolify.service.subName=db
+        env_file:
+          - .env
+      cache:
+        image: 'redis:7-alpine'
+        networks:
+          internal: null
+          default: null
+          referenceservice00000001: null
+        container_name: cache-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=cache-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=cache
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:cache>'
+          - coolify.service.subType=database
+          - coolify.service.subName=cache
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: cache-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
         env_file:
           - .env
       sidecar:
@@ -838,6 +902,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         env_file:
           - .env
@@ -940,6 +1005,8 @@
       exclude_from_status: false
       ports: ''
   databases:
+    cache:
+      exclude_from_status: false
     db:
       exclude_from_status: false
       volumes:
@@ -1077,6 +1144,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         labels:
           - com.example.team=platform
@@ -1147,6 +1215,7 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
+          internal: null
           referenceservice00000001: null
       api:
         image: 'node:22-alpine'
@@ -1178,6 +1247,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         ports:
           - '3000:3000'
@@ -1243,6 +1313,7 @@
           - 'caddy_0=https://api.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1268,6 +1339,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: my-app-referenceservice00000001
         restart: unless-stopped
@@ -1310,6 +1382,7 @@
           - 'caddy_0=https://my_app.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1335,6 +1408,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: www-referenceservice00000001
         restart: unless-stopped
@@ -1373,6 +1447,7 @@
           - 'caddy_0=https://www.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1398,6 +1473,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: blog-referenceservice00000001
         restart: unless-stopped
@@ -1445,6 +1521,7 @@
           - 'caddy_0=https://blog.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1470,6 +1547,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: gateway-referenceservice00000001
         restart: unless-stopped
@@ -1508,6 +1586,7 @@
           - 'caddy_0=https://gateway.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1533,6 +1612,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: gateway-ws-referenceservice00000001
         restart: unless-stopped
@@ -1572,6 +1652,7 @@
           - 'caddy_0=https://gateway.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1599,6 +1680,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: worker-referenceservice00000001
         restart: unless-stopped
@@ -1617,6 +1699,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=worker
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1642,6 +1725,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: scheduler-referenceservice00000001
         restart: unless-stopped
@@ -1660,6 +1744,7 @@
           - coolify.service.subType=application
           - coolify.service.subName=scheduler
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1686,6 +1771,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         volumes:
           - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
@@ -1714,6 +1800,49 @@
           - 'coolify.service.subUuid=<uuid:db>'
           - coolify.service.subType=database
           - coolify.service.subName=db
+        env_file:
+          - .env
+      cache:
+        image: 'redis:7-alpine'
+        networks:
+          internal: null
+          default: null
+          referenceservice00000001: null
+        container_name: cache-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=cache-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=cache
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:cache>'
+          - coolify.service.subType=database
+          - coolify.service.subName=cache
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: cache-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
         env_file:
           - .env
       sidecar:
@@ -1754,6 +1883,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         env_file:
           - .env
@@ -1859,6 +1989,8 @@
       exclude_from_status: false
       ports: ''
   databases:
+    cache:
+      exclude_from_status: false
     db:
       exclude_from_status: false
       volumes:
@@ -1996,6 +2128,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         labels:
           - com.example.team=platform
@@ -2066,6 +2199,7 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
+          internal: null
           referenceservice00000001: null
       api:
         image: 'node:22-alpine'
@@ -2097,6 +2231,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         ports:
           - '3000:3000'
@@ -2162,6 +2297,7 @@
           - 'caddy_0=https://api.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2187,6 +2323,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: my-app-referenceservice00000001
         restart: unless-stopped
@@ -2229,6 +2366,7 @@
           - 'caddy_0=https://my_app.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2254,6 +2392,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: www-referenceservice00000001
         restart: unless-stopped
@@ -2292,6 +2431,7 @@
           - 'caddy_0=https://www.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2317,6 +2457,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: blog-referenceservice00000001
         restart: unless-stopped
@@ -2364,6 +2505,7 @@
           - 'caddy_0=https://blog.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2389,6 +2531,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: gateway-referenceservice00000001
         restart: unless-stopped
@@ -2427,6 +2570,7 @@
           - 'caddy_0=https://gateway.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2452,6 +2596,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: gateway-ws-referenceservice00000001
         restart: unless-stopped
@@ -2491,6 +2636,7 @@
           - 'caddy_0=https://gateway.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2520,6 +2666,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: worker-referenceservice00000001
         restart: unless-stopped
@@ -2562,6 +2709,7 @@
           - 'caddy_0=https://worker-extra.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2589,6 +2737,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         container_name: scheduler-referenceservice00000001
         restart: unless-stopped
@@ -2631,6 +2780,7 @@
           - 'caddy_0=https://scheduler-extra.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
+          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2657,6 +2807,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         volumes:
           - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
@@ -2685,6 +2836,49 @@
           - 'coolify.service.subUuid=<uuid:db>'
           - coolify.service.subType=database
           - coolify.service.subName=db
+        env_file:
+          - .env
+      cache:
+        image: 'redis:7-alpine'
+        networks:
+          internal: null
+          default: null
+          referenceservice00000001: null
+        container_name: cache-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=cache-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=cache
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:cache>'
+          - coolify.service.subType=database
+          - coolify.service.subName=cache
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: cache-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
         env_file:
           - .env
       sidecar:
@@ -2746,6 +2940,7 @@
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
         env_file:
           - .env

@@ -65,7 +65,7 @@
         "category": "productivity",
         "logo": "svgs/affine.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "3010",
         "outdated": true
     },
@@ -196,7 +196,7 @@
         "category": "ai",
         "logo": "svgs/argilla.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "6900",
         "outdated": true
     },
@@ -630,7 +630,7 @@
         "category": "monitoring",
         "logo": "svgs/checkmate.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "52345",
         "outdated": true
     },
@@ -826,7 +826,7 @@
         "category": "productivity",
         "logo": "svgs/codimd.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "3000",
         "outdated": true
     },
@@ -933,7 +933,7 @@
         "category": "database",
         "logo": "svgs/deno-kv.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "4512",
         "outdated": true
     },
@@ -1324,7 +1324,7 @@
         "category": "analytics",
         "logo": "svgs/default.webp",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "6555",
         "outdated": true
     },
@@ -1454,7 +1454,7 @@
         "category": "backend",
         "logo": "svgs/evolution-api.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "8080",
         "outdated": true
     },
@@ -1472,7 +1472,7 @@
         "category": "productivity",
         "logo": "svgs/excalidraw.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "80",
         "outdated": true
     },
@@ -1537,7 +1537,7 @@
         "category": "storage",
         "logo": "svgs/filebrowser.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "80",
         "outdated": true
     },
@@ -1646,7 +1646,7 @@
         "category": "ai",
         "logo": "svgs/flowise.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "3001",
         "outdated": true
     },
@@ -1673,7 +1673,7 @@
         "category": "ai",
         "logo": "svgs/flowise.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "3001",
         "outdated": true
     },
@@ -2192,7 +2192,7 @@
         "category": "analytics",
         "logo": "svgs/goatcounter.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-01-27T21:23:59+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "8080",
         "outdated": true
     },
@@ -2257,7 +2257,7 @@
         "category": "monitoring",
         "logo": "svgs/grafana.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:41+01:00",
         "port": "3000"
     },
     "grafana": {
@@ -2273,7 +2273,7 @@
         "category": "monitoring",
         "logo": "svgs/grafana.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:41+01:00",
         "port": "3000"
     },
     "gramps-web": {
@@ -2697,7 +2697,7 @@
         "category": "devtools",
         "logo": "svgs/it-tools.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "80",
         "outdated": true
     },
@@ -3112,7 +3112,7 @@
         "category": "RSS",
         "logo": "svgs/linkding.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "9090",
         "outdated": true
     },
@@ -3127,7 +3127,7 @@
         "category": "RSS",
         "logo": "svgs/linkding.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "9090",
         "outdated": true
     },
@@ -3207,7 +3207,7 @@
         "category": "ai",
         "logo": "svgs/lobe-chat.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:41+01:00",
         "port": "3210"
     },
     "logto": {
@@ -3294,7 +3294,7 @@
         "category": "backend",
         "logo": "svgs/martin.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T16:19:39+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "3000",
         "outdated": true
     },
@@ -3452,7 +3452,7 @@
         "category": "mcp",
         "logo": "svgs/metamcp.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-10-19T18:04:06+02:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "12008",
         "outdated": true
     },
@@ -3485,7 +3485,7 @@
         "category": "ai",
         "logo": "svgs/mindsdb.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "47334",
         "outdated": true
     },
@@ -3640,7 +3640,7 @@
         "category": "proxy",
         "logo": "svgs/neon.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "80, 2112",
         "outdated": true
     },
@@ -3705,7 +3705,7 @@
         "category": "media",
         "logo": "coolify-logo.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "3000",
         "outdated": true
     },
@@ -3793,7 +3793,7 @@
         "category": "devtools",
         "logo": "svgs/nexus.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "8081",
         "outdated": true
     },
@@ -3832,7 +3832,7 @@
         "category": "cms",
         "logo": "svgs/nitropage.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "3000",
         "outdated": true
     },
@@ -3852,7 +3852,7 @@
         "category": "cms",
         "logo": "svgs/nitropage.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "3000",
         "outdated": true
     },
@@ -4144,7 +4144,7 @@
         "category": "analytics",
         "logo": "svgs/openpanel.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-04-06T11:35:16-05:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "3000",
         "outdated": true
     },
@@ -4261,7 +4261,7 @@
         "category": "media",
         "logo": "svgs/overseerr.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:41+01:00",
         "port": "5055"
     },
     "pairdrop": {
@@ -4411,7 +4411,7 @@
         "category": "devtools",
         "logo": "svgs/pgbackweb.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "8085",
         "outdated": true
     },
@@ -4712,7 +4712,7 @@
     "qbittorrent": {
         "documentation": "https://docs.linuxserver.io/images/docker-qbittorrent/?utm_source=coolify.io",
         "slogan": "The qBittorrent project aims to provide an open-source software alternative to \u03bcTorrent.",
-        "compose": "c2VydmljZXM6CiAgcWJpdDoKICAgIGltYWdlOiAnbHNjci5pby9saW51eHNlcnZlci9xYml0dG9ycmVudDo1LjMuMCcKICAgIGVudmlyb25tZW50OgogICAgICAtICdXRUJVSV9QT1JUPSR7V0VCVUlfUE9SVDotODA4MH0nCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICB2b2x1bWVzOgogICAgICAtICdxYml0dG9ycmVudC1jb25maWc6L2NvbmZpZycKICAgICAgLSAncWJpdHRvcnJlbnQtZG93bmxvYWRzOi9kb3dubG9hZHMnCiAgICAgIC0gJ3FiaXR0b3JyZW50LXRvcnJlbnRzOi90b3JyZW50cycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSB3Z2V0CiAgICAgICAgLSAnLXEnCiAgICAgICAgLSAnLS1zcGlkZXInCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo4MDgwLycKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAogIHZ1ZXRvcnJlbnQtYmFja2VuZDoKICAgIGltYWdlOiAnZ2hjci5pby92dWV0b3JyZW50L3Z1ZXRvcnJlbnQtYmFja2VuZDoyLjcuNCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9RQklUT1JSRU5UXzgwODAKICAgICAgLSAnUE9SVD0ke1dFQlVJX1BPUlQ6LTgwODB9JwogICAgICAtICdRQklUX0JBU0U9JHtTRVJWSUNFX0ZRRE5fUUJJVE9SUkVOVH0nCiAgICAgIC0gJ1JFTEVBU0VfVFlQRT0ke1JFTEVBU0VfVFlQRTotc3RhYmxlfScKICAgICAgLSAnVVBEQVRFX1ZUX0NST049JHtVUERBVEVfVlRfQ1JPTjotIjAgKiAqICogKiJ9JwogICAgdm9sdW1lczoKICAgICAgLSAndnVldG9ycmVudC1jb25maWc6L2NvbmZpZycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSB3Z2V0CiAgICAgICAgLSAnLXEnCiAgICAgICAgLSAnLS1zcGlkZXInCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo4MDgwLycKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "compose": "c2VydmljZXM6CiAgcWJpdDoKICAgIGltYWdlOiAnbHNjci5pby9saW51eHNlcnZlci9xYml0dG9ycmVudDo1LjMuMCcKICAgIGVudmlyb25tZW50OgogICAgICAtICdXRUJVSV9QT1JUPSR7V0VCVUlfUE9SVDotODA4MH0nCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICB2b2x1bWVzOgogICAgICAtICdxYml0dG9ycmVudC1jb25maWc6L2NvbmZpZycKICAgICAgLSAncWJpdHRvcnJlbnQtZG93bmxvYWRzOi9kb3dubG9hZHMnCiAgICAgIC0gJ3FiaXR0b3JyZW50LXRvcnJlbnRzOi90b3JyZW50cycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSB3Z2V0CiAgICAgICAgLSAnLXEnCiAgICAgICAgLSAnLS1zcGlkZXInCiAgICAgICAgLSAnaHR0cDovLzEyNy4wLjAuMTo4MDgwLycKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAogIHZ1ZXRvcnJlbnQtYmFja2VuZDoKICAgIGltYWdlOiAnZ2hjci5pby92dWV0b3JyZW50L3Z1ZXRvcnJlbnQtYmFja2VuZDoyLjcuNCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9RQklUT1JSRU5UXzgwODAKICAgICAgLSAnUE9SVD0ke1dFQlVJX1BPUlQ6LTgwODB9JwogICAgICAtICdRQklUX0JBU0U9aHR0cDovL3FiaXQ6JHtXRUJVSV9QT1JUOi04MDgwfScKICAgICAgLSAnUkVMRUFTRV9UWVBFPSR7UkVMRUFTRV9UWVBFOi1zdGFibGV9JwogICAgICAtICdVUERBVEVfVlRfQ1JPTj0ke1VQREFURV9WVF9DUk9OOi0iMCAqICogKiAqIn0nCiAgICB2b2x1bWVzOgogICAgICAtICd2dWV0b3JyZW50LWNvbmZpZzovY29uZmlnJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIHdnZXQKICAgICAgICAtICctcScKICAgICAgICAtICctLXNwaWRlcicKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjgwODAvJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
         "tags": [
             "torrent",
             "streaming",
@@ -4841,7 +4841,7 @@
         "category": "database,observability,developer-tools",
         "logo": "svgs/redisinsight.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-11-10T15:25:33+05:30",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "5540",
         "outdated": true
     },
@@ -5030,7 +5030,7 @@
         "category": "analytics",
         "logo": "svgs/sequin.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "7376",
         "outdated": true
     },
@@ -5152,7 +5152,7 @@
         "category": "productivity",
         "logo": "svgs/default.webp",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "5231",
         "outdated": true
     },
@@ -5200,7 +5200,7 @@
         "category": "messaging",
         "logo": "svgs/soketi.jpeg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "6001",
         "outdated": true
     },
@@ -5236,7 +5236,7 @@
         "category": "ai",
         "logo": "svgs/spacebot.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "19898",
         "outdated": true
     },
@@ -5298,7 +5298,7 @@
         "category": "monitoring",
         "logo": "svgs/statusnook.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2025-08-17T18:23:57+02:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "8000",
         "outdated": true
     },
@@ -5364,7 +5364,7 @@
         "category": "analytics",
         "logo": "svgs/superset.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-16T08:50:06+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "8088",
         "outdated": true
     },
@@ -5388,7 +5388,7 @@
         "category": "auth",
         "logo": "svgs/supertokens.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "3567",
         "outdated": true
     },
@@ -5877,7 +5877,7 @@
     "vikunja": {
         "documentation": "https://vikunja.io?utm_source=coolify.io",
         "slogan": "The open-source, self-hostable to-do app. Organize everything, on all platforms.",
-        "compose": "c2VydmljZXM6CiAgdmlrdW5qYToKICAgIGltYWdlOiAndmlrdW5qYS92aWt1bmphOjIuOC4wJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1ZJS1VOSkEKICAgICAgLSBWSUtVTkpBX1NFUlZJQ0VfUFVCTElDVVJMPSRTRVJWSUNFX0ZRRE5fVklLVU5KQQogICAgICAtIFZJS1VOSkFfU0VSVklDRV9TRUNSRVQ9JFNFUlZJQ0VfUEFTU1dPUkRfSldUU0VDUkVUCiAgICAgIC0gVklLVU5KQV9TRVJWSUNFX0VOQUJMRVJFR0lTVFJBVElPTj10cnVlCiAgICAgIC0gVklLVU5KQV9EQVRBQkFTRV9QQVRIPS9kYi92aWt1bmphLmRiCiAgICAgIC0gVklLVU5KQV9EQVRBQkFTRV9UWVBFPXNxbGl0ZQogICAgdm9sdW1lczoKICAgICAgLSAndmlrdW5qYS1kYXRhOi9hcHAvdmlrdW5qYS8nCiAgICAgIC0gJ3Zpa3VuamEtc3FsaXRlLWRhdGE6L2RiJwogICAgZGVwZW5kc19vbjoKICAgICAgLSBpbml0CiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gL2FwcC92aWt1bmphL3Zpa3VuamEKICAgICAgICAtIGhlYWx0aGNoZWNrCiAgICAgIGludGVydmFsOiAzMHMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogMwogICAgICBzdGFydF9wZXJpb2Q6IDE1cwogIGluaXQ6CiAgICBpbWFnZTogJ2J1c3lib3g6MS4zOC4wJwogICAgcmVzdGFydDogJ25vJwogICAgdm9sdW1lczoKICAgICAgLSAndmlrdW5qYS1kYXRhOi9hcHAvdmlrdW5qYScKICAgICAgLSAndmlrdW5qYS1zcWxpdGUtZGF0YTovZGInCiAgICBjb21tYW5kOgogICAgICAtIHNoCiAgICAgIC0gJy1jJwogICAgICAtICd0b3VjaCAvZGIvdmlrdW5qYS5kYiAmJiBjaG93biAtUiAxMDAwIC9kYiAmJiBjaG93biAtUiAxMDAwIC9hcHAvdmlrdW5qYScK",
+        "compose": "c2VydmljZXM6CiAgdmlrdW5qYToKICAgIGltYWdlOiAndmlrdW5qYS92aWt1bmphOjIuOC4wJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1ZJS1VOSkEKICAgICAgLSBWSUtVTkpBX1NFUlZJQ0VfUFVCTElDVVJMPSRTRVJWSUNFX0ZRRE5fVklLVU5KQQogICAgICAtIFZJS1VOSkFfU0VSVklDRV9TRUNSRVQ9JFNFUlZJQ0VfUEFTU1dPUkRfSldUU0VDUkVUCiAgICAgIC0gVklLVU5KQV9TRVJWSUNFX0VOQUJMRVJFR0lTVFJBVElPTj10cnVlCiAgICAgIC0gVklLVU5KQV9EQVRBQkFTRV9QQVRIPS9kYi92aWt1bmphLmRiCiAgICAgIC0gVklLVU5KQV9EQVRBQkFTRV9UWVBFPXNxbGl0ZQogICAgdm9sdW1lczoKICAgICAgLSAndmlrdW5qYS1maWxlczovYXBwL3Zpa3VuamEvZmlsZXMnCiAgICAgIC0gJ3Zpa3VuamEtc3FsaXRlLWRhdGE6L2RiJwogICAgZGVwZW5kc19vbjoKICAgICAgLSBpbml0CiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gL2FwcC92aWt1bmphL3Zpa3VuamEKICAgICAgICAtIGhlYWx0aGNoZWNrCiAgICAgIGludGVydmFsOiAzMHMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogMwogICAgICBzdGFydF9wZXJpb2Q6IDE1cwogIGluaXQ6CiAgICBpbWFnZTogJ2J1c3lib3g6MS4zOC4wJwogICAgcmVzdGFydDogJ25vJwogICAgdm9sdW1lczoKICAgICAgLSAndmlrdW5qYS1maWxlczovYXBwL3Zpa3VuamEvZmlsZXMnCiAgICAgIC0gJ3Zpa3VuamEtc3FsaXRlLWRhdGE6L2RiJwogICAgY29tbWFuZDoKICAgICAgLSBzaAogICAgICAtICctYycKICAgICAgLSAndG91Y2ggL2RiL3Zpa3VuamEuZGIgJiYgY2hvd24gLVIgMTAwMCAvZGIgJiYgY2hvd24gLVIgMTAwMCAvYXBwL3Zpa3VuamEvZmlsZXMnCg==",
         "tags": [
             "productivity",
             "todo"
@@ -5974,7 +5974,7 @@
         "category": "search",
         "logo": "svgs/whoogle.png",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "5000",
         "outdated": true
     },
@@ -6113,7 +6113,7 @@
         "category": "productivity",
         "logo": "svgs/yamtrack.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "8000",
         "outdated": true
     },
@@ -6137,7 +6137,7 @@
         "category": "productivity",
         "logo": "svgs/yamtrack.svg",
         "minversion": "0.0.0",
-        "template_last_updated_at": "2026-11-17T10:58:08+01:00",
+        "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "8000",
         "outdated": true
     },

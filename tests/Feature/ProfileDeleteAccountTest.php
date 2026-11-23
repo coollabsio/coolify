@@ -256,7 +256,7 @@ it('does not cancel the root team subscription when another owner deletes their 
         ->and(Team::find(0))->not->toBeNull();
 });
 
-it('removes the data of single-member teams only when asked and keeps shared team data', function () {
+it('removes the data of single-member teams only on Coolify Cloud and keeps shared team data', function () {
     $user = deleteAccountUser();
     $personalTeam = $user->teams()->first();
     $personalProject = Project::factory()->create(['team_id' => $personalTeam->id]);
@@ -274,7 +274,8 @@ it('removes the data of single-member teams only when asked and keeps shared tea
     expect(fn () => app(DeleteUserAccount::class)->handle($user))->toThrow(RuntimeException::class);
     expect(Project::find($personalProject->id))->not->toBeNull();
 
-    app(DeleteUserAccount::class)->handle($user, removeTeamResources: true);
+    config(['constants.coolify.self_hosted' => false]);
+    app(DeleteUserAccount::class)->handle($user);
 
     expect(User::find($user->id))->toBeNull()
         ->and(Team::find($personalTeam->id))->toBeNull()
@@ -287,6 +288,7 @@ it('removes the data of single-member teams only when asked and keeps shared tea
 
 it('forgets busy github runners without cleanup instead of blocking the removal of team data', function () {
     Bus::fake();
+    config(['constants.coolify.self_hosted' => false]);
     $user = deleteAccountUser();
     $team = $user->teams()->first();
     $privateKey = PrivateKey::factory()->create(['team_id' => $team->id]);
@@ -303,7 +305,7 @@ it('forgets busy github runners without cleanup instead of blocking the removal 
     $running = GithubRunnerExecution::create(['github_app_id' => $githubApp->id, 'github_runner_config_id' => $config->id, 'server_id' => $server->id, 'trigger_workflow_job_id' => 1, 'status' => GithubRunnerStatus::Running]);
     $queued = GithubRunnerExecution::create(['github_app_id' => $githubApp->id, 'trigger_workflow_job_id' => 2, 'status' => GithubRunnerStatus::Queued]);
 
-    app(DeleteUserAccount::class)->handle($user, removeTeamResources: true);
+    app(DeleteUserAccount::class)->handle($user);
 
     Bus::assertNotDispatched(CleanupGithubRunnerJob::class);
     Bus::assertNotDispatchedSync(CleanupGithubRunnerJob::class);
@@ -379,6 +381,29 @@ it('still asks a cloud owner with a paying subscription to delete servers and pr
     'paid' => [['stripe_invoice_paid' => true]],
     'past due' => [['stripe_past_due' => true]],
 ]);
+
+it('removes the data of an unpaid cloud team while another team of the user pays and is empty', function () {
+    config(['constants.coolify.self_hosted' => false]);
+    $user = deleteAccountUser();
+    $unpaidTeam = $user->teams()->first();
+    $unpaidProject = Project::factory()->create(['team_id' => $unpaidTeam->id]);
+    $payingTeam = Team::factory()->create(['name' => 'Paying']);
+    $payingTeam->members()->attach($user->id, ['role' => 'owner']);
+    Subscription::factory()->create(['team_id' => $payingTeam->id, 'stripe_subscription_id' => 'sub_paying', 'stripe_invoice_paid' => true]);
+    $stripe = Mockery::mock(StripeClient::class);
+    $stripe->subscriptions = Mockery::mock(SubscriptionService::class);
+    $stripe->subscriptions->shouldReceive('retrieve')->with('sub_paying')->andReturn(Stripe\Subscription::constructFrom(['id' => 'sub_paying', 'status' => 'active']));
+    $stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_paying', []);
+    app()->instance(StripeClient::class, $stripe);
+
+    expect(app(DeleteUserAccount::class)->blockers($user))->toBe([]);
+
+    app(DeleteUserAccount::class)->handle($user);
+
+    expect(User::find($user->id))->toBeNull()
+        ->and(Project::find($unpaidProject->id))->toBeNull()
+        ->and(Team::find($payingTeam->id))->toBeNull();
+});
 
 it('cancels the Stripe subscriptions of the email that Coolify does not record, except those of a team the user does not own', function () {
     config(['constants.coolify.self_hosted' => false]);
