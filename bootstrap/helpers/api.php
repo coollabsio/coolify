@@ -161,6 +161,35 @@ function apiEnvironmentVariableDisplayValue(mixed $data): mixed
 }
 
 /**
+ * Validation rules for the `compose_services` field of an environment variable of the resource.
+ * Null or an empty list means all Compose services; a list must only name services of the resource.
+ *
+ * @return array<string, mixed>
+ */
+function composeServicesValidationRules(mixed $resource): array
+{
+    return [
+        'compose_services' => ['nullable', 'array', function (string $attribute, mixed $value, Closure $fail) use ($resource): void {
+            $requested = is_array($value) ? array_values(array_filter($value, 'is_string')) : [];
+            if ($requested === []) {
+                return;
+            }
+            $available = composeServiceNamesForEnvironmentScope($resource);
+            if ($available === []) {
+                $fail('Only Docker Compose resources with a loaded Compose file can limit a variable to services. For a new Compose application, deploy it once or reload its Compose file first.');
+
+                return;
+            }
+            $unknown = array_values(array_diff($requested, $available));
+            if ($unknown !== []) {
+                $fail('Unknown Compose services: '.implode(', ', $unknown).'. Available services: '.implode(', ', $available).'.');
+            }
+        }],
+        'compose_services.*' => 'string',
+    ];
+}
+
+/**
  * Remove the saved proxy configuration and validation logs from every
  * serialized server in an API payload, including nested ones such as
  * `destination.server`, unless the token can read sensitive server data.

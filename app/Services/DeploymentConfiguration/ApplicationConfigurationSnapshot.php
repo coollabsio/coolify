@@ -350,6 +350,10 @@ class ApplicationConfigurationSnapshot
             'is_buildtime' => $environmentVariable->is_buildtime,
             'is_runtime' => $environmentVariable->is_runtime,
         ];
+        // Only set when scoped, so the snapshots of earlier deployments stay equal.
+        if ($environmentVariable->compose_services !== null) {
+            $compareValue['compose_services'] = $environmentVariable->compose_services;
+        }
 
         // Locked (is_shown_once) variables are always redacted and never store a value.
         if ($locked) {
@@ -399,6 +403,9 @@ class ApplicationConfigurationSnapshot
         $lines->push('Available at runtime: '.($environmentVariable->is_runtime ? 'enabled' : 'disabled'));
         $lines->push('Multiline: '.($environmentVariable->is_multiline ? 'enabled' : 'disabled'));
         $lines->push('Literal: '.($environmentVariable->is_literal ? 'enabled' : 'disabled'));
+        if ($environmentVariable->compose_services !== null) {
+            $lines->push('Compose services: '.implode(', ', $environmentVariable->compose_services));
+        }
 
         return $lines->implode("\n");
     }

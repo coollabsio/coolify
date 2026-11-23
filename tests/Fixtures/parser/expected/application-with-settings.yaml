@@ -182,7 +182,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.web.env
         image: 'referenceapplication0001_web:abcdef0123456789abcdef0123456789abcdef01'
       api:
         image: 'node:22-alpine'
@@ -268,7 +268,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.api.env
       my-app:
         image: 'httpd:2.4-alpine'
         environment:
@@ -340,7 +340,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.my-app.env
       api.v2:
         image: traefik/whoami
         container_name: api.v2-referenceapplication0001-20260102T030405
@@ -395,7 +395,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.api.v2.env
       admin:
         image: 'nginx:alpine'
         environment:
@@ -468,7 +468,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.admin.env
       blog:
         image: 'ghost:5-alpine'
         environment:
@@ -544,7 +544,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.blog.env
       db:
         image: 'postgres:16-alpine'
         environment:
@@ -610,7 +610,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.db.env
       sidecar:
         image: busybox
         restart: 'no'
@@ -665,7 +665,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.sidecar.env
       worker:
         image: 'node:22-alpine'
         command:
@@ -728,7 +728,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.worker.env
     volumes:
       db-data:
         driver_opts:
@@ -960,7 +960,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.web.env
         image: 'referenceapplication0001_web:abcdef0123456789abcdef0123456789abcdef01'
       api:
         image: 'node:22-alpine'
@@ -1060,7 +1060,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.api.env
       my-app:
         image: 'httpd:2.4-alpine'
         environment:
@@ -1141,7 +1141,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.my-app.env
       api.v2:
         image: traefik/whoami
         container_name: api.v2-referenceapplication0001-20260102T030405
@@ -1217,7 +1217,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.api.v2.env
       admin:
         image: 'nginx:alpine'
         environment:
@@ -1299,7 +1299,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.admin.env
       blog:
         image: 'ghost:5-alpine'
         environment:
@@ -1382,7 +1382,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.blog.env
       db:
         image: 'postgres:16-alpine'
         environment:
@@ -1450,7 +1450,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.db.env
       sidecar:
         image: busybox
         restart: 'no'
@@ -1507,7 +1507,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.sidecar.env
       worker:
         image: 'node:22-alpine'
         command:
@@ -1572,7 +1572,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.worker.env
     volumes:
       db-data:
         driver_opts:
@@ -1832,7 +1832,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.web-pr-7.env
         image: 'referenceapplication0001_web:pr-7'
       api-pr-7:
         image: 'node:22-alpine'
@@ -1932,7 +1932,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.api-pr-7.env
       my-app-pr-7:
         image: 'httpd:2.4-alpine'
         environment:
@@ -2018,7 +2018,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.my-app-pr-7.env
       api.v2-pr-7:
         image: traefik/whoami
         container_name: api.v2-referenceapplication0001-pr-7
@@ -2099,7 +2099,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.api.v2-pr-7.env
       admin-pr-7:
         image: 'nginx:alpine'
         environment:
@@ -2186,7 +2186,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.admin-pr-7.env
       blog-pr-7:
         image: 'ghost:5-alpine'
         environment:
@@ -2273,7 +2273,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.blog-pr-7.env
       db-pr-7:
         image: 'postgres:16-alpine'
         environment:
@@ -2343,7 +2343,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.db-pr-7.env
       sidecar-pr-7:
         image: busybox
         restart: 'no'
@@ -2400,7 +2400,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.sidecar-pr-7.env
       worker-pr-7:
         image: 'node:22-alpine'
         command:
@@ -2467,7 +2467,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.worker-pr-7.env
     volumes:
       db-data:
         driver_opts:
@@ -2687,7 +2687,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.web-pr-8.env
         image: 'referenceapplication0001_web:pr-8'
       api-pr-8:
         image: 'node:22-alpine'
@@ -2749,7 +2749,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.api-pr-8.env
       my-app-pr-8:
         image: 'httpd:2.4-alpine'
         environment:
@@ -2797,7 +2797,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.my-app-pr-8.env
       api.v2-pr-8:
         image: traefik/whoami
         container_name: api.v2-referenceapplication0001-pr-8
@@ -2844,7 +2844,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.api.v2-pr-8.env
       admin-pr-8:
         image: 'nginx:alpine'
         environment:
@@ -2893,7 +2893,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.admin-pr-8.env
       blog-pr-8:
         image: 'ghost:5-alpine'
         environment:
@@ -2941,7 +2941,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.blog-pr-8.env
       db-pr-8:
         image: 'postgres:16-alpine'
         environment:
@@ -2999,7 +2999,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.db-pr-8.env
       sidecar-pr-8:
         image: busybox
         restart: 'no'
@@ -3044,7 +3044,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.sidecar-pr-8.env
       worker-pr-8:
         image: 'node:22-alpine'
         command:
@@ -3099,7 +3099,7 @@
             env: 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME'
             labels: 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName'
         env_file:
-          - .env
+          - .coolify.worker-pr-8.env
     volumes:
       db-data:
         driver_opts:

@@ -1453,7 +1453,7 @@ test('export refuses credentials of another team', function () {
         ->toThrow(RuntimeException::class, 'does not belong to the server team');
 });
 
-test('transfer keeps maintenance mode, the server error page and swarm cluster, environment variable flags, the Coolify default variables switch, and the production values in previews switch and copies', function () {
+test('transfer keeps maintenance mode, the server error page and swarm cluster, environment variable flags and Compose service scope, the Coolify default variables switch, and the production values in previews switch and copies', function () {
     $this->application->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>App down</h1>'])->saveQuietly();
     $this->service->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>Service down</h1>', 'include_coolify_default_variables' => false])->saveQuietly();
     $this->application->settings->forceFill(['include_coolify_default_variables' => false, 'use_production_values_in_previews' => false])->saveQuietly();
@@ -1465,6 +1465,7 @@ test('transfer keeps maintenance mode, the server error page and swarm cluster, 
             'key' => 'COMPOSE_NULL',
             'value' => null,
             'preserve_compose_null' => true,
+            'compose_services' => ['web', 'worker'],
             'version' => '4.0.0-beta.400',
             'resourceable_type' => Application::class,
             'resourceable_id' => $this->application->id,
@@ -1508,6 +1509,7 @@ test('transfer keeps maintenance mode, the server error page and swarm cluster, 
         ->and($server->proxy_error_page)->toBe('<h1>Proxy error</h1>')
         ->and((int) $server->swarm_cluster)->toBe(7)
         ->and($variable->preserve_compose_null)->toBeTrue()
+        ->and($variable->compose_services)->toBe(['web', 'worker'])
         ->and($variable->value)->toBeNull()
         ->and($variable->version)->toBe('4.0.0-beta.400')
         ->and($application->environment_variables_preview()->where('key', 'COPIED_SECRET')->sole()->is_production_value_copy)->toBeTrue()
