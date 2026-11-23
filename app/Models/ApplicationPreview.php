@@ -81,6 +81,9 @@ class ApplicationPreview extends BaseModel
                 }
             }
 
+            // With Preserve Repository, the preview deployment copies the repository to this directory
+            instant_remote_process(['rm -rf '.escapeshellarg(addPreviewDeploymentSuffix($application->workdir(), $preview->pull_request_id))], $server, false);
+
             // Clean up persistent storage records
             $preview->persistentStorages()->delete();
         });

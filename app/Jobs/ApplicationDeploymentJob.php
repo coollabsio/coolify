@@ -277,7 +277,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->validatePathField($baseDir, 'base_directory');
         }
         $this->workdir = "{$this->basedir}".rtrim($baseDir, '/');
-        $this->configuration_dir = application_configuration_dir()."/{$this->application->uuid}";
+        $this->configuration_dir = $this->application->deploymentWorkdir($this->pull_request_id);
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
         $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
@@ -757,7 +757,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $this->validateShellSafeCommand($this->application->docker_compose_custom_start_command, 'docker_compose_custom_start_command');
             $this->docker_compose_custom_start_command = $this->application->docker_compose_custom_start_command;
             if (! str($this->docker_compose_custom_start_command)->contains('--project-directory')) {
-                $projectDir = $this->preserveRepository ? $this->application->workdir() : $this->workdir;
+                $projectDir = $this->preserveRepository ? $this->configuration_dir : $this->workdir;
                 $this->docker_compose_custom_start_command = str($this->docker_compose_custom_start_command)->replaceFirst('compose', 'compose --project-directory '.$projectDir)->value();
             }
         }
@@ -780,7 +780,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             foreach ($this->application->fileStorages as $fileStorage) {
                 $path = $fileStorage->fs_path;
                 $saveName = 'file_stat_'.$fileStorage->id;
-                $realPathInGit = str($path)->replace($this->application->workdir(), $this->workdir)->value();
+                $realPathInGit = str($path)->replace($this->configuration_dir, $this->workdir)->value();
                 // check if the file is a directory or a file inside the repository
                 $this->execute_remote_command(
                     [executeInDocker($this->deployment_uuid, "stat -c '%F' ".escapeshellarg($realPathInGit)), 'hidden' => true, 'ignore_errors' => true, 'save' => $saveName]
@@ -992,7 +992,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->use_build_server) {
             $this->write_deployment_configurations();
             $this->server = $this->mainServer;
-            $workdir = $this->application->workdir();
+            $workdir = $this->configuration_dir;
             $command = "{$this->coolify_variables} docker compose --env-file {$workdir}/.env --project-name {$this->application->uuid} --project-directory {$workdir} -f {$workdir}{$this->docker_compose_location} pull --ignore-buildable {$services}";
         } else {
             $workdir = $this->workdir;
@@ -1033,7 +1033,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         $this->write_missing_content_files();
 
-        $server_workdir = $this->application->workdir();
+        $server_workdir = $this->configuration_dir;
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             if ($this->docker_compose_custom_start_command) {
                 // Auto-inject -f (compose file) and --env-file flags using helper function
@@ -1309,9 +1309,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             $readme = generate_readme_file($this->application->name, $this->application_deployment_queue->updated_at);
 
             $mainDir = $this->configuration_dir;
-            if ($this->application->settings->is_raw_compose_deployment_enabled) {
-                $mainDir = $this->application->workdir();
-            }
             if ($this->pull_request_id === 0) {
                 $composeFileName = "$mainDir/docker-compose.yaml";
             } else {

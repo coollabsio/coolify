@@ -1535,16 +1535,19 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             $volume = composeLongBindVolume($volume, $source->value());
                         }
                     } else {
-                        if ((int) $resource->compose_parsing_version >= 4) {
-                            $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
-                        } else {
-                            $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
-                        }
-                        $source = resolveComposeBindSource($source, $mainDirectory, $foundConfig?->fs_path);
+                        $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         $isPreviewSuffixEnabled = $foundConfig
                             ? (bool) data_get($foundConfig, 'is_preview_suffix_enabled', true)
                             : true;
-                        if ($isPullRequest && $isPreviewSuffixEnabled) {
+                        // With Preserve Repository, a preview has its own copy of the repository for relative sources
+                        $isPreviewRepositorySource = $isPullRequest && $isPreviewSuffixEnabled
+                            && $resource->settings->is_preserve_repository_enabled
+                            && ! $source->startsWith('/');
+                        if ($isPreviewRepositorySource) {
+                            $mainDirectory = str($resource->deploymentWorkdir($pull_request_id));
+                        }
+                        $source = resolveComposeBindSource($source, $mainDirectory, $foundConfig?->fs_path);
+                        if ($isPullRequest && $isPreviewSuffixEnabled && ! $isPreviewRepositorySource) {
                             $source = str(addPreviewDeploymentSuffix($source, $pull_request_id));
                         }
                         // With `bind.create_host_path: false`, the host path must exist already: Coolify does not create or manage it.

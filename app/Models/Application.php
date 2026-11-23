@@ -542,7 +542,10 @@ class Application extends BaseModel
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
-            instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
+            $previewWorkdirs = $this->previews()->withTrashed()->pluck('pull_request_id')
+                ->map(fn (int $pullRequestId): string => ' '.addPreviewDeploymentSuffix($workdir, $pullRequestId))
+                ->implode('');
+            instant_remote_process(["rm -rf {$workdir}{$previewWorkdirs}"], $server, false);
         }
     }
 
@@ -1405,6 +1408,19 @@ class Application extends BaseModel
     public function workdir()
     {
         return application_configuration_dir()."/{$this->uuid}";
+    }
+
+    /**
+     * The server directory of a deployment. With Preserve Repository, each preview has its own
+     * directory, so that its repository files do not replace the files of the main deployment.
+     */
+    public function deploymentWorkdir(int $pullRequestId = 0): string
+    {
+        if ($pullRequestId !== 0 && $this->settings->is_preserve_repository_enabled) {
+            return addPreviewDeploymentSuffix($this->workdir(), $pullRequestId);
+        }
+
+        return $this->workdir();
     }
 
     public function isLogDrainEnabled()
