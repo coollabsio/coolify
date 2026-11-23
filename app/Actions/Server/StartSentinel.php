@@ -75,6 +75,24 @@ class StartSentinel
      *
      * @return array<int, string>
      */
+    /**
+     * Sentinel 1.1.8 and later archive the logs of Coolify-managed containers under /app/db/container-logs.
+     * Older Sentinel versions ignore these variables.
+     *
+     * @return array<string, string>
+     */
+    public static function sentinelLogArchiveEnvironment(Server $server): array
+    {
+        $settings = $server->settings;
+
+        return [
+            'LOG_ARCHIVE_ENABLED' => $settings->is_container_log_archive_enabled ? 'true' : 'false',
+            'LOG_ARCHIVE_MAX_FILE_MB' => (string) $settings->log_archive_max_file_mb,
+            'LOG_ARCHIVE_MAX_TOTAL_MB' => (string) $settings->log_archive_max_total_mb,
+            'LOG_ARCHIVE_RETENTION_DAYS' => (string) $settings->log_archive_retention_days,
+        ];
+    }
+
     public static function trafficLogPreparationCommands(Server $server): array
     {
         if (! $server->isTrafficAnalyticsEnabled() || ! $server->supportsTrafficAnalytics()) {
@@ -148,9 +166,12 @@ class StartSentinel
             'COLLECTOR_ENABLED' => $server->isMetricsEnabled() ? 'true' : 'false',
             'COLLECTOR_REFRESH_RATE_SECONDS' => $refreshRate,
             'COLLECTOR_RETENTION_PERIOD_DAYS' => $metricsHistory,
-            'LOG_ARCHIVE_ENABLED' => $server->settings->is_container_log_archive_enabled ? 'true' : 'false',
         ];
-        $environments = array_merge($environments, self::sentinelTrafficEnvironment($server));
+        $environments = array_merge(
+            $environments,
+            self::sentinelTrafficEnvironment($server),
+            self::sentinelLogArchiveEnvironment($server),
+        );
         $labels = [
             'coolify.managed' => 'true',
         ];

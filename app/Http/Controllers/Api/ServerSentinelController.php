@@ -28,6 +28,10 @@ class ServerSentinelController extends Controller
         'geoip_refresh_days',
         'geoip_maxmind_license_key',
         'traffic_ip_mode',
+        'is_container_log_archive_enabled',
+        'log_archive_max_file_mb',
+        'log_archive_max_total_mb',
+        'log_archive_retention_days',
     ];
 
     private function findServerForTeam(int $teamId, string $uuid): ?Server
@@ -58,6 +62,10 @@ class ServerSentinelController extends Controller
             'is_geoip_enabled' => (bool) $settings->is_geoip_enabled,
             'geoip_refresh_days' => (int) $settings->geoip_refresh_days,
             'traffic_ip_mode' => TrafficIpMode::forServer($server)->value,
+            'is_container_log_archive_enabled' => (bool) $settings->is_container_log_archive_enabled,
+            'log_archive_max_file_mb' => (int) $settings->log_archive_max_file_mb,
+            'log_archive_max_total_mb' => (int) $settings->log_archive_max_total_mb,
+            'log_archive_retention_days' => (int) $settings->log_archive_retention_days,
         ];
 
         if ($this->canReadSensitive()) {
@@ -101,6 +109,10 @@ class ServerSentinelController extends Controller
                         new OA\Property(property: 'is_geoip_enabled', type: 'boolean'),
                         new OA\Property(property: 'geoip_refresh_days', type: 'integer'),
                         new OA\Property(property: 'traffic_ip_mode', type: 'string', enum: ['full', 'anonymized', 'off'], description: 'How Sentinel stores client IPs for the Top IPs breakdown.'),
+                        new OA\Property(property: 'is_container_log_archive_enabled', type: 'boolean', description: 'Sentinel keeps the logs of Coolify-managed containers in files, so they stay readable after the container is removed.'),
+                        new OA\Property(property: 'log_archive_max_file_mb', type: 'integer'),
+                        new OA\Property(property: 'log_archive_max_total_mb', type: 'integer'),
+                        new OA\Property(property: 'log_archive_retention_days', type: 'integer'),
                         new OA\Property(property: 'geoip_maxmind_license_key', type: 'string', description: 'Only present with read:sensitive.'),
                     ],
                     type: 'object',
@@ -157,6 +169,10 @@ class ServerSentinelController extends Controller
                     new OA\Property(property: 'geoip_refresh_days', type: 'integer', minimum: 1),
                     new OA\Property(property: 'geoip_maxmind_license_key', type: 'string', nullable: true),
                     new OA\Property(property: 'traffic_ip_mode', type: 'string', enum: ['full', 'anonymized', 'off'], description: 'How Sentinel stores client IPs: full, anonymized (IPv4 /24, IPv6 /48), or off.'),
+                    new OA\Property(property: 'is_container_log_archive_enabled', type: 'boolean', description: 'Keep the logs of Coolify-managed containers after the container is removed. The size and retention limits need Sentinel 1.1.8 or later.'),
+                    new OA\Property(property: 'log_archive_max_file_mb', type: 'integer', maximum: 1024, minimum: 1, description: 'Size in MB at which an archive file is rotated. One rotated file is kept.'),
+                    new OA\Property(property: 'log_archive_max_total_mb', type: 'integer', maximum: 102400, minimum: 1, description: 'Total archive size in MB. Sentinel deletes the oldest files above it.'),
+                    new OA\Property(property: 'log_archive_retention_days', type: 'integer', maximum: 365, minimum: 1, description: 'Sentinel deletes archive files that were not written for this many days.'),
                 ],
                 type: 'object',
             ),
@@ -205,6 +221,10 @@ class ServerSentinelController extends Controller
             'geoip_refresh_days' => 'integer|min:1',
             'geoip_maxmind_license_key' => 'nullable|string|max:255',
             'traffic_ip_mode' => 'string|in:full,anonymized,off',
+            'is_container_log_archive_enabled' => 'boolean',
+            'log_archive_max_file_mb' => 'integer|min:1|max:1024',
+            'log_archive_max_total_mb' => 'integer|min:1|max:102400',
+            'log_archive_retention_days' => 'integer|min:1|max:365',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), self::ALLOWED_FIELDS);
