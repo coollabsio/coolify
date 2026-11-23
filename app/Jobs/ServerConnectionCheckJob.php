@@ -344,7 +344,7 @@ class ServerConnectionCheckJob implements ShouldBeEncrypted, ShouldQueue
     private function runDockerCommand(string $command): ?string
     {
         try {
-            $process = $this->runSsh($command, self::DOCKER_TIMEOUT_SECONDS);
+            $process = $this->runSsh(remoteCommandWithTimeout($command, self::DOCKER_TIMEOUT_SECONDS - 5), self::DOCKER_TIMEOUT_SECONDS);
         } catch (\Throwable $e) {
             Log::debug('ServerConnectionCheck: Docker command failed', [
                 'server_id' => $this->server->id,

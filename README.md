@@ -239,6 +239,7 @@ Thank you for your support!
 <a href="https://martiinii.dev"><img width="60px" alt="martiinii" src="https://github.com/martiinii.png"/></a>
 <a href="https://bragly.io"><img width="60px" alt="Bragly" src="https://cdn.coollabs.io/sponsors/bragly.png"/></a>
 <a href="https://github.com/vaultbase-sh"><img width="60px" alt="vaultbase.sh" src="https://github.com/vaultbase-sh.png"/></a>
+<a href="https://github.com/pckt-sh"><img width="60px" alt="pckt.sh" src="https://github.com/pckt-sh.png"/></a>
 
 ...and many more at [GitHub Sponsors](https://github.com/sponsors/coollabsio)
 

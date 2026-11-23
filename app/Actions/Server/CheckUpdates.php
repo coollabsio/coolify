@@ -85,6 +85,18 @@ sh -c 'if [ -f /var/run/reboot-required ]; then echo REBOOT=yes; exit 0; fi; if 
 SH;
 
     /**
+     * Prints the installed and the newest Amazon Linux 2023 release. AL2023 locks its repositories to the installed
+     * release, so the other dnf commands see only the updates of that release. The newest release comes from the
+     * `system-release` package of the `latest` repositories, not from `dnf check-release-update`, which can report an
+     * older release (https://alas.aws.amazon.com/announcements/2026-015.html).
+     *
+     * @see https://docs.aws.amazon.com/linux/al2023/ug/deterministic-upgrades-usage.html
+     */
+    public const AMAZON_LINUX_RELEASE_COMMAND = <<<'SH'
+sh -c 'echo "CURRENT|$(rpm -q --qf "%{VERSION}" system-release 2>/dev/null)"; echo "LATEST|$(LANG=C dnf -q --releasever=latest repoquery --latest-limit 1 --qf "%{version}" system-release 2>/dev/null | tail -n 1)"; exit 0'
+SH;
+
+    /**
      * Prints the running kernel (`RUNNING|<uname -r>`), each installed kernel (`KERNEL|<package>|<version>[|<arch>]`),
      * and the kernel that boots next (`BOOT|<uname -r>`, or `BOOT|newest`) when the boot loader tells it, so the
      * vulnerability list can tell an installed fix that waits for a reboot from a kernel that does not run.
@@ -94,7 +106,7 @@ SH;
      * @see https://www.gnu.org/software/grub/manual/grub/html_node/Simple-configuration.html
      */
     public const KERNELS_COMMAND = <<<'SH'
-sh -c 'echo "RUNNING|$(uname -r)"; if command -v dpkg-query >/dev/null 2>&1; then dpkg-query -W -f="\${db:Status-Abbrev}|\${Package}|\${Version}\n" "linux-image-[0-9]*" 2>/dev/null | sed -n "s/^ii *|/KERNEL|/p"; fi; if command -v rpm >/dev/null 2>&1; then rpm -q --qf "KERNEL|%{NAME}|%{VERSION}-%{RELEASE}|%{ARCH}\n" kernel-core kernel kernel-uek-core 2>/dev/null | grep "^KERNEL|"; fi; if command -v grubby >/dev/null 2>&1; then b=$(grubby --default-kernel 2>/dev/null); case "$b" in */vmlinuz-*) echo "BOOT|${b##*/vmlinuz-}";; esac; elif [ -f /etc/default/grub ]; then d=$(cat /etc/default/grub /etc/default/grub.d/*.cfg 2>/dev/null | sed -n "s/^[[:space:]]*GRUB_DEFAULT=//p" | tail -n 1 | tr -d "\042\047"); if [ "$d" = saved ]; then d=$(grub-editenv list 2>/dev/null | sed -n "s/^saved_entry=//p"); fi; case "$d" in ""|0) echo "BOOT|newest";; *) r=$(printf "%s\n" "$d" | sed -n -e "s/.*with Linux \([^ ]*\).*/\1/p" -e "s/.*gnulinux-\([0-9][^>]*\)-\(advanced\|recovery\)-.*/\1/p" | head -n 1); if [ -n "$r" ]; then echo "BOOT|$r"; fi;; esac; fi; exit 0'
+sh -c 'echo "RUNNING|$(uname -r)"; if command -v dpkg-query >/dev/null 2>&1; then dpkg-query -W -f="\${db:Status-Abbrev}|\${Package}|\${Version}\n" "linux-image-[0-9]*" 2>/dev/null | sed -n "s/^ii *|/KERNEL|/p"; fi; if command -v rpm >/dev/null 2>&1; then rpm -q --qf "KERNEL|%{NAME}|%{VERSION}-%{RELEASE}|%{ARCH}\n" kernel-core kernel kernel-uek-core 2>/dev/null | grep "^KERNEL|"; rpm -qa --qf "KERNEL|%{NAME}|%{VERSION}-%{RELEASE}|%{ARCH}\n" "kernel6.[0-9]" "kernel6.[0-9][0-9]" 2>/dev/null; fi; if command -v grubby >/dev/null 2>&1; then b=$(grubby --default-kernel 2>/dev/null); case "$b" in */vmlinuz-*) echo "BOOT|${b##*/vmlinuz-}";; esac; elif [ -f /etc/default/grub ]; then d=$(cat /etc/default/grub /etc/default/grub.d/*.cfg 2>/dev/null | sed -n "s/^[[:space:]]*GRUB_DEFAULT=//p" | tail -n 1 | tr -d "\042\047"); if [ "$d" = saved ]; then d=$(grub-editenv list 2>/dev/null | sed -n "s/^saved_entry=//p"); fi; case "$d" in ""|0) echo "BOOT|newest";; *) r=$(printf "%s\n" "$d" | sed -n -e "s/.*with Linux \([^ ]*\).*/\1/p" -e "s/.*gnulinux-\([0-9][^>]*\)-\(advanced\|recovery\)-.*/\1/p" | head -n 1); if [ -n "$r" ]; then echo "BOOT|$r"; fi;; esac; fi; exit 0'
 SH;
 
     /**
@@ -112,7 +124,7 @@ SH;
         ],
         'dnf' => [
             'docker' => ['docker-ce', 'docker-ce-cli', 'docker-ce-rootless-extras', 'docker-buildx-plugin', 'docker-compose-plugin', 'containerd.io', 'containerd', 'runc', 'moby-engine', 'docker'],
-            'kernel' => ['kernel', 'kernel-core', 'kernel-modules', 'kernel-modules-core', 'kernel-modules-extra', 'kernel-uek', 'kernel-uek-core', 'kernel-uek-modules'],
+            'kernel' => ['kernel', 'kernel-core', 'kernel-modules', 'kernel-modules-core', 'kernel-modules-extra', 'kernel-uek', 'kernel-uek-core', 'kernel-uek-modules', 'kernel6.[0-9]', 'kernel6.[0-9][0-9]'],
             'system' => ['glibc', 'glibc-common', 'glibc-langpack-*', 'systemd', 'systemd-libs', 'systemd-udev', 'dbus', 'dbus-broker', 'openssh-server'],
         ],
         'zypper' => [
@@ -247,6 +259,9 @@ SH;
             $out = $this->addUpdateDetails($out, $packageManager, $securityPackages);
             $out['reboot_required'] = $this->parseRebootStatus((string) instant_remote_process([self::REBOOT_CHECK_COMMAND], $server, false));
             $out['kernels'] = $this->parseKernels((string) instant_remote_process([self::KERNELS_COMMAND], $server, false));
+            if ($osId === 'amzn') {
+                $out['newer_release'] = $this->parseNewerAmazonLinuxRelease((string) instant_remote_process([self::AMAZON_LINUX_RELEASE_COMMAND], $server, false));
+            }
             $out['osId'] = $osId;
             $out['package_manager'] = $packageManager;
 
@@ -530,6 +545,20 @@ SH;
     private static function withoutEpoch(string $version): string
     {
         return (string) preg_replace('/^\d+:/', '', $version);
+    }
+
+    /**
+     * The newest Amazon Linux 2023 release when it is newer than the installed one, else null.
+     */
+    public function parseNewerAmazonLinuxRelease(string $output): ?string
+    {
+        preg_match('/^CURRENT\|([0-9.]+)$/m', $output, $current);
+        preg_match('/^LATEST\|([0-9.]+)$/m', $output, $latest);
+        if (! isset($current[1], $latest[1])) {
+            return null;
+        }
+
+        return version_compare($latest[1], $current[1], '>') ? $latest[1] : null;
     }
 
     public function parseRebootStatus(string $output): ?bool

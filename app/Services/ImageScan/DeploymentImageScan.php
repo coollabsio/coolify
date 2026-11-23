@@ -282,15 +282,16 @@ final class DeploymentImageScan
             return;
         }
 
-        $services = collect(data_get(Yaml::parse((string) $this->job('generated_docker_compose')), 'services', []));
-        $images = $services->map(fn ($service) => data_get($service, 'image'))->filter(fn ($image) => is_string($image) && $image !== '')->unique();
+        $compose = Yaml::parse((string) $this->job('generated_docker_compose'));
+        $images = $this->composeServiceImages($compose);
 
-        foreach ($images as $image) {
+        foreach (array_unique($images) as $image) {
             $this->checkGate($image);
         }
 
-        if (! $this->gateSettled && $services->contains(fn ($service) => ! is_string(data_get($service, 'image')))) {
-            // A raw Compose service without an image gets a name that Coolify does not know.
+        if (! $this->gateSettled && array_diff_key((array) ($compose['services'] ?? []), $images) !== []) {
+            // A raw Compose service without an image gets a name that Coolify does not know, and Coolify cannot
+            // resolve some variables in an image.
             $this->gateSettled = true;
             $this->applyGate(null, ImageScanErrorCode::Unknown);
         }
@@ -299,9 +300,8 @@ final class DeploymentImageScan
             return;
         }
 
-        $compose = Yaml::parse((string) $this->job('generated_docker_compose'));
-        foreach ($compose['services'] ?? [] as $name => $service) {
-            if (isset($this->checkedImages[(string) data_get($service, 'image')])) {
+        foreach ($images as $name => $image) {
+            if (isset($this->checkedImages[$image])) {
                 $compose['services'][$name]['pull_policy'] = 'never';
             }
         }
@@ -434,9 +434,8 @@ final class DeploymentImageScan
             // Images that the gate scanned before the start need no second scan; the others (a scan that could
             // not run, a rollback image that ran before) are scanned now.
             if ($this->application->build_pack === 'dockercompose') {
-                $images = collect(data_get(Yaml::parse((string) $this->job('generated_docker_compose')), 'services', []))
-                    ->map(fn ($service) => data_get($service, 'image'))
-                    ->filter(fn ($image) => is_string($image) && $image !== '' && ! isset($this->scannedImages[$image]))
+                $images = collect($this->composeServiceImages(Yaml::parse((string) $this->job('generated_docker_compose'))))
+                    ->reject(fn (string $image) => isset($this->scannedImages[$image]))
                     ->unique()
                     ->values()
                     ->all();
@@ -453,6 +452,23 @@ final class DeploymentImageScan
         } catch (Throwable $e) {
             Log::warning("Deployment {$this->job('deployment_uuid')} could not queue the image scan: {$e->getMessage()}");
         }
+    }
+
+    /**
+     * The image that each service of the Compose file starts, keyed by the service name, with the variables of the
+     * deployment resolved. Services without an image, or with a variable that Coolify cannot resolve, are left out.
+     *
+     * @return array<string, string>
+     */
+    private function composeServiceImages(mixed $compose): array
+    {
+        $images = collect((array) data_get($compose, 'services', []))
+            ->map(fn ($service) => data_get($service, 'image'))
+            ->filter(fn ($image): bool => is_string($image) && trim($image) !== '')
+            ->mapWithKeys(fn (string $image, $name): array => [(string) $name => $image])
+            ->all();
+
+        return ResourceScans::resolveComposeImages($this->application, $images, $this->job('pull_request_id') !== 0);
     }
 
     private function job(string $property): mixed
