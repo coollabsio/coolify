@@ -119,6 +119,15 @@ it('keeps the redirect URL ahead of the error page', function (string $proxyType
         ->and(implode("\n", $lines))->not->toContain('docker run');
 })->with([ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value]);
 
+it('does not touch the server when the proxy is not Traefik or Caddy', function (string $proxyType) {
+    $server = useErrorPageProxy($this->server, $proxyType, ['unknown_host_status' => 503]);
+
+    $server->setupDefaultRedirect();
+
+    Process::assertNothingRan();
+    expect($server->refresh()->unknownHostStatus())->toBe(503);
+})->with([ProxyTypes::NONE->value, ProxyTypes::NGINX->value]);
+
 it('removes the catch-all and the page container when the default redirect is disabled', function () {
     $server = useErrorPageProxy($this->server, ProxyTypes::TRAEFIK->value, ['redirect_enabled' => false]);
 
