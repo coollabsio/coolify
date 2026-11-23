@@ -22,6 +22,8 @@ class ComposeIncludeFlattener
 
     private const TOO_LARGE_MARKER = '__COOLIFY_COMPOSE_TOO_LARGE__';
 
+    private const SYMLINK_MARKER = '__COOLIFY_COMPOSE_SYMLINK__';
+
     /**
      * @param  string  $workDirectory  Folder on the server that contains the `checkout` folder of the repository
      */
@@ -30,7 +32,7 @@ class ComposeIncludeFlattener
     public static function hasIncludes(string $compose): bool
     {
         try {
-            $parsed = Yaml::parse($compose);
+            $parsed = Yaml::parse($compose, Yaml::PARSE_CUSTOM_TAGS);
         } catch (\Throwable) {
             return false;
         }
@@ -47,31 +49,37 @@ class ComposeIncludeFlattener
      */
     public function flatten(string $composeFile, string $projectDirectory): string
     {
+        // Compose resolves the includes of a file against the project directory of each entry that reaches it.
         $pending = [[$composeFile, $projectDirectory]];
-        $copied = [$composeFile => true];
+        $queued = ["{$composeFile}|{$projectDirectory}" => true];
+        $files = [$composeFile => true];
+        $contents = [];
         $envFiles = [];
         while ($pending !== []) {
             [$file, $directory] = array_shift($pending);
-            $content = $this->copyFile($file);
+            $content = $contents[$file] ??= $this->copyFile($file);
+            // Compose merge tags such as `!reset` and `!override` stay as tagged values; Compose applies them.
             try {
-                $compose = Yaml::parse($content);
+                $compose = Yaml::parse($content, Yaml::PARSE_CUSTOM_TAGS);
             } catch (\Throwable) {
                 $compose = null;
             }
             if (! is_array($compose)) {
-                throw new DeploymentException("{$file} is not a Docker Compose file. Symbolic links are not supported.");
+                throw new DeploymentException("{$file} is not a Docker Compose file.");
             }
 
             foreach (self::includeEntries($compose, $directory) as $entry) {
                 $envFiles = [...$envFiles, ...$entry['envFiles']];
                 foreach ($entry['files'] as $included) {
-                    if (isset($copied[$included])) {
+                    $key = "{$included}|{$entry['projectDirectory']}";
+                    if (isset($queued[$key])) {
                         continue;
                     }
-                    if (count($copied) >= self::MAX_FILES) {
+                    if (! isset($files[$included]) && count($files) >= self::MAX_FILES) {
                         throw new DeploymentException('A Docker Compose file can include at most '.(self::MAX_FILES - 1).' files.');
                     }
-                    $copied[$included] = true;
+                    $files[$included] = true;
+                    $queued[$key] = true;
                     $pending[] = [$included, $entry['projectDirectory']];
                 }
             }
@@ -110,8 +118,12 @@ class ComposeIncludeFlattener
             if (! is_array($include) || ! isset($include['path'])) {
                 throw new DeploymentException('Each include entry needs a path.');
             }
+            $paths = is_string($include['path']) ? [$include['path']] : $include['path'];
+            if (! is_array($paths) || $paths === [] || ! array_is_list($paths)) {
+                throw new DeploymentException('Each include path must be a string or a non-empty list of strings.');
+            }
 
-            $files = array_map(fn ($path) => self::repositoryPath($path, $projectDirectory, 'include path'), (array) $include['path']);
+            $files = array_map(fn ($path) => self::repositoryPath($path, $projectDirectory, 'include path'), $paths);
             $entries[] = [
                 'files' => $files,
                 'projectDirectory' => isset($include['project_directory'])
@@ -204,19 +216,24 @@ class ComposeIncludeFlattener
 
     /**
      * Writes the file from the Git object store as a regular file into the flat folder and returns its content.
-     * `git show` prints the target of a symbolic link instead of following it.
+     * Only regular files (mode 100644 or 100755) are copied; a symbolic link (mode 120000) is rejected.
      */
-    private function copyFile(string $file): string
+    protected function copyFile(string $file): string
     {
         $target = escapeshellarg("{$this->flatDirectory()}/{$file}");
         $limit = Application::MAX_DOCKER_COMPOSE_SIZE_BYTES;
         $script = 'cd '.escapeshellarg($this->checkoutDirectory())
+            .' && mode=$(git ls-tree HEAD -- '.escapeshellarg($file).' | cut -c1-6)'
+            .' && case "$mode" in 100644|100755) ;; 120000) echo '.self::SYMLINK_MARKER.'; exit 0 ;; *) echo '.escapeshellarg("No such file: {$file}").' >&2; exit 1 ;; esac'
             .' && mkdir -p '.escapeshellarg(dirname("{$this->flatDirectory()}/{$file}"))
-            .' && git show '.escapeshellarg("HEAD:{$file}")." > {$target}"
+            .' && git cat-file blob '.escapeshellarg("HEAD:{$file}")." > {$target}"
             ." && if [ \"$(wc -c < {$target})\" -gt {$limit} ]; then echo ".self::TOO_LARGE_MARKER."; else cat {$target}; fi";
 
         // One sh -c line, so the non-root sudo parser runs the redirects as root too.
         $content = (string) instant_remote_process(['sh -c '.escapeshellarg($script)], $this->server);
+        if ($content === self::SYMLINK_MARKER) {
+            throw new DeploymentException("{$file} is a symbolic link. Symbolic links are not supported.");
+        }
         if ($content === self::TOO_LARGE_MARKER) {
             throw new DeploymentException("{$file} exceeds the 5 MiB size limit.");
         }
@@ -230,7 +247,7 @@ class ComposeIncludeFlattener
      *
      * @param  array<int, string>  $envFiles
      */
-    private function runComposeConfig(string $composeFile, string $projectDirectory, array $envFiles): string
+    protected function runComposeConfig(string $composeFile, string $projectDirectory, array $envFiles): string
     {
         $script = collect($envFiles)
             ->map(function (string $envFile) {

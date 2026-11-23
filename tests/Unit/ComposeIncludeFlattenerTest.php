@@ -30,6 +30,12 @@ it('returns no entries when the file has no include section', function () {
     expect(ComposeIncludeFlattener::includeEntries(['services' => ['web' => ['image' => 'nginx']]], ''))->toBe([]);
 });
 
+it('finds the include section when the file uses Compose merge tags', function () {
+    $compose = "include:\n  - shared/compose.yml\nservices:\n  web:\n    image: nginx\n    ports: !reset []\n";
+
+    expect(ComposeIncludeFlattener::hasIncludes($compose))->toBeTrue();
+});
+
 it('rejects include paths that Coolify cannot read safely', function (mixed $include, string $message) {
     expect(fn () => ComposeIncludeFlattener::includeEntries(['include' => $include], 'app'))
         ->toThrow(DeploymentException::class, $message);
