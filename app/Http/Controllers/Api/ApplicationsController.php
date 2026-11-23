@@ -289,7 +289,7 @@ class ApplicationsController extends Controller
         $requestedContainer = $request->string('container')->value();
         $pullRequestId = $request->filled('pull_request_id') ? $request->integer('pull_request_id') : null;
 
-        if ($requestedContainer && ! ValidationPatterns::isValidContainerName($requestedContainer)) {
+        if ($requestedContainer !== '' && ! ValidationPatterns::isValidContainerName($requestedContainer)) {
             return response()->json(['message' => 'Invalid container name.'], 422);
         }
 
@@ -300,7 +300,7 @@ class ApplicationsController extends Controller
             ->unique('id')
             ->values();
 
-        if ($requestedServerUuid) {
+        if ($requestedServerUuid !== '') {
             $servers = $servers->filter(fn ($server) => $server->uuid === $requestedServerUuid)->values();
             if ($servers->isEmpty()) {
                 return response()->json(['message' => 'Server not found for this application.'], 404);
@@ -354,7 +354,7 @@ class ApplicationsController extends Controller
             return response()->json(['message' => 'No running application containers found.'], 404);
         }
 
-        if ($requestedContainer) {
+        if ($requestedContainer !== '') {
             $matchingTargets = $runningContainers
                 ->where('container', $requestedContainer)
                 ->values();
