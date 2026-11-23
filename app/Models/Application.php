@@ -153,6 +153,17 @@ class Application extends BaseModel
 
     public const MAX_DOCKER_COMPOSE_COLLECTION_ALIASES = 256;
 
+    /**
+     * Configuration pages that do not apply to a site deployed from uploaded archives, as route name prefixes.
+     */
+    private const ARCHIVE_SITE_HIDDEN_ROUTES = [
+        'project.application.environment-variables',
+        'project.application.persistent-storage',
+        'project.application.backup.',
+        'project.application.scheduled-tasks',
+        'project.application.webhooks',
+    ];
+
     private static $parserVersion = '5';
 
     protected $attributes = [
@@ -1669,6 +1680,11 @@ class Application extends BaseModel
         }
 
         return false;
+    }
+
+    public function hasConfigurationPage(string $routeName): bool
+    {
+        return ! $this->is_archive_source || ! Str::startsWith($routeName, self::ARCHIVE_SITE_HIDDEN_ROUTES);
     }
 
     public function git_based(): bool

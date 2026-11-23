@@ -152,7 +152,7 @@
 
         $configurationMenuItems = array_values(array_filter(
             $configurationMenuItems,
-            fn (array $item): bool => $item['visible'] ?? true,
+            fn (array $item): bool => ($item['visible'] ?? true) && $application->hasConfigurationPage($item['route']),
         ));
 
         // Icons follow the main sidebar's reicon set

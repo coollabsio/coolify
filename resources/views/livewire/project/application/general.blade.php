@@ -218,19 +218,20 @@
                                 @if (preg_match('/^[0-9a-f]{40}$/', (string) $application->git_commit_sha))
                                     Current version <span class="font-mono text-black dark:text-fg">{{ substr($application->git_commit_sha, 0, 7) }}</span>.
                                 @else
-                                    No archive uploaded yet.
+                                    No version yet. Upload an archive.
                                 @endif
-                                Coolify serves the files of the archive with nginx. A redeploy of the same version reuses its image.
+                                Coolify serves the files of the archive with nginx. A redeploy runs the current version again without a build.
                             </p>
                         </div>
                         @if (auth()->user()->can('update', $application) && auth()->user()->can('deploy', $application))
                             <x-static-archive-dropzone action="deployUpload" :applicationUuid="$application->uuid"
                                 message="Drop a new .tar / .tar.gz / .tgz to deploy" />
                         @endif
-                        <div class="w-full sm:w-96">
+                        <div class="flex w-full flex-col gap-1 sm:w-96">
                             <x-forms.checkbox instantSave id="isSpa" label="Single-page application"
                                 helper="Serve index.html for paths that do not match a file, for client-side routing."
                                 x-bind:disabled="!canUpdate" />
+                            <p class="text-xs text-neutral-500 dark:text-fg-dim">Applies at the next upload.</p>
                         </div>
                     </div>
                 @else
@@ -364,6 +365,9 @@
                     <x-forms.textarea id="customNginxConfiguration"
                         placeholder="Empty means default configuration will be used." rows="10"
                         monacoEditorLanguage="nginx" useMonacoEditor x-bind:disabled="!canUpdate" />
+                    @if ($application->is_archive_source)
+                        <p class="mt-1.5 text-xs text-neutral-500 dark:text-fg-dim">Applies at the next upload.</p>
+                    @endif
                 </div>
             @endif
             @if ($buildPack === 'dockercompose')
@@ -469,6 +473,7 @@
                     </div>
                 </x-application.settings-subsection>
             @endif
+            @unless ($application->is_archive_source)
             <x-application.settings-subsection id="deployment-lifecycle-section" title="Deployment commands">
             <div class="grid gap-4 sm:grid-cols-2">
                 <div class="flex flex-col gap-4">
@@ -493,6 +498,7 @@
                 </div>
             </div>
             </x-application.settings-subsection>
+            @endunless
             </x-application.settings-section>
 
             @if ($buildPack !== 'dockercompose')
@@ -613,10 +619,12 @@
                 </x-modal-input>
 
                 <x-application.settings-section id="container-section" title="Container" helper="Options and labels applied to the container when it starts.">
+                    @unless ($application->is_archive_source)
                     <x-forms.input
                         helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/custom-commands'>docs.</a>"
                         placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k --hostname=myapp"
                         id="customDockerRunOptions" label="Custom Docker options" x-bind:disabled="!canUpdate" />
+                    @endunless
                 <x-application.settings-subsection id="container-labels-section" title="Labels">
                     <div class="grid w-full gap-4 sm:grid-cols-2">
                         <x-forms.listbox id="isContainerLabelReadonlyEnabled" label="Label management"
