@@ -115,14 +115,20 @@ describe('BitbucketDataCenterWebhookVariant pushes', function () {
         'branch deletion' => [['ref' => ['displayId' => 'main', 'type' => 'BRANCH'], 'toHash' => str_repeat('0', 40), 'type' => 'DELETE']],
     ]);
 
-    test('uses the first created or updated branch change', function () {
+    test('reads every created or updated branch change', function () {
         $context = (new BitbucketDataCenterWebhookVariant)->parse(dataCenterPushRequest([
             ['ref' => ['displayId' => 'v1.0', 'type' => 'TAG'], 'toHash' => str_repeat('a', 40), 'type' => 'ADD'],
             ['ref' => ['displayId' => 'main', 'type' => 'BRANCH'], 'toHash' => str_repeat('b', 40), 'type' => 'ADD'],
+            ['ref' => ['displayId' => 'old', 'type' => 'BRANCH'], 'toHash' => str_repeat('0', 40), 'type' => 'DELETE'],
+            ['ref' => ['displayId' => 'develop', 'type' => 'BRANCH'], 'toHash' => str_repeat('c', 40), 'type' => 'UPDATE'],
         ]));
 
         expect($context->branch)->toBe('main')
-            ->and($context->commit)->toBe(str_repeat('b', 40));
+            ->and($context->commit)->toBe(str_repeat('b', 40))
+            ->and($context->pushedBranches)->toBe([
+                'main' => ['commit' => str_repeat('b', 40), 'skip_deploy' => false],
+                'develop' => ['commit' => str_repeat('c', 40), 'skip_deploy' => false],
+            ]);
     });
 
     test('skips the deployment when every commit asks for it', function (array $commits, bool $skip) {
@@ -131,7 +137,7 @@ describe('BitbucketDataCenterWebhookVariant pushes', function () {
             $commits,
         ));
 
-        expect($context->skipDeployCommits)->toBe($skip);
+        expect($context->pushedBranches['main']['skip_deploy'])->toBe($skip);
     })->with([
         'all skip' => [[['message' => 'docs [skip ci]'], ['message' => 'chore [skip cd]']], true],
         'one deploys' => [[['message' => 'docs [skip ci]'], ['message' => 'Fix the build']], false],
