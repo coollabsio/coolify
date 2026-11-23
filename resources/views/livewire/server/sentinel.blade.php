@@ -19,7 +19,7 @@
              `$wire.set('sentinelCustomDockerImage', …)` (and similar) briefly
              flashes this bar on every page open. --}}
         <x-unsaved-bar action="submit"
-            targets="sentinelCustomUrl,sentinelToken" />
+            targets="sentinelCustomUrl,sentinelToken,logArchiveMaxFileMb,logArchiveMaxTotalMb,logArchiveRetentionDays" />
 
         <x-application.settings-section id="server-sentinel-overview-section" title="Sentinel"
             helper="Monitor server and container health while collecting historical metrics.">
@@ -123,13 +123,28 @@
             </x-application.settings-section>
 
             <x-application.settings-section id="server-sentinel-container-logs-section" title="Container logs"
-                helper="Sentinel saves the logs of each Coolify container on the server, so you can read them on the Logs page after the container is removed. It keeps up to 7 days and 1 GB. When you turn this off, the saved logs are deleted.">
-                <div class="grid gap-4 lg:grid-cols-2">
-                    <x-forms.listbox canGate="update" :canResource="$server" id="isContainerLogArchiveEnabled"
-                        label="Keep logs of removed containers" onChange="instantSave" :options="[
-                            ['value' => true, 'label' => 'Enabled'],
-                            ['value' => false, 'label' => 'Disabled'],
-                        ]" />
+                helper="Sentinel saves the logs of each Coolify container on the server, so you can read them on the Logs page after the container is removed. When you turn this off, the saved logs are deleted. The size and retention limits need Sentinel 1.1.8 or later.">
+                <div class="flex flex-col gap-4">
+                    <div class="max-w-xs">
+                        <x-forms.listbox canGate="update" :canResource="$server" id="isContainerLogArchiveEnabled"
+                            label="Keep logs of removed containers" onChange="instantSave" :options="[
+                                ['value' => true, 'label' => 'Enabled'],
+                                ['value' => false, 'label' => 'Disabled'],
+                            ]" />
+                    </div>
+                    @if ($isContainerLogArchiveEnabled)
+                        <div class="grid gap-4 lg:grid-cols-3">
+                            <x-forms.input canGate="update" :canResource="$server" type="number" min="1" max="1024"
+                                id="logArchiveMaxFileMb" label="File size limit (MB)" required
+                                helper="Size at which the log file of a container is rotated. One rotated file is kept." />
+                            <x-forms.input canGate="update" :canResource="$server" type="number" min="1" max="102400"
+                                id="logArchiveMaxTotalMb" label="Total size limit (MB)" required
+                                helper="Total size of all log files. Sentinel deletes the oldest files above it." />
+                            <x-forms.input canGate="update" :canResource="$server" type="number" min="1" max="365"
+                                id="logArchiveRetentionDays" label="Retention (days)" required
+                                helper="Sentinel deletes log files that were not written for this many days." />
+                        </div>
+                    @endif
                 </div>
             </x-application.settings-section>
 

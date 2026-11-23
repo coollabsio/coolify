@@ -33,6 +33,15 @@ class Sentinel extends Component
 
     public ?string $sentinelCustomDockerImage = null;
 
+    #[Validate(['required', 'integer', 'min:1', 'max:1024'])]
+    public int|string $logArchiveMaxFileMb;
+
+    #[Validate(['required', 'integer', 'min:1', 'max:102400'])]
+    public int|string $logArchiveMaxTotalMb;
+
+    #[Validate(['required', 'integer', 'min:1', 'max:365'])]
+    public int|string $logArchiveRetentionDays;
+
     public function getListeners()
     {
         $teamId = $this->server->team_id ?? auth()->user()->currentTeam()->id;
@@ -61,6 +70,9 @@ class Sentinel extends Component
             $this->server->settings->sentinel_custom_url = $this->sentinelCustomUrl;
             $this->server->settings->is_sentinel_debug_enabled = $this->isSentinelDebugEnabled;
             $this->server->settings->is_container_log_archive_enabled = $this->isContainerLogArchiveEnabled;
+            $this->server->settings->log_archive_max_file_mb = $this->logArchiveMaxFileMb;
+            $this->server->settings->log_archive_max_total_mb = $this->logArchiveMaxTotalMb;
+            $this->server->settings->log_archive_retention_days = $this->logArchiveRetentionDays;
             $changedFields = auditChangedFields($this->server->settings);
             $this->server->settings->save();
 
@@ -71,6 +83,9 @@ class Sentinel extends Component
             $this->sentinelCustomUrl = $this->server->settings->sentinel_custom_url;
             $this->isSentinelDebugEnabled = $this->server->settings->is_sentinel_debug_enabled;
             $this->isContainerLogArchiveEnabled = $this->server->settings->is_container_log_archive_enabled;
+            $this->logArchiveMaxFileMb = $this->server->settings->log_archive_max_file_mb;
+            $this->logArchiveMaxTotalMb = $this->server->settings->log_archive_max_total_mb;
+            $this->logArchiveRetentionDays = $this->server->settings->log_archive_retention_days;
             $this->sentinelUpdatedAt = $this->server->sentinel_updated_at;
             $this->sentinelStatus = $this->server->sentinelStatus();
         }
@@ -177,9 +192,9 @@ class Sentinel extends Component
         try {
             $this->authorize('update', $this->server);
             $this->setSentinelRestarting();
-            $this->syncData(true);
+            $changedFields = $this->syncData(true);
             auditLog('ui.server.sentinel.updated', $this->auditContext([
-                'changed_fields' => ['is_metrics_enabled', 'sentinel_token', 'sentinel_custom_url', 'is_sentinel_debug_enabled', 'is_container_log_archive_enabled'],
+                'changed_fields' => $changedFields,
             ]));
             $this->dispatch('success', 'Sentinel settings updated. Restarting Sentinel.');
         } catch (\Throwable $e) {

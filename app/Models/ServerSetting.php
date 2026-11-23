@@ -39,6 +39,9 @@ use OpenApi\Attributes as OA;
         'is_geoip_enabled' => ['type' => 'boolean'],
         'geoip_refresh_days' => ['type' => 'integer'],
         'traffic_ip_mode' => ['type' => 'string', 'enum' => ['full', 'anonymized', 'off']],
+        'log_archive_max_file_mb' => ['type' => 'integer'],
+        'log_archive_max_total_mb' => ['type' => 'integer'],
+        'log_archive_retention_days' => ['type' => 'integer'],
         'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'],
         'is_reachable' => ['type' => 'boolean'],
         'ssh_host_key' => ['type' => 'string', 'nullable' => true, 'description' => 'Pinned SSH host key(s) of the server, one "type base64" line per key.'],
@@ -183,6 +186,9 @@ class ServerSetting extends Model
         'geoip_refresh_days',
         'geoip_maxmind_license_key',
         'traffic_ip_mode',
+        'log_archive_max_file_mb',
+        'log_archive_max_total_mb',
+        'log_archive_retention_days',
         'traefik_certificate_resolver',
         'docker_version',
         'docker_version_checked_at',
@@ -240,6 +246,9 @@ class ServerSetting extends Model
         'logdrain_type' => LogDrainType::class,
         'logdrain_config' => 'encrypted:array',
         'traffic_ip_mode' => TrafficIpMode::class,
+        'log_archive_max_file_mb' => 'integer',
+        'log_archive_max_total_mb' => 'integer',
+        'log_archive_retention_days' => 'integer',
         'docker_version_checked_at' => 'datetime',
         'compose_version_checked_at' => 'datetime',
         'backup_compression_cpu_percentage' => 'integer',
@@ -311,7 +320,10 @@ class ServerSetting extends Model
                 $settings->wasChanged('is_geoip_enabled') ||
                 $settings->wasChanged('geoip_refresh_days') ||
                 $settings->wasChanged('geoip_maxmind_license_key') ||
-                $settings->wasChanged('traffic_ip_mode')
+                $settings->wasChanged('traffic_ip_mode') ||
+                $settings->wasChanged('log_archive_max_file_mb') ||
+                $settings->wasChanged('log_archive_max_total_mb') ||
+                $settings->wasChanged('log_archive_retention_days')
             ) {
                 // Only recreate Sentinel when it is already enabled. Otherwise a change to a
                 // traffic/geoip tuning knob would turn Sentinel on as a side effect, because

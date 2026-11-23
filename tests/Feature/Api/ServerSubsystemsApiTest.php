@@ -442,6 +442,46 @@ describe('Sentinel API', function () {
         expect($this->server->settings->fresh()->traffic_ip_mode->value)->toBe('full');
     });
 
+    test('PATCH updates the container log archive settings and restarts Sentinel', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/sentinel", [
+                'is_container_log_archive_enabled' => true,
+                'log_archive_max_file_mb' => 20,
+                'log_archive_max_total_mb' => 2048,
+                'log_archive_retention_days' => 14,
+            ])
+            ->assertOk()
+            ->assertJsonPath('is_container_log_archive_enabled', true)
+            ->assertJsonPath('log_archive_max_file_mb', 20)
+            ->assertJsonPath('log_archive_max_total_mb', 2048)
+            ->assertJsonPath('log_archive_retention_days', 14);
+
+        expect(StartSentinel::sentinelLogArchiveEnvironment($this->server->fresh()))->toBe([
+            'LOG_ARCHIVE_ENABLED' => 'true',
+            'LOG_ARCHIVE_MAX_FILE_MB' => '20',
+            'LOG_ARCHIVE_MAX_TOTAL_MB' => '2048',
+            'LOG_ARCHIVE_RETENTION_DAYS' => '14',
+        ]);
+        expect(Queue::pushed(JobDecorator::class, fn (JobDecorator $job): bool => $job->getAction() instanceof StartSentinel))
+            ->toHaveCount(1);
+    });
+
+    test('PATCH rejects container log archive limits out of range', function (string $field, int $value) {
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/sentinel", [$field => $value])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors($field);
+    })->with([
+        ['log_archive_max_file_mb', 0],
+        ['log_archive_max_file_mb', 1025],
+        ['log_archive_max_total_mb', 0],
+        ['log_archive_max_total_mb', 102401],
+        ['log_archive_retention_days', 0],
+        ['log_archive_retention_days', 366],
+    ]);
+
     test('PATCH rejects disabling mandatory Sentinel', function () {
         $this->withHeaders(serverSubsystemsHeaders())
             ->patchJson("/api/v1/servers/{$this->server->uuid}/sentinel", [
