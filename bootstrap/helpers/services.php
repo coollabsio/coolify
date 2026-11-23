@@ -26,6 +26,7 @@ function service_logo_urls(mixed $logo): array
 }
 
 use App\Actions\Shared\CloneVolumeDataWithSourceStopped;
+use App\Jobs\BindMountCloneJob;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
 use App\Models\GithubApp;
@@ -687,7 +688,11 @@ function applyServiceApplicationPrerequisites(Service $service): void
  *
  * @param  array<string, mixed>  $overrides  Attributes for the new service, for example uuid, name, and environment_id.
  */
-function clone_service(Service $source, StandaloneDocker|SwarmDocker $destination, array $overrides = [], bool $cloneVolumeData = false): Service
+/**
+ * @param  bool  $keepDomains  Give the applications of the clone the domains of the source, as a parser migration does.
+ *                             Otherwise the parser generates new domains.
+ */
+function clone_service(Service $source, StandaloneDocker|SwarmDocker $destination, array $overrides = [], bool $cloneVolumeData = false, bool $keepDomains = false): Service
 {
     $teamId = $source->team()->id;
     $uuid = $overrides['uuid'] ?? new_public_id();
@@ -746,6 +751,8 @@ function clone_service(Service $source, StandaloneDocker|SwarmDocker $destinatio
     $sourceApplicationsByName = $source->applications()->get()->keyBy('name');
     $sourceDatabasesByName = $source->databases()->get()->keyBy('name');
     $pendingVolumeClones = [];
+    $pendingDirectoryClones = [];
+    $sameServer = $source->destination?->server?->id === $newService->destination?->server?->id;
 
     foreach ([
         [$newService->applications()->get(), $sourceApplicationsByName],
@@ -755,7 +762,35 @@ function clone_service(Service $source, StandaloneDocker|SwarmDocker $destinatio
             $newResource->fill(['status' => 'exited'])->save();
 
             $sourceResource = $sourcesByName->get($newResource->name);
-            if (! $sourceResource || ! $cloneVolumeData) {
+            if (! $sourceResource) {
+                continue;
+            }
+
+            if ($keepDomains && $newResource instanceof ServiceApplication) {
+                $newResource->fill(['fqdn' => $sourceResource->fqdn])->save();
+            }
+
+            // A legacy parser removes `content` from the stored Compose file, so the parse of the clone
+            // cannot tell a file mount from a directory mount. The source rows know it.
+            $sourceFileStoragesByMount = $sourceResource->fileStorages()->get()->keyBy('mount_path');
+            foreach ($newResource->fileStorages()->get() as $newFileStorage) {
+                $sourceFileStorage = $sourceFileStoragesByMount->get($newFileStorage->mount_path);
+                if (! $sourceFileStorage) {
+                    continue;
+                }
+                $newFileStorage->forceFill($sourceFileStorage->only(['content', 'is_directory', 'chown', 'chmod']))->save();
+
+                if ($cloneVolumeData && $sameServer && $sourceFileStorage->is_directory
+                    && ! $sourceFileStorage->isOutsideResourceDirectory() && ! $newFileStorage->isOutsideResourceDirectory()) {
+                    $pendingDirectoryClones[] = new BindMountCloneJob(
+                        $sourceFileStorage->resolvedFsPath($source->workdir())->value(),
+                        $newFileStorage->resolvedFsPath($newService->workdir())->value(),
+                        $newService->destination->server,
+                    );
+                }
+            }
+
+            if (! $cloneVolumeData) {
                 continue;
             }
 
@@ -787,13 +822,21 @@ function clone_service(Service $source, StandaloneDocker|SwarmDocker $destinatio
         }
     }
 
+    if ($keepDomains) {
+        // The parser writes the SERVICE_URL_* and SERVICE_FQDN_* variables from the domains of the applications.
+        $newService->parse();
+    }
+
     $sourceServer = $source->destination?->server;
     $targetServer = $newService->destination?->server;
     if ($sourceServer && $targetServer) {
-        CloneVolumeDataWithSourceStopped::run($source, array_map(
-            fn (array $clone) => new VolumeCloneJob($clone[0], $clone[1]->name, $sourceServer, $targetServer, $clone[1]),
-            $pendingVolumeClones,
-        ));
+        CloneVolumeDataWithSourceStopped::run($source, [
+            ...array_map(
+                fn (array $clone) => new VolumeCloneJob($clone[0], $clone[1]->name, $sourceServer, $targetServer, $clone[1]),
+                $pendingVolumeClones,
+            ),
+            ...$pendingDirectoryClones,
+        ]);
     }
 
     $dnsRecords = app(ResourceDnsRecords::class);

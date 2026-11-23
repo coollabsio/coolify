@@ -46,6 +46,9 @@ class ResourceOperations extends Component
 
     public bool $cloneVolumeData = false;
 
+    /** A parser migration keeps the domains of a service. A normal clone gets new domains. */
+    private bool $migratingParser = false;
+
     public bool $migrateVolumeData = true;
 
     public function mount()
@@ -277,7 +280,7 @@ class ResourceOperations extends Component
             } elseif ($this->resource->type() === 'service') {
                 $new_resource = clone_service($this->resource, $new_destination, [
                     'environment_id' => $new_environment->id,
-                ], $this->cloneVolumeData);
+                ], $this->cloneVolumeData, keepDomains: $this->migratingParser);
 
                 $route = route('project.service.configuration', [
                     'project_uuid' => $new_environment->project->uuid,
@@ -304,6 +307,7 @@ class ResourceOperations extends Component
                 throw new RuntimeException('This resource already uses the latest parser.');
             }
             $this->cloneVolumeData = true;
+            $this->migratingParser = true;
 
             return $this->cloneTo($this->resource->destination->uuid, $this->resource->environment_id);
         } catch (\Throwable $e) {

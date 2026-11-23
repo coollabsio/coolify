@@ -26,6 +26,18 @@
 
             <div class="min-w-0">
                 @if ($currentRoute === 'project.service.configuration')
+                    @if ($service->usesLegacyComposeParser())
+                        @can('update', $service)
+                            <x-callout type="warning" title="Migrate to the latest Compose parser" class="mb-6">
+                                <p>Coolify parses the Compose file of this service with parser {{ $service->compose_parsing_version }}.
+                                    The migration makes a copy with the latest parser and the volume data. This service stays as it is.</p>
+                                <div class="mt-2">
+                                    <a class="button" {{ wireNavigate() }}
+                                        href="{{ route('project.service.resource-operations', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}#migrate-parser-section">Migrate</a>
+                                </div>
+                            </x-callout>
+                        @endcan
+                    @endif
                     <livewire:project.service.stack-form :service="$service" />
 
                     <div class="mt-8" x-data="{

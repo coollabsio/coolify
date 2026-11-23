@@ -13,6 +13,7 @@ enum ApplicationRecommendation: string
 {
     case UseBuildSecrets = 'use-build-secrets';
     case UseRailpack = 'use-railpack';
+    case UseLatestComposeParser = 'use-latest-compose-parser';
 
     /**
      * Recommendations that apply to the application, are not done yet, and are not dismissed.
@@ -50,6 +51,7 @@ enum ApplicationRecommendation: string
         return match ($this) {
             self::UseBuildSecrets => 'Use build secrets',
             self::UseRailpack => 'Switch from Nixpacks to Railpack',
+            self::UseLatestComposeParser => 'Migrate to the latest Compose parser',
         };
     }
 
@@ -64,6 +66,7 @@ enum ApplicationRecommendation: string
                 'With build secrets, the values are available only inside RUN instructions, as environment variables. A Dockerfile that uses them in FROM, COPY, WORKDIR, or other instructions gets empty values there.',
             ])->filter()->implode(' '),
             self::UseRailpack => config('deprecations.nixpacks').' Railpack reads RAILPACK_* variables and railpack.json, not NIXPACKS_* variables or nixpacks.toml. Check them before you redeploy.',
+            self::UseLatestComposeParser => "Coolify parses the Compose file of this application with parser {$application->compose_parsing_version}. The migration makes a copy with the latest parser and the volume data. This application stays as it is.",
         };
     }
 
@@ -74,7 +77,7 @@ enum ApplicationRecommendation: string
     {
         return match ($this) {
             self::UseBuildSecrets => filled($application->docker_registry_image_name) ? 'danger' : 'warning',
-            self::UseRailpack => 'warning',
+            self::UseRailpack, self::UseLatestComposeParser => 'warning',
         };
     }
 
@@ -86,6 +89,7 @@ enum ApplicationRecommendation: string
                 && ($application->environment_variables()->withoutBuildpackControlVariables()->where('is_buildtime', true)->exists()
                     || $application->environment_variables_preview()->withoutBuildpackControlVariables()->where('is_buildtime', true)->exists()),
             self::UseRailpack => $application->build_pack === 'nixpacks',
+            self::UseLatestComposeParser => $application->usesLegacyComposeParser(),
         };
     }
 
@@ -94,6 +98,7 @@ enum ApplicationRecommendation: string
         return match ($this) {
             self::UseBuildSecrets => (bool) $application->settings?->use_build_secrets,
             self::UseRailpack => $application->build_pack === 'railpack',
+            self::UseLatestComposeParser => false,
         };
     }
 
@@ -107,14 +112,30 @@ enum ApplicationRecommendation: string
         return match ($this) {
             self::UseBuildSecrets => 'Turn on build secrets',
             self::UseRailpack => 'Switch to Railpack',
+            self::UseLatestComposeParser => 'Migrate',
         };
     }
 
     public function fixNeedsConfirmation(): bool
     {
         return match ($this) {
-            self::UseBuildSecrets => false,
+            self::UseBuildSecrets, self::UseLatestComposeParser => false,
             self::UseRailpack => true,
+        };
+    }
+
+    /**
+     * The page that does the fix, for a fix that is more than a settings change. Null when applyFix() does it.
+     */
+    public function fixUrl(Application $application): ?string
+    {
+        return match ($this) {
+            self::UseLatestComposeParser => route('project.application.resource-operations', [
+                'project_uuid' => $application->environment->project->uuid,
+                'environment_uuid' => $application->environment->uuid,
+                'application_uuid' => $application->uuid,
+            ]).'#migrate-parser-section',
+            default => null,
         };
     }
 
@@ -126,6 +147,7 @@ enum ApplicationRecommendation: string
         match ($this) {
             self::UseBuildSecrets => $application->settings->use_build_secrets = true,
             self::UseRailpack => $this->switchToRailpack($application),
+            self::UseLatestComposeParser => throw new \LogicException('The parser migration is done on the Resource Operations page.'),
         };
     }
 

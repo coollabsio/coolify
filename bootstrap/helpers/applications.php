@@ -4,6 +4,7 @@ use App\Actions\Shared\CloneVolumeDataWithSourceStopped;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\CancelPreviousDeployments;
 use App\Jobs\ApplicationDeploymentJob;
+use App\Jobs\BindMountCloneJob;
 use App\Jobs\CancelSupersededDeploymentJob;
 use App\Jobs\SyncGithubDeploymentJob;
 use App\Jobs\VolumeCloneJob;
@@ -658,6 +659,12 @@ function clone_application(Application $source, $destination, array $overrides =
                 $newPersistentVolume,
             );
         }
+
+        if ($source->destination->server->id === $newApplication->destination->server->id) {
+            foreach (legacyComposeBindMountClones($source, $newApplication) as [$sourcePath, $targetPath]) {
+                $pendingVolumeClones[] = new BindMountCloneJob($sourcePath, $targetPath, $newApplication->destination->server);
+            }
+        }
     }
 
     CloneVolumeDataWithSourceStopped::run($source, $pendingVolumeClones);
@@ -725,6 +732,41 @@ function clone_application(Application $source, $destination, array $overrides =
     $dnsRecords->queueAutomaticRecords($newApplication, array_keys($dnsRecords->hostnameUsers($source)));
 
     return $newApplication;
+}
+
+/**
+ * The relative bind mounts (./path) that a legacy Compose parser (version 1 or 2) gave an application,
+ * as pairs of host paths in the resource directories of the source and of the clone. Paths that
+ * leave the resource directory, absolute paths, and paths with variables are skipped.
+ *
+ * @return array<int, array{0: string, 1: string}> [path of the source, path of the clone]
+ */
+function legacyComposeBindMountClones(Application $source, Application $clone): array
+{
+    if ($source->build_pack !== 'dockercompose' || (int) $source->compose_parsing_version >= 3 || blank($source->docker_compose_raw)) {
+        return [];
+    }
+
+    $paths = [];
+    foreach (data_get(Yaml::parse($source->docker_compose_raw), 'services', []) as $service) {
+        foreach (data_get($service, 'volumes', []) as $volume) {
+            $hostPath = match (true) {
+                is_string($volume) => (string) parseDockerVolumeString($volume)['source'],
+                data_get($volume, 'type') === 'bind' => (string) data_get($volume, 'source'),
+                default => '',
+            };
+            if (! str_starts_with($hostPath, './') || str_contains($hostPath, '$')) {
+                continue;
+            }
+            $relativePath = trim(substr($hostPath, 2), '/');
+            if ($relativePath === '' || in_array('..', explode('/', $relativePath), true)) {
+                continue;
+            }
+            $paths[$relativePath] = [$source->workdir().'/'.$relativePath, $clone->workdir().'/'.$relativePath];
+        }
+    }
+
+    return array_values($paths);
 }
 
 /**

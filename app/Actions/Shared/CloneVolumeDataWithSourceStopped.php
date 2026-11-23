@@ -8,6 +8,7 @@ use App\Actions\Database\StopDatabase;
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\BindMountCloneJob;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
 use App\Models\Service;
@@ -45,7 +46,7 @@ class CloneVolumeDataWithSourceStopped
     private const APPLICATION_PARTLY_STOPPED = 1002;
 
     /**
-     * @param  array<int, VolumeCloneJob>  $volumeJobs
+     * @param  array<int, VolumeCloneJob|BindMountCloneJob>  $volumeJobs
      */
     public function handle(
         Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $source,

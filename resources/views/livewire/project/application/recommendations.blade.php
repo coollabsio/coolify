@@ -18,7 +18,9 @@
                         <p>{{ $recommendation->why($application) }}</p>
                         @can('update', $application)
                             <div class="mt-2 flex flex-wrap items-center gap-2">
-                                @if ($recommendation->fixNeedsConfirmation())
+                                @if ($fixUrl = $recommendation->fixUrl($application))
+                                    <a class="button" href="{{ $fixUrl }}" {{ wireNavigate() }}>{{ $recommendation->fixLabel() }}</a>
+                                @elseif ($recommendation->fixNeedsConfirmation())
                                     <x-modal-confirmation :title="$recommendation->title().'?'" :buttonTitle="$recommendation->fixLabel()"
                                         submitAction="applyFix('{{ $recommendation->value }}')" :actions="[
                                             'The build pack of this application changes to Railpack.',
