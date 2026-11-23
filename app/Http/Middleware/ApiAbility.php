@@ -44,6 +44,7 @@ class ApiAbility extends CheckForAnyAbility
         'validate',
         'host-key',
         'destinations',
+        'exec',
     ];
 
     public const SCOPED_ACCESS_DENIED_MESSAGE = 'This API token is limited to selected projects, environments, resources, or servers, so it cannot use this endpoint.';
@@ -67,7 +68,7 @@ class ApiAbility extends CheckForAnyAbility
                 return response()->json(['message' => self::SCOPED_ACCESS_DENIED_MESSAGE], 403);
             }
 
-            if ($user?->tokenCan('root')) {
+            if (! in_array('terminal', $abilities, true) && $user?->tokenCan('root')) {
                 return $next($request);
             }
 

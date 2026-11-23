@@ -3002,6 +3002,69 @@ paths:
       security:
         -
           bearerAuth: []
+  '/applications/{uuid}/exec':
+    post:
+      tags:
+        - Applications
+      summary: 'Execute Command'
+      description: 'Execute a non-interactive shell command inside a running application container.'
+      operationId: execute-command-on-application-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Application UUID'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - command
+              properties:
+                command:
+                  type: string
+                  description: 'Shell command to execute in the application container.'
+                timeout:
+                  type: integer
+                  description: 'Command timeout in seconds. Maximum 10 seconds. Defaults to 10 seconds.'
+                container:
+                  type: string
+                  description: 'Optional container name when the application has multiple running containers.'
+                server_uuid:
+                  type: string
+                  description: 'Optional server UUID when the application runs on multiple servers.'
+                pull_request_id:
+                  type: integer
+                  description: 'Optional preview pull request identifier.'
+              type: object
+      responses:
+        '200':
+          description: 'Command finished.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  exit_code: { type: integer }
+                  stdout: { type: string }
+                  stderr: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Terminal access is disabled on the target server, or the terminal API is disabled on the instance or for the team.'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+        '429':
+          $ref: '#/components/responses/TerminalRateLimited'
+      security:
+        -
+          bearerAuth: []
   '/applications/{uuid}':
     get:
       tags:
@@ -14879,6 +14942,60 @@ paths:
       security:
         -
           bearerAuth: []
+  '/servers/{uuid}/exec':
+    post:
+      tags:
+        - Servers
+      summary: 'Execute Command'
+      description: 'Execute a non-interactive shell command on a server through Coolify SSH.'
+      operationId: execute-command-on-server-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - command
+              properties:
+                command:
+                  type: string
+                  description: 'Shell command to execute on the server.'
+                timeout:
+                  type: integer
+                  description: 'Command timeout in seconds. Maximum 10 seconds. Defaults to 10 seconds.'
+              type: object
+      responses:
+        '200':
+          description: 'Command finished.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  exit_code: { type: integer }
+                  stdout: { type: string }
+                  stderr: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Terminal access is disabled on this server, or the terminal API is disabled on the instance or for the team.'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+        '429':
+          $ref: '#/components/responses/TerminalRateLimited'
+      security:
+        -
+          bearerAuth: []
   '/services/{uuid}/applications':
     get:
       tags:
@@ -20989,6 +21106,26 @@ components:
               message:
                 type: string
                 example: 'Rate limit exceeded. Please try again later.'
+            type: object
+    TerminalRateLimited:
+      description: 'Terminal command rate or concurrency limit exceeded.'
+      headers:
+        Retry-After:
+          description: 'Number of seconds to wait before retrying.'
+          schema:
+            type: integer
+            example: 42
+      content:
+        application/json:
+          schema:
+            properties:
+              message:
+                type: string
+                example: 'Too many terminal command requests. Please retry in 42 seconds.'
+              retry_after:
+                description: 'Number of seconds to wait before retrying.'
+                type: integer
+                example: 42
             type: object
     '502':
       description: 'The cloud provider API rejected the request.'

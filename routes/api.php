@@ -210,6 +210,7 @@ Route::group([
     Route::get('/servers/{uuid}/validate', [OtherController::class, 'post_required'])->middleware(['api.ability:write']);
     Route::post('/servers/{uuid}/validate', [ServersController::class, 'validate_server'])->middleware(['api.ability:write']);
     Route::post('/servers/{uuid}/host-key/reset', [ServersController::class, 'reset_host_key'])->middleware(['api.ability:write']);
+    Route::post('/servers/{uuid}/exec', [ServersController::class, 'execute_command'])->middleware(['api.ability:terminal', 'terminal.team.enabled', 'throttle:terminal-api-exec']);
 
     Route::get('/servers/{uuid}/registries', [ServerDockerRegistriesController::class, 'index'])->middleware(['api.ability:read:sensitive']);
     Route::post('/servers/{uuid}/registries', [ServerDockerRegistriesController::class, 'login'])->middleware(['api.ability:write', 'api.ability:deploy']);
@@ -313,6 +314,7 @@ Route::group([
     Route::patch('/applications/{uuid}/envs/bulk', [ApplicationsController::class, 'create_bulk_envs'])->middleware(['api.ability:write']);
     Route::patch('/applications/{uuid}/envs', [ApplicationsController::class, 'update_env_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/envs/{env_uuid}', [ApplicationsController::class, 'delete_env_by_uuid'])->middleware(['api.ability:delete']);
+    Route::post('/applications/{uuid}/exec', [ApplicationsController::class, 'execute_command'])->middleware(['api.ability:terminal', 'terminal.team.enabled', 'throttle:terminal-api-exec']);
     Route::get('/applications/{uuid}/logs', [ApplicationsController::class, 'logs_by_uuid'])->middleware(['api.ability:read:sensitive']);
     Route::get('/applications/{uuid}/metrics', [ResourceMetricsController::class, 'application'])->middleware(['api.ability:read']);
     Route::get('/applications/{uuid}/traffic', [ResourceTrafficController::class, 'application'])->middleware(['api.ability:read']);
