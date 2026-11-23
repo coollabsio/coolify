@@ -60,7 +60,10 @@ have no watch paths. This decision closes these gaps.
   token only to the host of `repository_url` (a Git credential helper). It
   gives the deploy key to every SSH host (`GIT_SSH_COMMAND`).
 - A preview build uses the credential of its parent (decision 0025,
-  `BuildsNodeWorkloadImage`), also for a pull request from a fork.
+  `BuildsNodeWorkloadImage`), also for a pull request from a fork. Until
+  2026-11-23, the builder gave this credential also to the submodules and LFS
+  objects of a fork. This is fixed (see "Security", "Fixed before this
+  decision").
 
 ### The contradiction in decision 0025
 
@@ -85,10 +88,10 @@ commit." The code follows the notes.
 
 | Field | Builder |
 | --- | --- |
-| `bool skip_submodules = 21` | No submodule step |
-| `bool skip_lfs = 22` | `GIT_LFS_SKIP_SMUDGE=1`, no `git lfs pull` |
-| `bool full_history = 23` | `git fetch origin <commit>` without `--depth`; submodules without `--depth=1` |
-| `bool untrusted_source = 24` | The submodule and LFS steps run without the Git credential (see "Security") |
+| `bool skip_submodules = 22` | No submodule step |
+| `bool skip_lfs = 23` | `GIT_LFS_SKIP_SMUDGE=1`, no `git lfs pull` |
+| `bool full_history = 24` | `git fetch origin <commit>` without `--depth`; submodules without `--depth=1` |
+| `bool untrusted_source = 21` | Built already, with its own capability `image.build.untrusted_source.v1` (see "Security") |
 
 - Coolify sends a field only when it is `true`. A build with a field set
   needs the capability on the builder Node. Else the build fails with "Upgrade
@@ -164,24 +167,27 @@ Watch paths:
 
 ## Security
 
-- **Fork previews and the credential (option A crosses a boundary).** A pull
-  request from a fork controls `.gitmodules` and `.lfsconfig`. Today the
-  builder runs the submodule and LFS steps with the credential of the parent.
-  So the content of a fork decides which repositories the credential reads
-  during the build. The token can read every repository of the installation,
-  and the deploy key goes to every SSH host. This crosses the boundary "no
-  login -> team data". The attacker needs no role. The team admin must turn
-  on `fork_preview_deployments_enabled`. Decision 0025 promises that a fork
-  preview gets no production build secret, and the credential is such a
-  secret.
-- With option B, Coolify sets `untrusted_source` for each build of a fork
-  preview (`pull_request_from_fork`). The builder uses the credential for the
-  fetch of the commit only. It then removes the credential helper and unsets
-  `GIT_SSH_COMMAND`. Public submodules still work. A private submodule fails
-  with the Git error.
-- A fork preview build of a repository with a credential needs
-  `image.build.git_options.v1`. Without it, the build fails. This closes the
-  gap also when submodules are on.
+- **Fixed before this decision: fork previews and the credential.** A pull
+  request from a fork controls `.gitmodules` and `.lfsconfig`. Until
+  2026-11-23, the builder ran the submodule and LFS steps with the credential
+  of the parent: the HTTPS token answered for every repository on the host
+  of the repository, and the deploy key went to every SSH host. So the
+  content of a fork decided which repositories the credential read. This
+  crossed the boundary "no login -> team data", when a team admin turned on
+  `fork_preview_deployments_enabled`. v4 has the same gap: its clone of a
+  pull request rewrites every HTTPS URL of the host to the token
+  (`url.<host>.insteadOf` in `Application::generateGitImportCommands`), also
+  for a fork.
+- The fix (Sentinel `57e889c`, Coolify on `v5-progress`): Coolify sets
+  `untrusted_source` for each build of a fork preview of a private
+  repository (`NodeWorkload::buildsUntrustedSource()`). The HTTPS token then
+  answers only for the path of the repository, with and without `.git`, which
+  includes its LFS endpoint. The deploy key is used only for the fetch of the
+  commit. Public submodules still work. A private submodule of a fork preview
+  fails with the Git error, and the LFS objects of a fork preview of an SSH
+  repository are not pulled. Such a build needs
+  `image.build.untrusted_source.v1` on the builder Node, and Flux refuses the
+  field for a Sentinel without it.
 - **Local paths.** `protocol.file.allow=never` refuses a submodule with a
   local path today. The `https`/`ssh` allow-list also refuses `git://`,
   `http://`, and `ext::`.
@@ -212,6 +218,7 @@ Watch paths:
 - With the four manual webhooks, previews deploy for each commit, as today.
   Only the GitHub App can skip a preview build.
 - A fork preview with a private submodule fails. The UI shows the Git error.
+  This is already so since the fix of 2026-11-23.
 - The shared matcher changes v4 code. The v4 tests of `matchPaths` must keep
   passing.
 
@@ -222,6 +229,5 @@ Watch paths:
 - A second credential for a submodule on another host.
 - LFS files inside submodules (v4 does not pull them either).
 - The file list of GitLab and Gitea pull requests through their APIs.
-- Whether v4 has the same fork gap. This decision did not check the v4 clone
-  of a fork preview.
+- The fix of the same fork gap in v4.
 - `StrictHostKeyChecking=no` of the deploy key in the builder.

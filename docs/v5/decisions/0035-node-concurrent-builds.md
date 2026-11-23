@@ -49,9 +49,12 @@ v4 has a setting for this. v5 has none.
 - When all builders are busy, the job calls `release(15)`. `retryUntil()` is
   one hour. After one hour, the build fails. The order between workloads is
   the order in which Horizon takes the released jobs, not FIFO.
-- `SelectBuilderNode` counts builds without a lock. `RunImageBuild` sets
-  `node_id` and `started_at` later. Two jobs at the same time can both select
-  the same Node.
+- Fixed on 2026-11-23: `SelectBuilderNode` counted builds without a lock,
+  and `RunImageBuild` set `node_id` and `started_at` later, so two jobs at the
+  same time could both select the same Node. Now `SelectBuilderNode::claim()`
+  locks the Nodes of the cluster (`lockForUpdate`, ordered by `id`), selects
+  the Node, and sets `node_id` and `started_at` of the build in one
+  transaction. The limit is still one build on each builder Node.
 - A running build holds one Horizon worker. `RunImageBuild` polls
   `container.list` and `container.logs` every 3 s until the build ends. The job
   timeout is 2400 s. `constants.node.build_timeout_minutes` (env
@@ -73,11 +76,12 @@ v4 has a setting for this. v5 has none.
   has `max_used_space_bytes`. 0 means 20% of the root disk. Coolify sends only
   `enabled` (`ReconcileNodeClusterNetwork::reconcileBuilder`), so every Node
   uses 20%. A change of the config hash replaces the BuildKit container.
-- `remove_stale_outputs()` deletes the image archive of each build whose
-  container is gone. Its comment says that this is safe because Coolify runs
-  one build at a time. `RunImageBuild` removes the container before
-  `image.load`. So with two builds on one Node, the start of the second build
-  can delete the archive of the first build before Coolify loads it.
+- Fixed on 2026-11-23 (Sentinel `57e889c`): `remove_stale_outputs()`
+  deleted the image archive of each build whose container was gone, and
+  `RunImageBuild` removes the container before `image.load`. So the start of
+  a second build could delete the archive of the first build before Coolify
+  loaded it. Now a build removes only its own old output, and the outputs of
+  other builds only one day after they ended without a load.
 
 ## Decision
 
@@ -98,19 +102,19 @@ v4 has a setting for this. v5 has none.
 
 Coolify enforces the limit. Sentinel refuses as a second check.
 
-- Coolify claims a slot in one transaction. It locks the candidate builder
-  Nodes (`lockForUpdate`, ordered by `id`), counts their active builds with a
-  `node_id`, and sets `node_id`, `status = running`, and `started_at` on the
-  build. Then it sends `image.build`. This removes the race.
+- Coolify claims a slot in one transaction, as `SelectBuilderNode::claim()`
+  does today for the limit of 1. It compares the count with
+  `concurrent_builds` instead of 0.
 - `builder.reconcile.v1` gets `max_concurrent_builds`. Before
   `image.build.v1` starts a container, Sentinel counts the containers with the
   `coolify.build` label. At the limit, it refuses with the fixed message
   "The builder is busy." Coolify puts the build back in the queue on this
   message.
-- A new capability, `image.build.concurrent.v1`, means that Sentinel keeps the
-  archive of a build until `image.load` or until the build is 2 hours old.
-  Coolify uses a value above 1 only for a Node that reports this capability.
-  For an older Node, the Node page shows the reason.
+- A new capability, `image.build.concurrent.v1`, means that Sentinel refuses
+  at the limit. Sentinel `57e889c` and later already keep the archive of
+  another build until its load or for one day. Coolify uses a value above 1
+  only for a Node that reports this capability. For an older Node, the Node
+  page shows the reason.
 
 ### Queue
 
@@ -168,7 +172,7 @@ option.
 | **Coolify queue with a lock, plus a Sentinel refusal (chosen)** | Exact limit, FIFO, a second check on the Node | None |
 | Coolify queue only | No refusal when two Coolify writers disagree | None |
 | Sentinel refusal only | Jobs loop on refusals; no order; no position in the UI | None |
-| Release loop with a higher limit | Race stays; no FIFO; fails after one hour | None |
+| Release loop with a higher limit | No FIFO; fails after one hour | None |
 | FIFO that ignores the requester | One queue is simpler | Crosses "member with access grants → servers outside the grants"; needs only a member with a write grant |
 | Limits on each build container only | Does nothing for `RUN` steps, which run in BuildKit | None |
 | Settings that a member can change | Fewer admin steps | Crosses "read-only member → write in the own team" |

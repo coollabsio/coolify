@@ -92,6 +92,7 @@ class RunImageBuild
             ...($build->source_type === NodeWorkloadSourceType::STATIC ? ['static_root' => trim((string) $build->workload->publish_directory, '/') ?: '.'] : []),
             ...$source,
             ...$credential,
+            ...($build->workload->buildsUntrustedSource() ? ['untrusted_source' => true] : []),
             ...$push,
             ...($imageLogin === null ? [] : ['image_username' => $imageLogin['username'], 'image_password' => $imageLogin['password']]),
             // Objects, because Flux reads maps and an empty PHP array encodes as a list.

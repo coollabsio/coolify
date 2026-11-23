@@ -387,7 +387,18 @@ class NodeWorkload extends BaseModel
             $this->source_type === NodeWorkloadSourceType::DOCKERFILE_INLINE ? NodeImages::INLINE_DOCKERFILE_BUILD_CAPABILITY : null,
             filled($this->build_target) ? NodeImages::BUILD_TARGET_CAPABILITY : null,
             $this->source_type === NodeWorkloadSourceType::STATIC ? NodeImages::STATIC_BUILD_CAPABILITY : null,
+            $this->buildsUntrustedSource() ? NodeImages::UNTRUSTED_SOURCE_BUILD_CAPABILITY : null,
         ]));
+    }
+
+    /**
+     * Whether a build gets the Git credential for a source that the team does not control: a
+     * preview of a pull request from a fork of a private repository. Sentinel then gives the
+     * credential only to the repository of the build.
+     */
+    public function buildsUntrustedSource(): bool
+    {
+        return (bool) $this->pull_request_from_fork && $this->usesPrivateGitSource();
     }
 
     /**

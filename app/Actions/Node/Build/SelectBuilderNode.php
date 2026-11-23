@@ -8,6 +8,7 @@ use App\Models\NodeBuild;
 use App\Models\NodeWorkload;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
@@ -29,7 +30,27 @@ class SelectBuilderNode
 
     public const NOT_ALLOWED = 'You cannot place resources on a builder server of this cluster. Ask an admin for access to a builder server, or to deploy this application.';
 
-    public function handle(NodeWorkload $workload, ?User $requestedBy = null): Node
+    /**
+     * Picks the builder Node of the build and claims it for the build in one transaction. The lock
+     * on the Nodes of the cluster makes a second job wait until this claim is committed, so two
+     * builds never pick the same free builder Node. The claim sets `node_id` and `started_at`;
+     * RunImageBuild then starts the build there.
+     */
+    public function claim(NodeBuild $build): Node
+    {
+        return DB::transaction(function () use ($build): Node {
+            Node::query()->whereIn('node_cluster_id', $build->workload->clusterIds())->orderBy('id')->lockForUpdate()->pluck('id');
+            $node = $this->handle($build->workload, $build->requestedBy, $build->id);
+            NodeBuild::query()->whereKey($build->id)->update(['node_id' => $node->id, 'started_at' => now()]);
+
+            return $node;
+        });
+    }
+
+    /**
+     * @param  ?int  $exceptBuildId  A build that does not count as active: the build that a retried job claimed before.
+     */
+    public function handle(NodeWorkload $workload, ?User $requestedBy = null, ?int $exceptBuildId = null): Node
     {
         $clusterIds = $workload->clusterIds();
         if ($clusterIds === []) {
@@ -39,7 +60,8 @@ class SelectBuilderNode
         $architecture = self::targetArchitecture($workload);
         $clusterNodes = Node::query()
             ->whereIn('node_cluster_id', $clusterIds)
-            ->withCount(['builds as active_builds_count' => fn ($query) => $query->active()->whereNotNull('started_at')])
+            ->withCount(['builds as active_builds_count' => fn ($query) => $query->active()->whereNotNull('started_at')
+                ->when($exceptBuildId !== null, fn ($query) => $query->whereKeyNot($exceptBuildId))])
             ->orderBy('active_builds_count')
             ->orderBy('id')
             ->get();

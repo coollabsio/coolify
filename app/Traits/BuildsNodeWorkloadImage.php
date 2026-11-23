@@ -65,7 +65,7 @@ trait BuildsNodeWorkloadImage
                 $build->update(['commit_sha' => ResolveGitCommit::run($build->git_repository, $build->git_branch, $credential)]);
             }
             try {
-                $node = SelectBuilderNode::run($build->workload, $build->requestedBy);
+                $node = SelectBuilderNode::make()->claim($build);
             } catch (RuntimeException $exception) {
                 if ($exception->getMessage() === NodeBuild::BUILDERS_BUSY) {
                     $this->release(15);

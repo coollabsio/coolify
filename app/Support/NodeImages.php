@@ -44,6 +44,13 @@ final class NodeImages
     /** A Static build serves files only, with the Railpack static file provider (decision 0006). */
     public const STATIC_BUILD_CAPABILITY = 'image.build.static.v1';
 
+    /**
+     * `untrusted_source` of `image.build`: the Git credential opens only the repository of the
+     * build, not its submodules or LFS objects in other repositories. A preview of a pull request
+     * from a fork needs it, because the fork controls `.gitmodules` and `.lfsconfig`.
+     */
+    public const UNTRUSTED_SOURCE_BUILD_CAPABILITY = 'image.build.untrusted_source.v1';
+
     public static function isLocalImage(?string $image): bool
     {
         return is_string($image) && str_starts_with($image, self::LOCAL_PREFIX);
