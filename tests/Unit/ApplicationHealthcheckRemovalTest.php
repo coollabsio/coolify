@@ -166,3 +166,50 @@ it('reads Dockerfile syntax around HEALTHCHECK like Docker', function (string $d
     'CRLF line endings' => ["FROM scratch\r\nHEALTHCHECK --interval=27s \\\r\n  CMD /probe\r\n", 'HEALTHCHECK --interval=27s CMD /probe'],
     'NONE with flags' => ["FROM scratch\nHEALTHCHECK --interval=44s NONE", null],
 ]);
+
+it('reads the HEALTHCHECK of a Docker image from docker inspect', function () {
+    $application = healthcheckApplication();
+
+    $application->parseHealthcheckFromImage('{"Test":["CMD","myapp","health"],"Interval":10000000000,"Timeout":2000000000,"StartPeriod":90000000000,"Retries":5}'."\n");
+
+    expect($application->custom_healthcheck_found)->toBeTrue()
+        ->and($application->health_check_interval)->toBe(10)
+        ->and($application->health_check_timeout)->toBe(2)
+        ->and($application->health_check_start_period)->toBe(90)
+        ->and($application->health_check_retries)->toBe(5);
+});
+
+it('uses the Docker defaults for options that the image HEALTHCHECK leaves out', function () {
+    $application = healthcheckApplication();
+
+    $application->parseHealthcheckFromImage('{"Test":["CMD-SHELL","pg_isready"],"Interval":500000000}');
+
+    expect($application->custom_healthcheck_found)->toBeTrue()
+        ->and($application->health_check_interval)->toBe(1)
+        ->and($application->health_check_timeout)->toBe(30)
+        ->and($application->health_check_start_period)->toBe(0)
+        ->and($application->health_check_retries)->toBe(3);
+});
+
+it('resets the custom healthcheck when the image has no HEALTHCHECK', function (string $inspectOutput) {
+    $application = healthcheckApplication(['custom_healthcheck_found' => true, 'health_check_interval' => 30]);
+
+    $application->parseHealthcheckFromImage($inspectOutput);
+
+    expect($application->custom_healthcheck_found)->toBeFalse()
+        ->and($application->health_check_interval)->toBe(5);
+})->with([
+    'no healthcheck' => ['null'],
+    'HEALTHCHECK NONE' => ['{"Test":["NONE"]}'],
+    'empty test' => ['{"Test":[]}'],
+    'inspect failed' => [''],
+]);
+
+it('keeps the settings when the image has no HEALTHCHECK and none was found before', function () {
+    $application = healthcheckApplication(['health_check_interval' => 12]);
+
+    $application->parseHealthcheckFromImage('null');
+
+    expect($application->custom_healthcheck_found)->toBeFalse()
+        ->and($application->health_check_interval)->toBe(12);
+});
