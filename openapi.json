@@ -21486,6 +21486,18 @@
                                                 4
                                             ]
                                         },
+                                        "image_rescan_days": {
+                                            "description": "Days between two rescans of the running images and the host packages. 0: no rescans, only scans at deployments and on request.",
+                                            "type": "integer",
+                                            "enum": [
+                                                1,
+                                                3,
+                                                7,
+                                                14,
+                                                30,
+                                                0
+                                            ]
+                                        },
                                         "scanner_state": {
                                             "description": "State of the scanner on the server. Null when unknown.",
                                             "type": [
@@ -21613,6 +21625,18 @@
                                             1,
                                             2,
                                             4
+                                        ]
+                                    },
+                                    "image_rescan_days": {
+                                        "description": "Days between two rescans of the running images and the host packages. 0: no rescans, only scans at deployments and on request.",
+                                        "type": "integer",
+                                        "enum": [
+                                            1,
+                                            3,
+                                            7,
+                                            14,
+                                            30,
+                                            0
                                         ]
                                     }
                                 },
