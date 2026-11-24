@@ -511,7 +511,7 @@ final class SecurityCard
             return [];
         }
 
-        return [trim('This image uses '.ucfirst($security->eol['name']).' '.$security->eol['version']).', which no longer gets security fixes.'];
+        return [trim(ucfirst($security->eol['name']).' '.$security->eol['version']).' no longer gets security fixes.'];
     }
 
     /**

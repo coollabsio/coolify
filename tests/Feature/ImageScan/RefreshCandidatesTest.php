@@ -475,8 +475,25 @@ it('asks for a login when the registry login uses a credential helper', function
     $scan->refresh();
     expect($scan->candidateStatus())->toBe('auth_required')
         ->and($scan->candidateEntries())->toBe([])
-        ->and(RefreshCandidates::message($scan))->toBe("Coolify cannot read the tags of ghcr.io/acme/api. Log in to ghcr.io on {$this->server->name}.")
+        ->and(RefreshCandidates::message($scan))->toBe("Cannot read the tags of ghcr.io/acme/api. Log in to ghcr.io on {$this->server->name}.")
         ->and(candidatesRan('DOCKER_CONFIG=/auth'))->toBe(0);
+});
+
+it('reports a registry certificate that the server does not trust instead of asking for a login', function () {
+    Process::fake(fn (PendingProcess $process) => Process::result(output: match (true) {
+        str_contains(candidatesCommand($process), 'coolify-scan-exit tags') => "coolify-scan-tls tags\n".candidatesPayload('tags', '', 1),
+        str_contains(candidatesCommand($process), 'df -P') => test()->diskFree,
+        default => '',
+    }));
+    $scan = candidatesScan('registry.example.com:5050/group/api:1.0');
+
+    RefreshCandidates::run($scan);
+
+    $scan->refresh();
+    expect($scan->candidateStatus())->toBe('failed')
+        ->and(data_get($scan->candidates, 'error'))->toBe('registry_tls')
+        ->and(RefreshCandidates::message($scan))->toBe("Untrusted certificate on registry.example.com:5050. Install its CA on {$this->server->name}.")
+        ->and(candidatesRan('.docker/config.json'))->toBe(0);
 });
 
 it('reads the tags of an image from a registry with a port', function () {

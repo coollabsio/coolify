@@ -790,7 +790,7 @@ describe('main card actions', function () {
 
         updateImagePage($this->admin, $this->database, 'database')
             ->assertDontSee('needs another check')
-            ->assertSee("Coolify cannot read the tags of postgres. Log in to docker.io on {$this->server->name}.")
+            ->assertSee("Cannot read the tags of postgres. Log in to docker.io on {$this->server->name}.")
             ->assertDontSeeHtml('updateImage(');
     });
 

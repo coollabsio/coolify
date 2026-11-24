@@ -171,6 +171,66 @@ it('cuts the network only for runs that do not need a registry or the database d
     }
 });
 
+it('lets only runs with network trust the CA bundle of the server in addition to their own', function () {
+    $lists = scannerCommandLists($this->commands);
+    $mount = "--mount 'type=bind,src=/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/ca,dst=/etc/coolify-ca,readonly'";
+
+    foreach (['dbUpdate', 'sbomFromRegistry', 'sbomFromRegistry with auth', 'tags', 'tags with auth', 'digest', 'digest with platform and auth'] as $name) {
+        expect(scannerDockerRuns($lists[$name]))->not->toBeEmpty()
+            ->each->toContain("-e 'SSL_CERT_DIR=/etc/coolify-ca'")->toContain($mount);
+    }
+    foreach (['dbStatus', 'sbomFromLocal', 'sbomFromHost', 'grype', 'packages'] as $name) {
+        expect(scannerDockerRuns($lists[$name]))->each->not->toContain('SSL_CERT_DIR')->not->toContain('/etc/coolify-ca');
+    }
+});
+
+it('copies the first CA bundle of the server into the work directory, and leaves the directory empty without one', function (array $bundles, ?string $copied) {
+    $dir = sys_get_temp_dir().'/coolify-scan-test-'.bin2hex(random_bytes(4));
+    mkdir("{$dir}/etc", 0755, true);
+    foreach ($bundles as $name) {
+        file_put_contents("{$dir}/etc/{$name}", "bundle {$name}\n");
+    }
+    $copy = collect(scannerUnwrapped($this->commands->tags('nginx', null)))->first(fn (string $line) => str_contains($line, '/ca/host.pem'));
+    $script = str_replace(
+        ['/data/coolify/image-scans/tmp-'.SCANNER_TEST_RUN_ID, '/etc/ssl/certs/ca-certificates.crt', '/etc/pki/tls/certs/ca-bundle.crt'],
+        [$dir, "{$dir}/etc/debian.crt", "{$dir}/etc/rhel.crt"],
+        $copy,
+    );
+
+    $result = Process::run(['sh', '-c', $script]);
+    $files = is_dir("{$dir}/ca") ? array_values(array_diff(scandir("{$dir}/ca"), ['.', '..'])) : null;
+    $content = is_file("{$dir}/ca/host.pem") ? file_get_contents("{$dir}/ca/host.pem") : null;
+    Process::run(['rm', '-rf', $dir]);
+
+    expect($result->successful())->toBeTrue()
+        ->and($files)->toBe($copied === null ? [] : ['host.pem'])
+        ->and($content)->toBe($copied === null ? null : "bundle {$copied}\n");
+})->with([
+    'first bundle wins' => [['debian.crt', 'rhel.crt'], 'debian.crt'],
+    'later bundle' => [['rhel.crt'], 'rhel.crt'],
+    'no bundle' => [[], null],
+]);
+
+it('marks a captured registry step that failed on an unknown certificate', function (string $stderr, bool $marked) {
+    $dir = sys_get_temp_dir().'/coolify-scan-test-'.bin2hex(random_bytes(4));
+    mkdir($dir);
+    file_put_contents("{$dir}/regctl", "#!/bin/sh\necho '{$stderr}' >&2\nexit 1\n");
+    chmod("{$dir}/regctl", 0755);
+    $step = collect(scannerUnwrapped($this->commands->tags('registry.example.com:5050/group/api', null)))->first(fn (string $line) => str_contains($line, 'coolify-scan-exit tags'));
+    $script = str_replace('/data/coolify/image-scans/tmp-'.SCANNER_TEST_RUN_ID, $dir, preg_replace('/timeout -k 10 \d+ docker run .*? > /', "{$dir}/regctl > ", $step, 1, $replaced));
+
+    $result = Process::run(['sh', '-c', $script]);
+    Process::run(['rm', '-rf', $dir]);
+    $parsed = ScannerCommands::parseOutput($result->output());
+
+    expect($replaced)->toBe(1)
+        ->and($parsed['exit_codes'])->toBe(['tags' => 1])
+        ->and($parsed['tls'])->toBe($marked ? ['tags'] : []);
+})->with([
+    'unknown authority' => ['failed to request: Get "https://registry.example.com:5050/v2/": tls: failed to verify certificate: x509: certificate signed by unknown authority', true],
+    'unauthorized' => ['unauthorized: authentication required', false],
+]);
+
 it('gives the work directory to the scanner user before a container uses it', function () {
     $chown = "chown -R 65534:65534 '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."'";
 
@@ -262,7 +322,7 @@ it('reads tool output through a size cap and prints an exit marker', function ()
 
         expect($all)->toContain("head -c 10485761 '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/out' 2>/dev/null || true")
             ->toContain('ulimit -f 40960; timeout ')
-            ->toContain("rc=\$?; if [ \"\$(docker inspect -f '{{.State.OOMKilled}}' coolify-scan-".SCANNER_TEST_RUN_ID." 2>/dev/null)\" = true ]; then echo 'coolify-scan-oom {$step}'; fi; docker rm -f coolify-scan-".SCANNER_TEST_RUN_ID." >/dev/null 2>&1; size=\$(wc -c < '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/out' 2>/dev/null | tr -cd 0-9); size=\${size:-0}; if [ \"\$size\" -ge 20971520 ]; then rc=0; fi; echo \"coolify-scan-exit {$step} \$rc \$size\"")
+            ->toContain("rc=\$?; if [ \"\$(docker inspect -f '{{.State.OOMKilled}}' coolify-scan-".SCANNER_TEST_RUN_ID." 2>/dev/null)\" = true ]; then echo 'coolify-scan-oom {$step}'; fi; docker rm -f coolify-scan-".SCANNER_TEST_RUN_ID." >/dev/null 2>&1; if grep -q -e 'x509: ' -e 'tls: ' '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/out.err' 2>/dev/null; then echo 'coolify-scan-tls {$step}'; fi; size=\$(wc -c < '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/out' 2>/dev/null | tr -cd 0-9); size=\${size:-0}; if [ \"\$size\" -ge 20971520 ]; then rc=0; fi; echo \"coolify-scan-exit {$step} \$rc \$size\"")
             ->and(array_search('echo coolify-scan-payload', $commands, true))->toBeLessThan(collect($commands)->search(fn (string $line) => str_starts_with($line, 'head -c')))
             ->and(end($commands))->toBe("rm -rf '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."' || true");
     }
@@ -478,10 +538,11 @@ it('parses exit markers before the payload separator', function () {
         'exit_codes' => ['save' => 0, 'sbom' => 0, 'grype' => 0],
         'sizes' => ['grype' => 12],
         'oom' => [],
+        'tls' => [],
         'payload' => "{\"a\":1}\ncoolify-scan-payload\n{\"b\":2}",
     ])->and(ScannerCommands::parseOutput("coolify-scan-exit save 0\ncoolify-scan-exit sbom 1"))->toBe([
-        'exit_codes' => ['save' => 0, 'sbom' => 1], 'sizes' => [], 'oom' => [], 'payload' => '',
-    ])->and(ScannerCommands::parseOutput(null))->toBe(['exit_codes' => [], 'sizes' => [], 'oom' => [], 'payload' => '']);
+        'exit_codes' => ['save' => 0, 'sbom' => 1], 'sizes' => [], 'oom' => [], 'tls' => [], 'payload' => '',
+    ])->and(ScannerCommands::parseOutput(null))->toBe(['exit_codes' => [], 'sizes' => [], 'oom' => [], 'tls' => [], 'payload' => '']);
 });
 
 it('ignores payload lines that look like exit markers', function () {
@@ -491,6 +552,7 @@ it('ignores payload lines that look like exit markers', function () {
         'exit_codes' => ['grype' => 2],
         'sizes' => ['grype' => 9],
         'oom' => [],
+        'tls' => [],
         'payload' => "coolify-scan-exit grype 0 9\n{}",
     ]);
 });

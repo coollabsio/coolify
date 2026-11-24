@@ -928,8 +928,8 @@ describe('image list', function () {
 
         securityPage($this->admin, $service, 'service')
             ->assertSee('No fix yet')
-            ->assertSeeText('n8nio/n8n:1.0 has a security problem that attackers are using. The fix is not in the newest n8nio/n8n 1.x image yet. Coolify checks every day.')
-            ->assertSee('Until then, limit who can reach this service, or ignore the problem if the affected part is not used.')
+            ->assertSeeText('n8nio/n8n:1.0 has a security problem that attackers are using. The fix is not in the newest n8nio/n8n 1.x image yet.')
+            ->assertSee('Until then, limit access to this service, or ignore the problem if the part is not used.')
             ->assertSeeInOrder(['No fix yet', 'Not fixed yet'])
             ->assertDontSee('images need an update')
             ->assertDontSee('Attackers are using this.');

@@ -439,10 +439,10 @@ describe('image rows', function () {
         expect(SecuritySentences::imageSentence($security, 'mysql:8'))->toBe($sentence)
             ->and(SecuritySentences::noFixAdvice($security))->toBe($advice);
     })->with([
-        'one, using' => [1, true, 'mysql:8 has a security problem that attackers are using. No fixed version exists yet, and Coolify checks every day.',
-            'Until then, limit who can reach this app, or ignore the problem if the affected part is not used.'],
-        'two, likely' => [2, false, 'mysql:8 has 2 security problems that attackers are likely to use. No fixed version exists yet, and Coolify checks every day.',
-            'Until then, limit who can reach this app, or ignore the problems if the affected parts are not used.'],
+        'one, using' => [1, true, 'mysql:8 has a security problem that attackers are using. No fixed version exists yet.',
+            'Until then, limit access to this app, or ignore the problem if the part is not used.'],
+        'two, likely' => [2, false, 'mysql:8 has 2 security problems that attackers are likely to use. No fixed version exists yet.',
+            'Until then, limit access to this app, or ignore problems in unused parts.'],
     ]);
 
     it('gives no advice to a builder image, whose sentence names the builder update', function () {
@@ -481,9 +481,9 @@ describe('image rows', function () {
             ->and(SecuritySentences::provenance($scan, null, $security))->toContain('Fixed versions exist, but the image does not include them yet.')
             ->and(SecuritySentences::provenance($scan, null, $security))->not->toContain('no fixed version');
     })->with([
-        'runs the newest' => [[], 'The fix is not in the newest mysql 8.x image yet. Coolify checks every day.'],
-        'newer tag without the fix' => [[[...sentenceCandidate('mysql:8.4', 'line'), 'better' => false, 'fixed_ids' => []]], 'The fix is not in the newest mysql 8.x image yet. Coolify checks every day.'],
-        'newer tag with the fix, but not better' => [[[...sentenceCandidate('mysql:8.4', 'line'), 'better' => false, 'fixed_ids' => ['CVE-2024-6119']]], 'A fix exists, but the image does not include it yet. Coolify checks every day.'],
+        'runs the newest' => [[], 'The fix is not in the newest mysql 8.x image yet.'],
+        'newer tag without the fix' => [[[...sentenceCandidate('mysql:8.4', 'line'), 'better' => false, 'fixed_ids' => []]], 'The fix is not in the newest mysql 8.x image yet.'],
+        'newer tag with the fix, but not better' => [[[...sentenceCandidate('mysql:8.4', 'line'), 'better' => false, 'fixed_ids' => ['CVE-2024-6119']]], 'The image does not include the fix yet.'],
     ]);
 
     it('speaks of one fix when one problem is found in two packages', function () {
@@ -495,7 +495,7 @@ describe('image rows', function () {
         $security = sentenceSecurity(SecurityStatusType::NoFix, ['problemCount' => 1, 'why' => $why]);
 
         expect(SecuritySentences::imageSentence($security, 'mysql:8.0', $scan))
-            ->toBe('mysql:8.0 has a security problem that attackers are likely to use. The fix is not in the newest mysql 8.x image yet. Coolify checks every day.');
+            ->toBe('mysql:8.0 has a security problem that attackers are likely to use. The fix is not in the newest mysql 8.x image yet.');
     });
 
     it('says that a fix exists without naming a line when the version check did not cover it', function () {
@@ -507,11 +507,11 @@ describe('image rows', function () {
         $mixed = sentenceScan(['image_ref' => 'mysql:8.0', 'findings' => [$finding, [...$finding, 'id' => 'CVE-2024-0001', 'displayId' => 'CVE-2024-0001', 'fixState' => 'not-fixed', 'fixedIn' => null]], 'candidates' => ['status' => 'failed', 'entries' => []]]);
 
         expect(SecuritySentences::imageSentence($security, 'mysql:8.0', $failed))
-            ->toBe('mysql:8.0 has 2 security problems that attackers are using. A fix exists for each, but the image does not include them yet. Coolify checks every day.')
+            ->toBe('mysql:8.0 has 2 security problems that attackers are using. The image does not include the fixes yet.')
             ->and(SecuritySentences::imageSentence($security, 'mysql:8.0', $mixed))
-            ->toBe('mysql:8.0 has 2 security problems that attackers are using. Some of them have a fix that the image does not include yet. Coolify checks every day.')
+            ->toBe('mysql:8.0 has 2 security problems that attackers are using. The image does not include some of the fixes yet.')
             ->and(SecuritySentences::imageSentence($security, 'mysql:8.0'))
-            ->toBe('mysql:8.0 has 2 security problems that attackers are using. No fixed version exists yet, and Coolify checks every day.');
+            ->toBe('mysql:8.0 has 2 security problems that attackers are using. No fixed version exists yet.');
     });
 
     it('gives a no_fix image a short action text for the team page', function () {
