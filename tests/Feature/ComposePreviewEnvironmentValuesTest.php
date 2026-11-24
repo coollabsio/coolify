@@ -90,7 +90,7 @@ it('fills empty compose values of a pull request deployment with the preview var
 });
 
 it('gives a public pull request deployment no production values or shared variables from the compose file', function () {
-    $this->application->settings->update(['is_pr_deployments_public_enabled' => true]);
+    $this->application->settings->update(['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true]);
 
     expect(composePreviewEnvironmentValues($this->application, 7))->toBe([
         'CHANGED_FOR_PREVIEW' => 'preview-value',
@@ -100,9 +100,29 @@ it('gives a public pull request deployment no production values or shared variab
 });
 
 it('resolves shared variables in a preview value of a public pull request deployment', function () {
-    $this->application->settings->update(['is_pr_deployments_public_enabled' => true]);
+    $this->application->settings->update(['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true]);
     $this->application->environment_variables_preview()->where('key', 'CHANGED_FOR_PREVIEW')->firstOrFail()
         ->update(['value' => '{{team.TEAM_SECRET}}']);
 
     expect(composePreviewEnvironmentValues($this->application, 7)['CHANGED_FOR_PREVIEW'])->toBe('team-secret-value');
+});
+
+it('does not give a public pull request deployment a preview value that resolves to the production value', function () {
+    $this->application->settings->update(['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true]);
+    $this->application->environment_variables()->where('key', 'SAME_AS_PRODUCTION')->firstOrFail()
+        ->update(['value' => '{{ team.TEAM_SECRET }}']);
+    $this->application->environment_variables_preview()->where('key', 'SAME_AS_PRODUCTION')->firstOrFail()
+        ->update(['value' => '{{team.TEAM_SECRET}}']);
+
+    expect(composePreviewEnvironmentValues($this->application, 7)['SAME_AS_PRODUCTION'])->toBe('');
+});
+
+it('gives production values to a pull request deployment while preview deployments are disabled', function () {
+    $this->application->settings->update(['is_preview_deployments_enabled' => false, 'is_pr_deployments_public_enabled' => true]);
+
+    expect(composePreviewEnvironmentValues($this->application, 7))->toBe([
+        'CHANGED_FOR_PREVIEW' => 'preview-value',
+        'SAME_AS_PRODUCTION' => 'production-value',
+        'FROM_TEAM' => 'team-secret-value',
+    ]);
 });

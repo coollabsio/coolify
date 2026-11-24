@@ -488,6 +488,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         try {
+            $this->ensureWebhookPreviewDeploymentsAreEnabled();
             $this->validateDeploymentEnvironmentVariableKeys();
             $this->warnAboutPreviewVariablesNotPassed();
             $this->ensureRegistryImageForMultipleServers();
@@ -2107,7 +2108,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->pull_request_id !== 0) {
             $reason = match (true) {
                 (bool) $this->application->settings->is_raw_compose_deployment_enabled => 'raw Compose deployments are on',
-                (bool) $this->application->settings->is_pr_deployments_public_enabled => 'public PR deployments are on, and a pull request from a fork could add host mounts to it',
+                $this->application->settings->hasPublicPrDeployments() => 'public PR deployments are on, and a pull request from a fork could add host mounts to it',
                 default => 'Coolify does not know that the branch of the pull request is in this repository. A pull request from a fork could add host mounts to it',
             };
             $this->application_deployment_queue->addLogEntry("This preview uses the Docker Compose file of the {$this->application->git_branch} branch, because {$reason}.");
@@ -2131,7 +2132,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         return $this->pull_request_id !== 0
             && $this->preview?->is_same_repository === true
-            && ! $this->application->settings->is_pr_deployments_public_enabled
+            && ! $this->application->settings->hasPublicPrDeployments()
             && ! $this->application->settings->is_raw_compose_deployment_enabled;
     }
 
@@ -3043,12 +3044,24 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
+     * A webhook queues a preview only while preview deployments are on. Public PR deployments apply only
+     * while they are on, so a webhook preview that starts after they were turned off would give a fork
+     * pull request the production values.
+     */
+    private function ensureWebhookPreviewDeploymentsAreEnabled(): void
+    {
+        if ($this->pull_request_id !== 0 && $this->application_deployment_queue->is_webhook && ! $this->application->settings->is_preview_deployments_enabled) {
+            throw new DeploymentException('Preview deployments were disabled after the webhook queued this deployment, so it did not start.');
+        }
+    }
+
+    /**
      * A preview can run code from a fork when public PR deployments are on, so it must not get production
      * values. A preview from before v4.5.1 keeps them, because it was deployed with them.
      */
     private function previewUsesProductionValues(): bool
     {
-        return ! $this->application->settings->is_pr_deployments_public_enabled || (bool) $this->preview?->keeps_production_values;
+        return ! $this->application->settings->hasPublicPrDeployments() || (bool) $this->preview?->keeps_production_values;
     }
 
     /**
@@ -3073,9 +3086,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $previewVariables = $this->application->environment_variables_preview()->get();
-        $skippedKeys = $previewVariables->whereIn('id', $this->previewVariableIdsWithProductionValues())->pluck('key');
+        $skippedKeys = $previewVariables->whereIn('id', $this->previewVariableIdsWithProductionValues())
+            ->reject(fn (EnvironmentVariable $env) => $this->build_pack === 'dockercompose' && $this->isGeneratedDockerComposeEnvironmentVariable($env))
+            ->pluck('key');
         if ($skippedKeys->isNotEmpty()) {
-            $this->application_deployment_queue->addLogEntry('⚠️ Public PR deployments are on, so this preview does not get the preview variables that still have the production value: '.$skippedKeys->implode(', '), 'stderr');
+            $this->application_deployment_queue->addLogEntry('⚠️ Public PR deployments are on, so this preview does not get the preview variables that have the same value as in production: '.$skippedKeys->implode(', '), 'stderr');
             $this->application_deployment_queue->addLogEntry('   To use them, give them a preview value in Environment Variables > Preview Deployments.', type: 'info');
         }
 
@@ -3117,10 +3132,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return $this->previewVariableIdsWithProductionValues = [];
         }
 
-        $productionValues = $this->application->environment_variables()->get()->pluck('value', 'key');
+        $productionVariables = $this->application->environment_variables()->get()->keyBy('key');
 
         return $this->previewVariableIdsWithProductionValues = $this->application->environment_variables_preview()->get()
-            ->filter(fn (EnvironmentVariable $env) => $productionValues->has($env->key) && $productionValues->get($env->key) === $env->value)
+            ->filter(fn (EnvironmentVariable $env) => $env->hasSameValueAs($productionVariables->get($env->key)))
             ->pluck('id')
             ->all();
     }
