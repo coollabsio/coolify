@@ -164,7 +164,7 @@ class VolumeBackupsController extends Controller
             ], 404);
         }
 
-        $this->authorize('update', $resource);
+        $this->authorize('manageBackups', $resource);
 
         if ($request->boolean('stop_during_backup')) {
             $forbidden = $this->deployAbilityForbiddenResponse($request, 'A backup that stops the containers needs a token with the deploy permission.');
@@ -562,7 +562,7 @@ class VolumeBackupsController extends Controller
             ], 404);
         }
 
-        $this->authorize('update', $resource);
+        $this->authorize('manageBackups', $resource);
 
         $storage = $this->findStorage($resource, $request->route('storage_uuid'));
         if (! $storage) {

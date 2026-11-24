@@ -96,6 +96,15 @@ class ServicePolicy
     }
 
     /**
+     * Determine whether the user can schedule, run, and download storage and database backups. coolify.json
+     * cannot declare them for services, so its read-only lock does not apply.
+     */
+    public function manageBackups(User $user, Service $service): bool
+    {
+        return $user->canAccess(AccessLevel::Write, $service);
+    }
+
+    /**
      * Determine whether the user can upload a backup archive for a database within this service.
      */
     public function uploadBackup(User $user, Service $service): bool
