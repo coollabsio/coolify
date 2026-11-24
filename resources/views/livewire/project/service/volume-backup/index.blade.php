@@ -116,12 +116,14 @@
             <div class="application-settings-form min-w-0 flex flex-col gap-6">
         <x-application.settings-section title="Backups"
             helper="Manage database, persistent volume, and directory backup schedules for this service.">
-            @can('update', $service)
+            @can('manageBackups', $service)
                 <x-slot:actions>
-                    <x-modal-input title="Import backup" buttonTitle="Import backup">
-                        <livewire:project.service.import-backup :service="$service"
-                            wire:key="service-import-backup-{{ $service->id }}" />
-                    </x-modal-input>
+                    @can('update', $service)
+                        <x-modal-input title="Import backup" buttonTitle="Import backup">
+                            <livewire:project.service.import-backup :service="$service"
+                                wire:key="service-import-backup-{{ $service->id }}" />
+                        </x-modal-input>
+                    @endcan
                     <div x-data="{ dropdownOpen: false }">
                         <div class="relative" @click.outside="dropdownOpen = false">
                             <x-forms.button class="button-highlighted" @click="dropdownOpen = !dropdownOpen"
@@ -288,7 +290,7 @@
                             </span>
                             <span>{{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}</span>
                             <span class="flex justify-end" x-on:click.stop x-on:keydown.enter.stop>
-                                @can('update', $service)
+                                @can('manageBackups', $service)
                                     <x-table.row-actions label="Backup schedule actions">
                                         <x-table.row-action
                                             :disabled="! str($databaseBackup->database->status)->startsWith('running')"
@@ -346,7 +348,7 @@
                                 {{ $latestExecution?->finished_at?->diffForHumans() ?? ($status === 'running' ? 'Running now' : 'Never') }}
                             </span>
                             <span class="flex justify-end" x-on:click.stop x-on:keydown.enter.stop>
-                                @can('update', $service)
+                                @can('manageBackups', $service)
                                     <x-table.row-actions label="Backup schedule actions">
                                         <x-table.row-action
                                             wire:click="backupNow('storage', '{{ $backup->uuid }}')">Back up now</x-table.row-action>
