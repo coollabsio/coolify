@@ -1037,19 +1037,20 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $key = ltrim($this->backup_dir, '/').'/'.basename($this->backup_location);
             $isUploaded = fn (): bool => false;
             if ($s3->usesCurlTransfer()) {
-                $uploadCommand = $s3->prepareCurlUpload($this->server, $container, $this->backup_location, $key);
+                $curlUploadCommand = $s3->prepareCurlUpload($this->server, $container, $this->backup_location, $key);
+                $uploadCommand = fn (): string => $curlUploadCommand;
             } else {
                 $escapedBackupLocation = escapeshellarg($this->backup_location);
                 $escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");
                 $resolveOptions = $s3->minioClientResolveOptions($this->server, $fullImageName, $network);
                 $partSizeOption = S3Storage::minioClientPartSizeOption($this->size);
                 $this->setMinioClientAlias($this->server, "backup-of-{$this->backup_log_uuid}", $s3, $resolveOptions);
-                $uploadCommand = "docker exec {$partSizeOption} backup-of-{$this->backup_log_uuid} mc cp{$resolveOptions} {$escapedBackupLocation} {$escapedS3Destination}";
+                $uploadCommand = fn (string $checksumOption): string => "docker exec {$partSizeOption} backup-of-{$this->backup_log_uuid} mc cp{$resolveOptions}{$checksumOption} {$escapedBackupLocation} {$escapedS3Destination}";
                 $size = (int) $this->size;
                 $isUploaded = fn (): bool => $s3->minioClientObjectHasSize($this->server, $container, $key, $size, $resolveOptions);
             }
-            S3Storage::retryMinioClientUpload(fn () => instant_remote_process(
-                [$uploadCommand],
+            S3Storage::retryMinioClientUpload(fn (string $checksumOption) => instant_remote_process(
+                [$uploadCommand($checksumOption)],
                 $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true,
             ), $isUploaded);
 
