@@ -54,6 +54,17 @@ class S3Storage extends BaseModel
      */
     private const MINIO_CLIENT_UPLOAD_RETRY_DELAYS_MS = [10_000, 30_000];
 
+    /**
+     * The MinIO client option that sends Content-MD5 with each upload request. An Object Lock bucket on AWS rejects
+     * uploads without it. `mc` adds it by itself only when the key can read the lock configuration of the bucket.
+     */
+    public const MINIO_CLIENT_CHECKSUM_OPTION = ' --checksum=MD5';
+
+    /**
+     * Part of the error of AWS when an upload to an Object Lock bucket has no Content-MD5 or checksum header.
+     */
+    public const CHECKSUM_REQUIRED_ERROR = 'content-md5 or x-amz-checksum';
+
     private const MINIO_CLIENT_STAT_TIMEOUT_SECONDS = 60;
 
     /**
@@ -970,19 +981,29 @@ class S3Storage extends BaseModel
      * repeated `CompleteMultipartUpload` with "multipart completion is already in progress". So after each failure,
      * and again before each new attempt, $isUploaded checks the bucket, and a complete object ends the upload.
      *
+     * When the bucket requires a checksum, the next attempt starts at once and gets MINIO_CLIENT_CHECKSUM_OPTION.
+     * Other uploads never get the option, so providers that do not support it work as before.
+     *
+     * @param  callable(string): mixed  $upload  receives the checksum option for the `mc` command, or an empty string
      * @param  callable(): bool  $isUploaded
      */
     public static function retryMinioClientUpload(callable $upload, callable $isUploaded): void
     {
         $delays = self::MINIO_CLIENT_UPLOAD_RETRY_DELAYS_MS;
+        $checksumOption = '';
         while (true) {
             try {
-                $upload();
+                $upload($checksumOption);
 
                 return;
             } catch (\Throwable $exception) {
                 if ($isUploaded()) {
                     return;
+                }
+                if ($checksumOption === '' && str_contains(strtolower($exception->getMessage()), self::CHECKSUM_REQUIRED_ERROR)) {
+                    $checksumOption = self::MINIO_CLIENT_CHECKSUM_OPTION;
+
+                    continue;
                 }
                 $delay = array_shift($delays);
                 if ($delay === null || $exception->getCode() === self::REMOTE_COMMAND_TIMEOUT_EXIT_CODE) {
