@@ -64,6 +64,17 @@
                                         @else
                                             {{ $label }}
                                         @endif
+                                        @if (data_get($change, 'impact') === 'build')
+                                            <span title="This change alters the image, so Coolify must build it again."
+                                                class="mt-0.5 flex w-fit items-center rounded px-1 text-[10px] font-medium leading-4 bg-amber-100 text-amber-800 dark:bg-warning/10 dark:text-warning">
+                                                Rebuild
+                                            </span>
+                                        @else
+                                            <span title="A restart applies this change. The current image is reused."
+                                                class="mt-0.5 flex w-fit items-center rounded px-1 text-[10px] font-medium leading-4 bg-neutral-100 text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim">
+                                                Restart
+                                            </span>
+                                        @endif
                                     </div>
 
                                     <div class="min-w-0 text-red-600 dark:text-red-400">
