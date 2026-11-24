@@ -9,6 +9,7 @@ use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\SharedEnvironmentVariable;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -950,7 +951,7 @@ it('filters docker compose generated service variables from build args', functio
 
 it('falls back to production runtime vars without a preview copy only when public PR deployments are off', function (bool $isPublic) {
     [$application, $server] = makeDeploymentControlVarFixture();
-    $application->settings()->update(['is_pr_deployments_public_enabled' => $isPublic]);
+    $application->settings()->update(['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => $isPublic]);
 
     createApplicationEnvironmentVariable($application, [
         'key' => 'APP_NAME',
@@ -1018,7 +1019,7 @@ it('keeps copied production values out of previews when public PR deployments ar
         'build_pack' => $buildPack,
         'docker_compose_raw' => "services:\n  app:\n    image: nginx\n",
     ]);
-    $application->settings()->update(['is_pr_deployments_public_enabled' => true]);
+    $application->settings()->update(['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true]);
 
     createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'production-secret']);
     createApplicationEnvironmentVariable($application, ['key' => 'API_URL', 'value' => 'https://api.example.com']);
@@ -2174,7 +2175,7 @@ it('does not warn about a PORT mismatch when readonly labels are disabled', func
 
 it('gives a preview from before v4.5.1 the production values it had', function () {
     [$application, $server] = makeDeploymentControlVarFixture();
-    $application->settings()->update(['is_pr_deployments_public_enabled' => true]);
+    $application->settings()->update(['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true]);
 
     createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'production-secret', 'is_buildtime' => false]);
     createApplicationEnvironmentVariable($application, ['key' => 'APP_NAME', 'value' => 'coolify', 'is_buildtime' => false]);
@@ -2402,4 +2403,62 @@ it('gives build secrets the stored value without the quotes that Coolify adds', 
         ->toContain("LITERAL='quoted' value\n")
         ->toContain("MULTILINE=line1\n")
         ->toContain("NORMAL='kept'\n");
+});
+
+it('gives copied production values to previews while preview deployments are disabled', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $application->settings()->update(['is_preview_deployments_enabled' => false, 'is_pr_deployments_public_enabled' => true]);
+
+    createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'production-secret']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 99,
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('DB_PASSWORD=') && str($env)->contains('production-secret')))->toBeTrue();
+});
+
+it('keeps a preview value out of public previews when it resolves to the production value', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $application->settings()->update(['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true]);
+    SharedEnvironmentVariable::create([
+        'key' => 'DB_PASSWORD', 'value' => 'team-secret', 'type' => 'team', 'team_id' => $application->team()->id,
+    ]);
+
+    createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => '{{ team.DB_PASSWORD }}']);
+    $application->environment_variables_preview()->where('key', 'DB_PASSWORD')->firstOrFail()
+        ->update(['value' => '{{team.DB_PASSWORD}}']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 99,
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs->filter(fn (string $env) => str($env)->contains('team-secret') || str($env)->startsWith('DB_PASSWORD=')))->toBeEmpty();
+});
+
+it('does not list generated Compose service variables as skipped preview variables', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx\n",
+    ]);
+    $application->settings()->update(['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true]);
+
+    createApplicationEnvironmentVariable($application, ['key' => 'SERVICE_URL_WEB', 'value' => 'https://web.example.com']);
+    createApplicationEnvironmentVariable($application, ['key' => 'SERVICE_FQDN_WEB', 'value' => 'web.example.com']);
+    createApplicationEnvironmentVariable($application, ['key' => 'DUMMY_VAR', 'value' => 'production-value']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 99,
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'warnAboutPreviewVariablesNotPassed');
+
+    $warning = collect($job->recordedLogEntries)->first(fn (string $entry) => str_contains($entry, 'same value as in production'));
+    expect($warning)->toEndWith(': DUMMY_VAR');
 });

@@ -1348,7 +1348,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         ? ($resource->previews()->find($preview_id) ?? ApplicationPreview::where('application_id', $resource->id)->where('pull_request_id', $pullRequestId)->first())
         : null;
     // A public preview can run the compose file of a fork pull request. A preview from before v4.5.1 keeps the production values.
-    $isPublicPullRequest = $isPullRequest && (bool) data_get($resource, 'settings.is_pr_deployments_public_enabled') && ! $pullRequestPreview?->keeps_production_values;
+    $isPublicPullRequest = $isPullRequest && (bool) $resource->settings?->hasPublicPrDeployments() && ! $pullRequestPreview?->keeps_production_values;
     // The Compose file of a pull request deploys only that preview: it reads the rows of the application, but does not add or change them.
     $keepsApplicationRows = $isPullRequest && $resource->usesPullRequestComposeFile;
     $server = data_get($resource, 'destination.server');
@@ -2317,8 +2317,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $dbEnv = $isPullRequest
                         ? $resource->environment_variables_preview()->where('key', $key)->first()
                         : $resource->environment_variables()->where('key', $key)->first();
-                    // A public preview does not get preview variables that still have the production value.
-                    if ($dbEnv && $isPublicPullRequest && $resource->environment_variables()->where('key', $key)->first()?->value === $dbEnv->value) {
+                    // A public preview does not get preview variables that have the same value as in production.
+                    if ($dbEnv && $isPublicPullRequest && $dbEnv->hasSameValueAs($resource->environment_variables()->where('key', $key)->first())) {
                         $dbEnv = null;
                     }
                     // Only use database override if it exists AND has a non-empty value
