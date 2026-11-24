@@ -2462,3 +2462,26 @@ it('does not list generated Compose service variables as skipped preview variabl
     $warning = collect($job->recordedLogEntries)->first(fn (string $entry) => str_contains($entry, 'same value as in production'));
     expect($warning)->toEndWith(': DUMMY_VAR');
 });
+
+it('stops a webhook preview deployment when preview deployments were disabled after it was queued', function (bool $isWebhook, bool $isPreviewDeploymentsEnabled, bool $stops) {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $application->settings()->update(['is_preview_deployments_enabled' => $isPreviewDeploymentsEnabled, 'is_pr_deployments_public_enabled' => true]);
+
+    $queue = Mockery::mock(ApplicationDeploymentQueue::class);
+    $queue->shouldReceive('getAttribute')->with('is_webhook')->andReturn($isWebhook);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 99,
+        'application_deployment_queue' => $queue,
+    ]);
+
+    $deploy = fn () => invokeDeploymentJobMethod($job, $reflection, 'ensureWebhookPreviewDeploymentsAreEnabled');
+
+    $stops
+        ? expect($deploy)->toThrow(DeploymentException::class, 'Preview deployments were disabled')
+        : expect($deploy())->toBeNull();
+})->with([
+    'webhook, previews disabled' => [true, false, true],
+    'webhook, previews enabled' => [true, true, false],
+    'deployed by hand, previews disabled' => [false, false, false],
+]);

@@ -488,6 +488,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         try {
+            $this->ensureWebhookPreviewDeploymentsAreEnabled();
             $this->validateDeploymentEnvironmentVariableKeys();
             $this->warnAboutPreviewVariablesNotPassed();
             $this->ensureRegistryImageForMultipleServers();
@@ -3040,6 +3041,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
         $this->application_deployment_queue->addLogEntry('   Suggested name: '.ValidationPatterns::displayShellEnvironmentVariableKey($suggestedKey), type: 'info');
+    }
+
+    /**
+     * A webhook queues a preview only while preview deployments are on. Public PR deployments apply only
+     * while they are on, so a webhook preview that starts after they were turned off would give a fork
+     * pull request the production values.
+     */
+    private function ensureWebhookPreviewDeploymentsAreEnabled(): void
+    {
+        if ($this->pull_request_id !== 0 && $this->application_deployment_queue->is_webhook && ! $this->application->settings->is_preview_deployments_enabled) {
+            throw new DeploymentException('Preview deployments were disabled after the webhook queued this deployment, so it did not start.');
+        }
     }
 
     /**
