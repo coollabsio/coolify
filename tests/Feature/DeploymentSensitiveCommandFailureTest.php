@@ -626,7 +626,7 @@ it('redacts fetched remote secrets in log entries the deployment adds before its
     linkSensitiveFailureSecretManager($application);
     Http::fake(['https://api.doppler.com/*' => Http::response(['DB_PASS' => 'fetched-remote-secret-5521'])]);
 
-    invokeSensitiveFailureJobMethod($job, $reflection, 'remote_secrets');
+    invokeSensitiveFailureJobMethod($job, $reflection, 'remote_secrets', ['default']);
     $queue->addLogEntry('Resolved DB_PASS=fetched-remote-secret-5521');
 
     $storedLogs = (string) $queue->fresh()->logs;

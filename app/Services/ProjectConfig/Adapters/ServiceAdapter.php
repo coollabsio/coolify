@@ -13,6 +13,7 @@ use App\Services\ProjectConfig\Children\ChildRecords;
 use App\Services\ProjectConfig\Children\EnvironmentVariables;
 use App\Services\ProjectConfig\Children\ScheduledTasks;
 use App\Services\ProjectConfig\Children\SecretManager;
+use App\Services\ProjectConfig\Children\StorageBackups;
 use App\Services\ProjectConfig\Children\Tags;
 use App\Services\ProjectConfig\ConfigError;
 use App\Services\ProjectConfig\Field;
@@ -20,6 +21,7 @@ use App\Services\ProjectConfig\FieldMap;
 use App\Services\ProjectConfig\FieldValues;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use LogicException;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
@@ -118,7 +120,7 @@ class ServiceAdapter implements ResourceAdapter
      */
     public function children(): array
     {
-        return $this->children ??= [new EnvironmentVariables, new ScheduledTasks, new Tags, new SecretManager];
+        return $this->children ??= [new EnvironmentVariables, new ScheduledTasks, new Tags, new SecretManager, new StorageBackups];
     }
 
     public function childTables(): array
@@ -331,7 +333,7 @@ class ServiceAdapter implements ResourceAdapter
     public function validate(string $key, array $desired, ApplyContext $ctx, ?Model $current = null): array
     {
         $base = "resources.{$key}";
-        $errors = [];
+        $errors = SecretManager::errors($base, $desired['secret_manager'] ?? null, $ctx->teamId);
 
         $hasTemplate = isset($desired['template']);
         $hasCompose = isset($desired['compose']);
@@ -350,6 +352,7 @@ class ServiceAdapter implements ResourceAdapter
         }
 
         $names = $this->composeServiceNames($compose);
+        $errors = [...$errors, ...StorageBackups::errors($base, $desired['storage_backups'] ?? null, $ctx->teamId, $this->composeVolumeKeys($compose))];
         foreach (array_keys((array) ($desired['services'] ?? [])) as $name) {
             if (! in_array($name, $names, true)) {
                 $errors[] = new ConfigError("{$base}.services.{$name}", 'The Compose file has no service with this name.');
@@ -380,6 +383,22 @@ class ServiceAdapter implements ResourceAdapter
         }
 
         return $errors;
+    }
+
+    /**
+     * The file keys of the named volumes of a Compose file, as the parser names them without the service UUID.
+     *
+     * @return list<string>
+     */
+    private function composeVolumeKeys(?string $compose): array
+    {
+        try {
+            $parsed = Yaml::parse((string) $compose);
+        } catch (Throwable) {
+            return [];
+        }
+
+        return array_map(fn ($name) => Str::slug((string) $name, '-'), array_keys((array) ($parsed['volumes'] ?? [])));
     }
 
     /**
@@ -416,6 +435,7 @@ class ServiceAdapter implements ResourceAdapter
         $this->writeServices($service, $desired);
         $this->writeChildren($service, $desired, $ctx);
         $service->parse();
+        $this->writeStorageBackups($service, $desired, $ctx);
 
         return $service;
     }
@@ -442,10 +462,20 @@ class ServiceAdapter implements ResourceAdapter
             $values['connect_to_docker_network'] = true;
         }
         $resource->forceFill($values)->save();
+        (new StorageBackups)->prune($resource, $desired['storage_backups'] ?? null);
         $resource->parse();
         $this->writeServices($resource->fresh(), $desired);
         $this->writeChildren($resource, $desired, $ctx);
         $resource->parse();
+        $this->writeStorageBackups($resource, $desired, $ctx);
+    }
+
+    /**
+     * Storage backups need the volume rows that parse() creates from the Compose file.
+     */
+    private function writeStorageBackups(Service $service, array $desired, ApplyContext $ctx): void
+    {
+        (new StorageBackups)->write($service, $desired['storage_backups'] ?? null, $ctx);
     }
 
     /**
@@ -497,6 +527,9 @@ class ServiceAdapter implements ResourceAdapter
     private function writeChildren(Service $service, array $desired, ApplyContext $ctx): void
     {
         foreach ($this->children() as $child) {
+            if ($child instanceof StorageBackups) {
+                continue;
+            }
             $child->write($service, $desired[$child->key()] ?? null, $ctx);
         }
     }

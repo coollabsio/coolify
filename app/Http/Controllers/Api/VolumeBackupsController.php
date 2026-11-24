@@ -329,7 +329,88 @@ class VolumeBackupsController extends Controller
             'backup_uuid' => $backup->uuid,
         ]);
 
-        return response()->json($this->responseData($backup, $storage, $s3Storages, $created), $created ? 201 : 200);
+        return response()->json([
+            'message' => $created ? 'Storage backup schedule created.' : 'Storage backup schedule updated.',
+            ...$this->responseData($backup, $storage, $s3Storages),
+        ], $created ? 201 : 200);
+    }
+
+    #[OA\Get(
+        summary: 'Get application storage backup schedule',
+        description: 'Get the backup schedule of a application storage.',
+        path: '/applications/{uuid}/storages/{storage_uuid}/backups',
+        operationId: 'get-application-storage-backup-schedule',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'storage_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Backup schedule.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ],
+    )]
+    #[OA\Get(
+        summary: 'Get database storage backup schedule',
+        description: 'Get the backup schedule of a database storage.',
+        path: '/databases/{uuid}/storages/{storage_uuid}/backups',
+        operationId: 'get-database-storage-backup-schedule',
+        security: [['bearerAuth' => []]],
+        tags: ['Databases'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'storage_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Backup schedule.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ],
+    )]
+    #[OA\Get(
+        summary: 'Get service storage backup schedule',
+        description: 'Get the backup schedule of a service storage.',
+        path: '/services/{uuid}/storages/{storage_uuid}/backups',
+        operationId: 'get-service-storage-backup-schedule',
+        security: [['bearerAuth' => []]],
+        tags: ['Services'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'storage_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Backup schedule.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ],
+    )]
+    public function show(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $resource = $this->findResource($request->route('resource_type'), $request->route('uuid'), $teamId);
+        if (! $resource) {
+            return response()->json(['message' => 'Resource not found.'], 404);
+        }
+
+        $this->authorize('view', $resource);
+
+        $storage = $this->findStorage($resource, $request->route('storage_uuid'));
+        if (! $storage) {
+            return response()->json(['message' => 'Storage not found.'], 404);
+        }
+
+        $backup = $storage->scheduledBackups()->first();
+        if (! $backup) {
+            return response()->json(['message' => 'Storage backup schedule not found.'], 404);
+        }
+
+        return response()->json($this->responseData($backup, $storage, $backup->selectedS3Storages()));
     }
 
     #[OA\Delete(
@@ -463,11 +544,9 @@ class VolumeBackupsController extends Controller
         ScheduledVolumeBackup $backup,
         LocalPersistentVolume|LocalFileVolume $storage,
         Collection $s3Storages,
-        bool $created,
     ): array {
         return [
             'uuid' => $backup->uuid,
-            'message' => $created ? 'Storage backup schedule created.' : 'Storage backup schedule updated.',
             'storage_uuid' => $storage->uuid,
             'storage_type' => $storage instanceof LocalFileVolume ? 'directory' : 'persistent',
             'frequency' => $backup->frequency,

@@ -21,6 +21,7 @@ use App\Services\ProjectConfig\Children\FileStorages;
 use App\Services\ProjectConfig\Children\PersistentStorages;
 use App\Services\ProjectConfig\Children\ScheduledTasks;
 use App\Services\ProjectConfig\Children\SecretManager;
+use App\Services\ProjectConfig\Children\StorageBackups;
 use App\Services\ProjectConfig\Children\Tags;
 use App\Services\ProjectConfig\ConfigError;
 use App\Services\ProjectConfig\Field;
@@ -235,6 +236,7 @@ class ApplicationAdapter implements ResourceAdapter
             new Tags,
             new SecretManager,
             new AdditionalServers,
+            new StorageBackups,
         ];
     }
 
@@ -457,11 +459,9 @@ class ApplicationAdapter implements ResourceAdapter
      */
     private function validateChildren(string $base, array $desired, ApplyContext $ctx): array
     {
-        $errors = [];
-        $token = $desired['secret_manager']['token'] ?? null;
-        if ($token !== null && ($message = NamedCredentials::error('token', (string) $token, $ctx->teamId)) !== null) {
-            $errors[] = new ConfigError("{$base}.secret_manager.token", $message);
-        }
+        $errors = SecretManager::errors($base, $desired['secret_manager'] ?? null, $ctx->teamId);
+        $volumes = ($desired['build']['pack'] ?? null) === 'dockercompose' ? null : array_map('strval', array_keys((array) ($desired['storages'] ?? [])));
+        $errors = [...$errors, ...StorageBackups::errors($base, $desired['storage_backups'] ?? null, $ctx->teamId, $volumes)];
         foreach (array_values((array) ($desired['additional_servers'] ?? [])) as $index => $entry) {
             $name = is_array($entry) ? ($entry['server'] ?? null) : $entry;
             $matches = Server::query()->where('team_id', $ctx->teamId)->get()->filter(fn (Server $server) => $server->name === $name);
@@ -530,6 +530,7 @@ class ApplicationAdapter implements ResourceAdapter
 
     private function writeChildren(Application $application, array $desired, ApplyContext $ctx): void
     {
+        (new StorageBackups)->prune($application, $desired['storage_backups'] ?? null);
         foreach ($this->children() as $child) {
             $child->write($application, $desired[$child->key()] ?? null, $ctx);
         }

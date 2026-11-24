@@ -745,19 +745,46 @@
                     }
                 },
                 "secret_manager": {
-                    "type": "object",
-                    "required": [
-                        "token"
-                    ],
-                    "additionalProperties": false,
-                    "properties": {
-                        "token": {
-                            "type": "string"
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": [
+                                "token"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                                "token": {
+                                    "type": "string"
+                                },
+                                "settings": {
+                                    "type": "object"
+                                }
+                            }
                         },
-                        "settings": {
-                            "type": "object"
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": [
+                                    "name",
+                                    "token"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$"
+                                    },
+                                    "token": {
+                                        "type": "string"
+                                    },
+                                    "settings": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
                         }
-                    }
+                    ]
                 },
                 "server": {
                     "type": "string"
@@ -1098,6 +1125,74 @@
                         }
                     }
                 },
+                "storage_backups": {
+                    "type": "object",
+                    "description": "Backup schedules of Docker volumes, keyed by volume name. One schedule per volume.",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": "string"
+                            },
+                            "missing_backup_notification_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": "number"
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": "number"
+                            },
+                            "s3_storage": {
+                                "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                    }
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "stop_during_backup": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                },
                 "storages": {
                     "type": "object",
                     "additionalProperties": {
@@ -1239,19 +1334,46 @@
                     }
                 },
                 "secret_manager": {
-                    "type": "object",
-                    "required": [
-                        "token"
-                    ],
-                    "additionalProperties": false,
-                    "properties": {
-                        "token": {
-                            "type": "string"
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": [
+                                "token"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                                "token": {
+                                    "type": "string"
+                                },
+                                "settings": {
+                                    "type": "object"
+                                }
+                            }
                         },
-                        "settings": {
-                            "type": "object"
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": [
+                                    "name",
+                                    "token"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$"
+                                    },
+                                    "token": {
+                                        "type": "string"
+                                    },
+                                    "settings": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
                         }
-                    }
+                    ]
                 },
                 "server": {
                     "type": "string"
@@ -1397,6 +1519,74 @@
                                 "boolean",
                                 "null"
                             ]
+                        }
+                    }
+                },
+                "storage_backups": {
+                    "type": "object",
+                    "description": "Backup schedules of Docker volumes, keyed by volume name. One schedule per volume.",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": "string"
+                            },
+                            "missing_backup_notification_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": "number"
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": "number"
+                            },
+                            "s3_storage": {
+                                "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                    }
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "stop_during_backup": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
                         }
                     }
                 },
@@ -1731,19 +1921,46 @@
                     }
                 },
                 "secret_manager": {
-                    "type": "object",
-                    "required": [
-                        "token"
-                    ],
-                    "additionalProperties": false,
-                    "properties": {
-                        "token": {
-                            "type": "string"
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": [
+                                "token"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                                "token": {
+                                    "type": "string"
+                                },
+                                "settings": {
+                                    "type": "object"
+                                }
+                            }
                         },
-                        "settings": {
-                            "type": "object"
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": [
+                                    "name",
+                                    "token"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$"
+                                    },
+                                    "token": {
+                                        "type": "string"
+                                    },
+                                    "settings": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
                         }
-                    }
+                    ]
                 },
                 "server": {
                     "type": "string"
@@ -1793,6 +2010,74 @@
                                 "string",
                                 "null"
                             ]
+                        }
+                    }
+                },
+                "storage_backups": {
+                    "type": "object",
+                    "description": "Backup schedules of Docker volumes, keyed by volume name. One schedule per volume.",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": "string"
+                            },
+                            "missing_backup_notification_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": "number"
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": "number"
+                            },
+                            "s3_storage": {
+                                "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                    }
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "stop_during_backup": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
                         }
                     }
                 },
@@ -2137,19 +2422,46 @@
                     }
                 },
                 "secret_manager": {
-                    "type": "object",
-                    "required": [
-                        "token"
-                    ],
-                    "additionalProperties": false,
-                    "properties": {
-                        "token": {
-                            "type": "string"
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": [
+                                "token"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                                "token": {
+                                    "type": "string"
+                                },
+                                "settings": {
+                                    "type": "object"
+                                }
+                            }
                         },
-                        "settings": {
-                            "type": "object"
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": [
+                                    "name",
+                                    "token"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$"
+                                    },
+                                    "token": {
+                                        "type": "string"
+                                    },
+                                    "settings": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
                         }
-                    }
+                    ]
                 },
                 "server": {
                     "type": "string"
@@ -2199,6 +2511,74 @@
                                 "string",
                                 "null"
                             ]
+                        }
+                    }
+                },
+                "storage_backups": {
+                    "type": "object",
+                    "description": "Backup schedules of Docker volumes, keyed by volume name. One schedule per volume.",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": "string"
+                            },
+                            "missing_backup_notification_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": "number"
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": "number"
+                            },
+                            "s3_storage": {
+                                "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                    }
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "stop_during_backup": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
                         }
                     }
                 },
@@ -2543,19 +2923,46 @@
                     }
                 },
                 "secret_manager": {
-                    "type": "object",
-                    "required": [
-                        "token"
-                    ],
-                    "additionalProperties": false,
-                    "properties": {
-                        "token": {
-                            "type": "string"
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": [
+                                "token"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                                "token": {
+                                    "type": "string"
+                                },
+                                "settings": {
+                                    "type": "object"
+                                }
+                            }
                         },
-                        "settings": {
-                            "type": "object"
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": [
+                                    "name",
+                                    "token"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$"
+                                    },
+                                    "token": {
+                                        "type": "string"
+                                    },
+                                    "settings": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
                         }
-                    }
+                    ]
                 },
                 "server": {
                     "type": "string"
@@ -2593,6 +3000,74 @@
                                 "boolean",
                                 "null"
                             ]
+                        }
+                    }
+                },
+                "storage_backups": {
+                    "type": "object",
+                    "description": "Backup schedules of Docker volumes, keyed by volume name. One schedule per volume.",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": "string"
+                            },
+                            "missing_backup_notification_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": "number"
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": "number"
+                            },
+                            "s3_storage": {
+                                "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                    }
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "stop_during_backup": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
                         }
                     }
                 },
@@ -2937,19 +3412,46 @@
                     }
                 },
                 "secret_manager": {
-                    "type": "object",
-                    "required": [
-                        "token"
-                    ],
-                    "additionalProperties": false,
-                    "properties": {
-                        "token": {
-                            "type": "string"
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": [
+                                "token"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                                "token": {
+                                    "type": "string"
+                                },
+                                "settings": {
+                                    "type": "object"
+                                }
+                            }
                         },
-                        "settings": {
-                            "type": "object"
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": [
+                                    "name",
+                                    "token"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$"
+                                    },
+                                    "token": {
+                                        "type": "string"
+                                    },
+                                    "settings": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
                         }
-                    }
+                    ]
                 },
                 "server": {
                     "type": "string"
@@ -2999,6 +3501,74 @@
                                 "string",
                                 "null"
                             ]
+                        }
+                    }
+                },
+                "storage_backups": {
+                    "type": "object",
+                    "description": "Backup schedules of Docker volumes, keyed by volume name. One schedule per volume.",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": "string"
+                            },
+                            "missing_backup_notification_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": "number"
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": "number"
+                            },
+                            "s3_storage": {
+                                "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                    }
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "stop_during_backup": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
                         }
                     }
                 },
@@ -3325,19 +3895,46 @@
                     }
                 },
                 "secret_manager": {
-                    "type": "object",
-                    "required": [
-                        "token"
-                    ],
-                    "additionalProperties": false,
-                    "properties": {
-                        "token": {
-                            "type": "string"
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": [
+                                "token"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                                "token": {
+                                    "type": "string"
+                                },
+                                "settings": {
+                                    "type": "object"
+                                }
+                            }
                         },
-                        "settings": {
-                            "type": "object"
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": [
+                                    "name",
+                                    "token"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$"
+                                    },
+                                    "token": {
+                                        "type": "string"
+                                    },
+                                    "settings": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
                         }
-                    }
+                    ]
                 },
                 "server": {
                     "type": "string"
@@ -3381,6 +3978,74 @@
                                 "boolean",
                                 "null"
                             ]
+                        }
+                    }
+                },
+                "storage_backups": {
+                    "type": "object",
+                    "description": "Backup schedules of Docker volumes, keyed by volume name. One schedule per volume.",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": "string"
+                            },
+                            "missing_backup_notification_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": "number"
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": "number"
+                            },
+                            "s3_storage": {
+                                "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                    }
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "stop_during_backup": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
                         }
                     }
                 },
@@ -3707,19 +4372,46 @@
                     }
                 },
                 "secret_manager": {
-                    "type": "object",
-                    "required": [
-                        "token"
-                    ],
-                    "additionalProperties": false,
-                    "properties": {
-                        "token": {
-                            "type": "string"
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": [
+                                "token"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                                "token": {
+                                    "type": "string"
+                                },
+                                "settings": {
+                                    "type": "object"
+                                }
+                            }
                         },
-                        "settings": {
-                            "type": "object"
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": [
+                                    "name",
+                                    "token"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$"
+                                    },
+                                    "token": {
+                                        "type": "string"
+                                    },
+                                    "settings": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
                         }
-                    }
+                    ]
                 },
                 "server": {
                     "type": "string"
@@ -3763,6 +4455,74 @@
                                 "boolean",
                                 "null"
                             ]
+                        }
+                    }
+                },
+                "storage_backups": {
+                    "type": "object",
+                    "description": "Backup schedules of Docker volumes, keyed by volume name. One schedule per volume.",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": "string"
+                            },
+                            "missing_backup_notification_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": "number"
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": "number"
+                            },
+                            "s3_storage": {
+                                "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                    }
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "stop_during_backup": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
                         }
                     }
                 },
@@ -4077,19 +4837,46 @@
                     }
                 },
                 "secret_manager": {
-                    "type": "object",
-                    "required": [
-                        "token"
-                    ],
-                    "additionalProperties": false,
-                    "properties": {
-                        "token": {
-                            "type": "string"
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": [
+                                "token"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                                "token": {
+                                    "type": "string"
+                                },
+                                "settings": {
+                                    "type": "object"
+                                }
+                            }
                         },
-                        "settings": {
-                            "type": "object"
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": [
+                                    "name",
+                                    "token"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$"
+                                    },
+                                    "token": {
+                                        "type": "string"
+                                    },
+                                    "settings": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
                         }
-                    }
+                    ]
                 },
                 "server": {
                     "type": "string"
@@ -4133,6 +4920,74 @@
                                 "boolean",
                                 "null"
                             ]
+                        }
+                    }
+                },
+                "storage_backups": {
+                    "type": "object",
+                    "description": "Backup schedules of Docker volumes, keyed by volume name. One schedule per volume.",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": "string"
+                            },
+                            "missing_backup_notification_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": "number"
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": "number"
+                            },
+                            "s3_storage": {
+                                "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                    }
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "stop_during_backup": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
                         }
                     }
                 },
@@ -4465,19 +5320,46 @@
                     }
                 },
                 "secret_manager": {
-                    "type": "object",
-                    "required": [
-                        "token"
-                    ],
-                    "additionalProperties": false,
-                    "properties": {
-                        "token": {
-                            "type": "string"
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": [
+                                "token"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                                "token": {
+                                    "type": "string"
+                                },
+                                "settings": {
+                                    "type": "object"
+                                }
+                            }
                         },
-                        "settings": {
-                            "type": "object"
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": [
+                                    "name",
+                                    "token"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$"
+                                    },
+                                    "token": {
+                                        "type": "string"
+                                    },
+                                    "settings": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
                         }
-                    }
+                    ]
                 },
                 "server": {
                     "type": "string"
@@ -4509,6 +5391,74 @@
                                 "boolean",
                                 "null"
                             ]
+                        }
+                    }
+                },
+                "storage_backups": {
+                    "type": "object",
+                    "description": "Backup schedules of Docker volumes, keyed by volume name. One schedule per volume.",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": "string"
+                            },
+                            "missing_backup_notification_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": "number"
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": "number"
+                            },
+                            "s3_storage": {
+                                "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                    }
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "stop_during_backup": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
                         }
                     }
                 },
@@ -4811,19 +5761,46 @@
                     }
                 },
                 "secret_manager": {
-                    "type": "object",
-                    "required": [
-                        "token"
-                    ],
-                    "additionalProperties": false,
-                    "properties": {
-                        "token": {
-                            "type": "string"
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": [
+                                "token"
+                            ],
+                            "additionalProperties": false,
+                            "properties": {
+                                "token": {
+                                    "type": "string"
+                                },
+                                "settings": {
+                                    "type": "object"
+                                }
+                            }
                         },
-                        "settings": {
-                            "type": "object"
+                        {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": [
+                                    "name",
+                                    "token"
+                                ],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "pattern": "^[a-z0-9][a-z0-9_-]{0,62}$"
+                                    },
+                                    "token": {
+                                        "type": "string"
+                                    },
+                                    "settings": {
+                                        "type": "object"
+                                    }
+                                }
+                            }
                         }
-                    }
+                    ]
                 },
                 "server": {
                     "type": "string"
@@ -4855,6 +5832,74 @@
                                 "boolean",
                                 "null"
                             ]
+                        }
+                    }
+                },
+                "storage_backups": {
+                    "type": "object",
+                    "description": "Backup schedules of Docker volumes, keyed by volume name. One schedule per volume.",
+                    "additionalProperties": {
+                        "type": "object",
+                        "required": [
+                            "frequency"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "disable_local_backup": {
+                                "type": "boolean"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "frequency": {
+                                "type": "string"
+                            },
+                            "missing_backup_notification_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_amount": {
+                                "type": "integer"
+                            },
+                            "retention_local_days": {
+                                "type": "integer"
+                            },
+                            "retention_local_max_storage": {
+                                "type": "number"
+                            },
+                            "retention_s3_amount": {
+                                "type": "integer"
+                            },
+                            "retention_s3_days": {
+                                "type": "integer"
+                            },
+                            "retention_s3_max_storage": {
+                                "type": "number"
+                            },
+                            "s3_storage": {
+                                "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
+                                "oneOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        },
+                                        "minItems": 1,
+                                        "uniqueItems": true
+                                    }
+                                ]
+                            },
+                            "save_s3": {
+                                "type": "boolean"
+                            },
+                            "stop_during_backup": {
+                                "type": "boolean"
+                            },
+                            "timeout": {
+                                "type": "integer"
+                            }
                         }
                     }
                 },
