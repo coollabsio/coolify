@@ -202,3 +202,28 @@ it('needs team-wide write access to use an S3 storage in a storage backup', func
 
     expect($paths)->toContain('resources.api.storage_backups.app-data.s3_storage');
 });
+
+it('leaves schedules made in the dashboard alone when the file has no storage_backups', function () {
+    storageBackupsApply(storageBackupsApp());
+    $volume = LocalPersistentVolume::query()->sole();
+    $volume->scheduledBackups()->create(['team_id' => $this->fx['team']->id, 'frequency' => 'daily']);
+
+    expect(array_map(fn ($c) => $c->path, storageBackupsPlan(storageBackupsApp())->changes))->toBe([]);
+
+    $revision = storageBackupsApply(storageBackupsApp(['ports' => ['exposes' => '4000']]));
+
+    expect($revision->status->value)->toBe('applied', (string) $revision->error)
+        ->and(ScheduledVolumeBackup::query()->sole()->frequency)->toBe('daily');
+});
+
+it('removes every schedule when storage_backups is an empty object', function () {
+    storageBackupsApply(storageBackupsApp(['storage_backups' => ['app-data' => STORAGE_BACKUPS_SCHEDULE]]));
+
+    expect(array_map(fn ($c) => $c->path, storageBackupsPlan(storageBackupsApp(['storage_backups' => new stdClass]))->changes))->toBe(['storage_backups']);
+
+    $revision = storageBackupsApply(storageBackupsApp(['storage_backups' => new stdClass]));
+
+    expect($revision->status->value)->toBe('applied', (string) $revision->error)
+        ->and(ScheduledVolumeBackup::query()->exists())->toBeFalse()
+        ->and(LocalPersistentVolume::query()->exists())->toBeTrue();
+});

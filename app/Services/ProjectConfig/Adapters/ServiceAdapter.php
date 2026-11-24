@@ -462,7 +462,9 @@ class ServiceAdapter implements ResourceAdapter
             $values['connect_to_docker_network'] = true;
         }
         $resource->forceFill($values)->save();
-        (new StorageBackups)->prune($resource, $desired['storage_backups'] ?? null);
+        if (StorageBackups::managedBy($desired)) {
+            (new StorageBackups)->prune($resource, $desired['storage_backups']);
+        }
         $resource->parse();
         $this->writeServices($resource->fresh(), $desired);
         $this->writeChildren($resource, $desired, $ctx);
@@ -475,7 +477,9 @@ class ServiceAdapter implements ResourceAdapter
      */
     private function writeStorageBackups(Service $service, array $desired, ApplyContext $ctx): void
     {
-        (new StorageBackups)->write($service, $desired['storage_backups'] ?? null, $ctx);
+        if (StorageBackups::managedBy($desired)) {
+            (new StorageBackups)->write($service, $desired['storage_backups'], $ctx);
+        }
     }
 
     /**

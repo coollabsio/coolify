@@ -118,7 +118,11 @@ class ConfigPlanner
                 continue;
             }
 
-            $differences = ConfigDiff::between($adapter->read($model, $ctx), $adapter->canonical($key, $desired));
+            $currentValues = $adapter->read($model, $ctx);
+            if (! StorageBackups::managedBy($desired)) {
+                unset($currentValues['storage_backups']);
+            }
+            $differences = ConfigDiff::between($currentValues, $adapter->canonical($key, $desired));
             foreach ($differences as $difference) {
                 $changes[] = $this->fieldChange($adapter, $key, $difference);
             }

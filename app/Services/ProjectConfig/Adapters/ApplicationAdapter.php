@@ -530,8 +530,14 @@ class ApplicationAdapter implements ResourceAdapter
 
     private function writeChildren(Application $application, array $desired, ApplyContext $ctx): void
     {
-        (new StorageBackups)->prune($application, $desired['storage_backups'] ?? null);
+        $managesBackups = StorageBackups::managedBy($desired);
+        if ($managesBackups) {
+            (new StorageBackups)->prune($application, $desired['storage_backups']);
+        }
         foreach ($this->children() as $child) {
+            if ($child instanceof StorageBackups && ! $managesBackups) {
+                continue;
+            }
             $child->write($application, $desired[$child->key()] ?? null, $ctx);
         }
     }

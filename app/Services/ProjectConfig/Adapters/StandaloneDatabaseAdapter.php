@@ -406,8 +406,14 @@ class StandaloneDatabaseAdapter implements ResourceAdapter
 
     private function writeChildren(Model $database, array $desired, ApplyContext $ctx): void
     {
-        (new StorageBackups)->prune($database, $desired['storage_backups'] ?? null);
+        $managesBackups = StorageBackups::managedBy($desired);
+        if ($managesBackups) {
+            (new StorageBackups)->prune($database, $desired['storage_backups']);
+        }
         foreach ($this->children() as $child) {
+            if ($child instanceof StorageBackups && ! $managesBackups) {
+                continue;
+            }
             $child->write($database, $desired[$child->key()] ?? null, $ctx);
         }
     }

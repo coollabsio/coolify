@@ -44,6 +44,14 @@ class StorageBackups implements ChildRecords
         return 'storage_backups';
     }
 
+    /**
+     * A file without the key leaves the schedules to the dashboard and the API. An empty object removes them all.
+     */
+    public static function managedBy(array $desired): bool
+    {
+        return array_key_exists('storage_backups', $desired);
+    }
+
     public function map(): FieldMap
     {
         $fields = [];
