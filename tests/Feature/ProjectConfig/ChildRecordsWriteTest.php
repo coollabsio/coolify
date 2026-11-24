@@ -312,3 +312,18 @@ it('rejects a list of secret manager sources with invalid or duplicate names and
         'resources.api.secret_manager.4.token',
     ]);
 });
+
+it('rejects a vault reference to a source that the file does not link', function () {
+    IntegrationToken::factory()->create(['team_id' => $this->fx['team']->id, 'provider' => 'doppler', 'name' => 'doppler-prod', 'capabilities' => ['secrets']]);
+
+    $errors = $this->adapter->validate('api', childWriteDesired([
+        'secret_manager' => [['name' => 'urls', 'token' => 'doppler-prod']],
+        'env' => [
+            'API_URL' => ['ref' => 'vault.urls.API_URL'],
+            'BROKEN' => ['ref' => 'vault.nope.X'],
+            'APP_KEY' => ['ref' => 'vault.APP_KEY'],
+        ],
+    ]), $this->ctx);
+
+    expect(array_map(fn ($e) => $e->path, $errors))->toBe(['resources.api.env.BROKEN.ref', 'resources.api.env.APP_KEY.ref']);
+});

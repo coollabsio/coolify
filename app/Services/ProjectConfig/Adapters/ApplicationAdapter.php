@@ -460,6 +460,7 @@ class ApplicationAdapter implements ResourceAdapter
     private function validateChildren(string $base, array $desired, ApplyContext $ctx): array
     {
         $errors = SecretManager::errors($base, $desired['secret_manager'] ?? null, $ctx->teamId);
+        $errors = [...$errors, ...SecretManager::referenceErrors($base, $desired['secret_manager'] ?? null, $desired['env'] ?? null)];
         $volumes = ($desired['build']['pack'] ?? null) === 'dockercompose' ? null : array_map('strval', array_keys((array) ($desired['storages'] ?? [])));
         $errors = [...$errors, ...StorageBackups::errors($base, $desired['storage_backups'] ?? null, $ctx->teamId, $volumes)];
         foreach (array_values((array) ($desired['additional_servers'] ?? [])) as $index => $entry) {

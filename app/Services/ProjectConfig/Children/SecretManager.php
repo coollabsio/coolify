@@ -171,6 +171,34 @@ class SecretManager implements ChildRecords
     }
 
     /**
+     * Variables that read a source the file does not link. Without this check, the plan passes and the next deployment fails.
+     * `vault.KEY` needs the `default` source once the file links any source.
+     *
+     * @return list<ConfigError>
+     */
+    public static function referenceErrors(string $base, mixed $desired, mixed $env): array
+    {
+        $names = array_column(self::sources($desired), 'name');
+        $errors = [];
+        foreach ((array) $env as $key => $entry) {
+            $ref = is_array($entry) ? ($entry['ref'] ?? null) : null;
+            if (! is_string($ref) || ! str_starts_with($ref, 'vault.')) {
+                continue;
+            }
+            $parts = explode('.', $ref);
+            $source = count($parts) === 3 ? $parts[1] : RemoteSecretReferences::DEFAULT_SOURCE;
+            if (count($parts) === 2 && $names === []) {
+                continue;
+            }
+            if (! in_array($source, $names, true)) {
+                $errors[] = new ConfigError("{$base}.env.{$key}.ref", "The secret_manager of this resource has no source named \"{$source}\".");
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
      * The paths of the integration tokens that the value names, for the team credential check.
      *
      * @return list<string> Paths relative to the resource, such as `secret_manager.token` or `secret_manager.1.token`
