@@ -126,7 +126,7 @@
                             @if ($showBackupAction)
                                 <div
                                     class="volumes-col-actions volumes-cell-actions flex flex-nowrap items-center justify-end gap-1.5">
-                                    @if ($canUpdate && ! $form['canDeleteStale'] && ! $form['canDeleteToApplyDriverOptions'])
+                                    @if ($canUpdate && ! $isComposeOrService && ! $form['canDeleteStale'] && ! $form['canDeleteToApplyDriverOptions'])
                                         <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
                                             <x-slot:content>
                                                 <button type="button" class="icon-button shrink-0" title="Configure volume backup"
@@ -162,7 +162,7 @@
                                                     @endif
                                                 </x-modal-input>
                                             @endif
-                                            @if ($form['canDeleteStale'] || $form['canDeleteToApplyDriverOptions'])
+                                            @if ($form['canDeleteStale'] || $form['canDeleteToApplyDriverOptions'] || ($canUpdate && $isComposeOrService))
                                                 <x-slot:danger>
                                                     @if ($form['canDeleteStale'])
                                                         <x-modal-confirmation title="Remove stale volume entry?" buttonFullWidth
@@ -206,6 +206,11 @@
                                                                 <x-table.row-action>Delete</x-table.row-action>
                                                             </x-slot:trigger>
                                                         </x-modal-confirmation>
+                                                    @endif
+                                                    @if (! $form['canDeleteStale'] && ! $form['canDeleteToApplyDriverOptions'])
+                                                        <x-table.row-action aria-disabled="true" class="listbox-option-disabled"
+                                                            data-tooltip="Remove this volume from the Docker Compose file first, then delete it here."
+                                                            data-tooltip-wrap>Delete</x-table.row-action>
                                                     @endif
                                                 </x-slot:danger>
                                             @endif
