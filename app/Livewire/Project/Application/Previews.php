@@ -36,7 +36,7 @@ class Previews extends Component
 
     public array $previewDockerTags = [];
 
-    public ?int $manualPullRequestId = null;
+    public ?string $manualPullRequestId = null;
 
     public ?string $manualDockerTag = null;
 
@@ -335,6 +335,7 @@ class Previews extends Component
     public function addDockerImagePreview()
     {
         $this->authorize('deploy', $this->application);
+        $this->manualPullRequestId = filled($this->manualPullRequestId) ? trim($this->manualPullRequestId) : null;
         $this->manualDockerTag = filled($this->manualDockerTag) ? trim($this->manualDockerTag) : null;
         $this->validateOnly('manualPullRequestId');
         $this->validateOnly('manualDockerTag');
@@ -351,7 +352,7 @@ class Previews extends Component
             return;
         }
 
-        $this->add_and_deploy($this->manualPullRequestId, null, $this->manualDockerTag);
+        $this->add_and_deploy((int) $this->manualPullRequestId, null, $this->manualDockerTag);
 
         $this->manualPullRequestId = null;
         $this->manualDockerTag = null;

@@ -108,8 +108,8 @@
             helper="Deploy a preview directly from a Docker image tag.">
             <form wire:submit.prevent="addDockerImagePreview"
                 class="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
-                <x-forms.input id="manualPullRequestId" label="Preview ID"
-                    helper="Used for domains, logs, container names, and cleanup." />
+                <x-forms.input id="manualPullRequestId" label="Preview ID" type="number" min="1"
+                    helper="A positive whole number, for example 1234. Used for domains, logs, container names, and cleanup." />
                 <x-forms.input id="manualDockerTag" label="Docker tag"
                     helper="For example, pr_1234." />
                 @can('deploy', $application)
