@@ -12,6 +12,7 @@ use App\Services\ConfigurationGenerator;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\DeploymentConfiguration\ConfigurationDiff;
 use App\Services\DeploymentConfiguration\ConfigurationDiffer;
+use App\Services\DeployTriggers\GitAccess;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\StaticSiteArchive;
@@ -148,6 +149,11 @@ use Symfony\Component\Yaml\Yaml;
 
 class Application extends BaseModel
 {
+    /**
+     * A build or install command that selects one workspace package (spec §2.1).
+     */
+    private const WORKSPACE_SELECTOR_PATTERN = '~--filter[=\s]|(?:^|\s)-F\s|--workspace[=\s]|(?:^|\s)-w\s|\byarn\s+workspace\s|\bnx\s+(?:build|run|serve)\s|(?:^|\s)(?:-p|--package)[=\s]|\bgo\s+build\b.*\s\./[^\s/]+/|gradlew?\s+:[^\s]|\bmvn\b.*\s-pl\s~m';
+
     /** @use HasFactory<ApplicationFactory> */
     use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasImageScans, HasMaintenancePage, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, HasStars, ReleasesManagedDnsRecords, ScopedByAccessGrants, SoftDeletes;
 
@@ -2199,7 +2205,137 @@ class Application extends BaseModel
             return null;
         }
 
-        return '-c '.escapeshellarg("http.{$this->gitHttpsCredentialOrigin()}.extraHeader=Authorization: Basic {$this->gitHttpsCredentialBasicToken()}");
+        return '-c '.escapeshellarg($this->gitHttpsCredentialConfigValue());
+    }
+
+    private function gitHttpsCredentialConfigValue(): string
+    {
+        return "http.{$this->gitHttpsCredentialOrigin()}.extraHeader=Authorization: Basic {$this->gitHttpsCredentialBasicToken()}";
+    }
+
+    /**
+     * A `git -c` value that sends a token for every URL under scheme://host/ (host may include a port and path prefix).
+     */
+    private static function tokenInsteadOfConfig(string $scheme, string $user, string $encodedToken, string $hostAndPrefix): string
+    {
+        return "url.{$scheme}://{$user}:{$encodedToken}@{$hostAndPrefix}/.insteadOf={$scheme}://{$hostAndPrefix}/";
+    }
+
+    /**
+     * How coolify-affected reaches this repository from a helper container (no deployment, no server key).
+     */
+    public function gitAccessForAffected(): GitAccess
+    {
+        ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
+        $sshAccess = fn (string $privateKey, int|string|null $port): GitAccess => GitAccess::ssh(
+            $customRepository,
+            $privateKey,
+            $port,
+            [...gitProviderHostKeys(), ...gitKnownHostsLines($this->git_ssh_known_hosts)],
+            gitPinnedHosts(),
+        );
+
+        if ($this->deploymentType() === 'source') {
+            $url = parse_url(filter_var((string) data_get($this, 'source.html_url'), FILTER_SANITIZE_URL)) ?: [];
+            $scheme = $url['scheme'] ?? 'https';
+
+            if ($this->source instanceof GithubApp) {
+                if ($this->source->is_public) {
+                    return new GitAccess("{$this->source->html_url}/{$customRepository}");
+                }
+                $host = $url['host'] ?? '';
+                $token = rawurlencode(generateGithubInstallationToken($this->source));
+
+                return new GitAccess("{$scheme}://{$host}/{$customRepository}.git", config: [self::tokenInsteadOfConfig($scheme, 'x-access-token', $token, $host)]);
+            }
+
+            if ($this->source instanceof GitlabApp || $this->source instanceof GiteaApp) {
+                $isGitea = $this->source instanceof GiteaApp;
+                if ($this->source->isConnected()) {
+                    $token = rawurlencode($isGitea ? generateGiteaCloneToken($this->source) : generateGitlabCloneToken($this->source));
+                    $hostAndPrefix = $this->urlHostWithPort($url).rtrim($url['path'] ?? '', '/');
+
+                    return new GitAccess("{$scheme}://{$hostAndPrefix}/{$customRepository}.git", config: [self::tokenInsteadOfConfig($scheme, 'oauth2', $token, $hostAndPrefix)]);
+                }
+                $privateKey = ($isGitea ? giteaAppPrivateKey($this->source) : gitlabAppPrivateKey($this->source))?->private_key;
+                if ($privateKey) {
+                    return $sshAccess($privateKey, $this->source->custom_port ?? 22);
+                }
+            }
+
+            return new GitAccess($customRepository);
+        }
+
+        if ($this->deploymentType() === 'deploy_key') {
+            $privateKey = data_get($this, 'private_key.private_key');
+            if (is_null($privateKey)) {
+                throw new RuntimeException('Private key not found. Please add a private key to the application and try again.');
+            }
+
+            return $sshAccess($privateKey, $customPort);
+        }
+
+        return new GitAccess($customRepository, config: $this->usesGitHttpsCredential() ? [$this->gitHttpsCredentialConfigValue()] : []);
+    }
+
+    /**
+     * True when the application can use only part of its repository, so push evaluation can pay off (spec §2.1).
+     */
+    public function isNarrowable(): bool
+    {
+        if (filled($this->base_directory) && trim($this->base_directory, '/') !== '') {
+            return true;
+        }
+
+        $location = match ($this->build_pack) {
+            'dockerfile' => $this->dockerfile_location,
+            'dockercompose' => $this->docker_compose_location,
+            default => null,
+        };
+        if (filled($location) && str_contains(trim($location, '/'), '/')) {
+            return true;
+        }
+
+        $commands = implode("\n", array_filter([
+            $this->install_command, $this->build_command, $this->start_command,
+            $this->docker_compose_custom_build_command, $this->docker_compose_custom_start_command,
+        ]));
+        if ($commands !== '' && preg_match(self::WORKSPACE_SELECTOR_PATTERN, $commands) === 1) {
+            return true;
+        }
+
+        $teamId = data_get($this, 'environment.project.team_id');
+
+        return $teamId !== null && self::query()
+            ->whereKeyNot($this->id)
+            ->where('git_repository', $this->git_repository)
+            ->where('git_branch', $this->git_branch)
+            ->whereHas('environment.project', fn ($query) => $query->where('team_id', $teamId))
+            ->exists();
+    }
+
+    /**
+     * The coolify.json path of this application's environment link when that file lives in this repository and branch.
+     *
+     * @return list<string>
+     */
+    public function managedConfigPaths(): array
+    {
+        if ($this->config_key === null || $this->environment_id === null) {
+            return [];
+        }
+
+        $link = EnvironmentConfigLink::query()->where('environment_id', $this->environment_id)->first();
+        if (! $link || blank($link->file_path)) {
+            return [];
+        }
+
+        $normalize = fn (?string $repository): string => strtolower(preg_replace('/\.git\z/', '', trim((string) $repository, '/')));
+        if ($normalize($link->repository) !== $normalize($this->git_repository) || ($link->branch !== null && $link->branch !== $this->git_branch)) {
+            return [];
+        }
+
+        return [ltrim($link->file_path, '/')];
     }
 
     private function gitHttpsCredentialOrigin(): ?string
@@ -2372,7 +2508,7 @@ class Application extends BaseModel
                     $encodedToken = rawurlencode($github_access_token);
 
                     // Rewrite same-host HTTPS URLs only for these git commands so submodules can authenticate without persisting credentials.
-                    $gitConfigOption = '-c '.escapeshellarg("url.{$source_html_url_scheme}://x-access-token:{$encodedToken}@{$source_html_url_host}/.insteadOf={$source_html_url_scheme}://{$source_html_url_host}/");
+                    $gitConfigOption = '-c '.escapeshellarg(self::tokenInsteadOfConfig($source_html_url_scheme, 'x-access-token', $encodedToken, $source_html_url_host));
                     $git_clone_command = str_replace('git clone', "git {$gitConfigOption} clone", $git_clone_command);
 
                     if ($exec_in_docker) {
@@ -2426,7 +2562,7 @@ class Application extends BaseModel
                     $source_html_url_host = $this->urlHostWithPort($url ?: []);
 
                     // Rewrite same-host HTTPS submodule URLs to auth with the OAuth token (mirrors the GitHub path) without persisting credentials.
-                    $gitConfigOption = '-c '.escapeshellarg("url.{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/.insteadOf={$source_html_url_scheme}://{$source_html_url_host}{$pathPrefix}/");
+                    $gitConfigOption = '-c '.escapeshellarg(self::tokenInsteadOfConfig($source_html_url_scheme, 'oauth2', $encodedToken, $source_html_url_host.$pathPrefix));
                     $git_clone_command = str_replace('git clone', "git {$gitConfigOption} clone", $git_clone_command);
 
                     $repoUrl = "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/{$customRepository}.git";
