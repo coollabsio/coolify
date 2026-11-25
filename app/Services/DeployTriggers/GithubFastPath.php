@@ -2,7 +2,6 @@
 
 namespace App\Services\DeployTriggers;
 
-use App\Models\Application;
 use App\Models\GithubApp;
 use App\Services\DeployTriggers\Contract\ApplicationDecision;
 use InvalidArgumentException;
@@ -79,7 +78,7 @@ class GithubFastPath
 
         $count = count($files);
         if ($candidate->mode === 'watch_paths') {
-            $matched = Application::matchPaths(collect($files), collect(explode("\n", (string) $candidate->application->watch_paths)));
+            $matched = LegacyWatchPaths::matches($candidate->application, $files);
 
             return $matched->isEmpty()
                 ? new ApplicationDecision($id, 'skip', 'watch_paths_no_match', "None of the {$count} changed files match the watch paths.", $candidate->base)

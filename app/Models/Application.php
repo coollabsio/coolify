@@ -3402,6 +3402,14 @@ class Application extends BaseModel
         }
     }
 
+    /**
+     * The watch paths as isWatchPathsTriggered() matches them (normalized once more), without saving.
+     */
+    public function effectiveWatchPaths(): ?string
+    {
+        return is_null($this->watch_paths) ? null : $this->parseWatchPaths($this->watch_paths);
+    }
+
     public function isWatchPathsTriggered(Collection $modified_files): bool
     {
         if (is_null($this->watch_paths)) {

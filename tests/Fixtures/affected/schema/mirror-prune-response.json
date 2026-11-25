@@ -1,0 +1,64 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://coolify.io/schemas/coolify-affected/v1/mirror-prune-response.json",
+	"title": "coolify-affected mirror prune response (schema_version 1)",
+	"type": "object",
+	"required": [
+		"schema_version",
+		"tool_version",
+		"removed",
+		"kept",
+		"total_bytes",
+		"errors"
+	],
+	"properties": {
+		"schema_version": {
+			"const": 1
+		},
+		"tool_version": {
+			"type": "string"
+		},
+		"removed": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": [
+					"mirror_key",
+					"bytes",
+					"reason"
+				],
+				"properties": {
+					"mirror_key": {
+						"type": "string",
+						"pattern": "^[a-f0-9]{64}$"
+					},
+					"bytes": {
+						"type": "integer",
+						"minimum": 0
+					},
+					"reason": {
+						"enum": [
+							"unused",
+							"size_cap"
+						]
+					}
+				},
+				"additionalProperties": false
+			}
+		},
+		"kept": {
+			"type": "integer",
+			"minimum": 0
+		},
+		"total_bytes": {
+			"type": "integer"
+		},
+		"errors": {
+			"type": "array",
+			"items": {
+				"type": "string"
+			}
+		}
+	},
+	"additionalProperties": false
+}

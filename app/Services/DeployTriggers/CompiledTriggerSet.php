@@ -154,7 +154,8 @@ final class CompiledTriggerSet
 
     private static function globToRegex(string $pattern): string
     {
-        $segments = explode('/', $pattern);
+        // Consecutive `**` segments mean the same as one.
+        $segments = array_values(array_filter(explode('/', $pattern), fn (string $segment, int $index): bool => $segment !== '**' || ($index === 0 || explode('/', $pattern)[$index - 1] !== '**'), ARRAY_FILTER_USE_BOTH));
         $last = count($segments) - 1;
         $regex = '';
         foreach ($segments as $position => $segment) {

@@ -67,6 +67,7 @@ it('acts on the application team after the session switches teams', function () 
 
 it('dispatches one dry run and rate limits evaluate now', function () {
     RateLimiter::clear('evaluate-now:'.$this->application->uuid);
+    $this->application->forceFill(['trigger_base_commit' => str_repeat('d', 40)])->save();
     $component = Livewire::test(DeployTriggers::class, ['application' => $this->application]);
 
     foreach (range(1, 4) as $attempt) {
@@ -76,10 +77,18 @@ it('dispatches one dry run and rate limits evaluate now', function () {
     $component->assertDispatched('error');
     Queue::assertPushed(EvaluatePush::class, 1);
     Queue::assertPushed(EvaluatePush::class, fn (EvaluatePush $job) => $job->dryRun
-        && $job->context->after === null
+        && $job->context->after === str_repeat('d', 40)
         && $job->context->ref === 'refs/heads/main'
         && $job->context->teamId === $this->fixture['team']->id
         && $job->applicationIds === [$this->application->id]);
+});
+
+it('asks for a first deployment before evaluating', function () {
+    Livewire::test(DeployTriggers::class, ['application' => $this->application])
+        ->call('evaluateNow')
+        ->assertDispatched('error');
+
+    Queue::assertNotPushed(EvaluatePush::class);
 });
 
 it('explains the trigger state', function (string $case, string $copy) {

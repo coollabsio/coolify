@@ -8,6 +8,7 @@ use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
+use App\Services\DeployTriggers\Contract\Sha;
 use App\Services\DeployTriggers\PushContext;
 use App\Traits\AuditsApplicationSettings;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -42,7 +43,7 @@ class DeployTriggers extends Component
     }
 
     /**
-     * Evaluates the branch tip without deploying, so the trigger paths show before the next push.
+     * Resolves the trigger paths at the deployed commit without deploying, so they show before the next push.
      */
     public function evaluateNow(): void
     {
@@ -51,6 +52,12 @@ class DeployTriggers extends Component
             $key = 'evaluate-now:'.$this->application->uuid;
             if (RateLimiter::tooManyAttempts($key, 3)) {
                 $this->dispatch('error', 'Please wait a minute before evaluating again.');
+
+                return;
+            }
+            $commit = $this->evaluationCommit();
+            if ($commit === null) {
+                $this->dispatch('error', 'Deploy the application once, then evaluate its trigger paths.');
 
                 return;
             }
@@ -66,13 +73,24 @@ class DeployTriggers extends Component
                 teamId: (int) $this->application->team()->id,
                 repositoryUrl: (string) $this->application->git_repository,
                 ref: "refs/heads/{$this->application->git_branch}",
-                after: null,
+                after: $commit,
                 githubAppId: $this->application->source_type === GithubApp::class ? $this->application->source_id : null,
             ), [$this->application->id], dryRun: true);
             $this->dispatch('success', 'Evaluating the branch. The trigger paths update in a moment.');
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
+    }
+
+    /**
+     * The deployed state of the application: its base commit, else its last successful deployment.
+     */
+    private function evaluationCommit(): ?string
+    {
+        $commit = $this->application->trigger_base_commit
+            ?? $this->application->get_last_successful_deployment(['commit'])?->commit;
+
+        return Sha::isValid($commit) ? $commit : null;
     }
 
     /**
