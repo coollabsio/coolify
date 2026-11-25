@@ -156,7 +156,7 @@ it('deploys a synchronized GitHub pull request preview when the head commit mess
         ->and(ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('pull_request_id', 42)->where('commit', 'after-sha')->exists())->toBeTrue();
 
     Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.github.com/repos/example/repo/commits/after-sha');
-    Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.github.com/repos/example/repo/compare/before-sha...after-sha');
+    Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), '/compare/'));
 });
 
 it('skips a GitHub pull request preview when the opened or reopened head commit message contains skip ci', function (string $action) {
