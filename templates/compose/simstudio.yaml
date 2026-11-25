@@ -7,7 +7,7 @@
 
 services:
   simstudio:
-    image: ghcr.io/simstudioai/simstudio:latest
+    image: ghcr.io/simstudioai/simstudio:v0.9.66
     restart: unless-stopped
     deploy:
       resources:
@@ -19,13 +19,14 @@ services:
       - BETTER_AUTH_URL=${SERVICE_URL_SIMSTUDIO}
       - NEXT_PUBLIC_APP_URL=${SERVICE_URL_SIMSTUDIO}
       - TRUSTED_ORIGINS=${TRUSTED_ORIGINS:-}
-      - BETTER_AUTH_SECRET=${SERVICE_PASSWORD_64_BETTERAUTHSECRET}
-      - ENCRYPTION_KEY=${SERVICE_PASSWORD_64_ENCRYPTIONKEY}
+      - BETTER_AUTH_SECRET=${SERVICE_HEX_64_BETTERAUTHSECRET}
+      - ENCRYPTION_KEY=${SERVICE_HEX_64_ENCRYPTIONKEY}
       - API_ENCRYPTION_KEY=${API_ENCRYPTION_KEY:-}
-      - INTERNAL_API_SECRET=${SERVICE_PASSWORD_64_INTERNALAPISECRET}
+      - INTERNAL_API_SECRET=${SERVICE_HEX_64_INTERNALAPISECRET}
+      - CRON_SECRET=${SERVICE_HEX_64_CRONSECRET}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
-      - COPILOT_API_KEY=${COPILOT_API_KEY}
-      - SIM_AGENT_API_URL=${SIM_AGENT_API_URL}
+      - COPILOT_API_KEY=${COPILOT_API_KEY:-}
+      - SIM_AGENT_API_URL=${SIM_AGENT_API_URL:-}
       - OLLAMA_URL=${OLLAMA_URL:-http://localhost:11434}
       - SOCKET_SERVER_URL=${SOCKET_SERVER_URL:-http://realtime:3002}
       - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL:-}
@@ -82,7 +83,7 @@ services:
           }
 
   realtime:
-    image: ghcr.io/simstudioai/realtime:latest
+    image: ghcr.io/simstudioai/realtime:v0.9.66
     restart: unless-stopped
     deploy:
       resources:
@@ -93,14 +94,16 @@ services:
       - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db:5432/${POSTGRES_DB:-simstudio}
       - NEXT_PUBLIC_APP_URL=${SERVICE_URL_SIMSTUDIO}
       - BETTER_AUTH_URL=${SERVICE_URL_SIMSTUDIO}
-      - BETTER_AUTH_SECRET=${SERVICE_PASSWORD_64_BETTERAUTHSECRET}
-      - INTERNAL_API_SECRET=${SERVICE_PASSWORD_64_INTERNALAPISECRET}
+      - BETTER_AUTH_SECRET=${SERVICE_HEX_64_BETTERAUTHSECRET}
+      - INTERNAL_API_SECRET=${SERVICE_HEX_64_INTERNALAPISECRET}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD
@@ -127,11 +130,12 @@ services:
       retries: 10
 
   migrations:
-    image: ghcr.io/simstudioai/migrations:latest
+    image: ghcr.io/simstudioai/migrations:v0.9.66
     exclude_from_hc: true
     working_dir: /app/packages/db
     environment:
       - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@db:5432/${POSTGRES_DB:-simstudio}
+      - ENCRYPTION_KEY=${SERVICE_HEX_64_ENCRYPTIONKEY}
     depends_on:
       db:
         condition: service_healthy
@@ -140,6 +144,18 @@ services:
       - run
       - db:migrate
     restart: 'no'
+
+  cron:
+    image: ghcr.io/simstudioai/cron:v0.9.66
+    restart: on-failure
+    exclude_from_hc: true
+    environment:
+      - SIM_URL=http://simstudio:3000
+      - CRON_SECRET=${SERVICE_HEX_64_CRONSECRET}
+      - TZ=${TZ:-UTC}
+    depends_on:
+      simstudio:
+        condition: service_healthy
 
   db:
     image: pgvector/pgvector:pg17
