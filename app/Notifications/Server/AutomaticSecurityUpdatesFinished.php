@@ -6,6 +6,7 @@ use App\Actions\Server\CheckAutomaticSecurityUpdatesRun;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -115,6 +116,22 @@ class AutomaticSecurityUpdatesFinished extends CustomEmailNotification
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
+            title: $this->failed() ? 'Automatic security updates failed' : 'Automatic security updates installed',
+            level: match (true) {
+                $this->failed() => 'error',
+                $this->rebootRequired() => 'warning',
+                default => 'success',
+            },
+            message: $this->title()."\n\n".$this->details(),
+            buttons: [
+                ['text' => 'Manage Server', 'url' => $this->serverUrl],
+            ],
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
             title: $this->failed() ? 'Automatic security updates failed' : 'Automatic security updates installed',
             level: match (true) {
                 $this->failed() => 'error',

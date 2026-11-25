@@ -35,6 +35,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\ManagedDnsRecord;
 use App\Models\ManagedDnsRecordReference;
 use App\Models\NotificationThrottle;
+use App\Models\NtfyNotificationSettings;
 use App\Models\OauthIdentity;
 use App\Models\OauthSetting;
 use App\Models\PersonalAccessToken;
@@ -381,6 +382,7 @@ final class ServerTransferCoverage
         TelegramNotificationSettings::class => 'Team notification settings, not server data.',
         PushoverNotificationSettings::class => 'Team notification settings, not server data.',
         WebhookNotificationSettings::class => 'Team notification settings, not server data.',
+        NtfyNotificationSettings::class => 'Team notification settings, not server data.',
         CloudInitScript::class => 'Team server-creation templates, not server data.',
         ProjectSetting::class => 'Created with the project on the target; it has no settings of its own yet.',
         ApplicationDeploymentQueue::class => 'Deployment history.',

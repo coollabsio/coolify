@@ -5,6 +5,7 @@ namespace App\Notifications\ProjectConfig;
 use App\Models\EnvironmentConfigRevision;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -79,6 +80,16 @@ abstract class ProjectConfigNotification extends CustomEmailNotification
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
+            title: $this->title(),
+            level: $this->isError() ? 'error' : 'warning',
+            message: $this->summary(),
+            buttons: [['text' => 'Open in Coolify', 'url' => $this->url]],
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
             title: $this->title(),
             level: $this->isError() ? 'error' : 'warning',
             message: $this->summary(),

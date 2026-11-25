@@ -97,6 +97,8 @@ Route::group([
     Route::patch('/notifications/telegram', [NotificationsController::class, 'update_telegram'])->middleware(['api.ability:write']);
     Route::get('/notifications/pushover', [NotificationsController::class, 'pushover'])->middleware(['api.ability:read']);
     Route::patch('/notifications/pushover', [NotificationsController::class, 'update_pushover'])->middleware(['api.ability:write']);
+    Route::get('/notifications/ntfy', [NotificationsController::class, 'ntfy'])->middleware(['api.ability:read']);
+    Route::patch('/notifications/ntfy', [NotificationsController::class, 'update_ntfy'])->middleware(['api.ability:write']);
     Route::get('/notifications/webhook', [NotificationsController::class, 'webhook'])->middleware(['api.ability:read']);
     Route::patch('/notifications/webhook', [NotificationsController::class, 'update_webhook'])->middleware(['api.ability:write']);
     Route::get('/settings/email', [InstanceEmailSettingsController::class, 'show'])->middleware(['api.ability:read']);

@@ -6,6 +6,7 @@ use App\Contracts\ThrottledNotification;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Database\Eloquent\Model;
@@ -99,6 +100,24 @@ class ContainerRestarted extends CustomEmailNotification implements ThrottledNot
             level: 'warning',
             message: "A resource ({$this->name}) has been restarted automatically on {$this->server->name}",
             buttons: $buttons,
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        $buttons = [];
+        if ($this->url) {
+            $buttons[] = [
+                'text' => 'Check Resource in Coolify',
+                'url' => $this->url,
+            ];
+        }
+
+        return new NtfyMessage(
+            title: 'Resource restarted',
+            message: "A resource ({$this->name}) has been restarted automatically on {$this->server->name}",
+            buttons: $buttons,
+            level: 'warning',
         );
     }
 

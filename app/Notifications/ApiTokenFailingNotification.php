@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\PersonalAccessToken;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -90,6 +91,21 @@ class ApiTokenFailingNotification extends CustomEmailNotification
             title: 'API token sends many failed requests',
             level: 'warning',
             message: $message,
+            buttons: [
+                [
+                    'text' => 'Manage API tokens',
+                    'url' => $this->manageUrl,
+                ],
+            ],
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
+            title: 'API token sends many failed requests',
+            level: 'warning',
+            message: "{$this->summary()}\n\nLast failed request: {$this->lastRequest}\n\nAction Required: {$this->action()}",
             buttons: [
                 [
                     'text' => 'Manage API tokens',

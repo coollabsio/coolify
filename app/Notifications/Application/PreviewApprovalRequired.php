@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -97,6 +98,18 @@ class PreviewApprovalRequired extends CustomEmailNotification
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
+            title: "Pull request #{$this->preview->pull_request_id} waits for approval",
+            level: 'warning',
+            message: "A fork pull request of {$this->application_name} waits for an admin approval of commit {$this->commit}.",
+            buttons: [
+                ['text' => 'Approve', 'url' => $this->previews_url],
+            ],
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
             title: "Pull request #{$this->preview->pull_request_id} waits for approval",
             level: 'warning',
             message: "A fork pull request of {$this->application_name} waits for an admin approval of commit {$this->commit}.",

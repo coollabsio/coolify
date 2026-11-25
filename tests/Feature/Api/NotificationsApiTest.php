@@ -3,6 +3,7 @@
 use App\Models\DiscordNotificationSettings;
 use App\Models\EmailNotificationSettings;
 use App\Models\InstanceSettings;
+use App\Models\NtfyNotificationSettings;
 use App\Models\PushoverNotificationSettings;
 use App\Models\SlackNotificationSettings;
 use App\Models\Team;
@@ -85,6 +86,7 @@ describe('GET /api/v1/notifications/*', function () {
         'slack',
         'telegram',
         'pushover',
+        'ntfy',
         'webhook',
     ]);
 
@@ -269,7 +271,7 @@ describe('PATCH /api/v1/notifications/*', function () {
             ->and($settings->deployment_success_discord_notifications)->toBeTrue();
     });
 
-    test('updates slack, telegram, pushover, and webhook channels', function (string $channel, array $payload, string $modelClass, string $enabledField) {
+    test('updates slack, telegram, pushover, ntfy, and webhook channels', function (string $channel, array $payload, string $modelClass, string $enabledField) {
         $response = $this->withHeaders(authHeaders($this->bearerToken))
             ->patchJson("/api/v1/notifications/{$channel}", $payload);
 
@@ -311,6 +313,20 @@ describe('PATCH /api/v1/notifications/*', function () {
             PushoverNotificationSettings::class,
             'pushover_enabled',
         ],
+        'ntfy' => [
+            'ntfy',
+            [
+                'ntfy_enabled' => true,
+                'ntfy_url' => 'https://ntfy.sh',
+                'ntfy_topic' => 'coolify-alerts',
+                'ntfy_auth_method' => 'token',
+                'ntfy_token' => 'tk_secret',
+                'ntfy_priority_error_events' => 5,
+                'deployment_failure_ntfy_notifications' => true,
+            ],
+            NtfyNotificationSettings::class,
+            'ntfy_enabled',
+        ],
         'webhook' => [
             'webhook',
             [
@@ -321,6 +337,93 @@ describe('PATCH /api/v1/notifications/*', function () {
             WebhookNotificationSettings::class,
             'webhook_enabled',
         ],
+    ]);
+
+    test('hides ntfy server, topic, and credentials without read:sensitive ability', function () {
+        $this->team->ntfyNotificationSettings->update([
+            'ntfy_enabled' => true,
+            'ntfy_url' => 'https://ntfy.example.com/hidden-server',
+            'ntfy_topic' => 'hidden-topic',
+            'ntfy_token' => 'hidden-token',
+            'ntfy_username' => 'hidden-user',
+            'ntfy_password' => 'hidden-password',
+        ]);
+
+        $readToken = $this->user->createToken('read-token', ['read'])->plainTextToken;
+
+        $response = $this->withHeaders(authHeaders($readToken))
+            ->getJson('/api/v1/notifications/ntfy');
+
+        $response->assertSuccessful();
+        $response->assertJsonPath('ntfy_enabled', true);
+        foreach (['ntfy_url', 'ntfy_topic', 'ntfy_token', 'ntfy_username', 'ntfy_password'] as $secret) {
+            $response->assertJsonMissingPath($secret);
+        }
+        expect($response->getContent())->not->toContain('hidden-');
+    });
+
+    test('clears stored ntfy credentials when the server URL changes without new ones', function () {
+        $this->team->ntfyNotificationSettings->update([
+            'ntfy_url' => 'https://ntfy.example.com',
+            'ntfy_topic' => 'alerts',
+            'ntfy_auth_method' => 'token',
+            'ntfy_token' => 'tk_stored',
+            'ntfy_username' => 'stored-user',
+            'ntfy_password' => 'stored-password',
+        ]);
+
+        $this->withHeaders(authHeaders($this->bearerToken))
+            ->patchJson('/api/v1/notifications/ntfy', ['ntfy_url' => 'https://1.1.1.1'])
+            ->assertSuccessful();
+
+        $settings = $this->team->ntfyNotificationSettings->fresh();
+        expect($settings->ntfy_url)->toBe('https://1.1.1.1')
+            ->and($settings->ntfy_token)->toBeNull()
+            ->and($settings->ntfy_username)->toBeNull()
+            ->and($settings->ntfy_password)->toBeNull();
+    });
+
+    test('keeps ntfy credentials sent together with a new server URL', function () {
+        $this->team->ntfyNotificationSettings->update([
+            'ntfy_url' => 'https://ntfy.example.com',
+            'ntfy_auth_method' => 'token',
+            'ntfy_token' => 'tk_stored',
+        ]);
+
+        $this->withHeaders(authHeaders($this->bearerToken))
+            ->patchJson('/api/v1/notifications/ntfy', ['ntfy_url' => 'https://1.1.1.1', 'ntfy_token' => 'tk_new'])
+            ->assertSuccessful();
+
+        expect($this->team->ntfyNotificationSettings->fresh()->ntfy_token)->toBe('tk_new');
+    });
+
+    test('keeps stored ntfy credentials when the server URL does not change', function () {
+        $this->team->ntfyNotificationSettings->update([
+            'ntfy_url' => 'https://1.1.1.1',
+            'ntfy_auth_method' => 'token',
+            'ntfy_token' => 'tk_stored',
+        ]);
+
+        $this->withHeaders(authHeaders($this->bearerToken))
+            ->patchJson('/api/v1/notifications/ntfy', ['ntfy_url' => 'https://1.1.1.1', 'ntfy_priority_error_events' => 4])
+            ->assertSuccessful();
+
+        expect($this->team->ntfyNotificationSettings->fresh()->ntfy_token)->toBe('tk_stored');
+    });
+
+    test('rejects invalid ntfy settings with 422', function (array $payload, string $field) {
+        $this->withHeaders(authHeaders($this->bearerToken))
+            ->patchJson('/api/v1/notifications/ntfy', $payload)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors($field);
+    })->with([
+        'priority above 5' => [['ntfy_priority_error_events' => 6], 'ntfy_priority_error_events'],
+        'priority below 1' => [['ntfy_priority_success_events' => 0], 'ntfy_priority_success_events'],
+        'unknown auth method' => [['ntfy_auth_method' => 'oauth'], 'ntfy_auth_method'],
+        'topic with a slash' => [['ntfy_topic' => 'alerts/other'], 'ntfy_topic'],
+        'topic with a newline' => [['ntfy_topic' => "alerts\nother"], 'ntfy_topic'],
+        'token with a newline' => [['ntfy_token' => "tk_abc\nX-Injected: 1"], 'ntfy_token'],
+        'username with a control character' => [['ntfy_username' => "us\x00er"], 'ntfy_username'],
     ]);
 
     test('rejects unknown fields with 422', function () {
