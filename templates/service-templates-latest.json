@@ -4148,6 +4148,24 @@
         "port": "3000",
         "outdated": true
     },
+    "opensearch": {
+        "documentation": "https://docs.opensearch.org/latest?utm_source=coolify.io",
+        "slogan": "OpenSearch is an open-source search and analytics engine.",
+        "compose": "c2VydmljZXM6CiAgb3BlbnNlYXJjaDoKICAgIGltYWdlOiAnb3BlbnNlYXJjaHByb2plY3Qvb3BlbnNlYXJjaDozLjEwLjEnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9PUEVOU0VBUkNIXzkyMDAKICAgICAgLSBjbHVzdGVyLm5hbWU9b3BlbnNlYXJjaC1jbHVzdGVyCiAgICAgIC0gbm9kZS5uYW1lPW9wZW5zZWFyY2gtbm9kZTEKICAgICAgLSBkaXNjb3ZlcnkudHlwZT1zaW5nbGUtbm9kZQogICAgICAtIGJvb3RzdHJhcC5tZW1vcnlfbG9jaz10cnVlCiAgICAgIC0gJ09QRU5TRUFSQ0hfSkFWQV9PUFRTPS1YbXM1MTJtIC1YbXg1MTJtJwogICAgICAtICdPUEVOU0VBUkNIX0lOSVRJQUxfQURNSU5fUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX09QRU5TRUFSQ0h9JwogICAgICAtIHBsdWdpbnMuc2VjdXJpdHkuc3NsLmh0dHAuZW5hYmxlZD1mYWxzZQogICAgdWxpbWl0czoKICAgICAgbWVtbG9jazoKICAgICAgICBzb2Z0OiAtMQogICAgICAgIGhhcmQ6IC0xCiAgICAgIG5vZmlsZToKICAgICAgICBzb2Z0OiA2NTUzNgogICAgICAgIGhhcmQ6IDY1NTM2CiAgICB2b2x1bWVzOgogICAgICAtICdvcGVuc2VhcmNoLWRhdGE6L3Vzci9zaGFyZS9vcGVuc2VhcmNoL2RhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ2N1cmwgLS11c2VyIGFkbWluOiR7U0VSVklDRV9QQVNTV09SRF9PUEVOU0VBUkNIfSAtLXNpbGVudCAtLWZhaWwgaHR0cDovL2xvY2FsaG9zdDo5MjAwL19jbHVzdGVyL2hlYWx0aCB8fCBleGl0IDEnCiAgICAgIGludGVydmFsOiAzMHMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDEwCnZvbHVtZXM6CiAgb3BlbnNlYXJjaC1kYXRhOiBudWxsCg==",
+        "tags": [
+            "search",
+            "engine",
+            "fulltext",
+            "full",
+            "text",
+            "opensearch"
+        ],
+        "category": "search",
+        "logo": "svgs/opensearch.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-11-25T19:28:15+01:00",
+        "port": "9200"
+    },
     "openwa-with-postgresql-and-redis": {
         "documentation": "https://github.com/rmyndharis/OpenWA?utm_source=coolify.io",
         "slogan": "Production OpenWA with PostgreSQL, Redis, and bundled dashboard.",
