@@ -5,6 +5,8 @@ use App\Services\DeployTriggers\AffectedRunnerException;
 use App\Services\DeployTriggers\Contract\EvaluateApplicationInput;
 use App\Services\DeployTriggers\Contract\EvaluateRequest;
 use App\Services\DeployTriggers\Git\GitEvaluator;
+use App\Services\DeployTriggers\Git\MirrorOutput;
+use App\Services\DeployTriggers\Git\MirrorScript;
 use App\Services\DeployTriggers\GitAccess;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
@@ -316,3 +318,60 @@ it('keeps checking references on later pushes after a reference brought in a pac
     expect($first->decision)->toBe('deploy')
         ->and($next->decision)->toBe('deploy');
 });
+
+it('removes what an interrupted git process left in the mirror', function () {
+    $after = evalCommit($this, ['apps/api/src/main.ts' => 'changed']);
+    $request = gitEvaluatorRequest($this, $after, [gitEvaluatorInput('web', '/apps/web/Dockerfile', $this->base)]);
+    evaluateWith($this, $request);
+    $mirror = $this->root.'/mirrors/mirror-key.git';
+    File::put("{$mirror}/objects/pack/tmp_pack_interrupted", 'partial');
+    File::put("{$mirror}/packed-refs.lock", '');
+    File::ensureDirectoryExists("{$mirror}/refs/coolify/ref");
+    File::put("{$mirror}/refs/coolify/ref/0.lock", '');
+
+    evaluateWith($this, $request);
+
+    expect(File::exists("{$mirror}/objects/pack/tmp_pack_interrupted"))->toBeFalse()
+        ->and(File::exists("{$mirror}/packed-refs.lock"))->toBeFalse()
+        ->and(File::exists("{$mirror}/refs/coolify/ref/0.lock"))->toBeFalse();
+});
+
+it('deploys when the server has less free disk space than the mirror may use', function () {
+    $after = evalCommit($this, ['apps/api/src/main.ts' => 'changed']);
+    $request = new EvaluateRequest('file://'.$this->source, 'mirror-key', $after, ['refs/heads/main'], [gitEvaluatorInput('web', '/apps/web/Dockerfile', $this->base)], ['max_changed_files' => 50000, 'max_mirror_bytes' => 1 << 50]);
+
+    expect(fn () => evaluateWith($this, $request))->toThrow(AffectedRunnerException::class, 'free disk space');
+});
+
+it('removes a mirror that loading file contents grows past the limit', function () {
+    $after = evalCommit($this, ['apps/api/src/main.ts' => 'changed']);
+    evaluateWith($this, gitEvaluatorRequest($this, $after, [gitEvaluatorInput('web', '/apps/web/Dockerfile', $this->base)]));
+    $size = (int) trim(Process::run(['du', '-sk', $this->root.'/mirrors/mirror-key.git'])->output());
+    $oid = trim(evalGit($this, "rev-parse {$after}:README.md"));
+
+    $script = new MirrorScript($this->mirror, new GitAccess('file://'.$this->source), 'mirror-key', ($size - 1) * 1024);
+    $output = $this->mirror->run($script->blobs([$oid]), 60);
+
+    expect(fn () => MirrorOutput::parse($output, fn (string $message) => $message))->toThrow(AffectedRunnerException::class, 'larger than the limit')
+        ->and(File::exists($this->root.'/mirrors/mirror-key.git'))->toBeFalse();
+});
+
+it('reads lists of files longer than the limit of a shell argument', function () {
+    $after = evalCommit($this, ['apps/api/src/main.ts' => 'changed']);
+    evaluateWith($this, gitEvaluatorRequest($this, $after, [gitEvaluatorInput('web', '/apps/web/Dockerfile', $this->base)]));
+    $oid = trim(evalGit($this, "rev-parse {$after}:README.md"));
+
+    $script = new MirrorScript($this->mirror, new GitAccess('file://'.$this->source), 'mirror-key', EvaluateRequest::DEFAULT_MAX_MIRROR_BYTES);
+    $output = MirrorOutput::parse($this->mirror->run($script->blobs(array_fill(0, 4000, $oid)), 60), fn (string $message) => $message);
+
+    expect(MirrorOutput::blobs(MirrorOutput::payload($output->first('BLOBS')[0])))->toBe([$oid => '# readme']);
+});
+
+it('stops a script at its timeout inside the helper container', function () {
+    if (! getenv('DEPLOY_TRIGGERS_HELPER_IMAGE')) {
+        $this->markTestSkipped('Set DEPLOY_TRIGGERS_HELPER_IMAGE to run it in the helper image.');
+    }
+
+    // Killed at the timeout, the script never prints its end and exits with an error.
+    $this->mirror->run("sleep 20\necho '@@END'\n", 2);
+})->throws(AffectedRunnerException::class);

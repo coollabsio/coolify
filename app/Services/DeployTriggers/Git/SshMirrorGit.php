@@ -15,6 +15,11 @@ final class SshMirrorGit implements MirrorGit
 {
     public const VOLUME = 'coolify-git-mirrors';
 
+    /**
+     * An init process lets `timeout` stop the script (PID 1 ignores SIGTERM); the label finds leftover containers.
+     */
+    public const CONTAINER_FLAGS = '--init --memory 2g --pids-limit 512 --label coolify.type=git-mirror';
+
     private bool $imageReady = false;
 
     public function __construct(private readonly Server $server) {}
@@ -32,7 +37,7 @@ final class SshMirrorGit implements MirrorGit
             }
 
             $remoteCommand = ($this->server->isNonRoot() ? 'sudo ' : '')
-                .'docker run --rm -i --network host --tmpfs /run/coolify:rw,nosuid,nodev,noexec,size=512m'
+                .'docker run '.self::CONTAINER_FLAGS.' --rm -i --network host --tmpfs /run/coolify:rw,nosuid,nodev,noexec,size=512m'
                 .' -v '.self::VOLUME.':/mirrors --entrypoint sh '.escapeshellarg($image)
                 .' -c '.escapeshellarg("umask 077; cat > /run/coolify/script && exec timeout {$timeoutSeconds} sh /run/coolify/script");
             $process = runSshProcess(

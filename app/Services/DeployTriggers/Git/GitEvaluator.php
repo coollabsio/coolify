@@ -62,7 +62,7 @@ final class GitEvaluator implements AffectedRunner
                 $mergeBases['merge:'.$input->mergeBaseRef] = $input->mergeBaseRef;
             }
         }
-        ['after' => $after, 'diffs' => $diffs] = $session->fetchAndDiff(array_keys($bases), $mergeBases, $limits['max_mirror_bytes']);
+        ['after' => $after, 'diffs' => $diffs] = $session->fetchAndDiff(array_keys($bases), $mergeBases);
 
         $decisions = [];
         $pending = [];

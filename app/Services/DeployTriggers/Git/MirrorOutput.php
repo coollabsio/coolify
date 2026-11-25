@@ -67,14 +67,28 @@ final class MirrorOutput
     }
 
     /**
+     * The payload of the first frame of a tag, which the script must print.
+     *
+     * @throws AffectedContractException
+     */
+    public function requiredPayload(string $tag): string
+    {
+        $field = $this->first($tag)[0] ?? null;
+        if ($field === null) {
+            throw new AffectedContractException("The git mirror output has no {$tag}.");
+        }
+
+        return self::payload($field);
+    }
+
+    /**
+     * A payload is never empty: even gzip of an empty file has a header.
+     *
      * @throws AffectedContractException
      */
     public static function payload(string $field, int $maxBytes = 268435456): string
     {
-        if ($field === '') {
-            return '';
-        }
-        $compressed = base64_decode($field, true);
+        $compressed = $field === '' ? false : base64_decode($field, true);
         $data = $compressed === false ? false : @gzdecode($compressed, $maxBytes);
         if ($data === false) {
             throw new AffectedContractException('The git mirror output has an invalid payload.');

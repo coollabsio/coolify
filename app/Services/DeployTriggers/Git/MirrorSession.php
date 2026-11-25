@@ -32,7 +32,7 @@ final class MirrorSession
         private readonly EvaluateRequest $request,
         private readonly Closure $redact,
     ) {
-        $this->script = new MirrorScript($git, $access, $request->mirrorKey);
+        $this->script = new MirrorScript($git, $access, $request->mirrorKey, ($request->limits ?? EvaluateRequest::defaultLimits())['max_mirror_bytes']);
     }
 
     /**
@@ -40,21 +40,12 @@ final class MirrorSession
      * @param  array<string, string>  $mergeBases  key => ref
      * @return array{after: string, diffs: array<string, array{base: ?string, files: ?list<string>, symlinks: list<string>}>}
      */
-    public function fetchAndDiff(array $bases, array $mergeBases, int $maxMirrorBytes): array
+    public function fetchAndDiff(array $bases, array $mergeBases): array
     {
-        $tooLarge = 'deploy-triggers:mirror-too-large:'.$this->request->mirrorKey;
-        if (Cache::has($tooLarge)) {
+        if (Cache::has($this->tooLargeKey())) {
             throw new AffectedRunnerException('The repository is larger than the limit of push evaluation, so pushes deploy.');
         }
-        try {
-            $output = $this->run($this->script->fetchAndDiff($this->request->after, $this->request->fetchRefs, $bases, $mergeBases, $maxMirrorBytes), GitEvaluator::FETCH_TIMEOUT_SECONDS);
-        } catch (AffectedRunnerException $exception) {
-            if (str_contains($exception->getMessage(), 'larger than the limit')) {
-                Cache::put($tooLarge, true, now()->addDay());
-            }
-
-            throw $exception;
-        }
+        $output = $this->run($this->script->fetchAndDiff($this->request->after, $this->request->fetchRefs, $bases, $mergeBases), GitEvaluator::FETCH_TIMEOUT_SECONDS);
         $after = $output->first('AFTER')[0] ?? null;
         if (! Sha::isValid($after) || ($this->request->after !== null && $after !== $this->request->after)) {
             throw new AffectedContractException('The git mirror reported an invalid commit.');
@@ -84,17 +75,20 @@ final class MirrorSession
             array_push($wanted, ...TriggerSetBuilder::wantedPaths($input));
         }
         $output = $this->run($this->script->tree($after, array_values(array_unique($wanted))), GitEvaluator::READ_TIMEOUT_SECONDS);
-        $entries = MirrorOutput::tree(MirrorOutput::payload($output->first('TREE')[0] ?? ''));
+        $entries = MirrorOutput::tree($output->requiredPayload('TREE'));
         if (count($entries) > $maxEntries) {
             throw new WidenException('The repository has too many files to resolve which of them affect the application, so it deploys.');
         }
 
-        $blobs = MirrorOutput::blobs(MirrorOutput::payload($output->first('BLOBS')[0] ?? ''));
+        $blobs = MirrorOutput::blobs($output->requiredPayload('BLOBS'));
         $loader = function (array $oids) use (&$blobs): array {
             $missing = array_values(array_diff($oids, array_keys($blobs)));
             if ($missing !== []) {
                 $loaded = $this->run($this->script->blobs($missing), GitEvaluator::READ_TIMEOUT_SECONDS);
-                $blobs += MirrorOutput::blobs(MirrorOutput::payload($loaded->first('BLOBS')[0] ?? ''));
+                $blobs += MirrorOutput::blobs($loaded->requiredPayload('BLOBS'));
+                if (array_diff($missing, array_keys($blobs)) !== []) {
+                    throw new AffectedContractException('The git mirror did not return the contents of a file.');
+                }
             }
 
             return array_intersect_key($blobs, array_flip($oids));
@@ -124,13 +118,12 @@ final class MirrorSession
 
         $needles = array_values(array_unique($needles));
         $output = $this->run($this->script->grep($after, array_values(array_unique($directories)), $needles, $maxFiles), GitEvaluator::READ_TIMEOUT_SECONDS);
-        $payload = $output->first('GREP')[0] ?? '-';
-        if ($payload === '-') {
+        if (($output->first('GREP')[0] ?? null) === '-') {
             return null;
         }
 
         $found = [];
-        foreach (explode("\n", MirrorOutput::payload($payload)) as $line) {
+        foreach (explode("\n", $output->requiredPayload('GREP')) as $line) {
             $separator = strpos($line, "\0");
             if ($separator !== false && str_starts_with($line, "{$after}:")) {
                 $found[substr($line, strlen($after) + 1, $separator - strlen($after) - 1)."\0".substr($line, $separator + 1)] = true;
@@ -152,11 +145,18 @@ final class MirrorSession
     private function run(string $script, int $timeout): MirrorOutput
     {
         try {
-            $output = $this->git->run($script, $timeout);
+            return MirrorOutput::parse($this->git->run($script, $timeout), $this->redact);
         } catch (AffectedRunnerException $exception) {
+            if (str_contains($exception->getMessage(), 'larger than the limit')) {
+                Cache::put($this->tooLargeKey(), true, now()->addDay());
+            }
+
             throw new AffectedRunnerException(($this->redact)($exception->getMessage()));
         }
+    }
 
-        return MirrorOutput::parse($output, $this->redact);
+    private function tooLargeKey(): string
+    {
+        return 'deploy-triggers:mirror-too-large:'.$this->request->mirrorKey;
     }
 }
