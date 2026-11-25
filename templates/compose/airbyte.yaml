@@ -21,7 +21,6 @@ services:
       start_period: 10s
     volumes:
       - db-data:/var/lib/postgresql/data
-    restart: unless-stopped
 
   rustfs:
     image: rustfs/rustfs:1.0.1
@@ -33,7 +32,6 @@ services:
       - RUSTFS_CONSOLE_ENABLE=false
     volumes:
       - rustfs-data:/data
-    restart: unless-stopped
     healthcheck:
       test: [CMD-SHELL, 'curl -fsS http://127.0.0.1:9000/health/ready >/dev/null']
       interval: 10s
@@ -140,7 +138,6 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    restart: unless-stopped
     healthcheck:
       test:
         - CMD
@@ -178,7 +175,6 @@ services:
       timeout: 5s
       retries: 60
       start_period: 20s
-    restart: unless-stopped
 
   docker-dns:
     image: rancher/mirrored-coredns-coredns:1.14.7
@@ -199,7 +195,6 @@ services:
     depends_on:
       k3s:
         condition: service_started
-    restart: unless-stopped
     healthcheck:
       test: [CMD, /coredns, -version]
       interval: 10s
