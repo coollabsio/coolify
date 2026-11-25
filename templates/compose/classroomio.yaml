@@ -76,7 +76,7 @@ services:
           grep -q "^[[:space:]]*media[[:space:]]" /tmp/buckets
 
   api:
-    image: classroomio/api:${CIO_VERSION:-latest}
+    image: classroomio/api:${CIO_VERSION:-1.0.0}
     depends_on:
       postgres:
         condition: service_healthy
@@ -113,7 +113,7 @@ services:
       start_period: 30s
 
   dashboard:
-    image: classroomio/dashboard:${CIO_VERSION:-latest}
+    image: classroomio/dashboard:${CIO_VERSION:-1.0.0}
     depends_on:
       api:
         condition: service_healthy
@@ -129,11 +129,10 @@ services:
       - CSP_CONNECT_SRC_DOMAINS=$SERVICE_URL_STORAGE
 
   jobs:
-    image: classroomio/jobs:${CIO_VERSION:-latest}
+    image: classroomio/jobs:${CIO_VERSION:-1.0.0}
+    # The api runs the database migrations at start, so jobs waits for it.
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
+      api:
         condition: service_healthy
     environment:
       - NODE_ENV=production
