@@ -126,7 +126,7 @@ function skippedRow($application): ApplicationDeploymentQueue
     ]);
 }
 
-function showDeployment($test, ApplicationDeploymentQueue $row)
+function showTriggerDeployment($test, ApplicationDeploymentQueue $row)
 {
     return Livewire::test(Show::class, [
         'project_uuid' => $test->fixture['environment']->project->uuid,
@@ -139,7 +139,7 @@ function showDeployment($test, ApplicationDeploymentQueue $row)
 it('shows why pushes were skipped and deploys anyway', function () {
     $row = skippedRow($this->application);
 
-    showDeployment($this, $row)
+    showTriggerDeployment($this, $row)
         ->assertSee('Skipped 3 pushes')
         ->assertSee('None of the 2 changed files affect this application.')
         ->call('deploySkippedPush');
@@ -151,7 +151,7 @@ it('does not deploy anyway a row that is not skipped', function () {
     $row = skippedRow($this->application);
     $row->update(['status' => ApplicationDeploymentStatus::FINISHED->value]);
 
-    showDeployment($this, $row)->call('deploySkippedPush');
+    showTriggerDeployment($this, $row)->call('deploySkippedPush');
 
     expect(ApplicationDeploymentQueue::query()->count())->toBe(1);
 });
@@ -163,7 +163,7 @@ it('shows what triggered a deployment', function () {
         'matches' => [['file' => 'packages/ui/src/Button.tsx', 'rule' => 'workspace', 'via' => ['apps/web (@acme/web)', '@acme/ui']]],
     ]]);
 
-    showDeployment($this, $row)->assertSee('packages/ui/src/Button.tsx')->assertSee('@acme/ui');
+    showTriggerDeployment($this, $row)->assertSee('packages/ui/src/Button.tsx')->assertSee('@acme/ui');
 });
 
 it('labels folded skips in the deployment list', function () {
