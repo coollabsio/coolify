@@ -149,7 +149,7 @@ class VolumeBackups extends Component
 
     public function save(): void
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('manageBackups', $this->resource);
 
         if (! $this->validateSettings()) {
             return;
@@ -166,7 +166,7 @@ class VolumeBackups extends Component
 
     public function updatedS3StorageIds(): void
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('manageBackups', $this->resource);
 
         if (! $this->validateSettings()) {
             return;
@@ -179,7 +179,7 @@ class VolumeBackups extends Component
 
     public function toggleS3(): void
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('manageBackups', $this->resource);
 
         if (! $this->saveToS3 && $this->selectedS3StorageIds()->isEmpty()) {
             $this->dispatch('error', 'Select a usable S3 storage before enabling S3 backups.');
@@ -199,7 +199,7 @@ class VolumeBackups extends Component
 
     public function toggleEnabled(): void
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('manageBackups', $this->resource);
 
         if (! $this->backup) {
             if (! $this->validateSettings()) {
@@ -221,7 +221,7 @@ class VolumeBackups extends Component
 
     public function backupNow(): Redirector|RedirectResponse|null
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('manageBackups', $this->resource);
 
         if (! $this->backup) {
             if (! $this->validateSettings()) {
@@ -322,7 +322,7 @@ class VolumeBackups extends Component
 
     public function retryRecovery(int $executionId): void
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('manageBackups', $this->resource);
 
         $execution = $this->backup?->executions()->whereKey($executionId)->first();
         if (! $execution || ! $execution->hasPendingRecovery()) {
@@ -347,7 +347,7 @@ class VolumeBackups extends Component
 
     public function downloadBackup(int $executionId): void
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('manageBackups', $this->resource);
 
         $execution = $this->backup?->executions()->whereKey($executionId)->first();
         if (! $execution) {

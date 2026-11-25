@@ -9,6 +9,7 @@ use App\Actions\Application\LookupGitAppRepository;
 use App\Actions\Application\StopApplication;
 use App\Enums\BuildPackTypes;
 use App\Enums\HttpBasicAuthHashAlgorithm;
+use App\Http\Controllers\Api\Concerns\HandlesTerminalApi;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Jobs\ServerStorageSaveJob;
@@ -35,6 +36,7 @@ use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
@@ -47,6 +49,7 @@ class ApplicationsController extends Controller
     use Concerns\HandlesTagsApi;
     use Concerns\RequiresDeployAbility;
     use Concerns\RequiresDeployForOutsideHostPaths;
+    use HandlesTerminalApi;
 
     private const APPLICATION_SETTING_FIELDS = [
         'is_git_submodules_enabled',
@@ -234,6 +237,38 @@ class ApplicationsController extends Controller
         ], 422);
     }
 
+    /**
+     * A site from uploaded archives builds only from the archive, so the build and Git fields do not apply.
+     */
+    private function archiveSiteFieldsResponse(Application $application, Request $request): ?JsonResponse
+    {
+        if (! $application->is_archive_source) {
+            return null;
+        }
+        $fields = collect(array_keys($request->all()))->filter(fn (string $field): bool => Str::startsWith($field, ['git_', 'dockerfile']) || in_array($field, [
+            'build_pack', 'install_command', 'build_command', 'start_command', 'base_directory', 'publish_directory',
+            'pre_deployment_command', 'pre_deployment_command_container', 'post_deployment_command', 'post_deployment_command_container',
+            'custom_docker_run_options', 'static_image',
+        ], true));
+        if ($fields->isEmpty()) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => $fields->mapWithKeys(fn (string $field): array => [$field => ['Archive sites do not use this field.']])->all(),
+        ], 422);
+    }
+
+    private function archiveSiteEnvironmentVariablesResponse(Application $application): ?JsonResponse
+    {
+        if (! $application->is_archive_source) {
+            return null;
+        }
+
+        return response()->json(['message' => 'Archive sites do not use environment variables.'], 422);
+    }
+
     private function sharedImageNameValidationResponse(Application $application): ?JsonResponse
     {
         $otherApplication = $application->otherApplicationBuildingSameImage();
@@ -274,6 +309,127 @@ class ApplicationsController extends Controller
     private function extraApplicationFieldMessage(string $field): string
     {
         return $field === 'fqdn' ? 'Use the domains field to set application URLs.' : 'This field is not allowed.';
+    }
+
+    /**
+     * Finds the running container to run a terminal command in. Each scanned server counts once
+     * toward its terminal rate limit, and its `docker ps` runs in a concurrency slot of the server.
+     */
+    private function resolveApplicationTerminalTarget(Application $application, Request $request, int $teamId): array|JsonResponse
+    {
+        $requestedServerUuid = $request->string('server_uuid')->value();
+        $requestedContainer = $request->string('container')->value();
+        $pullRequestId = $request->filled('pull_request_id') ? $request->integer('pull_request_id') : null;
+
+        if ($requestedContainer !== '' && ! ValidationPatterns::isValidContainerName($requestedContainer)) {
+            return response()->json(['message' => 'Invalid container name.'], 422);
+        }
+
+        $application->loadMissing(['destination.server', 'additional_servers']);
+        $servers = collect([$application->destination?->server])
+            ->merge($application->additional_servers)
+            ->filter(fn ($server) => $server !== null && (int) $server->team_id === $teamId)
+            ->unique('id')
+            ->values();
+
+        if ($requestedServerUuid !== '') {
+            $servers = $servers->filter(fn ($server) => $server->uuid === $requestedServerUuid)->values();
+            if ($servers->isEmpty()) {
+                return response()->json(['message' => 'Server not found for this application.'], 404);
+            }
+        }
+
+        if ($servers->isNotEmpty() && $servers->every(fn ($server) => $server->isSwarm())) {
+            return response()->json(['message' => 'The terminal API does not support Docker Swarm applications.'], 422);
+        }
+        $servers = $servers->reject(fn ($server) => $server->isSwarm())->values();
+
+        $runningContainers = collect();
+        $disabledServers = collect();
+        foreach ($servers as $server) {
+            if ($this->isTerminalDisabledOn($server)) {
+                $disabledServers->push($server);
+
+                continue;
+            }
+
+            $rateLimitResponse = $this->enforceTerminalServerRateLimit($server, $teamId);
+            if ($rateLimitResponse instanceof JsonResponse) {
+                return $rateLimitResponse;
+            }
+
+            $containers = $this->runInTerminalServerSlot($server, $teamId, self::TERMINAL_COMMAND_TIMEOUT, fn () => getCurrentApplicationContainerStatus(
+                $server,
+                $application,
+                $pullRequestId,
+                includePullrequests: $pullRequestId === null,
+            ));
+            if ($containers instanceof JsonResponse) {
+                return $containers;
+            }
+
+            $containers
+                ->filter(fn ($container) => data_get($container, 'State') === 'running')
+                ->each(function ($container) use ($runningContainers, $server) {
+                    $runningContainers->push([
+                        'server' => $server,
+                        'container' => data_get($container, 'Names'),
+                    ]);
+                });
+        }
+
+        if ($runningContainers->isEmpty()) {
+            if ($servers->count() > 0 && $disabledServers->count() === $servers->count()) {
+                return response()->json(['message' => 'Terminal access is disabled on this server.'], 403);
+            }
+
+            return response()->json(['message' => 'No running application containers found.'], 404);
+        }
+
+        if ($requestedContainer !== '') {
+            $matchingTargets = $runningContainers
+                ->where('container', $requestedContainer)
+                ->values();
+
+            if ($matchingTargets->isEmpty()) {
+                return response()->json(['message' => 'Container not found for this application.'], 404);
+            }
+
+            if ($matchingTargets->count() > 1) {
+                return response()->json([
+                    'message' => 'Multiple servers contain this container. Specify a server_uuid.',
+                    'containers' => $matchingTargets->map(fn ($target) => [
+                        'server_uuid' => $target['server']->uuid,
+                        'container' => $target['container'],
+                    ]),
+                ], 422);
+            }
+
+            return $matchingTargets->first();
+        }
+
+        if ($runningContainers->count() > 1) {
+            return response()->json([
+                'message' => 'Multiple running containers found. Specify a container.',
+                'containers' => $runningContainers->map(fn ($target) => [
+                    'server_uuid' => $target['server']->uuid,
+                    'container' => $target['container'],
+                ])->values(),
+            ], 422);
+        }
+
+        return $runningContainers->first();
+    }
+
+    private function applicationDockerExecCommand(Server $server, string $container, string $command, int $timeout): string
+    {
+        $dockerCommand = 'docker exec '.escapeshellarg($container).' '.$this->withRemoteTimeout($command, $timeout);
+
+        if ($server->isNonRoot()) {
+            return "sudo {$dockerCommand}";
+        }
+
+        return $dockerCommand;
     }
 
     /**
@@ -524,6 +680,7 @@ class ApplicationsController extends Controller
                             'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
                             'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
                             'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
+                            'ip_allowlist' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
@@ -740,6 +897,7 @@ class ApplicationsController extends Controller
                             'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
                             'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
                             'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
+                            'ip_allowlist' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
@@ -955,6 +1113,7 @@ class ApplicationsController extends Controller
                             'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
                             'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
                             'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
+                            'ip_allowlist' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
@@ -1171,6 +1330,7 @@ class ApplicationsController extends Controller
                             'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
                             'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
                             'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
+                            'ip_allowlist' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
@@ -1357,6 +1517,7 @@ class ApplicationsController extends Controller
                             'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
                             'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
                             'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
+                            'ip_allowlist' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
@@ -1539,6 +1700,7 @@ class ApplicationsController extends Controller
                             'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'default' => 10, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
                             'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'default' => 65536, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
                             'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'default' => 4, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
+                            'ip_allowlist' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'],
                             'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
                             'force_domain_override' => ['type' => 'boolean', 'description' => 'Force domain usage even if conflicts are detected. Default is false.'],
                             'autogenerate_domain' => ['type' => 'boolean', 'default' => true, 'description' => 'If true and domains is empty, auto-generate a domain using the server\'s wildcard domain or sslip.io fallback. Ignored for the dockercompose build pack, which uses docker_compose_domains. Default: true.'],
@@ -1629,7 +1791,7 @@ class ApplicationsController extends Controller
         if ($return instanceof JsonResponse) {
             return $return;
         }
-        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'git_https_username', 'git_https_password', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'gitea_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'use_build_secrets', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled', 'tags', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
+        $allowedFields = ['project_uuid', 'environment_name', 'environment_uuid', 'server_uuid', 'destination_uuid', 'type', 'name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'git_https_username', 'git_https_password', 'private_key_uuid', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container',  'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'redirect', 'github_app_uuid', 'gitea_app_uuid', 'instant_deploy', 'dockerfile', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_raw', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'watch_paths', 'use_build_server', 'use_build_secrets', 'static_image', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost', 'ip_allowlist', 'connect_to_docker_network', 'force_domain_override', 'autogenerate_domain', 'is_container_label_escape_enabled', 'tags', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', ...self::APPLICATION_SETTING_FIELDS];
 
         $validator = customApiValidator($request->all(), [
             'name' => ValidationPatterns::nameRules(required: false, nullable: false),
@@ -2807,6 +2969,143 @@ class ApplicationsController extends Controller
         return response()->json(['message' => 'Invalid type.'], 400);
     }
 
+    #[OA\Post(
+        summary: 'Execute Command',
+        description: 'Execute a non-interactive shell command inside a running application container.',
+        path: '/applications/{uuid}/exec',
+        operationId: 'execute-command-on-application-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Application UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    required: ['command'],
+                    properties: [
+                        'command' => ['type' => 'string', 'description' => 'Shell command to execute in the application container.'],
+                        'timeout' => ['type' => 'integer', 'description' => 'Command timeout in seconds. Maximum 10 seconds. Defaults to 10 seconds.'],
+                        'container' => ['type' => 'string', 'description' => 'Optional container name when the application has multiple running containers.'],
+                        'server_uuid' => ['type' => 'string', 'description' => 'Optional server UUID when the application runs on multiple servers.'],
+                        'pull_request_id' => ['type' => 'integer', 'description' => 'Optional preview pull request identifier.'],
+                    ],
+                    type: 'object',
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Command finished.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'exit_code' => ['type' => 'integer'],
+                                'stdout' => ['type' => 'string'],
+                                'stderr' => ['type' => 'string'],
+                            ],
+                        ),
+                    ),
+                ],
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Terminal access is disabled on the target server, or the terminal API is disabled on the instance or for the team.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+            new OA\Response(response: 429, ref: '#/components/responses/TerminalRateLimited'),
+        ]
+    )]
+    public function execute_command(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $allowedFields = ['command', 'timeout', 'container', 'server_uuid', 'pull_request_id'];
+        $validator = customApiValidator($request->all(), [
+            'command' => 'required|string|max:20000|not_regex:/\x00/',
+            'timeout' => 'integer|nullable|min:1|max:10',
+            'container' => 'string|nullable|max:255',
+            'server_uuid' => 'string|nullable|max:255',
+            'pull_request_id' => 'integer|nullable|min:0',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $target = $this->resolveApplicationTerminalTarget($application, $request, $teamId);
+        if ($target instanceof JsonResponse) {
+            return $target;
+        }
+
+        // The discovery already counted this request toward the rate limit of the server.
+        $server = $target['server'];
+        $timeout = $request->integer('timeout') ?: self::TERMINAL_COMMAND_TIMEOUT;
+        $dockerCommand = $this->applicationDockerExecCommand($server, $target['container'], $request->command, $timeout);
+        try {
+            $process = $this->runConcurrentTerminalProcess($server, $teamId, $dockerCommand, $timeout);
+        } catch (ProcessTimedOutException) {
+            auditLog('api.application.command.executed', [
+                'team_id' => $teamId,
+                'application_uuid' => $application->uuid,
+                'application_name' => $application->name,
+                'server_uuid' => $server->uuid,
+                'container' => $target['container'],
+                'exit_code' => 124,
+            ]);
+
+            return $this->terminalTimedOutResponse($timeout);
+        }
+
+        if ($process instanceof JsonResponse) {
+            return $process;
+        }
+
+        auditLog('api.application.command.executed', [
+            'team_id' => $teamId,
+            'application_uuid' => $application->uuid,
+            'application_name' => $application->name,
+            'server_uuid' => $server->uuid,
+            'container' => $target['container'],
+            'exit_code' => $process->exitCode(),
+        ]);
+
+        return response()->json([
+            'exit_code' => $process->exitCode(),
+            'stdout' => $this->formatTerminalCommandOutput($process->output()),
+            'stderr' => $this->formatTerminalCommandOutput($process->errorOutput()),
+        ]);
+    }
+
     #[OA\Get(
         summary: 'Get',
         description: 'Get application by UUID.',
@@ -3513,6 +3812,7 @@ class ApplicationsController extends Controller
                             'manual_webhook_secret_bitbucket' => ['type' => 'string', 'description' => 'Manual webhook secret for Bitbucket. Needs the deploy ability.'],
                             'manual_webhook_secret_gitea' => ['type' => 'string', 'description' => 'Manual webhook secret for Gitea. Needs the deploy ability.'],
                             'redirect' => ['type' => 'string', 'nullable' => true, 'description' => 'How to set redirect with Traefik / Caddy. www<->non-www.', 'enum' => ['www', 'non-www', 'both']],
+                            'ip_allowlist' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'],
                             'instant_deploy' => ['type' => 'boolean', 'description' => 'The flag to indicate if the application should be deployed instantly.'],
                             'dockerfile' => ['type' => 'string', 'description' => 'The Dockerfile content.'],
                             'dockerfile_location' => ['type' => 'string', 'description' => 'The Dockerfile location in the repository.'],
@@ -3666,6 +3966,9 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('update', $application);
+        if ($response = $this->archiveSiteFieldsResponse($application, $request)) {
+            return $response;
+        }
         $settingsBefore = $application->settings->getAttributes();
 
         if ($request->has('redact_all_env_values_in_logs') || $request->has('include_coolify_default_variables')) {
@@ -3680,7 +3983,7 @@ class ApplicationsController extends Controller
         $dnsCleanup = app(ManagedDnsRecordCleanup::class);
         $previousDnsHostnames = $dnsCleanup->hostnamesOf($application);
         $server = $application->destination->server;
-        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'git_https_username', 'git_https_password', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'use_build_secrets', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', 'github_app_uuid', 'gitea_app_uuid', 'dockerfile', ...self::APPLICATION_SETTING_FIELDS];
+        $allowedFields = ['name', 'description', 'is_static', 'is_spa', 'is_auto_deploy_enabled', 'is_force_https_enabled', 'is_preview_deployments_enabled', 'domains', 'noindex_domains', 'git_repository', 'git_branch', 'git_commit_sha', 'git_https_username', 'git_https_password', 'docker_registry_image_name', 'docker_registry_image_tag', 'build_pack', 'static_image', 'install_command', 'build_command', 'start_command', 'ports_exposes', 'ports_mappings', 'custom_network_aliases', 'base_directory', 'publish_directory', 'health_check_enabled', 'health_check_type', 'health_check_command', 'health_check_path', 'health_check_port', 'health_check_host', 'health_check_method', 'health_check_return_code', 'health_check_scheme', 'health_check_response_text', 'health_check_interval', 'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'limits_memory', 'limits_memory_swap', 'limits_memory_swappiness', 'limits_memory_reservation', 'limits_cpus', 'limits_cpuset', 'limits_cpu_shares', 'custom_labels', 'custom_docker_run_options', 'post_deployment_command', 'post_deployment_command_container', 'pre_deployment_command', 'pre_deployment_command_container', 'watch_paths', 'manual_webhook_secret_github', 'manual_webhook_secret_gitlab', 'manual_webhook_secret_bitbucket', 'manual_webhook_secret_gitea', 'dockerfile_location', 'dockerfile_target_build', 'docker_compose_location', 'docker_compose_custom_start_command', 'docker_compose_custom_build_command', 'docker_compose_domains', 'redirect', 'instant_deploy', 'use_build_server', 'use_build_secrets', 'custom_nginx_configuration', 'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_hash_algorithm', 'http_basic_auth_bcrypt_cost', 'http_basic_auth_argon2id_memory_cost', 'http_basic_auth_argon2id_time_cost', 'ip_allowlist', 'connect_to_docker_network', 'force_domain_override', 'is_container_label_escape_enabled', 'is_preserve_repository_enabled', 'preview_url_template', 'max_restart_count', 'github_app_uuid', 'gitea_app_uuid', 'dockerfile', ...self::APPLICATION_SETTING_FIELDS];
 
         $validationRules = [
             'name' => ValidationPatterns::nameRules(required: false, nullable: false),
@@ -4231,6 +4534,9 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('view', $application);
+        if ($response = $this->archiveSiteEnvironmentVariablesResponse($application)) {
+            return $response;
+        }
 
         $envs = $application->environment_variables->sortBy('id')->merge($application->environment_variables_preview->sortBy('id'));
 
@@ -4344,6 +4650,9 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('manageEnvironment', $application);
+        if ($response = $this->archiveSiteEnvironmentVariablesResponse($application)) {
+            return $response;
+        }
 
         if ($request->has('key')) {
             $request->merge(['key' => ValidationPatterns::normalizeEnvironmentVariableKey((string) $request->key)]);
@@ -4508,6 +4817,9 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('manageEnvironment', $application);
+        if ($response = $this->archiveSiteEnvironmentVariablesResponse($application)) {
+            return $response;
+        }
 
         $bulk_data = $request->get('data');
         if (! $bulk_data) {
@@ -4702,6 +5014,9 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('manageEnvironment', $application);
+        if ($response = $this->archiveSiteEnvironmentVariablesResponse($application)) {
+            return $response;
+        }
 
         if ($request->has('key')) {
             $request->merge(['key' => ValidationPatterns::normalizeEnvironmentVariableKey((string) $request->key)]);
@@ -4887,6 +5202,9 @@ class ApplicationsController extends Controller
         }
 
         $this->authorize('manageEnvironment', $application);
+        if ($response = $this->archiveSiteEnvironmentVariablesResponse($application)) {
+            return $response;
+        }
 
         $found_env = EnvironmentVariable::where('uuid', $request->route('env_uuid'))
             ->where('resourceable_type', Application::class)

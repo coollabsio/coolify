@@ -19,6 +19,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -30,6 +31,7 @@ use App\Services\ImageScan\DeploymentImageScan;
 use App\Services\ProjectConfig\UnlinkedConfigFileHint;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
+use App\Support\StaticSiteArchive;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\ExecuteRemoteCommand;
@@ -46,8 +48,10 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use JsonException;
 use Spatie\Url\Url;
@@ -327,7 +331,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->restart_only = $this->application_deployment_queue->restart_only;
         // These build packs need the cloned repository to start, so a restart runs a regular deployment.
         // The deployment skips the build when the image for the commit exists.
-        $this->restart_only = $this->restart_only && ! in_array($this->application->build_pack, ['dockerimage', 'dockerfile', 'dockercompose'], true);
+        $this->restart_only = $this->restart_only && ! in_array($this->application->build_pack, ['dockerimage', 'dockerfile', 'dockercompose'], true) && ! $this->application->is_archive_source;
         $this->only_this_server = $this->application_deployment_queue->only_this_server;
         $this->dockerImagePreviewTag = $this->application_deployment_queue->docker_registry_image_tag;
         $this->validateDockerRegistryImageConfiguration();
@@ -715,6 +719,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         } elseif ($this->application->build_pack === 'dockerimage') {
             $this->deploy_dockerimage_buildpack();
+        } elseif ($this->application->is_archive_source) {
+            $this->deploy_static_archive();
         } elseif ($this->pull_request_id !== 0) {
             $this->deploy_pull_request();
         } elseif ($this->application->dockerfile) {
@@ -1665,6 +1671,170 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->push_to_docker_registry();
         $this->rolling_update();
+    }
+
+    /**
+     * A static site from an uploaded archive. The commit is the site version (see StaticSiteArchive).
+     * A deployment of an upload has its own archive and always builds. Any other deployment (redeploy,
+     * restart, rollback, additional server) never builds and runs the image of the version.
+     */
+    private function deploy_static_archive()
+    {
+        if ($this->pull_request_id !== 0) {
+            throw new DeploymentException('Preview deployments are not available for sites deployed from an uploaded archive.');
+        }
+        if (! preg_match('/^[0-9a-f]{40}$/', $this->commit)) {
+            throw new DeploymentException('No site archive was uploaded yet. Upload a .tar, .tar.gz, or .tgz archive to deploy the site.');
+        }
+        $archivePath = StaticSiteArchive::deploymentArchive($this->application, $this->deployment_uuid);
+        try {
+            $s3Archive = StaticSiteArchive::deploymentS3Archive($this->application, $this->deployment_uuid);
+        } catch (\RuntimeException $exception) {
+            StaticSiteArchive::deleteDeploymentArchive($this->application, $this->deployment_uuid);
+
+            throw new DeploymentException($exception->getMessage());
+        }
+        if (! Storage::exists($archivePath) && $s3Archive === null) {
+            $this->run_static_archive_image();
+
+            return;
+        }
+
+        try {
+            if ($this->use_build_server) {
+                $this->server = $this->build_server;
+            }
+            $this->application_deployment_queue->addLogEntry('Starting deployment of site version '.substr($this->commit, 0, 7)." to {$this->server->name}.");
+            $this->prepare_builder_image();
+            $this->generate_image_names();
+            $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
+            $this->create_workdir();
+            if ($s3Archive !== null) {
+                $this->extract_static_archive_from_s3($s3Archive['storage'], $s3Archive['key'], $s3Archive['archive']);
+            } else {
+                $this->extract_static_archive(Storage::path($archivePath));
+            }
+        } finally {
+            StaticSiteArchive::deleteDeploymentArchive($this->application, $this->deployment_uuid);
+        }
+        $this->generate_compose_file();
+
+        // Save build-time .env file BEFORE the build
+        $this->save_buildtime_environment_variables();
+
+        $this->build_static_image();
+
+        // Save runtime environment variables AFTER the build
+        $this->save_runtime_environment_variables();
+
+        $this->push_to_docker_registry();
+        $this->rolling_update();
+    }
+
+    private function run_static_archive_image()
+    {
+        if ($this->use_build_server) {
+            $this->server = $this->build_server;
+        }
+        $this->application_deployment_queue->addLogEntry('Starting site version '.substr($this->commit, 0, 7)." on {$this->server->name}.");
+        $this->prepare_builder_image();
+        $this->generate_image_names();
+        $this->check_image_locally_or_remotely();
+        if (str($this->saved_outputs->get('local_image_found'))->isEmpty()) {
+            throw new DeploymentException('This site version is no longer on the server. Upload the archive again.');
+        }
+        $this->application_deployment_queue->addLogEntry("Image found ({$this->production_image_name}). Build step skipped.");
+        $this->skip_build = true;
+        $this->generate_compose_file();
+        $this->save_runtime_environment_variables();
+        $this->push_to_docker_registry();
+        $this->rolling_update();
+    }
+
+    /**
+     * Downloads an archive from an S3 storage into the helper container with a presigned URL, so it does not go
+     * through Coolify. The archive was inspected when it was published, so its SHA-256 must still match.
+     */
+    private function extract_static_archive_from_s3(S3Storage $storage, string $key, StaticSiteArchive $archive)
+    {
+        $this->application_deployment_queue->addLogEntry("Downloading the site archive ({$archive->fileCount} files) from S3 storage {$storage->name} to {$this->server->name}.");
+
+        $helperPath = "/artifacts/static-archive-{$this->deployment_uuid}";
+        $safeHelperPath = escapeshellarg($helperPath);
+        try {
+            $download = $storage->prepareCurlDownload($this->server, $this->deployment_uuid, $key, $helperPath);
+            $this->execute_remote_command(
+                [
+                    $download,
+                    'hidden' => true,
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, 'test "$(sha256sum '.$safeHelperPath.' | cut -c1-40)" = '.escapeshellarg($archive->sha)
+                        .' || { echo "The site archive in the S3 storage changed after it was uploaded. Upload it again." >&2; exit 1; }'),
+                    'hidden' => true,
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, $archive->extractCommand($helperPath, $this->workdir)),
+                    'hidden' => true,
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, 'chmod -R u+rwX,go+rX '.escapeshellarg($this->workdir)),
+                    'hidden' => true,
+                ],
+            );
+        } finally {
+            $this->execute_remote_command(
+                [
+                    executeInDocker($this->deployment_uuid, 'rm -f '.$safeHelperPath.' /tmp/s3-transfer.curl'),
+                    'hidden' => true,
+                    'ignore_errors' => true,
+                ],
+            );
+        }
+    }
+
+    private function extract_static_archive(string $localPath)
+    {
+        try {
+            $archive = StaticSiteArchive::inspect($localPath);
+        } catch (ValidationException $exception) {
+            throw new DeploymentException('The uploaded site archive is not valid: '.$exception->getMessage());
+        }
+        $this->application_deployment_queue->addLogEntry("Copying the site archive ({$archive->fileCount} files) to {$this->server->name}.");
+
+        $serverPath = "/tmp/coolify-static-{$this->deployment_uuid}";
+        $helperPath = "/artifacts/static-archive-{$this->deployment_uuid}";
+        $safeServerPath = escapeshellarg($serverPath);
+        try {
+            instant_scp($localPath, $serverPath, $this->server);
+            $this->execute_remote_command(
+                [
+                    'docker cp '.$safeServerPath.' '.escapeshellarg("{$this->deployment_uuid}:{$helperPath}"),
+                    'hidden' => true,
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, $archive->extractCommand($helperPath, $this->workdir)),
+                    'hidden' => true,
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, 'chmod -R u+rwX,go+rX '.escapeshellarg($this->workdir)),
+                    'hidden' => true,
+                ],
+            );
+        } finally {
+            $this->execute_remote_command(
+                [
+                    'rm -f '.$safeServerPath,
+                    'hidden' => true,
+                    'ignore_errors' => true,
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, 'rm -f '.escapeshellarg($helperPath)),
+                    'hidden' => true,
+                    'ignore_errors' => true,
+                ],
+            );
+        }
     }
 
     private function write_deployment_configurations()

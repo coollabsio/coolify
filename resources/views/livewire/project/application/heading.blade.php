@@ -68,7 +68,8 @@
                                     {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment' : 'Deploy' }}
                                 </x-slot:main>
                                 @if (!$application->destination->server->isSwarm())
-                                    <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="deploy(true)"
+                                    <button type="button" class="listbox-option justify-start! gap-2.5! {{ $application->is_archive_source ? 'listbox-option-disabled' : '' }}" wire:click="deploy(true)"
+                                        @disabled($application->is_archive_source) @if ($application->is_archive_source) title="Archive sites build only from a new upload." @endif
                                         @click="open = false" role="menuitem">
                                         <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                         {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment (without cache)' : 'Deploy (without cache)' }}
@@ -99,8 +100,9 @@
                                         <x-reicon name="refresh" class="size-3.5" />
                                         Redeploy
                                     </x-slot:main>
-                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    <button type="button" class="listbox-option justify-start! gap-2.5! {{ $application->is_archive_source ? 'listbox-option-disabled' : '' }}"
                                         wire:click="{{ str($application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)' }}"
+                                        @disabled($application->is_archive_source) @if ($application->is_archive_source) title="Archive sites build only from a new upload." @endif
                                         @click="open = false" role="menuitem">
                                         <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                         Redeploy (without cache)
@@ -196,7 +198,8 @@
                                         {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment' : 'Deploy' }}
                                     </x-slot:main>
                                     @if (!$application->destination->server->isSwarm())
-                                        <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="deploy(true)"
+                                        <button type="button" class="listbox-option justify-start! gap-2.5! {{ $application->is_archive_source ? 'listbox-option-disabled' : '' }}" wire:click="deploy(true)"
+                                            @disabled($application->is_archive_source) @if ($application->is_archive_source) title="Archive sites build only from a new upload." @endif
                                             @click="open = false" role="menuitem">
                                             <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                             {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment (without cache)' : 'Deploy (without cache)' }}
@@ -227,8 +230,9 @@
                                             <x-reicon name="refresh" class="size-3.5" />
                                             Redeploy
                                         </x-slot:main>
-                                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        <button type="button" class="listbox-option justify-start! gap-2.5! {{ $application->is_archive_source ? 'listbox-option-disabled' : '' }}"
                                             wire:click="{{ str($application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)' }}"
+                                            @disabled($application->is_archive_source) @if ($application->is_archive_source) title="Archive sites build only from a new upload." @endif
                                             @click="open = false" role="menuitem">
                                             <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                             Redeploy (without cache)

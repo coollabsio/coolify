@@ -7,12 +7,14 @@ use App\Enums\BuildPackTypes;
 use App\Enums\HttpBasicAuthHashAlgorithm;
 use App\Enums\ProxyTypes;
 use App\Exceptions\DeploymentException;
+use App\Rules\ValidIpAllowlist;
 use App\Services\ConfigurationGenerator;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\DeploymentConfiguration\ConfigurationDiff;
 use App\Services\DeploymentConfiguration\ConfigurationDiffer;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
+use App\Support\StaticSiteArchive;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasComposeVolumeWarnings;
@@ -34,6 +36,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
@@ -102,6 +105,7 @@ use Symfony\Component\Yaml\Yaml;
         'private_key_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'Private key identifier.'],
         'environment_id' => ['type' => 'integer', 'description' => 'Environment identifier.'],
         'dockerfile' => ['type' => 'string', 'nullable' => true, 'description' => 'Dockerfile content. Used for dockerfile build pack.'],
+        'is_archive_source' => ['type' => 'boolean', 'description' => 'The static site is deployed from uploaded archives instead of a Git repository.'],
         'dockerfile_location' => ['type' => 'string', 'description' => 'Dockerfile location.'],
         'custom_labels' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom labels.'],
         'dockerfile_target_build' => ['type' => 'string', 'nullable' => true, 'description' => 'Dockerfile target build.'],
@@ -137,6 +141,7 @@ use Symfony\Component\Yaml\Yaml;
         'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
         'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
         'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
+        'ip_allowlist' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'],
         new OA\Property(property: 'settings', ref: '#/components/schemas/ApplicationSetting'),
     ]
 )]
@@ -149,6 +154,17 @@ class Application extends BaseModel
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 
     public const MAX_DOCKER_COMPOSE_COLLECTION_ALIASES = 256;
+
+    /**
+     * Configuration pages that do not apply to a site deployed from uploaded archives, as route name prefixes.
+     */
+    private const ARCHIVE_SITE_HIDDEN_ROUTES = [
+        'project.application.environment-variables',
+        'project.application.persistent-storage',
+        'project.application.backup.',
+        'project.application.scheduled-tasks',
+        'project.application.webhooks',
+    ];
 
     private static $parserVersion = '5';
 
@@ -230,6 +246,7 @@ class Application extends BaseModel
         'redirect',
         'compose_parsing_version',
         'custom_nginx_configuration',
+        'is_archive_source',
         'custom_network_aliases',
         'custom_healthcheck_found',
         'nixpkgsarchive',
@@ -240,6 +257,7 @@ class Application extends BaseModel
         'http_basic_auth_bcrypt_cost',
         'http_basic_auth_argon2id_memory_cost',
         'http_basic_auth_argon2id_time_cost',
+        'ip_allowlist',
         'connect_to_docker_network',
         'force_domain_override',
         'is_container_label_escape_enabled',
@@ -326,6 +344,7 @@ class Application extends BaseModel
             'is_maintenance_enabled' => 'boolean',
             'health_check_enabled' => 'boolean',
             'custom_healthcheck_found' => 'boolean',
+            'is_archive_source' => 'boolean',
         ];
     }
 
@@ -455,6 +474,7 @@ class Application extends BaseModel
         });
         static::forceDeleting(function ($application) {
             $application->update(['fqdn' => null]);
+            Storage::deleteDirectory(StaticSiteArchive::storageDirectory($application));
             $application->settings()->delete();
             $application->persistentStorages()->delete();
             $application->environment_variables()->delete();
@@ -1089,6 +1109,16 @@ class Application extends BaseModel
         return $this->getRawOriginal('status');
     }
 
+    /**
+     * Stores the allowlist as comma-separated unique entries, or null when empty.
+     */
+    protected function ipAllowlist(): Attribute
+    {
+        return Attribute::make(
+            set: fn (?string $value) => implode(',', ValidIpAllowlist::entries($value)) ?: null,
+        );
+    }
+
     protected function serverStatus(): Attribute
     {
         return Attribute::make(
@@ -1668,9 +1698,14 @@ class Application extends BaseModel
         return false;
     }
 
+    public function hasConfigurationPage(string $routeName): bool
+    {
+        return ! $this->is_archive_source || ! Str::startsWith($routeName, self::ARCHIVE_SITE_HIDDEN_ROUTES);
+    }
+
     public function git_based(): bool
     {
-        if ($this->dockerfile) {
+        if ($this->dockerfile || $this->is_archive_source) {
             return false;
         }
         if ($this->build_pack === 'dockerimage') {
