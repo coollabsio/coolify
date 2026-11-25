@@ -1145,25 +1145,39 @@
                                 "type": "string"
                             },
                             "missing_backup_notification_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 365
                             },
                             "retention_local_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_local_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_local_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "retention_s3_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_s3_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_s3_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "s3_storage": {
                                 "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
@@ -1188,7 +1202,9 @@
                                 "type": "boolean"
                             },
                             "timeout": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 60,
+                                "maximum": 36000
                             }
                         }
                     }
@@ -1542,25 +1558,39 @@
                                 "type": "string"
                             },
                             "missing_backup_notification_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 365
                             },
                             "retention_local_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_local_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_local_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "retention_s3_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_s3_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_s3_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "s3_storage": {
                                 "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
@@ -1585,7 +1615,9 @@
                                 "type": "boolean"
                             },
                             "timeout": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 60,
+                                "maximum": 36000
                             }
                         }
                     }
@@ -2033,25 +2065,39 @@
                                 "type": "string"
                             },
                             "missing_backup_notification_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 365
                             },
                             "retention_local_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_local_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_local_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "retention_s3_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_s3_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_s3_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "s3_storage": {
                                 "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
@@ -2076,7 +2122,9 @@
                                 "type": "boolean"
                             },
                             "timeout": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 60,
+                                "maximum": 36000
                             }
                         }
                     }
@@ -2534,25 +2582,39 @@
                                 "type": "string"
                             },
                             "missing_backup_notification_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 365
                             },
                             "retention_local_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_local_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_local_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "retention_s3_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_s3_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_s3_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "s3_storage": {
                                 "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
@@ -2577,7 +2639,9 @@
                                 "type": "boolean"
                             },
                             "timeout": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 60,
+                                "maximum": 36000
                             }
                         }
                     }
@@ -3023,25 +3087,39 @@
                                 "type": "string"
                             },
                             "missing_backup_notification_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 365
                             },
                             "retention_local_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_local_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_local_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "retention_s3_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_s3_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_s3_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "s3_storage": {
                                 "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
@@ -3066,7 +3144,9 @@
                                 "type": "boolean"
                             },
                             "timeout": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 60,
+                                "maximum": 36000
                             }
                         }
                     }
@@ -3524,25 +3604,39 @@
                                 "type": "string"
                             },
                             "missing_backup_notification_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 365
                             },
                             "retention_local_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_local_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_local_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "retention_s3_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_s3_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_s3_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "s3_storage": {
                                 "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
@@ -3567,7 +3661,9 @@
                                 "type": "boolean"
                             },
                             "timeout": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 60,
+                                "maximum": 36000
                             }
                         }
                     }
@@ -4001,25 +4097,39 @@
                                 "type": "string"
                             },
                             "missing_backup_notification_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 365
                             },
                             "retention_local_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_local_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_local_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "retention_s3_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_s3_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_s3_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "s3_storage": {
                                 "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
@@ -4044,7 +4154,9 @@
                                 "type": "boolean"
                             },
                             "timeout": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 60,
+                                "maximum": 36000
                             }
                         }
                     }
@@ -4478,25 +4590,39 @@
                                 "type": "string"
                             },
                             "missing_backup_notification_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 365
                             },
                             "retention_local_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_local_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_local_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "retention_s3_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_s3_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_s3_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "s3_storage": {
                                 "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
@@ -4521,7 +4647,9 @@
                                 "type": "boolean"
                             },
                             "timeout": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 60,
+                                "maximum": 36000
                             }
                         }
                     }
@@ -4943,25 +5071,39 @@
                                 "type": "string"
                             },
                             "missing_backup_notification_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 365
                             },
                             "retention_local_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_local_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_local_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "retention_s3_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_s3_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_s3_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "s3_storage": {
                                 "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
@@ -4986,7 +5128,9 @@
                                 "type": "boolean"
                             },
                             "timeout": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 60,
+                                "maximum": 36000
                             }
                         }
                     }
@@ -5414,25 +5558,39 @@
                                 "type": "string"
                             },
                             "missing_backup_notification_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 365
                             },
                             "retention_local_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_local_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_local_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "retention_s3_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_s3_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_s3_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "s3_storage": {
                                 "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
@@ -5457,7 +5615,9 @@
                                 "type": "boolean"
                             },
                             "timeout": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 60,
+                                "maximum": 36000
                             }
                         }
                     }
@@ -5855,25 +6015,39 @@
                                 "type": "string"
                             },
                             "missing_backup_notification_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 365
                             },
                             "retention_local_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_local_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_local_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "retention_s3_amount": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 10000
                             },
                             "retention_s3_days": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 2147483647
                             },
                             "retention_s3_max_storage": {
-                                "type": "number"
+                                "type": "number",
+                                "minimum": 0,
+                                "maximum": 9999999999
                             },
                             "s3_storage": {
                                 "description": "Name of the S3 storage, or a list of names. The first one is the primary destination.",
@@ -5898,7 +6072,9 @@
                                 "type": "boolean"
                             },
                             "timeout": {
-                                "type": "integer"
+                                "type": "integer",
+                                "minimum": 60,
+                                "maximum": 36000
                             }
                         }
                     }

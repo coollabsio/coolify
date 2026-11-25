@@ -18250,7 +18250,7 @@ paths:
       tags:
         - Applications
       summary: 'Get application storage backup schedule'
-      description: 'Get the backup schedule of a application storage.'
+      description: 'Get the backup schedule of an application storage.'
       operationId: get-application-storage-backup-schedule
       parameters:
         -
@@ -18268,8 +18268,14 @@ paths:
       responses:
         '200':
           description: 'Backup schedule.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolumeBackupScheduleResponse'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: Forbidden.
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -18384,8 +18390,14 @@ paths:
       responses:
         '200':
           description: 'Backup schedule.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolumeBackupScheduleResponse'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: Forbidden.
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -18500,8 +18512,14 @@ paths:
       responses:
         '200':
           description: 'Backup schedule.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolumeBackupScheduleResponse'
         '401':
           $ref: '#/components/responses/401'
+        '403':
+          description: Forbidden.
         '404':
           $ref: '#/components/responses/404'
       security:
@@ -20164,7 +20182,6 @@ components:
     VolumeBackupScheduleResponse:
       required:
         - uuid
-        - message
         - storage_uuid
         - storage_type
         - frequency
@@ -20184,6 +20201,7 @@ components:
         uuid:
           type: string
         message:
+          description: 'Only in the response of a create or replace.'
           type: string
         storage_uuid:
           type: string

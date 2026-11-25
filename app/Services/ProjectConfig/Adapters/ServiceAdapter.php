@@ -334,6 +334,7 @@ class ServiceAdapter implements ResourceAdapter
     {
         $base = "resources.{$key}";
         $errors = SecretManager::errors($base, $desired['secret_manager'] ?? null, $ctx->teamId);
+        $errors = [...$errors, ...SecretManager::referenceErrors($base, $desired['secret_manager'] ?? null, $desired['env'] ?? null, checkRefs: false)];
 
         $hasTemplate = isset($desired['template']);
         $hasCompose = isset($desired['compose']);
@@ -387,6 +388,7 @@ class ServiceAdapter implements ResourceAdapter
 
     /**
      * The file keys of the named volumes of a Compose file, as the parser names them without the service UUID.
+     * External and network (CIFS, NFS) volumes are left out, because the parser makes no storage for them.
      *
      * @return list<string>
      */
@@ -398,7 +400,15 @@ class ServiceAdapter implements ResourceAdapter
             return [];
         }
 
-        return array_map(fn ($name) => Str::slug((string) $name, '-'), array_keys((array) ($parsed['volumes'] ?? [])));
+        $keys = [];
+        foreach ((array) ($parsed['volumes'] ?? []) as $name => $declaration) {
+            if (isComposeExternalVolume($declaration) || in_array(data_get($declaration, 'driver_opts.type'), ['cifs', 'nfs'], true)) {
+                continue;
+            }
+            $keys[] = Str::slug((string) $name, '-');
+        }
+
+        return $keys;
     }
 
     /**

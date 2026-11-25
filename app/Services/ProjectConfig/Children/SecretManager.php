@@ -171,27 +171,43 @@ class SecretManager implements ChildRecords
     }
 
     /**
-     * Variables that read a source the file does not link. Without this check, the plan passes and the next deployment fails.
+     * Variables that read a source the file does not link, or that hold text which looks like a vault reference
+     * but is not one. Without this check, the plan passes and the next deployment fails or keeps the text.
      * `vault.KEY` needs the `default` source once the file links any source.
      *
+     * @param  bool  $checkRefs  False for resources that reject vault refs with their own error
      * @return list<ConfigError>
      */
-    public static function referenceErrors(string $base, mixed $desired, mixed $env): array
+    public static function referenceErrors(string $base, mixed $desired, mixed $env, bool $checkRefs = true): array
     {
         $names = array_column(self::sources($desired), 'name');
         $errors = [];
         foreach ((array) $env as $key => $entry) {
-            $ref = is_array($entry) ? ($entry['ref'] ?? null) : null;
-            if (! is_string($ref) || ! str_starts_with($ref, 'vault.')) {
+            if (! is_array($entry)) {
                 continue;
             }
-            $parts = explode('.', $ref);
-            $source = count($parts) === 3 ? $parts[1] : RemoteSecretReferences::DEFAULT_SOURCE;
-            if (count($parts) === 2 && $names === []) {
-                continue;
-            }
-            if (! in_array($source, $names, true)) {
-                $errors[] = new ConfigError("{$base}.env.{$key}.ref", "The secret_manager of this resource has no source named \"{$source}\".");
+            foreach (['' => $entry, '.preview' => $entry['preview'] ?? null] as $suffix => $variant) {
+                if (! is_array($variant)) {
+                    continue;
+                }
+                $texts = ['value' => is_string($variant['value'] ?? null) ? $variant['value'] : null];
+                if ($checkRefs && is_string($variant['ref'] ?? null)) {
+                    $texts['ref'] = '{{'.$variant['ref'].'}}';
+                }
+                foreach ($texts as $field => $text) {
+                    $path = "{$base}.env.{$key}{$suffix}.{$field}";
+                    foreach (RemoteSecretReferences::malformed($text) as $malformed) {
+                        $errors[] = new ConfigError($path, "\"{$malformed}\" is not a vault reference. Use {{vault.KEY}} or {{vault.<source>.KEY}} with a lowercase source name.");
+                    }
+                    foreach (RemoteSecretReferences::referencedSources($text) as $source) {
+                        if ($source === RemoteSecretReferences::DEFAULT_SOURCE && $names === []) {
+                            continue;
+                        }
+                        if (! in_array($source, $names, true)) {
+                            $errors[] = new ConfigError($path, "The secret_manager of this resource has no source named \"{$source}\".");
+                        }
+                    }
+                }
             }
         }
 

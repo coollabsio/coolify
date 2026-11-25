@@ -335,6 +335,7 @@ class StandaloneDatabaseAdapter implements ResourceAdapter
     {
         $base = "resources.{$key}";
         $errors = SecretManager::errors($base, $desired['secret_manager'] ?? null, $ctx->teamId);
+        $errors = [...$errors, ...SecretManager::referenceErrors($base, $desired['secret_manager'] ?? null, $desired['env'] ?? null, checkRefs: false)];
 
         $server = $this->server($desired, $ctx);
         if ($server !== null && ($message = $this->destinationError($server, $desired['destination'] ?? null)) !== null) {

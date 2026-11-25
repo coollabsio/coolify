@@ -227,3 +227,61 @@ it('removes every schedule when storage_backups is an empty object', function ()
         ->and(ScheduledVolumeBackup::query()->exists())->toBeFalse()
         ->and(LocalPersistentVolume::query()->exists())->toBeTrue();
 });
+
+it('rejects retention values outside the API limits', function () {
+    $plan = storageBackupsPlan(storageBackupsApp(['storage_backups' => ['app-data' => [
+        'frequency' => 'daily',
+        'retention_local_amount' => -1,
+        'retention_s3_days' => '7d',
+        'retention_local_max_storage' => 1.5,
+        'missing_backup_notification_days' => 400,
+    ]]]));
+
+    expect(array_map(fn ($e) => $e->path, $plan->errors))->toEqualCanonicalizing([
+        'resources.api.storage_backups.app-data.retention_local_amount',
+        'resources.api.storage_backups.app-data.retention_s3_days',
+        'resources.api.storage_backups.app-data.missing_backup_notification_days',
+    ]);
+});
+
+it('rejects external and network volumes of a Compose service, which get no storage', function () {
+    $compose = "services:\n  web:\n    image: 'nginx:alpine'\n    volumes:\n      - 'shared:/shared'\n      - 'nfs-data:/nfs'\nvolumes:\n  shared:\n    external: true\n  nfs-data:\n    driver_opts:\n      type: nfs\n";
+
+    $plan = storageBackupsPlan(['stack' => [
+        'type' => 'service', 'server' => 'prod-1', 'compose' => $compose,
+        'storage_backups' => ['shared' => ['frequency' => 'daily'], 'nfs-data' => ['frequency' => 'daily']],
+    ]]);
+
+    expect(array_map(fn ($e) => $e->path, $plan->errors))->toEqualCanonicalizing([
+        'resources.stack.storage_backups.shared',
+        'resources.stack.storage_backups.nfs-data',
+    ]);
+});
+
+it('warns about schedules of a Compose application whose volumes do not exist yet', function () {
+    $plan = storageBackupsPlan(storageBackupsApp(['build' => ['pack' => 'dockercompose'], 'storages' => [], 'storage_backups' => ['db-data' => ['frequency' => 'daily']]]));
+
+    expect($plan->errors)->toBe([])
+        ->and($plan->warnings)->toHaveCount(1)
+        ->and($plan->warnings[0])->toStartWith('resources.api.storage_backups.db-data:');
+});
+
+it('keeps one schedule for a volume that two containers of a Compose service mount', function () {
+    $compose = "services:\n  web:\n    image: 'nginx:alpine'\n    volumes:\n      - 'app-data:/data'\n  worker:\n    image: 'nginx:alpine'\n    volumes:\n      - 'app-data:/data'\nvolumes:\n  app-data: {}\n";
+    $desired = ['stack' => ['type' => 'service', 'server' => 'prod-1', 'compose' => $compose]];
+    storageBackupsApply($desired);
+    $rows = LocalPersistentVolume::query()->orderBy('id')->get();
+    expect($rows)->toHaveCount(2);
+    foreach ($rows as $row) {
+        $row->scheduledBackups()->create(['team_id' => $this->fx['team']->id, 'frequency' => 'daily']);
+    }
+
+    $revision = storageBackupsApply(['stack' => [...$desired['stack'], 'storage_backups' => ['app-data' => ['frequency' => 'hourly']]]]);
+    expect($revision->status->value)->toBe('applied', (string) $revision->error)
+        ->and(ScheduledVolumeBackup::query()->pluck('frequency')->all())->toBe(['hourly']);
+
+    $rows->last()->scheduledBackups()->create(['team_id' => $this->fx['team']->id, 'frequency' => 'daily']);
+    $revision = storageBackupsApply(['stack' => [...$desired['stack'], 'storage_backups' => new stdClass]]);
+    expect($revision->status->value)->toBe('applied', (string) $revision->error)
+        ->and(ScheduledVolumeBackup::query()->exists())->toBeFalse();
+});

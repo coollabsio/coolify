@@ -45,10 +45,10 @@ use RuntimeException;
 )]
 #[OA\Schema(
     schema: 'VolumeBackupScheduleResponse',
-    required: ['uuid', 'message', 'storage_uuid', 'storage_type', 'frequency', 'enabled', 'save_s3', 'disable_local_backup', 'stop_during_backup', 'retention_amount_locally', 'retention_days_locally', 'retention_max_storage_locally', 'retention_amount_s3', 'retention_days_s3', 'retention_max_storage_s3', 'timeout', 'missing_backup_notification_days'],
+    required: ['uuid', 'storage_uuid', 'storage_type', 'frequency', 'enabled', 'save_s3', 'disable_local_backup', 'stop_during_backup', 'retention_amount_locally', 'retention_days_locally', 'retention_max_storage_locally', 'retention_amount_s3', 'retention_days_s3', 'retention_max_storage_s3', 'timeout', 'missing_backup_notification_days'],
     properties: [
         new OA\Property(property: 'uuid', type: 'string'),
-        new OA\Property(property: 'message', type: 'string'),
+        new OA\Property(property: 'message', type: 'string', description: 'Only in the response of a create or replace.'),
         new OA\Property(property: 'storage_uuid', type: 'string'),
         new OA\Property(property: 'storage_type', type: 'string', enum: ['persistent', 'directory']),
         new OA\Property(property: 'frequency', type: 'string'),
@@ -337,7 +337,7 @@ class VolumeBackupsController extends Controller
 
     #[OA\Get(
         summary: 'Get application storage backup schedule',
-        description: 'Get the backup schedule of a application storage.',
+        description: 'Get the backup schedule of an application storage.',
         path: '/applications/{uuid}/storages/{storage_uuid}/backups',
         operationId: 'get-application-storage-backup-schedule',
         security: [['bearerAuth' => []]],
@@ -347,8 +347,9 @@ class VolumeBackupsController extends Controller
             new OA\Parameter(name: 'storage_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
-            new OA\Response(response: 200, description: 'Backup schedule.'),
+            new OA\Response(response: 200, description: 'Backup schedule.', content: new OA\JsonContent(ref: '#/components/schemas/VolumeBackupScheduleResponse')),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Forbidden.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ],
     )]
@@ -364,8 +365,9 @@ class VolumeBackupsController extends Controller
             new OA\Parameter(name: 'storage_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
-            new OA\Response(response: 200, description: 'Backup schedule.'),
+            new OA\Response(response: 200, description: 'Backup schedule.', content: new OA\JsonContent(ref: '#/components/schemas/VolumeBackupScheduleResponse')),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Forbidden.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ],
     )]
@@ -381,8 +383,9 @@ class VolumeBackupsController extends Controller
             new OA\Parameter(name: 'storage_uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
-            new OA\Response(response: 200, description: 'Backup schedule.'),
+            new OA\Response(response: 200, description: 'Backup schedule.', content: new OA\JsonContent(ref: '#/components/schemas/VolumeBackupScheduleResponse')),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Forbidden.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
         ],
     )]

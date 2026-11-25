@@ -29004,7 +29004,7 @@
                     "Applications"
                 ],
                 "summary": "Get application storage backup schedule",
-                "description": "Get the backup schedule of a application storage.",
+                "description": "Get the backup schedule of an application storage.",
                 "operationId": "get-application-storage-backup-schedule",
                 "parameters": [
                     {
@@ -29026,10 +29026,20 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Backup schedule."
+                        "description": "Backup schedule.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/VolumeBackupScheduleResponse"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Forbidden."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -29198,10 +29208,20 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Backup schedule."
+                        "description": "Backup schedule.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/VolumeBackupScheduleResponse"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Forbidden."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -29370,10 +29390,20 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Backup schedule."
+                        "description": "Backup schedule.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/VolumeBackupScheduleResponse"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Forbidden."
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
@@ -31846,7 +31876,6 @@
             "VolumeBackupScheduleResponse": {
                 "required": [
                     "uuid",
-                    "message",
                     "storage_uuid",
                     "storage_type",
                     "frequency",
@@ -31868,6 +31897,7 @@
                         "type": "string"
                     },
                     "message": {
+                        "description": "Only in the response of a create or replace.",
                         "type": "string"
                     },
                     "storage_uuid": {

@@ -83,6 +83,7 @@ class ConfigPlanner
         }
 
         $missingRequired = [];
+        $volumeWarnings = [];
         foreach ($env->resources as $key => $desired) {
             $type = $desired['type'];
             if (! $this->registry->has($type)) {
@@ -99,6 +100,8 @@ class ConfigPlanner
                 ...$this->checkActor($key, $desired, $ctx),
                 ...$adapter->validate($key, $desired, $ctx, $current[1] ?? null),
             ];
+
+            $volumeWarnings = [...$volumeWarnings, ...(new StorageBackups)->pendingVolumeWarnings($key, $desired, $current[1] ?? null)];
 
             $missing = $this->missingRequired($desired, $current[1] ?? null);
             if ($missing !== []) {
@@ -149,7 +152,7 @@ class ConfigPlanner
         return new ConfigPlan(
             changes: $changes,
             errors: $errors,
-            warnings: $ctx->template ? [] : [...$this->moveWarnings($changes), ...$this->unmanagedWarnings($ctx, $importedIds)],
+            warnings: $ctx->template ? [] : [...$this->moveWarnings($changes), ...$this->unmanagedWarnings($ctx, $importedIds), ...$volumeWarnings],
             stateHash: $stateHash,
             missingRequired: $missingRequired,
             removesAll: $env->resources === [],

@@ -327,3 +327,37 @@ it('rejects a vault reference to a source that the file does not link', function
 
     expect(array_map(fn ($e) => $e->path, $errors))->toBe(['resources.api.env.BROKEN.ref', 'resources.api.env.APP_KEY.ref']);
 });
+
+it('rejects vault references in values that read a source the file does not link or that are malformed', function () {
+    IntegrationToken::factory()->create(['team_id' => $this->fx['team']->id, 'provider' => 'doppler', 'name' => 'doppler-prod', 'capabilities' => ['secrets']]);
+
+    $errors = $this->adapter->validate('api', childWriteDesired([
+        'secret_manager' => [['name' => 'urls', 'token' => 'doppler-prod']],
+        'env' => [
+            'OK' => ['value' => 'https://{{vault.urls.HOST}}/api'],
+            'MISSING' => ['value' => 'x-{{vault.nope.X}}'],
+            'UPPER' => ['value' => '{{vault.URLS.HOST}}'],
+            'PREVIEW' => ['value' => 'a', 'preview' => ['value' => '{{vault.nope.Y}}']],
+        ],
+    ]), $this->ctx);
+
+    expect(array_map(fn ($e) => $e->path, $errors))->toBe([
+        'resources.api.env.MISSING.value',
+        'resources.api.env.UPPER.value',
+        'resources.api.env.PREVIEW.preview.value',
+    ]);
+});
+
+it('rejects vault references in service and database values that read a source the file does not link', function (string $type, array $desired) {
+    $errors = app(AdapterRegistry::class)->for($type)->validate('res', [
+        ...$desired,
+        'type' => $type,
+        'server' => 'prod-1',
+        'env' => ['URL' => ['value' => '{{vault.urls.URL}}'], 'KEY' => ['value' => '{{vault.KEY}}']],
+    ], $this->ctx);
+
+    expect(array_map(fn ($e) => $e->path, $errors))->toBe(['resources.res.env.URL.value']);
+})->with([
+    'service' => ['service', ['compose' => "services:\n  web:\n    image: 'nginx:alpine'\n"]],
+    'database' => ['postgresql', []],
+]);

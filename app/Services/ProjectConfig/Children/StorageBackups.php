@@ -39,6 +39,18 @@ class StorageBackups implements ChildRecords
         'missing_backup_notification_days' => ['missing_backup_notification_days', 0, 'integer'],
     ];
 
+    /** file key => [minimum, maximum], the same limits as the API */
+    private const RANGES = [
+        'retention_local_amount' => [0, 10000],
+        'retention_local_days' => [0, 2147483647],
+        'retention_local_max_storage' => [0, 9999999999],
+        'retention_s3_amount' => [0, 10000],
+        'retention_s3_days' => [0, 2147483647],
+        'retention_s3_max_storage' => [0, 9999999999],
+        'timeout' => [60, 36000],
+        'missing_backup_notification_days' => [0, 365],
+    ];
+
     public function key(): string
     {
         return 'storage_backups';
@@ -70,8 +82,8 @@ class StorageBackups implements ChildRecords
     public function read(Model $owner): ?array
     {
         $result = [];
-        foreach ($this->volumes($owner) as $key => $volume) {
-            $backup = $volume->scheduledBackups()->with(['s3', 's3Storages'])->first();
+        foreach ($this->volumes($owner) as $key => $rows) {
+            $backup = $rows->first()->scheduledBackups()->with(['s3', 's3Storages'])->first();
             if ($backup === null) {
                 continue;
             }
@@ -155,6 +167,9 @@ class StorageBackups implements ChildRecords
         ];
         foreach (self::FIELDS as $path => [, , $jsonType]) {
             $properties[$path] = ['type' => $jsonType];
+            if (isset(self::RANGES[$path])) {
+                [$properties[$path]['minimum'], $properties[$path]['maximum']] = self::RANGES[$path];
+            }
         }
         ksort($properties);
 
@@ -198,13 +213,15 @@ class StorageBackups implements ChildRecords
                     $errors[] = new ConfigError("{$path}.s3_storage", $message);
                 }
             }
-            $timeout = $entry['timeout'] ?? ScheduledVolumeBackup::DEFAULT_TIMEOUT;
-            if (! is_int($timeout) || $timeout < 60 || $timeout > 36000) {
-                $errors[] = new ConfigError("{$path}.timeout", 'Use a number of seconds from 60 to 36000.');
-            }
-            $alertDays = $entry['missing_backup_notification_days'] ?? 0;
-            if (! is_int($alertDays) || $alertDays < 0 || $alertDays > 365) {
-                $errors[] = new ConfigError("{$path}.missing_backup_notification_days", 'Use a number of days from 0 to 365.');
+            foreach (self::RANGES as $field => [$min, $max]) {
+                if (! array_key_exists($field, $entry)) {
+                    continue;
+                }
+                $value = $entry[$field];
+                $isNumber = self::FIELDS[$field][2] === 'integer' ? is_int($value) : (is_int($value) || is_float($value));
+                if (! $isNumber || $value < $min || $value > $max) {
+                    $errors[] = new ConfigError("{$path}.{$field}", "Use a number from {$min} to {$max}.");
+                }
             }
         }
 
@@ -230,17 +247,15 @@ class StorageBackups implements ChildRecords
 
     /**
      * Removes the schedules that the file no longer has. It runs before the storages are written,
-     * because a volume with a schedule cannot be deleted. The backup archives stay.
+     * because a volume with a schedule cannot be deleted. The archive files stay on the server and in S3,
+     * but Coolify no longer lists them, as when a schedule is deleted in the dashboard without its archives.
      */
     public function prune(Model $owner, mixed $desired): void
     {
         $desired = is_array($desired) ? $desired : [];
-        foreach ($this->volumes($owner) as $key => $volume) {
-            if (array_key_exists($key, $desired)) {
-                continue;
-            }
-            foreach ($volume->scheduledBackups()->get() as $backup) {
-                DeleteScheduledVolumeBackup::run($backup, deleteLocalArchives: false, deleteS3Archives: false);
+        foreach ($this->volumes($owner) as $key => $rows) {
+            if (! array_key_exists($key, $desired)) {
+                $this->deleteSchedules($rows);
             }
         }
     }
@@ -256,8 +271,8 @@ class StorageBackups implements ChildRecords
         $volumes = $this->volumes($owner);
 
         foreach ($desired as $key => $entry) {
-            $volume = $volumes[(string) $key] ?? null;
-            if ($volume === null) {
+            $rows = $volumes[(string) $key] ?? null;
+            if ($rows === null) {
                 continue;
             }
             $entry = (array) $entry;
@@ -277,36 +292,70 @@ class StorageBackups implements ChildRecords
             }
             $attributes['disable_local_backup'] = $saveS3 && $attributes['disable_local_backup'];
 
-            $backup = $volume->scheduledBackups()->updateOrCreate([], $attributes);
+            $backup = $rows->first()->scheduledBackups()->updateOrCreate([], $attributes);
             $backup->syncS3Storages($saveS3 ? $storageIds : []);
+            // One schedule per volume: the other containers that mount the same volume lose theirs.
+            $this->deleteSchedules($rows->slice(1));
         }
     }
 
     /**
-     * The volumes that can have a schedule, by file key. A Compose service gives the volumes of all its containers;
-     * a volume that several containers share is listed once.
+     * Plan warnings for the schedules of a Compose application whose volumes do not exist yet. The volumes of a
+     * Compose application are known only after a deployment, so a schedule for a volume that does not exist yet
+     * is added at the first apply after a deployment creates it. A name that no deployment creates never gets one.
      *
-     * @return Collection<string, LocalPersistentVolume>
+     * @return list<string>
+     */
+    public function pendingVolumeWarnings(string $key, array $desired, ?Model $current): array
+    {
+        if (($desired['type'] ?? null) !== 'application' || ($desired['build']['pack'] ?? null) !== 'dockercompose') {
+            return [];
+        }
+        $existing = $current === null ? collect() : $this->volumes($current);
+        $warnings = [];
+        foreach (array_keys((array) ($desired['storage_backups'] ?? [])) as $volume) {
+            if (! $existing->has((string) $volume)) {
+                $warnings[] = "resources.{$key}.storage_backups.{$volume}: the application has no volume with this name yet. Coolify adds the schedule at the first apply after a deployment creates the volume.";
+            }
+        }
+
+        return $warnings;
+    }
+
+    /**
+     * @param  Collection<int, LocalPersistentVolume>  $rows
+     */
+    private function deleteSchedules(Collection $rows): void
+    {
+        foreach ($rows as $volume) {
+            foreach ($volume->scheduledBackups()->get() as $backup) {
+                DeleteScheduledVolumeBackup::run($backup, deleteLocalArchives: false, deleteS3Archives: false);
+            }
+        }
+    }
+
+    /**
+     * The volumes that can have a schedule, by file key. In a Compose service, several containers can mount the
+     * same volume, so each key has a list of rows. The first row holds the schedule: a row that has one, or else the oldest row.
+     *
+     * @return Collection<string, Collection<int, LocalPersistentVolume>>
      */
     public function volumes(Model $owner): Collection
     {
         $owners = $owner instanceof Service ? $owner->applications()->get()->concat($owner->databases()->get()) : collect([$owner]);
         $keys = new PersistentStorages;
-        $result = collect();
+        $rows = collect();
         foreach ($owners as $resource) {
-            $rows = LocalPersistentVolume::query()
+            $rows = $rows->concat(LocalPersistentVolume::query()
                 ->where('resource_type', $resource->getMorphClass())
                 ->where('resource_id', $resource->getKey())
+                ->withExists('scheduledBackups')
                 ->orderBy('id')
-                ->get();
-            foreach ($rows as $volume) {
-                $key = $keys->keyFor($owner, $volume->name);
-                if (! $result->has($key) || ($volume->scheduledBackups()->exists() && ! $result[$key]->scheduledBackups()->exists())) {
-                    $result[$key] = $volume;
-                }
-            }
+                ->get());
         }
 
-        return $result;
+        return $rows
+            ->groupBy(fn (LocalPersistentVolume $volume) => $keys->keyFor($owner, $volume->name))
+            ->map(fn (Collection $group) => $group->sortBy([['scheduled_backups_exists', 'desc'], ['id', 'asc']])->values());
     }
 }

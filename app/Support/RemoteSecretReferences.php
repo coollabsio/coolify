@@ -18,6 +18,9 @@ class RemoteSecretReferences
 {
     public const PATTERN = '/{{\s*vault\.(?:([a-z0-9][a-z0-9_-]{0,62})\.)?([A-Za-z0-9_]+)\s*}}/';
 
+    /** Any text that starts like a reference, also one that PATTERN does not accept, such as `{{vault.URLS.KEY}}` */
+    private const LOOSE_PATTERN = '/{{\s*vault\.[^}]*}}/';
+
     public const DEFAULT_SOURCE = 'default';
 
     public const SOURCE_NAME_PATTERN = '/^[a-z0-9][a-z0-9_-]{0,62}$/';
@@ -30,6 +33,21 @@ class RemoteSecretReferences
     public static function containsReference(?string $value): bool
     {
         return filled($value) && preg_match(self::PATTERN, $value) === 1;
+    }
+
+    /**
+     * Texts that look like references but do not match PATTERN, so a deployment would keep them as text.
+     *
+     * @return list<string>
+     */
+    public static function malformed(?string $value): array
+    {
+        if (blank($value)) {
+            return [];
+        }
+        preg_match_all(self::LOOSE_PATTERN, $value, $matches);
+
+        return array_values(array_unique(array_filter($matches[0], fn (string $text) => preg_match(self::PATTERN, $text) !== 1)));
     }
 
     /**
