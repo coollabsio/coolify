@@ -11,8 +11,10 @@ services:
     environment:
       - SERVICE_URL_MONICA_80
       - APP_KEY=$SERVICE_BASE64_APPKEY
+      - HASH_SALT=$SERVICE_PASSWORD_64_HASHSALT
       - APP_ENV=production
-      - APP_URL=$SERVICE_URL_MONICA_80
+      - APP_URL=$SERVICE_URL_MONICA
+      - APP_TRUSTED_PROXIES=*
       - DB_CONNECTION=mysql
       - DB_HOST=mariadb
       - DB_PORT=3306
@@ -29,6 +31,29 @@ services:
       retries: 10
     depends_on:
       mariadb:
+        condition: service_healthy
+
+  monica-cron:
+    image: monica:4.1.2-apache
+    command: cron.sh
+    environment:
+      - APP_KEY=$SERVICE_BASE64_APPKEY
+      - HASH_SALT=$SERVICE_PASSWORD_64_HASHSALT
+      - APP_ENV=production
+      - APP_URL=$SERVICE_URL_MONICA
+      - APP_TRUSTED_PROXIES=*
+      - DB_CONNECTION=mysql
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - DB_DATABASE=${MARIADB_DATABASE:-monica}
+      - DB_USERNAME=$SERVICE_USER_MARIADB
+      - DB_PASSWORD=$SERVICE_PASSWORD_MARIADB
+      - DB_USE_UTF8MB4=true
+    volumes:
+      - monica-storage:/var/www/html/storage
+    exclude_from_hc: true
+    depends_on:
+      monica:
         condition: service_healthy
 
   mariadb:
