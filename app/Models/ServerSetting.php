@@ -6,6 +6,7 @@ use App\Enums\LogDrainType;
 use App\Enums\ServerRole;
 use App\Enums\TrafficIpMode;
 use App\Helpers\SshMultiplexingHelper;
+use App\Jobs\RefreshImageScanSummariesJob;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -316,6 +317,10 @@ class ServerSetting extends Model
             }
             if ($settings->wasChanged('ssh_host_key') && $settings->server) {
                 SshMultiplexingHelper::deleteStaleKnownHostsFiles($settings->server->uuid, $settings->ssh_host_key);
+            }
+            // The stored security statuses mark a result stale by the rescan days of its server.
+            if ($settings->wasChanged('image_rescan_days') && $settings->server) {
+                RefreshImageScanSummariesJob::dispatch((int) $settings->server->team_id);
             }
             if (
                 $settings->wasChanged('sentinel_token') ||

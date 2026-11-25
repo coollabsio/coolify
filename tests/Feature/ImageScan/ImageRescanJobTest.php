@@ -7,6 +7,7 @@ use App\Jobs\ImageRescanJob;
 use App\Jobs\PrepareImageScannerJob;
 use App\Jobs\RefreshCandidatesJob;
 use App\Jobs\RefreshImageScanSummariesJob;
+use App\Jobs\ScanHostPackagesJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -537,10 +538,105 @@ describe('rescan', function () {
             ->and(rescanTestRanCommand('coolify-scan-exit tags'))->toBe(0);
 
         $uniqueLock->release(new RefreshCandidatesJob($scan));
+        // The next rescan is due the next day.
+        $this->travel(1)->days();
         rescanTestRun();
 
         expect($scan->fresh()->candidateStatus())->not->toBeNull()
             ->and((new UniqueLock(Cache::store()))->acquire(new RefreshCandidatesJob($scan)))->toBeTrue();
+    });
+});
+
+describe('rescan frequency', function () {
+    it('rescans only when the rescan days passed since the last successful rescan', function () {
+        $this->server->settings->forceFill(['image_rescan_days' => 7])->saveQuietly();
+        rescanTestFake();
+        rescanTestApplicationContainer($this->application);
+
+        Carbon::setTestNow('2026-10-20 03:00:00');
+        rescanTestRun();
+        Carbon::setTestNow('2026-10-26 03:00:00');
+        rescanTestRun();
+
+        expect(rescanTestRanCommand('coolify-scan-exit grype'))->toBe(1)
+            ->and(rescanTestRanCommand('coolify-scan-exit db-update'))->toBe(1);
+
+        Carbon::setTestNow('2026-10-27 03:00:00');
+        rescanTestRun();
+
+        expect(rescanTestRanCommand('coolify-scan-exit grype'))->toBe(2)
+            ->and(rescanTestRanCommand('coolify-scan-exit db-update'))->toBe(2);
+        Carbon::setTestNow();
+    });
+
+    it('never rescans and never scans the host packages with rescan days 0', function () {
+        Queue::fake();
+        $this->server->settings->forceFill(['image_rescan_days' => 0])->saveQuietly();
+        rescanTestFake();
+        rescanTestApplicationContainer($this->application);
+
+        rescanTestRun();
+
+        expect(rescanTestRanCommand('coolify-scan-exit grype'))->toBe(0)
+            ->and(rescanTestRanCommand('coolify-scan-exit db-update'))->toBe(0);
+        Queue::assertNotPushed(ScanHostPackagesJob::class);
+    });
+
+    it('does not run Grype again when the image and the database did not change', function () {
+        $builtAt = now()->subDay()->startOfSecond();
+        rescanTestFake(['db-status' => fn () => rescanTestDatabaseStatus($builtAt)]);
+        rescanTestApplicationContainer($this->application);
+        rescanTestRun();
+        $scan = $this->application->imageScans()->sole();
+        $findings = $scan->findings;
+        $sbom = ImageSbom::query()->findOrFail($scan->image_sbom_id);
+        $sbom->forceFill(['last_used_at' => now()->subDays(10)])->save();
+
+        $this->travel(1)->days();
+        $this->containers = [];
+        rescanTestApplicationContainer($this->application, tag: 'latest');
+        rescanTestRun();
+
+        $scan->refresh();
+        expect(rescanTestRanCommand('coolify-scan-exit grype'))->toBe(1)
+            ->and($scan->status)->toBe(ImageScanStatus::Completed)
+            ->and($scan->findings)->toBe($findings)
+            ->and($scan->scanned_at->isToday())->toBeTrue()
+            ->and($scan->image_ref)->toBe("{$this->application->uuid}:latest")
+            ->and($sbom->fresh()->last_used_at->isToday())->toBeTrue();
+    });
+
+    it('runs Grype again when the vulnerability database changed', function () {
+        rescanTestFake(['db-status' => fn () => rescanTestDatabaseStatus(now()->subDay()->startOfSecond())]);
+        rescanTestApplicationContainer($this->application);
+        rescanTestRun();
+
+        $this->travel(1)->days();
+        rescanTestRun();
+
+        expect(rescanTestRanCommand('coolify-scan-exit grype'))->toBe(2);
+    });
+});
+
+describe('vulnerability database age', function () {
+    it('updates a database older than 3 days before a scan and keeps the old one when the update fails', function () {
+        rescanTestFake([
+            'db-update' => 'coolify-scan-exit db-update 1',
+            'db-status' => fn () => rescanTestDatabaseStatus(now()->subDays(4)),
+        ]);
+
+        $builtAt = ScanImage::databaseBuiltAt(new ScannerCommands($this->server, 'abcdefghijklmnopqrstuvwx'));
+
+        expect(rescanTestRanCommand('coolify-scan-exit db-update'))->toBe(1)
+            ->and($builtAt->isSameDay(now()->subDays(4)))->toBeTrue();
+    });
+
+    it('does not update a database of 3 days or less before a scan', function () {
+        rescanTestFake(['db-status' => fn () => rescanTestDatabaseStatus(now()->subDays(2))]);
+
+        ScanImage::databaseBuiltAt(new ScannerCommands($this->server, 'abcdefghijklmnopqrstuvwx'));
+
+        expect(rescanTestRanCommand('coolify-scan-exit db-update'))->toBe(0);
     });
 });
 

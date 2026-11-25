@@ -22,7 +22,7 @@ it('keeps the server scan lock for the Syft and Grype time limits of the server'
 
     expect(ScanImage::sbomStepTimeout($this->server))->toBe(600 + 1800 + 60)
         ->and(ScanImage::lockTtl($this->server))->toBe($default + (1800 - 600) + 2 * (1200 - 600))
-        ->and(ScanImage::gateScanReserveSeconds($this->server))->toBe(600 + 1800 + 60 + 1200 + 60)
+        ->and(ScanImage::gateScanReserveSeconds($this->server))->toBe(960 + 600 + 1800 + 60 + 1200 + 60)
         ->and(ScanImage::lockTtl($this->server))->toBeLessThanOrEqual(ScanImage::MAX_LOCK_TTL);
 });
 

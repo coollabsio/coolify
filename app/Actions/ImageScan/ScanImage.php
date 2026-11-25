@@ -254,10 +254,10 @@ class ScanImage
         return self::LOCK_TTL_WITHOUT_SCANNERS + self::sbomStepTimeout($server) + 2 * self::grypeStepTimeout($server);
     }
 
-    /** The deploy time that a gate keeps for its own scan (SBOM and Grype) after it waited for the lock. */
+    /** The deploy time that a gate keeps for its own scan (database update, SBOM, and Grype) after it waited for the lock. */
     public static function gateScanReserveSeconds(Server $server): int
     {
-        return self::sbomStepTimeout($server) + self::grypeStepTimeout($server);
+        return self::TIMEOUT_DB_UPDATE + self::sbomStepTimeout($server) + self::grypeStepTimeout($server);
     }
 
     /** SSH timeout of one SBOM step on the server: `docker save` of a local image, then Syft. */
@@ -414,7 +414,7 @@ class ScanImage
 
                 throw new ScanFailed(ImageScanErrorCode::ImageMissing);
             }
-            $unchanged = $this->unchangedScans($server, $resources, $imageId, $databaseBuiltAt);
+            $unchanged = $this->unchangedScans($server, $targets, $imageId, $databaseBuiltAt);
             if ($unchanged !== null) {
                 return $unchanged;
             }
@@ -454,31 +454,40 @@ class ScanImage
      * The completed rows of the resources, marked as checked now, when Grype would give the same result: each row has
      * this image, its SBOM, and the database that the server has now. Null when one resource needs a scan.
      *
-     * @param  list<Model>  $resources
+     * @param  list<array{0: Model, 1: string, 2: ResolvedImageScanPolicy}>  $targets
      * @return list<ImageScan>|null
      */
-    private function unchangedScans(Server $server, array $resources, string $imageId, CarbonImmutable $databaseBuiltAt): ?array
+    private function unchangedScans(Server $server, array $targets, string $imageId, CarbonImmutable $databaseBuiltAt): ?array
     {
-        $sbomId = ImageSbom::query()->where('server_id', $server->id)->where('image_id', $imageId)->value('id');
-        if ($sbomId === null) {
+        $sbom = ImageSbom::query()->where('server_id', $server->id)->where('image_id', $imageId)->first();
+        if ($sbom === null) {
             return null;
         }
 
         $scans = [];
-        foreach ($resources as $resource) {
+        foreach ($targets as [$resource]) {
             $scan = $this->resourceScans($resource)->where('image_id', $imageId)->first();
             if ($scan === null
                 || $scan->status !== ImageScanStatus::Completed
                 || (int) $scan->server_id !== (int) $server->id
-                || (int) $scan->image_sbom_id !== (int) $sbomId
+                || (int) $scan->image_sbom_id !== (int) $sbom->id
                 || $scan->grype_db_built_at?->getTimestamp() !== $databaseBuiltAt->getTimestamp()) {
                 return null;
             }
             $scans[] = $scan;
         }
 
-        return array_map(function (ImageScan $scan, Model $resource): ImageScan {
-            $scan->forceFill([...$this->deploymentLink($resource, $scan, null), 'scanned_at' => now()]);
+        // Keeps the SBOM of a running image used, like a Grype run on it.
+        $sbom->forceFill(['last_used_at' => now()])->save();
+
+        return array_map(function (ImageScan $scan, array $target): ImageScan {
+            [$resource, $imageRef] = $target;
+            $scan->forceFill([
+                ...$this->deploymentLink($resource, $scan, null),
+                'image_ref' => mb_substr($imageRef, 0, 512),
+                'is_baseline' => false,
+                'scanned_at' => now(),
+            ]);
             $scan->setRelation('resource', $resource);
             SecurityStatus::store($scan);
             $scan->save();
@@ -487,7 +496,7 @@ class ScanImage
             $this->broadcast($resource, (string) $scan->uuid);
 
             return $scan;
-        }, $scans, $resources);
+        }, $scans, $targets);
     }
 
     /**

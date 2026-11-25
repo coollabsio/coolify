@@ -2469,6 +2469,7 @@ test('the image scanner limits move with the server', function () {
         'image_scan_grype_timeout' => 1200,
         'image_scan_cpus' => 2.0,
         'image_scan_memory_mb' => 4096,
+        'image_rescan_days' => 14,
     ])->saveQuietly();
 
     $bundle = $this->exporter->export($this->server);
@@ -2483,7 +2484,8 @@ test('the image scanner limits move with the server', function () {
     expect($settings->image_scan_syft_timeout)->toBe(1800)
         ->and($settings->image_scan_grype_timeout)->toBe(1200)
         ->and($settings->image_scan_cpus)->toBe(2.0)
-        ->and($settings->image_scan_memory_mb)->toBe(4096);
+        ->and($settings->image_scan_memory_mb)->toBe(4096)
+        ->and($settings->image_rescan_days)->toBe(14);
 });
 
 test('transfer keeps the fork pull request approval state of previews and the approval setting', function () {
