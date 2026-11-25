@@ -27,7 +27,6 @@ use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
 use App\Notifications\Application\PreviewApprovalRequired;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
-use App\Services\DeployTriggers\DeploymentTriggerScan;
 use App\Services\DeployTriggers\TriggerRecorder;
 use App\Services\ImageScan\DeploymentImageScan;
 use App\Services\ProjectConfig\UnlinkedConfigFileHint;
@@ -4190,29 +4189,6 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             );
         }
         $this->detectUnlinkedConfigFile();
-        $this->runTriggerScan();
-    }
-
-    /**
-     * Finds paths outside the application that its files reference, for push evaluation (after the clone, before cleanup_git).
-     */
-    private function runTriggerScan(): void
-    {
-        try {
-            app(DeploymentTriggerScan::class)->run(
-                $this->application,
-                $this->pull_request_id === 0 ? null : $this->preview,
-                $this->basedir,
-                $this->commit,
-                function (string $command): ?string {
-                    $this->execute_remote_command([executeInDocker($this->deployment_uuid, $command), 'hidden' => true, 'save' => 'trigger_scan', 'ignore_errors' => true]);
-
-                    return $this->saved_outputs->has('trigger_scan') ? (string) $this->saved_outputs->get('trigger_scan') : null;
-                },
-            );
-        } catch (Throwable) {
-            // The scan only narrows later pushes; without it the next push deploys.
-        }
     }
 
     /**

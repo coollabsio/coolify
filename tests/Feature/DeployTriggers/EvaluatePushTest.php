@@ -13,7 +13,6 @@ use App\Services\DeployTriggers\EvaluationRequestBuilder;
 use App\Services\DeployTriggers\EvaluationSlots;
 use App\Services\DeployTriggers\PullRequestContext;
 use App\Services\DeployTriggers\PushContext;
-use App\Services\DeployTriggers\TriggerFingerprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\Support\FakeAffectedRunner;
@@ -43,8 +42,6 @@ function epApplication(array $fixture, string $baseDirectory): Application
 {
     $application = deployTriggerApplication($fixture, ['base_directory' => $baseDirectory, 'git_repository' => 'https://github.com/acme/mono']);
     $application->forceFill(['trigger_base_commit' => EP_BASE])->save();
-    $application->refresh();
-    $application->forceFill(['trigger_scan' => ['commit' => EP_BASE, 'reference_paths' => [], 'widened' => [], 'config_fingerprint' => TriggerFingerprint::for($application)]])->save();
 
     return $application->refresh();
 }
@@ -120,13 +117,13 @@ it('deploys every candidate when the response breaks the contract', function () 
     expect(ApplicationDeploymentQueue::query()->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)->count())->toBe(2);
 });
 
-it('deploys smart apps and uses legacy watch paths when the helper is unsupported', function () {
+it('deploys smart apps and uses legacy watch paths when no server can evaluate', function () {
     FakeAffectedRunner::unsupported();
     $this->api->update(['watch_paths' => 'apps/api/**']);
 
     epRun(epContext(['payloadChangedFiles' => ['apps/web/a.ts']]), [$this->web, $this->api]);
 
-    expect(ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->sole()->trigger_reason['reason_code'])->toBe('helper_unsupported')
+    expect(ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->sole()->trigger_reason['reason_code'])->toBe('no_server')
         ->and(ApplicationDeploymentQueue::query()->where('application_id', $this->api->id)->sole()->status)->toBe(ApplicationDeploymentStatus::SKIPPED->value);
 });
 
@@ -137,16 +134,6 @@ it('deploys legacy watch path apps when the payload has no file list', function 
     epRun(epContext(['payloadChangedFiles' => null]), [$this->api]);
 
     expect(ApplicationDeploymentQueue::query()->where('application_id', $this->api->id)->sole()->status)->not->toBe(ApplicationDeploymentStatus::SKIPPED->value);
-});
-
-it('deploys with no_scan when the stored scan does not match the effective base', function () {
-    $runner = FakeAffectedRunner::respondWith(epRespond([]));
-    $this->web->forceFill(['trigger_scan' => ['commit' => str_repeat('9', 40), 'reference_paths' => [], 'widened' => [], 'config_fingerprint' => TriggerFingerprint::for($this->web)]])->save();
-
-    epRun(epContext(), [$this->web]);
-
-    expect(ApplicationDeploymentQueue::query()->sole()->trigger_reason['reason_code'])->toBe('no_scan')
-        ->and($runner->requests)->toBe([]);
 });
 
 it('deploys fork pull requests without calling the runner', function () {
@@ -323,9 +310,9 @@ it('drops a redelivered push that was already evaluated', function () {
         ->and(ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->sole()->skipped_count)->toBe(1);
 });
 
-it('evaluates a dry run without a stored base or scan', function () {
+it('evaluates a dry run without a stored base', function () {
     $runner = FakeAffectedRunner::respondWith(epRespond([$this->web->uuid => ['skip', 'no_match']]));
-    $this->web->forceFill(['trigger_base_commit' => null, 'trigger_scan' => null])->save();
+    $this->web->forceFill(['trigger_base_commit' => null])->save();
 
     epRun(epContext(['after' => EP_AFTER]), [$this->web->refresh()], dryRun: true);
 

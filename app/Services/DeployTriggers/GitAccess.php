@@ -3,7 +3,7 @@
 namespace App\Services\DeployTriggers;
 
 /**
- * How coolify-affected reaches a repository from a helper container. Files are mounted read-only at /run/coolify.
+ * How the git mirror reaches a repository from a helper container. Files are written to a tmpfs at /run/coolify.
  */
 final readonly class GitAccess
 {

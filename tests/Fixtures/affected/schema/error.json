@@ -1,6 +1,0 @@
-{
-	"$schema": "https://json-schema.org/draft/2020-12/schema",
-	"$id": "https://coolify.io/schemas/coolify-affected/v1/error.json",
-	"title": "coolify-affected error output (exit codes 2 and 3)",
-	"$ref": "common.json#/$defs/error_document"
-}

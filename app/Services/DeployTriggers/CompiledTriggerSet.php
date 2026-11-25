@@ -5,7 +5,7 @@ namespace App\Services\DeployTriggers;
 use InvalidArgumentException;
 
 /**
- * Matches repository paths against a compiled trigger set of coolify-affected (contract §8.1).
+ * Matches repository paths against a compiled trigger set.
  *
  * A path matches when every ruleset includes it. In a ruleset the last matching rule wins,
  * and the ruleset default applies when no rule matches.

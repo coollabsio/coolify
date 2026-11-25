@@ -23,13 +23,11 @@ it('casts the trigger json columns to arrays', function () {
     $application->forceFill([
         'trigger_base_commit' => str_repeat('a', 40),
         'trigger_set' => ['display' => ['apps/web/**']],
-        'trigger_scan' => ['reference_paths' => ['content']],
     ])->save();
 
     $application->refresh();
 
     expect($application->trigger_set)->toBe(['display' => ['apps/web/**']])
-        ->and($application->trigger_scan)->toBe(['reference_paths' => ['content']])
         ->and($application->trigger_base_commit)->toBe(str_repeat('a', 40));
 });
 

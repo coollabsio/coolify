@@ -11,7 +11,7 @@ use App\Services\DeployTriggers\Contract\EvaluateRequest;
 use Illuminate\Support\Collection;
 
 /**
- * Turns a push and its candidate applications into one coolify-affected request.
+ * Turns a push and its candidate applications into one evaluation request.
  */
 class EvaluationRequestBuilder
 {
@@ -28,7 +28,7 @@ class EvaluationRequestBuilder
             if ($dryRun) {
                 // A dry run only resolves the trigger set at the evaluated commit.
                 $candidates[$candidate->id] = new TriggerCandidate($candidate->id, $candidate->application, $candidate->preview, $candidate->mode,
-                    $candidate->base ?? $context->after, false, $candidate->fingerprint, true);
+                    $candidate->base ?? $context->after, false, $candidate->fingerprint);
 
                 continue;
             }
@@ -54,13 +54,9 @@ class EvaluationRequestBuilder
         $request = new EvaluateRequest(
             repositoryUrl: $access->repositoryUrl,
             mirrorKey: EvaluateRequest::mirrorKeyFor($context->teamId, strtolower(preg_replace('/\.git\z/', '', rtrim($access->repositoryUrl, '/')))),
-            gitEnv: $access->env,
-            gitConfig: $access->config,
             after: $context->after,
             fetchRefs: $fetchRefs,
-            isFork: (bool) $context->pullRequest?->isFork,
-            submodules: (bool) $first->settings?->is_git_submodules_enabled,
-            applications: array_values(array_map(fn (TriggerCandidate $candidate): EvaluateApplicationInput => $this->input($candidate, $context), $remaining)),
+            applications: array_values(array_map(fn (TriggerCandidate $candidate): EvaluateApplicationInput => $this->input($candidate, $context, $dryRun), $remaining)),
             limits: EvaluateRequest::defaultLimits((int) config('constants.coolify.push_evaluation.max_mirror_bytes', EvaluateRequest::DEFAULT_MAX_MIRROR_BYTES)),
         );
 
@@ -88,26 +84,7 @@ class EvaluationRequestBuilder
             base: $base,
             isStored: $isStored,
             fingerprint: $fingerprint,
-            scanValid: $this->scanIsValid($application, $preview, $pullRequest !== null, $base, $fingerprint),
         );
-    }
-
-    private function scanIsValid(Application $application, ?ApplicationPreview $preview, bool $isPullRequest, ?string $base, string $fingerprint): bool
-    {
-        // A new preview has no scan yet; it borrows the scan of the application while that is valid.
-        if ($isPullRequest && $preview === null) {
-            $preview = null;
-            $base = $application->trigger_base_commit;
-            $fingerprint = TriggerFingerprint::for($application);
-        }
-
-        $scan = ($preview ?? $application)->trigger_scan;
-
-        return is_array($scan)
-            && $base !== null
-            && ($scan['commit'] ?? null) === $base
-            && ($scan['config_fingerprint'] ?? null) === $fingerprint
-            && ($scan['widened'] ?? []) === [];
     }
 
     private function precheck(TriggerCandidate $candidate, PushContext $context): ?ApplicationDecision
@@ -124,24 +101,19 @@ class EvaluationRequestBuilder
             return ApplicationDecision::deployBecause($candidate->id, 'no_base', 'Coolify does not know the deployed commit yet, so this push deploys.');
         }
 
-        if ($candidate->mode === 'smart' && ! $candidate->scanValid) {
-            return ApplicationDecision::deployBecause($candidate->id, 'no_scan', 'The files this application references are not known yet, so this push deploys.', $candidate->base);
-        }
-
         return null;
     }
 
-    private function input(TriggerCandidate $candidate, PushContext $context): EvaluateApplicationInput
+    private function input(TriggerCandidate $candidate, PushContext $context, bool $dryRun): EvaluateApplicationInput
     {
         $application = $candidate->application;
-        $scan = ($candidate->preview ?? $application)->trigger_scan;
 
         return new EvaluateApplicationInput(
             id: $candidate->id,
             baseCommit: $candidate->base,
             mergeBaseRef: $context->pullRequest !== null && $candidate->preview === null ? "refs/heads/{$context->pullRequest->targetBranch}" : null,
             mode: $candidate->mode,
-            watchPaths: $candidate->mode === 'watch_paths' ? $application->watch_paths : null,
+            watchPaths: $candidate->mode === 'watch_paths' ? $application->effectiveWatchPaths() : null,
             buildPack: (string) $application->build_pack,
             baseDirectory: $application->base_directory ?: '/',
             dockerfileLocation: $application->build_pack === 'dockerfile' ? $application->dockerfile_location : null,
@@ -153,8 +125,8 @@ class EvaluationRequestBuilder
                 'compose_build' => $application->docker_compose_custom_build_command,
                 'compose_start' => $application->docker_compose_custom_start_command,
             ],
-            referencePaths: array_values(array_filter($scan['reference_paths'] ?? [], 'is_string')),
             managedConfigPaths: $application->managedConfigPaths(),
+            storedTriggerSet: $dryRun || $candidate->mode !== 'smart' ? null : $candidate->validStoredSet(),
         );
     }
 

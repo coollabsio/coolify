@@ -1,32 +1,13 @@
 <?php
 
-use App\Models\Application;
 use App\Services\DeployTriggers\CompiledTriggerSet;
-use App\Services\DeployTriggers\LegacyWatchPaths;
 
 $conformance = json_decode(file_get_contents(dirname(__DIR__, 2).'/Fixtures/affected/matcher-conformance.json'), true, flags: JSON_THROW_ON_ERROR);
 
-it('passes the compiled matcher conformance case', function (array $compiled, string $file, bool $expected) {
+it('passes the matcher conformance case', function (array $compiled, string $file, bool $expected) {
     expect(CompiledTriggerSet::fromArray($compiled)->matches($file))->toBe($expected);
-})->with(collect($conformance['compiled'])->mapWithKeys(fn (array $case, int $index): array => [
-    "{$index}: {$case['name']}" => [$case['compiled'], $case['file'], $case['expected']],
-])->all());
-
-it('passes the watch paths conformance case', function (string $watchPaths, string $file, bool $expected) {
-    // Saved watch paths are normalized by the setter and again at match time; the legacy regex quirks (`#`, `[`) only emit warnings and never match.
-    $application = new Application;
-    $application->watch_paths = $watchPaths;
-    if (blank($application->watch_paths)) {
-        // Coolify uses watch-paths mode only for applications with stored watch paths.
-        expect(true)->toBeTrue();
-
-        return;
-    }
-    $matched = @LegacyWatchPaths::matches($application, [$file]);
-
-    expect($matched->isNotEmpty())->toBe($expected);
-})->with(collect($conformance['watch_paths'])->mapWithKeys(fn (array $case, int $index): array => [
-    "{$index}: {$case['name']}" => [$case['watch_paths'], $case['file'], $case['expected']],
+})->with(collect($conformance['cases'])->mapWithKeys(fn (array $case): array => [
+    $case['note'] => [$case['compiled'], $case['file'], $case['expected']],
 ])->all());
 
 it('rejects unknown rule kinds', function () {

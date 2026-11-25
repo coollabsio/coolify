@@ -315,7 +315,6 @@ class Application extends BaseModel
     protected $hidden = [
         ...self::COMMAND_AND_CONFIGURATION_ATTRIBUTES,
         'trigger_set',
-        'trigger_scan',
         'http_basic_auth_password',
         'git_https_password',
         'manual_webhook_secret_github',
@@ -342,7 +341,6 @@ class Application extends BaseModel
             'manual_webhook_secret_gitea' => 'encrypted',
             'noindex_domains' => 'array',
             'trigger_set' => 'array',
-            'trigger_scan' => 'array',
             'domain_dns_statuses' => 'array',
             'domain_port_overrides' => 'array',
             'docker_compose_image_overrides' => 'array',
@@ -378,7 +376,6 @@ class Application extends BaseModel
                 // Trigger state belongs to the old source; the next push deploys and rebuilds it.
                 $application->trigger_base_commit = null;
                 $application->trigger_set = null;
-                $application->trigger_scan = null;
             }
             if ($application->isDirty('docker_compose_raw')) {
                 EnvironmentVariable::authorizeAddedSharedVariableReferencesIn($application, $application->getOriginal('docker_compose_raw'), $application->docker_compose_raw, 'docker_compose_raw');
@@ -2230,7 +2227,7 @@ class Application extends BaseModel
     }
 
     /**
-     * How coolify-affected reaches this repository from a helper container (no deployment, no server key).
+     * How the push evaluation reaches this repository from a helper container (no deployment, no server key).
      */
     public function gitAccessForAffected(): GitAccess
     {

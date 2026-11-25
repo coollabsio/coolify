@@ -12,7 +12,6 @@ return new class extends Migration
             Schema::table($tableName, function (Blueprint $table) {
                 $table->string('trigger_base_commit', 64)->nullable();
                 $table->jsonb('trigger_set')->nullable();
-                $table->jsonb('trigger_scan')->nullable();
             });
         }
     }
@@ -21,7 +20,7 @@ return new class extends Migration
     {
         foreach (['applications', 'application_previews'] as $tableName) {
             Schema::table($tableName, function (Blueprint $table) {
-                $table->dropColumn(['trigger_base_commit', 'trigger_set', 'trigger_scan']);
+                $table->dropColumn(['trigger_base_commit', 'trigger_set']);
             });
         }
     }

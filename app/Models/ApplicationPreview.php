@@ -49,7 +49,6 @@ class ApplicationPreview extends BaseModel
         'approved_at' => 'datetime',
         'keeps_production_values' => 'boolean',
         'trigger_set' => 'array',
-        'trigger_scan' => 'array',
     ];
 
     protected static function booted(): void

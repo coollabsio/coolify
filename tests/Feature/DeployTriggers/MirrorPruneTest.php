@@ -27,7 +27,7 @@ function fakeCleanupProcesses($scripts, ?Closure $prune = null): void
     Process::fake(function (PendingProcess $process) use ($scripts, $prune) {
         $script = remoteProcessScript($process);
         $scripts->push($script);
-        if ($prune && str_contains($script, 'mirror prune')) {
+        if ($prune && str_contains($script, 'coolify-git-mirrors:/mirrors')) {
             return $prune();
         }
 
@@ -40,9 +40,9 @@ it('prunes git mirrors during docker cleanup', function () {
 
     (new DockerCleanupJob($this->server))->handle();
 
-    $prune = $this->scripts->first(fn (string $script) => str_contains($script, 'coolify-affected mirror prune'));
+    $prune = $this->scripts->first(fn (string $script) => str_contains($script, '-v coolify-git-mirrors:/mirrors'));
     expect($prune)->not->toBeNull()
-        ->and($prune)->toContain('--days 14')
+        ->and($prune)->toContain('-mtime +14')
         ->and($prune)->toContain('docker volume inspect coolify-git-mirrors')
         ->and($prune)->toContain('-v coolify-git-mirrors:/mirrors');
 });

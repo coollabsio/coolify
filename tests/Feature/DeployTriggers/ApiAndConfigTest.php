@@ -21,7 +21,6 @@ beforeEach(function () {
             'display' => ['apps/web/**'], 'limits' => ['build_context'], 'resolvers' => ['pnpm'], 'anchor' => ['package' => '@acme/web'],
             'widened' => [], 'evaluated_commit' => str_repeat('a', 40), 'compiled' => ['version' => 1, 'all_of' => []], 'config_fingerprint' => 'x',
         ],
-        'trigger_scan' => ['commit' => str_repeat('a', 40), 'reference_paths' => ['content']],
     ])->save();
 });
 
@@ -55,7 +54,6 @@ it('returns the trigger paths without the compiled set or the scan', function ()
         'display' => ['apps/web/**'], 'limits' => ['build_context'], 'resolvers' => ['pnpm'], 'anchor' => ['package' => '@acme/web'],
         'widened' => [], 'evaluated_commit' => str_repeat('a', 40),
     ])->and($response->json('trigger_base_commit'))->toBe(str_repeat('a', 40))
-        ->and($response->json())->not->toHaveKey('trigger_scan')
         ->and($response->json('settings.is_smart_triggers_enabled'))->toBeTrue();
 });
 

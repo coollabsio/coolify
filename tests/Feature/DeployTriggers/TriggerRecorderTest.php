@@ -4,7 +4,6 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Services\DeployTriggers\Contract\ApplicationDecision;
-use App\Services\DeployTriggers\Contract\ScanResponse;
 use App\Services\DeployTriggers\TriggerRecorder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -93,18 +92,6 @@ it('does not move the base when a deployment was in flight', function () {
     expect($this->application->refresh()->trigger_base_commit)->toBe(sha('a'));
 });
 
-it('advances the scan commit with the base only when it matched', function () {
-    $this->application->forceFill(['trigger_base_commit' => sha('a'), 'trigger_scan' => ['commit' => sha('a'), 'reference_paths' => ['content']]])->save();
-    $this->recorder->recordSkip($this->application, null, $this->skip, sha('b'), sha('a'), true, null);
-    expect($this->application->refresh()->trigger_scan['commit'])->toBe(sha('b'))
-        ->and($this->application->trigger_scan['reference_paths'])->toBe(['content']);
-
-    $this->application->forceFill(['trigger_scan' => ['commit' => sha('9'), 'reference_paths' => []]])->save();
-    $this->recorder->recordSkip($this->application, null, $this->skip, sha('c'), sha('b'), true, null);
-    expect($this->application->refresh()->trigger_scan['commit'])->toBe(sha('9'))
-        ->and($this->application->trigger_base_commit)->toBe(sha('c'));
-});
-
 it('records skips and the base on previews by pull request', function () {
     $preview = ApplicationPreview::create(['application_id' => $this->application->id, 'pull_request_id' => 12, 'pull_request_html_url' => 'https://example.com/pr/12']);
     $preview->forceFill(['trigger_base_commit' => sha('a')])->save();
@@ -134,14 +121,6 @@ it('keeps the previous set when an evaluation fails without one', function () {
 
     expect($this->application->refresh()->trigger_set['display'])->toBe(['apps/web/**'])
         ->and($this->application->trigger_set['last_error'])->toBe('timeout');
-});
-
-it('stores a scan with the fingerprint', function () {
-    $this->recorder->storeScan($this->application, null, new ScanResponse(sha('b'), ['content'], [], []), 'fingerprint');
-
-    expect($this->application->refresh()->trigger_scan)->toMatchArray([
-        'commit' => sha('b'), 'reference_paths' => ['content'], 'widened' => [], 'config_fingerprint' => 'fingerprint',
-    ]);
 });
 
 it('moves the base on success', function () {

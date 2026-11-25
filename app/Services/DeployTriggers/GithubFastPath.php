@@ -31,7 +31,7 @@ class GithubFastPath
         $compares = [];
         $decisions = [];
         foreach ($candidates as $id => $candidate) {
-            if ($candidate->base === null || ! $this->storedSetIsValid($candidate)) {
+            if ($candidate->base === null || ($candidate->mode === 'smart' && $candidate->validStoredSet() === null)) {
                 continue;
             }
 
@@ -47,23 +47,6 @@ class GithubFastPath
         }
 
         return $decisions;
-    }
-
-    private function storedSetIsValid(TriggerCandidate $candidate): bool
-    {
-        if ($candidate->mode === 'watch_paths') {
-            return true;
-        }
-
-        $set = $candidate->storedSet();
-
-        return $candidate->scanValid
-            && is_array($set)
-            && ($set['evaluated_commit'] ?? null) === $candidate->base
-            && ($set['config_fingerprint'] ?? null) === $candidate->fingerprint
-            && ($set['last_error'] ?? null) === null
-            && is_array($set['compiled'] ?? null)
-            && is_array($set['input_patterns'] ?? null);
     }
 
     /**
@@ -85,25 +68,24 @@ class GithubFastPath
                 : new ApplicationDecision($id, 'deploy', 'watch_paths_matched', "{$matched->first()} matches the watch paths.", $candidate->base, [['file' => $matched->first(), 'rule' => 'watch_paths']]);
         }
 
-        $set = $candidate->storedSet();
+        $set = $candidate->validStoredSet();
         try {
-            $compiled = CompiledTriggerSet::fromArray($set['compiled']);
             $inputs = CompiledTriggerSet::fromArray($set['input_patterns']);
+            $compiled = CompiledTriggerSet::fromArray($set['compiled']);
+            foreach ($files as $file) {
+                if ($inputs->matches($file) || $compiled->isLockfile($file)) {
+                    return null;
+                }
+            }
+
+            $decision = TriggerSetDecider::decide($id, $set, $files, $candidate->base)['decision'];
+
+            // A change in the application's own files can add a reference; the next full evaluation checks again.
+            return $decision?->deploys()
+                ? new ApplicationDecision($id, 'deploy', $decision->reasonCode, $decision->reason, $decision->base, $decision->matches, triggerSet: [...$set, 'references_checked' => false])
+                : $decision;
         } catch (InvalidArgumentException) {
             return null;
         }
-
-        foreach ($files as $file) {
-            if ($inputs->matches($file) || $compiled->isLockfile($file)) {
-                return null;
-            }
-        }
-
-        $kept = array_diff_key($set, array_flip(['evaluated_commit', 'config_fingerprint', 'evaluated_at', 'last_error']));
-        $match = $compiled->firstMatch($files);
-
-        return $match === null
-            ? new ApplicationDecision($id, 'skip', 'no_match', "None of the {$count} changed files affect this application.", $candidate->base, triggerSet: $kept)
-            : new ApplicationDecision($id, 'deploy', 'matched', "{$match} changed.", $candidate->base, [['file' => $match, 'rule' => 'trigger_set']], triggerSet: $kept);
     }
 }

@@ -120,7 +120,6 @@ class ApplicationAdapter implements ResourceAdapter
             Field::derived('custom_healthcheck_found', 'Coolify finds it in the Dockerfile.'),
             Field::derived('trigger_base_commit', 'Coolify derives it from pushes and deployments.'),
             Field::derived('trigger_set', 'Coolify derives it from pushes and deployments.'),
-            Field::derived('trigger_scan', 'Coolify derives it from pushes and deployments.'),
             Field::managed('ports_exposes', 'ports.exposes'),
             Field::managed('ports_mappings', 'ports.mappings'),
             Field::managed('custom_network_aliases', 'network.aliases'),

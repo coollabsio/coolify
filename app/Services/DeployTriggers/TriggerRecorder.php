@@ -7,7 +7,6 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Services\DeployTriggers\Contract\ApplicationDecision;
-use App\Services\DeployTriggers\Contract\ScanResponse;
 use App\Services\DeployTriggers\Contract\Sha;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -76,18 +75,6 @@ class TriggerRecorder
         $target->forceFill(['trigger_set' => $set])->saveQuietly();
     }
 
-    public function storeScan(Application $application, ?ApplicationPreview $preview, ScanResponse $scan, string $configFingerprint): void
-    {
-        ($preview ?? $application)->forceFill(['trigger_scan' => [
-            'commit' => $scan->commit,
-            'reference_paths' => $scan->referencePaths,
-            'evidence' => array_slice($scan->evidence, 0, 50),
-            'widened' => $scan->widened,
-            'config_fingerprint' => $configFingerprint,
-            'scanned_at' => Carbon::now()->toIso8601String(),
-        ]])->saveQuietly();
-    }
-
     /**
      * The base moves to the deployed commit once every destination of the deployment finished.
      */
@@ -118,12 +105,7 @@ class TriggerRecorder
             return;
         }
 
-        $scan = $locked->trigger_scan;
-        if (is_array($scan) && ($scan['commit'] ?? null) === $readBase) {
-            $scan['commit'] = $after;
-        }
-
-        $locked->forceFill(['trigger_base_commit' => $after, 'trigger_scan' => $scan])->saveQuietly();
+        $locked->forceFill(['trigger_base_commit' => $after])->saveQuietly();
         $target->setRawAttributes($locked->getAttributes(), sync: true);
     }
 

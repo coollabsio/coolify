@@ -56,7 +56,7 @@ function fastCandidate($application, array $overrides = []): TriggerCandidate
 {
     return new TriggerCandidate(...array_merge([
         'id' => $application->uuid, 'application' => $application, 'preview' => null, 'mode' => 'smart',
-        'base' => FAST_BASE, 'isStored' => true, 'fingerprint' => TriggerFingerprint::for($application), 'scanValid' => true,
+        'base' => FAST_BASE, 'isStored' => true, 'fingerprint' => TriggerFingerprint::for($application),
     ], $overrides));
 }
 
@@ -127,7 +127,6 @@ it('leaves the decision to the tool when', function (array $candidate, array $co
     'fingerprint changed' => [['fingerprint' => 'other'], [], 'ahead', ['apps/api/a.ts'], []],
     'set from another commit' => [[], [], 'ahead', ['apps/api/a.ts'], ['evaluated_commit' => str_repeat('c', 40)]],
     'last evaluation failed' => [[], [], 'ahead', ['apps/api/a.ts'], ['last_error' => 'timeout']],
-    'no valid scan' => [['scanValid' => false], [], 'ahead', ['apps/api/a.ts'], []],
     'no base' => [['base' => null], [], 'ahead', ['apps/api/a.ts'], []],
 ]);
 

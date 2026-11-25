@@ -37,9 +37,9 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 300;
+    public int $timeout = 900;
 
-    public int $uniqueFor = 300;
+    public int $uniqueFor = 900;
 
     public int $maxExceptions = 3;
 
@@ -168,7 +168,7 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
                 }
             } else {
                 foreach ($remaining as $id => $candidate) {
-                    $decisions[$id] = $this->withoutHelper($candidate);
+                    $decisions[$id] = $this->withoutServer($candidate);
                 }
             }
         }
@@ -278,14 +278,13 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             base: null,
             isStored: false,
             fingerprint: '',
-            scanValid: false,
         );
     }
 
-    private function withoutHelper(TriggerCandidate $candidate): ApplicationDecision
+    private function withoutServer(TriggerCandidate $candidate): ApplicationDecision
     {
         return $candidate->mode === 'smart'
-            ? ApplicationDecision::deployBecause($candidate->id, 'helper_unsupported', 'The helper image of the server cannot evaluate pushes, so it deploys.')
+            ? ApplicationDecision::deployBecause($candidate->id, 'no_server', 'No server of the team is reachable to evaluate the push, so it deploys.')
             : LegacyWatchPaths::decide($candidate, $this->context->payloadChangedFiles);
     }
 

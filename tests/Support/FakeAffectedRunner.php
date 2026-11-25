@@ -11,7 +11,7 @@ use Closure;
 use Throwable;
 
 /**
- * Replays coolify-affected output for EvaluatePush tests and records the requests.
+ * Replays evaluation output for EvaluatePush tests and records the requests.
  */
 final class FakeAffectedRunner implements AffectedRunner
 {

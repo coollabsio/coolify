@@ -11,7 +11,7 @@ use App\Models\Server;
 use App\Rules\SafeExternalUrl;
 use App\Services\Access\AccessResolver;
 use App\Services\DeployTriggers\AffectedRunner;
-use App\Services\DeployTriggers\SshAffectedRunner;
+use App\Services\DeployTriggers\Git\GitEvaluator;
 use App\Services\ProjectConfig\AdapterRegistry;
 use App\Services\ProjectConfig\Adapters\ApplicationAdapter;
 use App\Services\ProjectConfig\Adapters\ServiceAdapter;
@@ -42,7 +42,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->scoped(ConfigPushRouter::class);
-        $this->app->bind(AffectedRunner::class, SshAffectedRunner::class);
+        $this->app->bind(AffectedRunner::class, GitEvaluator::class);
         $this->app->singleton(AdapterRegistry::class, fn () => new AdapterRegistry([
             new ApplicationAdapter,
             new ServiceAdapter,

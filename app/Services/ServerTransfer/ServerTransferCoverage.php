@@ -275,7 +275,6 @@ final class ServerTransferCoverage
             'environment_id' => self::LINKED, 'destination_type' => self::LINKED, 'destination_id' => self::LINKED,
             'source_type' => self::LINKED, 'source_id' => self::LINKED, 'private_key_id' => self::LINKED,
             'trigger_base_commit' => self::DERIVED_TRIGGER_STATE, 'trigger_set' => self::DERIVED_TRIGGER_STATE,
-            'trigger_scan' => self::DERIVED_TRIGGER_STATE,
         ],
         ApplicationSetting::class => ['application_id' => self::LINKED, 'has_unlinked_config_file' => self::RUNTIME],
         ApplicationPreview::class => [
@@ -283,7 +282,6 @@ final class ServerTransferCoverage
             'restart_count' => self::RUNTIME, 'restart_limit_reached' => self::RUNTIME, 'last_restart_at' => self::RUNTIME,
             'last_restart_type' => self::RUNTIME,
             'trigger_base_commit' => self::DERIVED_TRIGGER_STATE, 'trigger_set' => self::DERIVED_TRIGGER_STATE,
-            'trigger_scan' => self::DERIVED_TRIGGER_STATE,
         ],
         EnvironmentVariable::class => ['resourceable_type' => self::LINKED, 'resourceable_id' => self::LINKED],
         LocalPersistentVolume::class => [
