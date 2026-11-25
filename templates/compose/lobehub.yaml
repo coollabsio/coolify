@@ -2,7 +2,7 @@
 # slogan: LobeHub is an open-source AI agent workspace with accounts, sync, file uploads, and web search.
 # category: ai
 # tags: ai, chat, openai, llm, chatbot, agents, lobehub
-# logo: svgs/lobe-chat.png
+# logo: svgs/lobehub.svg
 # port: 3210
 #
 # Before deploy, set JWKS_KEY to an RS256 JWKS JSON string.
