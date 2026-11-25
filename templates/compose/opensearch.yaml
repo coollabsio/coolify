@@ -8,7 +8,6 @@
 services:
   opensearch:
     image: 'opensearchproject/opensearch:3.10.1'
-    restart: unless-stopped
     environment:
       - SERVICE_URL_OPENSEARCH_9200
       - cluster.name=opensearch-cluster
