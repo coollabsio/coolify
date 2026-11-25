@@ -1,0 +1,156 @@
+{
+ "schema_version": 1,
+ "tool_version": "1.0.0",
+ "after": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+ "timings_ms": {
+  "total": 10
+ },
+ "diffs": {
+  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": {
+   "status": "ok",
+   "relation": "ancestor",
+   "changed_files_count": 1,
+   "changed_files_truncated": false,
+   "changed_files": [
+    "apps/api/a.ts"
+   ]
+  }
+ },
+ "applications": [
+  {
+   "id": "web",
+   "decision": "skip",
+   "reason_code": "no_match",
+   "reason": "None of the 1 changed files affect this application.",
+   "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "matches": [],
+   "trigger_set": {
+    "compiled": {
+     "version": 1,
+     "all_of": [
+      {
+       "limit": "workspace",
+       "default": "include",
+       "rules": [
+        {
+         "action": "exclude",
+         "kind": "dir",
+         "path": "apps/api"
+        }
+       ]
+      }
+     ],
+     "lockfiles": [
+      "pnpm-lock.yaml"
+     ]
+    },
+    "display": [
+     "apps/web/**"
+    ],
+    "limits": [
+     "workspace"
+    ],
+    "resolvers": [
+     "pnpm"
+    ],
+    "anchor": {
+     "resolver": "pnpm",
+     "package": "@acme/web",
+     "dir": "apps/web",
+     "source": "dockerfile_location"
+    },
+    "widened": [],
+    "manifest_fingerprint": "sha256:abc",
+    "input_patterns": {
+     "version": 1,
+     "all_of": [
+      {
+       "limit": "inputs",
+       "default": "exclude",
+       "rules": [
+        {
+         "action": "include",
+         "kind": "glob",
+         "pattern": "**/package.json"
+        }
+       ]
+      }
+     ],
+     "lockfiles": []
+    }
+   }
+  },
+  {
+   "id": "api",
+   "decision": "deploy",
+   "reason_code": "matched",
+   "reason": "apps/api/a.ts changed.",
+   "base": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "matches": [
+    {
+     "file": "apps/api/a.ts",
+     "rule": "workspace",
+     "via": [
+      "apps/api"
+     ]
+    }
+   ],
+   "trigger_set": {
+    "compiled": {
+     "version": 1,
+     "all_of": [
+      {
+       "limit": "workspace",
+       "default": "include",
+       "rules": [
+        {
+         "action": "exclude",
+         "kind": "dir",
+         "path": "apps/api"
+        }
+       ]
+      }
+     ],
+     "lockfiles": [
+      "pnpm-lock.yaml"
+     ]
+    },
+    "display": [
+     "apps/web/**"
+    ],
+    "limits": [
+     "workspace"
+    ],
+    "resolvers": [
+     "pnpm"
+    ],
+    "anchor": {
+     "resolver": "pnpm",
+     "package": "@acme/web",
+     "dir": "apps/web",
+     "source": "dockerfile_location"
+    },
+    "widened": [],
+    "manifest_fingerprint": "sha256:abc",
+    "input_patterns": {
+     "version": 1,
+     "all_of": [
+      {
+       "limit": "inputs",
+       "default": "exclude",
+       "rules": [
+        {
+         "action": "include",
+         "kind": "glob",
+         "pattern": "**/package.json"
+        }
+       ]
+      }
+     ],
+     "lockfiles": []
+    }
+   }
+  }
+ ],
+ "errors": []
+}
