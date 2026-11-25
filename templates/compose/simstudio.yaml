@@ -1,4 +1,4 @@
-# documentation: https://docs.simstudio.ai
+# documentation: https://docs.sim.ai
 # slogan: Open source platform for building and running AI agents.
 # category: ai
 # tags: ai,agents,automation,workflows,postgresql
@@ -8,7 +8,6 @@
 services:
   simstudio:
     image: ghcr.io/simstudioai/simstudio:v0.9.66
-    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -52,7 +51,7 @@ services:
       start_period: 10s
 
   gateway:
-    image: caddy:2-alpine
+    image: caddy:2.11.9-alpine
     environment:
       - SERVICE_URL_SIMSTUDIO_3000
     depends_on:
@@ -84,7 +83,6 @@ services:
 
   realtime:
     image: ghcr.io/simstudioai/realtime:v0.9.66
-    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -116,8 +114,7 @@ services:
       start_period: 10s
 
   redis:
-    image: redis:7-alpine
-    restart: unless-stopped
+    image: redis:7.4.12-alpine
     volumes:
       - redis_data:/data
     healthcheck:
@@ -158,8 +155,7 @@ services:
         condition: service_healthy
 
   db:
-    image: pgvector/pgvector:pg17
-    restart: unless-stopped
+    image: pgvector/pgvector:0.8.7-pg17
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
