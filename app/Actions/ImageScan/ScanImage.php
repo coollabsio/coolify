@@ -530,8 +530,8 @@ class ScanImage
     }
 
     /**
-     * Updates a missing database, or one older than DB_UPDATE_AGE_DAYS, once. The daily rescan keeps it new, but a
-     * server with fewer rescans updates it at the next scan. Grype refuses a database older than 5 days.
+     * Updates a missing database, or one older than DB_UPDATE_AGE_DAYS at most once per hour. The daily rescan keeps it
+     * new, but a server with fewer rescans updates it at the next scan. Grype refuses a database older than 5 days.
      */
     public static function databaseBuiltAt(ScannerCommands $commands): CarbonImmutable
     {
@@ -540,7 +540,9 @@ class ScanImage
         if ($builtAt === null) {
             self::updateDatabase($commands);
             $builtAt = self::databaseStatus($commands) ?? throw new ScanFailed(ImageScanErrorCode::DbMissing, detail: 'no valid vulnerability database after the update');
-        } elseif ($builtAt->lt(now()->subDays(self::DB_UPDATE_AGE_DAYS))) {
+        } elseif ($builtAt->lt(now()->subDays(self::DB_UPDATE_AGE_DAYS))
+            && Cache::add("image-scan:db-update-tried:{$commands->server->id}", true, now()->addHour())) {
+            // One try per hour, so a failing update does not hold the lock for each image of a rescan or each deployment.
             self::updateDatabase($commands);
             // A failed update keeps the old database, which is still good until DB_MAX_AGE_DAYS.
             $builtAt = self::databaseStatus($commands) ?? $builtAt;

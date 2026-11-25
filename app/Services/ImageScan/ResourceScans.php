@@ -508,10 +508,10 @@ final class ResourceScans
      *
      * @return Collection<int, ImageScan>
      */
-    public static function currentForTeam(int $teamId): Collection
+    public static function currentForTeam(int $teamId, ?int $serverId = null): Collection
     {
         return ImageScan::query()
-            ->whereIn('server_id', Server::query()->where('team_id', $teamId)->select('id'))
+            ->whereIn('server_id', Server::query()->where('team_id', $teamId)->when($serverId !== null, fn ($query) => $query->whereKey($serverId))->select('id'))
             ->select(['resource_type', 'resource_id'])
             ->distinct()
             ->get()

@@ -797,11 +797,12 @@ describe('stored status', function () {
     it('updates the stored statuses when the rescan days change', function () {
         statusTestScan($this->application, [], ['scanned_at' => now()]);
         ResourceScans::refreshSummaries(ResourceScans::currentFor($this->application));
-        Queue::fake();
 
         $this->server->settings->update(['image_rescan_days' => 14]);
+        Queue::pushed(RefreshImageScanSummariesJob::class)->sole()->handle();
 
-        Queue::assertPushed(RefreshImageScanSummariesJob::class, fn (RefreshImageScanSummariesJob $job): bool => $job->teamId === $this->team->id);
+        $this->travel(3)->days();
+        expect(SecurityStatus::stored($this->application)->checkReason)->toBeNull();
     });
 
     it('needs a check for a service with an image that has no stored status', function () {

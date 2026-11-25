@@ -320,7 +320,7 @@ class ServerSetting extends Model
             }
             // The stored security statuses mark a result stale by the rescan days of its server.
             if ($settings->wasChanged('image_rescan_days') && $settings->server) {
-                RefreshImageScanSummariesJob::dispatch((int) $settings->server->team_id);
+                RefreshImageScanSummariesJob::dispatch((int) $settings->server->team_id, (int) $settings->server->id);
             }
             if (
                 $settings->wasChanged('sentinel_token') ||

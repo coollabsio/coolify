@@ -631,6 +631,21 @@ describe('vulnerability database age', function () {
             ->and($builtAt->isSameDay(now()->subDays(4)))->toBeTrue();
     });
 
+    it('tries one failed update of an old database per hour, not once per image of a rescan', function () {
+        rescanTestFake([
+            'db-update' => 'coolify-scan-exit db-update 1',
+            'db-status' => fn () => rescanTestDatabaseStatus(now()->subDays(4)),
+        ]);
+        rescanTestApplicationContainer($this->application);
+        rescanTestApplicationContainer($this->otherApplication, hex: str_repeat('b', 64));
+
+        rescanTestRun();
+
+        // The rescan job tries once, then the first image scan once; the second image scan does not try again.
+        expect(rescanTestRanCommand('coolify-scan-exit grype'))->toBe(2)
+            ->and(rescanTestRanCommand('coolify-scan-exit db-update'))->toBe(2);
+    });
+
     it('does not update a database of 3 days or less before a scan', function () {
         rescanTestFake(['db-status' => fn () => rescanTestDatabaseStatus(now()->subDays(2))]);
 
