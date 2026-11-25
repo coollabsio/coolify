@@ -71,7 +71,48 @@ final readonly class JsWorkspaceGraph
      */
     public function packagesFromCommand(string $command): ?array
     {
-        $command = ' '.$command;
+        $packages = [];
+        // Each statement on its own: one that names a package does not bound another that builds them all.
+        foreach (preg_split('/&&|\|\||[;|\n]/', preg_replace('/\\\\\r?\n/', ' ', $command) ?? $command) ?: [] as $statement) {
+            // Exec form (`["pnpm", "-r", "start"]`) reads as the plain command.
+            $statement = ' '.(preg_replace('/[",\[\]]/', ' ', $statement) ?? $statement);
+            $selected = $this->statementPackages($statement);
+            if ($selected === null || ($selected === [] && preg_match(self::ALL_PACKAGES_PATTERN, $statement) === 1)) {
+                return null;
+            }
+            array_push($packages, ...$selected);
+        }
+
+        return array_values(array_unique($packages));
+    }
+
+    /**
+     * Workspace packages whose directory (or scoped name) a text such as a Dockerfile mentions.
+     *
+     * @return list<string>
+     */
+    public function packagesMentionedIn(string $text): array
+    {
+        $mentioned = [];
+        foreach ($this->packages as $name => $directory) {
+            $needles = array_filter([$directory, str_contains($name, '/') ? $name : null]);
+            foreach ($needles as $needle) {
+                if (preg_match('#(?<![\w.@-])'.preg_quote($needle, '#').'(?![\w.-])#', $text) === 1) {
+                    $mentioned[] = $name;
+
+                    break;
+                }
+            }
+        }
+
+        return $mentioned;
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function statementPackages(string $command): ?array
+    {
         $patterns = [
             '/(?:--filter|\s-F|--scope)(?:=|\s+)(["\']?)([^\s"\']+)\1/',
             '/(?:--workspace|\s-w)(?:=|\s+)(["\']?)([^\s"\']+)\1/',
@@ -93,11 +134,8 @@ final readonly class JsWorkspaceGraph
                 $packages[] = $package;
             }
         }
-        if ($packages === [] && preg_match(self::ALL_PACKAGES_PATTERN, $command) === 1) {
-            return null;
-        }
 
-        return array_values(array_unique($packages));
+        return $packages;
     }
 
     private function packageNamed(string $selector): ?string

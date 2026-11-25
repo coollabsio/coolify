@@ -80,9 +80,10 @@ class GithubFastPath
 
             $decision = TriggerSetDecider::decide($id, $set, $files, $candidate->base)['decision'];
 
-            // A change in the application's own files can add a reference; the next full evaluation checks again.
+            // A change in the application's own files can add a reference or a symlink, which the compare API cannot show.
+            // Without a set, the stored one stays at its old commit and the next push resolves the set again.
             return $decision?->deploys()
-                ? new ApplicationDecision($id, 'deploy', $decision->reasonCode, $decision->reason, $decision->base, $decision->matches, triggerSet: [...$set, 'references_checked' => false])
+                ? new ApplicationDecision($id, 'deploy', $decision->reasonCode, $decision->reason, $decision->base, $decision->matches)
                 : $decision;
         } catch (InvalidArgumentException) {
             return null;

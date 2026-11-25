@@ -19,7 +19,7 @@ final class TriggerSetDecider
     public static function decide(string $id, array $set, array $files, ?string $base): array
     {
         $compiled = CompiledTriggerSet::fromArray($set['compiled']);
-        $match = $compiled->firstMatch($files);
+        $match = $compiled->firstMatch($files) ?? collect($files)->first(fn (string $file): bool => $compiled->matchesBelow($file));
         if ($match !== null) {
             return ['decision' => new ApplicationDecision($id, 'deploy', 'matched', "{$match} changed.", $base, [[
                 'file' => $match,
@@ -48,7 +48,7 @@ final class TriggerSetDecider
     }
 
     /**
-     * The set with the referenced packages moved into the closure.
+     * The set with the referenced packages, and the excluded packages they depend on, moved into the closure.
      *
      * @param  array<string, mixed>  $set
      * @param  array<string, string>  $referenced  name => directory
@@ -56,6 +56,19 @@ final class TriggerSetDecider
      */
     public static function withReferences(array $set, array $referenced): array
     {
+        $excluded = is_array($set['excluded'] ?? null) ? $set['excluded'] : [];
+        $queue = array_keys($referenced);
+        while ($queue !== []) {
+            $name = array_shift($queue);
+            foreach ($set['dependencies'][$name] ?? [] as $dependency) {
+                if (isset($excluded[$dependency]) && ! isset($referenced[$dependency])) {
+                    $referenced[$dependency] = $excluded[$dependency];
+                    $queue[] = $dependency;
+                }
+            }
+        }
+        $set['dependencies'] = array_diff_key($set['dependencies'] ?? [], $referenced);
+
         foreach ($set['compiled']['all_of'] as $index => $ruleset) {
             if (($ruleset['limit'] ?? null) === 'workspace') {
                 foreach ($referenced as $directory) {

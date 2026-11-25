@@ -4,6 +4,7 @@ use App\Services\DeployTriggers\CompiledTriggerSet;
 use App\Services\DeployTriggers\Contract\EvaluateApplicationInput;
 use App\Services\DeployTriggers\Resolution\RepositorySnapshot;
 use App\Services\DeployTriggers\Resolution\TriggerSetBuilder;
+use App\Services\DeployTriggers\TriggerSetDecider;
 
 function builderApp(array $overrides = []): EvaluateApplicationInput
 {
@@ -57,7 +58,7 @@ it('narrows a root-context workspace app to its closure, globals and lifecycle m
         ->and(affects($built, 'apps/api/package.json'))->toBeTrue()
         ->and(affects($built, 'apps/api/src/main.ts'))->toBeFalse()
         ->and(affects($built, 'packages/other/index.ts'))->toBeFalse()
-        ->and(affects($built, 'README.md'))->toBeFalse()
+        ->and(affects($built, 'LICENSE'))->toBeFalse()
         ->and(affects($built, '.github/workflows/ci.yml'))->toBeFalse()
         ->and($built['limits'])->toBe(['build_context', 'workspace'])
         ->and($built['resolvers'])->toBe(['pnpm'])
@@ -248,3 +249,102 @@ it('records the tsconfig path aliases of packages outside the closure for the re
         ->and($built['reference_needles'])->not->toHaveKey('@acme/ui')
         ->and(CompiledTriggerSet::fromArray($built['input_patterns'])->matches('tsconfig.base.json'))->toBeTrue();
 });
+
+it('includes the whole repository for a Compose service that builds or mounts the repository root', function (string $compose) {
+    $snapshot = RepositorySnapshot::fromFiles(['docker-compose.yaml' => $compose, 'Dockerfile' => "FROM node\nCOPY . .\n", 'src/index.js' => 'x']);
+
+    $built = (new TriggerSetBuilder)->build(builderApp(['buildPack' => 'dockercompose', 'dockerComposeLocation' => '/docker-compose.yaml']), $snapshot)->toArray();
+
+    expect(affects($built, 'src/index.js'))->toBeTrue();
+})->with([
+    'build .' => "services:\n  app:\n    build: .\n",
+    'bind mount .' => "services:\n  app:\n    image: node\n    volumes:\n      - .:/app\n",
+]);
+
+it('widens the workspace when one Dockerfile step names a package and another builds every package', function (string $dockerfile) {
+    $built = (new TriggerSetBuilder)->build(builderApp(), monorepo(['Dockerfile' => $dockerfile]))->toArray();
+
+    expect(affects($built, 'apps/web/src/page.tsx'))->toBeTrue()
+        ->and($built['limits'])->not->toContain('workspace');
+})->with([
+    'separate steps' => "FROM node\nCOPY . .\nRUN pnpm --filter @acme/api prisma generate\nRUN pnpm -r build\n",
+    'one step' => "FROM node\nCOPY . .\nRUN pnpm --filter @acme/api prisma generate && pnpm -r build\n",
+    'exec form' => "FROM node\nCOPY . .\nRUN pnpm --filter @acme/api prisma generate\nCMD [\"pnpm\", \"-r\", \"--parallel\", \"start\"]\n",
+]);
+
+it('keeps a filtered recursive command narrow', function () {
+    $built = (new TriggerSetBuilder)->build(builderApp(), monorepo([
+        'Dockerfile' => "FROM node\nCOPY . .\nRUN pnpm -r --filter @acme/web build\n",
+    ]))->toArray();
+
+    expect($built['anchor']['package'])->toBe('@acme/web')
+        ->and(affects($built, 'apps/api/src/main.ts'))->toBeFalse();
+});
+
+it('drops the Compose limit when the Compose commands name other Compose or env files', function () {
+    $snapshot = RepositorySnapshot::fromFiles([
+        'docker-compose.yaml' => "services:\n  app:\n    image: nginx\n",
+        'docker-compose.prod.yaml' => "services:\n  app:\n    build: ./app\n",
+        'app/index.html' => 'x',
+    ]);
+    $command = 'docker compose -f docker-compose.yaml -f docker-compose.prod.yaml';
+
+    $built = (new TriggerSetBuilder)->build(builderApp(['buildPack' => 'dockercompose', 'dockerComposeLocation' => '/docker-compose.yaml',
+        'commands' => ['compose_build' => "{$command} build", 'compose_start' => "{$command} up -d"]]), $snapshot)->toArray();
+
+    expect(affects($built, 'app/index.html'))->toBeTrue()
+        ->and(affects($built, 'docker-compose.prod.yaml'))->toBeTrue()
+        ->and($built['limits'])->not->toContain('compose');
+});
+
+it('widens the workspace when a Compose service builds from a directory that holds several packages', function () {
+    $built = (new TriggerSetBuilder)->build(builderApp(['buildPack' => 'dockercompose', 'dockerComposeLocation' => '/docker-compose.yaml']), monorepo([
+        'docker-compose.yaml' => "services:\n  web:\n    build: ./apps/web\n  worker:\n    build:\n      context: .\n      dockerfile: apps/api/Dockerfile\n",
+        'apps/api/Dockerfile' => "FROM node\nCOPY . .\nRUN cd apps/api && pnpm build\n",
+    ]))->toArray();
+
+    expect(affects($built, 'apps/api/src/main.ts'))->toBeTrue();
+});
+
+it('keeps a Compose app narrow when it also mounts a directory outside the packages', function () {
+    $built = (new TriggerSetBuilder)->build(builderApp(['buildPack' => 'dockercompose', 'dockerComposeLocation' => '/docker-compose.yaml']), monorepo([
+        'docker-compose.yaml' => "services:\n  web:\n    build: ./apps/web\n    volumes:\n      - ./nginx:/etc/nginx\n",
+    ]))->toArray();
+
+    expect(affects($built, 'apps/web/src/page.tsx'))->toBeTrue()
+        ->and(affects($built, 'apps/api/src/main.ts'))->toBeFalse();
+});
+
+it('includes a package that the Dockerfile runs by its directory', function () {
+    $built = (new TriggerSetBuilder)->build(builderApp(), monorepo([
+        'Dockerfile' => "FROM node\nCOPY . .\nRUN node packages/other/index.ts\nRUN pnpm --filter @acme/web build\n",
+    ]))->toArray();
+
+    expect(affects($built, 'packages/other/index.ts'))->toBeTrue()
+        ->and(affects($built, 'apps/api/src/main.ts'))->toBeFalse()
+        ->and($built['anchor']['package'])->toBe('@acme/web');
+});
+
+it('does not narrow to a package that the Dockerfile only runs by its directory', function () {
+    $built = (new TriggerSetBuilder)->build(builderApp(), monorepo([
+        'Dockerfile' => "FROM node\nCOPY . .\nRUN node packages/other/index.ts\n",
+    ]))->toArray();
+
+    expect(affects($built, 'apps/api/src/main.ts'))->toBeTrue();
+});
+
+it('keeps root files that a build can read, such as the README and the CHANGELOG', function (string $file) {
+    $built = (new TriggerSetBuilder)->build(builderApp(['dockerfileLocation' => '/apps/web/Dockerfile']), monorepo())->toArray();
+
+    expect(affects($built, $file))->toBeTrue();
+})->with(['README.md', 'CHANGELOG.md', '.editorconfig']);
+
+it('deploys when a submodule changes that holds files of the set', function (array $application, array $files) {
+    $built = (new TriggerSetBuilder)->build(builderApp($application), RepositorySnapshot::fromFiles([...$files, 'vendor/lib' => 'gitlink'], ['vendor/lib' => '160000']))->toArray();
+
+    expect(TriggerSetDecider::decide('web', $built, ['vendor/lib'], null)['decision']?->deploys())->toBeTrue()
+        ->and(TriggerSetDecider::decide('web', $built, ['vendor/other'], null)['decision']?->deploys())->toBeFalse();
+})->with([
+    'copied below it' => [[], ['Dockerfile' => "FROM node\nCOPY vendor/lib/src ./src\n"]],
+    'base directory below it' => [['buildPack' => 'railpack', 'baseDirectory' => '/vendor/lib/app', 'dockerfileLocation' => null], []],
+]);

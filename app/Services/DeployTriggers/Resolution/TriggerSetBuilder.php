@@ -12,7 +12,11 @@ use App\Services\DeployTriggers\Contract\EvaluateApplicationInput;
  */
 final class TriggerSetBuilder
 {
-    private const ROOT_META_FILES = ['README*', 'LICENSE*', 'CHANGELOG*', 'CONTRIBUTING*', 'CODE_OF_CONDUCT*', 'SECURITY*', '.gitlab-ci.yml', '.editorconfig', 'CODEOWNERS'];
+    /** Root files no build reads. A README, a CHANGELOG, or .editorconfig can be (docs sites, linters), so they stay. */
+    private const ROOT_META_FILES = ['LICENSE*', 'CONTRIBUTING*', 'CODE_OF_CONDUCT*', 'SECURITY*', '.gitlab-ci.yml', 'CODEOWNERS'];
+
+    /** Compose flags that read files other than the Compose file Coolify knows. */
+    private const COMPOSE_FILE_FLAGS = '/(?:^|\s)(?:-f|--file|--env-file|--project-directory)(?:=|\s)/';
 
     private const ROOT_META_DIRECTORIES = ['.github', '.gitlab', '.vscode', '.idea', '.husky', '.changeset'];
 
@@ -51,7 +55,11 @@ final class TriggerSetBuilder
             $this->dockerfileLimit($snapshot, $context, $dockerfile, $ignoreFiles);
         }
         if ($compose !== null) {
-            $this->composeLimit($snapshot, $compose, $context);
+            if (self::composeCommandsReadOtherFiles($application)) {
+                $this->widen('compose', 'The Compose commands name other Compose or env files.');
+            } else {
+                $this->composeLimit($snapshot, $compose, $context);
+            }
         }
         [$graph, $closure, $anchor, $resolvers] = $this->workspaceLimit($application, $snapshot, $context, $dockerfile, $compose, $referencedPackages);
         $this->followSymlinks($snapshot);
@@ -198,7 +206,7 @@ final class TriggerSetBuilder
         };
         $anchors = $this->anchors($application, $graph, $snapshot, $context, $dockerfile, $compose);
         if ($anchors === null) {
-            $this->widen('workspace', 'The build command builds packages that Coolify cannot name, such as every package or the dependents of one.');
+            $this->widen('workspace', 'The build can build packages that Coolify cannot name, such as every package, the dependents of one, or the packages of a shared Compose build context.');
 
             return [$graph, [], null, [$resolver]];
         }
@@ -267,23 +275,43 @@ final class TriggerSetBuilder
             $commands[] = $snapshot->read($dockerfile);
         }
         if ($compose !== null) {
+            if (self::composeCommandsReadOtherFiles($application)) {
+                return null;
+            }
             $sources = $snapshot->has($compose) ? ComposeSources::parse((string) $snapshot->read($compose), $compose, $context) : null;
             foreach ($sources['dirs'] ?? [] as $directory) {
-                $anchors[] = $graph->packageOwning($directory.'/x');
+                $owner = $graph->packageOwning($directory.'/x');
+                // A context that holds several packages (such as the root) can build any of them.
+                if ($owner === null && collect($graph->packages)->contains(fn (string $package): bool => RepoPath::isWithin($package, $directory))) {
+                    return null;
+                }
+                $anchors[] = $owner;
             }
         }
+        $commands = array_values(array_filter($commands, fn (mixed $command): bool => is_string($command) && $command !== ''));
         foreach ($commands as $command) {
-            if (! is_string($command) || $command === '') {
-                continue;
-            }
             $selected = $graph->packagesFromCommand($command);
             if ($selected === null) {
                 return null;
             }
             array_push($anchors, ...$selected);
         }
+        $anchors = array_values(array_unique(array_filter($anchors)));
 
-        return array_values(array_unique(array_filter($anchors)));
+        // A package the Dockerfile or a command runs by its path, such as `node packages/codegen/run.js`, counts too.
+        // Only next to a named package: on its own it does not show what the application builds.
+        return $anchors === [] ? [] : array_values(array_unique([...$anchors, ...$graph->packagesMentionedIn(implode("\n", $commands))]));
+    }
+
+    private static function composeCommandsReadOtherFiles(EvaluateApplicationInput $application): bool
+    {
+        foreach (['compose_build', 'compose_start'] as $key) {
+            if (is_string($application->commands[$key] ?? null) && preg_match(self::COMPOSE_FILE_FLAGS, $application->commands[$key]) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -388,7 +416,7 @@ final class TriggerSetBuilder
             if ($limit === 'workspace' && $rule['action'] === 'exclude') {
                 continue;
             }
-            $path = ($rule['path'] ?? $rule['pattern']).($rule['kind'] === 'dir' ? '/**' : '');
+            $path = $rule['kind'] === 'dir' ? ($rule['path'] === '' ? '**' : $rule['path'].'/**') : ($rule['path'] ?? $rule['pattern']);
             $this->display[] = "{$limit}: ".($rule['action'] === 'exclude' ? '!' : '').$path;
         }
         $this->display = array_values(array_unique($this->display));

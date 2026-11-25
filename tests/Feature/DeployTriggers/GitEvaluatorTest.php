@@ -257,3 +257,62 @@ it('keeps tokens out of errors and out of the files it leaves behind', function 
     }
     expect(Process::run(['grep', '-rl', $token, $this->root.'/mirrors'])->output())->toBe('');
 });
+
+it('deploys a Compose application that builds from the repository root when its source changes', function () {
+    $base = evalCommit($this, ['docker-compose.yaml' => "services:\n  app:\n    build: .\n", 'Dockerfile' => "FROM node\nCOPY . .\n", 'src/index.js' => '1']);
+    $after = evalCommit($this, ['src/index.js' => '2']);
+    $input = new EvaluateApplicationInput('app', $base, null, 'smart', null, 'dockercompose', '/', null, '/docker-compose.yaml',
+        ['install' => null, 'build' => null, 'start' => null, 'compose_build' => null, 'compose_start' => null], []);
+
+    expect(evaluateWith($this, gitEvaluatorRequest($this, $after, [$input]))->applications['app']->decision)->toBe('deploy');
+});
+
+it('follows the workspace dependencies of a package that the application references without declaring it', function () {
+    $base = evalCommit($this, [
+        'apps/web/src/page.tsx' => "import { Button } from '@acme/editor'",
+        'packages/editor/package.json' => json_encode(['name' => '@acme/editor', 'dependencies' => ['@acme/core' => 'workspace:*']]),
+        'packages/editor/src/index.ts' => 'export const editor = 1',
+        'packages/core/package.json' => json_encode(['name' => '@acme/core']),
+        'packages/core/src/index.ts' => 'export const x = 1',
+    ]);
+    $after = evalCommit($this, ['packages/core/src/index.ts' => 'export const x = 2']);
+
+    $decision = evaluateWith($this, gitEvaluatorRequest($this, $after, [gitEvaluatorInput('web', '/apps/web/Dockerfile', $base)]))->applications['web'];
+
+    expect($decision->decision)->toBe('deploy')
+        ->and($decision->triggerSet['packages'])->toHaveKeys(['@acme/editor', '@acme/core']);
+});
+
+it('searches the packages that a reference brings in for further references', function () {
+    $base = evalCommit($this, [
+        'apps/web/src/page.tsx' => "import { Editor } from '@acme/editor'",
+        'packages/editor/package.json' => json_encode(['name' => '@acme/editor']),
+        'packages/editor/src/index.ts' => "export * from '@acme/core'",
+        'packages/core/package.json' => json_encode(['name' => '@acme/core']),
+        'packages/core/src/index.ts' => 'export const x = 1',
+    ]);
+    $after = evalCommit($this, ['packages/core/src/index.ts' => 'export const x = 2']);
+
+    $decision = evaluateWith($this, gitEvaluatorRequest($this, $after, [gitEvaluatorInput('web', '/apps/web/Dockerfile', $base)]))->applications['web'];
+
+    expect($decision->decision)->toBe('deploy')
+        ->and($decision->triggerSet['references_checked'])->toBeTrue();
+});
+
+it('keeps checking references on later pushes after a reference brought in a package', function () {
+    $base = evalCommit($this, [
+        'apps/web/src/page.tsx' => "import { Editor } from '@acme/editor'",
+        'packages/editor/package.json' => json_encode(['name' => '@acme/editor']),
+        'packages/editor/src/index.ts' => "export * from '@acme/core'",
+        'packages/core/package.json' => json_encode(['name' => '@acme/core']),
+        'packages/core/src/index.ts' => 'export const x = 1',
+    ]);
+    $middle = evalCommit($this, ['packages/editor/src/index.ts' => "export * from '@acme/core' // 2"]);
+    $first = evaluateWith($this, gitEvaluatorRequest($this, $middle, [gitEvaluatorInput('web', '/apps/web/Dockerfile', $base)]))->applications['web'];
+    $after = evalCommit($this, ['packages/core/src/index.ts' => 'export const x = 2']);
+
+    $next = evaluateWith($this, gitEvaluatorRequest($this, $after, [gitEvaluatorInput('web', '/apps/web/Dockerfile', $middle, ['storedTriggerSet' => $first->triggerSet])]))->applications['web'];
+
+    expect($first->decision)->toBe('deploy')
+        ->and($next->decision)->toBe('deploy');
+});

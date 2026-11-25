@@ -94,6 +94,8 @@ final readonly class BuiltTriggerSet
             'widened' => $this->widened,
             'packages' => $this->graph === null ? [] : array_intersect_key($this->graph->packages, array_flip($this->closure)),
             'excluded' => $this->excludedPackages(),
+            // So a referenced package brings its own workspace dependencies in.
+            'dependencies' => array_filter(array_intersect_key($this->graph?->dependencies ?? [], $this->excludedPackages())),
             'reference_needles' => $this->referenceNeedles(),
         ];
     }

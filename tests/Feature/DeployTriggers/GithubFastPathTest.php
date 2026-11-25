@@ -93,6 +93,15 @@ it('deploys and records the matching file', function () {
         ->and($decision->matches[0]['file'])->toBe('apps/web/page.tsx');
 });
 
+it('leaves the set to be resolved again after a deployment, which can add symlinks it cannot see', function () {
+    fakeCompare('ahead', ['apps/web/page.tsx']);
+
+    $decision = fastDecide($this, [fastCandidate($this->application)])[$this->application->uuid];
+
+    expect($decision->deploys())->toBeTrue()
+        ->and($decision->triggerSet)->toBeNull();
+});
+
 it('deploys an identical compare as an empty diff', function () {
     fakeCompare('identical', []);
 

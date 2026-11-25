@@ -13,7 +13,7 @@ use InvalidArgumentException;
 final class CompiledTriggerSet
 {
     /**
-     * @param  list<array{default: bool, dirs: array<string, int>, files: array<string, int>, globs: list<array{index: int, include: bool, regex: string}>, includes: list<bool>}>  $rulesets
+     * @param  list<array{default: bool, dirs: array<string, int>, files: array<string, int>, globs: list<array{index: int, include: bool, regex: string}>, includes: list<bool>, above: array<string, true>}>  $rulesets
      * @param  list<string>  $lockfiles
      */
     private function __construct(private readonly array $rulesets, private readonly array $lockfiles) {}
@@ -51,6 +51,24 @@ final class CompiledTriggerSet
     }
 
     /**
+     * Whether a changed path can hold files of the set below it: a submodule, or a file that replaced a directory.
+     */
+    public function matchesBelow(string $path): bool
+    {
+        if ($path === '' || $this->rulesets === []) {
+            return false;
+        }
+
+        foreach ($this->rulesets as $ruleset) {
+            if (! $this->rulesetIncludes($ruleset, $path) && ! $this->rulesetIncludesBelow($ruleset, $path)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * @param  iterable<string>  $paths
      */
     public function firstMatch(iterable $paths): ?string
@@ -79,7 +97,7 @@ final class CompiledTriggerSet
 
     /**
      * @param  array<string, mixed>  $ruleset
-     * @return array{default: bool, dirs: array<string, int>, files: array<string, int>, globs: list<array{index: int, include: bool, regex: string}>, includes: list<bool>}
+     * @return array{default: bool, dirs: array<string, int>, files: array<string, int>, globs: list<array{index: int, include: bool, regex: string}>, includes: list<bool>, above: array<string, true>}
      */
     private static function compileRuleset(array $ruleset): array
     {
@@ -108,11 +126,12 @@ final class CompiledTriggerSet
             };
         }
 
-        return ['default' => $default, 'dirs' => $dirs, 'files' => $files, 'globs' => $globs, 'includes' => $includes];
+        return ['default' => $default, 'dirs' => $dirs, 'files' => $files, 'globs' => $globs, 'includes' => $includes,
+            'above' => self::directoriesAboveIncludes(array_values($ruleset['rules'] ?? []))];
     }
 
     /**
-     * @param  array{default: bool, dirs: array<string, int>, files: array<string, int>, globs: list<array{index: int, include: bool, regex: string}>, includes: list<bool>}  $ruleset
+     * @param  array{default: bool, dirs: array<string, int>, files: array<string, int>, globs: list<array{index: int, include: bool, regex: string}>, includes: list<bool>, above: array<string, true>}  $ruleset
      */
     private function rulesetIncludes(array $ruleset, string $path): bool
     {
@@ -130,6 +149,10 @@ final class CompiledTriggerSet
             $slash = strrpos($prefix, '/');
             $prefix = $slash === false ? '' : substr($prefix, 0, $slash);
         }
+        // A dir rule for '' is the repository root.
+        if (isset($ruleset['dirs']['']) && $ruleset['dirs'][''] > $winner) {
+            $winner = $ruleset['dirs'][''];
+        }
 
         foreach ($ruleset['globs'] as $glob) {
             if ($glob['index'] > $winner && preg_match($glob['regex'], $path) === 1) {
@@ -138,6 +161,53 @@ final class CompiledTriggerSet
         }
 
         return $winner === -1 ? $ruleset['default'] : $ruleset['includes'][$winner];
+    }
+
+    /**
+     * @param  array{dirs: array<string, int>, files: array<string, int>, globs: list<array{index: int, include: bool, regex: string}>, includes: list<bool>, above: array<string, true>}  $ruleset
+     */
+    private function rulesetIncludesBelow(array $ruleset, string $path): bool
+    {
+        return isset($ruleset['above'][$path]);
+    }
+
+    /**
+     * The directories above the paths that include rules name, so a change of one of them can be found in O(1).
+     * A glob counts by its segments before the first wildcard; one that starts with a wildcard is left out.
+     *
+     * @param  list<array<string, mixed>>  $rules
+     * @return array<string, true>
+     */
+    private static function directoriesAboveIncludes(array $rules): array
+    {
+        $above = [];
+        foreach ($rules as $rule) {
+            if (($rule['action'] ?? null) !== 'include') {
+                continue;
+            }
+            $path = $rule['kind'] === 'glob' ? self::literalPrefix($rule['pattern']).'/*' : $rule['path'];
+            for ($slash = strrpos($path, '/'); $slash !== false && $slash > 0; $slash = strrpos(substr($path, 0, $slash), '/')) {
+                $above[substr($path, 0, $slash)] = true;
+            }
+        }
+
+        return $above;
+    }
+
+    /**
+     * The segments of a glob before its first wildcard.
+     */
+    private static function literalPrefix(string $pattern): string
+    {
+        $literal = [];
+        foreach (explode('/', $pattern) as $segment) {
+            if (strpbrk($segment, '*?') !== false) {
+                break;
+            }
+            $literal[] = $segment;
+        }
+
+        return implode('/', $literal);
     }
 
     /**

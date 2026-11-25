@@ -29,6 +29,9 @@ final class GitEvaluator implements AffectedRunner
 
     public const MAX_GREP_FILES = 20000;
 
+    /** Searches for references through packages that a reference brought in, at most this many times. */
+    public const MAX_REFERENCE_ROUNDS = 5;
+
     /** @var Closure(Server): MirrorGit */
     private readonly Closure $mirrorFor;
 
@@ -98,14 +101,10 @@ final class GitEvaluator implements AffectedRunner
             return $decisions;
         }
 
-        $referenced = $session->references($after, array_map(fn (array $set): array => [
-            'directories' => array_values($set['packages']),
-            'packages' => $set['excluded'],
-            'needles' => is_array($set['reference_needles'] ?? null) ? $set['reference_needles'] : [],
-        ], $sets), self::MAX_GREP_FILES);
+        $searched = $this->searchReferences($sets, $session, $after);
 
         foreach ($sets as $id => $set) {
-            $checked = $referenced === null ? null : [...TriggerSetDecider::withReferences($set, $referenced[$id] ?? []), 'references_checked' => true];
+            $checked = $searched === null ? null : [...$searched[$id], 'references_checked' => true];
             if (isset($pending[$id])) {
                 ['files' => $files, 'base' => $base] = $pending[$id];
                 $decisions[$id] = $checked === null
@@ -121,6 +120,46 @@ final class GitEvaluator implements AffectedRunner
         }
 
         return $decisions;
+    }
+
+    /**
+     * Moves the referenced packages into each set, then searches the packages that came in, until no new reference turns up.
+     *
+     * @param  array<string, array<string, mixed>>  $sets
+     * @return array<string, array<string, mixed>>|null null when there are too many files to search
+     */
+    private function searchReferences(array $sets, MirrorSession $session, string $after): ?array
+    {
+        $directories = array_map(fn (array $set): array => array_values($set['packages']), $sets);
+        for ($round = 0; $directories !== []; $round++) {
+            if ($round === self::MAX_REFERENCE_ROUNDS) {
+                return null;
+            }
+            $referenced = $session->references($after, array_map(fn (string $id): array => [
+                'directories' => $directories[$id],
+                'packages' => $sets[$id]['excluded'],
+                'needles' => is_array($sets[$id]['reference_needles'] ?? null) ? $sets[$id]['reference_needles'] : [],
+            ], array_combine(array_keys($directories), array_keys($directories))), self::MAX_GREP_FILES);
+            if ($referenced === null) {
+                return null;
+            }
+
+            $next = [];
+            foreach (array_keys($directories) as $id) {
+                if (($referenced[$id] ?? []) === []) {
+                    continue;
+                }
+                $before = $sets[$id]['packages'];
+                $sets[$id] = TriggerSetDecider::withReferences($sets[$id], $referenced[$id]);
+                $added = array_values(array_diff($sets[$id]['packages'], $before));
+                if ($added !== [] && $sets[$id]['excluded'] !== []) {
+                    $next[$id] = $added;
+                }
+            }
+            $directories = $next;
+        }
+
+        return $sets;
     }
 
     /**
