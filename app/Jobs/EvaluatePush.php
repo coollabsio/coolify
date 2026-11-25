@@ -223,8 +223,13 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             return false;
         }
 
+        // Already queued for this commit, or held for coolify.json: nothing new was queued.
+        if ($result['status'] === 'skipped') {
+            return true;
+        }
+
         ApplicationDeploymentQueue::query()
-            ->where('deployment_uuid', $result['deployment_uuid'] ?? $deploymentUuid)
+            ->where('deployment_uuid', $deploymentUuid)
             ->whereNull('trigger_reason')
             ->first()
             ?->forceFill(['trigger_reason' => $decision->toTriggerReason($after)])

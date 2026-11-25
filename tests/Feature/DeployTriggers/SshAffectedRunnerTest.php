@@ -62,38 +62,55 @@ function fakeAffectedProcesses(array &$scripts, Closure $handler): void
     });
 }
 
-it('runs evaluate through one remote script and parses stdout', function () {
-    fakeAffectedProcesses($this->scripts, fn (string $script) => str_contains($script, 'coolify-affected evaluate')
+function fakeAffectedProcessParts(array &$parts, Closure $handler): void
+{
+    Process::fake(function (PendingProcess $process) use (&$parts, $handler) {
+        $command = is_array($process->command) ? implode(' ', $process->command) : (string) $process->command;
+        $input = is_string($process->input) ? $process->input : '';
+        $parts[] = ['command' => $command, 'input' => $input];
+
+        return $handler($command, $input);
+    });
+}
+
+it('runs evaluate with the request and credentials on stdin', function () {
+    $parts = [];
+    fakeAffectedProcessParts($parts, fn (string $command, string $input) => str_contains($command, 'coolify-affected evaluate')
         ? Process::result(output: runnerResponse())
         : Process::result());
 
-    $response = (new SshAffectedRunner)->evaluate($this->server, runnerRequest(), new GitAccess('git@git.example.com:acme/mono.git', files: ['id_key' => "KEY\n"]));
+    $response = (new SshAffectedRunner)->evaluate($this->server, runnerRequest(), new GitAccess('git@git.example.com:acme/mono.git', files: ['id_key' => "PRIVATE-KEY-MATERIAL\n"]));
 
-    $script = collect($this->scripts)->first(fn (string $s) => str_contains($s, 'coolify-affected evaluate'));
+    $run = collect($parts)->first(fn (array $part) => str_contains($part['command'], 'coolify-affected evaluate'));
+    $pull = collect($parts)->first(fn (array $part) => str_contains($part['command'].$part['input'], 'docker image inspect'));
     expect($response->applications['web']->reasonCode)->toBe('no_match')
-        ->and($script)->toContain("sh -c '")
-        ->and($script)->toContain('umask 077')
-        ->and($script)->toContain('-v coolify-git-mirrors:/mirrors')
-        ->and($script)->toContain(':/run/coolify:ro')
-        ->and($script)->toContain('docker image inspect')
-        ->and($script)->toContain('timeout 600 docker pull')
-        ->and($script)->toContain('trap ');
+        ->and($run['command'])->toContain('docker run --rm -i --network host -v coolify-git-mirrors:/mirrors --entrypoint sh')
+        ->and($run['command'])->not->toContain(base64_encode("PRIVATE-KEY-MATERIAL\n"))
+        ->and($run['command'])->not->toContain('SUPERSECRETTOKEN')
+        ->and($run['input'])->toContain('id_key:'.base64_encode("PRIVATE-KEY-MATERIAL\n"))
+        ->and($run['input'])->toContain("\n--\n")
+        ->and($run['input'])->toContain('"mirror_key"')
+        ->and($pull['command'].$pull['input'])->toContain('timeout 600 docker pull');
 });
 
-it('keeps the whole script in one shell for a non-root server', function () {
+it('prefixes sudo for a non-root server', function () {
     $this->server->update(['user' => 'deploy']);
     $this->server->refresh();
-    fakeAffectedProcesses($this->scripts, fn (string $script) => Process::result(output: runnerResponse()));
+    $parts = [];
+    fakeAffectedProcessParts($parts, fn (string $command, string $input) => Process::result(output: runnerResponse()));
 
     (new SshAffectedRunner)->evaluate($this->server, runnerRequest(), new GitAccess('repo'));
 
-    $script = collect($this->scripts)->first(fn (string $s) => str_contains($s, 'coolify-affected evaluate'));
-    expect($script)->toMatch("/sudo sh -c '/")
-        ->and(substr_count($script, 'sudo '))->toBe(1);
+    $run = collect($parts)->first(fn (array $part) => str_contains($part['command'], 'coolify-affected evaluate'));
+    $pull = collect($parts)->first(fn (array $part) => str_contains($part['command'].$part['input'], 'docker image inspect'));
+    expect($run['command'])->toContain('sudo docker run')
+        ->and($pull['command'].$pull['input'])->toContain('sudo docker image inspect');
 });
 
 it('throws a runner exception without credentials when the remote script fails', function () {
-    fakeAffectedProcesses($this->scripts, fn (string $script) => Process::result(output: '', errorOutput: 'fatal: could not read from https://x-access-token:SUPERSECRETTOKEN@github.com', exitCode: 3));
+    fakeAffectedProcesses($this->scripts, fn (string $script) => str_contains($script, 'coolify-affected evaluate')
+        ? Process::result(output: '', errorOutput: 'fatal: could not read from https://x-access-token:SUPERSECRETTOKEN@github.com', exitCode: 3)
+        : Process::result());
 
     try {
         (new SshAffectedRunner)->evaluate($this->server, runnerRequest(), new GitAccess('repo'));
@@ -161,7 +178,9 @@ it('remembers a missing binary for a day', function () {
 });
 
 it('makes a single ssh attempt for evaluate', function () {
-    fakeAffectedProcesses($this->scripts, fn (string $script) => Process::result(errorOutput: 'Connection reset by peer', exitCode: 255));
+    fakeAffectedProcesses($this->scripts, fn (string $script) => str_contains($script, 'coolify-affected evaluate')
+        ? Process::result(errorOutput: 'Connection reset by peer', exitCode: 255)
+        : Process::result());
 
     try {
         (new SshAffectedRunner)->evaluate($this->server, runnerRequest(), new GitAccess('repo'));

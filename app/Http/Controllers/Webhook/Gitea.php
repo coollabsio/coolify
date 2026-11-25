@@ -309,11 +309,9 @@ class Gitea extends Controller
                             gitType: 'gitea',
                             htmlUrl: $pull_request_html_url ?? null,
                         );
-                        if (true) {
-                            $previewTriggers ??= PushTriggerRouter::forPush($this->pullRequestPushContext('gitea', $this->webhookString(data_get($payload, 'repository.html_url')) ?? $this->webhookString(data_get($payload, 'repository.full_name')), "refs/pull/{$pull_request_id}/head", $commit ?? null, $pullRequestContext));
-                            if ($this->deferPushIfEvaluated($previewTriggers, $application, $return_payloads)) {
-                                continue;
-                            }
+                        $previewTriggers ??= PushTriggerRouter::forPush($this->pullRequestPushContext('gitea', $this->webhookString(data_get($payload, 'repository.html_url')) ?? $this->webhookString(data_get($payload, 'repository.full_name')), "refs/pull/{$pull_request_id}/head", $commit ?? null, $pullRequestContext));
+                        if ($this->deferPushIfEvaluated($previewTriggers, $application, $return_payloads)) {
+                            continue;
                         }
                         $deployment_uuid = new_public_id();
                         EnsurePullRequestPreview::run($application, $pullRequestContext, $commit ?? null);
@@ -582,11 +580,9 @@ class Gitea extends Controller
                                 gitType: 'gitea',
                                 htmlUrl: $pull_request_html_url ?? null,
                             );
-                            if (true) {
-                                $previewTriggers ??= PushTriggerRouter::forPush($this->pullRequestPushContext('gitea', $this->webhookString(data_get($payload, 'repository.html_url')) ?? $this->webhookString(data_get($payload, 'repository.full_name')), "refs/pull/{$pull_request_id}/head", $commit ?? null, $pullRequestContext));
-                                if ($this->deferPushIfEvaluated($previewTriggers, $application, $return_payloads)) {
-                                    continue;
-                                }
+                            $previewTriggers ??= PushTriggerRouter::forPush($this->pullRequestPushContext('gitea', $this->webhookString(data_get($payload, 'repository.html_url')) ?? $this->webhookString(data_get($payload, 'repository.full_name')), "refs/pull/{$pull_request_id}/head", $commit ?? null, $pullRequestContext));
+                            if ($this->deferPushIfEvaluated($previewTriggers, $application, $return_payloads)) {
+                                continue;
                             }
                             $deployment_uuid = new_public_id();
                             EnsurePullRequestPreview::run($application, $pullRequestContext, $commit ?? null);

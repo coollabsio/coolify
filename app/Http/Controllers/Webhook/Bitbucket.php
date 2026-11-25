@@ -23,14 +23,13 @@ use Illuminate\Support\Collection;
 
 class Bitbucket extends Controller
 {
+    use MatchesManualWebhookApplications;
+    use RoutesConfigPushes;
     use RoutesPushTriggers;
+    use ValidatesPreviewDeploymentRepository;
 
     /** @var array<string, PushTriggerRouter> branch => router */
     private array $pushTriggers = [];
-
-    use MatchesManualWebhookApplications;
-    use RoutesConfigPushes;
-    use ValidatesPreviewDeploymentRepository;
 
     public function manual(Request $request, ?BitbucketWebhookVariantRegistry $registry = null)
     {

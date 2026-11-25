@@ -333,3 +333,16 @@ it('evaluates a dry run without a stored base or scan', function () {
         ->and($runner->requests[0]->applications[0]->baseCommit)->toBe(EP_AFTER)
         ->and($this->web->refresh()->trigger_set['display'])->toBe(['apps/x/**']);
 });
+
+it('leaves an already queued deployment of the same commit alone', function () {
+    FakeAffectedRunner::respondWith(epRespond([$this->web->uuid => ['deploy', 'matched']]));
+    $existing = ApplicationDeploymentQueue::create([
+        'application_id' => $this->web->id, 'deployment_uuid' => 'manual-one', 'pull_request_id' => 0,
+        'status' => ApplicationDeploymentStatus::QUEUED->value, 'commit' => EP_AFTER, 'server_id' => $this->fixture['server']->id,
+    ]);
+
+    epRun(epContext(), [$this->web]);
+
+    expect(ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->count())->toBe(1)
+        ->and($existing->refresh()->trigger_reason)->toBeNull();
+});
