@@ -724,7 +724,7 @@ class Service extends BaseModel
                     $opensearch_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_OPENSEARCH')->first();
                     if ($opensearch_password) {
                         $data = $data->merge([
-                            'Password (default user: opensearch)' => [
+                            'Password (default user: admin)' => [
                                 'key' => data_get($opensearch_password, 'key'),
                                 'value' => data_get($opensearch_password, 'value'),
                                 'rules' => 'required',
@@ -732,7 +732,7 @@ class Service extends BaseModel
                             ],
                         ]);
                     }
-                    $fields->put('OPENSEARCH', $data->toArray());
+                    $fields->put('OpenSearch', $data->toArray());
                     break;
                 case $image->contains('directus'):
                     $data = collect([]);
