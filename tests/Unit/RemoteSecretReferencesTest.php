@@ -45,3 +45,50 @@ test('reports missing keys', function () {
     expect(RemoteSecretReferences::missingKeys('{{vault.A}}-{{vault.B}}', ['A' => '1']))->toBe(['B'])
         ->and(RemoteSecretReferences::missingKeys('{{vault.A}}', ['A' => '1']))->toBe([]);
 });
+
+it('reads {{vault.KEY}} as the default source and {{vault.<source>.KEY}} as a named source', function () {
+    $value = '{{vault.DB_PASSWORD}} {{ vault.urls.API_URL }} {{vault.my-src_2.KEY}} {{vault.default.OTHER}}';
+
+    expect(RemoteSecretReferences::references($value))->toBe([
+        ['source' => 'default', 'key' => 'DB_PASSWORD'],
+        ['source' => 'urls', 'key' => 'API_URL'],
+        ['source' => 'my-src_2', 'key' => 'KEY'],
+        ['source' => 'default', 'key' => 'OTHER'],
+    ])
+        ->and(RemoteSecretReferences::referencedSources($value))->toBe(['default', 'urls', 'my-src_2'])
+        ->and(RemoteSecretReferences::referencedKeys($value))->toBe(['DB_PASSWORD', 'urls.API_URL', 'my-src_2.KEY', 'OTHER']);
+});
+
+it('keeps a lowercase key without a source in the default source', function () {
+    expect(RemoteSecretReferences::references('{{vault.api_key}}'))->toBe([['source' => 'default', 'key' => 'api_key']])
+        ->and(RemoteSecretReferences::containsReference('{{vault.Urls.KEY}}'))->toBeFalse()
+        ->and(RemoteSecretReferences::containsReference('{{vault.-bad.KEY}}'))->toBeFalse()
+        ->and(RemoteSecretReferences::containsReference('{{vault.a.b.KEY}}'))->toBeFalse();
+});
+
+it('substitutes and reports missing keys per source', function () {
+    $secrets = [
+        ...RemoteSecretReferences::labelSecrets('default', ['TOKEN' => 'default-token']),
+        ...RemoteSecretReferences::labelSecrets('urls', ['TOKEN' => 'urls-token']),
+    ];
+    $value = '{{vault.TOKEN}}|{{vault.urls.TOKEN}}|{{vault.urls.MISSING}}';
+
+    expect(RemoteSecretReferences::substitute($value, $secrets))->toBe('default-token|urls-token|{{vault.urls.MISSING}}')
+        ->and(RemoteSecretReferences::missingKeys($value, $secrets))->toBe(['urls.MISSING'])
+        ->and(RemoteSecretReferences::reference('default', 'KEY'))->toBe('{{vault.KEY}}')
+        ->and(RemoteSecretReferences::reference('urls', 'KEY'))->toBe('{{vault.urls.KEY}}');
+});
+
+it('accepts only lowercase source names of up to 63 characters', function (mixed $name, bool $valid) {
+    expect(RemoteSecretReferences::isValidSourceName($name))->toBe($valid);
+})->with([
+    ['default', true],
+    ['urls', true],
+    ['my-src_2', true],
+    [str_repeat('a', 63), true],
+    [str_repeat('a', 64), false],
+    ['Urls', false],
+    ['-urls', false],
+    ['', false],
+    [null, false],
+]);

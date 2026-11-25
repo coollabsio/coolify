@@ -6,6 +6,7 @@ use App\Enums\LogDrainType;
 use App\Enums\ServerRole;
 use App\Enums\TrafficIpMode;
 use App\Helpers\SshMultiplexingHelper;
+use App\Jobs\RefreshImageScanSummariesJob;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -130,6 +131,12 @@ class ServerSetting extends Model
     /** @var list<float> */
     public const array IMAGE_SCAN_CPU_OPTIONS = [0.5, 1.0, 2.0, 4.0];
 
+    /** Days between two rescans of the running images. 0: only deployments and manual scans scan images. */
+    public const int DEFAULT_IMAGE_RESCAN_DAYS = 1;
+
+    /** @var list<int> */
+    public const array IMAGE_RESCAN_DAYS_OPTIONS = [1, 3, 7, 14, 30, 0];
+
     protected $fillable = [
         'server_id',
         'is_image_scan_enabled',
@@ -141,6 +148,7 @@ class ServerSetting extends Model
         'image_scan_syft_timeout',
         'image_scan_grype_timeout',
         'image_scan_cpus',
+        'image_rescan_days',
         'is_swarm_manager',
         'is_jump_server',
         'is_build_server',
@@ -224,6 +232,7 @@ class ServerSetting extends Model
         'image_scan_syft_timeout' => self::DEFAULT_IMAGE_SCAN_TIMEOUT_SECONDS,
         'image_scan_grype_timeout' => self::DEFAULT_IMAGE_SCAN_TIMEOUT_SECONDS,
         'image_scan_cpus' => self::DEFAULT_IMAGE_SCAN_CPUS,
+        'image_rescan_days' => self::DEFAULT_IMAGE_RESCAN_DAYS,
     ];
 
     protected $casts = [
@@ -231,6 +240,7 @@ class ServerSetting extends Model
         'image_scan_syft_timeout' => 'integer',
         'image_scan_grype_timeout' => 'integer',
         'image_scan_cpus' => 'float',
+        'image_rescan_days' => 'integer',
         'force_docker_cleanup' => 'boolean',
         'docker_cleanup_threshold' => 'integer',
         'sentinel_token' => 'encrypted',
@@ -311,6 +321,10 @@ class ServerSetting extends Model
             }
             if ($settings->wasChanged('ssh_host_key') && $settings->server) {
                 SshMultiplexingHelper::deleteStaleKnownHostsFiles($settings->server->uuid, $settings->ssh_host_key);
+            }
+            // The stored security statuses mark a result stale by the rescan days of its server.
+            if ($settings->wasChanged('image_rescan_days') && $settings->server) {
+                RefreshImageScanSummariesJob::dispatch((int) $settings->server->team_id, (int) $settings->server->id);
             }
             if (
                 $settings->wasChanged('sentinel_token') ||

@@ -96,8 +96,8 @@ class ServicePolicy
     }
 
     /**
-     * Determine whether the user can schedule, run, and download storage and database backups. coolify.json
-     * cannot declare them for services, so its read-only lock does not apply.
+     * Determine whether the user can schedule, run, and download storage and database backups. The read-only lock of
+     * coolify.json does not apply. When the file has `storage_backups`, its next apply replaces the schedules edited in the dashboard.
      */
     public function manageBackups(User $user, Service $service): bool
     {

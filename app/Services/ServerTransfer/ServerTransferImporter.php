@@ -57,6 +57,7 @@ use App\Rules\ValidServerIp;
 use App\Services\Dns\CloudflareDnsProvider;
 use App\Services\LogDrain\LegacyLogDrainFields;
 use App\Services\ProjectIconStorageService;
+use App\Support\RemoteSecretReferences;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -1357,7 +1358,7 @@ class ServerTransferImporter
         $this->importScheduledTasks(data_get($payload, 'scheduled_tasks', []), $application, $teamId);
         $this->importTags(data_get($payload, 'tags', []), $application, $teamId);
         $this->importPreviews(data_get($payload, 'previews', []), $application, $preserveUuids, $adoptMode, $teamId);
-        $this->importSecretManagerLink(data_get($payload, 'secret_manager_link'), $application, "Application {$name}");
+        $this->importSecretManagerLinks($payload, $application, "Application {$name}");
 
         return $application;
     }
@@ -1416,7 +1417,7 @@ class ServerTransferImporter
             $this->importTags(data_get($payload, 'tags', []), $database, $teamId);
         }
         $this->importScheduledBackups(data_get($payload, 'scheduled_backups', []), $database, $teamId);
-        $this->importSecretManagerLink(data_get($payload, 'secret_manager_link'), $database, "Database {$database->name}");
+        $this->importSecretManagerLinks($payload, $database, "Database {$database->name}");
 
         return $database;
     }
@@ -1460,7 +1461,7 @@ class ServerTransferImporter
         $this->importEnvVars(data_get($payload, 'environment_variables', []), $service, false);
         $this->importScheduledTasks(data_get($payload, 'scheduled_tasks', []), $service, $teamId);
         $this->importTags(data_get($payload, 'tags', []), $service, $teamId);
-        $this->importSecretManagerLink(data_get($payload, 'secret_manager_link'), $service, "Service {$service->name}");
+        $this->importSecretManagerLinks($payload, $service, "Service {$service->name}");
 
         foreach (data_get($payload, 'applications', []) as $appPayload) {
             $serviceApp = $this->importServiceApplication($appPayload, $service, $preserveUuids, $adoptMode);
@@ -2167,9 +2168,32 @@ class ServerTransferImporter
         return $this->integrationTokenMap[$tokenUuid]->id;
     }
 
+    /**
+     * The named secret manager sources of a resource. Bundles of older instances have one `secret_manager_link`, the `default` source.
+     *
+     * @param  array<string, mixed>  $resourcePayload
+     */
+    private function importSecretManagerLinks(array $resourcePayload, Model $resource, string $label): void
+    {
+        $links = data_get($resourcePayload, 'secret_manager_links');
+        if (! is_array($links)) {
+            $links = is_array($legacy = data_get($resourcePayload, 'secret_manager_link')) ? [$legacy] : [];
+        }
+
+        foreach ($links as $link) {
+            $this->importSecretManagerLink($link, $resource, $label);
+        }
+    }
+
     private function importSecretManagerLink(mixed $payload, Model $resource, string $label): void
     {
-        if (! is_array($payload) || ! method_exists($resource, 'secretManagerLink')) {
+        if (! is_array($payload) || ! method_exists($resource, 'secretManagerLinks')) {
+            return;
+        }
+        $name = data_get($payload, 'name', RemoteSecretReferences::DEFAULT_SOURCE);
+        if (! RemoteSecretReferences::isValidSourceName($name)) {
+            $this->importWarnings[] = "{$label}: a secret manager source has an invalid name and was skipped; link it again.";
+
             return;
         }
 
@@ -2190,6 +2214,7 @@ class ServerTransferImporter
         $link->forceFill([
             'resourceable_type' => $resource->getMorphClass(),
             'resourceable_id' => $resource->getKey(),
+            'name' => $name,
             'integration_token_id' => $tokenId,
             'settings' => data_get($payload, 'settings'),
         ]);

@@ -17,7 +17,7 @@ final class ConfigPlanView
     ];
 
     /** Groups whose entries are records: a missing value means added or removed, not the default. */
-    private const RECORD_GROUPS = ['env', 'storages', 'files', 'scheduled_tasks', 'backups', 'services'];
+    private const RECORD_GROUPS = ['env', 'storages', 'files', 'scheduled_tasks', 'backups', 'storage_backups', 'services'];
 
     /**
      * @param  list<array<string, mixed>>  $changes

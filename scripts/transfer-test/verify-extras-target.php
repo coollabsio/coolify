@@ -32,8 +32,10 @@ $check('Infisical token moved with its secret', $infisical?->token === 'fake-inf
 $check('Cloudflare tunnel uses the moved token', $server?->settings?->cloudflare_tunnel_integration_token_id === $cloudflare?->id && $server?->settings?->cloudflare_tunnel_id === 'fake-tunnel');
 
 $app = Application::where('name', 'whoami-2')->first();
-$link = SecretManagerLink::where('resourceable_type', $app?->getMorphClass())->where('resourceable_id', $app?->id)->first();
+$link = SecretManagerLink::where('resourceable_type', $app?->getMorphClass())->where('resourceable_id', $app?->id)->where('name', 'default')->first();
 $check('secret manager link moved to the moved token', $link?->integration_token_id === $infisical?->id && data_get($link?->settings, 'project_id') === 'fake-project');
+$namedLink = SecretManagerLink::where('resourceable_type', $app?->getMorphClass())->where('resourceable_id', $app?->id)->where('name', 'urls')->first();
+$check('named secret manager source moved with its name', $namedLink?->integration_token_id === $infisical?->id && data_get($namedLink?->settings, 'project_id') === 'fake-urls');
 
 $record = ManagedDnsRecord::where('name', 'whoami2.example.test')->first();
 $check('DNS record + zone moved', $record !== null && $record->zone?->provider_zone_id === 'fake-zone-id' && $record->integration_token_id === $cloudflare?->id);

@@ -114,9 +114,9 @@ final class ServerTransferCoverage
         ManagedDnsRecord::class => ['managed_dns_records.*'],
         ManagedDnsRecordReference::class => ['managed_dns_records.*.references.*'],
         SecretManagerLink::class => [
-            'projects.*.environments.*.applications.*.secret_manager_link',
-            'projects.*.environments.*.databases.*.secret_manager_link',
-            'projects.*.environments.*.services.*.secret_manager_link',
+            'projects.*.environments.*.applications.*.secret_manager_links.*',
+            'projects.*.environments.*.databases.*.secret_manager_links.*',
+            'projects.*.environments.*.services.*.secret_manager_links.*',
         ],
         SslCertificate::class => ['ssl_certificates.*'],
         ImageScanPolicy::class => ['image_scan_policies.*'],

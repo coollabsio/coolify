@@ -433,3 +433,20 @@ test('the edit modal value autocomplete has no vault scope without a source', fu
 
     expect($component->instance()->fetchSecretManagerKeys())->toBe([]);
 });
+
+test('named sources are listed read-only and the form keeps managing the default source', function () {
+    $this->application->secretManagerLink()->create(['integration_token_id' => $this->token->id]);
+    $this->application->secretManagerLinks()->create(['name' => 'urls', 'integration_token_id' => $this->token->id, 'settings' => ['project' => 'urls-project', 'config' => 'prd']]);
+
+    $component = Livewire::test(SecretManagerLinks::class, ['resource' => $this->application])
+        ->assertSee('Named sources')
+        ->assertSee('urls')
+        ->assertSee('{{vault.urls.KEY}}', false)
+        ->assertDontSee('dp.st.token');
+
+    expect($component->get('link')->name)->toBe('default');
+
+    $component->call('removeSource');
+
+    expect($this->application->secretManagerLinks()->pluck('name')->all())->toBe(['urls']);
+});

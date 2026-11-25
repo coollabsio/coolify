@@ -13,44 +13,75 @@ use App\Models\StandaloneRedis;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Throwable;
 
 trait HasSecretManager
 {
-    /** @var array<string, string>|null */
+    /**
+     * Fetched secrets of all fetched sources, keyed by reference label (`KEY`, `<source>.KEY`).
+     *
+     * @var array<string, string>|null
+     */
     private ?array $resolvedSecretManagerValues = null;
+
+    /** @var array<string, true> Sources whose secrets are in */
+    private array $resolvedSecretManagerSources = [];
+
+    /** @var array<string, RemoteSecretException> Sources that could not be fetched; they are not asked again */
+    private array $failedSecretManagerSources = [];
 
     public static function bootHasSecretManager(): void
     {
         // Return nothing: a non-null result halts the "deleting" event and skips later listeners.
         static::deleting(function ($resource): void {
-            $resource->secretManagerLink()->delete();
+            $resource->secretManagerLinks()->delete();
         });
     }
 
+    /** All secret manager sources of this resource. */
+    public function secretManagerLinks(): MorphMany
+    {
+        return $this->morphMany(SecretManagerLink::class, 'resourceable');
+    }
+
+    /** The `default` source, referenced as {{vault.KEY}}. */
     public function secretManagerLink(): MorphOne
     {
-        return $this->morphOne(SecretManagerLink::class, 'resourceable');
+        return $this->morphOne(SecretManagerLink::class, 'resourceable')
+            ->withAttributes(['name' => RemoteSecretReferences::DEFAULT_SOURCE]);
+    }
+
+    /** A source by name; a new link created through it gets that name. */
+    public function secretManagerLinkNamed(string $name): MorphOne
+    {
+        return $this->morphOne(SecretManagerLink::class, 'resourceable')->withAttributes(['name' => $name]);
     }
 
     /**
-     * Give a cloned resource the same secret manager source. The token is team-scoped, so a clone in another team gets no link.
+     * Give a cloned resource the same secret manager sources. Tokens are team-scoped, so a clone in another team gets no links.
      */
     public function cloneSecretManagerLinkTo(Model $target): void
     {
-        $link = $this->secretManagerLink()->with('integrationToken')->first();
         // fresh(): a replicated model keeps the relations of its source, such as the old environment.
         $targetTeamId = $target->fresh()?->team()?->id;
 
-        if (! $link || $targetTeamId === null || (int) $link->integrationToken?->team_id !== (int) $targetTeamId) {
+        if ($targetTeamId === null) {
             return;
         }
 
-        $target->secretManagerLink()->create([
-            'integration_token_id' => $link->integration_token_id,
-            'settings' => $link->settings,
-        ]);
+        foreach ($this->secretManagerLinks()->with('integrationToken')->get() as $link) {
+            if ((int) $link->integrationToken?->team_id !== (int) $targetTeamId) {
+                continue;
+            }
+
+            $target->secretManagerLinks()->create([
+                'name' => $link->sourceName(),
+                'integration_token_id' => $link->integration_token_id,
+                'settings' => $link->settings,
+            ]);
+        }
     }
 
     /**
@@ -297,7 +328,7 @@ trait HasSecretManager
         }
 
         if ($this->resolvesRemoteSecretReferences($environmentVariable, $value)) {
-            $secrets = $this->secretManagerValues();
+            $secrets = $this->secretManagerValues(RemoteSecretReferences::referencedSources($value));
             $missing = RemoteSecretReferences::missingKeys($value, $secrets);
 
             if ($missing !== []) {
@@ -319,7 +350,7 @@ trait HasSecretManager
     }
 
     /**
-     * Without a source, a literal keeps "{{vault.KEY}}" as text; other references fail closed.
+     * Without any source, a literal keeps "{{vault.KEY}}" as text; other references fail closed.
      */
     private function resolvesRemoteSecretReferences(EnvironmentVariable $environmentVariable, ?string $value): bool
     {
@@ -329,7 +360,7 @@ trait HasSecretManager
 
         return ! $environmentVariable->is_literal
             || $this->resolvedSecretManagerValues !== null
-            || $this->secretManagerLink()->exists();
+            || $this->secretManagerLinks()->exists();
     }
 
     private function resolvedEnvironmentVariableValue(EnvironmentVariable $environmentVariable): ?string
@@ -341,26 +372,45 @@ trait HasSecretManager
         );
     }
 
-    /** @return array<string, string> */
-    private function secretManagerValues(): array
+    /**
+     * Fetches each given source once and returns the secrets of all fetched sources, keyed by reference label.
+     *
+     * @param  list<string>  $sources
+     * @return array<string, string>
+     */
+    private function secretManagerValues(array $sources): array
     {
-        if ($this->resolvedSecretManagerValues !== null) {
-            return $this->resolvedSecretManagerValues;
+        foreach ($sources as $source) {
+            if (isset($this->resolvedSecretManagerSources[$source])) {
+                continue;
+            }
+
+            if (isset($this->failedSecretManagerSources[$source])) {
+                throw $this->failedSecretManagerSources[$source];
+            }
+
+            $link = $this->secretManagerLinkNamed($source)->with('integrationToken')->first();
+
+            if (! $link) {
+                throw new RemoteSecretException($source === RemoteSecretReferences::DEFAULT_SOURCE
+                    ? 'Environment variables reference remote secrets, but no secret manager source is configured.'
+                    : "Environment variables reference the secret manager source \"{$source}\", but this resource has no source with that name.");
+            }
+
+            try {
+                $secrets = $link->fetchSecrets();
+            } catch (RemoteSecretException $e) {
+                throw $this->failedSecretManagerSources[$source] = $e;
+            } catch (Throwable $e) {
+                $from = $source === RemoteSecretReferences::DEFAULT_SOURCE ? '' : " of source \"{$source}\"";
+                throw $this->failedSecretManagerSources[$source] = new RemoteSecretException("Could not fetch remote secrets{$from}: ".$e->getMessage(), previous: $e);
+            }
+
+            $this->resolvedSecretManagerValues = ($this->resolvedSecretManagerValues ?? []) + RemoteSecretReferences::labelSecrets($source, $secrets);
+            $this->resolvedSecretManagerSources[$source] = true;
         }
 
-        $link = $this->secretManagerLink()->with('integrationToken')->first();
-
-        if (! $link) {
-            throw new RemoteSecretException('Environment variables reference remote secrets, but no secret manager source is configured.');
-        }
-
-        try {
-            return $this->resolvedSecretManagerValues = $link->fetchSecrets();
-        } catch (RemoteSecretException $e) {
-            throw $e;
-        } catch (Throwable $e) {
-            throw new RemoteSecretException('Could not fetch remote secrets: '.$e->getMessage(), previous: $e);
-        }
+        return $this->resolvedSecretManagerValues ?? [];
     }
 
     /** @return array<string, string> */

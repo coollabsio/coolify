@@ -275,6 +275,25 @@ describe('scanner time and CPU limits', function () {
     });
 });
 
+describe('rescan frequency', function () {
+    it('saves the rescan days', function () {
+        imageScanningPage()
+            ->assertSet('rescanDays', '1')
+            ->assertSee('Every week')
+            ->set('rescanDays', '0')
+            ->assertHasNoErrors()
+            ->assertDispatched('success', 'Rescan frequency saved.');
+
+        expect($this->server->settings->fresh()->image_rescan_days)->toBe(0);
+    });
+
+    it('refuses rescan days that are not one of the options', function () {
+        imageScanningPage()->set('rescanDays', '2')->assertHasErrors('rescanDays');
+
+        expect($this->server->settings->fresh()->image_rescan_days)->toBe(1);
+    });
+});
+
 describe('scanner limits that fit the server', function () {
     beforeEach(function () {
         $this->server->forceFill(['server_metadata' => ['memory_bytes' => 2 * 1024 ** 3, 'cpus' => 2]])->saveQuietly();

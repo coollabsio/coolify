@@ -13,7 +13,7 @@
             $hostScanError = $hostScan?->error_code?->message([...($hostScan->error_context ?? []), 'server' => $server->name]);
         @endphp
         <x-application.settings-section id="server-host-vulnerabilities-section" title="Vulnerabilities"
-            helper="Known vulnerabilities in the operating system packages of this server. Coolify scans them with the image scanner every day and after a package update. Problems that the distribution does not fix are not shown."
+            helper="Known vulnerabilities in the operating system packages of this server. Coolify scans them with the image scanner at each image rescan and after a package update. Problems that the distribution does not fix are not shown."
             flush>
             <x-slot:badges>
                 @if ($hostScanError && ! $hostScanRunning)

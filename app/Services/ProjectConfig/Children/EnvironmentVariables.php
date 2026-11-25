@@ -26,7 +26,7 @@ class EnvironmentVariables implements ChildRecords
      */
     public function __construct(private readonly array $protectedKeys = []) {}
 
-    private const SHARED_REF = '/^\{\{\s*((team|project|environment|server|vault)\.[A-Za-z_][A-Za-z0-9_]*)\s*\}\}\z/';
+    private const SHARED_REF = '/^\{\{\s*((team|project|environment|server|vault)\.[A-Za-z_][A-Za-z0-9_]*|vault\.[a-z0-9][a-z0-9_-]{0,62}\.[A-Za-z_][A-Za-z0-9_]*)\s*\}\}\z/';
 
     public function key(): string
     {
