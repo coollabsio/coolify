@@ -6,6 +6,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ImageScanErrorCode;
 use App\Enums\ImageScanStatus;
 use App\Events\ImageScanUpdated;
+use App\Jobs\PrepareImageScannerJob;
 use App\Jobs\RefreshCandidatesJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -87,6 +88,9 @@ class ScanImage
     private const TIMEOUT_PULL = 660;
 
     private const DB_MAX_AGE_DAYS = 5;
+
+    /** A scan updates a database older than this first, for servers that rescan less often than every day. */
+    private const DB_UPDATE_AGE_DAYS = 3;
 
     private const DISK_RESERVE_BYTES = 1073741824;
 
@@ -250,10 +254,10 @@ class ScanImage
         return self::LOCK_TTL_WITHOUT_SCANNERS + self::sbomStepTimeout($server) + 2 * self::grypeStepTimeout($server);
     }
 
-    /** The deploy time that a gate keeps for its own scan (SBOM and Grype) after it waited for the lock. */
+    /** The deploy time that a gate keeps for its own scan (database update, SBOM, and Grype) after it waited for the lock. */
     public static function gateScanReserveSeconds(Server $server): int
     {
-        return self::sbomStepTimeout($server) + self::grypeStepTimeout($server);
+        return self::TIMEOUT_DB_UPDATE + self::sbomStepTimeout($server) + self::grypeStepTimeout($server);
     }
 
     /** SSH timeout of one SBOM step on the server: `docker save` of a local image, then Syft. */
@@ -410,6 +414,10 @@ class ScanImage
 
                 throw new ScanFailed(ImageScanErrorCode::ImageMissing);
             }
+            $unchanged = $this->unchangedScans($server, $targets, $imageId, $databaseBuiltAt);
+            if ($unchanged !== null) {
+                return $unchanged;
+            }
             $this->progressAll($resources, 'sbom');
             [$sbom, $grype] = $this->sbomAndReport($commands, $resources, $imageId, $image);
             $report = $this->report($grype);
@@ -443,6 +451,55 @@ class ScanImage
     }
 
     /**
+     * The completed rows of the resources, marked as checked now, when Grype would give the same result: each row has
+     * this image, its SBOM, and the database that the server has now. Null when one resource needs a scan.
+     *
+     * @param  list<array{0: Model, 1: string, 2: ResolvedImageScanPolicy}>  $targets
+     * @return list<ImageScan>|null
+     */
+    private function unchangedScans(Server $server, array $targets, string $imageId, CarbonImmutable $databaseBuiltAt): ?array
+    {
+        $sbom = ImageSbom::query()->where('server_id', $server->id)->where('image_id', $imageId)->first();
+        if ($sbom === null) {
+            return null;
+        }
+
+        $scans = [];
+        foreach ($targets as [$resource]) {
+            $scan = $this->resourceScans($resource)->where('image_id', $imageId)->first();
+            if ($scan === null
+                || $scan->status !== ImageScanStatus::Completed
+                || (int) $scan->server_id !== (int) $server->id
+                || (int) $scan->image_sbom_id !== (int) $sbom->id
+                || $scan->grype_db_built_at?->getTimestamp() !== $databaseBuiltAt->getTimestamp()) {
+                return null;
+            }
+            $scans[] = $scan;
+        }
+
+        // Keeps the SBOM of a running image used, like a Grype run on it.
+        $sbom->forceFill(['last_used_at' => now()])->save();
+
+        return array_map(function (ImageScan $scan, array $target): ImageScan {
+            [$resource, $imageRef] = $target;
+            $scan->forceFill([
+                ...$this->deploymentLink($resource, $scan, null),
+                'image_ref' => mb_substr($imageRef, 0, 512),
+                'is_baseline' => false,
+                'scanned_at' => now(),
+            ]);
+            $scan->setRelation('resource', $resource);
+            SecurityStatus::store($scan);
+            $scan->save();
+            Cache::forget(self::lastErrorCacheKey($resource));
+            $this->forgetProgress($resource);
+            $this->broadcast($resource, (string) $scan->uuid);
+
+            return $scan;
+        }, $scans, $targets);
+    }
+
+    /**
      * @return Builder<ImageScan>
      */
     private function resourceScans(Model $resource): Builder
@@ -473,7 +530,8 @@ class ScanImage
     }
 
     /**
-     * Updates a missing database once. Grype refuses a database older than 5 days.
+     * Updates a missing database, or one older than DB_UPDATE_AGE_DAYS at most once per hour. The daily rescan keeps it
+     * new, but a server with fewer rescans updates it at the next scan. Grype refuses a database older than 5 days.
      */
     public static function databaseBuiltAt(ScannerCommands $commands): CarbonImmutable
     {
@@ -482,6 +540,13 @@ class ScanImage
         if ($builtAt === null) {
             self::updateDatabase($commands);
             $builtAt = self::databaseStatus($commands) ?? throw new ScanFailed(ImageScanErrorCode::DbMissing, detail: 'no valid vulnerability database after the update');
+        } elseif ($builtAt->lt(now()->subDays(self::DB_UPDATE_AGE_DAYS))
+            && Cache::add("image-scan:db-update-tried:{$commands->server->id}", true, now()->addHour())) {
+            // One try per hour, so a failing update does not hold the lock for each image of a rescan or each deployment.
+            self::updateDatabase($commands);
+            // A failed update keeps the old database, which is still good until DB_MAX_AGE_DAYS.
+            $builtAt = self::databaseStatus($commands) ?? $builtAt;
+            Cache::put(PrepareImageScannerJob::builtAtCacheKey($commands->server), $builtAt->toIso8601ZuluString(), now()->addDays(7));
         }
 
         if ($builtAt->lt(now()->subDays(self::DB_MAX_AGE_DAYS))) {

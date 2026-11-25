@@ -20,13 +20,14 @@ class RefreshImageScanSummariesJob implements ShouldQueue
 
     public $tries = 1;
 
-    public function __construct(public int $teamId)
+    /** With a server, only the resources that have scans on that server, for example after its rescan days changed. */
+    public function __construct(public int $teamId, public ?int $serverId = null)
     {
         $this->onQueue(isCloud() ? maintenance_queue() : 'default');
     }
 
     public function handle(): void
     {
-        ResourceScans::refreshSummaries(ResourceScans::currentForTeam($this->teamId));
+        ResourceScans::refreshSummaries(ResourceScans::currentForTeam($this->teamId, $this->serverId));
     }
 }
