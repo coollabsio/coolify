@@ -558,7 +558,7 @@ function clone_application(Application $source, $destination, array $overrides =
         'status' => 'exited',
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),
-    ], $overrides));
+    ], $source->is_archive_source ? ['git_commit_sha' => 'HEAD'] : [], $overrides));
     $newApplication->save();
 
     // Update custom labels if needed

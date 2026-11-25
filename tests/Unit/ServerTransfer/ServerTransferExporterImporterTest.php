@@ -42,6 +42,7 @@ use App\Services\ServerTransfer\ServerTransferImporter;
 use App\Services\ServerTransfer\TransferFinishChecklist;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
@@ -1318,7 +1319,7 @@ test('transfer keeps the link between an application volume and its sqlite datab
         ->and($importedSqlite->persistentStorages()->sole()->isSharedWithAnotherResource())->toBeTrue();
 });
 
-test('secret manager links of applications and databases move with their integration token', function () {
+test('all named secret manager links of applications and databases move with their integration token', function () {
     $token = IntegrationToken::factory()->create([
         'team_id' => $this->team->id,
         'provider' => 'vault',
@@ -1326,6 +1327,7 @@ test('secret manager links of applications and databases move with their integra
         'capabilities' => ['secrets'],
     ]);
     $this->application->secretManagerLink()->create(['integration_token_id' => $token->id, 'settings' => ['mount' => 'secret', 'path' => 'app']]);
+    $this->application->secretManagerLinks()->create(['name' => 'urls', 'integration_token_id' => $token->id, 'settings' => ['mount' => 'secret', 'path' => 'urls']]);
     $this->database->secretManagerLink()->create(['integration_token_id' => $token->id, 'settings' => ['mount' => 'kv', 'path' => 'db']]);
 
     $bundle = $this->exporter->export($this->server);
@@ -1333,7 +1335,8 @@ test('secret manager links of applications and databases move with their integra
     expect(collect($bundle['warnings'])->filter(fn (string $warning) => str_contains($warning, 'secret manager')))->toBeEmpty()
         ->and($bundle['integration_tokens'])->toHaveCount(1)
         ->and($bundle['integration_tokens'][0]['token'])->toBe('vault-root-token')
-        ->and(data_get($bundle, 'projects.0.environments.0.databases.0.secret_manager_link.integration_token_uuid'))->toBe($token->uuid);
+        ->and(data_get($bundle, 'projects.0.environments.0.databases.0.secret_manager_links.0.integration_token_uuid'))->toBe($token->uuid)
+        ->and(data_get($bundle, 'projects.0.environments.0.applications.0.secret_manager_links.*.name'))->toBe(['default', 'urls']);
 
     $this->service->forceDelete();
     $this->application->forceDelete();
@@ -1345,6 +1348,11 @@ test('secret manager links of applications and databases move with their integra
     $this->privateKey->delete();
     $token->delete();
 
+    // Bundles of older instances have one `secret_manager_link` per resource.
+    $databaseLinks = data_get($bundle, 'projects.0.environments.0.databases.0.secret_manager_links');
+    data_set($bundle, 'projects.0.environments.0.databases.0.secret_manager_link', Arr::except($databaseLinks[0], 'name'));
+    Arr::forget($bundle, 'projects.0.environments.0.databases.0.secret_manager_links');
+
     $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: true, adoptMode: true);
 
     $imported = IntegrationToken::where('uuid', $token->uuid)->where('team_id', $this->team->id)->firstOrFail();
@@ -1353,6 +1361,9 @@ test('secret manager links of applications and databases move with their integra
     expect($imported->token)->toBe('vault-root-token')
         ->and($application->secretManagerLink->integration_token_id)->toBe($imported->id)
         ->and($application->secretManagerLink->settings)->toBe(['mount' => 'secret', 'path' => 'app'])
+        ->and($application->secretManagerLinkNamed('urls')->first()?->integration_token_id)->toBe($imported->id)
+        ->and($application->secretManagerLinkNamed('urls')->first()?->settings)->toBe(['mount' => 'secret', 'path' => 'urls'])
+        ->and($application->secretManagerLinks()->count())->toBe(2)
         ->and($database->secretManagerLink->integration_token_id)->toBe($imported->id)
         ->and($database->secretManagerLink->settings)->toBe(['mount' => 'kv', 'path' => 'db']);
 });
@@ -2469,6 +2480,7 @@ test('the image scanner limits move with the server', function () {
         'image_scan_grype_timeout' => 1200,
         'image_scan_cpus' => 2.0,
         'image_scan_memory_mb' => 4096,
+        'image_rescan_days' => 14,
     ])->saveQuietly();
 
     $bundle = $this->exporter->export($this->server);
@@ -2483,7 +2495,8 @@ test('the image scanner limits move with the server', function () {
     expect($settings->image_scan_syft_timeout)->toBe(1800)
         ->and($settings->image_scan_grype_timeout)->toBe(1200)
         ->and($settings->image_scan_cpus)->toBe(2.0)
-        ->and($settings->image_scan_memory_mb)->toBe(4096);
+        ->and($settings->image_scan_memory_mb)->toBe(4096)
+        ->and($settings->image_rescan_days)->toBe(14);
 });
 
 test('transfer keeps the fork pull request approval state of previews and the approval setting', function () {

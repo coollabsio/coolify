@@ -5,6 +5,7 @@ Versioned `coolify.json` files that define the resources of a project environmen
 
 - A push to the linked branch applies safe changes; removals and other destructive changes wait for approval on the `Config as code` page of the environment
 - Settings that the file manages are read-only in Coolify; a team admin can pause the sync
+- Storage backups and the database backups of services stay editable on managed resources, because the file cannot declare them ([#12642](https://github.com/coollabsio/coolify/issues/12642))
 - The link sets the project and the default server, so one file works in any project; a resource names a `server` only to run on another one
 - Variables in the file use `value`, `required`, `generate`, or `ref`, so secret values stay out of the repository. `containers` limits a variable to some services of a Docker Compose file
 - When a new repository has a `coolify.json`, the add form uses it one time as the default settings of normal resources (the default), links the environment to it, or ignores it

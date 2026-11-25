@@ -52,6 +52,9 @@ class Advanced extends Component
     #[Validate('boolean')]
     public bool $is_mcp_server_enabled;
 
+    #[Validate('boolean')]
+    public bool $is_terminal_api_enabled;
+
     public ?string $webhook_allowed_internal_hosts = null;
 
     #[Validate('boolean')]
@@ -90,6 +93,7 @@ class Advanced extends Component
             'is_passkey_enabled' => 'boolean',
             'is_wire_navigate_enabled' => 'boolean',
             'is_mcp_server_enabled' => 'boolean',
+            'is_terminal_api_enabled' => 'boolean',
             'webhook_allowed_internal_hosts' => 'nullable|string',
             'webhook_allow_localhost' => 'boolean',
             'domain_connect_private_key' => 'nullable|string',
@@ -118,6 +122,7 @@ class Advanced extends Component
         $this->is_sponsorship_popup_enabled = $this->settings->is_sponsorship_popup_enabled;
         $this->is_wire_navigate_enabled = $this->settings->is_wire_navigate_enabled ?? true;
         $this->is_mcp_server_enabled = $this->settings->is_mcp_server_enabled ?? false;
+        $this->is_terminal_api_enabled = $this->settings->is_terminal_api_enabled ?? false;
         $this->webhook_allowed_internal_hosts = collect($this->settings->webhook_allowed_internal_hosts ?? [])->implode(',');
         $this->webhook_allow_localhost = $this->settings->webhook_allow_localhost ?? false;
         // Do not prefill the secret into the form; only update when the admin pastes a new value.
@@ -255,6 +260,7 @@ class Advanced extends Component
             $this->settings->is_passkey_enabled = $this->is_passkey_enabled;
             $this->settings->is_wire_navigate_enabled = $this->is_wire_navigate_enabled;
             $this->settings->is_mcp_server_enabled = $this->is_mcp_server_enabled;
+            $this->settings->is_terminal_api_enabled = $this->is_terminal_api_enabled;
             $this->settings->webhook_allowed_internal_hosts = $webhookAllowedInternalHosts ?? $this->settings->webhook_allowed_internal_hosts ?? [];
             $this->settings->webhook_allow_localhost = $this->webhook_allow_localhost;
             $this->settings->image_cdn_url = filled($this->image_cdn_url) ? rtrim($this->image_cdn_url, '/') : null;

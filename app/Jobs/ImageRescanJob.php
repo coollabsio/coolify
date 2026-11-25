@@ -13,10 +13,12 @@ use App\Models\ImageSbom;
 use App\Models\ImageScan;
 use App\Models\ImageScanIgnore;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Services\ImageScan\IgnoreMatcher;
 use App\Services\ImageScan\ResourceScans;
 use App\Services\ImageScan\ScanLockBusy;
 use App\Services\ImageScan\ScannerCommands;
+use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -32,8 +34,9 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Daily rescan of the images that run on a server (spec 4.5): updates the Grype database, runs Grype once per
- * running image ID, updates the scan rows of this server only, and applies the retention of spec 4.3.
+ * Daily run for the images of a server (spec 4.5). When a rescan is due by the rescan days of the server, it updates
+ * the Grype database, runs Grype once per running image ID, updates the scan rows of this server only, and scans the
+ * host packages. Every run applies the retention of spec 4.3 and the ignores that ended.
  */
 class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
@@ -136,6 +139,43 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         return "image-rescan:failures:{$server->id}";
     }
 
+    /**
+     * The images get a rescan today: the rescan days of the server have passed since the last successful rescan.
+     * A failed rescan is not recorded, so it runs again the next day. Rescan days 0 turns rescans off.
+     */
+    public static function isRescanDue(Server $server): bool
+    {
+        $days = (int) $server->settings?->image_rescan_days;
+        if ($days <= 0) {
+            return false;
+        }
+        $last = Cache::get(self::lastRescanCacheKey($server));
+
+        return ! is_string($last) || CarbonImmutable::parse($last)->addDays($days)->toDateString() <= now()->toDateString();
+    }
+
+    /**
+     * The scanner state and the database date are kept 7 days after a database update. A server with fewer rescans
+     * keeps them, so its page does not ask to get the scanner again.
+     */
+    private static function keepScannerState(Server $server): void
+    {
+        $stateKey = PrepareImageScannerJob::stateCacheKey($server);
+        if (Cache::get($stateKey) !== PrepareImageScannerJob::STATE_READY) {
+            return;
+        }
+        Cache::put($stateKey, PrepareImageScannerJob::STATE_READY, now()->addDays(7));
+        $builtAt = Cache::get(PrepareImageScannerJob::builtAtCacheKey($server));
+        if (is_string($builtAt)) {
+            Cache::put(PrepareImageScannerJob::builtAtCacheKey($server), $builtAt, now()->addDays(7));
+        }
+    }
+
+    private static function lastRescanCacheKey(Server $server): string
+    {
+        return "image-rescan:last:{$server->id}";
+    }
+
     public function handle(): void
     {
         $server = $this->server->fresh(['settings']);
@@ -148,8 +188,12 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         // goes on where it stopped; the last attempt runs without the busy steps.
         $lastAttempt = $this->attempts() >= $this->tries;
         $progress = $this->progress();
+        $rescan = self::isRescanDue($server);
+        if (! $rescan) {
+            self::keepScannerState($server);
+        }
 
-        if (! $progress['database']) {
+        if ($rescan && ! $progress['database']) {
             if (! $this->updateDatabase($server, $commands) && ! $lastAttempt) {
                 $this->retryLater($progress);
 
@@ -160,15 +204,17 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 
         $listing = $this->runningContainers($server, $commands);
         if ($listing === null) {
-            self::recordRescanResult($server, false);
             $this->forgetProgress();
-            ScanHostPackagesJob::dispatch($server);
+            if ($rescan) {
+                self::recordRescanResult($server, false);
+                ScanHostPackagesJob::dispatch($server);
+            }
 
             return;
         }
 
         [$targets, $runningRefs] = $this->targets($server, $listing['containers']);
-        foreach ($targets as $imageId => $imageTargets) {
+        foreach ($rescan ? $targets : [] as $imageId => $imageTargets) {
             if (in_array($imageId, $progress['done'], true)) {
                 continue;
             }
@@ -189,7 +235,13 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             }
             $progress['done'][] = $imageId;
         }
-        self::recordRescanResult($server, $progress['completed'] > 0 || ($progress['scanned'] === 0 && $progress['errors'] === 0));
+        if ($rescan) {
+            $succeeded = $progress['completed'] > 0 || ($progress['scanned'] === 0 && $progress['errors'] === 0);
+            self::recordRescanResult($server, $succeeded);
+            if ($succeeded) {
+                Cache::put(self::lastRescanCacheKey($server), now()->toDateString(), now()->addDays(max(ServerSetting::IMAGE_RESCAN_DAYS_OPTIONS) + 7));
+            }
+        }
         $this->forgetProgress();
         $this->refreshCountsAfterEndedIgnores($server);
 
@@ -197,7 +249,9 @@ class ImageRescanJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         if (! $listing['truncated']) {
             $this->cleanUp($server, $commands, $targets, $runningRefs);
         }
-        ScanHostPackagesJob::dispatch($server);
+        if ($rescan) {
+            ScanHostPackagesJob::dispatch($server);
+        }
     }
 
     /**

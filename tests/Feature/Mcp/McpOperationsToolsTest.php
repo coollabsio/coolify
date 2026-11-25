@@ -462,6 +462,11 @@ test('manage_storage sets, runs, and removes a volume backup without returning S
     $backup = ScheduledVolumeBackup::query()->sole();
     expect($backup->s3_storage_id)->toBe($this->own['s3']->id);
 
+    $get = mcpOpsCall(mcpOpsToken($this->user, ['read']), 'manage_storage', [...$args, 'action' => 'get_backup']);
+    expect(mcpOpsIsError($get))->toBeFalse()
+        ->and(mcpOpsText($get))->toContain($backup->uuid)
+        ->and(mcpOpsText($get))->not->toContain('S3SECRET');
+
     $run = mcpOpsCall($token, 'manage_storage', [...$args, 'action' => 'run_backup', 'confirm' => true]);
     expect(mcpOpsIsError($run))->toBeFalse();
     Queue::assertPushed(VolumeBackupJob::class);

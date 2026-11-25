@@ -7,6 +7,8 @@ use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use App\Services\Access\AccessResolver;
 use App\Services\ProjectConfig\Adapters\ResourceAdapter;
+use App\Services\ProjectConfig\Children\SecretManager;
+use App\Services\ProjectConfig\Children\StorageBackups;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -16,7 +18,7 @@ use Illuminate\Support\Facades\Gate;
  */
 class ConfigPlanner
 {
-    private const REMOVAL_IS_DESTRUCTIVE = ['env', 'storages', 'files', 'scheduled_tasks'];
+    private const REMOVAL_IS_DESTRUCTIVE = ['env', 'storages', 'files', 'scheduled_tasks', 'storage_backups'];
 
     public function __construct(private readonly AdapterRegistry $registry) {}
 
@@ -81,6 +83,7 @@ class ConfigPlanner
         }
 
         $missingRequired = [];
+        $volumeWarnings = [];
         foreach ($env->resources as $key => $desired) {
             $type = $desired['type'];
             if (! $this->registry->has($type)) {
@@ -97,6 +100,8 @@ class ConfigPlanner
                 ...$this->checkActor($key, $desired, $ctx),
                 ...$adapter->validate($key, $desired, $ctx, $current[1] ?? null),
             ];
+
+            $volumeWarnings = [...$volumeWarnings, ...(new StorageBackups)->pendingVolumeWarnings($key, $desired, $current[1] ?? null)];
 
             $missing = $this->missingRequired($desired, $current[1] ?? null);
             if ($missing !== []) {
@@ -116,7 +121,11 @@ class ConfigPlanner
                 continue;
             }
 
-            $differences = ConfigDiff::between($adapter->read($model, $ctx), $adapter->canonical($key, $desired));
+            $currentValues = $adapter->read($model, $ctx);
+            if (! StorageBackups::managedBy($desired)) {
+                unset($currentValues['storage_backups']);
+            }
+            $differences = ConfigDiff::between($currentValues, $adapter->canonical($key, $desired));
             foreach ($differences as $difference) {
                 $changes[] = $this->fieldChange($adapter, $key, $difference);
             }
@@ -143,7 +152,7 @@ class ConfigPlanner
         return new ConfigPlan(
             changes: $changes,
             errors: $errors,
-            warnings: $ctx->template ? [] : [...$this->moveWarnings($changes), ...$this->unmanagedWarnings($ctx, $importedIds)],
+            warnings: $ctx->template ? [] : [...$this->moveWarnings($changes), ...$this->unmanagedWarnings($ctx, $importedIds), ...$volumeWarnings],
             stateHash: $stateHash,
             missingRequired: $missingRequired,
             removesAll: $env->resources === [],
@@ -319,13 +328,16 @@ class ConfigPlanner
                 $credentials[] = "source.{$kind}";
             }
         }
-        if (isset($desired['secret_manager']['token'])) {
-            $credentials[] = 'secret_manager.token';
+        foreach (SecretManager::tokenPaths($desired['secret_manager'] ?? null) as $path) {
+            $credentials[] = $path;
         }
         foreach (array_values((array) ($desired['backups'] ?? [])) as $index => $backup) {
             if (isset($backup['s3_storage'])) {
                 $credentials[] = "backups.{$index}.s3_storage";
             }
+        }
+        foreach (StorageBackups::credentialPaths($desired['storage_backups'] ?? null) as $path) {
+            $credentials[] = $path;
         }
         if ($credentials !== [] && ! app(AccessResolver::class)->allowsTeamWide($ctx->actor, AccessLevel::Write, $ctx->teamId)) {
             foreach ($credentials as $path) {
@@ -395,6 +407,16 @@ class ConfigPlanner
     private function unknownKeys(mixed $value, array $schema, string $path): array
     {
         if (isset($schema['$ref']) || ! is_array($value)) {
+            return [];
+        }
+        if (isset($schema['oneOf'])) {
+            $type = array_is_list($value) ? 'array' : 'object';
+            foreach ($schema['oneOf'] as $branch) {
+                if (($branch['type'] ?? null) === $type) {
+                    return $this->unknownKeys($value, $branch, $path);
+                }
+            }
+
             return [];
         }
         if (array_is_list($value)) {

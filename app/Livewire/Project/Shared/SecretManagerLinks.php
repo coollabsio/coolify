@@ -4,17 +4,22 @@ namespace App\Livewire\Project\Shared;
 
 use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\IntegrationToken;
+use App\Models\SecretManagerLink;
 use App\Services\SecretManagers\ResourceSecretManager;
+use App\Support\RemoteSecretReferences;
 use App\Support\ValidationPatterns;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 /**
- * Manages a resource's single secret manager source and lets the user
+ * Manages a resource's `default` secret manager source and lets the user
  * browse remote key names, add {{vault.KEY}} reference variables, and import
- * all missing keys. Secret values never enter the component state or the DB.
+ * all missing keys. Other named sources ({{vault.<name>.KEY}}) are listed
+ * read-only; coolify.json and the API manage them.
+ * Secret values never enter the component state or the DB.
  */
 class SecretManagerLinks extends Component
 {
@@ -277,9 +282,26 @@ class SecretManagerLinks extends Component
         ));
     }
 
+    /**
+     * The named sources other than `default`, sorted by name.
+     *
+     * @return Collection<int, SecretManagerLink>
+     */
+    private function otherSources(): Collection
+    {
+        return $this->resource->secretManagerLinks()
+            ->where('name', '!=', RemoteSecretReferences::DEFAULT_SOURCE)
+            ->with('integrationToken')
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (SecretManagerLink $link) => $link->integrationToken !== null)
+            ->values();
+    }
+
     public function render(): View
     {
         return view('livewire.project.shared.secret-manager-links', [
+            'otherSources' => $this->otherSources(),
             'selectedToken' => $this->selectedToken,
             'filteredKeys' => $this->filteredKeys,
             'invalidKeys' => array_flip(array_filter(

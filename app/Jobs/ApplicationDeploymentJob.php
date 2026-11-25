@@ -19,6 +19,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
@@ -30,6 +31,7 @@ use App\Services\ImageScan\DeploymentImageScan;
 use App\Services\ProjectConfig\UnlinkedConfigFileHint;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
+use App\Support\StaticSiteArchive;
 use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\ExecuteRemoteCommand;
@@ -46,8 +48,10 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use JsonException;
 use Spatie\Url\Url;
@@ -216,8 +220,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     /** @var array<string, list<string>>|null */
     private ?array $compose_environment_scopes = null;
 
-    /** @var array<string, string>|null */
+    /**
+     * Fetched secrets of all fetched sources, keyed by reference label (`KEY`, `<source>.KEY`).
+     *
+     * @var array<string, string>|null
+     */
     private ?array $remote_secrets_cache = null;
+
+    /** @var array<string, true> Secret manager sources that were fetched in this deployment */
+    private array $remote_secret_sources_fetched = [];
 
     /** @var array<int, int>|null */
     private ?array $previewVariableIdsWithProductionValues = null;
@@ -327,7 +338,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->restart_only = $this->application_deployment_queue->restart_only;
         // These build packs need the cloned repository to start, so a restart runs a regular deployment.
         // The deployment skips the build when the image for the commit exists.
-        $this->restart_only = $this->restart_only && ! in_array($this->application->build_pack, ['dockerimage', 'dockerfile', 'dockercompose'], true);
+        $this->restart_only = $this->restart_only && ! in_array($this->application->build_pack, ['dockerimage', 'dockerfile', 'dockercompose'], true) && ! $this->application->is_archive_source;
         $this->only_this_server = $this->application_deployment_queue->only_this_server;
         $this->dockerImagePreviewTag = $this->application_deployment_queue->docker_registry_image_tag;
         $this->validateDockerRegistryImageConfiguration();
@@ -715,6 +726,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return;
         } elseif ($this->application->build_pack === 'dockerimage') {
             $this->deploy_dockerimage_buildpack();
+        } elseif ($this->application->is_archive_source) {
+            $this->deploy_static_archive();
         } elseif ($this->pull_request_id !== 0) {
             $this->deploy_pull_request();
         } elseif ($this->application->dockerfile) {
@@ -1667,6 +1680,170 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         $this->rolling_update();
     }
 
+    /**
+     * A static site from an uploaded archive. The commit is the site version (see StaticSiteArchive).
+     * A deployment of an upload has its own archive and always builds. Any other deployment (redeploy,
+     * restart, rollback, additional server) never builds and runs the image of the version.
+     */
+    private function deploy_static_archive()
+    {
+        if ($this->pull_request_id !== 0) {
+            throw new DeploymentException('Preview deployments are not available for sites deployed from an uploaded archive.');
+        }
+        if (! preg_match('/^[0-9a-f]{40}$/', $this->commit)) {
+            throw new DeploymentException('No site archive was uploaded yet. Upload a .tar, .tar.gz, or .tgz archive to deploy the site.');
+        }
+        $archivePath = StaticSiteArchive::deploymentArchive($this->application, $this->deployment_uuid);
+        try {
+            $s3Archive = StaticSiteArchive::deploymentS3Archive($this->application, $this->deployment_uuid);
+        } catch (\RuntimeException $exception) {
+            StaticSiteArchive::deleteDeploymentArchive($this->application, $this->deployment_uuid);
+
+            throw new DeploymentException($exception->getMessage());
+        }
+        if (! Storage::exists($archivePath) && $s3Archive === null) {
+            $this->run_static_archive_image();
+
+            return;
+        }
+
+        try {
+            if ($this->use_build_server) {
+                $this->server = $this->build_server;
+            }
+            $this->application_deployment_queue->addLogEntry('Starting deployment of site version '.substr($this->commit, 0, 7)." to {$this->server->name}.");
+            $this->prepare_builder_image();
+            $this->generate_image_names();
+            $this->validateDeploymentEnvironmentVariableKeys(buildsImage: true);
+            $this->create_workdir();
+            if ($s3Archive !== null) {
+                $this->extract_static_archive_from_s3($s3Archive['storage'], $s3Archive['key'], $s3Archive['archive']);
+            } else {
+                $this->extract_static_archive(Storage::path($archivePath));
+            }
+        } finally {
+            StaticSiteArchive::deleteDeploymentArchive($this->application, $this->deployment_uuid);
+        }
+        $this->generate_compose_file();
+
+        // Save build-time .env file BEFORE the build
+        $this->save_buildtime_environment_variables();
+
+        $this->build_static_image();
+
+        // Save runtime environment variables AFTER the build
+        $this->save_runtime_environment_variables();
+
+        $this->push_to_docker_registry();
+        $this->rolling_update();
+    }
+
+    private function run_static_archive_image()
+    {
+        if ($this->use_build_server) {
+            $this->server = $this->build_server;
+        }
+        $this->application_deployment_queue->addLogEntry('Starting site version '.substr($this->commit, 0, 7)." on {$this->server->name}.");
+        $this->prepare_builder_image();
+        $this->generate_image_names();
+        $this->check_image_locally_or_remotely();
+        if (str($this->saved_outputs->get('local_image_found'))->isEmpty()) {
+            throw new DeploymentException('This site version is no longer on the server. Upload the archive again.');
+        }
+        $this->application_deployment_queue->addLogEntry("Image found ({$this->production_image_name}). Build step skipped.");
+        $this->skip_build = true;
+        $this->generate_compose_file();
+        $this->save_runtime_environment_variables();
+        $this->push_to_docker_registry();
+        $this->rolling_update();
+    }
+
+    /**
+     * Downloads an archive from an S3 storage into the helper container with a presigned URL, so it does not go
+     * through Coolify. The archive was inspected when it was published, so its SHA-256 must still match.
+     */
+    private function extract_static_archive_from_s3(S3Storage $storage, string $key, StaticSiteArchive $archive)
+    {
+        $this->application_deployment_queue->addLogEntry("Downloading the site archive ({$archive->fileCount} files) from S3 storage {$storage->name} to {$this->server->name}.");
+
+        $helperPath = "/artifacts/static-archive-{$this->deployment_uuid}";
+        $safeHelperPath = escapeshellarg($helperPath);
+        try {
+            $download = $storage->prepareCurlDownload($this->server, $this->deployment_uuid, $key, $helperPath);
+            $this->execute_remote_command(
+                [
+                    $download,
+                    'hidden' => true,
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, 'test "$(sha256sum '.$safeHelperPath.' | cut -c1-40)" = '.escapeshellarg($archive->sha)
+                        .' || { echo "The site archive in the S3 storage changed after it was uploaded. Upload it again." >&2; exit 1; }'),
+                    'hidden' => true,
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, $archive->extractCommand($helperPath, $this->workdir)),
+                    'hidden' => true,
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, 'chmod -R u+rwX,go+rX '.escapeshellarg($this->workdir)),
+                    'hidden' => true,
+                ],
+            );
+        } finally {
+            $this->execute_remote_command(
+                [
+                    executeInDocker($this->deployment_uuid, 'rm -f '.$safeHelperPath.' /tmp/s3-transfer.curl'),
+                    'hidden' => true,
+                    'ignore_errors' => true,
+                ],
+            );
+        }
+    }
+
+    private function extract_static_archive(string $localPath)
+    {
+        try {
+            $archive = StaticSiteArchive::inspect($localPath);
+        } catch (ValidationException $exception) {
+            throw new DeploymentException('The uploaded site archive is not valid: '.$exception->getMessage());
+        }
+        $this->application_deployment_queue->addLogEntry("Copying the site archive ({$archive->fileCount} files) to {$this->server->name}.");
+
+        $serverPath = "/tmp/coolify-static-{$this->deployment_uuid}";
+        $helperPath = "/artifacts/static-archive-{$this->deployment_uuid}";
+        $safeServerPath = escapeshellarg($serverPath);
+        try {
+            instant_scp($localPath, $serverPath, $this->server);
+            $this->execute_remote_command(
+                [
+                    'docker cp '.$safeServerPath.' '.escapeshellarg("{$this->deployment_uuid}:{$helperPath}"),
+                    'hidden' => true,
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, $archive->extractCommand($helperPath, $this->workdir)),
+                    'hidden' => true,
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, 'chmod -R u+rwX,go+rX '.escapeshellarg($this->workdir)),
+                    'hidden' => true,
+                ],
+            );
+        } finally {
+            $this->execute_remote_command(
+                [
+                    'rm -f '.$safeServerPath,
+                    'hidden' => true,
+                    'ignore_errors' => true,
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, 'rm -f '.escapeshellarg($helperPath)),
+                    'hidden' => true,
+                    'ignore_errors' => true,
+                ],
+            );
+        }
+    }
+
     private function write_deployment_configurations()
     {
         if ($this->preserveRepository) {
@@ -2070,41 +2247,52 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Fetch the secrets from the application's secret manager source. Values
+     * Fetch the secrets of the given secret manager sources of the application. Values
      * live only in memory during the deployment and in the generated .env on
-     * the server — they are never persisted in the Coolify database. Fetched
-     * lazily (only when a variable references a secret), once per deployment.
-     * A fetch failure fails the deployment.
+     * the server — they are never persisted in the Coolify database. Each source is
+     * fetched lazily (only when a variable references it), once per deployment.
+     * A missing source or a fetch failure fails the deployment.
      *
-     * @return array<string, string>
+     * @param  list<string>  $sources
+     * @return array<string, string> Secrets of all fetched sources, keyed by reference label
      */
-    private function remote_secrets(): array
+    private function remote_secrets(array $sources): array
     {
-        if ($this->remote_secrets_cache !== null) {
-            return $this->remote_secrets_cache;
+        foreach ($sources as $source) {
+            if (isset($this->remote_secret_sources_fetched[$source])) {
+                continue;
+            }
+
+            $link = $this->application->secretManagerLinkNamed($source)->with('integrationToken')->first();
+
+            if (! $link) {
+                $message = $source === RemoteSecretReferences::DEFAULT_SOURCE
+                    ? 'Environment variables reference remote secrets ({{vault.KEY}}), but no secret manager source is configured for this application.'
+                    : "Environment variables reference the secret manager source \"{$source}\" ({{vault.{$source}.KEY}}), but this application has no source with that name.";
+
+                throw new DeploymentException($message);
+            }
+
+            $provider = $link->integrationToken->providerName();
+            $sourceLabel = $source === RemoteSecretReferences::DEFAULT_SOURCE ? '' : "source {$source}, ";
+            $description = "{$provider} ({$sourceLabel}{$link->integrationToken->name}, {$link->sourceSummary()})";
+
+            try {
+                $secrets = $link->fetchSecrets();
+            } catch (Throwable $e) {
+                $this->application_deployment_queue->addLogEntry("Failed to fetch secrets from {$description}: {$e->getMessage()}", 'stderr');
+
+                throw new DeploymentException("Could not fetch secrets from {$provider}. The deployment was stopped so the application does not start with missing secrets.");
+            }
+
+            $this->remote_secrets_cache = ($this->remote_secrets_cache ?? []) + RemoteSecretReferences::labelSecrets($source, $secrets);
+            $this->remote_secret_sources_fetched[$source] = true;
+            // Registers the secrets of all fetched sources, so the values of earlier sources stay redacted.
+            $this->application_deployment_queue->redactRemoteSecrets($this->remote_secrets_cache);
+            $this->application_deployment_queue->addLogEntry('Fetched '.count($secrets)." secrets from {$description}.");
         }
 
-        $link = $this->application->secretManagerLink()->with('integrationToken')->first();
-
-        if (! $link) {
-            throw new DeploymentException('Environment variables reference remote secrets ({{vault.KEY}}), but no secret manager source is configured for this application.');
-        }
-
-        $provider = $link->integrationToken->providerName();
-        $tokenName = $link->integrationToken->name;
-
-        try {
-            $secrets = $link->fetchSecrets();
-        } catch (Throwable $e) {
-            $this->application_deployment_queue->addLogEntry("Failed to fetch secrets from {$provider} ({$tokenName}, {$link->sourceSummary()}): {$e->getMessage()}", 'stderr');
-
-            throw new DeploymentException("Could not fetch secrets from {$provider}. The deployment was stopped so the application does not start with missing secrets.");
-        }
-
-        $this->application_deployment_queue->redactRemoteSecrets($secrets);
-        $this->application_deployment_queue->addLogEntry('Fetched '.count($secrets)." secrets from {$provider} ({$tokenName}, {$link->sourceSummary()}).");
-
-        return $this->remote_secrets_cache = $secrets;
+        return $this->remote_secrets_cache ?? [];
     }
 
     /**
@@ -2125,8 +2313,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Replace {{vault.KEY}} references with values from the configured secret
-     * manager source. Missing keys fail the deployment with a
+     * Replace {{vault.KEY}} and {{vault.<source>.KEY}} references with values from the
+     * secret manager sources of the application. Missing keys fail the deployment with a
      * list — changing the source never re-checks references, so this is the
      * moment problems surface. Values without references are returned as-is
      * and never fetch secrets.
@@ -2137,7 +2325,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return $value;
         }
 
-        $secrets = $this->remote_secrets();
+        $secrets = $this->remote_secrets(RemoteSecretReferences::referencedSources($value));
         $missing = RemoteSecretReferences::missingKeys($value, $secrets);
 
         if ($missing !== []) {
@@ -2165,7 +2353,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Without a source, a literal keeps "{{vault.KEY}}" as text; other references fail closed.
+     * Without any source, a literal keeps "{{vault.KEY}}" as text; other references fail closed.
      */
     private function uses_remote_secret_references(EnvironmentVariable $env): bool
     {
@@ -2179,7 +2367,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function has_secret_manager_source(): bool
     {
         return $this->has_secret_manager_source ??= $this->remote_secrets_cache !== null
-            || $this->application->secretManagerLink()->exists();
+            || $this->application->secretManagerLinks()->exists();
     }
 
     /**

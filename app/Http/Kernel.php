@@ -15,6 +15,7 @@ use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\EnsureMcpEnabled;
 use App\Http\Middleware\EnsureTeamMcpEnabled;
+use App\Http\Middleware\EnsureTeamTerminalApiEnabled;
 use App\Http\Middleware\EnsureTeamWideAccess;
 use App\Http\Middleware\EnsureTokenBelongsToCurrentTeamMember;
 use App\Http\Middleware\KeepConcurrentTeamSwitch;
@@ -125,5 +126,6 @@ class Kernel extends HttpKernel
         'mcp.enabled' => EnsureMcpEnabled::class,
         'api.ip.allowed' => ApiIpAllowed::class,
         'mcp.team.enabled' => EnsureTeamMcpEnabled::class,
+        'terminal.team.enabled' => EnsureTeamTerminalApiEnabled::class,
     ];
 }

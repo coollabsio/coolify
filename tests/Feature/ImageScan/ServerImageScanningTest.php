@@ -111,7 +111,7 @@ describe('server image scanning page', function () {
 
         imageScanningPage()
             ->assertSee('Database built 1 day ago')
-            ->assertSee('Coolify downloads the latest vulnerability database every day')
+            ->assertSee('Coolify downloads the latest vulnerability database at each rescan')
             ->assertDontSee('Update database')
             ->assertDontSee('Get scanner')
             ->assertSee('Disable image scanning?')
@@ -281,6 +281,25 @@ describe('scanner time and CPU limits', function () {
         imageScanningPage()->set('scannerGrypeTimeout', '3600')->assertNotDispatched('success')->assertSet('scannerGrypeTimeout', '600');
 
         expect($this->server->settings->fresh()->image_scan_grype_timeout)->toBe(600);
+    });
+});
+
+describe('rescan frequency', function () {
+    it('saves the rescan days', function () {
+        imageScanningPage()
+            ->assertSet('rescanDays', '1')
+            ->assertSee('Every week')
+            ->set('rescanDays', '0')
+            ->assertHasNoErrors()
+            ->assertDispatched('success', 'Rescan frequency saved.');
+
+        expect($this->server->settings->fresh()->image_rescan_days)->toBe(0);
+    });
+
+    it('refuses rescan days that are not one of the options', function () {
+        imageScanningPage()->set('rescanDays', '2')->assertHasErrors('rescanDays');
+
+        expect($this->server->settings->fresh()->image_rescan_days)->toBe(1);
     });
 });
 

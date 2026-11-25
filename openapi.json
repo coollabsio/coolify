@@ -4501,6 +4501,105 @@
                 ]
             }
         },
+        "\/applications\/{uuid}\/exec": {
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Execute Command",
+                "description": "Execute a non-interactive shell command inside a running application container.",
+                "operationId": "execute-command-on-application-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Application UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "command"
+                                ],
+                                "properties": {
+                                    "command": {
+                                        "type": "string",
+                                        "description": "Shell command to execute in the application container."
+                                    },
+                                    "timeout": {
+                                        "type": "integer",
+                                        "description": "Command timeout in seconds. Maximum 10 seconds. Defaults to 10 seconds."
+                                    },
+                                    "container": {
+                                        "type": "string",
+                                        "description": "Optional container name when the application has multiple running containers."
+                                    },
+                                    "server_uuid": {
+                                        "type": "string",
+                                        "description": "Optional server UUID when the application runs on multiple servers."
+                                    },
+                                    "pull_request_id": {
+                                        "type": "integer",
+                                        "description": "Optional preview pull request identifier."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Command finished.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "exit_code": {
+                                            "type": "integer"
+                                        },
+                                        "stdout": {
+                                            "type": "string"
+                                        },
+                                        "stderr": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Terminal access is disabled on the target server, or the terminal API is disabled on the instance or for the team."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "429": {
+                        "$ref": "#\/components\/responses\/TerminalRateLimited"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/applications\/{uuid}": {
             "get": {
                 "tags": [
@@ -19736,6 +19835,16 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "name",
+                        "in": "query",
+                        "description": "Source name. Default: default.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "default"
+                        }
                     }
                 ],
                 "responses": {
@@ -19770,7 +19879,7 @@
                     "Secret Managers"
                 ],
                 "summary": "Remove Secret Manager Source",
-                "description": "Remove the secret manager source. Existing {{vault.*}} variables stay and fail the next deployment until they are removed.",
+                "description": "Remove a secret manager source (`default` when no name is given). Existing references to it stay and fail the next deployment until they are removed.",
                 "operationId": "remove-secret-manager-source",
                 "parameters": [
                     {
@@ -19794,6 +19903,16 @@
                         "required": true,
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    {
+                        "name": "name",
+                        "in": "query",
+                        "description": "Source name. Default: default.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "default"
                         }
                     }
                 ],
@@ -19822,7 +19941,7 @@
                     "Secret Managers"
                 ],
                 "summary": "Set Secret Manager Source",
-                "description": "Link a secret manager token of the team to an application, service, or database, or change the token or settings of the link. References resolve at the next deployment.",
+                "description": "Link a secret manager token of the team to an application, service, or database as a named source (`default` when no name is given), or change the token or settings of that source. References resolve at the next deployment.",
                 "operationId": "set-secret-manager-source",
                 "parameters": [
                     {
@@ -19858,6 +19977,11 @@
                                     "integration_token_uuid"
                                 ],
                                 "properties": {
+                                    "name": {
+                                        "description": "Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.",
+                                        "type": "string",
+                                        "default": "default"
+                                    },
                                     "integration_token_uuid": {
                                         "type": "string"
                                     },
@@ -19922,6 +20046,11 @@
                                     "integration_token_uuid"
                                 ],
                                 "properties": {
+                                    "name": {
+                                        "description": "Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.",
+                                        "type": "string",
+                                        "default": "default"
+                                    },
                                     "integration_token_uuid": {
                                         "type": "string"
                                     },
@@ -19989,6 +20118,16 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "name",
+                        "in": "query",
+                        "description": "Source name. Default: default.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "default"
+                        }
                     }
                 ],
                 "responses": {
@@ -20036,7 +20175,7 @@
                     "Secret Managers"
                 ],
                 "summary": "Add Secret Manager Reference",
-                "description": "Add a {{vault.KEY}} environment variable for one key of the linked source.",
+                "description": "Add a {{vault.KEY}} environment variable ({{vault.<name>.KEY}} for a named source) for one key of the source.",
                 "operationId": "add-secret-manager-reference",
                 "parameters": [
                     {
@@ -20074,6 +20213,11 @@
                                 "properties": {
                                     "key": {
                                         "type": "string"
+                                    },
+                                    "name": {
+                                        "description": "Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.",
+                                        "type": "string",
+                                        "default": "default"
                                     }
                                 },
                                 "type": "object"
@@ -20114,7 +20258,7 @@
                     "Secret Managers"
                 ],
                 "summary": "Import Secret Manager References",
-                "description": "Add a {{vault.KEY}} environment variable for every key of the linked source that has no variable yet. Keys that are not valid variable names are skipped.",
+                "description": "Add a {{vault.KEY}} environment variable ({{vault.<name>.KEY}} for a named source) for every key of the source that has no variable yet. Keys that are not valid variable names are skipped.",
                 "operationId": "import-secret-manager-references",
                 "parameters": [
                     {
@@ -20141,6 +20285,23 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "description": "Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.",
+                                        "type": "string",
+                                        "default": "default"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "Import result.",
@@ -21433,6 +21594,18 @@
                                                 4
                                             ]
                                         },
+                                        "image_rescan_days": {
+                                            "description": "Days between two rescans of the running images and the host packages. 0: no rescans, only scans at deployments and on request.",
+                                            "type": "integer",
+                                            "enum": [
+                                                1,
+                                                3,
+                                                7,
+                                                14,
+                                                30,
+                                                0
+                                            ]
+                                        },
                                         "scanner_state": {
                                             "description": "State of the scanner on the server. Null when unknown.",
                                             "type": [
@@ -21560,6 +21733,18 @@
                                             1,
                                             2,
                                             4
+                                        ]
+                                    },
+                                    "image_rescan_days": {
+                                        "description": "Days between two rescans of the running images and the host packages. 0: no rescans, only scans at deployments and on request.",
+                                        "type": "integer",
+                                        "enum": [
+                                            1,
+                                            3,
+                                            7,
+                                            14,
+                                            30,
+                                            0
                                         ]
                                     }
                                 },
@@ -23718,6 +23903,93 @@
                     },
                     "422": {
                         "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/servers\/{uuid}\/exec": {
+            "post": {
+                "tags": [
+                    "Servers"
+                ],
+                "summary": "Execute Command",
+                "description": "Execute a non-interactive shell command on a server through Coolify SSH.",
+                "operationId": "execute-command-on-server-by-uuid",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "Server UUID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "command"
+                                ],
+                                "properties": {
+                                    "command": {
+                                        "type": "string",
+                                        "description": "Shell command to execute on the server."
+                                    },
+                                    "timeout": {
+                                        "type": "integer",
+                                        "description": "Command timeout in seconds. Maximum 10 seconds. Defaults to 10 seconds."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Command finished.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "exit_code": {
+                                            "type": "integer"
+                                        },
+                                        "stdout": {
+                                            "type": "string"
+                                        },
+                                        "stderr": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Terminal access is disabled on this server, or the terminal API is disabled on the instance or for the team."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "429": {
+                        "$ref": "#\/components\/responses\/TerminalRateLimited"
                     }
                 },
                 "security": [
@@ -27927,6 +28199,401 @@
                 ]
             }
         },
+        "\/applications\/archive\/uploads": {
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Upload static site archive",
+                "description": "Upload a .tar, .tar.gz, or .tgz archive of a static site in DropZone chunks (dzuuid, dzchunkindex, dztotalchunkcount, dzchunkbyteoffset, dztotalfilesize). Send the same upload_id with every chunk. The last chunk validates the archive: at most 1 GiB, 5 GiB extracted, 100,000 entries, and only regular files and directories with relative paths. The upload is kept for 24 hours, and a team keeps its 3 newest uploads. A team can upload 5 GiB in an hour; more returns 429. Without application_uuid, the token user must be able to create applications.",
+                "operationId": "upload-static-site-archive",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart\/form-data": {
+                            "schema": {
+                                "required": [
+                                    "upload_id",
+                                    "file"
+                                ],
+                                "properties": {
+                                    "upload_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "description": "A UUID that the client generates for this upload."
+                                    },
+                                    "file": {
+                                        "type": "string",
+                                        "format": "binary",
+                                        "description": "The archive, or one chunk of it."
+                                    },
+                                    "application_uuid": {
+                                        "type": "string",
+                                        "description": "The archive site that this upload is a new version of."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Chunk received."
+                    },
+                    "201": {
+                        "description": "Upload completed and validated.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "upload_id": {
+                                            "type": "string"
+                                        },
+                                        "size": {
+                                            "type": "integer",
+                                            "description": "The size of the archive in bytes."
+                                        },
+                                        "sha": {
+                                            "type": "string",
+                                            "description": "The site version: the first 40 hex characters of the SHA-256 of the archive."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token user cannot create applications or update and deploy the application."
+                    },
+                    "404": {
+                        "description": "Application not found."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "409": {
+                        "description": "The instance sends uploads to its S3 upload storage. Use \/applications\/archive\/uploads\/s3."
+                    },
+                    "429": {
+                        "description": "The team uploaded more than 5 GiB of archives in the last hour."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/applications\/archive\/uploads\/s3": {
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Prepare static site archive upload to S3",
+                "description": "Return a presigned URL that uploads an archive straight to the upload storage that the instance admin selected, so the archive does not use the disk of the Coolify instance. When the instance has an upload storage, use this instead of \/applications\/archive\/uploads, which then returns 409. Send the archive with one PUT request to the URL, with the returned headers, before expires_at. Then use the upload_id like the upload_id of a direct upload. Creating or deploying the site reads the archive from the bucket to check it (at most 1 GiB), and the deployment deletes it from the bucket. The upload is kept for 24 hours, and a team keeps its 3 newest uploads.",
+                "operationId": "prepare-static-site-archive-s3-upload",
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "application_uuid": {
+                                        "type": "string",
+                                        "description": "The archive site that this upload is a new version of."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Presigned upload URL.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "upload_id": {
+                                            "type": "string"
+                                        },
+                                        "url": {
+                                            "type": "string",
+                                            "description": "The presigned PUT URL."
+                                        },
+                                        "headers": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            },
+                                            "description": "Headers to send with the PUT request."
+                                        },
+                                        "expires_at": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token user cannot create applications or update and deploy the application."
+                    },
+                    "404": {
+                        "description": "Application not found."
+                    },
+                    "422": {
+                        "description": "The instance has no upload storage."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/applications\/archive": {
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Create (static site from an archive)",
+                "description": "Create a static site that is deployed from uploaded archives instead of a Git repository. With upload_id, the uploaded archive becomes the first version of the site and is deployed, which needs a token with the deploy ability.",
+                "operationId": "create-static-site-archive-application",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "project_uuid",
+                                    "server_uuid"
+                                ],
+                                "properties": {
+                                    "project_uuid": {
+                                        "type": "string",
+                                        "description": "The project UUID."
+                                    },
+                                    "server_uuid": {
+                                        "type": "string",
+                                        "description": "The server UUID."
+                                    },
+                                    "environment_name": {
+                                        "type": "string",
+                                        "description": "The environment name. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "environment_uuid": {
+                                        "type": "string",
+                                        "description": "The environment UUID. You need to provide at least one of environment_name or environment_uuid."
+                                    },
+                                    "destination_uuid": {
+                                        "type": "string",
+                                        "description": "The destination UUID. Required when the server has more than one destination."
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "description": "The application name."
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "description": "The application description."
+                                    },
+                                    "domains": {
+                                        "type": "string",
+                                        "description": "The application URLs in a comma-separated list."
+                                    },
+                                    "autogenerate_domain": {
+                                        "type": "boolean",
+                                        "default": true,
+                                        "description": "Generate a domain when domains is empty."
+                                    },
+                                    "force_domain_override": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Use the domains even when another resource uses them."
+                                    },
+                                    "is_spa": {
+                                        "type": "boolean",
+                                        "default": false,
+                                        "description": "Serve index.html for unknown paths (single-page application)."
+                                    },
+                                    "upload_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "description": "A completed upload from POST \/applications\/archive\/uploads."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Application created.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "uuid": {
+                                            "type": "string"
+                                        },
+                                        "domains": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "link": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "description": "The page of the application in the Coolify UI."
+                                        },
+                                        "deployment_uuid": {
+                                            "type": "string",
+                                            "description": "Set when a deployment was queued."
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "description": "Set when the deployment could not be queued."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability to deploy the archive."
+                    },
+                    "404": {
+                        "description": "Project, environment, server, or upload not found."
+                    },
+                    "409": {
+                        "description": "Domain conflicts detected."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/applications\/{uuid}\/archive": {
+            "post": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Deploy static site archive",
+                "description": "Make an uploaded archive the current version of a static site that is deployed from archives, and build and deploy it. Needs a token with the write and deploy abilities.",
+                "operationId": "deploy-static-site-archive",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the application.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "required": [
+                                    "upload_id"
+                                ],
+                                "properties": {
+                                    "upload_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "description": "A completed upload from POST \/applications\/archive\/uploads."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Deployment queued.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "properties": {
+                                        "deployment_uuid": {
+                                            "type": "string"
+                                        },
+                                        "sha": {
+                                            "type": "string",
+                                            "description": "The site version."
+                                        },
+                                        "domains": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "link": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "description": "The page of the application in the Coolify UI."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#\/components\/responses\/400"
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "The token needs the deploy ability."
+                    },
+                    "404": {
+                        "description": "Application or upload not found."
+                    },
+                    "422": {
+                        "$ref": "#\/components\/responses\/422"
+                    },
+                    "429": {
+                        "description": "The deployment queue is full. Upload the archive again later."
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "\/tags": {
             "get": {
                 "tags": [
@@ -28402,6 +29069,58 @@
             }
         },
         "\/applications\/{uuid}\/storages\/{storage_uuid}\/backups": {
+            "get": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Get application storage backup schedule",
+                "description": "Get the backup schedule of an application storage.",
+                "operationId": "get-application-storage-backup-schedule",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "storage_uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Backup schedule.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/VolumeBackupScheduleResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Forbidden."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
             "put": {
                 "tags": [
                     "Applications"
@@ -28532,6 +29251,58 @@
             }
         },
         "\/databases\/{uuid}\/storages\/{storage_uuid}\/backups": {
+            "get": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Get database storage backup schedule",
+                "description": "Get the backup schedule of a database storage.",
+                "operationId": "get-database-storage-backup-schedule",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "storage_uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Backup schedule.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/VolumeBackupScheduleResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Forbidden."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
             "put": {
                 "tags": [
                     "Databases"
@@ -28662,6 +29433,58 @@
             }
         },
         "\/services\/{uuid}\/storages\/{storage_uuid}\/backups": {
+            "get": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Get service storage backup schedule",
+                "description": "Get the backup schedule of a service storage.",
+                "operationId": "get-service-storage-backup-schedule",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "storage_uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Backup schedule.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/VolumeBackupScheduleResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Forbidden."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
             "put": {
                 "tags": [
                     "Services"
@@ -30880,8 +31703,12 @@
                 "type": "object"
             },
             "SecretManagerSource": {
-                "description": "The secret manager source of an application, service, or database. Routes start with the resource type (`applications`, `services`, `databases`), so tokens limited to some resources can use them.",
+                "description": "A secret manager source of an application, service, or database. A resource can have several named sources: variables reference the `default` source as {{vault.KEY}} and other sources as {{vault.<name>.KEY}}. Routes start with the resource type (`applications`, `services`, `databases`), so tokens limited to some resources can use them.",
                 "properties": {
+                    "name": {
+                        "description": "Name of the source that the other fields describe.",
+                        "type": "string"
+                    },
                     "linked": {
                         "type": "boolean"
                     },
@@ -30922,6 +31749,30 @@
                                 },
                                 "provider": {
                                     "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "sources": {
+                        "description": "All sources of the resource, sorted by name.",
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                },
+                                "integration_token_uuid": {
+                                    "type": "string"
+                                },
+                                "provider": {
+                                    "type": "string"
+                                },
+                                "settings": {
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ]
                                 }
                             },
                             "type": "object"
@@ -31095,7 +31946,6 @@
             "VolumeBackupScheduleResponse": {
                 "required": [
                     "uuid",
-                    "message",
                     "storage_uuid",
                     "storage_type",
                     "frequency",
@@ -31117,6 +31967,7 @@
                         "type": "string"
                     },
                     "message": {
+                        "description": "Only in the response of a create or replace.",
                         "type": "string"
                     },
                     "storage_uuid": {
@@ -31446,6 +32297,10 @@
                         "type": "string",
                         "nullable": true,
                         "description": "Dockerfile content. Used for dockerfile build pack."
+                    },
+                    "is_archive_source": {
+                        "type": "boolean",
+                        "description": "The static site is deployed from uploaded archives instead of a Git repository."
                     },
                     "dockerfile_location": {
                         "type": "string",
@@ -32903,6 +33758,36 @@
                                 "message": {
                                     "type": "string",
                                     "example": "Rate limit exceeded. Please try again later."
+                                }
+                            },
+                            "type": "object"
+                        }
+                    }
+                }
+            },
+            "TerminalRateLimited": {
+                "description": "Terminal command rate or concurrency limit exceeded.",
+                "headers": {
+                    "Retry-After": {
+                        "description": "Number of seconds to wait before retrying.",
+                        "schema": {
+                            "type": "integer",
+                            "example": 42
+                        }
+                    }
+                },
+                "content": {
+                    "application\/json": {
+                        "schema": {
+                            "properties": {
+                                "message": {
+                                    "type": "string",
+                                    "example": "Too many terminal command requests. Please retry in 42 seconds."
+                                },
+                                "retry_after": {
+                                    "description": "Number of seconds to wait before retrying.",
+                                    "type": "integer",
+                                    "example": 42
                                 }
                             },
                             "type": "object"

@@ -53,6 +53,12 @@
                                 ['value' => true, 'label' => 'Enabled'],
                                 ['value' => false, 'label' => 'Disabled'],
                             ]" />
+                        <x-forms.listbox id="is_terminal_api_enabled" label="Terminal API"
+                            helper="Allows API tokens with the terminal permission to run commands on servers and in application containers. Each team must also enable it."
+                            onChange="instantSave" :options="[
+                                ['value' => true, 'label' => 'Enabled'],
+                                ['value' => false, 'label' => 'Disabled'],
+                            ]" />
                         <div class="lg:col-span-2">
                             <x-forms.input id="allowed_ips" label="Allowed IPs"
                                 helper="Applies to the REST API and the MCP endpoint. Comma-separated IPs or CIDR ranges. Empty or 0.0.0.0 allows all sources."
@@ -206,7 +212,7 @@
                     </x-callout>
                 </x-application.settings-subsection>
                 <x-application.settings-subsection id="upload-storage-section" title="Uploads"
-                    helper="Choose where files go that users upload in the browser (database imports and static site archives). With S3, the browser uploads each file straight to the bucket, so it does not use disk space on this instance, and the servers download it from S3. Coolify deletes each file when it no longer needs it. Uploads through the API still go to this instance.">
+                    helper="Choose where files go that users upload in the browser (database imports and static site archives). With S3, the browser uploads each file straight to the bucket, so it does not use disk space on this instance, and the servers download it from S3. Coolify deletes each file when it no longer needs it. Database imports through the API still go to this instance. Static site archives through the API use POST /api/v1/applications/archive/uploads/s3.">
                     <div class="flex max-w-md flex-col gap-4">
                         <x-forms.listbox id="upload_storage" label="Upload storage" onChange="instantSave"
                             :options="[

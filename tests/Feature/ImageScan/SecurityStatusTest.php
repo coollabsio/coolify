@@ -4,6 +4,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ImageScanStatus;
 use App\Enums\SecurityActionType;
 use App\Enums\SecurityStatusType;
+use App\Jobs\RefreshImageScanSummariesJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
@@ -777,6 +778,31 @@ describe('stored status', function () {
         expect(SecurityStatus::stored($this->application))
             ->status->toBe(SecurityStatusType::CheckNeeded)
             ->checkReason->toBe('stale');
+    });
+
+    it('marks a result stale only after the rescan days of its server', function () {
+        $this->server->settings->forceFill(['image_rescan_days' => 7])->saveQuietly();
+        statusTestScan($this->application, [], ['scanned_at' => now()]);
+        ResourceScans::refreshSummaries(ResourceScans::currentFor($this->application));
+
+        $this->travel(6)->days();
+        expect(SecurityStatus::stored($this->application)->checkReason)->toBeNull()
+            ->and(SecurityStatus::forResource($this->application)->checkReason)->toBeNull();
+
+        $this->travel(3)->days();
+        expect(SecurityStatus::stored($this->application)->checkReason)->toBe('stale')
+            ->and(SecurityStatus::forResource($this->application)->checkReason)->toBe('stale');
+    });
+
+    it('updates the stored statuses when the rescan days change', function () {
+        statusTestScan($this->application, [], ['scanned_at' => now()]);
+        ResourceScans::refreshSummaries(ResourceScans::currentFor($this->application));
+
+        $this->server->settings->update(['image_rescan_days' => 14]);
+        Queue::pushed(RefreshImageScanSummariesJob::class)->sole()->handle();
+
+        $this->travel(3)->days();
+        expect(SecurityStatus::stored($this->application)->checkReason)->toBeNull();
     });
 
     it('needs a check for a service with an image that has no stored status', function () {

@@ -10,6 +10,7 @@ use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Enums\ServerRole;
 use App\Helpers\SshMultiplexingHelper;
+use App\Http\Controllers\Api\Concerns\HandlesTerminalApi;
 use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
@@ -29,6 +30,7 @@ use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
@@ -36,6 +38,7 @@ use Stringable;
 
 class ServersController extends Controller
 {
+    use HandlesTerminalApi;
     use RequiresDeployAbility;
 
     /**
@@ -1396,5 +1399,134 @@ class ServersController extends Controller
         }
 
         return str(str($authority)->explode(':')[0]);
+    }
+
+    #[OA\Post(
+        summary: 'Execute Command',
+        description: 'Execute a non-interactive shell command on a server through Coolify SSH.',
+        path: '/servers/{uuid}/exec',
+        operationId: 'execute-command-on-server-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    required: ['command'],
+                    properties: [
+                        'command' => ['type' => 'string', 'description' => 'Shell command to execute on the server.'],
+                        'timeout' => ['type' => 'integer', 'description' => 'Command timeout in seconds. Maximum 10 seconds. Defaults to 10 seconds.'],
+                    ],
+                    type: 'object',
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Command finished.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'exit_code' => ['type' => 'integer'],
+                                'stdout' => ['type' => 'string'],
+                                'stderr' => ['type' => 'string'],
+                            ],
+                        ),
+                    ),
+                ],
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Terminal access is disabled on this server, or the terminal API is disabled on the instance or for the team.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+            new OA\Response(response: 429, ref: '#/components/responses/TerminalRateLimited'),
+        ]
+    )]
+    public function execute_command(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $allowedFields = ['command', 'timeout'];
+        $validator = customApiValidator($request->all(), [
+            'command' => 'required|string|max:20000|not_regex:/\x00/',
+            'timeout' => 'integer|nullable|min:1|max:10',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->route('uuid'))->first();
+        if (! $server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+        if ($this->isTerminalDisabledOn($server)) {
+            return response()->json(['message' => 'Terminal access is disabled on this server.'], 403);
+        }
+
+        $rateLimitResponse = $this->enforceTerminalServerRateLimit($server, $teamId);
+        if ($rateLimitResponse instanceof JsonResponse) {
+            return $rateLimitResponse;
+        }
+
+        $timeout = $request->integer('timeout') ?: self::TERMINAL_COMMAND_TIMEOUT;
+        try {
+            // Bash runs the command as before (see SshMultiplexingHelper::remoteShellCommand()), sh when the server has no bash.
+            $remoteCommand = $this->withRemoteTimeout($request->command, $timeout, '$(command -v bash || echo sh)');
+            $process = $this->runConcurrentTerminalProcess($server, $teamId, $remoteCommand, $timeout);
+        } catch (ProcessTimedOutException) {
+            auditLog('api.server.command.executed', [
+                'team_id' => $teamId,
+                'server_uuid' => $server->uuid,
+                'server_name' => $server->name,
+                'exit_code' => 124,
+            ]);
+
+            return $this->terminalTimedOutResponse($timeout);
+        }
+
+        if ($process instanceof JsonResponse) {
+            return $process;
+        }
+
+        auditLog('api.server.command.executed', [
+            'team_id' => $teamId,
+            'server_uuid' => $server->uuid,
+            'server_name' => $server->name,
+            'exit_code' => $process->exitCode(),
+        ]);
+
+        return response()->json([
+            'exit_code' => $process->exitCode(),
+            'stdout' => $this->formatTerminalCommandOutput($process->output()),
+            'stderr' => $this->formatTerminalCommandOutput($process->errorOutput()),
+        ]);
     }
 }

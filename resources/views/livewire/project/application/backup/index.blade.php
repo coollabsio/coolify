@@ -73,7 +73,7 @@
             <div class="application-settings-form flex min-w-0 flex-col gap-6">
             <x-application.settings-section title="Storage backups"
                 helper="Schedule backups for persistent volumes and directory mounts attached to this application.">
-                @can('update', $application)
+                @can('manageBackups', $application)
                     <x-slot:actions>
                         <x-modal-input title="New scheduled backup" :wireIgnore="false">
                             <x-slot:content>
