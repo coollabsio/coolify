@@ -419,7 +419,9 @@ final class TriggerSetBuilder
             if ($limit === 'workspace' && $rule['action'] === 'exclude') {
                 continue;
             }
-            $path = $this->displayPath($rule);
+            $path = $limit === 'workspace' && $rule['kind'] === 'file' && str_ends_with($rule['path'], '/package.json')
+                ? '**/package.json'
+                : $this->displayPath($rule);
             if ($path !== null) {
                 $this->display[] = "{$limit}: ".($rule['action'] === 'exclude' ? '!' : '').$path;
             }
@@ -436,7 +438,18 @@ final class TriggerSetBuilder
     private function displayPath(array $rule): ?string
     {
         if ($rule['kind'] === 'glob') {
-            return $rule['pattern'];
+            $pattern = $rule['pattern'];
+            // pathRules() adds `<glob>/**` next to `<glob>`: one line is enough.
+            if (str_ends_with($pattern, '/**') && Glob::hasWildcard(substr($pattern, 0, -3))) {
+                return null;
+            }
+            $literal = preg_split('~[*?\[{]~', $pattern, 2)[0];
+            $folder = str_contains($literal, '/') ? substr($literal, 0, strrpos($literal, '/')) : '';
+            if ($rule['action'] === 'include' && $folder !== '' && $this->snapshot !== null && ! $this->snapshot->directoryExists($folder)) {
+                return null;
+            }
+
+            return $pattern;
         }
         $path = $rule['path'];
         if ($path === '') {

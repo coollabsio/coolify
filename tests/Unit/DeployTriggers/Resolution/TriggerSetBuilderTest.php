@@ -357,3 +357,13 @@ it('shows root files as files and leaves out the paths that do not exist yet', f
         // The rules still cover a lockfile that a later push adds.
         ->and(affects($built, 'yarn.lock'))->toBeTrue();
 });
+
+it('lists each glob once, hides globs under missing folders, and folds the package manifests into one line', function () {
+    $built = (new TriggerSetBuilder)->build(builderApp(['dockerfileLocation' => '/apps/web/Dockerfile']), monorepo())->toArray();
+    $workspace = array_values(array_filter($built['display'], fn (string $line) => str_starts_with($line, 'workspace: ')));
+
+    expect($workspace)->toContain('workspace: tsconfig*.json', 'workspace: **/package.json')
+        ->not->toContain('workspace: tsconfig*.json/**', 'workspace: .yarn/**', 'workspace: apps/api/package.json')
+        ->and(affects($built, '.yarn/releases/yarn.cjs'))->toBeTrue()
+        ->and(affects($built, 'apps/api/package.json'))->toBeTrue();
+});
