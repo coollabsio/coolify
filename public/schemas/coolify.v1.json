@@ -982,6 +982,12 @@
                                 "null"
                             ]
                         },
+                        "is_smart_triggers_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
                         "image_builds_by_team": {
                             "type": [
                                 "boolean",

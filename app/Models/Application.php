@@ -314,6 +314,8 @@ class Application extends BaseModel
      */
     protected $hidden = [
         ...self::COMMAND_AND_CONFIGURATION_ATTRIBUTES,
+        'trigger_set',
+        'trigger_scan',
         'http_basic_auth_password',
         'git_https_password',
         'manual_webhook_secret_github',
