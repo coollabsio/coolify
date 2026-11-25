@@ -57,6 +57,16 @@ final class SshMirrorGit implements MirrorGit
         return $process->output();
     }
 
+    /**
+     * The sh script that removes mirrors no push used for 14 days, each under its lock and skipped while busy.
+     * Lock files stay, so a waiting evaluation and a new one never lock different files.
+     * No `$(`, `&&`, `||`, or pipe: the sudo parser of non-root servers rewrites them even inside quotes.
+     */
+    public static function pruneScript(string $root): string
+    {
+        return "find {$root} -mindepth 1 -maxdepth 1 -name \"*.git\" -type d -mtime +14 -exec flock -n {}.lock rm -rf {} \\;";
+    }
+
     public function mirrorsPath(): string
     {
         return '/mirrors';

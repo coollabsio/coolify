@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Notifications\ScheduledJobRecovered;
 use App\Notifications\Server\DockerCleanupFailed;
 use App\Notifications\Server\DockerCleanupSuccess;
+use App\Services\DeployTriggers\Git\SshMirrorGit;
 use App\Services\ScheduledJobDeliveryService;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
@@ -236,7 +237,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
         $image = coolifyHelperImage().':'.getHelperVersion();
         try {
             instant_remote_process([
-                "docker volume inspect coolify-git-mirrors >/dev/null 2>&1 && docker run --rm -v coolify-git-mirrors:/mirrors --entrypoint sh {$image} -c 'find /mirrors -mindepth 1 -maxdepth 1 -mtime +14 -exec rm -rf {} +' >/dev/null 2>&1 || true",
+                "docker volume inspect coolify-git-mirrors >/dev/null 2>&1 && docker run --rm -v coolify-git-mirrors:/mirrors --entrypoint sh {$image} -c '".SshMirrorGit::pruneScript('/mirrors')."' >/dev/null 2>&1 || true",
             ], $this->server, throwError: false, timeout: 300);
         } catch (\Throwable) {
             // Pruning is best effort.
