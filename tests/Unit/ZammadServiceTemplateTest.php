@@ -39,6 +39,7 @@ it('includes a production-ready Zammad one-click service template', function () 
         ->and($zammad['healthcheck']['test'])->toBe(['CMD', 'curl', '-sf', 'http://127.0.0.1:8080/'])
         ->and($sharedEnvironment['ZAMMAD_FQDN'])->toBe('${SERVICE_FQDN_ZAMMAD}')
         ->and($sharedEnvironment)->toHaveKey('S3_URL', null)
+        ->and($sharedEnvironment['RAILS_TRUSTED_PROXIES'])->toContain('10.0.0.0/8')
         ->and($sharedEnvironment['POSTGRESQL_PASS'])->toBe('${SERVICE_PASSWORD_POSTGRES}')
         ->and($services['zammad-postgresql']['environment']['POSTGRES_PASSWORD'])->toBe('${SERVICE_PASSWORD_POSTGRES}')
         ->and(array_keys($compose['volumes']))->toBe([
