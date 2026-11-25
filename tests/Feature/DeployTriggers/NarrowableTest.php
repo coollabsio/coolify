@@ -64,8 +64,7 @@ it('changes the fingerprint when a trigger relevant field changes', function (st
 })->with([
     ['build_pack', 'dockerfile'],
     ['base_directory', '/apps/web'],
-    ['dockerfile_location', '/apps/web/Dockerfile'],
-    ['docker_compose_location', '/x/docker-compose.yaml'],
+    ['build_pack', 'dockercompose'],
     ['install_command', 'pnpm i'],
     ['build_command', 'pnpm build'],
     ['start_command', 'node .'],
@@ -91,5 +90,16 @@ it('changes the fingerprint when the toggle changes', function () {
 
     $application->settings->is_smart_triggers_enabled = false;
 
+    expect(TriggerFingerprint::for($application))->not->toBe($before);
+});
+
+it('fingerprints only the file location of the build pack', function () {
+    $application = deployTriggerApplication($this->fixture, ['build_pack' => 'dockerfile']);
+    $before = TriggerFingerprint::for($application);
+
+    $application->docker_compose_location = '/elsewhere/docker-compose.yaml';
+    expect(TriggerFingerprint::for($application))->toBe($before);
+
+    $application->dockerfile_location = '/apps/web/Dockerfile';
     expect(TriggerFingerprint::for($application))->not->toBe($before);
 });

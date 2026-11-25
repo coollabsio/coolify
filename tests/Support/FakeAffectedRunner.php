@@ -21,6 +21,9 @@ final class FakeAffectedRunner implements AffectedRunner
     /** @var list<GitAccess> */
     public array $accesses = [];
 
+    /** @var list<Server> */
+    public array $servers = [];
+
     private function __construct(
         private readonly bool $supported,
         private readonly ?Closure $respond,
@@ -57,6 +60,7 @@ final class FakeAffectedRunner implements AffectedRunner
     public function evaluate(Server $server, EvaluateRequest $request, GitAccess $access): EvaluateResponse
     {
         $this->requests[] = $request;
+        $this->servers[] = $server;
         $this->accesses[] = $access;
         if ($this->failure) {
             throw $this->failure;

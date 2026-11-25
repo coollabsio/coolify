@@ -1,0 +1,254 @@
+<?php
+
+use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\ApplicationDeploymentJob;
+use App\Jobs\EvaluatePush;
+use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationPreview;
+use App\Models\Server;
+use App\Services\DeployTriggers\AffectedRunnerException;
+use App\Services\DeployTriggers\Contract\EvaluateRequest;
+use App\Services\DeployTriggers\EvaluationSlots;
+use App\Services\DeployTriggers\PullRequestContext;
+use App\Services\DeployTriggers\PushContext;
+use App\Services\DeployTriggers\TriggerFingerprint;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
+use Tests\Support\FakeAffectedRunner;
+
+uses(RefreshDatabase::class);
+
+const EP_BASE = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const EP_AFTER = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+
+beforeEach(function () {
+    Queue::fake([ApplicationDeploymentJob::class]);
+    app()->instance(EvaluationSlots::class, new class extends EvaluationSlots
+    {
+        public bool $busy = false;
+
+        public function run(Closure $callback, Closure $whenBusy): void
+        {
+            $this->busy ? $whenBusy() : $callback();
+        }
+    });
+    $this->fixture = deployTriggerFixture();
+    $this->web = epApplication($this->fixture, '/apps/web');
+    $this->api = epApplication($this->fixture, '/apps/api');
+});
+
+function epApplication(array $fixture, string $baseDirectory): Application
+{
+    $application = deployTriggerApplication($fixture, ['base_directory' => $baseDirectory, 'git_repository' => 'https://github.com/acme/mono']);
+    $application->forceFill(['trigger_base_commit' => EP_BASE])->save();
+    $application->refresh();
+    $application->forceFill(['trigger_scan' => ['commit' => EP_BASE, 'reference_paths' => [], 'widened' => [], 'config_fingerprint' => TriggerFingerprint::for($application)]])->save();
+
+    return $application->refresh();
+}
+
+function epContext(array $overrides = []): PushContext
+{
+    return new PushContext(...array_merge([
+        'provider' => 'gitlab', 'teamId' => 1, 'repositoryUrl' => 'https://github.com/acme/mono', 'ref' => 'refs/heads/main',
+        'after' => EP_AFTER, 'before' => EP_BASE, 'forced' => null, 'commitMessage' => 'feat: change',
+    ], $overrides));
+}
+
+/**
+ * @param  array<string, array{0: string, 1: string}>  $decisions  application id => [decision, reason_code]
+ */
+function epRespond(array $decisions): Closure
+{
+    return function (EvaluateRequest $request) use ($decisions): string {
+        return json_encode([
+            'schema_version' => 1, 'tool_version' => '1.0.0', 'after' => $request->after ?? EP_AFTER, 'diffs' => [], 'errors' => [],
+            'applications' => array_map(fn (string $id) => [
+                'id' => $id, 'decision' => $decisions[$id][0] ?? 'deploy', 'reason_code' => $decisions[$id][1] ?? 'matched',
+                'reason' => 'because', 'base' => EP_BASE, 'matches' => [['file' => 'apps/x/a.ts', 'rule' => 'workspace', 'via' => ['apps/x']]],
+                'trigger_set' => ['display' => ['apps/x/**'], 'compiled' => ['version' => 1, 'all_of' => [], 'lockfiles' => []], 'input_patterns' => ['version' => 1, 'all_of' => [], 'lockfiles' => []]],
+            ], $request->applicationIds()),
+        ]);
+    };
+}
+
+function epRun(PushContext $context, array $applications, bool $dryRun = false): void
+{
+    (new EvaluatePush($context, array_map(fn (Application $a) => $a->id, $applications), $dryRun))->handle();
+}
+
+it('queues deployments for deploy decisions with the trigger reason', function () {
+    FakeAffectedRunner::respondWith(epRespond([$this->web->uuid => ['deploy', 'matched'], $this->api->uuid => ['skip', 'no_match']]));
+
+    epRun(epContext(), [$this->web, $this->api]);
+
+    $deployment = ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->sole();
+    expect($deployment->status)->not->toBe(ApplicationDeploymentStatus::SKIPPED->value)
+        ->and($deployment->commit)->toBe(EP_AFTER)
+        ->and($deployment->trigger_reason['reason_code'])->toBe('matched')
+        ->and($deployment->trigger_reason['matches'][0]['file'])->toBe('apps/x/a.ts');
+});
+
+it('records skips and moves the base', function () {
+    FakeAffectedRunner::respondWith(epRespond([$this->web->uuid => ['skip', 'no_match'], $this->api->uuid => ['skip', 'no_match']]));
+
+    epRun(epContext(), [$this->web, $this->api]);
+
+    expect(ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->sole()->status)->toBe(ApplicationDeploymentStatus::SKIPPED->value)
+        ->and($this->web->refresh()->trigger_base_commit)->toBe(EP_AFTER)
+        ->and($this->web->trigger_set['evaluated_commit'])->toBe(EP_AFTER)
+        ->and($this->web->trigger_set['display'])->toBe(['apps/x/**']);
+});
+
+it('deploys every candidate when the runner fails and stores the last error', function () {
+    FakeAffectedRunner::failing(new AffectedRunnerException('server unreachable'));
+
+    epRun(epContext(), [$this->web, $this->api]);
+
+    expect(ApplicationDeploymentQueue::query()->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)->count())->toBe(2)
+        ->and(ApplicationDeploymentQueue::query()->first()->trigger_reason['reason_code'])->toBe('evaluation_failed')
+        ->and($this->web->refresh()->trigger_set['last_error'])->toBe('server unreachable');
+});
+
+it('deploys every candidate when the response breaks the contract', function () {
+    FakeAffectedRunner::respondWith('{"schema_version":2}');
+
+    epRun(epContext(), [$this->web, $this->api]);
+
+    expect(ApplicationDeploymentQueue::query()->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)->count())->toBe(2);
+});
+
+it('deploys smart apps and uses legacy watch paths when the helper is unsupported', function () {
+    FakeAffectedRunner::unsupported();
+    $this->api->update(['watch_paths' => 'apps/api/**']);
+
+    epRun(epContext(['payloadChangedFiles' => ['apps/web/a.ts']]), [$this->web, $this->api]);
+
+    expect(ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->sole()->trigger_reason['reason_code'])->toBe('helper_unsupported')
+        ->and(ApplicationDeploymentQueue::query()->where('application_id', $this->api->id)->sole()->status)->toBe(ApplicationDeploymentStatus::SKIPPED->value);
+});
+
+it('deploys legacy watch path apps when the payload has no file list', function () {
+    FakeAffectedRunner::unsupported();
+    $this->api->update(['watch_paths' => 'apps/api/**']);
+
+    epRun(epContext(['payloadChangedFiles' => null]), [$this->api]);
+
+    expect(ApplicationDeploymentQueue::query()->where('application_id', $this->api->id)->sole()->status)->not->toBe(ApplicationDeploymentStatus::SKIPPED->value);
+});
+
+it('deploys with no_scan when the stored scan does not match the effective base', function () {
+    $runner = FakeAffectedRunner::respondWith(epRespond([]));
+    $this->web->forceFill(['trigger_scan' => ['commit' => str_repeat('9', 40), 'reference_paths' => [], 'widened' => [], 'config_fingerprint' => TriggerFingerprint::for($this->web)]])->save();
+
+    epRun(epContext(), [$this->web]);
+
+    expect(ApplicationDeploymentQueue::query()->sole()->trigger_reason['reason_code'])->toBe('no_scan')
+        ->and($runner->requests)->toBe([]);
+});
+
+it('deploys fork pull requests without calling the runner', function () {
+    $runner = FakeAffectedRunner::respondWith(epRespond([]));
+    $this->web->settings->update(['is_preview_deployments_enabled' => true]);
+
+    epRun(epContext(['ref' => 'refs/pull/3/head', 'pullRequest' => new PullRequestContext(3, 'main', true, 'github', 'https://github.com/acme/mono/pull/3')]), [$this->web]);
+
+    $deployment = ApplicationDeploymentQueue::query()->sole();
+    expect($deployment->pull_request_id)->toBe(3)
+        ->and($deployment->trigger_reason['reason_code'])->toBe('fork_no_narrowing')
+        ->and($runner->requests)->toBe([]);
+});
+
+it('drops applications deleted, auto-deploy-disabled, or branch-changed since dispatch', function () {
+    $runner = FakeAffectedRunner::respondWith(epRespond([]));
+    $this->web->settings->update(['is_auto_deploy_enabled' => false]);
+    $this->api->update(['git_branch' => 'staging']);
+    $deletedId = 999999;
+
+    (new EvaluatePush(epContext(), [$this->web->id, $this->api->id, $deletedId]))->handle();
+
+    expect(ApplicationDeploymentQueue::query()->count())->toBe(0)
+        ->and($runner->requests)->toBe([]);
+});
+
+it('is unique per team, repository, ref and commit', function () {
+    $first = new EvaluatePush(epContext(), [$this->web->id]);
+
+    expect($first->uniqueId())->toBe((new EvaluatePush(epContext(), [$this->api->id]))->uniqueId())
+        ->and($first->uniqueId())->not->toBe((new EvaluatePush(epContext(['after' => str_repeat('c', 40)]), [$this->web->id]))->uniqueId())
+        ->and($first->uniqueId())->not->toBe((new EvaluatePush(epContext(), [$this->web->id], dryRun: true))->uniqueId());
+});
+
+it('re-dispatches the remaining applications with a delay when the queue is full', function () {
+    Queue::fake();
+    FakeAffectedRunner::respondWith(epRespond([]));
+    $this->fixture['server']->settings->update(['deployment_queue_limit' => 1]);
+    $other = deployTriggerApplication($this->fixture, ['base_directory' => '/apps/other']);
+    ApplicationDeploymentQueue::create(['application_id' => $other->id, 'deployment_uuid' => 'busy', 'server_id' => $this->fixture['server']->id, 'status' => ApplicationDeploymentStatus::QUEUED->value, 'commit' => EP_BASE]);
+
+    epRun(epContext(), [$this->web, $this->api]);
+
+    Queue::assertPushed(EvaluatePush::class, fn (EvaluatePush $job) => $job->applicationIds === [$this->web->id, $this->api->id] && $job->delay !== null);
+    expect(ApplicationDeploymentQueue::query()->whereIn('application_id', [$this->web->id, $this->api->id])->count())->toBe(0);
+});
+
+it('releases itself when no evaluation slot is free', function () {
+    $runner = FakeAffectedRunner::respondWith(epRespond([]));
+    app(EvaluationSlots::class)->busy = true;
+    $job = (new EvaluatePush(epContext(), [$this->web->id]))->withFakeQueueInteractions();
+
+    $job->handle();
+
+    $job->assertReleased(15);
+    expect($runner->requests)->toBe([]);
+});
+
+it('creates the preview only when a pull request deploys', function () {
+    FakeAffectedRunner::respondWith(epRespond([$this->web->uuid.':pr-5' => ['deploy', 'matched'], $this->api->uuid.':pr-5' => ['skip', 'no_match']]));
+    $this->web->settings->update(['is_preview_deployments_enabled' => true]);
+    $this->api->settings->update(['is_preview_deployments_enabled' => true]);
+
+    epRun(epContext(['ref' => 'refs/pull/5/head', 'pullRequest' => new PullRequestContext(5, 'main', false, 'github', 'https://github.com/acme/mono/pull/5')]), [$this->web, $this->api]);
+
+    expect(ApplicationPreview::query()->where('application_id', $this->web->id)->where('pull_request_id', 5)->exists())->toBeTrue()
+        ->and(ApplicationPreview::query()->where('application_id', $this->api->id)->exists())->toBeFalse()
+        ->and(ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->sole()->pull_request_id)->toBe(5);
+});
+
+it('stores trigger sets on a dry run without deploying or moving the base', function () {
+    FakeAffectedRunner::respondWith(epRespond([$this->web->uuid => ['skip', 'no_match']]));
+
+    epRun(epContext(['after' => null]), [$this->web], dryRun: true);
+
+    expect(ApplicationDeploymentQueue::query()->count())->toBe(0)
+        ->and($this->web->refresh()->trigger_base_commit)->toBe(EP_BASE)
+        ->and($this->web->trigger_set['display'])->toBe(['apps/x/**']);
+});
+
+it('sends managed config paths and merge_base_ref for a new preview', function () {
+    $runner = FakeAffectedRunner::respondWith(epRespond([]));
+    $this->web->settings->update(['is_preview_deployments_enabled' => true]);
+
+    epRun(epContext(['ref' => 'refs/pull/9/head', 'pullRequest' => new PullRequestContext(9, 'main', false, 'github', 'https://github.com/acme/mono/pull/9')]), [$this->web]);
+
+    $input = $runner->requests[0]->applications[0];
+    expect($input->id)->toBe($this->web->uuid.':pr-9')
+        ->and($input->baseCommit)->toBeNull()
+        ->and($input->mergeBaseRef)->toBe('refs/heads/main')
+        ->and($runner->requests[0]->fetchRefs)->toBe(['refs/pull/9/head', 'refs/heads/main'])
+        ->and($runner->requests[0]->mirrorKey)->toBe(EvaluateRequest::mirrorKeyFor(1, 'https://github.com/acme/mono'));
+});
+
+it('chooses the lowest-id functional destination server', function () {
+    $runner = FakeAffectedRunner::respondWith(epRespond([]));
+
+    epRun(epContext(), [$this->web, $this->api]);
+
+    $other = Server::factory()->create(['team_id' => $this->fixture['team']->id]);
+    $other->settings->update(['is_reachable' => false, 'is_usable' => false]);
+
+    expect($runner->requests)->toHaveCount(1)
+        ->and($runner->servers[0]->id)->toBe($this->fixture['server']->id)
+        ->and($runner->requests[0]->applicationIds())->toEqualCanonicalizing([$this->web->uuid, $this->api->uuid]);
+});

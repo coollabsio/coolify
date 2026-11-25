@@ -16,8 +16,8 @@ final class TriggerFingerprint
         return hash('sha256', json_encode([
             'build_pack' => $application->build_pack,
             'base_directory' => $application->base_directory,
-            'dockerfile_location' => $application->dockerfile_location,
-            'docker_compose_location' => $application->docker_compose_location,
+            'dockerfile_location' => $application->build_pack === 'dockerfile' ? $application->dockerfile_location : null,
+            'docker_compose_location' => $application->build_pack === 'dockercompose' ? $application->docker_compose_location : null,
             'install_command' => $application->install_command,
             'build_command' => $application->build_command,
             'start_command' => $application->start_command,
