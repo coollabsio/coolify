@@ -361,6 +361,9 @@ class Gitlab extends Controller
             ]);
         } catch (Exception $e) {
             return handleError($e);
+        } finally {
+            // Deferred applications are evaluated also when a later application failed.
+            $this->dispatchPushTriggers($triggers ?? null, $previewTriggers ?? null);
         }
     }
 
@@ -686,6 +689,9 @@ class Gitlab extends Controller
             ]]);
         } catch (Exception $e) {
             return handleError($e);
+        } finally {
+            // Deferred applications are evaluated also when a later application failed.
+            $this->dispatchPushTriggers($triggers ?? null, $previewTriggers ?? null);
         }
     }
 

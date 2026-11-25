@@ -410,3 +410,13 @@ it('recreates the preview when a closed pull request is reopened at the same hea
 
     expect(ApplicationPreview::query()->where('application_id', $application->id)->where('pull_request_id', 7)->exists())->toBeTrue();
 });
+
+it('marks the last error of a failed dry run as coming from evaluate now', function () {
+    FakeAffectedRunner::failing(new AffectedRunnerException('server unreachable'));
+
+    epRun(epContext(), [$this->web], dryRun: true);
+
+    expect(ApplicationDeploymentQueue::query()->count())->toBe(0)
+        ->and($this->web->refresh()->trigger_set['last_error'])->toBe('server unreachable')
+        ->and($this->web->trigger_set['last_error_dry_run'])->toBeTrue();
+});

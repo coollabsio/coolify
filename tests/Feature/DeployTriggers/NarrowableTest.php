@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use App\Services\DeployTriggers\TriggerFingerprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -102,4 +103,17 @@ it('fingerprints only the file location of the build pack', function () {
 
     $application->dockerfile_location = '/apps/web/Dockerfile';
     expect(TriggerFingerprint::for($application))->not->toBe($before);
+});
+
+it('sees the other application on the repository for a member who has no grant for it', function () {
+    $first = deployTriggerApplication($this->fixture, ['git_repository' => 'acme/mono', 'git_branch' => 'main']);
+    deployTriggerApplication($this->fixture, ['git_repository' => 'acme/mono', 'git_branch' => 'main']);
+    $member = User::factory()->create();
+    $member->teams()->attach($this->fixture['team'], ['role' => 'member', 'access' => json_encode([
+        ['scope' => 'resource', 'uuid' => $first->uuid, 'levels' => ['read']],
+    ])]);
+    $this->actingAs($member);
+    session(['currentTeam' => $this->fixture['team']]);
+
+    expect($first->isNarrowable())->toBeTrue();
 });

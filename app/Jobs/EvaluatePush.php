@@ -193,7 +193,7 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             if ($after !== null) {
                 // A pull request without a preview has nowhere to keep a set; the application's own set must not change.
                 if ($this->context->pullRequest === null || $candidate->preview !== null) {
-                    $recorder->storeTriggerSet($candidate->application, $candidate->preview, $decision->triggerSet, $after, $candidate->fingerprint, $decision->reasonCode === 'evaluation_failed' ? $lastError : null);
+                    $recorder->storeTriggerSet($candidate->application, $candidate->preview, $decision->triggerSet, $after, $candidate->fingerprint, $decision->reasonCode === 'evaluation_failed' ? $lastError : null, $this->dryRun);
                 }
             }
             array_shift($pending);

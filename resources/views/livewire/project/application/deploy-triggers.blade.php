@@ -5,7 +5,7 @@
         $summary['anchor'] ? 'package '.$summary['anchor'] : null,
     ])->filter()->implode(', ');
 @endphp
-<div class="flex flex-col gap-3">
+<div class="flex flex-col gap-3" @if ($isEvaluating) wire:poll.3s="checkEvaluation" @endif>
     <x-forms.checkbox instantSave id="isSmartTriggersEnabled" label="Smart deploy triggers"
         helper="Deploy on a Git push only when files this application uses change." canGate="update"
         :canResource="$application" />
@@ -49,9 +49,15 @@
         @endswitch
 
         @if ($summary['lastError'])
-            <x-callout type="warning" title="Last push" class="mt-3">
-                The last push couldn't be evaluated ({{ $summary['lastError'] }}), so it deployed.
-            </x-callout>
+            @if ($summary['lastErrorFromEvaluateNow'])
+                <x-callout type="warning" title="Evaluate now" class="mt-3">
+                    Evaluate now could not finish ({{ $summary['lastError'] }}).
+                </x-callout>
+            @else
+                <x-callout type="warning" title="Last push" class="mt-3">
+                    The last push couldn't be evaluated ({{ $summary['lastError'] }}), so it deployed.
+                </x-callout>
+            @endif
         @endif
     </div>
 </div>

@@ -61,7 +61,7 @@ class TriggerRecorder
     /**
      * @param  array<string, mixed>|null  $triggerSet  null keeps the stored set (a failed evaluation)
      */
-    public function storeTriggerSet(Application $application, ?ApplicationPreview $preview, ?array $triggerSet, string $evaluatedCommit, string $configFingerprint, ?string $lastError = null): void
+    public function storeTriggerSet(Application $application, ?ApplicationPreview $preview, ?array $triggerSet, string $evaluatedCommit, string $configFingerprint, ?string $lastError = null, bool $dryRun = false): void
     {
         $target = $preview ?? $application;
         $set = $triggerSet ?? ($target->trigger_set ?? []);
@@ -71,6 +71,7 @@ class TriggerRecorder
         }
         $set['evaluated_at'] = Carbon::now()->toIso8601String();
         $set['last_error'] = $lastError;
+        $set['last_error_dry_run'] = $lastError !== null && $dryRun;
 
         $target->forceFill(['trigger_set' => $set])->saveQuietly();
     }

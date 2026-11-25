@@ -8,6 +8,7 @@ use App\Enums\HttpBasicAuthHashAlgorithm;
 use App\Enums\ProxyTypes;
 use App\Exceptions\DeploymentException;
 use App\Rules\ValidIpAllowlist;
+use App\Services\Access\AccessResolver;
 use App\Services\ConfigurationGenerator;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\DeploymentConfiguration\ConfigurationDiff;
@@ -143,6 +144,7 @@ use Symfony\Component\Yaml\Yaml;
         'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
         'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
         'ip_allowlist' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'],
+        'trigger_set' => ['type' => 'object', 'nullable' => true, 'description' => 'The paths whose changes deploy the application on a Git push, as smart deploy triggers resolved them: display, limits, resolvers, anchor, widened, and evaluated_commit.'],
         new OA\Property(property: 'settings', ref: '#/components/schemas/ApplicationSetting'),
     ]
 )]
@@ -2311,12 +2313,13 @@ class Application extends BaseModel
 
         $teamId = data_get($this, 'environment.project.team_id');
 
-        return $teamId !== null && self::query()
+        // Every application of the team counts, also those the member has no grant for: webhooks see them all.
+        return $teamId !== null && app(AccessResolver::class)->withoutVisibilityScope(fn (): bool => self::query()
             ->whereKeyNot($this->id)
             ->where('git_repository', $this->git_repository)
             ->where('git_branch', $this->git_branch)
             ->whereHas('environment.project', fn ($query) => $query->where('team_id', $teamId))
-            ->exists();
+            ->exists());
     }
 
     /**

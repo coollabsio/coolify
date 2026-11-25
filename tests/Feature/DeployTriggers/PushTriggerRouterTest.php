@@ -90,3 +90,15 @@ it('lets the coolify.json hold take a managed application instead of deferring i
     $this->router->dispatch();
     Queue::assertNotPushed(EvaluatePush::class);
 });
+
+it('dispatches the deferred applications only once', function () {
+    Queue::fake();
+    $application = deployTriggerApplication(deployTriggerFixture(), ['base_directory' => '/apps/web']);
+    $router = PushTriggerRouter::forPush(new PushContext(provider: 'gitlab', teamId: $application->team()->id, repositoryUrl: 'https://gitlab.com/acme/mono', ref: 'refs/heads/main', after: str_repeat('b', 40)));
+    $router->defer($application);
+
+    $router->dispatch();
+    $router->dispatch();
+
+    Queue::assertPushed(EvaluatePush::class, 1);
+});

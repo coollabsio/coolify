@@ -177,7 +177,7 @@ class ServerCanvas
         $query = fn () => ApplicationDeploymentQueue::query()->whereIn('server_id', $servers->pluck('id'));
         $activeStatuses = [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value];
         $active = $query()->whereIn('status', $activeStatuses)->orderBy('status')->orderBy('id')->get($columns);
-        $recent = $query()->whereNotIn('status', $activeStatuses)->orderByDesc('id')->limit(8)->get($columns);
+        $recent = $query()->whereNotIn('status', [...$activeStatuses, ApplicationDeploymentStatus::SKIPPED->value])->orderByDesc('id')->limit(8)->get($columns);
         $applicationUuids = Application::query()
             ->whereIn('id', $active->concat($recent)->pluck('application_id')->unique())
             ->pluck('uuid', 'id');

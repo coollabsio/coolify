@@ -213,3 +213,48 @@ it('does not let a read-only member deploy a skipped push or evaluate', function
     expect(ApplicationDeploymentQueue::query()->count())->toBe(1);
     Queue::assertNotPushed(EvaluatePush::class);
 });
+
+it('does not deploy anyway a skipped push that a newer deployment follows', function () {
+    $row = skippedRow($this->application);
+    ApplicationDeploymentQueue::create(['application_id' => $this->application->id, 'deployment_uuid' => 'newer', 'pull_request_id' => 0,
+        'status' => ApplicationDeploymentStatus::FINISHED->value, 'commit' => str_repeat('e', 40)]);
+
+    showTriggerDeployment($this, $row)
+        ->assertDontSee('Deploy anyway')
+        ->call('deploySkippedPush')
+        ->assertDispatched('error');
+
+    expect(ApplicationDeploymentQueue::query()->count())->toBe(2);
+});
+
+it('stops polling a skipped push', function () {
+    showTriggerDeployment($this, skippedRow($this->application))->assertSet('isKeepAliveOn', false);
+});
+
+it('does not claim that a failed evaluate now deployed', function () {
+    $this->application->forceFill(['trigger_set' => [
+        'display' => [], 'evaluated_commit' => str_repeat('a', 40), 'last_error' => 'server unreachable', 'last_error_dry_run' => true,
+    ]])->save();
+
+    Livewire::test(DeployTriggers::class, ['application' => $this->application->refresh()])
+        ->assertSee('Evaluate now could not finish (server unreachable).', escape: false)
+        ->assertDontSee('so it deployed');
+});
+
+it('shows the new trigger paths once evaluate now finishes', function () {
+    RateLimiter::clear('evaluate-now:'.$this->application->uuid);
+    $this->application->forceFill(['trigger_base_commit' => str_repeat('d', 40)])->save();
+    $component = Livewire::test(DeployTriggers::class, ['application' => $this->application])->call('evaluateNow');
+    $this->application->forceFill(['trigger_set' => [
+        'display' => ['apps/web/**'], 'evaluated_commit' => str_repeat('d', 40), 'evaluated_at' => now()->toIso8601String(), 'last_error' => null,
+    ]])->save();
+
+    $component->call('checkEvaluation')->assertSee('apps/web/**')->assertSet('isEvaluating', false);
+});
+
+it('updates the trigger state after the general settings change', function () {
+    $component = Livewire::test(DeployTriggers::class, ['application' => $this->application])->assertSee('Not evaluated yet');
+    $this->application->update(['base_directory' => '/']);
+
+    $component->dispatch('configurationChanged')->assertSee('builds from the root of the repository');
+});

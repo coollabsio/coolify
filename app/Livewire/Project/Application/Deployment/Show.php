@@ -14,6 +14,7 @@ use App\Services\DeployTriggers\PullRequestContext;
 use App\Services\ImageScan\SecurityCard;
 use App\Traits\AuditsApplicationSettings;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Throwable;
 
@@ -94,6 +95,11 @@ class Show extends Component
 
                 return;
             }
+            if (! $this->isNewestDeployment()) {
+                $this->dispatch('error', 'A newer deployment exists.');
+
+                return;
+            }
 
             $pullRequestId = (int) $row->pull_request_id;
             $gitType = $row->git_type;
@@ -133,6 +139,20 @@ class Show extends Component
         } catch (Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * Only the newest row of the application or pull request can deploy anyway: an older commit would roll back.
+     */
+    #[Computed]
+    public function isNewestDeployment(): bool
+    {
+        $latestId = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->application->id)
+            ->where('pull_request_id', $this->application_deployment_queue->pull_request_id)
+            ->max('id');
+
+        return (int) $latestId === (int) $this->application_deployment_queue->id;
     }
 
     /**
@@ -274,7 +294,7 @@ class Show extends Component
 
     private function isKeepAliveOn()
     {
-        if (data_get($this->application_deployment_queue, 'status') === 'finished' || data_get($this->application_deployment_queue, 'status') === 'failed') {
+        if (in_array(data_get($this->application_deployment_queue, 'status'), ['finished', 'failed', ApplicationDeploymentStatus::SKIPPED->value], true)) {
             $this->isKeepAliveOn = false;
         } else {
             $this->isKeepAliveOn = true;

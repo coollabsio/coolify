@@ -14,6 +14,7 @@ use App\Traits\AuditsApplicationSettings;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class DeployTriggers extends Component
@@ -23,6 +24,13 @@ class DeployTriggers extends Component
     public Application $application;
 
     public bool $isSmartTriggersEnabled = true;
+
+    /** Polls for the result of Evaluate now until the stored set changes or two minutes pass. */
+    public bool $isEvaluating = false;
+
+    public ?string $evaluatingSince = null;
+
+    public ?string $evaluatedAtBefore = null;
 
     public function mount(): void
     {
@@ -76,10 +84,29 @@ class DeployTriggers extends Component
                 after: $commit,
                 githubAppId: $this->application->source_type === GithubApp::class ? $this->application->source_id : null,
             ), [$this->application->id], dryRun: true);
+            $this->isEvaluating = true;
+            $this->evaluatingSince = now()->toIso8601String();
+            $this->evaluatedAtBefore = data_get($this->application->trigger_set, 'evaluated_at');
             $this->dispatch('success', 'Evaluating the branch. The trigger paths update in a moment.');
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
+    }
+
+    public function checkEvaluation(): void
+    {
+        $this->refreshApplication();
+        $finished = data_get($this->application->trigger_set, 'evaluated_at') !== $this->evaluatedAtBefore;
+        if ($finished || $this->evaluatingSince === null || now()->subMinutes(2)->greaterThan($this->evaluatingSince)) {
+            $this->isEvaluating = false;
+        }
+    }
+
+    #[On('configurationChanged')]
+    public function refreshApplication(): void
+    {
+        $this->application->refresh();
+        unset($this->triggerSummary);
     }
 
     /**
@@ -94,7 +121,7 @@ class DeployTriggers extends Component
     }
 
     /**
-     * @return array{state: 'none'|'not_narrowable'|'watch_paths'|'disabled_instance'|'disabled'|'evaluated', display: list<string>, resolvers: list<string>, anchor: ?string, notes: list<string>, lastError: ?string, evaluatedCommit: ?string}
+     * @return array{state: 'none'|'not_narrowable'|'watch_paths'|'disabled_instance'|'disabled'|'evaluated', display: list<string>, resolvers: list<string>, anchor: ?string, notes: list<string>, lastError: ?string, lastErrorFromEvaluateNow: bool, evaluatedCommit: ?string}
      */
     #[Computed]
     public function triggerSummary(): array
@@ -106,6 +133,7 @@ class DeployTriggers extends Component
             'anchor' => is_string($set['anchor']['package'] ?? null) ? $set['anchor']['package'] : null,
             'notes' => array_values(array_filter(array_map(fn (mixed $note): ?string => is_array($note) ? ($note['reason'] ?? null) : null, $set['widened'] ?? []))),
             'lastError' => is_string($set['last_error'] ?? null) ? $set['last_error'] : null,
+            'lastErrorFromEvaluateNow' => (bool) ($set['last_error_dry_run'] ?? false),
             'evaluatedCommit' => is_string($set['evaluated_commit'] ?? null) ? $set['evaluated_commit'] : null,
         ];
 

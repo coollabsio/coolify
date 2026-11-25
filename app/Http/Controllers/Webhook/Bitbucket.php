@@ -153,6 +153,9 @@ class Bitbucket extends Controller
             ]);
         } catch (Exception $e) {
             return handleError($e);
+        } finally {
+            // Deferred applications are evaluated also when a later application failed.
+            $this->dispatchPushTriggers(...array_values($this->pushTriggers));
         }
     }
 

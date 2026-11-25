@@ -48,6 +48,6 @@ final readonly class TriggerCandidate
             return null;
         }
 
-        return array_diff_key($set, array_flip(['evaluated_commit', 'config_fingerprint', 'evaluated_at', 'last_error']));
+        return array_diff_key($set, array_flip(['evaluated_commit', 'config_fingerprint', 'evaluated_at', 'last_error', 'last_error_dry_run']));
     }
 }

@@ -275,6 +275,9 @@ class Github extends Controller
             return response($e->getMessage());
         } catch (Exception $e) {
             return handleError($e);
+        } finally {
+            // Deferred applications are evaluated also when a later application failed.
+            ($triggers ?? null)?->dispatch();
         }
     }
 
@@ -654,6 +657,9 @@ class Github extends Controller
             return response($e->getMessage());
         } catch (Exception $e) {
             return handleError($e);
+        } finally {
+            // Deferred applications are evaluated also when a later application failed.
+            ($triggers ?? null)?->dispatch();
         }
     }
 

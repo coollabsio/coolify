@@ -315,7 +315,7 @@
                         @if ($isSkippedPush && filled($application_deployment_queue->first_skipped_commit) && $skippedCount > 1)
                             <p class="mt-1 text-xs">Commits <code>{{ substr($application_deployment_queue->first_skipped_commit, 0, 7) }}</code>…<code>{{ substr($application_deployment_queue->commit, 0, 7) }}</code></p>
                         @endif
-                        @if ($isSkippedPush)
+                        @if ($isSkippedPush && $this->isNewestDeployment)
                             @can('deploy', $application)
                                 <x-forms.button type="button" class="mt-2" wire:click="deploySkippedPush">Deploy anyway</x-forms.button>
                             @endcan
