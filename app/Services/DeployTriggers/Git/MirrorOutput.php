@@ -4,6 +4,7 @@ namespace App\Services\DeployTriggers\Git;
 
 use App\Services\DeployTriggers\AffectedRunnerException;
 use App\Services\DeployTriggers\Contract\AffectedContractException;
+use App\Services\DeployTriggers\Resolution\RepositorySnapshot;
 
 /**
  * Parses the `@@TAG` lines of a mirror script.
@@ -88,6 +89,31 @@ final class MirrorOutput
     public static function nulSeparated(string $data): array
     {
         return array_values(array_filter(explode("\0", $data), fn (string $item): bool => $item !== ''));
+    }
+
+    /**
+     * Parses `git diff-tree -r -z` raw output into the changed paths and the ones that are or were symlinks.
+     *
+     * @return array{files: list<string>, symlinks: list<string>}
+     */
+    public static function rawDiff(string $data): array
+    {
+        $files = [];
+        $symlinks = [];
+        $fields = explode("\0", $data);
+        for ($i = 0; $i + 1 < count($fields); $i += 2) {
+            $meta = explode(' ', ltrim($fields[$i], ':'));
+            $path = $fields[$i + 1];
+            if (count($meta) < 5 || $path === '') {
+                continue;
+            }
+            $files[] = $path;
+            if ($meta[0] === RepositorySnapshot::MODE_SYMLINK || $meta[1] === RepositorySnapshot::MODE_SYMLINK) {
+                $symlinks[] = $path;
+            }
+        }
+
+        return ['files' => $files, 'symlinks' => $symlinks];
     }
 
     /**

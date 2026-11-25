@@ -65,6 +65,7 @@ final class TriggerSetDecider
         }
         $set['packages'] = [...($set['packages'] ?? []), ...$referenced];
         $set['excluded'] = array_diff_key($set['excluded'] ?? [], $referenced);
+        $set['reference_needles'] = array_diff_key($set['reference_needles'] ?? [], $referenced);
         foreach ($referenced as $directory) {
             $set['display'][] = "workspace: {$directory}/**";
         }

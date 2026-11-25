@@ -60,6 +60,7 @@ it('sends the script with its credentials only on stdin, to a container with a t
         ->and($pulls->first()['command'].$pulls->first()['input'])->toContain('timeout 600 docker pull')
         ->and($runs->first()['command'])->toContain('--tmpfs /run/coolify:rw,nosuid,nodev,noexec')
         ->and($runs->first()['command'])->toContain('-v coolify-git-mirrors:/mirrors')
+        ->and($runs->first()['command'])->toContain('timeout 60 sh /run/coolify/script')
         ->and($runs->first()['command'])->not->toContain('SUPERSECRETTOKEN')
         ->and($runs->first()['command'])->not->toContain(base64_encode("PRIVATE-KEY-MATERIAL\n"))
         ->and($runs->first()['input'])->toBe($script)

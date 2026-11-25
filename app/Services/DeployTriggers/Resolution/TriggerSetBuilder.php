@@ -2,6 +2,7 @@
 
 namespace App\Services\DeployTriggers\Resolution;
 
+use App\Services\DeployTriggers\CompiledTriggerSet;
 use App\Services\DeployTriggers\Contract\EvaluateApplicationInput;
 
 /**
@@ -27,23 +28,33 @@ final class TriggerSetBuilder
     /** @var list<array{scope: string, reason: string}> */
     private array $widened = [];
 
+    /** @var list<string> paths a Dockerfile or Compose file names explicitly */
+    private array $explicitPaths = [];
+
+    /** @var array<string, list<string>> package name => tsconfig path aliases that point into it */
+    private array $aliases = [];
+
     /**
      * @param  list<string>  $referencedPackages  packages the application's files reference without declaring them
      */
     public function build(EvaluateApplicationInput $application, RepositorySnapshot $snapshot, array $referencedPackages = []): BuiltTriggerSet
     {
-        $this->rulesets = $this->display = $this->limits = $this->widened = [];
+        $this->rulesets = $this->display = $this->limits = $this->widened = $this->explicitPaths = $this->aliases = [];
         ['context' => $context, 'dockerfile' => $dockerfile, 'compose' => $compose, 'ignoreFiles' => $ignoreFiles] = self::locations($application);
-        $snapshot->prefetch(array_values(array_filter([$dockerfile, $compose, ...$ignoreFiles, ...JsWorkspaces::manifestPaths($snapshot), ...$snapshot->symlinks()])));
+        $snapshot->prefetch(array_values(array_filter([$dockerfile, $compose, ...$ignoreFiles, ...JsWorkspaces::manifestPaths($snapshot), ...self::tsconfigPaths($snapshot), ...$snapshot->symlinks()])));
 
-        $this->buildContextLimit($snapshot, $context, $dockerfile, $ignoreFiles);
+        if ($compose === null) {
+            // Compose builds from any directory of the clone; its own limit bounds it.
+            $this->buildContextLimit($snapshot, $context, $dockerfile, $ignoreFiles);
+        }
         if ($dockerfile !== null) {
             $this->dockerfileLimit($snapshot, $context, $dockerfile, $ignoreFiles);
         }
         if ($compose !== null) {
-            $this->composeLimit($snapshot, $compose);
+            $this->composeLimit($snapshot, $compose, $context);
         }
         [$graph, $closure, $anchor, $resolvers] = $this->workspaceLimit($application, $snapshot, $context, $dockerfile, $compose, $referencedPackages);
+        $this->followSymlinks($snapshot);
 
         return new BuiltTriggerSet(
             compiled: ['version' => 1, 'all_of' => $this->rulesets, 'lockfiles' => []],
@@ -55,6 +66,7 @@ final class TriggerSetBuilder
             widened: $this->widened,
             graph: $graph,
             closure: $closure,
+            aliases: $this->aliases,
         );
     }
 
@@ -76,8 +88,9 @@ final class TriggerSetBuilder
     private static function locations(EvaluateApplicationInput $application): array
     {
         $context = RepoPath::join('', $application->baseDirectory) ?? '';
-        $dockerfile = $application->buildPack === 'dockerfile' ? RepoPath::join($context, $application->dockerfileLocation ?: '/Dockerfile') : null;
-        $compose = $application->buildPack === 'dockercompose' ? RepoPath::join($context, $application->dockerComposeLocation ?: '/docker-compose.yaml') : null;
+        // Both locations are relative to the base directory, with a leading slash.
+        $dockerfile = $application->buildPack === 'dockerfile' ? RepoPath::join($context, ltrim($application->dockerfileLocation ?: '/Dockerfile', '/')) : null;
+        $compose = $application->buildPack === 'dockercompose' ? RepoPath::join($context, ltrim($application->dockerComposeLocation ?: '/docker-compose.yaml', '/')) : null;
         $ignoreFiles = $dockerfile === null ? [] : [$dockerfile.'.dockerignore', ($context === '' ? '' : $context.'/').'.dockerignore'];
 
         return ['context' => $context, 'dockerfile' => $dockerfile, 'compose' => $compose, 'ignoreFiles' => $ignoreFiles];
@@ -124,22 +137,25 @@ final class TriggerSetBuilder
         foreach ($ignoreFiles as $path) {
             $rules[] = self::rule('include', 'file', $path);
         }
+        $paths = [];
         foreach ($sources as $source) {
             $path = RepoPath::join($context, $source);
-            if ($path === null) {
-                $this->widen('dockerfile', "{$source} leaves the repository.");
+            if ($path === null || str_contains($source, '[')) {
+                $this->widen('dockerfile', "The Dockerfile copies {$source}, which Coolify cannot bound.");
 
                 return;
             }
+            $paths[] = $path;
             array_push($rules, ...self::pathRules('include', $path));
         }
+        array_push($this->explicitPaths, ...$paths);
         $this->addRuleset('dockerfile', 'exclude', $rules);
     }
 
-    private function composeLimit(RepositorySnapshot $snapshot, string $compose): void
+    private function composeLimit(RepositorySnapshot $snapshot, string $compose, string $context): void
     {
         $content = $snapshot->read($compose);
-        $sources = $content === null ? null : ComposeSources::parse($content, $compose);
+        $sources = $content === null ? null : ComposeSources::parse($content, $compose, $context);
         if ($sources === null) {
             $this->widen('compose', $content === null ? "{$compose} was not found." : 'The Compose file uses includes, extends, or remote build contexts.');
 
@@ -147,6 +163,7 @@ final class TriggerSetBuilder
         }
 
         $rules = [];
+        array_push($this->explicitPaths, ...$sources['dirs'], ...$sources['files']);
         foreach ($sources['dirs'] as $directory) {
             $rules[] = self::rule('include', 'dir', $directory);
         }
@@ -180,6 +197,11 @@ final class TriggerSetBuilder
             default => 'npm',
         };
         $anchors = $this->anchors($application, $graph, $snapshot, $context, $dockerfile, $compose);
+        if ($anchors === null) {
+            $this->widen('workspace', 'The build command builds packages that Coolify cannot name, such as every package or the dependents of one.');
+
+            return [$graph, [], null, [$resolver]];
+        }
         if ($anchors === []) {
             $this->widen('workspace', "Couldn't tell which package this application builds.");
 
@@ -213,51 +235,122 @@ final class TriggerSetBuilder
         foreach ($application->managedConfigPaths as $path) {
             $rules[] = self::rule('include', 'file', $path);
         }
-
-        foreach ($snapshot->symlinks() as $link) {
-            if (! collect($closureDirectories)->contains(fn (string $directory): bool => RepoPath::isWithin($link, $directory))) {
-                continue;
-            }
-            $target = RepoPath::join(RepoPath::directory($link), (string) $snapshot->read($link));
-            if ($target === null) {
-                $this->widen('workspace', "The symlink {$link} points outside the repository.");
-
-                return [$graph, $closure, null, [$resolver]];
-            }
-            $rules[] = self::rule('include', 'dir', $target);
+        foreach ($this->explicitPaths as $path) {
+            array_push($rules, ...self::pathRules('include', $path));
         }
-
         $this->addRuleset('workspace', 'include', $rules);
+        $this->aliases = $this->tsconfigAliases($snapshot, $graph);
         $anchor = $anchors[0];
 
         return [$graph, $closure, ['resolver' => $resolver, 'package' => $anchor, 'dir' => $graph->packages[$anchor]], [$resolver]];
     }
 
     /**
-     * @return list<string>
+     * The packages the application builds; null when it may build packages that cannot be named.
+     *
+     * @return list<string>|null
      */
-    private function anchors(EvaluateApplicationInput $application, JsWorkspaceGraph $graph, RepositorySnapshot $snapshot, string $context, ?string $dockerfile, ?string $compose): array
+    private function anchors(EvaluateApplicationInput $application, JsWorkspaceGraph $graph, RepositorySnapshot $snapshot, string $context, ?string $dockerfile, ?string $compose): ?array
     {
         $anchors = [];
         if ($context !== '') {
             $anchors[] = $graph->packageOwning($context.'/x');
         }
+        // Commands the build pack runs; the others may be left over from another build pack.
+        $commands = match ($application->buildPack) {
+            'dockerfile' => [],
+            'dockercompose' => [$application->commands['compose_build'] ?? null, $application->commands['compose_start'] ?? null],
+            default => [$application->commands['install'] ?? null, $application->commands['build'] ?? null, $application->commands['start'] ?? null],
+        };
         if ($dockerfile !== null) {
             $anchors[] = $graph->packageOwning($dockerfile);
+            $commands[] = $snapshot->read($dockerfile);
         }
         if ($compose !== null) {
-            $sources = $snapshot->has($compose) ? ComposeSources::parse((string) $snapshot->read($compose), $compose) : null;
+            $sources = $snapshot->has($compose) ? ComposeSources::parse((string) $snapshot->read($compose), $compose, $context) : null;
             foreach ($sources['dirs'] ?? [] as $directory) {
                 $anchors[] = $graph->packageOwning($directory.'/x');
             }
         }
-        foreach ($application->commands as $command) {
-            if (is_string($command) && $command !== '') {
-                $anchors[] = $graph->packageFromCommand($command);
+        foreach ($commands as $command) {
+            if (! is_string($command) || $command === '') {
+                continue;
             }
+            $selected = $graph->packagesFromCommand($command);
+            if ($selected === null) {
+                return null;
+            }
+            array_push($anchors, ...$selected);
         }
 
         return array_values(array_unique(array_filter($anchors)));
+    }
+
+    /**
+     * Symlinks inside the set bring their targets in: Docker and package managers follow them.
+     */
+    private function followSymlinks(RepositorySnapshot $snapshot): void
+    {
+        if ($this->rulesets === []) {
+            return;
+        }
+        $compiled = CompiledTriggerSet::fromArray(['version' => 1, 'all_of' => $this->rulesets, 'lockfiles' => []]);
+        foreach ($snapshot->symlinks() as $link) {
+            $target = RepoPath::join(RepoPath::directory($link), (string) $snapshot->read($link));
+            // A target outside the repository cannot change with a push; the link itself is an input pattern.
+            if ($target === null || ! $compiled->matches($link)) {
+                continue;
+            }
+            foreach (array_keys($this->rulesets) as $index) {
+                $this->rulesets[$index]['rules'][] = self::rule('include', 'dir', $target);
+            }
+            $this->display[] = "symlink: {$target}/**";
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function tsconfigPaths(RepositorySnapshot $snapshot): array
+    {
+        return array_values(array_filter($snapshot->paths(), fn (string $path): bool => preg_match('#(^|/)(tsconfig|jsconfig)[^/]*\.json$#', $path) === 1));
+    }
+
+    /**
+     * Path aliases (`compilerOptions.paths`) by the package they point into, so the reference check finds imports through them.
+     *
+     * @return array<string, list<string>>
+     */
+    private function tsconfigAliases(RepositorySnapshot $snapshot, JsWorkspaceGraph $graph): array
+    {
+        $aliases = [];
+        foreach (self::tsconfigPaths($snapshot) as $path) {
+            $config = Jsonc::decode((string) $snapshot->read($path));
+            if ($config === null) {
+                $this->widen('workspace', "{$path} could not be read.");
+                $this->rulesets = array_values(array_filter($this->rulesets, fn (array $ruleset): bool => $ruleset['limit'] !== 'workspace'));
+                $this->limits = array_values(array_diff($this->limits, ['workspace']));
+
+                return [];
+            }
+            $options = is_array($config['compilerOptions'] ?? null) ? $config['compilerOptions'] : [];
+            $base = RepoPath::join(RepoPath::directory($path), is_string($options['baseUrl'] ?? null) ? $options['baseUrl'] : '.') ?? '';
+            foreach (is_array($options['paths'] ?? null) ? $options['paths'] : [] as $alias => $targets) {
+                $needle = explode('*', (string) $alias, 2)[0];
+                if ($needle === '' || ! is_array($targets)) {
+                    continue;
+                }
+                foreach ($targets as $target) {
+                    $directory = is_string($target) ? RepoPath::join($base, explode('*', $target, 2)[0]) : null;
+                    $owner = $directory === null ? null : $graph->packageOwning(rtrim($directory, '/').'/x');
+                    if ($owner !== null) {
+                        $aliases[$owner][] = $needle;
+                    }
+                }
+            }
+        }
+
+        return array_map(fn (array $needles): array => array_values(array_unique($needles)), $aliases);
     }
 
     /**
@@ -271,6 +364,8 @@ final class TriggerSetBuilder
             self::rule('include', 'file', 'turbo.json'),
             self::rule('include', 'glob', '**/.dockerignore'),
             self::rule('include', 'glob', '**/*.dockerignore'),
+            self::rule('include', 'glob', '**/tsconfig*.json'),
+            self::rule('include', 'glob', '**/jsconfig*.json'),
         ];
         foreach (array_filter([$dockerfile, $compose]) as $path) {
             $rules[] = self::rule('include', 'file', $path);

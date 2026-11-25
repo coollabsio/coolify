@@ -25,7 +25,7 @@ final class GitEvaluator implements AffectedRunner
 
     public const READ_TIMEOUT_SECONDS = 120;
 
-    public const MAX_TREE_ENTRIES = 250000;
+    public const MAX_TREE_ENTRIES = 150000;
 
     public const MAX_GREP_FILES = 20000;
 
@@ -101,6 +101,7 @@ final class GitEvaluator implements AffectedRunner
         $referenced = $session->references($after, array_map(fn (array $set): array => [
             'directories' => array_values($set['packages']),
             'packages' => $set['excluded'],
+            'needles' => is_array($set['reference_needles'] ?? null) ? $set['reference_needles'] : [],
         ], $sets), self::MAX_GREP_FILES);
 
         foreach ($sets as $id => $set) {
@@ -123,7 +124,7 @@ final class GitEvaluator implements AffectedRunner
     }
 
     /**
-     * @param  array{base: ?string, files: ?list<string>}|null  $diff
+     * @param  array{base: ?string, files: ?list<string>, symlinks: list<string>}|null  $diff
      * @param  array<string, int>  $limits
      * @return ApplicationDecision|array{set: array<string, mixed>, files: list<string>, base: ?string} a set that waits on the reference check
      */
@@ -142,7 +143,7 @@ final class GitEvaluator implements AffectedRunner
             $set = null;
             if ($input->mode === 'smart') {
                 try {
-                    $set = $this->triggerSet($input, [], $session, $after);
+                    $set = $this->triggerSet($input, [], [], $session, $after);
                 } catch (WidenException) {
                 }
             }
@@ -167,7 +168,7 @@ final class GitEvaluator implements AffectedRunner
         }
 
         try {
-            $set = $this->triggerSet($input, $files, $session, $after);
+            $set = $this->triggerSet($input, [...$files], $diff['symlinks'] ?? [], $session, $after);
             $decision = TriggerSetDecider::decide($id, $set, $files, $base)['decision'];
 
             return $decision ?? ['set' => $set, 'files' => $files, 'base' => $base];
@@ -180,12 +181,13 @@ final class GitEvaluator implements AffectedRunner
      * The stored set when no input of resolution changed, else a set resolved at the pushed commit.
      *
      * @param  list<string>  $files
+     * @param  list<string>  $symlinks  changed paths that are or were symlinks
      * @return array<string, mixed>
      */
-    private function triggerSet(EvaluateApplicationInput $input, array $files, MirrorSession $session, string $after): array
+    private function triggerSet(EvaluateApplicationInput $input, array $files, array $symlinks, MirrorSession $session, string $after): array
     {
         $stored = $input->storedTriggerSet;
-        if ($stored !== null) {
+        if ($stored !== null && $symlinks === []) {
             $inputs = CompiledTriggerSet::fromArray($stored['input_patterns']);
             if (! collect($files)->contains(fn (string $file): bool => $inputs->matches($file))) {
                 return $stored;

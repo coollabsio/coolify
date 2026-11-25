@@ -65,7 +65,7 @@ final class MirrorScript
             'gitc ls-tree -r -z --full-tree "$AFTER" > "$R/tree" || fail "git ls-tree failed"',
             'printf "@@TREE "; payload "$R/tree"',
             'printf %s '.self::arg(implode("\n", $wantedPaths)."\n").' > "$R/wanted"',
-            'gitc -c core.quotePath=false ls-tree -r --full-tree "$AFTER" | awk -F "\t" \'NR == FNR { w[$0] = 1; next } { split($1, e, " ") } e[1] == "120000" || ($2 in w) || $2 ~ /(^|\/)(package\.json|pnpm-workspace\.yaml|turbo\.json|[^\/]*\.dockerignore)$/ { print e[3] }\' "$R/wanted" - | sort -u > "$R/oids"',
+            'gitc -c core.quotePath=false ls-tree -r --full-tree "$AFTER" | awk -F "\t" \'NR == FNR { w[$0] = 1; next } { split($1, e, " ") } e[1] == "120000" || ($2 in w) || $2 ~ /(^|\/)(package\.json|pnpm-workspace\.yaml|turbo\.json|[^\/]*\.dockerignore|(tsconfig|jsconfig)[^\/]*\.json)$/ { print e[3] }\' "$R/wanted" - | sort -u > "$R/oids"',
             'blobs "$R/oids"',
         ]);
     }
@@ -84,7 +84,7 @@ final class MirrorScript
     }
 
     /**
-     * Prints `<commit>:<path>:<needle>` lines for each needle that occurs in a text file under the directories,
+     * Prints `<commit>:<path>\0<needle>` lines for each needle that occurs in a text file under the directories,
      * or `@@GREP -` when there are too many files.
      *
      * @param  list<string>  $directories
@@ -100,8 +100,8 @@ final class MirrorScript
             'gitc ls-tree -r --format="%(objecttype) %(objectname)" "$AFTER" -- '.$pathspecs.' | awk \'$1 == "blob" { print $2 }\' > "$R/oids" || fail "git ls-tree failed"',
             'if [ "$(wc -l < "$R/oids")" -gt '.$maxFiles.' ]; then echo "@@GREP -"; else',
             '  prefetch "$R/oids"',
-            '  gitc -c core.quotePath=false grep -I -o -F -f "$R/needles" "$AFTER" -- '.$pathspecs.' > "$R/grep"; [ $? -le 1 ] || fail "git grep failed"',
-            '  sort -u "$R/grep" > "$R/found"; printf "@@GREP "; payload "$R/found"',
+            '  gitc grep -I -z -o -F -f "$R/needles" "$AFTER" -- '.$pathspecs.' > "$R/grep"; [ $? -le 1 ] || fail "git grep failed"',
+            '  printf "@@GREP "; payload "$R/grep"',
             'fi',
         ]);
     }
@@ -139,6 +139,7 @@ final class MirrorScript
             'GIT_ASKPASS' => '/bin/false',
             'SSH_ASKPASS' => '/bin/false',
             'GIT_NO_LAZY_FETCH' => '1',
+            'GIT_LITERAL_PATHSPECS' => '1',
         ];
         foreach ($this->access->env as $name => $value) {
             if (preg_match('/\AGIT_[A-Z_]+\z/', $name) === 1) {
@@ -159,10 +160,10 @@ final class MirrorScript
         $protocols = ['https', 'http', 'ssh', 'git', ...($this->git->allowsFileProtocol() ? ['file'] : [])];
         $allow = implode(' ', array_map(fn (string $protocol): string => "-c protocol.{$protocol}.allow=always", $protocols));
         array_push($lines,
-            "gitc() { git -C \"\$G\" -c protocol.allow=never {$allow} -c core.hooksPath=/dev/null -c fetch.recurseSubmodules=false -c submodule.recurse=false -c gc.autoDetach=false -c maintenance.autoDetach=false \"\$@\"; }",
+            "gitc() { git -C \"\$G\" -c protocol.allow=never {$allow} -c core.hooksPath=/dev/null -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 -c fetch.recurseSubmodules=false -c submodule.recurse=false -c gc.autoDetach=false -c maintenance.autoDetach=false \"\$@\"; }",
             'fetch_quiet() { gitc fetch -q --no-tags --no-write-fetch-head --filter=blob:none origin "$@" 2>> "$R/err"; }',
             'have_commit() { gitc cat-file -e "$1^{commit}" 2>/dev/null || { fetch_quiet "$1" && gitc cat-file -e "$1^{commit}" 2>/dev/null; }; }',
-            'diff_from() { if have_commit "$2" && gitc diff-tree -r -z --no-renames --name-only "$2" "$AFTER" > "$R/diff" 2>> "$R/err"; then printf "@@DIFF %s %s " "$1" "$2"; payload "$R/diff"; else printf "@@DIFF %s %s -\n" "$1" "$2"; fi; }',
+            'diff_from() { if have_commit "$2" && gitc diff-tree -r -z --no-renames "$2" "$AFTER" > "$R/diff" 2>> "$R/err"; then printf "@@DIFF %s %s " "$1" "$2"; payload "$R/diff"; else printf "@@DIFF %s %s -\n" "$1" "$2"; fi; }',
             'prefetch() { gitc cat-file --batch-check < "$1" 2>/dev/null | awk \'$2 == "missing" { print $1 }\' > "$R/missing"; if [ -s "$R/missing" ]; then gitc -c fetch.negotiationAlgorithm=noop fetch -q --no-tags --no-write-fetch-head --filter=blob:none --stdin origin < "$R/missing" 2>> "$R/err" || fail "git fetch of file contents failed"; fi; }',
             'blobs() { prefetch "$1"; gitc cat-file --batch < "$1" > "$R/blobs" 2>> "$R/err" || fail "git cat-file failed"; printf "@@BLOBS "; payload "$R/blobs"; }',
             'exec 9> "$G.lock"',

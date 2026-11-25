@@ -95,7 +95,7 @@ it('limits an app with a base directory to its context minus its dockerignore', 
 
 it('limits a compose app to its build contexts, mounts and files', function () {
     $built = (new TriggerSetBuilder)->build(builderApp(['buildPack' => 'dockercompose', 'dockerfileLocation' => null, 'dockerComposeLocation' => '/deploy/docker-compose.yml']), RepositorySnapshot::fromFiles([
-        'deploy/docker-compose.yml' => "services:\n  api:\n    build: ../services/api\n    volumes:\n      - ./nginx:/etc/nginx\n  db:\n    image: postgres\n",
+        'deploy/docker-compose.yml' => "services:\n  api:\n    build: ./services/api\n    volumes:\n      - ./deploy/nginx:/etc/nginx\n  db:\n    image: postgres\n",
         'services/api/main.go' => 'x', 'services/worker/main.go' => 'x', 'deploy/nginx/default.conf' => 'x', 'README.md' => 'x',
     ]))->toArray();
 
@@ -128,15 +128,16 @@ it('adds referenced packages to the closure', function () {
     expect(affects($built, 'packages/other/index.ts'))->toBeTrue();
 });
 
-it('follows a symlink in the closure and widens on one that leaves the repository', function () {
+it('follows a symlink in the closure and ignores one that leaves the repository', function () {
     $snapshot = monorepo(['apps/web/shared' => '../../packages/other', 'apps/web/outside' => '../../../etc']);
     $built = (new TriggerSetBuilder)->build(builderApp(['dockerfileLocation' => '/apps/web/Dockerfile']), RepositorySnapshot::fromFiles(
         array_merge(array_combine($snapshot->paths(), array_map(fn ($p) => $snapshot->read($p), $snapshot->paths()))),
         ['apps/web/shared' => '120000', 'apps/web/outside' => '120000'],
     ))->toArray();
 
-    expect(affects($built, 'apps/api/src/main.ts'))->toBeTrue()
-        ->and(collect($built['widened'])->pluck('scope'))->toContain('workspace');
+    expect(affects($built, 'packages/other/index.ts'))->toBeTrue()
+        ->and(affects($built, 'apps/api/src/main.ts'))->toBeFalse()
+        ->and($built['widened'])->toHaveCount(1);
 });
 
 it('lists the paths whose change can alter the set', function () {
@@ -155,4 +156,95 @@ it('returns the directories of the packages outside the closure', function () {
     $built = (new TriggerSetBuilder)->build(builderApp(['dockerfileLocation' => '/apps/web/Dockerfile']), monorepo());
 
     expect($built->excludedPackages())->toBe(['@acme/api' => 'apps/api', '@acme/other' => 'packages/other']);
+});
+
+it('reads the Dockerfile relative to the base directory', function () {
+    $built = (new TriggerSetBuilder)->build(builderApp(['baseDirectory' => '/apps/web', 'dockerfileLocation' => '/Dockerfile']), monorepo([
+        'Dockerfile' => "FROM node\nCOPY root.txt /",
+        'apps/web/Dockerfile' => "FROM node\nCOPY src src",
+    ]))->toArray();
+
+    expect(affects($built, 'apps/web/src/a.ts'))->toBeTrue()
+        ->and(affects($built, 'apps/web/Dockerfile'))->toBeTrue()
+        ->and(affects($built, 'apps/web/README.md'))->toBeFalse()
+        ->and(CompiledTriggerSet::fromArray($built['input_patterns'])->matches('apps/web/Dockerfile'))->toBeTrue();
+});
+
+it('resolves compose paths from the base directory, as docker compose --project-directory does', function () {
+    $built = (new TriggerSetBuilder)->build(builderApp(['buildPack' => 'dockercompose', 'baseDirectory' => '/apps/x', 'dockerfileLocation' => null, 'dockerComposeLocation' => '/deploy/compose.yaml']), RepositorySnapshot::fromFiles([
+        'apps/x/deploy/compose.yaml' => "services:\n  api:\n    build: ../shared\n  web:\n    build: .\n    volumes:\n      - type: bind\n        source: nginx.conf\n        target: /etc/nginx.conf\n",
+        'apps/shared/main.go' => 'x', 'apps/x/src/main.go' => 'x', 'apps/x/nginx.conf' => 'x', 'apps/other/main.go' => 'x',
+    ]))->toArray();
+
+    expect(affects($built, 'apps/shared/main.go'))->toBeTrue()
+        ->and(affects($built, 'apps/x/src/main.go'))->toBeTrue()
+        ->and(affects($built, 'apps/x/nginx.conf'))->toBeTrue()
+        ->and(affects($built, 'apps/x/deploy/compose.yaml'))->toBeTrue()
+        ->and(affects($built, 'apps/other/main.go'))->toBeFalse();
+});
+
+it('deploys every package when a build command selects several or all of them', function (string $command) {
+    $built = (new TriggerSetBuilder)->build(builderApp(['buildPack' => 'railpack', 'dockerfileLocation' => null, 'commands' => ['build' => $command]]), monorepo())->toArray();
+
+    expect(affects($built, 'packages/other/index.ts'))->toBeTrue();
+})->with([
+    'two filters' => 'turbo run build --filter=@acme/web --filter=@acme/other',
+    'dependents' => 'pnpm --filter ...@acme/ui build',
+    'recursive' => 'pnpm -r build',
+    'unfiltered turbo' => 'turbo run build',
+    'run-many' => 'nx run-many -t build',
+]);
+
+it('ignores build commands that the build pack does not run', function () {
+    $built = (new TriggerSetBuilder)->build(builderApp(['dockerfileLocation' => '/apps/web/Dockerfile', 'commands' => ['build' => 'pnpm --filter @acme/other build']]), monorepo())->toArray();
+
+    expect($built['anchor']['package'])->toBe('@acme/web')
+        ->and(affects($built, 'packages/other/index.ts'))->toBeFalse();
+});
+
+it('anchors on the package that the Dockerfile builds, and widens on a Dockerfile that builds them all', function () {
+    $selected = (new TriggerSetBuilder)->build(builderApp(['dockerfileLocation' => '/Dockerfile']), monorepo([
+        'Dockerfile' => "FROM node\nCOPY . .\nRUN pnpm install && pnpm turbo prune @acme/api --docker",
+    ]))->toArray();
+    $all = (new TriggerSetBuilder)->build(builderApp(['dockerfileLocation' => '/apps/web/Dockerfile']), monorepo([
+        'apps/web/Dockerfile' => "FROM node\nCOPY . .\nRUN pnpm install && pnpm turbo run build",
+    ]))->toArray();
+
+    expect($selected['anchor']['package'])->toBe('@acme/api')
+        ->and(affects($all, 'packages/other/index.ts'))->toBeTrue();
+});
+
+it('keeps root files that the Dockerfile copies explicitly', function () {
+    $built = (new TriggerSetBuilder)->build(builderApp(['dockerfileLocation' => '/apps/web/Dockerfile']), monorepo([
+        'apps/web/Dockerfile' => "FROM node\nCOPY README.md ./\nCOPY apps/web apps/web\n",
+    ]))->toArray();
+
+    expect(affects($built, 'README.md'))->toBeTrue();
+});
+
+it('widens a Dockerfile source with brackets', function () {
+    $built = (new TriggerSetBuilder)->build(builderApp(['dockerfileLocation' => '/apps/web/Dockerfile']), monorepo([
+        'apps/web/Dockerfile' => "FROM node\nCOPY apps/web/[ab].txt ./\n",
+        'apps/web/a.txt' => 'x',
+    ]))->toArray();
+
+    expect(affects($built, 'apps/web/a.txt'))->toBeTrue();
+});
+
+it('follows a symlink that a Dockerfile copies', function () {
+    $files = ['Dockerfile' => "FROM alpine\nCOPY lib /lib\n", 'lib' => 'vendor/lib', 'vendor/lib/a.c' => 'x', 'other/b.c' => 'x'];
+    $built = (new TriggerSetBuilder)->build(builderApp(), RepositorySnapshot::fromFiles($files, ['lib' => '120000']))->toArray();
+
+    expect(affects($built, 'vendor/lib/a.c'))->toBeTrue()
+        ->and(affects($built, 'other/b.c'))->toBeFalse();
+});
+
+it('records the tsconfig path aliases of packages outside the closure for the reference check', function () {
+    $built = (new TriggerSetBuilder)->build(builderApp(['dockerfileLocation' => '/apps/web/Dockerfile']), monorepo([
+        'tsconfig.base.json' => "{\n  // aliases\n  \"compilerOptions\": { \"baseUrl\": \".\", \"paths\": { \"@other/*\": [\"packages/other/src/*\"], \"@ui\": [\"packages/ui/index.ts\"], }, },\n}",
+    ]))->toArray();
+
+    expect($built['reference_needles']['@acme/other'])->toContain('@other/', '@acme/other', 'packages/other', '../other')
+        ->and($built['reference_needles'])->not->toHaveKey('@acme/ui')
+        ->and(CompiledTriggerSet::fromArray($built['input_patterns'])->matches('tsconfig.base.json'))->toBeTrue();
 });

@@ -15,8 +15,6 @@ final class SshMirrorGit implements MirrorGit
 {
     public const VOLUME = 'coolify-git-mirrors';
 
-    private const BOOTSTRAP = 'umask 077; cat > /run/coolify/script && exec sh /run/coolify/script';
-
     private bool $imageReady = false;
 
     public function __construct(private readonly Server $server) {}
@@ -35,7 +33,8 @@ final class SshMirrorGit implements MirrorGit
 
             $remoteCommand = ($this->server->isNonRoot() ? 'sudo ' : '')
                 .'docker run --rm -i --network host --tmpfs /run/coolify:rw,nosuid,nodev,noexec,size=512m'
-                .' -v '.self::VOLUME.':/mirrors --entrypoint sh '.escapeshellarg($image).' -c '.escapeshellarg(self::BOOTSTRAP);
+                .' -v '.self::VOLUME.':/mirrors --entrypoint sh '.escapeshellarg($image)
+                .' -c '.escapeshellarg("umask 077; cat > /run/coolify/script && exec timeout {$timeoutSeconds} sh /run/coolify/script");
             $process = runSshProcess(
                 SshMultiplexingHelper::generateSshStdinCommand($this->server, $remoteCommand, commandTimeout: $timeoutSeconds + 30),
                 $timeoutSeconds + 30,

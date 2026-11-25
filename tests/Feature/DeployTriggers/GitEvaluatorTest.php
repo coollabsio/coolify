@@ -177,6 +177,41 @@ it('checks references again when a deployment changes the application', function
         ->and($next->decision)->toBe('deploy');
 });
 
+it('finds a reference through a tsconfig path alias', function () {
+    evalCommit($this, [
+        'tsconfig.base.json' => "{\n  // aliases\n  \"compilerOptions\": { \"paths\": { \"@api/*\": [\"apps/api/src/*\"] } }\n}",
+        'apps/web/src/page.tsx' => "import { main } from '@api/main'",
+    ]);
+    $base = trim(evalGit($this, 'rev-parse HEAD'));
+    $after = evalCommit($this, ['apps/api/src/main.ts' => 'changed']);
+
+    $decision = evaluateWith($this, gitEvaluatorRequest($this, $after, [gitEvaluatorInput('web', '/apps/web/Dockerfile', $base)]))->applications['web'];
+
+    expect($decision->decision)->toBe('deploy');
+});
+
+it('re-resolves after a push adds a symlink, so its target counts', function () {
+    $first = evalCommit($this, ['apps/api/src/main.ts' => 'one']);
+    $set = evaluateWith($this, gitEvaluatorRequest($this, $first, [gitEvaluatorInput('web', '/apps/web/Dockerfile', $this->base)]))->applications['web']->triggerSet;
+    symlink('../api', $this->source.'/apps/web/api-link');
+    $second = evalCommit($this, []);
+    $deployed = evaluateWith($this, gitEvaluatorRequest($this, $second, [gitEvaluatorInput('web', '/apps/web/Dockerfile', $first, ['storedTriggerSet' => $set])]))->applications['web'];
+    $third = evalCommit($this, ['apps/api/src/main.ts' => 'two']);
+
+    $next = evaluateWith($this, gitEvaluatorRequest($this, $third, [gitEvaluatorInput('web', '/apps/web/Dockerfile', $second, ['storedTriggerSet' => $deployed->triggerSet])]))->applications['web'];
+
+    expect($deployed->decision)->toBe('deploy')->and($next->decision)->toBe('deploy');
+});
+
+it('stops fetching a repository that is larger than the limit for a day', function () {
+    $after = evalCommit($this, ['apps/api/src/main.ts' => 'changed']);
+    $request = new EvaluateRequest('file://'.$this->source, 'mirror-key', $after, ['refs/heads/main'], [gitEvaluatorInput('web', '/apps/web/Dockerfile', $this->base)], ['max_changed_files' => 50000, 'max_mirror_bytes' => 1024]);
+
+    expect(fn () => evaluateWith($this, $request))->toThrow(AffectedRunnerException::class, 'larger than the limit');
+    expect(fn () => evaluateWith($this, $request))->toThrow(AffectedRunnerException::class, 'larger than the limit');
+    expect($this->mirror->scripts)->toHaveCount(1);
+});
+
 it('compares a new pull request with its merge base', function () {
     evalGit($this, 'checkout -q -b feature');
     $after = evalCommit($this, ['packages/ui/src/Button.tsx' => 'feature']);

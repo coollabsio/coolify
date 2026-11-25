@@ -59,23 +59,45 @@ final readonly class JsWorkspaceGraph
     }
 
     /**
-     * The package a build or install command selects, or null when it selects none or several.
+     * Commands that build every package of the workspace.
      */
-    public function packageFromCommand(string $command): ?string
+    private const ALL_PACKAGES_PATTERN = '/\b(?:pnpm|bun)\s+(?:\S+\s+)*?(?:-r|--recursive)\b|--workspaces\b|\s-ws\b|\byarn\s+workspaces\s+foreach\b|\blerna\s+(?:run|exec)\b|\bnx\s+(?:run-many|affected)\b|\bturbo\s+(?:run\s+)?[\w:-]+(?![^;&|]*(?:--filter|-F\s|--scope))/';
+
+    /**
+     * The packages a command selects: an empty list when it selects none, null when it may build
+     * other packages that cannot be named (every package, a glob, a path, or a package's dependents).
+     *
+     * @return list<string>|null
+     */
+    public function packagesFromCommand(string $command): ?array
     {
+        $command = ' '.$command;
         $patterns = [
-            '/(?:--filter|\s-F)(?:=|\s+)(["\']?)([^\s"\']+)\1/',
+            '/(?:--filter|\s-F|--scope)(?:=|\s+)(["\']?)([^\s"\']+)\1/',
             '/(?:--workspace|\s-w)(?:=|\s+)(["\']?)([^\s"\']+)\1/',
             '/\byarn\s+workspace\s+()(\S+)/',
             '/\bnx\s+(?:build|run|serve)\s+()([^\s:]+)/',
+            '/\bturbo\s+prune\s+()([^\s-][^\s]*)/',
         ];
+        $packages = [];
         foreach ($patterns as $pattern) {
-            if (preg_match($pattern, ' '.$command, $match) === 1) {
-                return $this->packageNamed($match[2]);
+            preg_match_all($pattern, $command, $matches, PREG_SET_ORDER);
+            foreach ($matches as $match) {
+                if (str_starts_with($match[2], '...')) {
+                    return null;
+                }
+                $package = $this->packageNamed($match[2]);
+                if ($package === null) {
+                    return null;
+                }
+                $packages[] = $package;
             }
         }
+        if ($packages === [] && preg_match(self::ALL_PACKAGES_PATTERN, $command) === 1) {
+            return null;
+        }
 
-        return null;
+        return array_values(array_unique($packages));
     }
 
     private function packageNamed(string $selector): ?string

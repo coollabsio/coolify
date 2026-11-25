@@ -16,6 +16,7 @@ final readonly class BuiltTriggerSet
      * @param  array{resolver: string, package: string, dir: string}|null  $anchor
      * @param  list<array{scope: string, reason: string}>  $widened
      * @param  list<string>  $closure
+     * @param  array<string, list<string>>  $aliases  package name => tsconfig path aliases that point into it
      */
     public function __construct(
         public array $compiled,
@@ -27,6 +28,7 @@ final readonly class BuiltTriggerSet
         public array $widened,
         public ?JsWorkspaceGraph $graph,
         public array $closure,
+        public array $aliases = [],
     ) {}
 
     /**
@@ -44,6 +46,22 @@ final readonly class BuiltTriggerSet
             array_diff_key($this->graph->packages, array_flip($this->closure)),
             fn (string $directory): bool => ! in_array($directory, $this->graph->lifecycleDirectories, true),
         );
+    }
+
+    /**
+     * What a file of the application contains when it uses an excluded package: its name, its directory,
+     * a relative path to it, and the tsconfig aliases that point into it.
+     *
+     * @return array<string, list<string>>
+     */
+    public function referenceNeedles(): array
+    {
+        $needles = [];
+        foreach ($this->excludedPackages() as $name => $directory) {
+            $needles[$name] = array_values(array_unique([$name, $directory, '../'.basename($directory), ...($this->aliases[$name] ?? [])]));
+        }
+
+        return $needles;
     }
 
     /**
@@ -76,6 +94,7 @@ final readonly class BuiltTriggerSet
             'widened' => $this->widened,
             'packages' => $this->graph === null ? [] : array_intersect_key($this->graph->packages, array_flip($this->closure)),
             'excluded' => $this->excludedPackages(),
+            'reference_needles' => $this->referenceNeedles(),
         ];
     }
 }

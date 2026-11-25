@@ -66,24 +66,33 @@ it('reads turbo global dependencies', function () {
     expect($graph->globalPatterns)->toContain('.env', 'tsconfig.base.json', 'turbo.json', 'package.json');
 });
 
-it('finds the package a build command selects', function (string $command, ?string $expected) {
+it('finds the packages a build command selects', function (string $command, ?array $expected) {
     $graph = JsWorkspaces::resolve(jsSnapshot([
         'package.json' => json_encode(['workspaces' => ['apps/*']]),
         'apps/web/package.json' => json_encode(['name' => '@acme/web']),
         'apps/api/package.json' => json_encode(['name' => 'api']),
     ]));
 
-    expect($graph->packageFromCommand($command))->toBe($expected);
+    expect($graph->packagesFromCommand($command))->toBe($expected);
 })->with([
-    ['pnpm --filter @acme/web build', '@acme/web'],
-    ['pnpm -F api build', 'api'],
-    ['pnpm --filter=@acme/web... build', '@acme/web'],
-    ['turbo run build --filter=api', 'api'],
-    ['npm run build -w apps/web', '@acme/web'],
-    ['npm run build --workspace=api', 'api'],
-    ['yarn workspace @acme/web build', '@acme/web'],
-    ['bun --filter api run build', 'api'],
-    ['npx nx build api', 'api'],
-    ['npm run build', null],
+    ['pnpm --filter @acme/web build', ['@acme/web']],
+    ['pnpm -F api build', ['api']],
+    ['pnpm --filter=@acme/web... build', ['@acme/web']],
+    ['turbo run build --filter=api', ['api']],
+    ['turbo run build --filter=api --filter=@acme/web', ['api', '@acme/web']],
+    ['turbo prune api --docker', ['api']],
+    ['npm run build -w apps/web', ['@acme/web']],
+    ['npm run build --workspace=api', ['api']],
+    ['yarn workspace @acme/web build', ['@acme/web']],
+    ['bun --filter api run build', ['api']],
+    ['npx nx build api', ['api']],
+    ['npm run build', []],
+    ['pnpm install --frozen-lockfile', []],
     ['pnpm --filter "./apps/**" build', null],
+    ['pnpm --filter ...api build', null],
+    ['pnpm --filter unknown build', null],
+    ['pnpm -r build', null],
+    ['turbo run build', null],
+    ['npm run build --workspaces', null],
+    ['nx run-many -t build', null],
 ]);

@@ -11,9 +11,11 @@ use Symfony\Component\Yaml\Yaml;
 final class ComposeSources
 {
     /**
+     * Relative paths resolve from the project directory: Coolify runs `docker compose --project-directory <base directory>`.
+     *
      * @return array{dirs: list<string>, files: list<string>}|null
      */
-    public static function parse(string $yaml, string $composePath): ?array
+    public static function parse(string $yaml, string $composePath, string $projectDirectory): ?array
     {
         try {
             $document = Yaml::parse($yaml);
@@ -24,7 +26,7 @@ final class ComposeSources
             return null;
         }
 
-        $base = RepoPath::directory($composePath);
+        $base = $projectDirectory;
         $dirs = [];
         $files = [$composePath];
         foreach (is_array($document['services'] ?? null) ? $document['services'] : [] as $service) {
@@ -38,18 +40,21 @@ final class ComposeSources
                 return null;
             }
             foreach (self::envFiles($service['env_file'] ?? null) as $envFile) {
-                $path = RepoPath::join($base, $envFile);
+                $path = self::path($base, $envFile);
                 if ($path === null) {
                     return null;
                 }
                 $files[] = $path;
             }
             foreach (is_array($service['volumes'] ?? null) ? $service['volumes'] : [] as $volume) {
-                $source = is_array($volume) ? (($volume['type'] ?? null) === 'bind' ? ($volume['source'] ?? null) : null) : explode(':', (string) $volume)[0];
-                if (! is_string($source) || ! str_starts_with($source, '.')) {
+                // Short syntax: only a source starting with `.` is a path. Long syntax: any source that is not absolute.
+                $source = is_array($volume)
+                    ? (($volume['type'] ?? null) === 'bind' && is_string($volume['source'] ?? null) && ! preg_match('#^[/~]#', $volume['source']) ? $volume['source'] : null)
+                    : (str_starts_with((string) $volume, '.') ? explode(':', (string) $volume)[0] : null);
+                if ($source === null) {
                     continue;
                 }
-                $path = RepoPath::join($base, $source);
+                $path = self::path($base, $source);
                 if ($path === null) {
                     return null;
                 }
@@ -60,7 +65,7 @@ final class ComposeSources
         foreach (['configs', 'secrets'] as $section) {
             foreach (is_array($document[$section] ?? null) ? $document[$section] : [] as $entry) {
                 if (is_array($entry) && is_string($entry['file'] ?? null)) {
-                    $path = RepoPath::join($base, $entry['file']);
+                    $path = self::path($base, $entry['file']);
                     if ($path === null) {
                         return null;
                     }
@@ -90,14 +95,14 @@ final class ComposeSources
         if (self::isRemote($context)) {
             return false;
         }
-        $contextPath = RepoPath::join($base, $context);
+        $contextPath = self::path($base, $context);
         if ($contextPath === null) {
             return false;
         }
         $dirs[] = $contextPath;
 
         if (is_string($build['dockerfile'] ?? null)) {
-            $dockerfile = RepoPath::join($contextPath, $build['dockerfile']);
+            $dockerfile = self::path($contextPath, $build['dockerfile']);
             if ($dockerfile === null) {
                 return false;
             }
@@ -110,7 +115,7 @@ final class ComposeSources
             if (self::isRemote($value) || str_contains($value, '://') || str_starts_with($value, 'service:')) {
                 continue;
             }
-            $path = RepoPath::join($base, $value);
+            $path = self::path($base, $value);
             if ($path === null) {
                 return false;
             }
@@ -131,6 +136,14 @@ final class ComposeSources
             fn (mixed $entry): ?string => is_string($entry) ? $entry : (is_array($entry) && is_string($entry['path'] ?? null) ? $entry['path'] : null),
             $entries,
         )));
+    }
+
+    /**
+     * Null for a path that leaves the repository or that Compose interpolates.
+     */
+    private static function path(string $base, string $path): ?string
+    {
+        return str_contains($path, '$') ? null : RepoPath::join($base, $path);
     }
 
     private static function isRemote(string $value): bool
