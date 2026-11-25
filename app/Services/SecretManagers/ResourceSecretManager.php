@@ -4,6 +4,7 @@ namespace App\Services\SecretManagers;
 
 use App\Models\IntegrationToken;
 use App\Models\SecretManagerLink;
+use App\Support\RemoteSecretReferences;
 use App\Support\ValidationPatterns;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,7 +14,8 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 /**
- * The secret manager source of an application, service, or database, and its {{vault.KEY}} reference variables.
+ * The secret manager sources of an application, service, or database, and their {{vault.KEY}} and
+ * {{vault.<source>.KEY}} reference variables.
  * Only tokens of the resource's team can be linked. Secret values are read into memory only to list or import
  * key names; they are never stored or returned. The resource page and the API use this service.
  */
@@ -21,7 +23,7 @@ class ResourceSecretManager
 {
     /**
      * Secret manager tokens of the resource's team that have the secrets capability. Without write access on
-     * the whole team, only the linked token: such a user cannot link another token.
+     * the whole team, only the linked tokens: such a user cannot link another token.
      *
      * @return Collection<int, IntegrationToken>
      */
@@ -29,7 +31,7 @@ class ResourceSecretManager
     {
         $tokens = $this->teamTokens($resource);
         if (! Gate::allows('useTeamCredentials', $resource)) {
-            $tokens->whereIn('id', $resource->secretManagerLink()->select('integration_token_id'));
+            $tokens->whereIn('id', $resource->secretManagerLinks()->select('integration_token_id'));
         }
 
         return $tokens->get()
@@ -72,22 +74,23 @@ class ResourceSecretManager
     }
 
     /**
-     * Links the token as the source of the resource, or changes the token or settings of the existing link.
+     * Links the token as the named source of the resource, or changes the token or settings of the existing link.
      * Both need write access on the whole team: the token and its settings decide which secrets the resource reads.
      *
      * @param  array<string, mixed>  $settings
      *
      * @throws AuthorizationException
      */
-    public function link(Model $resource, IntegrationToken $token, array $settings, string $auditSource): SecretManagerLink
+    public function link(Model $resource, IntegrationToken $token, array $settings, string $auditSource, string $name = RemoteSecretReferences::DEFAULT_SOURCE): SecretManagerLink
     {
         Gate::authorize('useTeamCredentials', $resource);
         $settings = array_filter($settings, fn ($value) => filled($value));
-        $link = $resource->secretManagerLink()->updateOrCreate([], [
+        $link = $resource->secretManagerLinkNamed($name)->updateOrCreate([], [
             'integration_token_id' => $token->id,
             'settings' => $settings ?: null,
         ]);
         $this->audit($auditSource, $resource, 'source_updated', [
+            'source' => $name,
             'integration_token_uuid' => $token->uuid,
             'provider' => $token->provider,
         ]);
@@ -96,13 +99,14 @@ class ResourceSecretManager
     }
 
     /**
-     * Removes the source. Existing {{vault.*}} variables stay and fail the next deployment until they are removed.
+     * Removes the named source. Existing references to it stay and fail the next deployment until they are removed.
      */
-    public function unlink(Model $resource, string $auditSource): void
+    public function unlink(Model $resource, string $auditSource, string $name = RemoteSecretReferences::DEFAULT_SOURCE): void
     {
-        $token = $resource->secretManagerLink()->with('integrationToken')->first()?->integrationToken;
-        $resource->secretManagerLink()->delete();
+        $token = $resource->secretManagerLinkNamed($name)->with('integrationToken')->first()?->integrationToken;
+        $resource->secretManagerLinkNamed($name)->delete();
         $this->audit($auditSource, $resource, 'source_removed', [
+            'source' => $name,
             'integration_token_uuid' => $token?->uuid,
             'provider' => $token?->provider,
         ]);
@@ -117,17 +121,17 @@ class ResourceSecretManager
     {
         $keys = array_map('strval', array_keys($link->fetchSecrets()));
         sort($keys);
-        $this->audit($auditSource, $resource, 'keys_viewed', ['key_count' => count($keys)]);
+        $this->audit($auditSource, $resource, 'keys_viewed', ['source' => $link->sourceName(), 'key_count' => count($keys)]);
 
         return $keys;
     }
 
     /**
-     * Adds a {{vault.KEY}} variable for one remote key.
+     * Adds a {{vault.KEY}} variable ({{vault.<source>.KEY}} for a named source) for one remote key.
      *
      * @throws ValidationException when the key is not a valid variable name or a variable with the key exists
      */
-    public function addReference(Model $resource, string $key, string $auditSource): void
+    public function addReference(Model $resource, string $key, string $auditSource, string $source = RemoteSecretReferences::DEFAULT_SOURCE): string
     {
         if (! ValidationPatterns::isValidEnvironmentVariableKey($key)) {
             throw ValidationException::withMessages(['key' => "{$key} is not a valid variable name."]);
@@ -136,12 +140,15 @@ class ResourceSecretManager
             throw ValidationException::withMessages(['key' => "A variable with the key {$key} already exists."]);
         }
 
-        $resource->environment_variables()->create(['key' => $key, 'value' => '{{vault.'.$key.'}}']);
-        $this->audit($auditSource, $resource, 'reference_created', ['secret_key' => $key]);
+        $reference = RemoteSecretReferences::reference($source, $key);
+        $resource->environment_variables()->create(['key' => $key, 'value' => $reference]);
+        $this->audit($auditSource, $resource, 'reference_created', ['source' => $source, 'secret_key' => $key]);
+
+        return $reference;
     }
 
     /**
-     * Adds a {{vault.KEY}} variable for every remote key that has no variable yet.
+     * Adds a reference variable for every remote key of the source that has no variable yet.
      *
      * @return array{imported: list<string>, skipped: list<string>}
      */
@@ -149,6 +156,7 @@ class ResourceSecretManager
     {
         $result = $link->importMissingReferences();
         $this->audit($auditSource, $resource, 'references_imported', [
+            'source' => $link->sourceName(),
             'key_count' => count($result['imported']),
             'secret_keys' => $result['imported'],
             'skipped_key_count' => count($result['skipped']),

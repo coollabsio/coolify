@@ -134,3 +134,15 @@ test('cloning does not copy a secret manager link whose token belongs to another
 
     expect($clone->secretManagerLink()->exists())->toBeFalse();
 });
+
+test('cloning an application copies all of its named secret manager sources', function () {
+    $this->application->secretManagerLink()->create(['integration_token_id' => $this->token->id, 'settings' => ['mount' => 'secret', 'path' => 'app']]);
+    $this->application->secretManagerLinks()->create(['name' => 'urls', 'integration_token_id' => $this->token->id, 'settings' => ['mount' => 'secret', 'path' => 'urls']]);
+
+    $clone = clone_application($this->application, $this->destination, [
+        'environment_id' => $this->environment->id,
+    ]);
+
+    expect($clone->secretManagerLinks()->orderBy('name')->get()->map(fn (SecretManagerLink $link) => [$link->name, $link->settings])->all())
+        ->toBe([['default', ['mount' => 'secret', 'path' => 'app']], ['urls', ['mount' => 'secret', 'path' => 'urls']]]);
+});

@@ -325,6 +325,10 @@ function makeControlVarFilteringJob(Application $application, Server $server, ar
 
     $mergedProperties = array_merge($properties, $overrides);
     $mergedProperties['saved_outputs'] = new Collection($overrides['saved_outputs'] ?? []);
+    // A primed secrets cache stands for secrets that the default source returned.
+    if (($mergedProperties['remote_secrets_cache'] ?? null) !== null && ! array_key_exists('remote_secret_sources_fetched', $mergedProperties)) {
+        $mergedProperties['remote_secret_sources_fetched'] = ['default' => true];
+    }
 
     if (($mergedProperties['pull_request_id'] ?? 0) !== 0 && ! array_key_exists('preview', $mergedProperties)) {
         $mergedProperties['preview'] = ApplicationPreview::create([

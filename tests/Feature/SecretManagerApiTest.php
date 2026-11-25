@@ -251,3 +251,66 @@ test('a token or resource of another team cannot be used', function () {
 
     expect($this->application->secretManagerLink()->exists())->toBeFalse();
 });
+
+test('named sources are linked, listed, referenced, and removed through the api', function () {
+    $token = secretManagerApiDopplerToken($this);
+    $headers = secretManagerApiHeaders($this->bearerToken);
+    $base = "/api/v1/applications/{$this->application->uuid}/secret-manager";
+    Http::fake(['https://api.doppler.com/*' => Http::response(['API_URL' => 'remote-url-value'])]);
+
+    $this->withHeaders($headers)->patchJson($base, ['integration_token_uuid' => $token->uuid])->assertOk()->assertJsonPath('name', 'default');
+    $this->withHeaders($headers)->patchJson($base, ['name' => 'urls', 'integration_token_uuid' => $token->uuid])->assertOk()->assertJsonPath('name', 'urls');
+
+    $read = $this->withHeaders($headers)->getJson("{$base}?name=urls")
+        ->assertOk()
+        ->assertJson(['name' => 'urls', 'linked' => true, 'integration_token_uuid' => $token->uuid])
+        ->assertJsonPath('sources.*.name', ['default', 'urls']);
+    expect($read->getContent())->not->toContain('secret-value');
+    $this->withHeaders($headers)->getJson("{$base}?name=other")->assertOk()->assertJson(['name' => 'other', 'linked' => false]);
+
+    $this->withHeaders($headers)->postJson("{$base}/references", ['name' => 'urls', 'key' => 'API_URL'])
+        ->assertCreated()
+        ->assertExactJson(['key' => 'API_URL', 'value' => '{{vault.urls.API_URL}}']);
+    expect($this->application->environment_variables()->where('key', 'API_URL')->value('value'))->toBe('{{vault.urls.API_URL}}');
+
+    $this->withHeaders($headers)->getJson("{$base}/keys?name=other")->assertNotFound();
+    $this->withHeaders($headers)->deleteJson("{$base}?name=urls")->assertOk();
+    expect($this->application->secretManagerLinks()->pluck('name')->all())->toBe(['default']);
+});
+
+test('an invalid source name is rejected', function (string $method, string $path, array $body) {
+    $this->withHeaders(secretManagerApiHeaders($this->bearerToken))
+        ->json($method, "/api/v1/applications/{$this->application->uuid}/secret-manager{$path}", $body)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('name');
+})->with([
+    'get' => ['GET', '?name=Bad.Name', []],
+    'patch' => ['PATCH', '', ['name' => '-bad', 'integration_token_uuid' => 'x']],
+]);
+
+test('a named source of a resource of another team cannot be read or changed', function () {
+    $token = secretManagerApiDopplerToken($this);
+    $this->application->secretManagerLinks()->create(['name' => 'urls', 'integration_token_id' => $token->id]);
+    $otherTeam = Team::factory()->create();
+    $otherTeam->members()->attach($this->user, ['role' => 'owner']);
+    $otherBearer = $this->user->createToken('other', ['*'], teamId: $otherTeam->id)->plainTextToken;
+    $base = "/api/v1/applications/{$this->application->uuid}/secret-manager";
+
+    $this->withHeaders(secretManagerApiHeaders($otherBearer))->getJson("{$base}?name=urls")->assertNotFound();
+    $this->withHeaders(secretManagerApiHeaders($otherBearer))->deleteJson("{$base}?name=urls")->assertNotFound();
+
+    expect($this->application->secretManagerLinkNamed('urls')->exists())->toBeTrue();
+});
+
+test('a read-only member cannot change a named source', function () {
+    $token = secretManagerApiDopplerToken($this);
+    $member = User::factory()->create();
+    $this->team->members()->attach($member, ['role' => 'member']);
+    $readOnly = $member->createToken('member-read', ['read'])->plainTextToken;
+
+    $this->withHeaders(secretManagerApiHeaders($readOnly))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}/secret-manager", ['name' => 'urls', 'integration_token_uuid' => $token->uuid])
+        ->assertForbidden();
+
+    expect($this->application->secretManagerLinks()->exists())->toBeFalse();
+});

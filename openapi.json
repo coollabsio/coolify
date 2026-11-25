@@ -19789,6 +19789,16 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "name",
+                        "in": "query",
+                        "description": "Source name. Default: default.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "default"
+                        }
                     }
                 ],
                 "responses": {
@@ -19823,7 +19833,7 @@
                     "Secret Managers"
                 ],
                 "summary": "Remove Secret Manager Source",
-                "description": "Remove the secret manager source. Existing {{vault.*}} variables stay and fail the next deployment until they are removed.",
+                "description": "Remove a secret manager source (`default` when no name is given). Existing references to it stay and fail the next deployment until they are removed.",
                 "operationId": "remove-secret-manager-source",
                 "parameters": [
                     {
@@ -19847,6 +19857,16 @@
                         "required": true,
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    {
+                        "name": "name",
+                        "in": "query",
+                        "description": "Source name. Default: default.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "default"
                         }
                     }
                 ],
@@ -19875,7 +19895,7 @@
                     "Secret Managers"
                 ],
                 "summary": "Set Secret Manager Source",
-                "description": "Link a secret manager token of the team to an application, service, or database, or change the token or settings of the link. References resolve at the next deployment.",
+                "description": "Link a secret manager token of the team to an application, service, or database as a named source (`default` when no name is given), or change the token or settings of that source. References resolve at the next deployment.",
                 "operationId": "set-secret-manager-source",
                 "parameters": [
                     {
@@ -19911,6 +19931,11 @@
                                     "integration_token_uuid"
                                 ],
                                 "properties": {
+                                    "name": {
+                                        "description": "Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.",
+                                        "type": "string",
+                                        "default": "default"
+                                    },
                                     "integration_token_uuid": {
                                         "type": "string"
                                     },
@@ -19975,6 +20000,11 @@
                                     "integration_token_uuid"
                                 ],
                                 "properties": {
+                                    "name": {
+                                        "description": "Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.",
+                                        "type": "string",
+                                        "default": "default"
+                                    },
                                     "integration_token_uuid": {
                                         "type": "string"
                                     },
@@ -20042,6 +20072,16 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "name",
+                        "in": "query",
+                        "description": "Source name. Default: default.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "default"
+                        }
                     }
                 ],
                 "responses": {
@@ -20089,7 +20129,7 @@
                     "Secret Managers"
                 ],
                 "summary": "Add Secret Manager Reference",
-                "description": "Add a {{vault.KEY}} environment variable for one key of the linked source.",
+                "description": "Add a {{vault.KEY}} environment variable ({{vault.<name>.KEY}} for a named source) for one key of the source.",
                 "operationId": "add-secret-manager-reference",
                 "parameters": [
                     {
@@ -20127,6 +20167,11 @@
                                 "properties": {
                                     "key": {
                                         "type": "string"
+                                    },
+                                    "name": {
+                                        "description": "Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.",
+                                        "type": "string",
+                                        "default": "default"
                                     }
                                 },
                                 "type": "object"
@@ -20167,7 +20212,7 @@
                     "Secret Managers"
                 ],
                 "summary": "Import Secret Manager References",
-                "description": "Add a {{vault.KEY}} environment variable for every key of the linked source that has no variable yet. Keys that are not valid variable names are skipped.",
+                "description": "Add a {{vault.KEY}} environment variable ({{vault.<name>.KEY}} for a named source) for every key of the source that has no variable yet. Keys that are not valid variable names are skipped.",
                 "operationId": "import-secret-manager-references",
                 "parameters": [
                     {
@@ -20194,6 +20239,23 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application\/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "description": "Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.",
+                                        "type": "string",
+                                        "default": "default"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "Import result.",
@@ -28937,6 +28999,58 @@
             }
         },
         "\/applications\/{uuid}\/storages\/{storage_uuid}\/backups": {
+            "get": {
+                "tags": [
+                    "Applications"
+                ],
+                "summary": "Get application storage backup schedule",
+                "description": "Get the backup schedule of an application storage.",
+                "operationId": "get-application-storage-backup-schedule",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "storage_uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Backup schedule.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/VolumeBackupScheduleResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Forbidden."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
             "put": {
                 "tags": [
                     "Applications"
@@ -29067,6 +29181,58 @@
             }
         },
         "\/databases\/{uuid}\/storages\/{storage_uuid}\/backups": {
+            "get": {
+                "tags": [
+                    "Databases"
+                ],
+                "summary": "Get database storage backup schedule",
+                "description": "Get the backup schedule of a database storage.",
+                "operationId": "get-database-storage-backup-schedule",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "storage_uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Backup schedule.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/VolumeBackupScheduleResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Forbidden."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
             "put": {
                 "tags": [
                     "Databases"
@@ -29197,6 +29363,58 @@
             }
         },
         "\/services\/{uuid}\/storages\/{storage_uuid}\/backups": {
+            "get": {
+                "tags": [
+                    "Services"
+                ],
+                "summary": "Get service storage backup schedule",
+                "description": "Get the backup schedule of a service storage.",
+                "operationId": "get-service-storage-backup-schedule",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "storage_uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Backup schedule.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "$ref": "#\/components\/schemas\/VolumeBackupScheduleResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
+                    },
+                    "403": {
+                        "description": "Forbidden."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
             "put": {
                 "tags": [
                     "Services"
@@ -31415,8 +31633,12 @@
                 "type": "object"
             },
             "SecretManagerSource": {
-                "description": "The secret manager source of an application, service, or database. Routes start with the resource type (`applications`, `services`, `databases`), so tokens limited to some resources can use them.",
+                "description": "A secret manager source of an application, service, or database. A resource can have several named sources: variables reference the `default` source as {{vault.KEY}} and other sources as {{vault.<name>.KEY}}. Routes start with the resource type (`applications`, `services`, `databases`), so tokens limited to some resources can use them.",
                 "properties": {
+                    "name": {
+                        "description": "Name of the source that the other fields describe.",
+                        "type": "string"
+                    },
                     "linked": {
                         "type": "boolean"
                     },
@@ -31457,6 +31679,30 @@
                                 },
                                 "provider": {
                                     "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        }
+                    },
+                    "sources": {
+                        "description": "All sources of the resource, sorted by name.",
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                },
+                                "integration_token_uuid": {
+                                    "type": "string"
+                                },
+                                "provider": {
+                                    "type": "string"
+                                },
+                                "settings": {
+                                    "type": [
+                                        "object",
+                                        "null"
+                                    ]
                                 }
                             },
                             "type": "object"
@@ -31630,7 +31876,6 @@
             "VolumeBackupScheduleResponse": {
                 "required": [
                     "uuid",
-                    "message",
                     "storage_uuid",
                     "storage_type",
                     "frequency",
@@ -31652,6 +31897,7 @@
                         "type": "string"
                     },
                     "message": {
+                        "description": "Only in the response of a create or replace.",
                         "type": "string"
                     },
                     "storage_uuid": {
