@@ -19,12 +19,19 @@ class EvaluationRequestBuilder
      * @param  Collection<int, Application>  $applications
      * @return array{server: ?Server, request: ?EvaluateRequest, access: ?GitAccess, candidates: array<string, TriggerCandidate>, prechecked: array<string, ApplicationDecision>}
      */
-    public function build(Collection $applications, PushContext $context): array
+    public function build(Collection $applications, PushContext $context, bool $dryRun = false): array
     {
         $candidates = [];
         $prechecked = [];
         foreach ($applications as $application) {
             $candidate = $this->candidate($application, $context);
+            if ($dryRun) {
+                // A dry run only resolves the trigger set at the evaluated commit.
+                $candidates[$candidate->id] = new TriggerCandidate($candidate->id, $candidate->application, $candidate->preview, $candidate->mode,
+                    $candidate->base ?? $context->after, false, $candidate->fingerprint, true);
+
+                continue;
+            }
             $candidates[$candidate->id] = $candidate;
             $decision = $this->precheck($candidate, $context);
             if ($decision !== null) {

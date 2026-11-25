@@ -134,3 +134,39 @@ it('binds the ssh runner and reads the mirror cap from config', function () {
     expect(app(AffectedRunner::class))->toBeInstanceOf(SshAffectedRunner::class)
         ->and(config('constants.coolify.push_evaluation.max_mirror_bytes'))->toBe(123);
 });
+
+it('remembers a failed probe only for a few minutes', function () {
+    $failing = true;
+    fakeAffectedProcesses($this->scripts, function (string $script) use (&$failing) {
+        return $failing
+            ? Process::result(errorOutput: 'ssh: connect to host timed out', exitCode: 255)
+            : Process::result(output: '{"version":"1.0.0","schema_version":1}');
+    });
+
+    expect(app(HelperCapability::class)->compatible($this->server))->toBeFalse();
+    $failing = false;
+    expect(app(HelperCapability::class)->compatible($this->server))->toBeFalse();
+    $this->travel(6)->minutes();
+    expect(app(HelperCapability::class)->compatible($this->server))->toBeTrue();
+});
+
+it('remembers a missing binary for a day', function () {
+    fakeAffectedProcesses($this->scripts, fn (string $script) => Process::result(errorOutput: 'exec: "coolify-affected": executable file not found in $PATH', exitCode: 127));
+
+    app(HelperCapability::class)->compatible($this->server);
+    $this->travel(6)->minutes();
+    app(HelperCapability::class)->compatible($this->server);
+
+    expect(collect($this->scripts)->filter(fn (string $s) => str_contains($s, 'coolify-affected version'))->count())->toBe(1);
+});
+
+it('makes a single ssh attempt for evaluate', function () {
+    fakeAffectedProcesses($this->scripts, fn (string $script) => Process::result(errorOutput: 'Connection reset by peer', exitCode: 255));
+
+    try {
+        (new SshAffectedRunner)->evaluate($this->server, runnerRequest(), new GitAccess('repo'));
+    } catch (AffectedRunnerException) {
+    }
+
+    expect(collect($this->scripts)->filter(fn (string $s) => str_contains($s, 'coolify-affected evaluate'))->count())->toBe(1);
+});

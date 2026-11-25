@@ -24,7 +24,7 @@ class SshAffectedRunner implements AffectedRunner
     public function evaluate(Server $server, EvaluateRequest $request, GitAccess $access): EvaluateResponse
     {
         try {
-            $output = instant_remote_process([$this->script($request, $access)], $server, throwError: true, timeout: self::SSH_TIMEOUT_SECONDS);
+            $output = instant_remote_process([$this->script($request, $access)], $server, throwError: true, timeout: self::SSH_TIMEOUT_SECONDS, maxAttempts: 1);
         } catch (RuntimeException $exception) {
             throw new AffectedRunnerException($this->redact($exception->getMessage(), $request), previous: null);
         }

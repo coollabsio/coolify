@@ -9,6 +9,7 @@ use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Services\DeployTriggers\AffectedRunnerException;
 use App\Services\DeployTriggers\Contract\EvaluateRequest;
+use App\Services\DeployTriggers\EvaluationRequestBuilder;
 use App\Services\DeployTriggers\EvaluationSlots;
 use App\Services\DeployTriggers\PullRequestContext;
 use App\Services\DeployTriggers\PushContext;
@@ -175,7 +176,7 @@ it('drops applications deleted, auto-deploy-disabled, or branch-changed since di
 it('is unique per team, repository, ref and commit', function () {
     $first = new EvaluatePush(epContext(), [$this->web->id]);
 
-    expect($first->uniqueId())->toBe((new EvaluatePush(epContext(), [$this->api->id]))->uniqueId())
+    expect($first->uniqueId())->toBe((new EvaluatePush(epContext(), [$this->web->id]))->uniqueId())
         ->and($first->uniqueId())->not->toBe((new EvaluatePush(epContext(['after' => str_repeat('c', 40)]), [$this->web->id]))->uniqueId())
         ->and($first->uniqueId())->not->toBe((new EvaluatePush(epContext(), [$this->web->id], dryRun: true))->uniqueId());
 });
@@ -262,4 +263,73 @@ it('filters watch path apps with the webhook file list while the base is unknown
 
     expect(ApplicationDeploymentQueue::query()->where('application_id', $this->api->id)->sole()->status)->toBe(ApplicationDeploymentStatus::SKIPPED->value)
         ->and($runner->requests)->toBe([]);
+});
+
+it('keeps retrying after releases for half an hour', function () {
+    $job = new EvaluatePush(epContext(), [$this->web->id]);
+
+    expect($job->retryUntil()->greaterThan(now()->addMinutes(29)))->toBeTrue();
+});
+
+it('gives jobs for different applications of one push different unique ids', function () {
+    expect((new EvaluatePush(epContext(), [$this->web->id]))->uniqueId())
+        ->not->toBe((new EvaluatePush(epContext(), [$this->api->id]))->uniqueId())
+        ->and((new EvaluatePush(epContext(), [$this->web->id, $this->api->id]))->uniqueId())
+        ->toBe((new EvaluatePush(epContext(), [$this->api->id, $this->web->id]))->uniqueId())
+        ->and((new EvaluatePush(epContext(['provider' => 'github']), [$this->web->id]))->uniqueId())
+        ->not->toBe((new EvaluatePush(epContext(['provider' => 'github_manual']), [$this->web->id]))->uniqueId());
+});
+
+it('re-dispatches the remaining applications under a new unique id', function () {
+    Queue::fake();
+    FakeAffectedRunner::respondWith(epRespond([]));
+    $this->fixture['server']->settings->update(['deployment_queue_limit' => 1]);
+    $other = deployTriggerApplication($this->fixture, ['base_directory' => '/apps/other']);
+    ApplicationDeploymentQueue::create(['application_id' => $other->id, 'deployment_uuid' => 'busy', 'server_id' => $this->fixture['server']->id, 'status' => ApplicationDeploymentStatus::QUEUED->value, 'commit' => EP_BASE]);
+    $job = new EvaluatePush(epContext(), [$this->web->id, $this->api->id]);
+
+    $job->handle();
+
+    Queue::assertPushed(EvaluatePush::class, fn (EvaluatePush $retry) => $retry->uniqueId() !== $job->uniqueId());
+});
+
+it('deploys every candidate when building the request throws', function () {
+    FakeAffectedRunner::respondWith(epRespond([]));
+    $this->mock(EvaluationRequestBuilder::class, fn ($mock) => $mock->shouldReceive('build')->andThrow(new RuntimeException('Private key not found')));
+
+    epRun(epContext(), [$this->web, $this->api]);
+
+    expect(ApplicationDeploymentQueue::query()->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)->count())->toBe(2)
+        ->and(ApplicationDeploymentQueue::query()->first()->trigger_reason['reason_code'])->toBe('evaluation_failed')
+        ->and($this->web->refresh()->trigger_set['last_error'])->toContain('Private key not found');
+});
+
+it('deploys every candidate when the job fails', function () {
+    $job = new EvaluatePush(epContext(), [$this->web->id, $this->api->id]);
+
+    $job->failed(new RuntimeException('worker timeout'));
+
+    expect(ApplicationDeploymentQueue::query()->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)->count())->toBe(2)
+        ->and(ApplicationDeploymentQueue::query()->first()->trigger_reason['reason_code'])->toBe('evaluation_failed');
+});
+
+it('drops a redelivered push that was already evaluated', function () {
+    $runner = FakeAffectedRunner::respondWith(epRespond([$this->web->uuid => ['skip', 'no_match']]));
+    epRun(epContext(), [$this->web]);
+
+    epRun(epContext(), [$this->web->refresh()]);
+
+    expect($runner->requests)->toHaveCount(1)
+        ->and(ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->sole()->skipped_count)->toBe(1);
+});
+
+it('evaluates a dry run without a stored base or scan', function () {
+    $runner = FakeAffectedRunner::respondWith(epRespond([$this->web->uuid => ['skip', 'no_match']]));
+    $this->web->forceFill(['trigger_base_commit' => null, 'trigger_scan' => null])->save();
+
+    epRun(epContext(['after' => EP_AFTER]), [$this->web->refresh()], dryRun: true);
+
+    expect($runner->requests)->toHaveCount(1)
+        ->and($runner->requests[0]->applications[0]->baseCommit)->toBe(EP_AFTER)
+        ->and($this->web->refresh()->trigger_set['display'])->toBe(['apps/x/**']);
 });

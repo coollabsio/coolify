@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Application\EnsurePullRequestPreview;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationPreview;
 use App\Services\DeployTriggers\AffectedRunner;
 use App\Services\DeployTriggers\Contract\ApplicationDecision;
 use App\Services\DeployTriggers\EvaluationRequestBuilder;
@@ -14,6 +15,7 @@ use App\Services\DeployTriggers\LegacyWatchPaths;
 use App\Services\DeployTriggers\PushContext;
 use App\Services\DeployTriggers\TriggerCandidate;
 use App\Services\DeployTriggers\TriggerRecorder;
+use DateTimeInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -45,13 +47,49 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         public PushContext $context,
         public array $applicationIds,
         public bool $dryRun = false,
+        public int $generation = 0,
     ) {
         $this->onQueue(webhooks_queue());
     }
 
+    /**
+     * One evaluation per push, provider, and set of applications. A re-dispatch for a full queue is a new generation.
+     */
     public function uniqueId(): string
     {
-        return $this->context->uniqueKey().($this->dryRun ? ':dry' : '');
+        $ids = $this->applicationIds;
+        sort($ids);
+
+        return $this->context->uniqueKey().':'.$this->context->provider.':'.sha1(implode(',', $ids))
+            .($this->dryRun ? ':dry' : '').($this->generation > 0 ? ":{$this->generation}" : '');
+    }
+
+    /**
+     * Releases (busy lane or no free evaluation slot) do not use up the job.
+     */
+    public function retryUntil(): DateTimeInterface
+    {
+        return now()->addMinutes(30);
+    }
+
+    /**
+     * A job that fails or times out deploys every candidate, as an evaluation error does.
+     */
+    public function failed(Throwable $exception): void
+    {
+        if ($this->dryRun) {
+            return;
+        }
+
+        $reason = Str::limit($exception->getMessage(), 300);
+        foreach ($this->candidates() as $application) {
+            try {
+                $candidate = $this->fallbackCandidate($application);
+                $this->deploy($candidate, ApplicationDecision::deployBecause($candidate->id, 'evaluation_failed', "The push could not be evaluated ({$reason}), so it deploys."), (string) $this->context->after);
+            } catch (Throwable $deployException) {
+                report($deployException);
+            }
+        }
     }
 
     /**
@@ -80,15 +118,28 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
      */
     private function evaluate(Collection $applications): void
     {
-        ['server' => $server, 'request' => $request, 'access' => $access, 'candidates' => $candidates, 'prechecked' => $decisions]
-            = app(EvaluationRequestBuilder::class)->build($applications, $this->context);
         $after = $this->context->after;
         $lastError = null;
-
-        $remaining = array_diff_key($candidates, $decisions);
-        $fast = app(GithubFastPath::class)->decide($remaining, $this->context);
-        $decisions += $fast;
-        $remaining = array_diff_key($remaining, $fast);
+        try {
+            ['server' => $server, 'request' => $request, 'access' => $access, 'candidates' => $candidates, 'prechecked' => $decisions]
+                = app(EvaluationRequestBuilder::class)->build($applications, $this->context, $this->dryRun);
+            $remaining = array_diff_key($candidates, $decisions);
+            $fast = app(GithubFastPath::class)->decide($remaining, $this->context);
+            $decisions += $fast;
+            $remaining = array_diff_key($remaining, $fast);
+        } catch (Throwable $exception) {
+            $lastError = Str::limit($exception->getMessage(), 300);
+            Log::warning('Push evaluation could not start; deploying every candidate.', ['error' => $lastError]);
+            $candidates = [];
+            $decisions = [];
+            foreach ($applications as $application) {
+                $candidate = $this->fallbackCandidate($application);
+                $candidates[$candidate->id] = $candidate;
+                $decisions[$candidate->id] = ApplicationDecision::deployBecause($candidate->id, 'evaluation_failed', "The push could not be evaluated ({$lastError}), so it deploys.");
+            }
+            $remaining = [];
+            $server = $request = $access = null;
+        }
 
         if ($remaining !== []) {
             $runner = app(AffectedRunner::class);
@@ -141,7 +192,7 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 
             if (! $this->deploy($candidate, $decision, $after)) {
                 $remainingIds = collect($pending)->prepend($id)->map(fn (string $key): int => $candidates[$key]->application->id)->unique()->values()->all();
-                self::dispatch($this->context, $remainingIds)->delay(now()->addSeconds(60));
+                self::dispatch($this->context, $remainingIds, generation: $this->generation + 1)->delay(now()->addSeconds(60));
 
                 return;
             }
@@ -192,6 +243,26 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         return true;
     }
 
+    private function fallbackCandidate(Application $application): TriggerCandidate
+    {
+        $pullRequest = $this->context->pullRequest;
+        $preview = $pullRequest === null ? null : ApplicationPreview::query()
+            ->where('application_id', $application->id)
+            ->where('pull_request_id', $pullRequest->number)
+            ->first();
+
+        return new TriggerCandidate(
+            id: $pullRequest === null ? $application->uuid : "{$application->uuid}:pr-{$pullRequest->number}",
+            application: $application,
+            preview: $preview,
+            mode: filled($application->watch_paths) ? 'watch_paths' : 'smart',
+            base: null,
+            isStored: false,
+            fingerprint: '',
+            scanValid: false,
+        );
+    }
+
     private function withoutHelper(TriggerCandidate $candidate): ApplicationDecision
     {
         return $candidate->mode === 'smart'
@@ -214,6 +285,11 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             ->get()
             ->filter(fn (Application $application): bool => $application->git_branch === $branch
                 && ($this->dryRun || ($this->context->pullRequest !== null ? $application->isPRDeployable() : $application->isDeployable())))
+            // A redelivered webhook of a push that was already evaluated changes nothing.
+            ->reject(fn (Application $application): bool => ! $this->dryRun && $this->context->pullRequest === null
+                && $this->context->after !== null
+                && data_get($application->trigger_set, 'evaluated_commit') === $this->context->after
+                && data_get($application->trigger_set, 'last_error') === null)
             ->values();
     }
 }
