@@ -6,20 +6,24 @@
             description="Configure the Git repository, branch, and commit Coolify deploys.">
             <x-slot:actions>
                 <div class="flex flex-wrap items-center gap-2">
-                    <a target="_blank" class="button" href="{{ $application?->gitBranchLocation }}">
-                        Repository
-                        <x-external-link />
-                    </a>
+                    @if (filled($application?->gitBranchLocation))
+                        <a target="_blank" class="button" href="{{ $application->gitBranchLocation }}">
+                            Repository
+                            <x-external-link />
+                        </a>
+                    @endif
                     @if (data_get($application, 'source.is_public') === false && $application->source instanceof \App\Models\GithubApp)
                         <a target="_blank" class="button" href="{{ getInstallationPath($application->source) }}">
                             Git app
                             <x-external-link />
                         </a>
                     @endif
-                    <a target="_blank" class="button" href="{{ $application?->gitCommits }}">
-                        Commits
-                        <x-external-link />
-                    </a>
+                    @if (filled($application?->gitCommits))
+                        <a target="_blank" class="button" href="{{ $application->gitCommits }}">
+                            Commits
+                            <x-external-link />
+                        </a>
+                    @endif
                 </div>
             </x-slot:actions>
 
@@ -208,7 +212,7 @@
                 $currentSourceIsGitlab = $currentSourceMorph === \App\Models\GitlabApp::class;
                 $currentSourceIsGitea = $currentSourceMorph === \App\Models\GiteaApp::class;
                 $currentSourceSubtitle = match (true) {
-                    $currentSourceIsGithub && filled(data_get($currentSource, 'organization')) => 'GitHub · '.$currentSource->organization,
+                    $currentSourceIsGithub && filled($currentSource->accountName()) => 'GitHub · '.$currentSource->accountName(),
                     $currentSourceIsGithub => data_get($currentSource, 'is_public') ? 'Public GitHub' : 'GitHub · Personal account',
                     $currentSourceIsGitlab && filled(data_get($currentSource, 'group_name')) => 'GitLab · '.$currentSource->group_name,
                     $currentSourceIsGitlab => 'GitLab · Personal account',
@@ -248,7 +252,7 @@
                             $sourceIsGitlab = $sourceMorph === \App\Models\GitlabApp::class;
                             $sourceIsGitea = $sourceMorph === \App\Models\GiteaApp::class;
                             $sourceSubtitle = match (true) {
-                                $sourceIsGithub && filled($source->organization) => 'GitHub · '.$source->organization,
+                                $sourceIsGithub && filled($source->accountName()) => 'GitHub · '.$source->accountName(),
                                 $sourceIsGithub => data_get($source, 'is_public') ? 'Public GitHub' : 'GitHub · Personal account',
                                 $sourceIsGitlab && filled($source->group_name) => 'GitLab · '.$source->group_name,
                                 $sourceIsGitlab => 'GitLab · Personal account',

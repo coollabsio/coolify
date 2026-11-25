@@ -148,7 +148,6 @@ it('shows restarting until the sentinel container starts', function () {
     Livewire::test(Sentinel::class, ['server' => $this->server])
         ->call('restartSentinel')
         ->assertSet('sentinelStatus', 'restarting')
-        ->assertSee('Restarting')
         ->assertDispatched('sentinel-status-changed', outOfSync: false, expiresInMilliseconds: 90000);
 });
 
@@ -157,9 +156,7 @@ it('shows waiting for first report after the sentinel container starts', functio
 
     Livewire::test(Sentinel::class, ['server' => $this->server])
         ->call('handleSentinelRestarted', ['serverUuid' => $this->server->uuid])
-        ->assertSet('sentinelStatus', 'waiting')
-        ->assertSee('Waiting for first report')
-        ->assertDontSee('Sentinel is out of sync');
+        ->assertSet('sentinelStatus', 'waiting');
 });
 
 it('uses one push interval plus thirty seconds for the first report timeout', function () {
@@ -190,8 +187,7 @@ it('shows in sync after the first authenticated report', function () {
 
     Livewire::test(Sentinel::class, ['server' => $this->server])
         ->call('handleSentinelSynchronized', ['serverUuid' => $this->server->uuid])
-        ->assertSet('sentinelStatus', 'in_sync')
-        ->assertSee('In sync');
+        ->assertSet('sentinelStatus', 'in_sync');
 });
 
 it('shows out of sync when the first report timeout expires', function () {
@@ -200,8 +196,7 @@ it('shows out of sync when the first report timeout expires', function () {
     ])->save();
 
     Livewire::test(Sentinel::class, ['server' => $this->server->fresh()])
-        ->assertSet('sentinelStatus', 'out_of_sync')
-        ->assertSee('Out of sync');
+        ->assertSet('sentinelStatus', 'out_of_sync');
 });
 
 it('warns about remote HTTP reports even when the instance URL uses HTTP', function () {

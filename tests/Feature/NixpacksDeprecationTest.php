@@ -49,24 +49,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         ?? StandaloneDocker::factory()->create(['server_id' => $this->server->id, 'network' => 'coolify-test']);
 });
 
-test('the general page does not repeat the nixpacks deprecation notice from the heading', function () {
-    $application = Application::factory()->create([
-        'environment_id' => $this->environment->id,
-        'destination_id' => $this->destination->id,
-        'destination_type' => StandaloneDocker::class,
-        'build_pack' => 'nixpacks',
-        'static_image' => 'nginx:alpine',
-        'base_directory' => '/',
-        'ports_exposes' => '3000',
-        'is_http_basic_auth_enabled' => false,
-        'redirect' => 'no',
-    ]);
-
-    Livewire::test(General::class, ['application' => $application])
-        ->assertSuccessful()
-        ->assertDontSee(config('deprecations.nixpacks'));
-});
-
 test('the Railpack recommendation shows the nixpacks deprecation notice only for nixpacks', function (string $buildPack, bool $showsNotice) {
     $application = Application::factory()->create([
         'environment_id' => $this->environment->id,

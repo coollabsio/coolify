@@ -12,7 +12,7 @@ function fakeTemplateBundle(string $slug, string $compose): void
 {
     Cache::flush();
     $json = json_encode([$slug => ['compose' => base64_encode($compose)]]);
-    Cache::forever('coolify:service-templates-bundle', ['fetched_at' => now()->toIso8601String(), 'json' => $json]);
+    Cache::forever(service_templates_cache_key(), ['fetched_at' => now()->toIso8601String(), 'json' => $json]);
 }
 
 it('reports no update when the reference hash matches the current template', function () {

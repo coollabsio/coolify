@@ -7,7 +7,7 @@
 
 services:
   garage:
-    image: dxflrs/garage:v2.3.0
+    image: dxflrs/garage:v2.5.0
     command:
       - /garage
       - server

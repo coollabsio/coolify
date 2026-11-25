@@ -1010,6 +1010,7 @@ class ServerTransferExporter
             'private_key_uuid' => $application->private_key?->uuid,
             'had_git_source' => filled($application->source_id),
             'had_private_key' => filled($application->private_key_id),
+            'checks_health_check_response_text' => true,
         ];
     }
 
@@ -1461,6 +1462,7 @@ class ServerTransferExporter
             'custom_port' => $app->custom_port,
             'app_id' => $app->app_id,
             'installation_id' => $app->installation_id,
+            'installation_account' => $app->installation_account,
             'client_id' => $app->client_id,
             'client_secret' => $app->client_secret,
             'webhook_secret' => $app->webhook_secret,
@@ -1818,6 +1820,7 @@ class ServerTransferExporter
                 'approved_commit' => $preview->approved_commit,
                 'approved_at' => $preview->approved_at?->toIso8601String(),
                 'keeps_production_values' => $preview->keeps_production_values,
+                'is_same_repository' => $preview->is_same_repository,
                 'persistent_storages' => method_exists($preview, 'persistentStorages')
                     ? $this->exportPersistentStorages($preview->persistentStorages)
                     : [],

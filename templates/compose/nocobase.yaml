@@ -7,7 +7,7 @@
 
 services:
   nocobase:
-    image: nocobase/nocobase:1.9.33
+    image: nocobase/nocobase:2.2.46
     environment:
       - SERVICE_URL_NOCOBASE_13000
       - APP_KEY=${SERVICE_BASE64_64_APPKEY}
@@ -25,6 +25,7 @@ services:
 
   postgres:
     image: postgres:17-alpine
+    command: postgres -c wal_level=logical
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}

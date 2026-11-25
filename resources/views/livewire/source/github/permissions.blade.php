@@ -66,7 +66,7 @@
                             helper="Organization permission. Write access is needed to register runners." />
                         <x-forms.input canGate="view" :canResource="$github_app"
                             label="Actions" readonly placeholder="N/A" :value="$github_app->actions"
-                            helper="Repository permission. Read access is needed for the Workflow job webhook event." />
+                            helper="Repository permission. Read access is needed for the Workflow job webhook event. With write access, Coolify cancels the workflow run of a job whose runner stopped." />
                         <x-forms.input canGate="view" :canResource="$github_app"
                             label="Webhook events" readonly placeholder="N/A"
                             :value="implode(', ', $github_app->webhook_events ?? [])"

@@ -105,7 +105,7 @@ test('deploy key scans clone with the key, like a deployment', function () {
     $application->setRelation('private_key', (new PrivateKey)->forceFill(['private_key' => 'test-key']));
     $detector = new RepositoryDetector($application, '/', new Server);
 
-    $clone = (new ReflectionMethod($detector, 'scanCommands'))->invoke($detector, 'scan-test')->get(3);
+    $clone = (new ReflectionMethod($detector, 'scanCommands'))->invoke($detector, 'scan-test')->get(2);
 
     expect($clone)->toStartWith('sh -c ')
         ->toContain(base64_encode('test-key'))

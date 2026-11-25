@@ -47,6 +47,7 @@ class Heading extends Component
         return [
             'compose_loaded' => '$refresh',
             'configurationChanged' => '$refresh',
+            'envsUpdated' => '$refresh',
             'update_links' => '$refresh',
             ...$this->teamChannelListeners([
                 'ServiceStatusChanged' => 'checkStatus',
@@ -166,6 +167,24 @@ class Heading extends Component
      *
      * @return array{result: array<string, mixed>, action: ?string, vulnerabilities_url: string, deployment_url: string}|null
      */
+    /**
+     * What the Restart button will do, from the same configuration diff that the deployment job uses to skip
+     * the build. A restart also builds when the image is no longer on the server, which only the job can see.
+     *
+     * @return array{builds: bool, reasons: array<int, string>}
+     */
+    #[Computed]
+    public function restartPlan(): array
+    {
+        if ($this->application->build_pack === 'dockerimage') {
+            return ['builds' => false, 'reasons' => []];
+        }
+
+        $diff = $this->application->pendingDeploymentConfigurationDiff();
+
+        return ['builds' => $diff->requiresBuild(), 'reasons' => $diff->buildReasons()];
+    }
+
     #[Computed]
     public function imageScanGate(): ?array
     {
@@ -224,7 +243,7 @@ class Heading extends Component
 
                 return;
             }
-            if (data_get($this->application, 'settings.is_build_server_enabled') && str($this->application->docker_registry_image_name)->isEmpty()) {
+            if ($this->application->isBuildServerEnabled() && str($this->application->docker_registry_image_name)->isEmpty()) {
                 $this->dispatch('error', 'Failed to deploy.', 'To use a build server, you must first set a Docker image.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/build-server">documentation</a>');
 
                 return;

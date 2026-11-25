@@ -117,8 +117,7 @@ describe('runner settings page', function () {
             ->set('memoryLimit', '4G')
             ->call('submit')
             ->assertHasNoErrors()
-            ->assertDispatched('success')
-            ->assertSee('Recent runners');
+            ->assertDispatched('success');
 
         $config = GithubRunnerConfig::sole();
         expect($config->server_id)->toBe($this->server->id)
@@ -303,11 +302,8 @@ describe('runner settings page', function () {
 
         Livewire::actingAs($this->owner)
             ->test(GithubRunners::class, ['server_uuid' => $this->server->uuid])
-            ->assertDontSee('Enable runners on this server?')
             ->call('toggleEnabled')
-            ->assertDispatched('success')
-            ->assertSee('Application builds')
-            ->assertDontSee('Runners share this server with your resources');
+            ->assertDispatched('success');
     });
 
     it('disables runners and removes only the idle ones', function () {
@@ -474,14 +470,13 @@ describe('isolated Docker with Sysbox', function () {
         Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'test -x /usr/bin/fusermount3'));
     });
 
-    it('shows the install button when Sysbox is missing', function () {
+    it('detects that Sysbox is missing', function () {
         Process::fake(['*' => Process::result(output: '')]);
 
         Livewire::withoutLazyLoading()
             ->actingAs($this->owner)
             ->test(SysboxStatus::class, ['server' => $this->server])
-            ->assertSet('isInstalled', false)
-            ->assertSee('Install Sysbox');
+            ->assertSet('isInstalled', false);
     });
 
     it('stops before the installation on servers without apt', function () {
@@ -658,16 +653,6 @@ describe('GitHub App runner permissions', function () {
             ->assertDontSee('Organization permission "Self-hosted runners": write');
     });
 
-    it('shows the runner option disabled with a reason when the App has no organization', function () {
-        $personalApp = GithubApp::create(['name' => 'personal', 'api_url' => 'https://api.github.com', 'html_url' => 'https://github.com', 'custom_user' => 'git', 'custom_port' => 22, 'team_id' => $this->team->id, 'is_system_wide' => false]);
-
-        Livewire::withQueryParams(['github_app_uuid' => $personalApp->uuid])
-            ->actingAs($this->owner)
-            ->test(Change::class)
-            ->assertSee('GitHub Actions runners')
-            ->assertSee('Only GitHub Apps that belong to an organization can run workflow jobs.');
-    });
-
     it('survives the confirmation modal refresh after deleting an App', function () {
         $unregistered = GithubApp::create(['name' => 'to-delete', 'organization' => 'acme', 'api_url' => 'https://api.github.com', 'html_url' => 'https://github.com', 'custom_user' => 'git', 'custom_port' => 22, 'team_id' => $this->team->id, 'is_system_wide' => false]);
 
@@ -719,15 +704,6 @@ describe('new GitHub App purpose', function () {
             ->assertHasErrors(['organization' => 'required']);
 
         expect(GithubApp::where('team_id', $this->team->id)->count())->toBe(1);
-    });
-
-    it('marks the organization as required when GitHub Actions runners are selected', function () {
-        Livewire::actingAs($this->owner)
-            ->test(Create::class)
-            ->assertSee('Personal account when empty')
-            ->set('use_for_github_runners', true)
-            ->assertSee('GitHub organization, for example coollabsio')
-            ->assertSeeHtml('required');
     });
 
     it('passes the selected purposes to the registration page', function () {

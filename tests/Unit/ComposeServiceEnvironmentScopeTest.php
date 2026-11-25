@@ -29,7 +29,7 @@ function scopeComposeServiceEnvironment(array $composeFile, array $scopes, array
     return (new ReflectionMethod(ApplicationDeploymentJob::class, 'scope_compose_service_environment'))->invoke($job, $composeFile);
 }
 
-it('gives each Compose service its own env file and only the scoped build arguments of that service', function () {
+it('gives each Compose service build only the scoped build arguments of that service', function () {
     $result = scopeComposeServiceEnvironment([
         'services' => [
             'api' => ['build' => './api'],
@@ -38,9 +38,9 @@ it('gives each Compose service its own env file and only the scoped build argume
         ],
     ], ['API_TOKEN' => ['api'], 'DB_PASSWORD' => ['db']], ['SHARED' => 'x', 'API_TOKEN' => 'secret', 'DB_PASSWORD' => 'pw']);
 
-    expect($result['services']['api'])->toBe(['build' => ['context' => './api', 'args' => ['API_TOKEN']], 'env_file' => ['.coolify.api.env']])
-        ->and($result['services']['worker'])->toBe(['build' => ['context' => './worker', 'args' => ['EXISTING=1']], 'env_file' => ['.coolify.worker.env']])
-        ->and($result['services']['db'])->toBe(['image' => 'postgres', 'env_file' => ['.coolify.db.env']]);
+    expect($result['services']['api'])->toBe(['build' => ['context' => './api', 'args' => ['API_TOKEN']]])
+        ->and($result['services']['worker'])->toBe(['build' => ['context' => './worker', 'args' => ['EXISTING=1']]])
+        ->and($result['services']['db'])->toBe(['image' => 'postgres']);
 });
 
 it('matches the scopes of a preview deployment to the service names of the Compose file', function () {
@@ -51,5 +51,5 @@ it('matches the scopes of a preview deployment to the service names of the Compo
         pullRequestId: 7,
     );
 
-    expect($result['services']['api-pr-7'])->toBe(['build' => ['context' => './api', 'args' => ['API_TOKEN']], 'env_file' => ['.coolify.api-pr-7.env']]);
+    expect($result['services']['api-pr-7'])->toBe(['build' => ['context' => './api', 'args' => ['API_TOKEN']]]);
 });

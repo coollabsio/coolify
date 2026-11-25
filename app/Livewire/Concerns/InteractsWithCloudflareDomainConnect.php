@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Models\Server;
 use App\Services\Dns\ServerDnsAddresses;
 use App\Support\DnsRecordHints;
 use App\Support\DomainConnect\CloudflareDomainConnect;
@@ -217,7 +218,7 @@ trait InteractsWithCloudflareDomainConnect
 
     protected function serverDnsAddresses(): ServerDnsAddresses
     {
-        return new ServerDnsAddresses($this->serverIp, $this->serverIpConfigured, $this->usesInstanceNetworkAddressesForDnsHints());
+        return new ServerDnsAddresses($this->serverIp, $this->serverIpConfigured, ...ServerDnsAddresses::ipsByFamily($this->dnsTargetServer()));
     }
 
     protected function defaultDnsHostname(): string
@@ -255,7 +256,7 @@ trait InteractsWithCloudflareDomainConnect
         return null;
     }
 
-    abstract protected function usesInstanceNetworkAddressesForDnsHints(): bool;
+    abstract protected function dnsTargetServer(): ?Server;
 
     abstract protected function authorizeUpdateForDomainConnect(): void;
 }

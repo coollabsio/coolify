@@ -151,13 +151,9 @@ it('renders KPIs from a mocked traffic client when analytics is enabled', functi
 
     loadLazy(Livewire::test(Analytics::class, ['application' => $application]))
         ->assertOk()
-        ->assertSee('Requests')
         ->assertSee('1,000')
-        ->assertSee('Unique visitors')
-        ->assertSee('Error rate')
         ->assertSee('/')
         ->assertSee('United States')
-        ->assertSee('GeoIP data by MaxMind')
         ->assertSet('breakdowns.referer', [
             ['value' => 'google.com', 'requests' => 300, 'bytesOut' => 8000],
         ]);

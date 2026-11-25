@@ -7,7 +7,7 @@
 
 services:
   web:
-    image: ghcr.io/karakeep-app/karakeep:0.33.2
+    image: ghcr.io/karakeep-app/karakeep:0.35.0
     volumes:
       - karakeep-data:/data
     environment:
@@ -22,9 +22,9 @@ services:
       - DATA_DIR=/data
 
   chrome:
-    image: ghcr.io/karakeep-app/karakeep-chrome:release
+    image: ghcr.io/karakeep-app/karakeep-chrome:157.0.8103.78-r1
+    init: true
     command:
-      - '--no-sandbox'
       - '--disable-gpu'
       - '--disable-dev-shm-usage'
       - '--hide-scrollbars'
@@ -32,7 +32,7 @@ services:
       - '--window-size=1440,900'
 
   meilisearch:
-    image: getmeili/meilisearch:v1.41.0
+    image: getmeili/meilisearch:v1.55.0
     environment:
       - MEILI_NO_ANALYTICS=${MEILI_NO_ANALYTICS:-true}
       - NEXTAUTH_SECRET=${SERVICE_PASSWORD_KARAKEEPNEXTAUTH}

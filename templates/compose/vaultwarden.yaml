@@ -7,7 +7,7 @@
 
 services:
   vaultwarden:
-    image: vaultwarden/server:latest
+    image: vaultwarden/server:1.37.5
     environment:
       - SERVICE_URL_VAULTWARDEN
       - DOMAIN=${SERVICE_URL_VAULTWARDEN}

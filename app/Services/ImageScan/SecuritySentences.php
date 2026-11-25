@@ -202,7 +202,7 @@ final class SecuritySentences
      */
     private static function noFixState(?ImageScan $scan, ResourceSecurity $security): string
     {
-        $none = 'No fixed version exists yet, and Coolify checks every day.';
+        $none = 'No fixed version exists yet.';
         $findings = $scan === null ? [] : self::whyFindings($scan, $security);
         $withFix = count(array_filter($findings, fn (Finding $finding): bool => self::hasPackageFix($finding)));
         if ($findings === [] || $withFix === 0) {
@@ -211,15 +211,15 @@ final class SecuritySentences
 
         $many = $security->problemCount > 1;
         if ($withFix < count($findings)) {
-            return 'Some of them have a fix that the image does not include yet. Coolify checks every day.';
+            return 'The image does not include some of the fixes yet.';
         }
 
         $newest = self::newestImageWithout($scan, $findings);
 
         return match (true) {
-            $newest !== null => ($many ? 'The fixes are' : 'The fix is')." not in the newest {$newest} image yet. Coolify checks every day.",
-            $many => 'A fix exists for each, but the image does not include them yet. Coolify checks every day.',
-            default => 'A fix exists, but the image does not include it yet. Coolify checks every day.',
+            $newest !== null => ($many ? 'The fixes are' : 'The fix is')." not in the newest {$newest} image yet.",
+            $many => 'The image does not include the fixes yet.',
+            default => 'The image does not include the fix yet.',
         };
     }
 
@@ -308,8 +308,8 @@ final class SecuritySentences
         }
 
         return $security->problemCount > 1
-            ? "Until then, limit who can reach {$resourceNoun}, or ignore the problems if the affected parts are not used."
-            : "Until then, limit who can reach {$resourceNoun}, or ignore the problem if the affected part is not used.";
+            ? "Until then, limit access to {$resourceNoun}, or ignore problems in unused parts."
+            : "Until then, limit access to {$resourceNoun}, or ignore the problem if the part is not used.";
     }
 
     /**

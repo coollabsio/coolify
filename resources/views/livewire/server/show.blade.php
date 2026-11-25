@@ -80,7 +80,7 @@
                 <form wire:submit.prevent="submit" class="application-settings-form flex flex-col gap-6">
                     {{-- Server role saves separately; keep dirty tracking on explicit-save fields. --}}
                     <x-unsaved-bar action="submit"
-                        targets="name,description,ip,user,port,connectionTimeout,serverTimezone,wildcardDomain" />
+                        targets="name,description,ip,user,port,connectionTimeout,serverTimezone,wildcardDomain,publicIpv4,publicIpv6" />
 
                     <x-application.settings-section id="server-connection-section" title="Connection"
                         helper="Configure how Coolify identifies, reaches, and validates this server.">
@@ -260,6 +260,19 @@
                                     :disabled="$isValidating" />
                             @endif
                         </div>
+
+                        @if (!$server->isLocalhost() && !$isSwarmWorker && $serverRole !== 'build')
+                            <div class="mt-4 grid gap-4 lg:grid-cols-3">
+                                <x-forms.input canGate="update" :canResource="$server" id="publicIpv4"
+                                    label="Public IPv4" placeholder="203.0.113.10"
+                                    helper="Set this when Coolify connects to the server over a private network. DNS checks and DNS records use this address instead of the IP address above."
+                                    :disabled="$isValidating" />
+                                <x-forms.input canGate="update" :canResource="$server" id="publicIpv6"
+                                    label="Public IPv6" placeholder="2001:db8::10"
+                                    helper="Set this when Coolify connects to the server over a private network. DNS checks and DNS records use this address instead of the IP address above."
+                                    :disabled="$isValidating" />
+                            </div>
+                        @endif
 
                         @if (!$server->isLocalhost())
                             <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.08]">

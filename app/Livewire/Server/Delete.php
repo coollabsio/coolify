@@ -4,7 +4,6 @@ namespace App\Livewire\Server;
 
 use App\Actions\Server\AuthorizedKeys;
 use App\Actions\Server\DeleteServer;
-use App\Jobs\DeleteResourceJob;
 use App\Models\Server;
 use App\Services\ServerTransfer\ServerTransferClaimer;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -25,6 +24,8 @@ class Delete extends Component
     public bool $delete_from_hostinger = false;
 
     public bool $force_delete_resources = false;
+
+    public bool $remove_resources_from_server = true;
 
     public bool $remove_ssh_key = false;
 
@@ -49,6 +50,7 @@ class Delete extends Component
             $this->delete_from_digitalocean = in_array('delete_from_digitalocean', $selectedActions);
             $this->delete_from_hostinger = in_array('delete_from_hostinger', $selectedActions);
             $this->force_delete_resources = in_array('force_delete_resources', $selectedActions);
+            $this->remove_resources_from_server = in_array('remove_resources_from_server', $selectedActions);
             $this->remove_ssh_key = in_array('remove_ssh_key', $selectedActions);
         }
         // Another Coolify instance manages a transferred server. This instance deletes only its own records:
@@ -60,6 +62,7 @@ class Delete extends Component
             $this->delete_from_digitalocean = false;
             $this->delete_from_hostinger = false;
             $this->force_delete_resources = true;
+            $this->remove_resources_from_server = false;
             $this->remove_ssh_key = false;
         }
         try {
@@ -85,12 +88,7 @@ class Delete extends Component
             }
             // Applications that use the server only as an additional destination stay; they lose this server.
             // Another instance manages a transferred server, so the containers stay as they are there.
-            $this->server->detachAdditionalApplications(stopContainers: ! $isArchive);
-            if ($this->force_delete_resources) {
-                foreach ($resources as $resource) {
-                    DeleteResourceJob::dispatch($resource, deleteFromCoolifyOnly: $isArchive);
-                }
-            }
+            $this->server->detachAdditionalApplications(stopContainers: $this->remove_resources_from_server);
 
             $this->server->delete();
             DeleteServer::dispatch(
@@ -104,7 +102,8 @@ class Delete extends Component
                 $this->delete_from_digitalocean,
                 $this->server->digitalocean_droplet_id,
                 $this->delete_from_hostinger,
-                $this->server->hostinger_virtual_machine_id
+                $this->server->hostinger_virtual_machine_id,
+                $this->remove_resources_from_server,
             );
 
             return redirectRoute($this, 'server.index');
@@ -161,6 +160,11 @@ class Delete extends Component
                 'id' => 'force_delete_resources',
                 'label' => "Delete all resources ({$resourcesToDelete->count()} total): ".$resourcesToDelete->pluck('name')->implode(', '),
                 'default_warning' => 'Server cannot be deleted while it has resources.',
+            ];
+            $checkboxes[] = [
+                'id' => 'remove_resources_from_server',
+                'label' => 'Also remove the containers, volumes, and files of these resources from the server',
+                'default_warning' => 'The resources are deleted only from Coolify. Their containers, volumes, and files stay on the server and keep running.',
             ];
         }
 

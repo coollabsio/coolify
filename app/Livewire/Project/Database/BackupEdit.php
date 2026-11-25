@@ -2,9 +2,9 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Actions\Database\DeleteScheduledDatabaseBackup;
 use App\Enums\AccessLevel;
 use App\Livewire\Concerns\ManagesDatabaseBackup;
-use App\Livewire\Project\Database\Backup\Execution;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ServiceDatabase;
@@ -29,9 +29,6 @@ class BackupEdit extends Component
     public ScheduledDatabaseBackup $backup;
 
     public string $section = 'general';
-
-    /** The page shows the backup actions in the top header bar instead. */
-    public bool $actionsInHeader = false;
 
     #[Locked]
     public $availableS3Storages;
@@ -105,7 +102,6 @@ class BackupEdit extends Component
         // Keep "Backup Now" in sync when the database starts/stops without a full page refresh.
         $listeners = [
             'databaseUpdated' => 'refreshStatus',
-            'backupEnabledChanged' => 'syncBackupEnabled',
         ];
 
         $user = Auth::user();
@@ -247,26 +243,13 @@ class BackupEdit extends Component
                 $server = $database->destination->server;
             }
 
-            $filenames = $this->backup->executions()
-                ->whereNotNull('filename')
-                ->where('filename', '!=', '')
-                ->where('scheduled_database_backup_id', $this->backup->id)
-                ->pluck('filename')
-                ->filter()
-                ->all();
-
-            if (! empty($filenames)) {
-                if ($this->delete_associated_backups_locally && $server) {
-                    deleteBackupsLocally($filenames, $server);
-                }
-            }
-
-            if ($this->delete_associated_backups_s3) {
-                $this->backup->executions()->each(fn ($execution) => $execution->deleteS3Copies());
-            }
-
             $backupUuid = $this->backup->uuid;
-            $this->backup->delete();
+            DeleteScheduledDatabaseBackup::run(
+                $this->backup,
+                $server,
+                deleteLocalBackups: $this->delete_associated_backups_locally,
+                deleteS3Backups: $this->delete_associated_backups_s3,
+            );
             $this->skipRender();
             auditLog('ui.database.backup_schedule_deleted', [
                 'team_id' => $database->team()?->id,
@@ -323,15 +306,9 @@ class BackupEdit extends Component
     {
         try {
             $this->backupEnabled = $this->toggleDatabaseBackup($this->backup);
-            $this->dispatch('backupEnabledChanged')->to(Execution::class);
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
         }
-    }
-
-    public function syncBackupEnabled(): void
-    {
-        $this->backupEnabled = $this->backup->refresh()->enabled;
     }
 
     public function updatedS3StorageIds(): void

@@ -325,9 +325,14 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     /**
      * Send a notification, unless it is throttled and was already sent within its interval.
      * A throttle claim is released when sending throws, so a failed send is retried on the next check.
+     * A notification without enabled channels is not sent and does not claim the throttle.
      */
     public function notify($instance): void
     {
+        if ($instance->via($this) === []) {
+            return;
+        }
+
         $subject = $instance instanceof ThrottledNotification ? $instance->throttleSubject() : null;
         if ($subject === null) {
             $this->sendNotification($instance);

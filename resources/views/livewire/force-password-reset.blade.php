@@ -16,4 +16,11 @@
             Reset password
         </x-forms.button>
     </form>
+    <x-slot:footer>
+        <span>Not your account?</span>
+        <form action="{{ route('logout') }}" method="POST">
+            @csrf
+            <button type="submit" class="auth-text-link">Log out</button>
+        </form>
+    </x-slot:footer>
 </x-auth.shell>

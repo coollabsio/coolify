@@ -167,6 +167,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
 
             $warning = null;
+            $uploadFailed = false;
             $s3Uploaded = false;
             $s3CleanupPending = false;
             $localStorageDeleted = $streamToS3;
@@ -177,6 +178,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->execution->refreshS3Summary();
                 $this->execution->update(['s3_cleanup_pending' => false]);
             } elseif ($this->backup->save_s3 && $destinations->isEmpty()) {
+                $uploadFailed = true;
                 $warning = 'Storage upload failed: The selected backup storage no longer exists.';
             } elseif ($this->backup->save_s3) {
                 $s3CleanupPending = true;
@@ -187,6 +189,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
                 if ($s3Uploaded) {
                     $s3CleanupPending = false;
                 } else {
+                    $uploadFailed = true;
                     $warning = 'Storage upload failed: '.implode(' ', $uploadErrors);
 
                     try {
@@ -275,7 +278,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
             BackupCreated::dispatch($team->id);
         }
 
-        $team->notify(new BackupSuccess($this->backup, $warning));
+        $team->notify(new BackupSuccess($this->backup, $warning, $uploadFailed));
         if ($warning === null) {
             $this->notifyIfRecovered($team);
         }
@@ -479,7 +482,7 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         if (! $s3->isS3()) {
             $transfer = new RcloneTransfer($s3, $server, $containerName);
             try {
-                $transfer->start([$backupLocation.':'.$backupLocation.':ro'], timeout: $this->timeout);
+                $transfer->start([$backupLocation => $backupLocation], timeout: $this->timeout);
                 $transfer->upload($backupLocation, $backupLocation, $this->timeout);
             } finally {
                 instant_remote_process([$transfer->removeCommand()], $server, throwError: false, disableMultiplexing: true);
@@ -492,18 +495,25 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         try {
             instant_remote_process([
                 'docker rm -f '.escapeshellarg($containerName).' >/dev/null 2>&1 || true',
-                'docker run -d --name '.escapeshellarg($containerName).' --rm '.$s3->minioClientEnvOptions().' -v '
-                    .escapeshellarg($backupLocation.':'.$backupLocation.':ro').' '.escapeshellarg($image),
+                'docker run -d --name '.escapeshellarg($containerName).' --rm '.$s3->minioClientEnvOptions().' '
+                    .dockerReadOnlyFileMountOption($backupLocation, $backupLocation).' '.escapeshellarg($image),
             ], $server, timeout: $this->timeout, disableMultiplexing: true);
+            $key = ltrim($backupDirectory, '/').'/'.basename($backupLocation);
+            $isUploaded = fn (): bool => false;
             if ($s3->usesCurlTransfer()) {
-                $uploadCommand = $s3->prepareCurlUpload($server, $containerName, $backupLocation, ltrim($backupDirectory, '/').'/'.basename($backupLocation));
+                $curlUploadCommand = $s3->prepareCurlUpload($server, $containerName, $backupLocation, $key);
+                $uploadCommand = fn (): string => $curlUploadCommand;
             } else {
                 $resolveOptions = $s3->minioClientResolveOptions($server, $image);
                 $this->setMinioClientAlias($server, $containerName, $s3, $resolveOptions);
-                $uploadCommand = 'docker exec '.S3Storage::minioClientPartSizeOption($size).' '.escapeshellarg($containerName).' mc cp'.$resolveOptions.' '.escapeshellarg($backupLocation).' '
-                    .escapeshellarg('temporary/'.$s3->bucket.$backupDirectory.'/');
+                $uploadCommand = fn (string $checksumOption): string => 'docker exec '.S3Storage::minioClientPartSizeOption($size).' '.escapeshellarg($containerName)
+                    .' mc cp'.$resolveOptions.$checksumOption.' '.escapeshellarg($backupLocation).' '.escapeshellarg('temporary/'.$s3->bucket.$backupDirectory.'/');
+                $isUploaded = fn (): bool => $s3->minioClientObjectHasSize($server, $containerName, $key, $size, $resolveOptions);
             }
-            S3Storage::retryMinioClientUpload(fn () => instant_remote_process([$uploadCommand], $server, timeout: $this->timeout, disableMultiplexing: true));
+            S3Storage::retryMinioClientUpload(
+                fn (string $checksumOption) => instant_remote_process([$uploadCommand($checksumOption)], $server, timeout: $this->timeout, disableMultiplexing: true),
+                $isUploaded,
+            );
         } finally {
             instant_remote_process(
                 ['docker rm -f '.escapeshellarg($containerName)],
@@ -564,10 +574,13 @@ class VolumeBackupJob implements ShouldBeEncrypted, ShouldQueue
         // Each progress frame starts with "\r", so printing the last field per line keeps only the final frame and real errors.
         $mcPipeLog = '/tmp/mc-pipe.log';
         // Object Lock buckets need Content-MD5 on each upload. `mc cp` adds it when the bucket lock is enabled, `mc pipe` only with `--checksum=MD5`.
+        // A key that cannot read the lock configuration hides the lock, so the upload runs again with the checksum when the bucket asks for it.
         $streamScript = 'set -o pipefail; lock=$(mc retention info --default --json'.$resolveOptions.' '.escapeshellarg('temporary/'.$s3->bucket).' 2>/dev/null || true)'
-            .' && case "$lock" in *\'"enabled":"Enabled"\'*) checksum=--checksum=MD5 ;; *) checksum= ;; esac'
-            .' && ('.$archiveScript.' | mc pipe'.$resolveOptions.' $checksum '.escapeshellarg($destination).' >/dev/null 2>'.$mcPipeLog
-            .' || { status=$?; awk -F '.escapeshellarg('\r').' '.escapeshellarg('{ print $NF }').' '.$mcPipeLog.' >&2; exit $status; })'
+            .' && case "$lock" in *\'"enabled":"Enabled"\'*) checksum='.ltrim(S3Storage::MINIO_CLIENT_CHECKSUM_OPTION).' ;; *) checksum= ;; esac'
+            .' && upload() { '.$archiveScript.' | mc pipe'.$resolveOptions.' "$@" '.escapeshellarg($destination).' >/dev/null 2>'.$mcPipeLog.'; }'
+            .' && (upload $checksum || { status=$?;'
+            .' if [ -z "$checksum" ] && grep -qi '.escapeshellarg(S3Storage::CHECKSUM_REQUIRED_ERROR).' '.$mcPipeLog.'; then upload'.S3Storage::MINIO_CLIENT_CHECKSUM_OPTION.'; status=$?; fi;'
+            .' [ $status -eq 0 ] || { awk -F '.escapeshellarg('\r').' '.escapeshellarg('{ print $NF }').' '.$mcPipeLog.' >&2; exit $status; }; })'
             .' && mc stat --json'.$resolveOptions.' '.escapeshellarg($destination)
             .' | sed -n '.escapeshellarg('s/.*"size":\([0-9][0-9]*\).*/\1/p');
 

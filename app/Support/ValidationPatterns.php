@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Validation\ValidationException;
+
 /**
  * Shared validation patterns for consistent use across the application
  */
@@ -276,6 +278,18 @@ class ValidationPatterns
         }
 
         return $key;
+    }
+
+    /**
+     * Rejects an environment variable value with a NUL byte. A container cannot start with one.
+     *
+     * @throws ValidationException
+     */
+    public static function rejectNulByteInEnvironmentVariableValue(?string $value): void
+    {
+        if ($value !== null && str_contains($value, "\0")) {
+            throw ValidationException::withMessages(['value' => 'The value cannot contain a NUL character.']);
+        }
     }
 
     /**

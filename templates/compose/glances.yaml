@@ -7,7 +7,7 @@
 
 services:
   glances:
-    image: nicolargo/glances:latest
+    image: nicolargo/glances:4.5.9
     restart: unless-stopped
     environment:
       - GLANCES_OPT=-w

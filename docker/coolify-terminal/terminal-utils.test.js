@@ -350,7 +350,32 @@ test('getTerminalAuthHeaders forwards the whole cookie header so Laravel reads i
     assert.deepEqual(getTerminalAuthHeaders(cookieHeader), [{
         'Cookie': cookieHeader,
         'X-XSRF-TOKEN': 'xsrf-value',
+        'X-Forwarded-Proto': 'https',
     }]);
+});
+
+test('getTerminalAuthHeaders sends the scheme of each XSRF cookie, so Coolify reads the session cookie of that scheme (issue #4313)', () => {
+    // Plain HTTP (port 8000) cannot overwrite the Secure cookies of an HTTPS visit,
+    // so Coolify gives it the cookies coolify_session_http and XSRF-TOKEN-HTTP.
+    const cookieHeader = 'coolify_session=https-session; XSRF-TOKEN=https-xsrf; coolify_session_http=http-session; XSRF-TOKEN-HTTP=http-xsrf';
+
+    assert.deepEqual(getTerminalAuthHeaders(cookieHeader, 'https://coolify.example.com').map((headers) => [headers['X-XSRF-TOKEN'], headers['X-Forwarded-Proto']]), [
+        ['https-xsrf', 'https'],
+        ['http-xsrf', 'http'],
+    ]);
+});
+
+test('getTerminalAuthHeaders tries the cookies of the page scheme first', () => {
+    // A stale XSRF-TOKEN from a plain HTTP visit before the upgrade must not win on port 8000.
+    const cookieHeader = 'XSRF-TOKEN=stale-xsrf; coolify_session=stale-session; XSRF-TOKEN-HTTP=http-xsrf; coolify_session_http=http-session';
+    const tokens = (origin) => getTerminalAuthHeaders(cookieHeader, origin).map((headers) => headers['X-XSRF-TOKEN']);
+
+    assert.deepEqual(tokens('http://coolify.example.com:8000'), ['http-xsrf', 'stale-xsrf']);
+    assert.deepEqual(tokens('https://coolify.example.com'), ['stale-xsrf', 'http-xsrf']);
+});
+
+test('getTerminalAuthHeaders ignores cookies named like Object properties', () => {
+    assert.deepEqual(getTerminalAuthHeaders('constructor=value; __proto__=value; toString=value'), []);
 });
 
 test('getTerminalAuthHeaders makes one candidate for each XSRF-TOKEN cookie', () => {
@@ -397,7 +422,7 @@ test('authenticateTerminalUpgrade checks the Laravel session exactly like the pr
         },
     );
 
-    const authHeaders = { 'Cookie': 'coolify_session=session-value; XSRF-TOKEN=xsrf-value', 'X-XSRF-TOKEN': 'xsrf-value' };
+    const authHeaders = { 'Cookie': 'coolify_session=session-value; XSRF-TOKEN=xsrf-value', 'X-XSRF-TOKEN': 'xsrf-value', 'X-Forwarded-Proto': 'https' };
     assert.deepEqual(result, { authenticated: true, authHeaders });
     assert.deepEqual(requests, [['/terminal/auth', authHeaders]]);
 });

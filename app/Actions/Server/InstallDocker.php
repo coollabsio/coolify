@@ -92,7 +92,7 @@ class InstallDocker
                 ]);
             } else {
                 $command = $command->merge([
-                    'docker network create --attachable coolify >/dev/null 2>&1 || true',
+                    dockerProxyNetworkEnsureCommand('coolify'),
                 ]);
                 $command = $command->merge([
                     "echo 'Done!'",
@@ -136,7 +136,7 @@ class InstallDocker
     {
         return 'dnf install -y docker && '.
             'mkdir -p /usr/local/lib/docker/cli-plugins && '.
-            'curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose && '.
+            'curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose && '.
             'chmod +x /usr/local/lib/docker/cli-plugins/docker-compose';
     }
 

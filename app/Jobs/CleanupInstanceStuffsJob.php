@@ -43,6 +43,7 @@ class CleanupInstanceStuffsJob implements ShouldBeEncrypted, ShouldBeUnique, Sho
             $this->cleanupExpiredEmailChangeRequests();
             $this->enforceBackupRetention();
             $this->deleteOrphanedNotificationThrottles();
+            $this->failDeploymentsOfStoppedWorkers();
         } catch (\Throwable $e) {
             Log::error('CleanupInstanceStuffsJob failed with error: '.$e->getMessage());
         }
@@ -65,6 +66,15 @@ class CleanupInstanceStuffsJob implements ShouldBeEncrypted, ShouldBeUnique, Sho
                 'email_change_code' => null,
                 'email_change_code_expires_at' => null,
             ]);
+    }
+
+    private function failDeploymentsOfStoppedWorkers(): void
+    {
+        try {
+            fail_deployments_of_stopped_workers();
+        } catch (\Throwable $e) {
+            Log::error('Failed to fail the deployments of stopped workers: '.$e->getMessage());
+        }
     }
 
     private function deleteOrphanedNotificationThrottles(): void

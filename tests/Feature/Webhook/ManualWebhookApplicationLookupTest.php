@@ -27,7 +27,7 @@ beforeEach(function () {
     Event::listen('eloquent.retrieved: '.Application::class, fn (Application $application) => $this->retrievedApplicationIds->push($application->id));
 });
 
-function manualLookupApplication(string $gitRepository, string $branch = 'main'): Application
+function manualLookupApplication(string $gitRepository, string $branch = 'main', string $buildPack = 'nixpacks'): Application
 {
     $team = Team::factory()->create();
     $project = Project::factory()->create(['team_id' => $team->id]);
@@ -44,7 +44,7 @@ function manualLookupApplication(string $gitRepository, string $branch = 'main')
         'name' => 'manual-lookup-app',
         'git_repository' => $gitRepository,
         'git_branch' => $branch,
-        'build_pack' => 'nixpacks',
+        'build_pack' => $buildPack,
         'ports_exposes' => '3000',
         'environment_id' => $environment->id,
         'destination_id' => $destination->id,
@@ -215,6 +215,16 @@ test('pushes that must not deploy an application', function (string $case, strin
     'auto deploy disabled' => ['auto deploy disabled', 'Deployments disabled.'],
     'invalid signature' => ['invalid signature', 'No matching application or invalid signature.'],
 ]);
+
+test('a push does not deploy a Docker Compose application with auto deploy disabled', function (string $provider) {
+    $application = manualLookupApplication('https://github.com/acme/app', buildPack: 'dockercompose');
+    $application->settings->update(['is_auto_deploy_enabled' => false]);
+
+    $response = sendManualLookupPush($this, $provider, $application->{"manual_webhook_secret_{$provider}"})->assertOk();
+
+    expect($response->json('0.status'))->toBe('failed')
+        ->and(manualLookupDeployed($application))->toBeFalse();
+})->with(['github', 'gitlab', 'bitbucket', 'gitea']);
 
 test('pull request events dispatch only applications of the repository', function (string $action) {
     $application = manualLookupApplication('https://github.com/acme/app');

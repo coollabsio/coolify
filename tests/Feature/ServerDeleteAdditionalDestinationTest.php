@@ -1,7 +1,7 @@
 <?php
 
 use App\Actions\Application\StopApplicationOneServer;
-use App\Jobs\DeleteResourceJob;
+use App\Actions\Server\DeleteServer;
 use App\Livewire\Project\Shared\Destination;
 use App\Livewire\Server\Delete;
 use App\Models\Application;
@@ -15,6 +15,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
@@ -65,7 +66,7 @@ function deleteServer(object $test, string $path, bool $force): void
 
     $test->actingAs($test->user);
     Livewire::test(Delete::class, ['server_uuid' => $test->serverToDelete->uuid])
-        ->call('delete', 'password', $force ? ['force_delete_resources'] : [])
+        ->call('delete', 'password', $force ? ['force_delete_resources', 'remove_resources_from_server'] : [])
         ->assertHasNoErrors()
         ->assertNotDispatched('error');
 }
@@ -92,8 +93,12 @@ test('deleting a server with force deletes its own applications and only detache
         ->and(Application::find($additional->id))->not->toBeNull()
         ->and(additionalDestinationsOf($additional, $this->serverToDelete))->toBe(0);
 
-    Queue::assertPushed(DeleteResourceJob::class, 1);
-    Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($primary));
+    Process::fake();
+    DeleteServer::run($this->serverToDelete->id);
+
+    expect(Application::withTrashed()->find($primary->id))->toBeNull()
+        ->and(Application::find($additional->id))->not->toBeNull()
+        ->and(Server::withTrashed()->find($this->serverToDelete->id))->toBeNull();
 })->with(['api', 'ui']);
 
 test('a server with only additional-destination applications is deleted without force and detaches them', function (string $path) {
@@ -106,13 +111,13 @@ test('a server with only additional-destination applications is deleted without 
     expect(Server::withTrashed()->find($this->serverToDelete->id)->trashed())->toBeTrue()
         ->and(Application::find($additional->id))->not->toBeNull()
         ->and(additionalDestinationsOf($additional, $this->serverToDelete))->toBe(0);
-    Queue::assertNotPushed(DeleteResourceJob::class);
 })->with(['api', 'ui']);
 
 test('an application promoted to another server survives the deletion of its old server', function () {
     $application = ($this->makeApplication)($this->destinationToDelete, 'ref-admin');
     $application->additional_networks()->attach($this->otherDestination->id, ['server_id' => $this->otherServer->id]);
     $this->otherServer->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+    Process::fake();
     StopApplicationOneServer::shouldRun()->once();
 
     $this->actingAs($this->user);
@@ -126,7 +131,9 @@ test('an application promoted to another server survives the deletion of its old
     expect($application)->not->toBeNull()
         ->and($application->destination_id)->toBe($this->otherDestination->id)
         ->and(additionalDestinationsOf($application, $this->serverToDelete))->toBe(0);
-    Queue::assertNotPushed(DeleteResourceJob::class);
+
+    DeleteServer::run($this->serverToDelete->id);
+    expect(Application::find($application->id))->not->toBeNull();
 });
 
 test('the delete confirmation lists the resources to delete and the applications to detach', function () {

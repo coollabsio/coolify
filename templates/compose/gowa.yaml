@@ -7,7 +7,7 @@
 
 services:
   gowa:
-    image: aldinokemal2104/go-whatsapp-web-multidevice:latest
+    image: aldinokemal2104/go-whatsapp-web-multidevice:v9.9.0
     environment:
       - SERVICE_URL_GOWA_3000
       - SERVICE_USER_GOWA

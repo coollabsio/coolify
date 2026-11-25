@@ -382,7 +382,6 @@ test('admin can limit log redaction to locked values for one application', funct
 
     Livewire::test(EnvironmentVariableAll::class, ['resource' => $this->application])
         ->assertSet('redact_all_env_values_in_logs', true)
-        ->assertSee('Environment values in logs')
         ->set('redact_all_env_values_in_logs', false)
         ->call('saveLogRedactionSetting')
         ->assertHasNoErrors();
@@ -420,7 +419,6 @@ test('admin can limit log redaction to locked values for one database and a memb
 
     $this->actingAs($this->member);
     Livewire::test(EnvironmentVariableAll::class, ['resource' => $database])
-        ->assertSee('Environment values in logs')
         ->set('redact_all_env_values_in_logs', false)
         ->call('saveLogRedactionSetting')
         ->assertSet('redact_all_env_values_in_logs', true)

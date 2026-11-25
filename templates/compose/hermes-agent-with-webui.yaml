@@ -40,7 +40,7 @@ services:
       timeout: 5s
       retries: 5
   hermes-webui:
-    image: 'ghcr.io/nesquena/hermes-webui:0.52.458'
+    image: 'ghcr.io/nesquena/hermes-webui:0.52.695'
     depends_on:
       - hermes-agent
     environment:

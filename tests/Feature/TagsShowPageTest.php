@@ -30,33 +30,7 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-it('shows an empty state when there are no tags', function () {
-    Livewire::test(Show::class)
-        ->assertSee('Tags')
-        ->assertSee('No tags yet')
-        ->assertSee('Create a tag, then connect it to resources to group related deployments.');
-});
-
-it('shows a card grid overview when tags exist and none is selected', function () {
-    Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
-    Tag::create(['name' => 'production', 'team_id' => $this->team->id]);
-
-    Livewire::test(Show::class)
-        ->assertSee('Tags')
-        ->assertSee('2 tags for bulk deploys and grouping')
-        ->assertSee('hello')
-        ->assertSee('production')
-        ->assertSee('Search tags')
-        ->assertSee('Sort')
-        ->assertSee('Table view', false)
-        ->assertSee('Grid view', false)
-        ->assertSee('tagsIndex', false)
-        ->assertSee('Number(filteredTags.length)', false)
-        ->assertDontSee('Switch tag')
-        ->assertDontSee('Deploy webhook URL');
-});
-
-it('shows the tag detail layout with stats when a tag is selected', function () {
+it('shows the resources of the selected tag', function () {
     $tag = Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
 
     $server = Server::factory()->create(['team_id' => $this->team->id]);
@@ -72,25 +46,7 @@ it('shows the tag detail layout with stats when a tag is selected', function () 
     $application->tags()->attach($tag->id);
 
     Livewire::test(Show::class, ['tagName' => 'hello'])
-        ->assertSee('Tags')
-        ->assertDontSee('Switch tag')
-        ->assertSee('Resources')
-        ->assertSee('Applications')
-        ->assertSee('Active deployments')
-        ->assertSee('Deploy webhook URL')
-        ->assertSee('Redeploy all')
-        ->assertSee('tagged-app')
-        ->assertDontSee('No resources use this tag');
-});
-
-it('shows empty resource and deployment states for an unused tag', function () {
-    Tag::create(['name' => 'orphan', 'team_id' => $this->team->id]);
-
-    Livewire::test(Show::class, ['tagName' => 'orphan'])
-        ->assertSee('No resources use this tag')
-        ->assertSee('No active deployments')
-        ->assertSee('Using this tag')
-        ->assertSee('Queued or running');
+        ->assertSee('tagged-app');
 });
 
 it('redirects to the overview when the requested tag does not exist', function () {

@@ -312,10 +312,12 @@ class Gitlab extends Controller
                             }
                         }
 
-                        ($found ?? $pr_app)->markForkPullRequest($this->isForkPreviewRepository(
+                        $isFork = $this->isForkPreviewRepository(
                             data_get($payload, 'object_attributes.source_project_id'),
                             data_get($payload, 'object_attributes.target_project_id'),
-                        ), $commit ?? null);
+                        );
+                        ($found ?? $pr_app)->recordSameRepository(! $isFork);
+                        ($found ?? $pr_app)->markForkPullRequest($isFork, $commit ?? null);
 
                         $result = queue_application_deployment(
                             application: $application,
@@ -616,10 +618,12 @@ class Gitlab extends Controller
                                     $pr_app->generate_preview_fqdn();
                                 }
                             }
-                            ($found ?? $pr_app)->markForkPullRequest($this->isForkPreviewRepository(
+                            $isFork = $this->isForkPreviewRepository(
                                 data_get($payload, 'object_attributes.source_project_id'),
                                 data_get($payload, 'object_attributes.target_project_id'),
-                            ), $commit ?? null);
+                            );
+                            ($found ?? $pr_app)->recordSameRepository(! $isFork);
+                            ($found ?? $pr_app)->markForkPullRequest($isFork, $commit ?? null);
 
                             $result = queue_application_deployment(
                                 application: $application,

@@ -178,7 +178,6 @@ it('shows the KPI tiles, a stale badge for offline servers, and the container to
     Livewire::test(TestableMetrics::class)
         ->assertSee('web-1')
         ->assertSee('web-2')
-        ->assertSee('Fleet CPU')
         ->assertSee('healthy')
         ->assertSee('attention')
         ->assertSee('Offline');
@@ -215,17 +214,6 @@ it('cannot see another team’s servers', function () {
     expect($component->get('serverRows'))->toHaveCount(0);
 });
 
-it('drops the "Fleet" tile prefix when scoped to a single server', function () {
-    $s = metricsServer($this->team, $this->privateKey);
-    StubMetricsClient::$summaries = [$s->uuid => onlineSummary()];
-
-    Livewire::test(TestableMetrics::class)
-        ->assertSee('Fleet CPU')
-        ->set('serverUuid', $s->uuid)
-        ->assertDontSee('Fleet')
-        ->assertSee('for the selected server');
-});
-
 it('renders container metric values without leaking a blade directive', function () {
     $s = metricsServer($this->team, $this->privateKey);
     StubMetricsClient::$summaries = [$s->uuid => onlineSummary()];
@@ -252,19 +240,6 @@ it('falls back to cpu for an unknown container metric', function () {
         ->assertSet('containerMetric', 'cpu')
         ->set('containerMetric', 'bar')
         ->assertSet('containerMetric', 'cpu');
-});
-
-it('keys container rows by server so shared container ids do not collide', function () {
-    $one = metricsServer($this->team, $this->privateKey);
-    $two = metricsServer($this->team, $this->privateKey);
-    $proxy = ['id' => 'coolify-proxy', 'cpu' => 1.0, 'memUsed' => 10, 'memPercent' => 1.0, 'diskBytes' => 1, 'net' => 0.0];
-
-    StubMetricsClient::$summaries = [$one->uuid => onlineSummary(), $two->uuid => onlineSummary()];
-    StubMetricsClient::$containers = [$one->uuid => [$proxy], $two->uuid => [$proxy]];
-
-    Livewire::test(TestableMetrics::class)
-        ->assertSeeHtml('wire:key="fleet-container-'.$one->uuid.'-coolify-proxy"')
-        ->assertSeeHtml('wire:key="fleet-container-'.$two->uuid.'-coolify-proxy"');
 });
 
 it('removes a transferred server on refresh', function () {

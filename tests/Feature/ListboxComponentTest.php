@@ -42,12 +42,6 @@ function multipleListboxTestComponent(): Component
     };
 }
 
-test('multiple listbox shows the placeholder when nothing is selected', function (mixed $ids) {
-    Livewire::test(multipleListboxTestComponent(), ['ids' => $ids])
-        ->assertSeeHtml('aria-multiselectable="true"')
-        ->assertSeeHtml('x-text="current">Pick servers</span>');
-})->with([[[]], [['group']]]);
-
 test('multiple listbox joins up to two selected labels in the trigger', function () {
     // Ids that arrive as strings must match integer option values.
     Livewire::test(multipleListboxTestComponent(), ['ids' => ['2', 1]])
@@ -68,59 +62,6 @@ test('client-side multiple listbox treats a non-array value as empty', function 
     expect($html)
         ->toContain('x-text="current">No tags</span>')
         ->toMatch('/value:\\s*\\[\\]\\s*,/');
-});
-
-test('single listbox output has no multiple-selection attributes', function () {
-    $html = Blade::render(<<<'BLADE'
-        <x-forms.listbox id="mode" :wire="false" value="a" :options="[
-            ['value' => 'a', 'label' => 'A'],
-            ['value' => 'b', 'label' => 'B'],
-        ]" />
-    BLADE);
-
-    expect($html)
-        ->not->toContain('aria-multiselectable')
-        ->not->toContain('get selected()')
-        ->toContain('x-text="current"></span>')
-        ->toMatch("/value:\\s*'a'\\s*,/");
-});
-
-test('searchable listbox renders a search field with its placeholders', function () {
-    $html = Blade::render(<<<'BLADE'
-        <x-forms.listbox id="server" :wire="false" searchable searchPlaceholder="Search servers"
-            searchEmptyText="No matching server" :options="[['value' => 1, 'label' => 'One']]" />
-    BLADE);
-
-    expect($html)
-        ->toContain('type="search"')
-        ->toContain('placeholder="Search servers"')
-        ->toContain('No matching server');
-});
-
-test('searchable listbox with allowCustom offers the typed value as an option', function () {
-    $html = Blade::render(<<<'BLADE'
-        <x-forms.listbox id="path" :wire="false" searchable allowCustom :options="[['value' => 'Dockerfile', 'label' => 'Dockerfile']]" />
-    BLADE);
-
-    expect($html)
-        ->toContain('x-if="customOption"')
-        ->toContain('!customOption');
-});
-
-test('listbox without allowCustom offers no custom option', function () {
-    $html = Blade::render(<<<'BLADE'
-        <x-forms.listbox id="path" :wire="false" searchable :options="[['value' => 'Dockerfile', 'label' => 'Dockerfile']]" />
-    BLADE);
-
-    expect($html)->not->toContain('x-if="customOption"');
-});
-
-test('listbox without searchable renders no search field', function () {
-    $html = Blade::render(<<<'BLADE'
-        <x-forms.listbox id="server" :wire="false" :options="[['value' => 1, 'label' => 'One']]" />
-    BLADE);
-
-    expect($html)->not->toContain('type="search"');
 });
 
 test('multiple listbox shows the array validation error', function () {

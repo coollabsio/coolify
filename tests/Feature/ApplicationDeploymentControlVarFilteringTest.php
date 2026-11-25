@@ -9,6 +9,7 @@ use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\SharedEnvironmentVariable;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -890,7 +891,7 @@ YAML;
     $buildtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_buildtime_environment_variables');
     $envString = $buildtimeEnvs->implode("\n");
 
-    expect($envString)->toContain("SERVICE_NAME_POSTGRESAPP='postgresapp-pr-241'");
+    expect($envString)->toContain("SERVICE_NAME_POSTGRESAPP='postgresapp'");
     expect($envString)->not->toContain('SERVICE_NAME_POSTGRESAPP=""');
     expect($envString)->not->toContain('SERVICE_URL_APP=');
 });
@@ -974,6 +975,7 @@ it('filters docker compose generated service variables from build args', functio
 it('falls back to production runtime vars without a preview copy only when previews use production values', function (bool $isPublic, bool $usesProductionValues, bool $fallsBack) {
     [$application, $server] = makeDeploymentControlVarFixture();
     $application->settings()->update([
+        'is_preview_deployments_enabled' => true,
         'is_pr_deployments_public_enabled' => $isPublic,
         'use_production_values_in_previews' => $usesProductionValues,
     ]);
@@ -1045,7 +1047,7 @@ it('keeps copied production values out of previews when public PR deployments ar
         'build_pack' => $buildPack,
         'docker_compose_raw' => "services:\n  app:\n    image: nginx\n",
     ]);
-    $application->settings()->update(['is_pr_deployments_public_enabled' => true]);
+    $application->settings()->update(['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true]);
 
     createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'production-secret']);
     createApplicationEnvironmentVariable($application, ['key' => 'API_URL', 'value' => 'https://api.example.com']);
@@ -2228,7 +2230,7 @@ it('does not warn about a PORT mismatch when readonly labels are disabled', func
 
 it('gives a preview from before v4.5.1 the production values it had', function () {
     [$application, $server] = makeDeploymentControlVarFixture();
-    $application->settings()->update(['is_pr_deployments_public_enabled' => true]);
+    $application->settings()->update(['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true]);
 
     createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'production-secret', 'is_buildtime' => false]);
     createApplicationEnvironmentVariable($application, ['key' => 'APP_NAME', 'value' => 'coolify', 'is_buildtime' => false]);
@@ -2317,6 +2319,35 @@ YAML;
 })->with([
     'production' => 0,
     'preview' => 42,
+]);
+
+it('turns off the build cache of a custom Compose build command for a forced rebuild', function (bool $forceRebuild, string $customBuildCommand, string $expectedBuild) {
+    $compose = "services:\n  app:\n    build: .\n";
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => $compose,
+        'docker_compose' => $compose,
+        'docker_compose_domains' => '[]',
+    ]);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'remote_secrets_cache' => [],
+        'force_rebuild' => $forceRebuild,
+        'docker_compose_location' => '/docker-compose.yaml',
+        'docker_compose_custom_build_command' => $customBuildCommand,
+        'build_args' => collect(),
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'build_docker_compose_images', parseDockerComposeYaml($compose), collect());
+
+    $buildCommand = collect($job->recordedCommands)->flatten()->first(fn (mixed $command): bool => is_string($command) && str_contains($command, 'docker compose'));
+
+    expect($buildCommand)->toContain($expectedBuild)
+        ->and(substr_count($buildCommand, '--no-cache'))->toBe(str_contains($expectedBuild, '--no-cache') ? 1 : 0);
+})->with([
+    'forced rebuild' => [true, 'docker compose build app', ' build --no-cache app'],
+    'forced rebuild with --no-cache already set' => [true, 'docker compose build --no-cache app', ' build --no-cache app'],
+    'regular deployment' => [false, 'docker compose build app', ' build app'],
 ]);
 
 it('passes port-suffixed compose service URL variables to production and preview deployments', function (int $pullRequestId) {
@@ -2429,3 +2460,84 @@ it('gives build secrets the stored value without the quotes that Coolify adds', 
         ->toContain("MULTILINE=line1\n")
         ->toContain("NORMAL='kept'\n");
 });
+
+it('gives copied production values to previews while preview deployments are disabled', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $application->settings()->update(['is_preview_deployments_enabled' => false, 'is_pr_deployments_public_enabled' => true]);
+
+    createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => 'production-secret']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 99,
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs->contains(fn (string $env) => str($env)->startsWith('DB_PASSWORD=') && str($env)->contains('production-secret')))->toBeTrue();
+});
+
+it('keeps a preview value out of public previews when it resolves to the production value', function () {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $application->settings()->update(['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true]);
+    SharedEnvironmentVariable::create([
+        'key' => 'DB_PASSWORD', 'value' => 'team-secret', 'type' => 'team', 'team_id' => $application->team()->id,
+    ]);
+
+    createApplicationEnvironmentVariable($application, ['key' => 'DB_PASSWORD', 'value' => '{{ team.DB_PASSWORD }}']);
+    $application->environment_variables_preview()->where('key', 'DB_PASSWORD')->firstOrFail()
+        ->update(['value' => '{{team.DB_PASSWORD}}']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 99,
+    ]);
+
+    /** @var Collection $runtimeEnvs */
+    $runtimeEnvs = invokeDeploymentJobMethod($job, $reflection, 'generate_runtime_environment_variables');
+
+    expect($runtimeEnvs->filter(fn (string $env) => str($env)->contains('team-secret') || str($env)->startsWith('DB_PASSWORD=')))->toBeEmpty();
+});
+
+it('does not list generated Compose service variables as skipped preview variables', function () {
+    [$application, $server] = makeDeploymentControlVarFixture([
+        'build_pack' => 'dockercompose',
+        'docker_compose_raw' => "services:\n  web:\n    image: nginx\n",
+    ]);
+    $application->settings()->update(['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true]);
+
+    createApplicationEnvironmentVariable($application, ['key' => 'SERVICE_URL_WEB', 'value' => 'https://web.example.com']);
+    createApplicationEnvironmentVariable($application, ['key' => 'SERVICE_FQDN_WEB', 'value' => 'web.example.com']);
+    createApplicationEnvironmentVariable($application, ['key' => 'DUMMY_VAR', 'value' => 'production-value']);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 99,
+    ]);
+
+    invokeDeploymentJobMethod($job, $reflection, 'warnAboutPreviewVariablesNotPassed');
+
+    $warning = collect($job->recordedLogEntries)->first(fn (string $entry) => str_contains($entry, 'still have the production value'));
+    expect($warning)->toEndWith(': DUMMY_VAR');
+});
+
+it('stops a webhook preview deployment when preview deployments were disabled after it was queued', function (bool $isWebhook, bool $isPreviewDeploymentsEnabled, bool $stops) {
+    [$application, $server] = makeDeploymentControlVarFixture();
+    $application->settings()->update(['is_preview_deployments_enabled' => $isPreviewDeploymentsEnabled, 'is_pr_deployments_public_enabled' => true]);
+
+    $queue = Mockery::mock(ApplicationDeploymentQueue::class);
+    $queue->shouldReceive('getAttribute')->with('is_webhook')->andReturn($isWebhook);
+
+    [$job, $reflection] = makeControlVarFilteringJob($application->fresh(), $server, [
+        'pull_request_id' => 99,
+        'application_deployment_queue' => $queue,
+    ]);
+
+    $deploy = fn () => invokeDeploymentJobMethod($job, $reflection, 'ensureWebhookPreviewDeploymentsAreEnabled');
+
+    $stops
+        ? expect($deploy)->toThrow(DeploymentException::class, 'Preview deployments were disabled')
+        : expect($deploy())->toBeNull();
+})->with([
+    'webhook, previews disabled' => [true, false, true],
+    'webhook, previews enabled' => [true, true, false],
+    'deployed by hand, previews disabled' => [false, false, false],
+]);

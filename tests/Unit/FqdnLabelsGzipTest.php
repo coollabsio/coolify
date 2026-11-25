@@ -1,12 +1,14 @@
 <?php
 
 /**
- * Traefik compression must not buffer Server-Sent Events (text/event-stream),
- * otherwise streaming endpoints such as the n8n MCP trigger never respond.
+ * Traefik compression must not buffer Server-Sent Events (text/event-stream), otherwise
+ * streaming endpoints such as the n8n MCP trigger never respond. It must not compress
+ * video and audio either: compression removes `Accept-Ranges`, so Safari cannot play
+ * the file and other browsers cannot seek (#5222).
  *
- * The middleware has its own name because every running container declares the
- * legacy `gzip` middleware: a different definition under the same name makes
- * Traefik drop it for all routers until every resource is redeployed.
+ * The middleware has its own name because running containers declare the older `gzip`
+ * and `gzip-sse` middlewares: a different definition under the same name makes Traefik
+ * drop it for all routers until every resource is redeployed.
  */
 function gzipTraefikLabels(bool $gzip, string $domain = 'https://example.com'): array
 {
@@ -18,15 +20,22 @@ function gzipTraefikLabels(bool $gzip, string $domain = 'https://example.com'): 
     )->values()->all();
 }
 
-test('gzip compression excludes text/event-stream responses', function (string $domain, array $routers) {
+test('gzip compression excludes event streams and media responses', function (string $domain, array $routers) {
     $labels = gzipTraefikLabels(true, $domain);
 
-    expect($labels)
-        ->toContain('traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream')
-        ->not->toContain('traefik.http.middlewares.gzip.compress=true');
+    $definition = collect($labels)->first(
+        fn (string $label) => str_starts_with($label, 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=')
+    );
+    expect($definition)->not->toBeNull();
+    expect(explode(',', str($definition)->after('=')->toString()))
+        ->toContain('text/event-stream', 'video/mp4', 'video/webm', 'video/quicktime', 'audio/mpeg', 'application/octet-stream')
+        ->not->toContain('text/html', 'application/json', 'video/*');
+
+    expect(collect($labels)->filter(fn (string $label) => str_contains($label, 'middlewares.gzip.') || str_contains($label, 'middlewares.gzip-sse.')))
+        ->toBeEmpty();
 
     foreach ($routers as $router) {
-        expect(middlewaresOfRouter($labels, $router))->toContain('gzip-sse')->not->toContain('gzip');
+        expect(middlewaresOfRouter($labels, $router))->toContain('gzip-no-media')->not->toContain('gzip', 'gzip-sse');
     }
 })->with([
     'https domain' => ['https://example.com', ['https-0-testuuid']],

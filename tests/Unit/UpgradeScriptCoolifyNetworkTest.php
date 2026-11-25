@@ -27,6 +27,7 @@ function runUpgradeScriptEnsureCoolifyNetwork(string $script, ?string $existingG
     $harness = <<<BASH
         LOGFILE="{$dir}/upgrade.log"
         STATUS_FILE="{$dir}/status"
+        STATUS_LOCK_FILE="{$dir}/status.lock"
         docker() {
             echo "\$*" >> "{$dir}/calls"
             case "\$1 \$2" in

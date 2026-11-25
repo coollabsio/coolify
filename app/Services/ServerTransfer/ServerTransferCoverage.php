@@ -284,7 +284,7 @@ final class ServerTransferCoverage
             'resource_type' => self::LINKED, 'resource_id' => self::LINKED, 'standalone_sqlite_id' => self::LINKED,
             'container_id' => 'Not used: only listed in $fillable.',
         ],
-        LocalFileVolume::class => ['resource_type' => self::LINKED, 'resource_id' => self::LINKED],
+        LocalFileVolume::class => ['resource_type' => self::LINKED, 'resource_id' => self::LINKED, 'variable_fs_path' => self::RUNTIME],
         ScheduledTask::class => [
             'team_id' => self::TEAM, 'application_id' => self::LINKED, 'service_id' => self::LINKED,
             'consecutive_failures' => self::RUNTIME, 'failing_since' => self::RUNTIME,

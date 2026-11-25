@@ -8,7 +8,7 @@
 
 services:
   observium:
-    image: mbixtech/observium:latest
+    image: mbixtech/observium:24.12.13800
     platform: linux/amd64
     volumes:
       - observium_logs:/opt/observium/logs
@@ -36,7 +36,7 @@ services:
       start_period: 5s
 
   mariadb:
-    image: mariadb:lts
+    image: mariadb:12.3.3
     volumes:
       - observium_mariadb_data:/var/lib/mysql
     environment:

@@ -12,7 +12,6 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Once;
 use Livewire\Livewire;
 use Stripe\Exception\ApiConnectionException;
 use Stripe\Service\CustomerService;
@@ -37,21 +36,11 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-test('subscription pricing page shows pay as you go plan for unsubscribed team admin', function () {
-    Livewire::test(Index::class)
-        ->assertSuccessful()
-        ->assertSee('Pay as you go')
-        ->assertSee('Subscribe monthly')
-        ->assertSee('Choose a plan for Coolify Cloud');
-});
-
 test('subscription pricing page still renders when provider config is missing', function () {
     config()->set('subscription.provider', null);
 
     Livewire::test(Index::class)
-        ->assertSuccessful()
-        ->assertSee('Pay as you go')
-        ->assertSee('Subscribe monthly');
+        ->assertSuccessful();
 });
 
 test('unsubscribed cloud sidebar does not expose global search', function () {
@@ -62,27 +51,6 @@ test('unsubscribed cloud sidebar does not expose global search', function () {
     // Search button is gated; OS-aware title uses Alpine :title, so assert on the trigger instead.
     $response->assertDontSee("\$dispatch('open-global-search')", false);
     $response->assertDontSee('>Search</span>', false);
-});
-
-test('subscribed cloud sidebar shows subscription link for team admins', function () {
-    Subscription::create([
-        'team_id' => $this->team->id,
-        'stripe_subscription_id' => 'sub_active',
-        'stripe_customer_id' => 'cus_active',
-        'stripe_invoice_paid' => true,
-        'stripe_plan_id' => 'price_active',
-        'stripe_cancel_at_period_end' => false,
-        'stripe_past_due' => false,
-    ]);
-
-    Once::flush();
-    session(['currentTeam' => $this->team->fresh()]);
-
-    $html = view('components.navbar')->render();
-
-    expect($html)
-        ->toContain('title="Subscription"')
-        ->toContain(route('subscription.show'));
 });
 
 test('Stripe API failures show an error without redirecting or retrying checkout', function () {

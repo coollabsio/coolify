@@ -169,7 +169,7 @@ it('keeps a preview magic variable that the user created', function () {
 it('gives a public pull request its own magic values instead of the production values', function () {
     composePreviewMagicParse($this->application);
     $production = composePreviewMagicValues($this->application)['production'];
-    $this->application->settings->update(['is_pr_deployments_public_enabled' => true]);
+    $this->application->settings->update(['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true]);
 
     composePreviewMagicParse($this->application, 7);
 
@@ -187,7 +187,7 @@ it('gives a public pull request its own magic values instead of the production v
 
 it('keeps a changed preview magic value of a public pull request', function () {
     composePreviewMagicParse($this->application);
-    $this->application->settings->update(['is_pr_deployments_public_enabled' => true]);
+    $this->application->settings->update(['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true]);
     $this->application->environment_variables_preview()->create([
         'key' => 'SERVICE_PASSWORD_DB',
         'value' => 'preview-password',
@@ -207,7 +207,7 @@ it('replaces an existing preview copy of a production magic value for a public p
         'value' => $production['SERVICE_PASSWORD_DB'],
         'is_preview' => true,
     ]);
-    $this->application->settings->update(['is_pr_deployments_public_enabled' => true]);
+    $this->application->settings->update(['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true]);
 
     composePreviewMagicParse($this->application, 7);
 
@@ -230,7 +230,7 @@ it('keeps the production magic value of a public pull request preview from befor
         'pull_request_html_url' => 'https://github.com/example/repository/pull/7',
         'keeps_production_values' => true,
     ]);
-    $this->application->settings->update(['is_pr_deployments_public_enabled' => true]);
+    $this->application->settings->update(['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true]);
 
     composePreviewMagicParse($this->application, 7);
 

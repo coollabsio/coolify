@@ -113,16 +113,6 @@ test('a member who owns another team cannot use that role to transfer the server
         ->assertStatus(404);
 });
 
-test('transfer page renders for owned server', function () {
-    Livewire::test(Transfer::class, ['server_uuid' => $this->server->uuid])
-        ->assertOk()
-        ->assertSee('Transfer server')
-        ->assertSee('Target instance URL')
-        ->assertSee('Target API token')
-        ->assertDontSee('Manual transfer')
-        ->assertDontSee('Passphrase');
-});
-
 test('transfer page badge shows the management state of the server', function (string $state, string $label, array $hidden) {
     $claimer = app(ServerTransferClaimer::class);
     match ($state) {
@@ -226,9 +216,14 @@ test('deleting a transferred server deletes its resources from this instance onl
     expect(collect($component->viewData('checkboxes'))->pluck('id'))->not->toContain('force_delete_resources');
 
     $component->call('delete', $this->userPassword);
-
-    Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($application) && $job->deleteFromCoolifyOnly);
     expect(Server::find($this->server->id))->toBeNull();
+
+    Process::fake();
+    DeleteServer::run($this->server->id, removeResourcesFromServer: true);
+
+    Process::assertNothingRan();
+    expect(Application::withTrashed()->find($application->id))->toBeNull()
+        ->and(Server::withTrashed()->find($this->server->id))->toBeNull();
 });
 
 test('deleting a transferred server forgets the DNS records of its resources without releasing them at the provider', function () {
@@ -425,8 +420,10 @@ test('deleting an archive keeps applications that use the server only as an addi
     app(ServerTransferClaimer::class)->markTransferred($this->server, targetInstanceUrl: 'https://coolify-b.test');
 
     Livewire::test(Delete::class, ['server_uuid' => $this->server->uuid])->call('delete', $this->userPassword);
+    Process::fake();
+    DeleteServer::run($this->server->id);
 
-    Queue::assertPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($application));
-    Queue::assertNotPushed(DeleteResourceJob::class, fn (DeleteResourceJob $job) => $job->resource->is($sharedApplication));
-    expect($sharedApplication->additional_servers()->count())->toBe(0);
+    expect(Application::withTrashed()->find($application->id))->toBeNull()
+        ->and(Application::find($sharedApplication->id))->not->toBeNull()
+        ->and($sharedApplication->additional_servers()->count())->toBe(0);
 });

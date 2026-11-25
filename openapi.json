@@ -1944,6 +1944,9 @@
                     "400": {
                         "$ref": "#\/components\/responses\/400"
                     },
+                    "429": {
+                        "description": "GitHub API rate limit exceeded. The message tells when to try again."
+                    },
                     "409": {
                         "description": "Domain conflicts detected.",
                         "content": {
@@ -4701,6 +4704,16 @@
                         "schema": {
                             "type": "boolean",
                             "default": true
+                        }
+                    },
+                    {
+                        "name": "delete_backups",
+                        "in": "query",
+                        "description": "Delete the storage backups, on the server and on S3.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
                         }
                     }
                 ],
@@ -8645,6 +8658,16 @@
                             "type": "boolean",
                             "default": true
                         }
+                    },
+                    {
+                        "name": "delete_backups",
+                        "in": "query",
+                        "description": "Delete the database and storage backups, on the server and on S3.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
                     }
                 ],
                 "responses": {
@@ -8976,7 +8999,7 @@
                     "Databases"
                 ],
                 "summary": "Delete backup configuration",
-                "description": "Deletes a backup configuration and all its executions.",
+                "description": "Deletes a backup configuration and all its executions. When the server is not reachable, the local backup files stay on the server.",
                 "operationId": "delete-backup-configuration-by-uuid",
                 "parameters": [
                     {
@@ -10683,7 +10706,7 @@
                     "Databases"
                 ],
                 "summary": "Delete backup execution",
-                "description": "Deletes a specific backup execution.",
+                "description": "Deletes a specific backup execution. When the server is not reachable, the local backup file stays on the server.",
                 "operationId": "delete-backup-execution-by-uuid",
                 "parameters": [
                     {
@@ -12503,10 +12526,19 @@
                         "content": {
                             "application\/json": {
                                 "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#\/components\/schemas\/Application"
-                                    }
+                                    "properties": {
+                                        "count": {
+                                            "description": "Total number of deployments of the application.",
+                                            "type": "integer"
+                                        },
+                                        "deployments": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#\/components\/schemas\/ApplicationDeploymentQueue"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
@@ -12516,6 +12548,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
                     }
                 },
                 "security": [
@@ -16565,6 +16600,9 @@
                     },
                     "400": {
                         "$ref": "#\/components\/responses\/400"
+                    },
+                    "503": {
+                        "description": "Database migrations are not finished yet."
                     }
                 }
             }
@@ -23423,6 +23461,16 @@
                             "type": "boolean",
                             "default": false
                         }
+                    },
+                    {
+                        "name": "remove_resources_from_server",
+                        "in": "query",
+                        "description": "With force=true, also remove the containers, volumes, and files of the resources from the server. Set it to false to delete the resources only from Coolify and leave them running on the server.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": true
+                        }
                     }
                 ],
                 "responses": {
@@ -23572,6 +23620,16 @@
                                         "type": "string",
                                         "nullable": true,
                                         "description": "Wildcard domain (URL) used to generate domains for new resources on this server. Null removes it."
+                                    },
+                                    "public_ipv4": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Public IPv4 that DNS checks and DNS records use instead of the server IP, for servers that Coolify reaches over a private network. Ignored for localhost. Null removes it."
+                                    },
+                                    "public_ipv6": {
+                                        "type": "string",
+                                        "nullable": true,
+                                        "description": "Public IPv6 that DNS checks and DNS records use instead of the server IP, for servers that Coolify reaches over a private network. Ignored for localhost. Null removes it."
                                     },
                                     "server_timezone": {
                                         "type": "string",
@@ -25710,6 +25768,16 @@
                             "type": "boolean",
                             "default": true
                         }
+                    },
+                    {
+                        "name": "delete_backups",
+                        "in": "query",
+                        "description": "Delete the database and storage backups, on the server and on S3.",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
                     }
                 ],
                 "responses": {
@@ -26597,7 +26665,7 @@
                     "Services"
                 ],
                 "summary": "Start",
-                "description": "Start service.",
+                "description": "Start service. Pulls the latest images first.",
                 "operationId": "start-service-by-uuid",
                 "parameters": [
                     {
@@ -32496,7 +32564,7 @@
                 "type": "object"
             },
             "ApplicationDeploymentQueue": {
-                "description": "Project model",
+                "description": "Application deployment model",
                 "properties": {
                     "id": {
                         "type": "integer"
@@ -33186,6 +33254,16 @@
                         "type": "string",
                         "nullable": true,
                         "description": "Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates."
+                    },
+                    "public_ipv4": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Public IPv4 address that DNS records of resources on this server point to. Null uses the server IP."
+                    },
+                    "public_ipv6": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Public IPv6 address that DNS records of resources on this server point to. Null uses the server IP."
                     },
                     "is_reachable": {
                         "type": "boolean"
