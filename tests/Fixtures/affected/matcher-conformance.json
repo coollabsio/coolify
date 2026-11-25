@@ -1302,6 +1302,1413 @@
 			"expected": true
 		},
 		{
+			"name": "input patterns: README.md",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "README.md",
+			"expected": false
+		},
+		{
+			"name": "input patterns: a\nb",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "a\nb",
+			"expected": true
+		},
+		{
+			"name": "input patterns: a/b/c/package.json",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "a/b/c/package.json",
+			"expected": true
+		},
+		{
+			"name": "input patterns: apps",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "apps",
+			"expected": true
+		},
+		{
+			"name": "input patterns: apps/new/package.json",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "apps/new/package.json",
+			"expected": true
+		},
+		{
+			"name": "input patterns: apps/web",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "apps/web",
+			"expected": true
+		},
+		{
+			"name": "input patterns: apps/web/.dockerignore",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "apps/web/.dockerignore",
+			"expected": true
+		},
+		{
+			"name": "input patterns: apps/web/Dockerfile",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "apps/web/Dockerfile",
+			"expected": true
+		},
+		{
+			"name": "input patterns: apps/web/Dockerfile.dockerignore",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "apps/web/Dockerfile.dockerignore",
+			"expected": false
+		},
+		{
+			"name": "input patterns: apps/web/index.ts",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "apps/web/index.ts",
+			"expected": false
+		},
+		{
+			"name": "input patterns: dir\nname/x.txt",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "dir\nname/x.txt",
+			"expected": true
+		},
+		{
+			"name": "input patterns: libs/ui/tsconfig.lib.json",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "libs/ui/tsconfig.lib.json",
+			"expected": true
+		},
+		{
+			"name": "input patterns: package.json",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "package.json",
+			"expected": true
+		},
+		{
+			"name": "input patterns: package.json.bak",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "package.json.bak",
+			"expected": false
+		},
+		{
+			"name": "input patterns: plain/file.txt",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "plain/file.txt",
+			"expected": false
+		},
+		{
+			"name": "input patterns: pnpm-lock.yaml",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "pnpm-lock.yaml",
+			"expected": true
+		},
+		{
+			"name": "input patterns: pnpm-workspace.yaml",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "pnpm-workspace.yaml",
+			"expected": true
+		},
+		{
+			"name": "input patterns: tsconfig",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "tsconfig",
+			"expected": false
+		},
+		{
+			"name": "input patterns: tsconfig.json",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "tsconfig.json",
+			"expected": true
+		},
+		{
+			"name": "input patterns: x/pnpm-lock.yaml",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "x/pnpm-lock.yaml",
+			"expected": true
+		},
+		{
+			"name": "input patterns: x/y\n",
+			"compiled": {
+				"version": 1,
+				"all_of": [
+					{
+						"limit": "inputs",
+						"default": "exclude",
+						"rules": [
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/package.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/pnpm-lock.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/tsconfig*.json"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*"
+							},
+							{
+								"action": "include",
+								"kind": "glob",
+								"pattern": "**/*\n*/**"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "pnpm-workspace.yaml"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/Dockerfile"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web/.dockerignore"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps/web"
+							},
+							{
+								"action": "include",
+								"kind": "file",
+								"path": "apps"
+							}
+						]
+					}
+				],
+				"lockfiles": []
+			},
+			"file": "x/y\n",
+			"expected": true
+		},
+		{
 			"name": "file package.json:  package.json",
 			"compiled": {
 				"version": 1,

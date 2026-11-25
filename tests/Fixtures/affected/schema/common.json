@@ -316,7 +316,8 @@
 				"anchor",
 				"anchors",
 				"widened",
-				"manifest_fingerprint"
+				"manifest_fingerprint",
+				"input_patterns"
 			],
 			"properties": {
 				"compiled": {
@@ -376,6 +377,10 @@
 				"manifest_fingerprint": {
 					"type": "string",
 					"pattern": "^sha256:[0-9a-f]{64}$"
+				},
+				"input_patterns": {
+					"description": "Every path whose change can alter this trigger set: what the resolvers and limits read, what they would read if it were added, the tracked symlinks and the base directory. When no changed file of a push matches it (and no lockfile changed), the stored trigger set is still valid. A push that matches the trigger set (a deploy) can add a symlink inside the set, whose target the stored set does not follow: re-evaluate the set after such a push.",
+					"$ref": "#/$defs/compiled_set"
 				}
 			},
 			"additionalProperties": false
