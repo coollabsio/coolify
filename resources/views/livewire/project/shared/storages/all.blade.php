@@ -64,6 +64,11 @@
                                         Replaces the external volume '{{ $form['replacedExternalVolume'] }}'. Copy the data into the external volume, then delete this entry to use it.
                                     </span>
                                 @endif
+                                @if ($form['replacedHostPath'])
+                                    <span class="block text-xs text-amber-800 dark:text-amber-300/90">
+                                        Stays in use, so its data does not move. The variable in the Compose file gives the host path '{{ $form['replacedHostPath'] }}'. Copy the data to that path, then delete this entry to use it.
+                                    </span>
+                                @endif
                                 @if ($form['ignoresDriverOptions'])
                                     <span class="block text-xs text-amber-800 dark:text-amber-300/90">
                                         Coolify does not apply the driver options of this volume because it was created before they were supported. To apply them: stop the resource, back up any data you need, delete this entry together with the Docker volume, then redeploy.
@@ -176,6 +181,9 @@
                                                                 'This removes only the stale volume entry from Coolify.',
                                                                 $form['replacedExternalVolume']
                                                                     ? 'The next deployment uses the external volume \''.$form['replacedExternalVolume'].'\' instead of this volume.'
+                                                                    : null,
+                                                                $form['replacedHostPath']
+                                                                    ? 'The next deployment mounts the host path \''.$form['replacedHostPath'].'\' instead of this volume. Coolify does not copy the data.'
                                                                     : null,
                                                             ]))"
                                                             :warningMessage="$form['usedByContainers'] !== []

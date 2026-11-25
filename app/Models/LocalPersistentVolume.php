@@ -242,6 +242,48 @@ class LocalPersistentVolume extends BaseModel
     }
 
     /**
+     * The host path that a variable of the Compose file now gives this volume, or null. v4.7.6 and older
+     * made a short-syntax volume such as `${DATA}/config:/config` a named volume, also when the resource
+     * set DATA. While this storage entry exists, the parsers keep the volume so that the resource keeps
+     * its data (see keepSavedComposeNamedVolume()).
+     */
+    public function replacedComposeHostPath(): ?string
+    {
+        try {
+            $resource = $this->resource;
+            if (! $resource) {
+                return null;
+            }
+
+            $parent = $resource instanceof Application ? $resource : $resource->service;
+            if (! $parent || blank($parent->docker_compose_raw)) {
+                return null;
+            }
+
+            $services = data_get(parseDockerComposeYaml($parent->docker_compose_raw), 'services', []);
+            if ($this->isServiceResource()) {
+                $services = array_intersect_key($services, [$resource->name => true]);
+            }
+
+            foreach ($services as $service) {
+                foreach (data_get($service, 'volumes', []) as $volume) {
+                    if (! is_string($volume) || composeShortVolumeSavedName($volume, $parent->uuid) !== $this->name) {
+                        continue;
+                    }
+                    $hostPath = composeShortVolumeVariableHostPath($volume, composeVolumeSourceVariables($parent));
+                    if ($hostPath !== null) {
+                        return $hostPath;
+                    }
+                }
+            }
+
+            return null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * The external Compose volume that this storage entry still replaces, or null. Before Coolify
      * used external volumes as written, the parsers gave them a generated name, for example
      * "{uuid}_{volume}". While this storage entry exists, the parsers keep that name so that the

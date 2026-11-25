@@ -425,6 +425,68 @@ function keepSavedComposeBindSource(Stringable $source, ?string $volume, Stringa
 }
 
 /**
+ * The name of the Docker volume that v4.7.6 and older gave a short-syntax volume with a variable, such as
+ * `${DATA}/config:/config` or `${DATA:-name}:/data`. Those versions ignored the values of the resource, so the
+ * source was a volume name. Null when the source without those values is a host path.
+ */
+function composeShortVolumeSavedName(string $volume, string $uuid): ?string
+{
+    if (! str_contains($volume, '${')) {
+        return null;
+    }
+    try {
+        $source = parseDockerVolumeString($volume)['source'];
+    } catch (Exception) {
+        return null;
+    }
+    if ($source === null || sourceIsLocal($source)) {
+        return null;
+    }
+
+    return "{$uuid}_".Str::slug($source, '-');
+}
+
+/**
+ * The host path that the values of the resource give a short-syntax volume, or null when they give a volume name
+ * or a value that is not valid.
+ *
+ * @param  array<string, string>  $variables  The plain values that the resource sets (composeVolumeSourceVariables())
+ */
+function composeShortVolumeVariableHostPath(string $volume, array $variables): ?string
+{
+    try {
+        $source = parseDockerVolumeString($volume, $variables)['source'];
+    } catch (Exception) {
+        return null;
+    }
+
+    return $source !== null && sourceIsLocal($source) ? $source->value() : null;
+}
+
+/**
+ * Like keepSavedComposeBindSource() for a named volume: a short-syntax volume that v4.7.6 and older saved as a
+ * Docker volume stays that volume while its storage entry exists, also when its variable now gives a host path.
+ * So the data does not move after the upgrade. To use the host path, the user deletes the storage entry
+ * (LocalPersistentVolume::replacedComposeHostPath()).
+ *
+ * @param  array<string, string>  $variables  The plain values that the resource sets (composeVolumeSourceVariables())
+ * @return bool Whether the parser must use the volume without the values of the resource
+ */
+function keepSavedComposeNamedVolume(string $volume, string $uuid, array $variables, Application|ServiceApplication|ServiceDatabase $owner, Application|Service $resource): bool
+{
+    $name = composeShortVolumeSavedName($volume, $uuid);
+    if ($name === null || ! $owner->persistentStorages()->where('name', $name)->exists()) {
+        return false;
+    }
+    $hostPath = composeShortVolumeVariableHostPath($volume, $variables);
+    if ($hostPath !== null) {
+        $resource->addComposeVolumeWarning("The volume {$name} stays in use, so its data does not move. Its variable gives the host path {$hostPath}. To use that path, copy the data, delete the storage entry {$name} in Persistent Storage, and redeploy.");
+    }
+
+    return true;
+}
+
+/**
  * The environment variables that Coolify writes to the `.env` file, where Docker Compose reads the variables of the Compose file.
  */
 function composeEnvironmentVariablesQuery(Application|Service $resource, bool $isPreview = false): mixed
@@ -1725,11 +1787,18 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $content = null;
                 $isDirectory = false;
                 if (is_string($volume)) {
-                    $parsed = parseDockerVolumeString($volume, str_contains($volume, '${')
+                    $volumeVariables = str_contains($volume, '${')
                         ? $volumeSourceVariables ??= composeVolumeSourceVariables($resource, $isPullRequest)
-                        : null);
+                        : null;
+                    $keepsSavedVolume = $volumeVariables !== null
+                        && keepSavedComposeNamedVolume($volume, $uuid, $volumeVariables, $originalResource, $resource);
+                    $parsed = parseDockerVolumeString($volume, $keepsSavedVolume ? null : $volumeVariables);
                     $source = $parsed['source'];
                     $target = $parsed['target'];
+                    if ($keepsSavedVolume && ! $isPullRequest) {
+                        // An earlier parse of this version mounted the host path. That bind is not mounted anymore.
+                        forgetComposeBindStorage($originalResource, $target->value());
+                    }
                     // Mode is available in $parsed['mode'] if needed
                     $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
@@ -3100,11 +3169,18 @@ function serviceParser(Service $resource): Collection
                 $content = null;
                 $isDirectory = false;
                 if (is_string($volume)) {
-                    $parsed = parseDockerVolumeString($volume, str_contains($volume, '${')
+                    $volumeVariables = str_contains($volume, '${')
                         ? $volumeSourceVariables ??= composeVolumeSourceVariables($resource)
-                        : null);
+                        : null;
+                    $keepsSavedVolume = $volumeVariables !== null
+                        && keepSavedComposeNamedVolume($volume, $uuid, $volumeVariables, $originalResource, $resource);
+                    $parsed = parseDockerVolumeString($volume, $keepsSavedVolume ? null : $volumeVariables);
                     $source = $parsed['source'];
                     $target = $parsed['target'];
+                    if ($keepsSavedVolume) {
+                        // An earlier parse of this version mounted the host path. That bind is not mounted anymore.
+                        forgetComposeBindStorage($originalResource, $target->value());
+                    }
                     // Mode is available in $parsed['mode'] if needed
                     $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
                     if (sourceIsLocal($source)) {
