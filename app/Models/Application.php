@@ -372,6 +372,12 @@ class Application extends BaseModel
             ]);
         });
         static::saving(function ($application) {
+            if ($application->exists && $application->isDirty(['git_repository', 'git_branch'])) {
+                // Trigger state belongs to the old source; the next push deploys and rebuilds it.
+                $application->trigger_base_commit = null;
+                $application->trigger_set = null;
+                $application->trigger_scan = null;
+            }
             if ($application->isDirty('docker_compose_raw')) {
                 EnvironmentVariable::authorizeAddedSharedVariableReferencesIn($application, $application->getOriginal('docker_compose_raw'), $application->docker_compose_raw, 'docker_compose_raw');
             }

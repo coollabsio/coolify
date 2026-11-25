@@ -27,6 +27,8 @@ use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
 use App\Notifications\Application\PreviewApprovalRequired;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
+use App\Services\DeployTriggers\DeploymentTriggerScan;
+use App\Services\DeployTriggers\TriggerRecorder;
 use App\Services\ImageScan\DeploymentImageScan;
 use App\Services\ProjectConfig\UnlinkedConfigFileHint;
 use App\Support\RemoteSecretReferences;
@@ -4188,6 +4190,41 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             );
         }
         $this->detectUnlinkedConfigFile();
+        $this->runTriggerScan();
+    }
+
+    /**
+     * Finds paths outside the application that its files reference, for push evaluation (after the clone, before cleanup_git).
+     */
+    private function runTriggerScan(): void
+    {
+        try {
+            app(DeploymentTriggerScan::class)->run(
+                $this->application,
+                $this->pull_request_id === 0 ? null : $this->preview,
+                $this->basedir,
+                $this->commit,
+                function (string $command): ?string {
+                    $this->execute_remote_command([executeInDocker($this->deployment_uuid, $command), 'hidden' => true, 'save' => 'trigger_scan', 'ignore_errors' => true]);
+
+                    return $this->saved_outputs->has('trigger_scan') ? (string) $this->saved_outputs->get('trigger_scan') : null;
+                },
+            );
+        } catch (Throwable) {
+            // The scan only narrows later pushes; without it the next push deploys.
+        }
+    }
+
+    /**
+     * Moves the trigger base commit once every destination of this deployment finished.
+     */
+    private function recordTriggerBase(): void
+    {
+        try {
+            app(TriggerRecorder::class)->recordSuccessfulDeployment($this->application_deployment_queue->refresh());
+        } catch (Throwable $e) {
+            \Log::warning('Failed to record the trigger base commit for deployment '.$this->deployment_uuid.': '.$e->getMessage());
+        }
     }
 
     private function detectUnlinkedConfigFile(): void
@@ -7265,12 +7302,14 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         event(new ApplicationConfigurationChanged($this->application->team()->id));
 
         if (filled($this->application_deployment_queue->parent_deployment_uuid)) {
+            $this->recordTriggerBase();
             $this->sendMultiServerDeploymentNotification($this->application_deployment_queue->parent_deployment_uuid);
 
             return;
         }
 
         $queuedAdditionalDeployments = $this->only_this_server ? 0 : $this->deploy_to_additional_destinations();
+        $this->recordTriggerBase();
         if ($queuedAdditionalDeployments === 0) {
             $this->sendDeploymentNotification(DeploymentSuccess::class);
 
