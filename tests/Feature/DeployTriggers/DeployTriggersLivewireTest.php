@@ -281,3 +281,22 @@ it('shows no duration for a skipped push', function () {
         'application_uuid' => $this->application->uuid,
     ])->assertDontSee('05m 00s');
 });
+
+it('offers evaluate now only when the application is evaluated on push', function (string $case, bool $offered) {
+    match ($case) {
+        'not narrowable' => $this->application->update(['base_directory' => '/']),
+        'watch paths' => $this->application->update(['watch_paths' => 'apps/web/**']),
+        'instance off' => InstanceSettings::get()->update(['is_smart_triggers_enabled' => false]),
+        'application off' => $this->application->settings->update(['is_smart_triggers_enabled' => false]),
+        default => null,
+    };
+
+    $component = Livewire::test(DeployTriggers::class, ['application' => $this->application->refresh()]);
+    $offered ? $component->assertSeeHtml('wire:click="evaluateNow"') : $component->assertDontSeeHtml('wire:click="evaluateNow"');
+})->with([
+    ['narrowable', true],
+    ['not narrowable', false],
+    ['watch paths', false],
+    ['instance off', false],
+    ['application off', false],
+]);

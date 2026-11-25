@@ -13,9 +13,11 @@
     <div class="rounded-lg border border-neutral-200 p-3 text-sm dark:border-white/[0.08]">
         <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
             <span class="font-semibold text-black dark:text-fg">Trigger paths</span>
-            @can('update', $application)
-                <x-forms.button type="button" wire:click="evaluateNow">Evaluate now</x-forms.button>
-            @endcan
+            @if (in_array($summary['state'], ['none', 'evaluated'], true))
+                @can('update', $application)
+                    <x-forms.button type="button" wire:click="evaluateNow">Evaluate now</x-forms.button>
+                @endcan
+            @endif
         </div>
 
         @switch($summary['state'])
