@@ -422,3 +422,62 @@ it('does not set a schedule for storage outside the scoped parent', function () 
 
     expect(ScheduledVolumeBackup::query()->count())->toBe(0);
 });
+
+it('reads a storage backup schedule back through the API with a read token', function () {
+    $endpoint = "/api/v1/applications/{$this->application->uuid}/storages/{$this->volume->uuid}/backups";
+
+    $readToken = createVolumeBackupApiToken($this, $this->user, ['read']);
+    $this->withToken($readToken)->getJson($endpoint)
+        ->assertNotFound()
+        ->assertJsonPath('message', 'Storage backup schedule not found.');
+
+    auth()->forgetGuards();
+    $this->withHeaders($this->headers)->putJson($endpoint, [
+        'frequency' => '0 0,12 * * *',
+        'save_s3' => true,
+        's3_storage_uuid' => $this->s3Storage->uuid,
+        'retention_amount_s3' => 28,
+    ])->assertCreated();
+
+    auth()->forgetGuards();
+    $response = $this->withToken($readToken)->getJson($endpoint)->assertOk();
+
+    expect($response->json())
+        ->toMatchArray([
+            'storage_uuid' => $this->volume->uuid,
+            'storage_type' => 'persistent',
+            'frequency' => '0 0,12 * * *',
+            'save_s3' => true,
+            's3_storage_uuid' => $this->s3Storage->uuid,
+            's3_storage_uuids' => [$this->s3Storage->uuid],
+            'retention_amount_s3' => 28,
+        ])
+        ->not->toHaveKey('message');
+    expect($response->getContent())->not->toContain('secret');
+});
+
+it('does not read storage backup schedules of another team', function () {
+    $otherTeam = Team::factory()->create();
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnvironment = Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherApplication = Application::factory()->create([
+        'environment_id' => $otherEnvironment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+    $otherVolume = LocalPersistentVolume::create([
+        'name' => 'other-volume',
+        'mount_path' => '/data',
+        'resource_id' => $otherApplication->id,
+        'resource_type' => $otherApplication->getMorphClass(),
+    ]);
+    $otherVolume->scheduledBackups()->create(['team_id' => $otherTeam->id, 'frequency' => 'daily']);
+
+    $this->withHeaders($this->headers)
+        ->getJson("/api/v1/applications/{$otherApplication->uuid}/storages/{$otherVolume->uuid}/backups")
+        ->assertNotFound();
+    $this->withHeaders($this->headers)
+        ->getJson("/api/v1/applications/{$this->application->uuid}/storages/{$otherVolume->uuid}/backups")
+        ->assertNotFound()
+        ->assertJsonPath('message', 'Storage not found.');
+});

@@ -220,8 +220,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     /** @var array<string, list<string>>|null */
     private ?array $compose_environment_scopes = null;
 
-    /** @var array<string, string>|null */
+    /**
+     * Fetched secrets of all fetched sources, keyed by reference label (`KEY`, `<source>.KEY`).
+     *
+     * @var array<string, string>|null
+     */
     private ?array $remote_secrets_cache = null;
+
+    /** @var array<string, true> Secret manager sources that were fetched in this deployment */
+    private array $remote_secret_sources_fetched = [];
 
     /** @var array<int, int>|null */
     private ?array $previewVariableIdsWithProductionValues = null;
@@ -2240,41 +2247,52 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Fetch the secrets from the application's secret manager source. Values
+     * Fetch the secrets of the given secret manager sources of the application. Values
      * live only in memory during the deployment and in the generated .env on
-     * the server — they are never persisted in the Coolify database. Fetched
-     * lazily (only when a variable references a secret), once per deployment.
-     * A fetch failure fails the deployment.
+     * the server — they are never persisted in the Coolify database. Each source is
+     * fetched lazily (only when a variable references it), once per deployment.
+     * A missing source or a fetch failure fails the deployment.
      *
-     * @return array<string, string>
+     * @param  list<string>  $sources
+     * @return array<string, string> Secrets of all fetched sources, keyed by reference label
      */
-    private function remote_secrets(): array
+    private function remote_secrets(array $sources): array
     {
-        if ($this->remote_secrets_cache !== null) {
-            return $this->remote_secrets_cache;
+        foreach ($sources as $source) {
+            if (isset($this->remote_secret_sources_fetched[$source])) {
+                continue;
+            }
+
+            $link = $this->application->secretManagerLinkNamed($source)->with('integrationToken')->first();
+
+            if (! $link) {
+                $message = $source === RemoteSecretReferences::DEFAULT_SOURCE
+                    ? 'Environment variables reference remote secrets ({{vault.KEY}}), but no secret manager source is configured for this application.'
+                    : "Environment variables reference the secret manager source \"{$source}\" ({{vault.{$source}.KEY}}), but this application has no source with that name.";
+
+                throw new DeploymentException($message);
+            }
+
+            $provider = $link->integrationToken->providerName();
+            $sourceLabel = $source === RemoteSecretReferences::DEFAULT_SOURCE ? '' : "source {$source}, ";
+            $description = "{$provider} ({$sourceLabel}{$link->integrationToken->name}, {$link->sourceSummary()})";
+
+            try {
+                $secrets = $link->fetchSecrets();
+            } catch (Throwable $e) {
+                $this->application_deployment_queue->addLogEntry("Failed to fetch secrets from {$description}: {$e->getMessage()}", 'stderr');
+
+                throw new DeploymentException("Could not fetch secrets from {$provider}. The deployment was stopped so the application does not start with missing secrets.");
+            }
+
+            $this->remote_secrets_cache = ($this->remote_secrets_cache ?? []) + RemoteSecretReferences::labelSecrets($source, $secrets);
+            $this->remote_secret_sources_fetched[$source] = true;
+            // Registers the secrets of all fetched sources, so the values of earlier sources stay redacted.
+            $this->application_deployment_queue->redactRemoteSecrets($this->remote_secrets_cache);
+            $this->application_deployment_queue->addLogEntry('Fetched '.count($secrets)." secrets from {$description}.");
         }
 
-        $link = $this->application->secretManagerLink()->with('integrationToken')->first();
-
-        if (! $link) {
-            throw new DeploymentException('Environment variables reference remote secrets ({{vault.KEY}}), but no secret manager source is configured for this application.');
-        }
-
-        $provider = $link->integrationToken->providerName();
-        $tokenName = $link->integrationToken->name;
-
-        try {
-            $secrets = $link->fetchSecrets();
-        } catch (Throwable $e) {
-            $this->application_deployment_queue->addLogEntry("Failed to fetch secrets from {$provider} ({$tokenName}, {$link->sourceSummary()}): {$e->getMessage()}", 'stderr');
-
-            throw new DeploymentException("Could not fetch secrets from {$provider}. The deployment was stopped so the application does not start with missing secrets.");
-        }
-
-        $this->application_deployment_queue->redactRemoteSecrets($secrets);
-        $this->application_deployment_queue->addLogEntry('Fetched '.count($secrets)." secrets from {$provider} ({$tokenName}, {$link->sourceSummary()}).");
-
-        return $this->remote_secrets_cache = $secrets;
+        return $this->remote_secrets_cache ?? [];
     }
 
     /**
@@ -2295,8 +2313,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Replace {{vault.KEY}} references with values from the configured secret
-     * manager source. Missing keys fail the deployment with a
+     * Replace {{vault.KEY}} and {{vault.<source>.KEY}} references with values from the
+     * secret manager sources of the application. Missing keys fail the deployment with a
      * list — changing the source never re-checks references, so this is the
      * moment problems surface. Values without references are returned as-is
      * and never fetch secrets.
@@ -2307,7 +2325,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             return $value;
         }
 
-        $secrets = $this->remote_secrets();
+        $secrets = $this->remote_secrets(RemoteSecretReferences::referencedSources($value));
         $missing = RemoteSecretReferences::missingKeys($value, $secrets);
 
         if ($missing !== []) {
@@ -2335,7 +2353,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Without a source, a literal keeps "{{vault.KEY}}" as text; other references fail closed.
+     * Without any source, a literal keeps "{{vault.KEY}}" as text; other references fail closed.
      */
     private function uses_remote_secret_references(EnvironmentVariable $env): bool
     {
@@ -2349,7 +2367,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private function has_secret_manager_source(): bool
     {
         return $this->has_secret_manager_source ??= $this->remote_secrets_cache !== null
-            || $this->application->secretManagerLink()->exists();
+            || $this->application->secretManagerLinks()->exists();
     }
 
     /**

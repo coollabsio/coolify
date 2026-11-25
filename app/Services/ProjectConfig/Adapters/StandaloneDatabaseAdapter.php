@@ -23,6 +23,7 @@ use App\Services\ProjectConfig\Children\FileStorages;
 use App\Services\ProjectConfig\Children\PersistentStorages;
 use App\Services\ProjectConfig\Children\ScheduledBackups;
 use App\Services\ProjectConfig\Children\SecretManager;
+use App\Services\ProjectConfig\Children\StorageBackups;
 use App\Services\ProjectConfig\Children\Tags;
 use App\Services\ProjectConfig\ConfigError;
 use App\Services\ProjectConfig\Field;
@@ -242,6 +243,7 @@ class StandaloneDatabaseAdapter implements ResourceAdapter
             new ScheduledBackups,
             new Tags,
             new SecretManager,
+            new StorageBackups,
         ];
     }
 
@@ -332,7 +334,8 @@ class StandaloneDatabaseAdapter implements ResourceAdapter
     public function validate(string $key, array $desired, ApplyContext $ctx, ?Model $current = null): array
     {
         $base = "resources.{$key}";
-        $errors = [];
+        $errors = SecretManager::errors($base, $desired['secret_manager'] ?? null, $ctx->teamId);
+        $errors = [...$errors, ...SecretManager::referenceErrors($base, $desired['secret_manager'] ?? null, $desired['env'] ?? null, checkRefs: false)];
 
         $server = $this->server($desired, $ctx);
         if ($server !== null && ($message = $this->destinationError($server, $desired['destination'] ?? null)) !== null) {
@@ -354,6 +357,8 @@ class StandaloneDatabaseAdapter implements ResourceAdapter
                 $errors[] = new ConfigError("{$base}.env.{$name}", 'vault references work on applications only.');
             }
         }
+        $volumes = [...$this->config('volumes'), ...array_map('strval', array_keys((array) ($desired['storages'] ?? [])))];
+        $errors = [...$errors, ...StorageBackups::errors($base, $desired['storage_backups'] ?? null, $ctx->teamId, $volumes)];
         foreach (array_values((array) ($desired['backups'] ?? [])) as $index => $backup) {
             $storage = $backup['s3_storage'] ?? null;
             if ($storage !== null && ($message = NamedCredentials::error('s3_storage', (string) $storage, $ctx->teamId)) !== null) {
@@ -402,7 +407,14 @@ class StandaloneDatabaseAdapter implements ResourceAdapter
 
     private function writeChildren(Model $database, array $desired, ApplyContext $ctx): void
     {
+        $managesBackups = StorageBackups::managedBy($desired);
+        if ($managesBackups) {
+            (new StorageBackups)->prune($database, $desired['storage_backups']);
+        }
         foreach ($this->children() as $child) {
+            if ($child instanceof StorageBackups && ! $managesBackups) {
+                continue;
+            }
             $child->write($database, $desired[$child->key()] ?? null, $ctx);
         }
     }
