@@ -33,7 +33,7 @@ services:
       retries: 10
 
   minio:
-    image: minio/minio
+    image: ghcr.io/coollabsio/minio:RELEASE.2025-10-15T17-29-55Z # Released on 15 October 2025
     command: server /data --console-address ":9001"
     environment:
       - SERVICE_URL_MINIO_9000
@@ -43,16 +43,16 @@ services:
     volumes:
       - minio-data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "mc", "ready", "local"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   api:
-    image: dograhai/dograh-api:latest
+    image: dograhai/dograh-api:1.51.0
     environment:
       - SERVICE_URL_API_8000
-      - ENVIRONMENT=${ENVIRONMENT:-local}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - ENABLE_SIGNUP=${ENABLE_SIGNUP:-true}
       - PUBLIC_BASE_URL=${SERVICE_URL_API}
@@ -75,7 +75,8 @@ services:
       - FORWARDED_ALLOW_IPS=*
       - OSS_JWT_SECRET=${SERVICE_PASSWORD_64_OSSJWT}
       - ENABLE_TELEMETRY=${ENABLE_TELEMETRY:-true}
-      - TURN_HOST=${TURN_EXTERNAL_IP:?Set TURN_EXTERNAL_IP to this server's public IPv4 address so coturn (STUN/TURN) works behind NAT}
+      - ENABLE_COTURN=true
+      - TURN_HOST=${TURN_EXTERNAL_IP:?}
       - TURN_PORT=${TURN_PORT:-3478}
       - TURN_TLS_PORT=${TURN_TLS_PORT:-5349}
       - TURN_SECRET=${SERVICE_PASSWORD_64_TURN}
@@ -104,7 +105,7 @@ services:
       - --tls-listening-port=5349
       - --min-port=49152
       - --max-port=49200
-      - --external-ip=${TURN_EXTERNAL_IP:?Set this server's public IPv4 address so coturn (STUN/TURN) works behind NAT}
+      - --external-ip=${TURN_EXTERNAL_IP:?}
       - --realm=dograh.com
       - --use-auth-secret
       - --static-auth-secret=${SERVICE_PASSWORD_64_TURN}
@@ -120,7 +121,7 @@ services:
       - 49152-49200:49152-49200/udp
 
   ui:
-    image: dograhai/dograh-ui:latest
+    image: dograhai/dograh-ui:1.51.0
     environment:
       - SERVICE_URL_UI_3010
       - HOSTNAME=0.0.0.0
