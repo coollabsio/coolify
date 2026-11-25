@@ -35,9 +35,8 @@ abstract class ResourceTrafficAnalytics extends Component
     #[Locked]
     public ?string $analyticsServerUuid = null;
 
-    // Realtime refresh. Off by default (click "Live" to arm it). Only meaningful on the
-    // 24h range; the 60s cadence matches the SentinelTrafficClient cache TTL and
-    // Sentinel's per-minute rollups. The control is disabled for 7d/30d.
+    // Realtime refresh every 60s (the SentinelTrafficClient cache TTL); off by default,
+    // works with every range.
     public bool $live = false;
 
     public ?array $overview = null;
@@ -64,8 +63,11 @@ abstract class ResourceTrafficAnalytics extends Component
      */
     public array $series = [];
 
+    /** Breakdown dimensions of a resource, also read by the traffic API. */
+    public const BREAKDOWN_DIMENSIONS = ['country', 'city', 'referer', 'browser', 'os', 'device', 'protocol', 'cache', 'status', 'agent', 'ip', 'useragent'];
+
     /** @var array<int, string> */
-    protected array $breakdownDimensions = ['country', 'referer', 'browser', 'os', 'device', 'protocol', 'cache', 'status', 'agent', 'ip', 'useragent'];
+    protected array $breakdownDimensions = self::BREAKDOWN_DIMENSIONS;
 
     /**
      * Name of the public model property and lazy-load parameter ('application' / 'service').
@@ -109,20 +111,11 @@ abstract class ResourceTrafficAnalytics extends Component
         $this->loadData();
     }
 
-    public function toggleLive(): void
+    public function updatedLive(): void
     {
-        if ($this->range !== '24h') {
-            return;
+        if ($this->live) {
+            $this->loadData();
         }
-        $this->live = ! $this->live;
-    }
-
-    /**
-     * Realtime polling is only armed when the user has it on and the range is 24h.
-     */
-    public function isLivePollable(): bool
-    {
-        return $this->live && $this->range === '24h';
     }
 
     public function loadData(): void

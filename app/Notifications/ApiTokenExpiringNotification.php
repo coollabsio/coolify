@@ -33,7 +33,7 @@ class ApiTokenExpiringNotification extends CustomEmailNotification
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;
-        $mail->subject("Coolify: API token '{$this->tokenName}' expires in 24 hours");
+        $mail->subject("Coolify: API token '{$this->tokenName}' expires on {$this->expiresAt}");
         $mail->view('emails.api-token-expiring', [
             'tokenName' => $this->tokenName,
             'expiresAt' => $this->expiresAt,
@@ -51,7 +51,7 @@ class ApiTokenExpiringNotification extends CustomEmailNotification
             color: DiscordMessage::warningColor(),
         );
 
-        $message->addField('Manage tokens', "[Open Security settings]({$this->manageUrl})");
+        $message->addField('Manage tokens', "[Open API Tokens]({$this->manageUrl})");
 
         return $message;
     }

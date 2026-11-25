@@ -12,8 +12,9 @@ one fixed-size supervisor per queue. A busy queue cannot starve the others.
 | `default`     | `default`     | `HORIZON_DEFAULT_PROCESSES`     | 40               |
 | `maintenance` | `maintenance` | `HORIZON_MAINTENANCE_PROCESSES` | 60               |
 | `webhooks`    | `webhooks`    | `HORIZON_WEBHOOKS_PROCESSES`    | 10               |
+| `sentinel`    | `sentinel`    | `HORIZON_SENTINEL_PROCESSES`    | 20               |
 
-- Counts apply to **each node**. Two nodes with the defaults run 580 workers.
+- Counts apply to **each node**. Two nodes with the defaults run 620 workers.
 - `maintenance` runs Docker cleanups (scheduled, manual, and the cleanup
   that runs after a resource stops) and the weekly server patch checks.
   Remote prunes and package checks can be slow, so this pool limits how many
@@ -24,6 +25,9 @@ one fixed-size supervisor per queue. A busy queue cannot starve the others.
   server limit checks that follow subscription changes, so a full `high`
   queue cannot delay them. These jobs are short (60 s timeout or
   less). Self-hosted instances keep them on `high`.
+- `sentinel` processes Sentinel pushes (`PushServerUpdateJob`), so a burst
+  of pushes from many servers cannot take the workers of the other pools.
+  Self-hosted instances keep them on the default queue.
 - Each pool has `minProcesses = maxProcesses` and `balance = false`. Horizon
   does not scale them.
 - A value that is not a positive integer falls back to the default.
@@ -51,6 +55,7 @@ HORIZON_HIGH_PROCESSES=60
 HORIZON_DEFAULT_PROCESSES=40
 HORIZON_MAINTENANCE_PROCESSES=60
 HORIZON_WEBHOOKS_PROCESSES=10
+HORIZON_SENTINEL_PROCESSES=20
 # Worker timeout. Must stay above the longest job timeout (36000 s) and below
 # retry_after (86400 s). The config clamps it to 36600..85800.
 HORIZON_TIMEOUT=36600
@@ -88,6 +93,45 @@ policy deletes queued jobs without an error.
 | Application code (jobs, queues, middleware)               | New image, then `horizon:terminate`              |
 | New database migration                                    | `php artisan migrate` before new workers start   |
 
+## Drain a node
+
+Use `horizon:drain` before you stop or restart one node and do not want to
+wait for its long deployments and backups. Run it on the node to drain. The
+other node must run Horizon and must not be paused. The command refuses to
+run if it is not.
+
+```bash
+docker exec coolify php artisan horizon:drain --dry-run
+docker exec coolify php artisan horizon:drain --timeout=120
+```
+
+- `--dry-run` lists the running work of this node. It does not pause Horizon
+  and changes nothing.
+- The command pauses Horizon on this node. Workers finish the current job
+  and take no new job. Workers are not killed, because Horizon starts a
+  killed worker again unpaused.
+- Deployments: the command cancels the old deployment and removes its
+  helper container. Then it queues a new deployment with the same settings
+  (commit, pull request, server, build server, restart, rollback, image tag).
+  The new deployment obeys the concurrent build limit of the server. The log
+  of the old deployment shows the UUID of the new deployment. If a deployment
+  of the same commit is already queued, the command does not queue a copy.
+- Scheduled tasks, database backups, and storage backups: the command stops
+  the SSH commands of the job and removes the backup helper containers on
+  the server. A stopped storage backup starts the containers that it stopped
+  again. The execution shows "Stopped: moved to another worker node." The
+  team gets no failure notification for it.
+- After the old job has ended, the command queues the same task or backup
+  again. The other node runs it. If the old job still runs after
+  `--timeout` seconds, the command does not queue it again and shows it in
+  the result. Run the command again to retry.
+- The node stays paused until you run `php artisan horizon:continue` or
+  restart Horizon.
+
+A stopped scheduled task command can still finish inside the container on
+the server. The new run can then do the same work a second time. A stopped
+database dump can also finish on the server, but its file is not used.
+
 ## Rollout
 
 Do these steps on one node at a time. Do not flush Redis or clear queues.
@@ -114,13 +158,13 @@ Do these steps on one node at a time. Do not flush Redis or clear queues.
    docker exec coolify php artisan horizon:terminate
    ```
 
-5. Make sure the six supervisors are running on this node:
+5. Make sure the seven supervisors are running on this node:
 
    ```bash
    docker exec coolify php artisan horizon:supervisors
    ```
 
-6. Make sure the `maintenance` and `webhooks` queues drain (its depth goes down) and that
+6. Make sure the `maintenance`, `webhooks`, and `sentinel` queues drain (their depth goes down) and that
    `php artisan scheduled:diagnostics` shows no growing count of stale
    occurrences.
 7. Do the same steps on the next node.
@@ -132,10 +176,10 @@ jobs) stay on `high`, and the `high` pool still processes them.
 
 1. Deploy the previous image, or remove the `HORIZON_*_PROCESSES` overrides.
 2. Run `config:cache` and `horizon:terminate` on one node at a time.
-3. Jobs that wait on the `maintenance` or `webhooks` queue are not lost, but
+3. Jobs that wait on the `maintenance`, `webhooks`, or `sentinel` queue are not lost, but
    the old configuration has no pool for them. Keep one node with the new
-   configuration until both queues are empty, or start a temporary worker:
-   `php artisan queue:work redis --queue=maintenance,webhooks --tries=1 --timeout=600`.
+   configuration until these queues are empty, or start a temporary worker:
+   `php artisan queue:work redis --queue=maintenance,webhooks,sentinel --tries=1 --timeout=600`.
 4. Do not roll back the migration. The old code ignores the new columns.
 
 ## Metrics to collect before you change worker counts

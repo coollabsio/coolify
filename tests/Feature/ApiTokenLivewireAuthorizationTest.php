@@ -5,7 +5,6 @@ use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Livewire\Attributes\Locked;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 
@@ -20,25 +19,43 @@ beforeEach(function () {
     $this->team = Team::factory()->create();
 });
 
-test('api token permission flags are locked', function (string $property) {
-    $property = new ReflectionProperty(ApiTokens::class, $property);
-
-    expect($property->getAttributes(Locked::class))->not->toBeEmpty();
-})->with([
-    'root permission flag' => 'canUseRootPermissions',
-    'write permission flag' => 'canUseWritePermissions',
-]);
-
-test('member cannot tamper with root permission flag', function () {
+test('api token permission flags are locked', function (string $property, mixed $value) {
     $member = User::factory()->create();
     $this->team->members()->attach($member->id, ['role' => 'member']);
 
     $this->actingAs($member);
     session(['currentTeam' => $this->team]);
 
-    Livewire::test(ApiTokens::class)
-        ->set('canUseRootPermissions', true);
-})->throws(CannotUpdateLockedPropertyException::class);
+    Livewire::test(ApiTokens::class)->set($property, $value);
+})->throws(CannotUpdateLockedPropertyException::class)->with([
+    'root permission flag' => ['canUseRootPermissions', true],
+    'write permission flag' => ['canUseWritePermissions', true],
+    'terminal permission flag' => ['canUseTerminalPermissions', true],
+    'token search index' => ['tokenSearchIndex', []],
+]);
+
+test('token search index follows created and revoked tokens', function () {
+    $owner = User::factory()->create();
+    $this->team->members()->attach($owner->id, ['role' => 'owner']);
+
+    $this->actingAs($owner);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(ApiTokens::class)
+        ->set('form.description', 'deploy-token')
+        ->set('form.expiresInDays', 30)
+        ->set('form.permissions', ['read'])
+        ->call('addNewToken');
+
+    $token = $owner->tokens()->sole();
+    expect($component->get('tokenSearchIndex'))->toBe([
+        ['id' => (string) $token->id, 'search' => 'deploy-token read all resources in the team'],
+    ]);
+
+    $component->call('revoke', $token->id);
+
+    expect($component->get('tokenSearchIndex'))->toBe([]);
+});
 
 test('member cannot create root token through tampered permissions payload', function () {
     $member = User::factory()->create();
@@ -48,9 +65,9 @@ test('member cannot create root token through tampered permissions payload', fun
     session(['currentTeam' => $this->team]);
 
     Livewire::test(ApiTokens::class)
-        ->set('description', 'pwned-root-token')
-        ->set('expiresInDays', 30)
-        ->set('permissions', ['root'])
+        ->set('form.description', 'pwned-root-token')
+        ->set('form.expiresInDays', 30)
+        ->set('form.permissions', ['root'])
         ->call('addNewToken');
 
     expect($member->tokens()->count())->toBe(0);
@@ -64,9 +81,9 @@ test('member can still create read token', function () {
     session(['currentTeam' => $this->team]);
 
     Livewire::test(ApiTokens::class)
-        ->set('description', 'read-token')
-        ->set('expiresInDays', 30)
-        ->set('permissions', ['read'])
+        ->set('form.description', 'read-token')
+        ->set('form.expiresInDays', 30)
+        ->set('form.permissions', ['read'])
         ->call('addNewToken')
         ->assertHasNoErrors();
 
@@ -120,9 +137,9 @@ test('owner can create root token', function () {
     session(['currentTeam' => $this->team]);
 
     Livewire::test(ApiTokens::class)
-        ->set('description', 'root-token')
-        ->set('expiresInDays', 30)
-        ->set('permissions', ['root'])
+        ->set('form.description', 'root-token')
+        ->set('form.expiresInDays', 30)
+        ->set('form.permissions', ['root'])
         ->call('addNewToken')
         ->assertHasNoErrors();
 
@@ -140,7 +157,46 @@ test('owner can deselect root and falls back to read permission', function () {
     session(['currentTeam' => $this->team]);
 
     Livewire::test(ApiTokens::class)
-        ->set('permissions', ['root'])
-        ->set('permissions', [])
-        ->assertSet('permissions', ['read']);
+        ->set('form.permissions', ['root'])
+        ->set('form.permissions', [])
+        ->assertSet('form.permissions', ['read']);
+});
+
+test('deploy permission can be combined with write permission', function (array $steps) {
+    $owner = User::factory()->create();
+    $this->team->members()->attach($owner->id, ['role' => 'owner']);
+
+    $this->actingAs($owner);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(ApiTokens::class)->set('form.permissions', ['read']);
+
+    foreach ($steps as $permission) {
+        $component->set('form.permissions.'.count($component->get('form.permissions')), $permission);
+    }
+
+    $component->assertSet('form.permissions', ['deploy', 'read', 'write']);
+})->with([
+    'write then deploy' => [['write', 'deploy']],
+    'deploy then write' => [['deploy', 'write']],
+]);
+
+test('owner can create token with read, write, and deploy permissions', function () {
+    $owner = User::factory()->create();
+    $this->team->members()->attach($owner->id, ['role' => 'owner']);
+
+    $this->actingAs($owner);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(ApiTokens::class)
+        ->set('form.description', 'deploy-write-token')
+        ->set('form.expiresInDays', 30)
+        ->set('form.permissions', ['read', 'write', 'deploy'])
+        ->call('addNewToken')
+        ->assertHasNoErrors();
+
+    $token = $owner->tokens()->latest()->first();
+
+    expect($token)->not->toBeNull()
+        ->and($token->abilities)->toEqualCanonicalizing(['read', 'write', 'deploy']);
 });

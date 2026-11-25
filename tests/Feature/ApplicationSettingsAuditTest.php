@@ -127,7 +127,7 @@ it('audits adding, retagging and deleting a preview', function () {
         ->and($created->first()->metadata['pull_request_id'])->toBe(42)
         ->and($created->first()->resource_uuid)->toBe($this->application->uuid);
 
-    $component->set('previewDockerTags.0', 'pr-42')
+    $component->set('previewDockerTags.'.ApplicationPreview::query()->where('pull_request_id', 42)->value('id'), 'pr-42')
         ->call('save_preview', ApplicationPreview::query()->where('pull_request_id', 42)->value('id'));
 
     $updated = applicationSettingsAuditEvents('ui.application.preview_updated');
@@ -205,7 +205,7 @@ it('audits application setting changes from each settings control', function (Cl
     }, 'docker_images_to_keep'],
     'build secrets' => [function () {
         Livewire::test(All::class, ['resource' => $this->application])
-            ->set('use_build_secrets', true)
+            ->set('use_build_secrets', false)
             ->call('instantSave')
             ->assertHasNoErrors();
     }, 'use_build_secrets'],

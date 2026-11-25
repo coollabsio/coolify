@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Database\Sqlite;
 
 use App\Models\Server;
 use App\Models\StandaloneSqlite;
+use App\Services\ProjectConfig\ManagedResources;
 use App\Support\ValidationPatterns;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -29,6 +30,8 @@ class General extends Component
 
     public bool $isLogDrainEnabled = false;
 
+    public bool $isPasswordHiddenForMember = false;
+
     public function mount()
     {
         try {
@@ -43,6 +46,8 @@ class General extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+
+        $this->isPasswordHiddenForMember = ! ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->database);
     }
 
     protected function rules(): array
@@ -81,12 +86,14 @@ class General extends Component
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->save();
+            $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
+            $canSeeCredentials = ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->database);
             $this->name = $this->database->name;
             $this->description = $this->database->description;
             $this->sqliteDatabases = $this->database->sqlite_databases;
             $this->image = $this->database->image;
-            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->customDockerRunOptions = $canSeeCredentials ? $this->database->custom_docker_run_options : null;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
         }
     }

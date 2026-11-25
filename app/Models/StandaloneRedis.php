@@ -5,16 +5,20 @@ namespace App\Models;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
+use App\Traits\HasImageScans;
+use App\Traits\HasLogRedactionSetting;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
+use App\Traits\HasStars;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneRedis extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasImageScans, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, HasStars, ScopedByAccessGrants, SoftDeletes;
 
     protected array $auditExclude = ['last_online_at'];
 
@@ -58,12 +62,22 @@ class StandaloneRedis extends BaseModel
     protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
     /**
+     * Free-form configuration that can embed credentials. Only users who can
+     * update the database and `read:sensitive` tokens may read it.
+     */
+    public const CONFIGURATION_ATTRIBUTES = [
+        'redis_conf',
+        'custom_docker_run_options',
+    ];
+
+    /**
      * Sensitive fields hidden by default in serialized output (toArray/toJson).
      * API controllers should call makeVisible([...]) for callers with the
      * `read:sensitive` or `root` token ability.
      */
     protected $hidden = [
         'redis_password',
+        ...self::CONFIGURATION_ATTRIBUTES,
         'internal_db_url',
         'external_db_url',
         // Internal start-command state, not part of the API.
@@ -71,6 +85,7 @@ class StandaloneRedis extends BaseModel
     ];
 
     protected $casts = [
+        'include_coolify_default_variables' => 'boolean',
         'health_check_enabled' => 'boolean',
         'health_check_interval' => 'integer',
         'health_check_timeout' => 'integer',
@@ -103,12 +118,6 @@ class StandaloneRedis extends BaseModel
         static::saving(function ($database) {
             if ($database->isDirty('status')) {
                 $database->last_online_at = now();
-            }
-        });
-
-        static::retrieved(function ($database) {
-            if (! $database->redis_username) {
-                $database->redis_username = 'default';
             }
         });
     }
@@ -200,6 +209,9 @@ class StandaloneRedis extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
+            if ($storage->is_external) {
+                continue;
+            }
             instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
         }
     }
@@ -339,11 +351,12 @@ class StandaloneRedis extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $serverHost = formatHostForUrl($serverIp);
                     $redis_version = $this->getRedisVersion();
                     $username_part = version_compare($redis_version, '6.0', '>=') ? rawurlencode($this->redis_username).':' : '';
                     $encodedPass = rawurlencode($this->connectionPassword());
                     $scheme = $this->enable_ssl ? 'rediss' : 'redis';
-                    $url = "{$scheme}://{$username_part}{$encodedPass}@{$serverIp}:{$this->public_port}/0";
+                    $url = "{$scheme}://{$username_part}{$encodedPass}@{$serverHost}:{$this->public_port}/0";
 
                     if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
                         $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';
@@ -418,6 +431,15 @@ class StandaloneRedis extends BaseModel
     }
 
     /**
+     * Whether the password variable is locked (shown once) or reads a locked shared variable.
+     * The form, the connection URLs, and the API must then not show the password.
+     */
+    public function isCredentialLocked(): bool
+    {
+        return (bool) $this->runtimeEnvironmentVariable('REDIS_PASSWORD')?->isLockedForLogs();
+    }
+
+    /**
      * The server password for connection URLs. A remote secret is not fetched here, so the URL
      * shows its reference instead of a stale or wrong password.
      */
@@ -472,19 +494,10 @@ class StandaloneRedis extends BaseModel
     {
         return new Attribute(
             get: function () {
-                // A loaded relation does not hold a variable created by an earlier read, so check the table before creating one.
-                $username = $this->runtimeEnvironmentVariable('REDIS_USERNAME')
-                    ?? $this->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->first();
-                if (! $username) {
-                    $this->runtime_environment_variables()->create([
-                        'key' => 'REDIS_USERNAME',
-                        'value' => 'default',
-                    ]);
+                // Reading must not create the variable: a read during the create or clone of the variables adds a duplicate.
+                $username = $this->runtimeEnvironmentVariable('REDIS_USERNAME')?->value;
 
-                    return 'default';
-                }
-
-                return $username->value;
+                return filled($username) ? $username : 'default';
             }
         );
     }

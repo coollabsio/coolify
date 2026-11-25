@@ -246,3 +246,14 @@ YAML);
 
     expect($application->docker_compose_raw)->toContain('appdata');
 });
+
+it('resolves parent directory segments in long-form bind sources before remote work', function () {
+    Process::fake();
+
+    $application = makeRawComposeApplication(rawComposeBindSource('../../../../../../outside'));
+
+    expect(fn () => $application->oldRawParser())
+        ->toThrow(Exception::class, 'resolves to a path above /');
+
+    Process::assertNothingRan();
+});

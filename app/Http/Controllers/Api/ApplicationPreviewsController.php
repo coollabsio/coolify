@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\Application\ApproveForkPreviewCommit;
 use App\Enums\BuildPackTypes;
 use App\Http\Controllers\Controller;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use Illuminate\Http\JsonResponse;
@@ -13,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use OpenApi\Attributes as OA;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class ApplicationPreviewsController extends Controller
 {
@@ -27,14 +30,17 @@ class ApplicationPreviewsController extends Controller
         tags: ['Applications'],
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', description: 'UUID of the application.', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(ref: '#/components/parameters/Page'),
+            new OA\Parameter(ref: '#/components/parameters/PerPage'),
         ],
         responses: [
-            new OA\Response(response: 200, description: 'List of preview deployments.', content: new OA\JsonContent(
+            new OA\Response(response: 200, headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')], description: 'List of preview deployments.', content: new OA\JsonContent(
                 type: 'array',
                 items: new OA\Items(ref: '#/components/schemas/ApplicationPreview'),
             )),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],
     )]
     public function index(Request $request): JsonResponse
@@ -44,18 +50,17 @@ class ApplicationPreviewsController extends Controller
             return invalidTokenResponse();
         }
 
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
 
         $this->authorize('view', $application);
 
-        $previews = $application->previews()
-            ->get()
-            ->map(fn (ApplicationPreview $preview): array => $this->formatPreview($preview));
+        $request->validate(apiPaginationRules());
+        [$previews, $headers] = apiPaginate($application->previews()->orderBy('id', 'desc'), $request);
 
-        return response()->json($previews);
+        return response()->json($previews->map(fn (ApplicationPreview $preview): array => $this->formatPreview($preview)), 200, $headers);
     }
 
     #[OA\Get(
@@ -83,7 +88,7 @@ class ApplicationPreviewsController extends Controller
             return invalidTokenResponse();
         }
 
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
@@ -105,7 +110,7 @@ class ApplicationPreviewsController extends Controller
 
     #[OA\Post(
         summary: 'Create Preview Deployment',
-        description: 'Open a preview deployment for a pull request and queue its deployment. When the preview already exists, it is redeployed. Git based applications need git_type unless they use a GitHub or GitLab App source; Bitbucket also needs commit. Docker Image applications need docker_tag for a new preview.',
+        description: 'Open a preview deployment for a pull request and queue its deployment. When the preview already exists, it is redeployed. A token with the deploy permission can only redeploy an existing preview without changes; opening a preview, changing its pull request URL, git type, or docker tag, or choosing a commit also needs the write permission. Git based applications need git_type unless they use a GitHub or GitLab App source; Bitbucket also needs commit. Docker Image applications need docker_tag for a new preview.',
         path: '/applications/{uuid}/previews',
         operationId: 'create-preview-deployment-by-application-uuid',
         security: [['bearerAuth' => []]],
@@ -119,7 +124,7 @@ class ApplicationPreviewsController extends Controller
                 new OA\Property(property: 'pull_request_id', type: 'integer', minimum: 1, maximum: 2147483647, example: 42),
                 new OA\Property(property: 'pull_request_html_url', type: 'string', nullable: true, example: 'https://github.com/org/repo/pull/42'),
                 new OA\Property(property: 'git_type', type: 'string', nullable: true, enum: self::GIT_TYPES, description: 'Git provider that hosts the pull request. Sets the ref Coolify fetches (pull/{id}/head or merge-requests/{id}/head).'),
-                new OA\Property(property: 'commit', type: 'string', nullable: true, description: 'Commit SHA to deploy. Required for Bitbucket.'),
+                new OA\Property(property: 'commit', type: 'string', nullable: true, description: 'Commit SHA to deploy. Required for a new Bitbucket preview. Needs the write permission.'),
                 new OA\Property(property: 'docker_tag', type: 'string', nullable: true, description: 'Docker image tag. Docker Image applications only.'),
                 new OA\Property(property: 'force', type: 'boolean', default: false, description: 'Rebuild without cache.'),
                 new OA\Property(property: 'instant_deploy', type: 'boolean', default: true, description: 'Queue a deployment. Set to false to only create the preview, for example to set its domains first.'),
@@ -130,6 +135,7 @@ class ApplicationPreviewsController extends Controller
             new OA\Response(response: 201, description: 'Preview deployment created.', content: new OA\JsonContent(ref: '#/components/schemas/ApplicationPreviewDeployment')),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Missing permissions. Opening or changing a preview needs the write permission.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
             new OA\Response(response: 429, description: 'Deployment queue is full.'),
@@ -153,6 +159,11 @@ class ApplicationPreviewsController extends Controller
             new OA\Property(property: 'domain_port_overrides', type: 'object', nullable: true),
             new OA\Property(property: 'docker_registry_image_tag', type: 'string', nullable: true),
             new OA\Property(property: 'last_online_at', type: 'string', nullable: true),
+            new OA\Property(property: 'is_fork_pull_request', type: 'boolean', nullable: true, description: 'The pull request comes from a fork. null: Coolify does not know the origin yet (no webhook event of the pull request), and each commit needs an approval as for a fork.'),
+            new OA\Property(property: 'approval_status', type: 'string', nullable: true, enum: ['waiting_for_approval', 'approved', null], description: 'Approval state of a fork pull request. waiting_for_approval: pending_approval_commit waits for an admin. approved: approved_commit was approved. null: no commit needed approval.'),
+            new OA\Property(property: 'pending_approval_commit', type: 'string', nullable: true, description: 'Commit that waits for approval before it deploys.'),
+            new OA\Property(property: 'approved_commit', type: 'string', nullable: true, description: 'Last approved commit.'),
+            new OA\Property(property: 'approved_at', type: 'string', format: 'date-time', nullable: true),
             new OA\Property(property: 'created_at', type: 'string'),
             new OA\Property(property: 'updated_at', type: 'string'),
         ],
@@ -173,7 +184,7 @@ class ApplicationPreviewsController extends Controller
             return invalidTokenResponse();
         }
 
-        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->uuid)->first();
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
         if (! $application) {
             return response()->json(['message' => 'Application not found.'], 404);
         }
@@ -214,7 +225,7 @@ class ApplicationPreviewsController extends Controller
         if (! $isDockerImage && $gitType === null) {
             return response()->json([
                 'message' => 'Validation failed.',
-                'errors' => ['git_type' => ['The git type field is required for applications without a GitHub or GitLab App source.']],
+                'errors' => ['git_type' => ['The git type field is required for applications without a GitHub, GitLab, or Gitea App source.']],
             ], 422);
         }
         if ($isDockerImage && $dockerTag === null && blank($preview?->docker_registry_image_tag)) {
@@ -224,13 +235,28 @@ class ApplicationPreviewsController extends Controller
             ], 422);
         }
 
+        $pullRequestHtmlUrl = $request->input('pull_request_html_url');
+        $changesPreview = ! $preview
+            || ($pullRequestHtmlUrl !== null && $pullRequestHtmlUrl !== $preview->pull_request_html_url)
+            || ($request->input('git_type') !== null && $request->input('git_type') !== $preview->git_type)
+            || ($dockerTag !== null && $dockerTag !== $preview->docker_registry_image_tag)
+            || $request->filled('commit');
+        if ($changesPreview) {
+            if (! $request->user()->tokenCan('write') && ! $request->user()->tokenCan('root')) {
+                return response()->json([
+                    'message' => 'Missing required permissions: write. Opening a preview, changing its pull request URL, git type, or docker tag, or choosing a commit needs the write permission. The deploy permission only redeploys an existing preview.',
+                ], 403);
+            }
+            $this->authorize('update', $application);
+        }
+
         $created = ! $preview;
         if ($created) {
             $isCompose = $application->build_pack === BuildPackTypes::DOCKERCOMPOSE->value;
             $preview = ApplicationPreview::create([
                 'application_id' => $application->id,
                 'pull_request_id' => $pullRequestId,
-                'pull_request_html_url' => $request->input('pull_request_html_url') ?? '',
+                'pull_request_html_url' => $pullRequestHtmlUrl ?? '',
                 'git_type' => $isDockerImage ? null : $gitType,
                 'docker_compose_domains' => $isCompose ? $application->docker_compose_domains : null,
                 'docker_registry_image_tag' => $dockerTag,
@@ -240,7 +266,7 @@ class ApplicationPreviewsController extends Controller
                 : $preview->generate_preview_fqdn();
         } else {
             $preview->fill(array_filter([
-                'pull_request_html_url' => $request->input('pull_request_html_url'),
+                'pull_request_html_url' => $pullRequestHtmlUrl,
                 'git_type' => $isDockerImage ? null : $gitType,
                 'docker_registry_image_tag' => $dockerTag,
             ], fn (mixed $value): bool => $value !== null));
@@ -298,11 +324,92 @@ class ApplicationPreviewsController extends Controller
         ], $status);
     }
 
+    #[OA\Post(
+        summary: 'Approve Preview Commit',
+        description: 'Approve the commit of a fork pull request that waits for approval, and queue its deployment. Send the commit that you reviewed (pending_approval_commit of the preview). Needs admin or owner permissions and a token with the `write` and `deploy` abilities.',
+        path: '/applications/{uuid}/previews/{pull_request_id}/approve',
+        operationId: 'approve-preview-commit-by-pull-request-id',
+        security: [['bearerAuth' => []]],
+        tags: ['Applications'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', description: 'UUID of the application.', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'pull_request_id', in: 'path', description: 'Pull request ID of the preview.', required: true, schema: new OA\Schema(type: 'integer')),
+        ],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
+            required: ['commit'],
+            properties: [
+                new OA\Property(property: 'commit', type: 'string', pattern: '^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$', description: 'Full SHA of the reviewed commit. It must match pending_approval_commit of the preview.'),
+            ],
+        )),
+        responses: [
+            new OA\Response(response: 200, description: 'Commit approved.', content: new OA\JsonContent(
+                type: 'object',
+                properties: [
+                    new OA\Property(property: 'message', type: 'string'),
+                    new OA\Property(property: 'deployment_uuid', type: 'string', nullable: true),
+                ],
+            )),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Missing permissions.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 409, description: 'The preview does not wait for approval of this commit, for example because the pull request has a newer commit.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+            new OA\Response(response: 429, description: 'Deployment queue is full.'),
+        ],
+    )]
+    public function approve(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->route('uuid'))->first();
+        if (! $application) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        $pullRequestIdRaw = $request->route('pull_request_id');
+        if (! ctype_digit((string) $pullRequestIdRaw) || (int) $pullRequestIdRaw <= 0 || (int) $pullRequestIdRaw > 2147483647) {
+            return response()->json(['message' => 'Invalid pull_request_id.'], 422);
+        }
+
+        $preview = $application->previews()->where('pull_request_id', (int) $pullRequestIdRaw)->first();
+        if (! $preview) {
+            return response()->json(['message' => 'Preview not found.'], 404);
+        }
+
+        $this->authorize('approve', $preview);
+
+        $validator = Validator::make($request->all(), [
+            'commit' => ['required', 'string', 'regex:/^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$/'],
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
+        }
+
+        try {
+            $result = ApproveForkPreviewCommit::run($preview, $request->string('commit')->lower()->value(), 'api');
+        } catch (ConflictHttpException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        }
+
+        if ($result['status'] === 'queue_full') {
+            return response()->json(['message' => $result['message']], 429)->header('Retry-After', 60);
+        }
+
+        return response()->json([
+            'message' => $result['status'] === 'queued' ? 'Commit approved. Preview deployment queued.' : $result['message'],
+            'deployment_uuid' => $result['deployment_uuid'] ?? null,
+        ]);
+    }
+
     private function sourceGitType(Application $application): ?string
     {
         return match ($application->source?->getMorphClass()) {
             GithubApp::class => 'github',
             GitlabApp::class => 'gitlab',
+            GiteaApp::class => 'gitea',
             default => null,
         };
     }
@@ -330,6 +437,11 @@ class ApplicationPreviewsController extends Controller
             'domain_port_overrides' => $preview->domain_port_overrides,
             'docker_registry_image_tag' => $preview->docker_registry_image_tag,
             'last_online_at' => $preview->last_online_at,
+            'is_fork_pull_request' => $preview->is_fork_pull_request,
+            'approval_status' => $preview->approvalStatus(),
+            'pending_approval_commit' => $preview->pending_approval_commit,
+            'approved_commit' => $preview->approved_commit,
+            'approved_at' => $preview->approved_at,
             'created_at' => $preview->created_at,
             'updated_at' => $preview->updated_at,
         ];

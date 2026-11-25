@@ -269,6 +269,26 @@ BASH);
         ->and(devScriptLog())->toContain('php artisan dev:qemu ubuntu-root --as-localhost ENV=local CACHE=');
 });
 
+it('passes the gpu option to the host qemu command when COOLIFY_DEV_GPU is 1', function () {
+    if (! function_exists('posix_geteuid') || posix_geteuid() !== 0 || ! file_exists('/dev/kvm') || filetype('/dev/kvm') !== 'char' || ! is_readable('/dev/kvm') || ! is_writable('/dev/kvm')) {
+        $this->markTestSkipped('KVM and root access are required for this launcher branch.');
+    }
+
+    file_put_contents($this->devRoot.'/bin/php', <<<'BASH'
+#!/usr/bin/env bash
+printf 'php %s|\n' "$*" >> "$DEV_TEST_LOG"
+BASH);
+
+    $withGpu = runDevScript('wt', ['start', 'ubuntu-root'], ['COOLIFY_DEV_SERVER_BACKEND' => 'auto', 'COOLIFY_DEV_GPU' => '1']);
+    $withoutGpu = runDevScript('wt', ['start', 'ubuntu-root'], ['COOLIFY_DEV_SERVER_BACKEND' => 'auto', 'COOLIFY_DEV_GPU' => '0']);
+
+    expect($withGpu->isSuccessful())->toBeTrue($withGpu->getErrorOutput())
+        ->and($withoutGpu->isSuccessful())->toBeTrue($withoutGpu->getErrorOutput())
+        ->and(devScriptLog())
+        ->toContain('php artisan dev:qemu ubuntu-root --as-localhost --gpu|')
+        ->toContain('php artisan dev:qemu ubuntu-root --as-localhost|');
+});
+
 it('starts a lima vm as localhost on macos and seeds its forwarded ssh port', function () {
     ($this->fakeLima)();
     runDevScript('main', ['start']);

@@ -5,6 +5,7 @@ namespace App\Livewire\Team;
 use App\Models\AuditEvent;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -19,6 +20,17 @@ class AuditLog extends Component
     public string $source = 'all';
 
     public int $perPage = 25;
+
+    #[Locked]
+    public string $sort = 'time-desc';
+
+    /** @var array<string, string> sort value prefix => audit_events column */
+    private const SORT_COLUMNS = [
+        'time' => 'created_at',
+        'actor' => 'actor_name',
+        'activity' => 'description',
+        'source' => 'source',
+    ];
 
     public function boot(): void
     {
@@ -39,6 +51,18 @@ class AuditLog extends Component
 
     public function updatedSource(): void
     {
+        $this->resetPage();
+    }
+
+    public function setSort(string $sort): void
+    {
+        [$column, $direction] = array_pad(explode('-', $sort, 2), 2, null);
+
+        if (! array_key_exists($column, self::SORT_COLUMNS) || ! in_array($direction, ['asc', 'desc'], true)) {
+            return;
+        }
+
+        $this->sort = $sort;
         $this->resetPage();
     }
 
@@ -67,6 +91,10 @@ class AuditLog extends Component
         $events = AuditEvent::query()
             ->visibleToTeam($teamId, $canViewInstanceEvents)
             ->filtered($search, $this->action, $this->source)
+            ->when($this->sort !== 'time-desc', function ($query): void {
+                [$column, $direction] = explode('-', $this->sort, 2);
+                $query->orderBy(self::SORT_COLUMNS[$column], $direction);
+            })
             ->latestFirst()
             ->paginate($this->perPage);
 

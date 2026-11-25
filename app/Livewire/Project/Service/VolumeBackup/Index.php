@@ -45,6 +45,7 @@ class Index extends Component
             'modalClosed' => 'closeScheduleModal',
             ...$this->teamChannelListeners([
                 'ServiceChecked' => '$refresh',
+                'ServiceStatusChanged' => '$refresh',
                 'BackupCreated' => '$refresh',
             ]),
         ];
@@ -64,7 +65,7 @@ class Index extends Component
 
     public function openSchedule(string $backupUuid): void
     {
-        $this->authorize('update', $this->service);
+        $this->authorize('manageBackups', $this->service);
         $this->loadSelectedSchedule($backupUuid);
         $this->s3s = S3Storage::query()
             ->where('team_id', $this->service->team()?->id)
@@ -99,7 +100,7 @@ class Index extends Component
                 abort_unless($type === 'storage', 404);
                 $this->loadSelectedSchedule($backupUuid);
                 abort_unless($this->selectedVolumeBackup, 404);
-                $this->authorize('update', $this->selectedVolumeBackup->targetResource());
+                $this->authorize('manageBackups', $this->service);
                 VolumeBackupJob::dispatch($this->selectedVolumeBackup);
             }
 

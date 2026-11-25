@@ -5,16 +5,13 @@ namespace App\Mcp\Tools;
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesTeam;
 use App\Models\Application;
-use App\Models\Environment;
-use App\Models\Project;
-use App\Models\Server;
-use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class ListApplications extends Tool
 {
     protected string $name = 'list_applications';
@@ -69,48 +66,14 @@ class ListApplications extends Tool
 
         $query = Application::ownedByCurrentTeamAPI($teamId)
             ->with(['environment.project:id,uuid,name,team_id'])
-            ->when($tagName !== null, function ($query) use ($tagName) {
-                $query->whereHas('tags', fn ($q) => $q->where('name', $tagName));
-            })
-            ->when(is_string($projectUuid), function ($query) use ($projectUuid, $teamId) {
-                $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
-                if (! $project) {
-                    $query->whereRaw('1 = 0');
-
-                    return;
-                }
-                $query->whereHas('environment', fn ($q) => $q->where('project_id', $project->id));
-            })
-            ->when(is_string($environmentUuid), function ($query) use ($environmentUuid, $teamId) {
-                $env = Environment::ownedByCurrentTeamAPI($teamId)->where('uuid', $environmentUuid)->first();
-                if (! $env) {
-                    $query->whereRaw('1 = 0');
-
-                    return;
-                }
-                $query->where('environment_id', $env->id);
-            })
-            ->when(is_string($serverUuid), function ($query) use ($serverUuid, $teamId) {
-                $server = Server::whereTeamId($teamId)->where('uuid', $serverUuid)->first();
-                if (! $server) {
-                    $query->whereRaw('1 = 0');
-
-                    return;
-                }
-                $standaloneDockerIds = $server->standaloneDockers()->pluck('id');
-                $swarmDockerIds = $server->swarmDockers()->pluck('id');
-                $query->where(function ($q) use ($standaloneDockerIds, $swarmDockerIds) {
-                    $q->where(function ($inner) use ($standaloneDockerIds) {
-                        $inner->where('destination_type', StandaloneDocker::class)
-                            ->whereIn('destination_id', $standaloneDockerIds);
-                    })->orWhere(function ($inner) use ($swarmDockerIds) {
-                        $inner->where('destination_type', SwarmDocker::class)
-                            ->whereIn('destination_id', $swarmDockerIds);
-                    });
-                });
-            })
-            ->when(is_string($status), fn ($query) => $query->whereRaw('LOWER(status) LIKE ?', ['%'.strtolower($status).'%']))
-            ->when(is_string($name), fn ($query) => $query->whereRaw('LOWER(name) LIKE ?', ['%'.strtolower($name).'%']));
+            ->applyListFilters($teamId, [
+                'tag' => $tagName,
+                'project_uuid' => $projectUuid,
+                'environment_uuid' => $environmentUuid,
+                'server_uuid' => $serverUuid,
+                'status' => $status,
+                'name' => $name,
+            ]);
 
         $total = (clone $query)->count();
 

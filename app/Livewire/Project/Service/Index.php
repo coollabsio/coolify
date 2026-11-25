@@ -5,12 +5,15 @@ namespace App\Livewire\Project\Service;
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Actions\Service\DeleteService;
+use App\Enums\ProxyTypes;
 use App\Models\S3Storage;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Services\Dns\ManagedDnsRecordCleanup;
+use App\Services\Dns\ResourceDnsRecords;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -81,11 +84,20 @@ class Index extends Component
 
     public $requiredPort = null;
 
+    public ?int $requestedPort = null;
+
     public ?string $fqdn = null;
 
     public bool $isGzipEnabled = false;
 
     public bool $isStripprefixEnabled = false;
+
+    /**
+     * How the Traefik certificate resolver is chosen: `server`, `none`, or `custom`.
+     */
+    public string $certificateResolverMode = 'server';
+
+    public ?string $certificateResolverName = null;
 
     public mixed $maxRestartCount = 0;
 
@@ -105,6 +117,13 @@ class Index extends Component
         'fqdn' => 'nullable',
         'isGzipEnabled' => 'nullable|boolean',
         'isStripprefixEnabled' => 'nullable|boolean',
+        'certificateResolverMode' => 'required|in:server,none,custom',
+        'certificateResolverName' => ['exclude_unless:certificateResolverMode,custom', 'required', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN, 'not_in:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE],
+    ];
+
+    protected $validationAttributes = [
+        'certificateResolverMode' => 'certificate resolver',
+        'certificateResolverName' => 'certificate resolver name',
     ];
 
     public function mount(
@@ -152,8 +171,6 @@ class Index extends Component
                 return;
             }
             $this->parameters = get_route_parameters();
-            $this->query = request()->query();
-            $this->currentRoute = request()->route()->getName();
             $project = currentTeam()
                 ->projects()
                 ->select('id', 'uuid', 'team_id')
@@ -165,32 +182,12 @@ class Index extends Component
                 ->firstOrFail();
             $this->service = $environment->services()->whereUuid($this->parameters['service_uuid'])->firstOrFail();
             $this->authorize('view', $this->service);
-            if (in_array($this->currentRoute, ['project.service.index', 'project.service.index.advanced'], true)) {
-                return redirect()->route(
-                    'project.service.configuration',
-                    collect($this->parameters)->except('stack_service_uuid')->all(),
-                );
-            }
-            $service = $this->service->applications()->whereUuid($this->parameters['stack_service_uuid'])->first();
-            if ($service) {
-                $this->serviceApplication = $service;
-                $this->resourceType = 'application';
-                $this->serviceApplication->getFilesFromServer();
-                $this->initializeApplicationProperties();
-            } else {
-                $this->serviceDatabase = $this->service->databases()->whereUuid($this->parameters['stack_service_uuid'])->first();
-                if (! $this->serviceDatabase) {
-                    return redirect()->route('project.service.configuration', [
-                        'project_uuid' => $this->parameters['project_uuid'],
-                        'environment_uuid' => $this->parameters['environment_uuid'],
-                        'service_uuid' => $this->parameters['service_uuid'],
-                    ]);
-                }
-                $this->resourceType = 'database';
-                $this->serviceDatabase->getFilesFromServer();
-                $this->initializeDatabaseProperties();
-            }
-            $this->s3s = $this->serviceTeamS3Storages();
+
+            // The settings of a stack service open in a modal on the configuration page.
+            return redirect()->route(
+                'project.service.configuration',
+                collect($this->parameters)->except('stack_service_uuid')->all(),
+            );
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -447,6 +444,11 @@ class Index extends Component
             $this->serviceApplication->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->serviceApplication->is_gzip_enabled = $this->isGzipEnabled;
             $this->serviceApplication->is_stripprefix_enabled = $this->isStripprefixEnabled;
+            $this->serviceApplication->traefik_certificate_resolver = match ($this->certificateResolverMode) {
+                'none' => ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE,
+                'custom' => $this->certificateResolverName,
+                default => null,
+            };
             if ($this->serviceApplication->max_restart_count !== (int) $this->maxRestartCount) {
                 $this->serviceApplication->restart_limit_reached = false;
             }
@@ -460,8 +462,23 @@ class Index extends Component
             $this->isLogDrainEnabled = data_get($this->serviceApplication, 'is_log_drain_enabled', false);
             $this->isGzipEnabled = data_get($this->serviceApplication, 'is_gzip_enabled', true);
             $this->isStripprefixEnabled = data_get($this->serviceApplication, 'is_stripprefix_enabled', true);
+            $resolver = $this->serviceApplication->traefik_certificate_resolver;
+            $this->certificateResolverMode = match (true) {
+                blank($resolver) => 'server',
+                $resolver === ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE => 'none',
+                default => 'custom',
+            };
+            $this->certificateResolverName = $this->certificateResolverMode === 'custom' ? $resolver : null;
             $this->maxRestartCount = $this->serviceApplication->max_restart_count ?? 0;
         }
+    }
+
+    private function validateCertificateResolver(): void
+    {
+        $this->validate([
+            'certificateResolverMode' => $this->rules['certificateResolverMode'],
+            'certificateResolverName' => $this->rules['certificateResolverName'],
+        ]);
     }
 
     public function saveMaxRestartCount(): void
@@ -517,6 +534,7 @@ class Index extends Component
 
                 return;
             }
+            $this->validateCertificateResolver();
             $this->syncApplicationData(true);
             $changedFields = auditChangedFields($this->serviceApplication);
             $this->serviceApplication->save();
@@ -613,13 +631,14 @@ class Index extends Component
         try {
             $persistedApplication = $this->serviceApplication->fresh();
             $previousDnsHostnames = app(ManagedDnsRecordCleanup::class)->hostnamesOf($persistedApplication);
-            $previousEditableUrls = $persistedApplication->url;
+            $previousServiceDnsHostnames = array_keys(app(ResourceDnsRecords::class)->hostnameUsers($this->service));
             $previousFqdn = $persistedApplication->fqdn;
             $previousPortOverrides = $persistedApplication->domain_port_overrides;
             $this->authorize('update', $this->serviceApplication);
             $this->validate([
                 'fqdn' => ValidationPatterns::applicationDomainRules(),
             ]);
+            $this->validateCertificateResolver();
 
             $this->fqdn = ValidationPatterns::normalizeApplicationDomains($this->fqdn);
             $warning = sslipDomainWarning($this->fqdn);
@@ -651,8 +670,9 @@ class Index extends Component
                             continue;
                         }
 
-                        if ($this->serviceApplication->portRequiresConfirmation($fqdn, $requiredPort, $previousEditableUrls)) {
+                        if ($this->serviceApplication->portRequiresConfirmation($fqdn, $requiredPort)) {
                             $this->requiredPort = $requiredPort;
+                            $this->requestedPort = ServiceApplication::extractPortFromUrl($fqdn);
                             $this->showPortWarningModal = true;
                             $this->serviceApplication->fqdn = $previousFqdn;
                             $this->serviceApplication->domain_port_overrides = $previousPortOverrides;
@@ -671,6 +691,7 @@ class Index extends Component
             $this->auditServiceSubResourceUpdate($this->serviceApplication, $changedFields);
             $this->serviceApplication->refresh();
             app(ManagedDnsRecordCleanup::class)->queueReleaseOfRemovedHostnames($this->serviceApplication, $previousDnsHostnames, $this->service->team()->id);
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($this->service, $previousServiceDnsHostnames);
             $this->syncApplicationData(false);
             updateCompose($this->serviceApplication);
             if (str($this->serviceApplication->fqdn)->contains(',')) {
@@ -692,7 +713,12 @@ class Index extends Component
 
     public function render()
     {
-        return view('livewire.project.service.index');
+        $server = $this->resourceType === 'application' ? $this->service?->destination?->server : null;
+
+        return view('livewire.project.service.index', [
+            'showCertificateResolver' => $server?->proxyType() === ProxyTypes::TRAEFIK->value,
+            'serverCertificateResolver' => $server?->traefikCertificateResolver() ?? ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_NONE,
+        ]);
     }
 
     /**

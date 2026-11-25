@@ -5,12 +5,14 @@ namespace App\Models;
 use App\Services\DopplerService;
 use App\Services\InfisicalService;
 use App\Services\VaultService;
+use App\Support\RemoteSecretReferences;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
- * Links a resource (currently Application) to a remote secret manager source.
+ * Links a resource to a named remote secret manager source. Variables reference the `default`
+ * source as {{vault.KEY}} and other sources as {{vault.<name>.KEY}}.
  * Holds only the source coordinates — secret values are never persisted.
  */
 class SecretManagerLink extends BaseModel
@@ -18,6 +20,7 @@ class SecretManagerLink extends BaseModel
     protected $fillable = [
         'resourceable_type',
         'resourceable_id',
+        'name',
         'integration_token_id',
         'settings',
     ];
@@ -27,6 +30,17 @@ class SecretManagerLink extends BaseModel
         return [
             'settings' => 'array',
         ];
+    }
+
+    public function sourceName(): string
+    {
+        return $this->name ?? RemoteSecretReferences::DEFAULT_SOURCE;
+    }
+
+    /** The reference text of a key of this source, such as {{vault.KEY}} or {{vault.urls.KEY}}. */
+    public function referenceFor(string $key): string
+    {
+        return RemoteSecretReferences::reference($this->sourceName(), $key);
     }
 
     public function resourceable(): MorphTo
@@ -63,6 +77,7 @@ class SecretManagerLink extends BaseModel
                 data_get($metadata, 'base_url', 'https://app.infisical.com'),
                 (string) data_get($metadata, 'client_id'),
                 $token->token,
+                IntegrationToken::requestTimeout($metadata),
             ))->fetchSecrets(
                 (string) data_get($settings, 'project_id'),
                 (string) data_get($settings, 'environment'),
@@ -72,6 +87,7 @@ class SecretManagerLink extends BaseModel
                 (string) data_get($metadata, 'base_url'),
                 $token->token,
                 data_get($metadata, 'namespace'),
+                IntegrationToken::requestTimeout($metadata),
             ))->fetchSecrets(
                 (string) data_get($settings, 'mount', 'secret'),
                 (string) data_get($settings, 'path'),
@@ -81,7 +97,7 @@ class SecretManagerLink extends BaseModel
     }
 
     /**
-     * Create one {{vault.KEY}} reference variable per remote key that has no
+     * Create one {{vault.KEY}} (or {{vault.<name>.KEY}}) reference variable per remote key that has no
      * variable with that key yet. Only key names touch the database. Remote
      * names that are not valid variable keys (e.g. `db-password`) are skipped
      * as they are, never renamed.
@@ -112,7 +128,7 @@ class SecretManagerLink extends BaseModel
 
             $this->resourceable->environment_variables()->create([
                 'key' => $key,
-                'value' => '{{vault.'.$key.'}}',
+                'value' => $this->referenceFor($key),
             ]);
             $imported[] = $key;
         }

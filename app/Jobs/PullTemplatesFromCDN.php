@@ -44,13 +44,11 @@ class PullTemplatesFromCDN implements ShouldBeEncrypted, ShouldQueue
                     'status' => $response->status(),
                     'body' => str($response->body())->limit(500)->toString(),
                 ]);
-                send_internal_notification('PullTemplatesAndVersions failed with: '.$response->status().' '.$response->body());
             }
         } catch (\Throwable $e) {
             Log::error('PullTemplatesFromCDN exception', [
                 'message' => $e->getMessage(),
             ]);
-            send_internal_notification('PullTemplatesAndVersions failed with: '.$e->getMessage());
         }
     }
 }

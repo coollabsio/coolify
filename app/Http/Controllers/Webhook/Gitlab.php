@@ -8,13 +8,16 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
+use App\Http\Controllers\Webhook\Concerns\RoutesConfigPushes;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Livewire\Source\Gitlab\Change as GitlabSource;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GitlabApp;
+use App\Services\ServerTransfer\TransferFinishChecklist;
 use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
@@ -23,6 +26,7 @@ class Gitlab extends Controller
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
     use ReadsWebhookPushPayload;
+    use RoutesConfigPushes;
     use ValidatesPreviewDeploymentRepository;
 
     public function redirect(Request $request)
@@ -84,6 +88,9 @@ class Gitlab extends Controller
         try {
             $return_payloads = collect([]);
             $payload = $request->collect();
+            if ($request->header('X-Gitlab-Event') === 'System Hook') {
+                $payload = $this->normalizeSystemHookPayload($payload);
+            }
             $x_gitlab_token = $request->header('X-Gitlab-Token');
             $object_kind = $this->webhookString(data_get($payload, 'object_kind'));
 
@@ -118,6 +125,7 @@ class Gitlab extends Controller
                 ], 401);
             }
 
+            TransferFinishChecklist::recordWebhook('gitlab_app', $gitlab_app->uuid);
             $project_id = $this->webhookPayloadDatabaseId($payload, 'project.id', required: true);
             $applications = Application::where('source_id', $gitlab_app->id)
                 ->where('source_type', GitlabApp::class)
@@ -138,6 +146,7 @@ class Gitlab extends Controller
                     ]);
                 }
                 $commit = $this->webhookCommitSha($payload, 'after');
+                $this->beginConfigPush($gitlab_app, data_get($payload, 'project.path_with_namespace'), $branch, $commit);
 
                 $applications = $applications->where('git_branch', $branch)->get();
                 $changed_files = $this->webhookPushChangedFiles($payload);
@@ -231,7 +240,10 @@ class Gitlab extends Controller
                     'skip_deploy' => $skip_deploy_pr,
                 ] = $this->readMergeRequestPayload($payload);
 
-                $applications = $applications->where('git_branch', $base_branch)->get();
+                if (! in_array($action, ['closed', 'close', 'merge'])) {
+                    $applications->where('git_branch', $base_branch);
+                }
+                $applications = $applications->get();
 
                 foreach ($applications as $application) {
                     if (! $application->destination->server->isFunctional()) {
@@ -299,6 +311,11 @@ class Gitlab extends Controller
                                 $pr_app->generate_preview_fqdn();
                             }
                         }
+
+                        ($found ?? $pr_app)->markForkPullRequest($this->isForkPreviewRepository(
+                            data_get($payload, 'object_attributes.source_project_id'),
+                            data_get($payload, 'object_attributes.target_project_id'),
+                        ), $commit ?? null);
 
                         $result = queue_application_deployment(
                             application: $application,
@@ -429,6 +446,9 @@ class Gitlab extends Controller
                 return response($return_payloads);
             }
             $matched_branch = $x_gitlab_event === 'merge_request' ? $base_branch : $branch;
+            if ($x_gitlab_event === 'push') {
+                $this->beginConfigPush(null, $full_name, $branch, $commit, fn (string $secret): bool => hash_equals($secret, (string) $x_gitlab_token));
+            }
             $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'gitlab', $full_name, $matched_branch);
             // GitLab sends a static token. A repeated wrong token is one guess.
             $failure_attempt = $this->manualWebhookTokenAttempt($x_gitlab_token);
@@ -440,7 +460,10 @@ class Gitlab extends Controller
                 }
             }
             if ($x_gitlab_event === 'merge_request') {
-                $applications = $this->manualWebhookApplications($applications->where('git_branch', $base_branch), $full_name);
+                if (! in_array($action, ['closed', 'close', 'merge'])) {
+                    $applications->where('git_branch', $base_branch);
+                }
+                $applications = $this->manualWebhookApplications($applications, $full_name);
                 if ($applications->isEmpty()) {
                     return $this->unauthenticatedManualWebhookResponse($failure_key, $failure_attempt);
                 }
@@ -469,6 +492,7 @@ class Gitlab extends Controller
 
                     continue;
                 }
+                TransferFinishChecklist::recordWebhook('application', $application->uuid);
                 $isFunctional = $application->destination->server->isFunctional();
                 if (! $isFunctional) {
                     $return_payloads->push([
@@ -592,6 +616,11 @@ class Gitlab extends Controller
                                     $pr_app->generate_preview_fqdn();
                                 }
                             }
+                            ($found ?? $pr_app)->markForkPullRequest($this->isForkPreviewRepository(
+                                data_get($payload, 'object_attributes.source_project_id'),
+                                data_get($payload, 'object_attributes.target_project_id'),
+                            ), $commit ?? null);
+
                             $result = queue_application_deployment(
                                 application: $application,
                                 pull_request_id: $pull_request_id,
@@ -659,6 +688,30 @@ class Gitlab extends Controller
         } catch (Exception $e) {
             return handleError($e);
         }
+    }
+
+    /**
+     * Give a system hook payload the project webhook shape. Current GitLab sends
+     * the project webhook data to system hooks, but the documented push payload
+     * has only `event_name` and a top-level `project_id`.
+     *
+     * @see https://docs.gitlab.com/administration/system_hooks/#push-events
+     *
+     * @param  Collection<string, mixed>  $payload
+     * @return Collection<string, mixed>
+     */
+    private function normalizeSystemHookPayload(Collection $payload): Collection
+    {
+        if (! $payload->has('object_kind') && $payload->has('event_name')) {
+            $payload->put('object_kind', $payload->get('event_name'));
+        }
+
+        $project = $payload->get('project');
+        if (is_array($project) && ! array_key_exists('id', $project) && $payload->has('project_id')) {
+            $payload->put('project', ['id' => $payload->get('project_id')] + $project);
+        }
+
+        return $payload;
     }
 
     /**

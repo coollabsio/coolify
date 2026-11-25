@@ -1,4 +1,4 @@
-@can('createAnyResource')
+@can('create', \App\Models\GithubApp::class)
     <form wire:submit="createGitHubApp" class="flex w-full flex-col gap-4">
         <p class="text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
             Connect a GitHub App for private repositories, webhooks, and commit / pull request deployments.
@@ -13,7 +13,7 @@
                 :placeholder="$use_for_github_runners ? 'GitHub organization, for example coollabsio' : 'Personal account when empty'" />
         </div>
 
-        @if (! isCloud())
+        @if (! isCloud() && auth()->user()->can('makeSystemWide', \App\Models\GithubApp::class))
             <div x-data="{ showWarning: @entangle('is_system_wide') }">
                 <div class="max-w-xs">
                     <x-forms.checkbox id="is_system_wide" label="System wide"

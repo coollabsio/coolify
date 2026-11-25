@@ -4,14 +4,15 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesTeam;
-use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class ListDestinations extends Tool
 {
     protected string $name = 'list_destinations';
@@ -38,17 +39,16 @@ class ListDestinations extends Tool
             if (! is_string($serverUuid) || $serverUuid === '') {
                 return $this->mcpError($request, 'server_uuid must be a non-empty string.');
             }
-            $server = Server::whereTeamId($teamId)->whereUuid($serverUuid)->first();
+            $server = $this->visibleServers($request, $teamId)->whereUuid($serverUuid)->first();
             if (! $server) {
                 return $this->mcpError($request, "Server [{$serverUuid}] not found.", ['resource_uuid' => $serverUuid]);
             }
             $serverId = $server->id;
         }
 
-        $standaloneQuery = StandaloneDocker::with('server:id,uuid')
-            ->whereHas('server', fn ($q) => $q->whereTeamId($teamId));
-        $swarmQuery = SwarmDocker::with('server:id,uuid')
-            ->whereHas('server', fn ($q) => $q->whereTeamId($teamId));
+        $visibleServerIds = $this->visibleServers($request, $teamId)->select('id');
+        $standaloneQuery = StandaloneDocker::with('server:id,uuid')->whereIn('server_id', $visibleServerIds);
+        $swarmQuery = SwarmDocker::with('server:id,uuid')->whereIn('server_id', $visibleServerIds);
 
         if ($serverId !== null) {
             $standaloneQuery->where('server_id', $serverId);

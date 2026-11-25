@@ -38,13 +38,17 @@ class Maintenance extends Component
             && in_array($server->proxyType(), [ProxyTypes::TRAEFIK->value, ProxyTypes::CADDY->value], true));
     }
 
-    public function instantSaveMaintenance(): void
+    /**
+     * Turn maintenance mode on or off. The header button calls this after the user confirms.
+     */
+    public function toggleMaintenance(): void
     {
         try {
             $this->authorize('update', $this->resource);
-            $this->resource->is_maintenance_enabled = $this->isMaintenanceEnabled;
+            $this->resource->is_maintenance_enabled = ! $this->resource->is_maintenance_enabled;
             $this->resource->save();
             $this->resource->syncMaintenancePage();
+            $this->isMaintenanceEnabled = (bool) $this->resource->is_maintenance_enabled;
             $this->dispatch('success', $this->isMaintenanceEnabled ? 'Maintenance mode enabled.' : 'Maintenance mode disabled.');
         } catch (\Throwable $e) {
             $this->isMaintenanceEnabled = (bool) $this->resource->fresh()?->is_maintenance_enabled;

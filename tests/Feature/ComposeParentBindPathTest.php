@@ -241,9 +241,7 @@ services:
         content: hello
 YAML;
 
-        validateDockerComposeForInjection($compose);
-
-        expect(true)->toBeTrue();
+        expect(fn () => validateDockerComposeForInjection($compose))->not->toThrow(Exception::class);
     });
 
     it('rejects shell metacharacters in a resolved parent directory path', function () {

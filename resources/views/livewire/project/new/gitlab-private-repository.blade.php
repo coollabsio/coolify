@@ -109,7 +109,7 @@
                                 ])->values()->all()" />
                             <x-forms.listbox id="build_pack" label="Build pack" required live :options="[
                                 ['value' => 'railpack', 'label' => 'Railpack'],
-                                ['value' => 'nixpacks', 'label' => 'Nixpacks'],
+                                ['value' => 'nixpacks', 'label' => 'Nixpacks (deprecated)'],
                                 ['value' => 'static', 'label' => 'Static'],
                                 ['value' => 'dockerfile', 'label' => 'Dockerfile'],
                                 ['value' => 'dockercompose', 'label' => 'Docker Compose'],
@@ -130,12 +130,16 @@
                             @endif
                         </div>
 
+                        @if ($build_pack === 'nixpacks')
+                            <x-nixpacks-deprecated-callout />
+                        @endif
+
                         @if ($build_pack === 'dockercompose')
                             <x-forms.repository-paths class="sm:grid-cols-2" base="base_directory"
-                                file="docker_compose_location" fileLabel="Compose file"
+                                file="docker_compose_location" fileLabel="Compose file" compose
                                 defaultFile="/docker-compose.yaml" />
                         @else
-                            <x-forms.input wire:model="base_directory" label="Base directory"
+                            <x-forms.input id="base_directory" label="Base directory" placeholder="/"
                                 helper="Repository directory used as the build root." />
                         @endif
                     </div>

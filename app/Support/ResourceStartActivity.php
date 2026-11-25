@@ -89,6 +89,33 @@ class ResourceStartActivity
         return self::isRunning($activity) ? $activity : null;
     }
 
+    /**
+     * Uuids of the resources whose latest activity is queued or in progress and not stale,
+     * read with one query instead of one per resource.
+     *
+     * @param  array<int, string>  $typeUuids
+     * @return array<int, string>
+     */
+    public static function runningTypeUuids(array $typeUuids): array
+    {
+        if ($typeUuids === []) {
+            return [];
+        }
+
+        $staleAfterSeconds = max(self::QUEUED_STALE_AFTER_SECONDS, self::IN_PROGRESS_STALE_AFTER_SECONDS);
+
+        return Activity::query()
+            ->whereIn('properties->type_uuid', $typeUuids)
+            ->where('updated_at', '>=', now()->subSeconds($staleAfterSeconds))
+            ->latest()
+            ->orderByDesc('id')
+            ->get()
+            ->groupBy(fn (Activity $activity) => (string) data_get($activity, 'properties.type_uuid'))
+            ->filter(fn (Collection $group) => self::isRunning($group->first()))
+            ->keys()
+            ->all();
+    }
+
     public static function isRunning(?Activity $activity): bool
     {
         if (! $activity || ! in_array(data_get($activity, 'properties.status'), self::ACTIVE_STATUSES, true)) {
@@ -158,12 +185,14 @@ class ResourceStartActivity
     }
 
     /**
-     * Mark an activity as failed, append the reason to its log and stop log polling.
+     * Mark an activity as failed, append the redacted reason to its log and stop log polling.
      *
      * @param  array<string, mixed>  $extraProperties
      */
     public static function markFailed(Activity $activity, string $message, array $extraProperties = []): void
     {
+        // Callers can pass exception or command output text, which can contain secrets.
+        $message = remove_iip($message);
         $properties = [
             ...$extraProperties,
             'status' => ProcessStatus::ERROR->value,

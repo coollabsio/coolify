@@ -4,8 +4,6 @@ namespace App\Notifications\VolumeBackup;
 
 use App\Jobs\VolumeBackupRecoveryJob;
 use App\Models\ScheduledVolumeBackupExecution;
-use App\Models\ServiceApplication;
-use App\Models\ServiceDatabase;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\NtfyMessage;
@@ -40,10 +38,7 @@ class RecoveryFailed extends CustomEmailNotification
         };
         $this->containersStopped = (bool) $execution->stop_recovery_pending;
 
-        $linkable = $resource instanceof ServiceApplication || $resource instanceof ServiceDatabase ? $resource->service : $resource;
-        if ($linkable && method_exists($linkable, 'link')) {
-            $this->url = $linkable->link();
-        }
+        $this->url = $backup?->resourceUrl();
     }
 
     public function via(object $notifiable): array

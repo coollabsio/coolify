@@ -1,4 +1,4 @@
-<div>
+<div class="runtime-logs-page">
     <x-slot:title>
         {{ data_get_str($resource, 'name')->limit(10) }} > Logs | Coolify
     </x-slot>
@@ -14,13 +14,23 @@
     @endif
 
     @php
+        $archives ??= [];
+        $archiveOffServers ??= collect();
+        $archiveOptions ??= [];
+        $selectedArchive ??= null;
         $totalContainers = collect($serverContainers)->flatten(1)->count();
         $functionalServers = $servers->filter(fn ($server) => $server->isFunctional());
-        $logsUnavailable = $containersLoaded && (
+        $logsUnavailable = $containersLoaded && $archives === [] && (
             $servers->isEmpty()
             || $functionalServers->isEmpty()
             || $totalContainers === 0
         );
+        $logTargets = $targets ?? null;
+        $logSources = is_array($logTargets) ? ($logTargets['sources'] ?? []) : [];
+        $primarySource = $logSources[0] ?? null;
+        $selectedLogServer = is_array($primarySource)
+            ? $servers->firstWhere('uuid', $primarySource['server'])
+            : null;
     @endphp
 
     @if (in_array($type, ['application', 'database', 'service'], true))
@@ -33,20 +43,24 @@
                 @else
                     <x-service.configuration-sidebar :service="$resource" current-route="project.service.logs" />
                 @endif
-                <div class="min-w-0">
+                <div class="runtime-logs-column min-w-0">
     @endif
 
-    <div wire:loading.flex wire:target="loadAllContainers"
-        class="loading-state-card mt-4 hidden min-h-40 w-full items-center justify-center lg:mt-3">
-        <x-loading text="Loading containers" />
+    <div wire:loading.block wire:target="loadAllContainers" class="hidden w-full">
+        <x-skeleton.logs />
     </div>
 
-    <div class="mt-4 w-full lg:mt-3" x-init="if (! $wire.containersLoaded) { $wire.loadAllContainers() }"
+    <div class="w-full" x-init="if (! $wire.containersLoaded) { $wire.loadAllContainers() }"
         wire:loading.remove wire:target="loadAllContainers">
+        @foreach ($archiveOffServers as $archiveOffServer)
+            <x-callout type="info" title="Logs of removed containers are not saved" class="mb-4">
+                {{ $archiveOffServer->name }} deletes the logs of a container when the container is removed.
+                Turn on <a class="underline" href="{{ route('server.sentinel', ['server_uuid' => $archiveOffServer->uuid]) }}" {{ wireNavigate() }}>Keep logs of removed containers</a>
+                to read them here later.
+            </x-callout>
+        @endforeach
         @if (! $containersLoaded)
-            <div class="loading-state-card flex min-h-40 w-full items-center justify-center">
-                <x-loading text="Loading containers" />
-            </div>
+            <x-skeleton.logs />
         @elseif ($logsUnavailable)
             @if ($servers->isEmpty())
                 <x-empty size="lg" title="Runtime logs unavailable"
@@ -66,32 +80,73 @@
                     icon-name="file-content" />
             @endif
         @else
-            <div class="flex flex-col gap-4">
-                @foreach ($servers as $server)
-                    @if (! $server->isFunctional())
+            <div class="runtime-logs-workspace">
+                @foreach ($servers as $serverModel)
+                    @if (! $serverModel->isFunctional())
                         <x-callout type="warning" title="Server unavailable">
-                            {{ $server->name }} is not functional, so its container logs cannot be loaded.
+                            {{ $serverModel->name }} is not functional, so its container logs cannot be loaded.
                         </x-callout>
-                    @elseif (isset($serverErrors[$server->id]))
+                    @elseif (isset($serverErrors[$serverModel->id]))
                         <x-callout type="warning" title="Could not load containers">
-                            {{ $server->name }}: {{ $serverErrors[$server->id] }}
+                            {{ $serverModel->name }}: {{ $serverErrors[$serverModel->id] }}
                         </x-callout>
-                    @elseif (isset($serverContainers[$server->id]) && count($serverContainers[$server->id]) > 0)
-                        @if ($servers->count() > 1)
-                            <div class="flex items-center gap-2 px-1">
-                                <x-reicon name="servers" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
-                                <p class="text-xs font-medium text-neutral-500 dark:text-fg-dim">{{ $server->name }}</p>
-                            </div>
-                        @endif
-
-                        @foreach ($serverContainers[$server->id] as $container)
-                            <livewire:project.shared.get-logs
-                                wire:key="{{ data_get($container, 'ID', uniqid()) }}" :server="$server"
-                                :resource="$resource" :container="data_get($container, 'Names')"
-                                :expandByDefault="$totalContainers === 1" />
-                        @endforeach
                     @endif
                 @endforeach
+
+                @php
+                    $showArchivePicker = count($archiveOptions) > 1 || ($archiveOptions !== [] && $logSources !== []);
+                    $showDeploymentPicker = ! $selectedArchive && $logSources !== [] && count($logTargets['deployments']) > 1;
+                    $showServicePicker = ! $selectedArchive && $logSources !== [] && count($logTargets['services']) > 1;
+                @endphp
+                @if ($showArchivePicker || $showDeploymentPicker || $showServicePicker)
+                    <div class="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                        @if ($showArchivePicker)
+                            <div class="w-full sm:w-60" wire:key="runtime-logs-archives">
+                                <x-forms.listbox id="archive" label="Container" live searchable portal
+                                    searchPlaceholder="Search containers" :options="$archiveOptions" />
+                            </div>
+                        @endif
+                        @if ($showDeploymentPicker)
+                            <div class="w-full sm:w-60" wire:key="runtime-logs-deployments">
+                                <x-forms.listbox id="pullRequestId" label="Deployment" live searchable portal
+                                    searchPlaceholder="Search deployments" :options="$logTargets['deployments']" />
+                            </div>
+                        @endif
+                        @if ($showServicePicker)
+                            <div class="w-full sm:w-60" wire:key="runtime-logs-services">
+                                <x-forms.listbox id="service" label="Service" live searchable portal
+                                    searchPlaceholder="Search services" :options="$logTargets['services']" />
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
+                @if ($selectedArchive && $archiveServer)
+                    <x-callout type="info" title="Removed container">
+                        {{ $selectedArchive['container'] }} no longer exists. These logs come from the Sentinel log archive on {{ $archiveServer->name }}.
+                    </x-callout>
+                    <livewire:project.shared.get-logs
+                        wire:key="runtime-logs-archive-{{ $selectedArchive['server'] }}-{{ $selectedArchive['file'] }}"
+                        :server="$archiveServer"
+                        :resource="$resource"
+                        :container="$selectedArchive['container']"
+                        :archive-file="$selectedArchive['file']"
+                        :collapsible="false"
+                        :fill="true" />
+                @elseif ($selectedLogServer && $logSources !== [])
+                    <livewire:project.shared.get-logs
+                        wire:key="runtime-logs-{{ $logTargets['streamKey'] }}"
+                        :server="$selectedLogServer"
+                        :resource="$resource"
+                        :container="$primarySource['container']"
+                        :sources="count($logSources) > 1 ? $logSources : []"
+                        :collapsible="false"
+                        :fill="true" />
+                @else
+                    <x-empty size="lg" title="Runtime logs unavailable"
+                        description="No containers are running, so there are no runtime logs to show."
+                        icon-name="file-content" />
+                @endif
             </div>
         @endif
     </div>

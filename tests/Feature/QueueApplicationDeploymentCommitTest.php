@@ -187,6 +187,19 @@ describe('queue_application_deployment commit resolution', function () {
         Bus::assertDispatchedTimes(ApplicationDeploymentJob::class, 1);
     });
 
+    test('queues a successor behind a matching deployment that only cleans up', function () {
+        $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
+
+        queue_application_deployment($application, 'stopped-admission');
+        ApplicationDeploymentQueue::query()->where('deployment_uuid', 'stopped-admission')->update(['finished_at' => now()]);
+        $result = queue_application_deployment($application, 'successor-admission');
+
+        expect($result['status'])->toBe('queued')
+            ->and(ApplicationDeploymentQueue::query()->where('deployment_uuid', 'successor-admission')->value('status'))
+            ->toBe(ApplicationDeploymentStatus::QUEUED->value);
+        Bus::assertDispatchedTimes(ApplicationDeploymentJob::class, 1);
+    });
+
     test('allows explicit duplicate bypasses while queue capacity remains available', function (string $flag) {
         $application = makeApplication($this->environment->id, $this->destination->id, 'HEAD');
 

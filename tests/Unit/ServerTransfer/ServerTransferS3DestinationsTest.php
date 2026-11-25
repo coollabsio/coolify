@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ValidateAndInstallServerJob;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -16,11 +17,19 @@ use App\Models\Team;
 use App\Services\ServerTransfer\ServerTransferExporter;
 use App\Services\ServerTransfer\ServerTransferImporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function () {
+    // A claim writes the owner marker on the host over SSH.
+    Process::fake();
+    Storage::fake('ssh-keys');
+    // An import validates the claimed server over SSH; the sync test queue would run it.
+    Queue::fake([ValidateAndInstallServerJob::class]);
     Server::flushIdentityMap();
     InstanceSettings::forceCreate(['id' => 0, 'is_api_enabled' => true, 'fqdn' => 'https://coolify-a.test']);
 
@@ -141,4 +150,14 @@ test('transfer imports bundles that only have the primary S3 destination', funct
 
     expect(transferredBackupBuckets(ScheduledDatabaseBackup::where('team_id', $targetTeam->id)->sole()))->toBe(['second-bucket'])
         ->and(transferredBackupBuckets(ScheduledVolumeBackup::where('team_id', $targetTeam->id)->sole()))->toBe(['second-bucket']);
+});
+
+test('transfer keeps the TLS verification setting of S3 storages', function () {
+    $this->secondS3->update(['skip_tls_verification' => true]);
+    $bundle = app(ServerTransferExporter::class)->export($this->server);
+
+    $targetTeam = importTransferBundleIntoNewTeam($bundle, $this);
+
+    expect(S3Storage::where('team_id', $targetTeam->id)->pluck('skip_tls_verification', 'bucket')->all())
+        ->toBe(['first-bucket' => false, 'second-bucket' => true]);
 });

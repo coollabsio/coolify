@@ -171,7 +171,9 @@ describe('after the session team changes', function () {
     test('migrateTo rejects a destination of the session team', function () {
         resourceOperationsAfterTeamSwitch($this, $this->applicationA)
             ->call('migrateTo', $this->destinationB->uuid)
-            ->assertHasErrors(['destination_id' => 'Destination not found.']);
+            ->assertDispatched('error', 'Destination not found.');
+
+        expect($this->applicationA->fresh()->destination_id)->toBe($this->destinationA->id);
     });
 
     test('cloneTo and moveTo still work inside the resource team', function () {

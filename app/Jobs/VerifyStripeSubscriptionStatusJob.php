@@ -31,14 +31,18 @@ class VerifyStripeSubscriptionStatusJob implements ShouldBeEncrypted, ShouldQueu
             $this->subscription->stripe_customer_id) {
             try {
                 $stripe = app(StripeClient::class);
-                $subscriptions = $stripe->subscriptions->all([
+                $subscriptions = collect($stripe->subscriptions->all([
                     'customer' => $this->subscription->stripe_customer_id,
-                    'limit' => 1,
-                ]);
+                    'status' => 'all',
+                    'limit' => 10,
+                ])->data);
 
-                if ($subscriptions->data) {
+                $found = $subscriptions->first(fn ($sub) => in_array($sub->status, ['active', 'past_due'], true))
+                    ?? $subscriptions->first();
+
+                if ($found) {
                     $this->subscription->update([
-                        'stripe_subscription_id' => $subscriptions->data[0]->id,
+                        'stripe_subscription_id' => $found->id,
                     ]);
                 }
             } catch (\Exception $e) {
@@ -85,7 +89,7 @@ class VerifyStripeSubscriptionStatusJob implements ShouldBeEncrypted, ShouldQueu
 
                     $team = $this->subscription->team;
                     if ($team) {
-                        $team->subscriptionEnded();
+                        $team->subscriptionEnded($this->subscription);
                     }
                     break;
 

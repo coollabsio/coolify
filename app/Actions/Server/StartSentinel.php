@@ -4,6 +4,8 @@ namespace App\Actions\Server;
 
 use App\Enums\TrafficIpMode;
 use App\Events\SentinelRestarted;
+use App\Jobs\PullSentinelReportJob;
+use App\Jobs\ServerManagerJob;
 use App\Models\Server;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
@@ -18,6 +20,13 @@ class StartSentinel
 
     /** Shorter than the 120 second timeout of CheckAndStartSentinelJob. */
     public const LOCK_WAIT_SECONDS = 90;
+
+    /**
+     * A PEM file of CA certificates in the Sentinel directory of the server (mounted on /app/db).
+     * When it exists, Sentinel gets PUSH_ENDPOINT_CA_PATH and trusts these CAs for HTTPS requests
+     * to Coolify, for an instance with a certificate from a private CA. Older Sentinel versions ignore the variable.
+     */
+    public const PUSH_ENDPOINT_CA_FILE = 'push-endpoint-ca.pem';
 
     public static function lockKey(Server $server): string
     {
@@ -70,6 +79,24 @@ class StartSentinel
     }
 
     /**
+     * Sentinel 1.1.8 and later archive the logs of Coolify-managed containers under /app/db/container-logs.
+     * Older Sentinel versions ignore these variables.
+     *
+     * @return array<string, string>
+     */
+    public static function sentinelLogArchiveEnvironment(Server $server): array
+    {
+        $settings = $server->settings;
+
+        return [
+            'LOG_ARCHIVE_ENABLED' => $settings->is_container_log_archive_enabled ? 'true' : 'false',
+            'LOG_ARCHIVE_MAX_FILE_MB' => (string) $settings->log_archive_max_file_mb,
+            'LOG_ARCHIVE_MAX_TOTAL_MB' => (string) $settings->log_archive_max_total_mb,
+            'LOG_ARCHIVE_RETENTION_DAYS' => (string) $settings->log_archive_retention_days,
+        ];
+    }
+
+    /**
      * Sentinel opens the access log once at startup and never retries, so the file must exist
      * before the container starts. `touch` keeps an existing log intact.
      *
@@ -87,6 +114,24 @@ class StartSentinel
             'mkdir -p '.escapeshellarg($directory),
             'touch '.escapeshellarg($directory.'/access.log'),
         ];
+    }
+
+    /**
+     * Docker reads an env file line by line, so a line break in a value would add a variable.
+     *
+     * @param  array<string, mixed>  $environments
+     */
+    public static function envFileContent(array $environments): string
+    {
+        $lines = [];
+        foreach ($environments as $key => $value) {
+            if (preg_match('/[\r\n]/', (string) $value)) {
+                throw new \RuntimeException("The Sentinel setting {$key} must not contain a line break.");
+            }
+            $lines[] = "{$key}={$value}";
+        }
+
+        return implode("\n", $lines)."\n";
     }
 
     /**
@@ -118,20 +163,28 @@ class StartSentinel
         $refreshRate = data_get($server, 'settings.sentinel_metrics_refresh_rate_seconds');
         $pushInterval = data_get($server, 'settings.sentinel_push_interval_seconds');
         $token = $server->settings->ensureValidSentinelToken();
-        $endpoint = $server->settings->ensureSentinelUrl();
         $debug = data_get($server, 'settings.is_sentinel_debug_enabled');
         $mountDir = devHostDockerPath($server, base_configuration_dir().'/sentinel');
         $image = coolifyRegistryUrl().'/coollabsio/sentinel:'.$version;
+        // In pull mode Coolify reads the report over SSH (PullSentinelReportJob), so the server needs no route to Coolify.
+        // Older Sentinel versions exit without PUSH_ENDPOINT even when push is off, so pull mode still sends one when it exists.
+        $push = $server->settings->is_sentinel_pull_enabled
+            ? array_filter(['PUSH_ENABLED' => 'false', 'PUSH_ENDPOINT' => rescue(fn () => $server->settings->ensureSentinelUrl(), null, false)])
+            : ['PUSH_ENDPOINT' => $server->settings->ensureSentinelUrl()];
         $environments = [
             'TOKEN' => $token,
             'DEBUG' => $debug ? 'true' : 'false',
-            'PUSH_ENDPOINT' => $endpoint,
+            ...$push,
             'PUSH_INTERVAL_SECONDS' => $pushInterval,
             'COLLECTOR_ENABLED' => $server->isMetricsEnabled() ? 'true' : 'false',
             'COLLECTOR_REFRESH_RATE_SECONDS' => $refreshRate,
             'COLLECTOR_RETENTION_PERIOD_DAYS' => $metricsHistory,
         ];
-        $environments = array_merge($environments, self::sentinelTrafficEnvironment($server));
+        $environments = array_merge(
+            $environments,
+            self::sentinelTrafficEnvironment($server),
+            self::sentinelLogArchiveEnvironment($server),
+        );
         $labels = [
             'coolify.managed' => 'true',
         ];
@@ -141,14 +194,17 @@ class StartSentinel
                 $image = $customImage;
             }
         }
-        $dockerEnvironments = implode(' ', array_map(fn ($key, $value) => '-e '.escapeshellarg("$key=$value"), array_keys($environments), $environments));
+        $envFile = devHostDockerPath($server, base_configuration_dir().'/sentinel.env');
+        $envFileContent = self::envFileContent($environments);
         $dockerLabels = implode(' ', array_map(fn ($key, $value) => "$key=$value", array_keys($labels), $labels));
         $trafficLogDirectory = self::trafficLogDirectory($server);
         $trafficMount = self::collectsTraffic($server)
             ? '-v '.escapeshellarg("{$trafficLogDirectory}:{$trafficLogDirectory}:ro").' '
             : '';
         $network = $server->isLocalhost() ? ' --network coolify' : '';
-        $dockerCommand = "docker run -d$network $dockerEnvironments --name coolify-sentinel --restart unless-stopped -v /var/run/docker.sock:/var/run/docker.sock -v $mountDir:/app/db {$trafficMount}--pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-start-period 120s --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway --label $dockerLabels $image";
+        // A userns-remap daemon refuses --pid host unless the container opts out of remapping.
+        // On other daemons --userns host has no effect. https://docs.docker.com/engine/security/userns-remap/
+        $dockerCommand = "docker run -d$network --env-file $envFile --name coolify-sentinel --restart unless-stopped -v /var/run/docker.sock:/var/run/docker.sock -v $mountDir:/app/db {$trafficMount}--userns host --pid host --health-cmd \"curl --fail http://127.0.0.1:8888/api/health || exit 1\" --health-start-period 120s --health-interval 10s --health-retries 3 --add-host=host.docker.internal:host-gateway --label $dockerLabels $image";
 
         $server->sentinelHeartbeat(isReset: true);
         $server->forceFill(['sentinel_waiting_since' => now()])->save();
@@ -156,8 +212,22 @@ class StartSentinel
         instant_remote_process([
             'docker rm -f coolify-sentinel || true',
             "mkdir -p $mountDir",
+            // Sentinel does not clean up the archive when it is off, so the saved logs are deleted here.
+            ...($server->settings->is_container_log_archive_enabled ? [] : ['rm -rf '.escapeshellarg("{$mountDir}/container-logs")]),
             ...self::trafficLogPreparationCommands($server),
-            $dockerCommand,
+            'sh -ec '.escapeshellarg(implode("\n", [
+                'trap '.escapeshellarg("rm -f $envFile").' EXIT',
+                // The mode is set before the token is written, so it does not depend on the umask of the server.
+                "rm -f $envFile",
+                "touch $envFile",
+                "chmod 600 $envFile",
+                "echo '".base64_encode($envFileContent)."' | base64 -d | tee $envFile > /dev/null",
+                'if [ -f '.escapeshellarg("{$mountDir}/".self::PUSH_ENDPOINT_CA_FILE).' ]; then echo '.escapeshellarg('PUSH_ENDPOINT_CA_PATH=/app/db/'.self::PUSH_ENDPOINT_CA_FILE)." >> $envFile; fi",
+                $dockerCommand,
+                // Docker keeps the environment in the container configuration, so restarts do not read the file again.
+                "rm -f $envFile",
+                'trap - EXIT',
+            ])),
             "chown -R 9999:root $mountDir",
             "chmod -R 700 $mountDir",
         ], $server);
@@ -171,5 +241,12 @@ class StartSentinel
 
         // Dispatch event to notify UI components
         SentinelRestarted::dispatch($server, $version);
+
+        // The first scheduled pull can be up to a minute away, so pull as soon as the Sentinel API is up
+        // and start the pull interval from this pull.
+        if ($server->settings->is_sentinel_pull_enabled) {
+            Cache::put(ServerManagerJob::sentinelPullDueCacheKey($server), true, ServerManagerJob::sentinelPullSpacingSeconds($server));
+            PullSentinelReportJob::dispatch($server)->delay(now()->addSeconds(10));
+        }
     }
 }

@@ -10,6 +10,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -29,7 +30,7 @@ class FileStorage extends Component
 
     public LocalFileVolume $fileStorage;
 
-    public ServiceApplication|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|ServiceDatabase|Application $resource;
+    public ServiceApplication|StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite|ServiceDatabase|Application $resource;
 
     public string $fs_path;
 
@@ -167,10 +168,12 @@ class FileStorage extends Component
             $this->fileStorage->content = null;
             $this->fileStorage->is_based_on_git = false;
             $changedFields = auditChangedFields($this->fileStorage);
-            $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
+            $this->fileStorage->save();
             $this->auditFileStorageUpdate($changedFields, 'converted_to_directory');
         } catch (\Throwable $e) {
+            $this->fileStorage->refresh();
+
             return handleError($e, $this);
         } finally {
             $this->dispatch('storageCountsChanged')->to(Storage::class);
@@ -216,10 +219,12 @@ class FileStorage extends Component
                 $this->fileStorage->is_based_on_git = true;
             }
             $changedFields = auditChangedFields($this->fileStorage);
-            $this->fileStorage->save();
             $this->fileStorage->saveStorageOnServer();
+            $this->fileStorage->save();
             $this->auditFileStorageUpdate($changedFields, 'converted_to_file');
         } catch (\Throwable $e) {
+            $this->fileStorage->refresh();
+
             return handleError($e, $this);
         } finally {
             $this->dispatch('storageCountsChanged')->to(Storage::class);
@@ -228,7 +233,7 @@ class FileStorage extends Component
 
     public function delete($password, $selectedActions = [])
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('delete', $this->resource);
 
         if (! verifyPasswordConfirmation($password, $this)) {
             return 'The provided password is incorrect.';
@@ -372,6 +377,7 @@ class FileStorage extends Component
         return view('livewire.project.service.file-storage', [
             'deletionCheckboxes' => $deletionCheckboxes,
             'deletionActions' => $deletionActions,
+            'isYamlFile' => str($this->fileStorage->fs_path)->lower()->endsWith(['.yml', '.yaml']),
         ]);
     }
 }

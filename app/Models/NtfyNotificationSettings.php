@@ -41,7 +41,9 @@ class NtfyNotificationSettings extends Model
         'server_reachable_ntfy_notifications',
         'server_unreachable_ntfy_notifications',
         'server_patch_ntfy_notifications',
+        'server_auto_update_ntfy_notifications',
         'traefik_outdated_ntfy_notifications',
+        'image_vulnerabilities_ntfy_notifications',
     ];
 
     protected $hidden = [
@@ -81,7 +83,9 @@ class NtfyNotificationSettings extends Model
             'server_reachable_ntfy_notifications' => 'boolean',
             'server_unreachable_ntfy_notifications' => 'boolean',
             'server_patch_ntfy_notifications' => 'boolean',
+            'server_auto_update_ntfy_notifications' => 'boolean',
             'traefik_outdated_ntfy_notifications' => 'boolean',
+            'image_vulnerabilities_ntfy_notifications' => 'boolean',
         ];
     }
 

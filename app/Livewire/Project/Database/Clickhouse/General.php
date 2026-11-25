@@ -6,6 +6,7 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Models\Server;
 use App\Models\StandaloneClickhouse;
+use App\Services\ProjectConfig\ManagedResources;
 use App\Support\ValidationPatterns;
 use App\Traits\ListensToTeamChannel;
 use Exception;
@@ -73,7 +74,7 @@ class General extends Component
             return handleError($e, $this);
         }
 
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
+        $this->isPasswordHiddenForMember = ! ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->database);
     }
 
     protected function rules(): array
@@ -122,8 +123,11 @@ class General extends Component
             $this->validate();
             $this->database->name = $this->name;
             $this->database->description = $this->description;
-            $this->database->clickhouse_admin_user = $this->clickhouseAdminUser;
-            $this->database->clickhouse_admin_password = $this->clickhouseAdminPassword;
+            // After the first start the credentials are read-only, so autofilled values must not be saved.
+            if (! $this->database->started_at) {
+                $this->database->clickhouse_admin_user = $this->clickhouseAdminUser;
+                $this->database->clickhouse_admin_password = $this->clickhouseAdminPassword;
+            }
             $this->database->image = $this->image;
             $this->database->ports_mappings = $this->portsMappings;
             $this->database->is_public = $this->isPublic;
@@ -132,18 +136,19 @@ class General extends Component
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->save();
+            $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
+            $canSeeCredentials = ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->database);
             $this->name = $this->database->name;
             $this->description = $this->database->description;
             $this->clickhouseAdminUser = $this->database->clickhouse_admin_user;
-            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->clickhouseAdminPassword = $canSeeCredentials ? $this->database->clickhouse_admin_password : '';
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
             $this->publicPort = $this->database->public_port;
             $this->publicPortTimeout = $this->database->public_port_timeout;
-            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->customDockerRunOptions = $canSeeCredentials ? $this->database->custom_docker_run_options : null;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
         }
     }

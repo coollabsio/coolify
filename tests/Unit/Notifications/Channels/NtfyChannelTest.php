@@ -14,6 +14,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\Finder\Finder;
 use Tests\TestCase;
 
@@ -70,6 +71,17 @@ it('has an ntfy message for every notification that has a pushover message', fun
         ->all();
 
     expect($missing)->toBe([]);
+});
+
+it('has an ntfy setting for every per-event pushover setting', function () {
+    $eventColumns = fn (string $channel) => collect(Schema::getColumnListing("{$channel}_notification_settings"))
+        ->filter(fn (string $column) => str_ends_with($column, "_{$channel}_notifications"))
+        ->map(fn (string $column) => str_replace("_{$channel}_notifications", '', $column))
+        ->sort()
+        ->values()
+        ->all();
+
+    expect(array_diff($eventColumns('pushover'), $eventColumns('ntfy')))->toBe([]);
 });
 
 it('sends to the configured server and topic with the team priority for the level', function () {

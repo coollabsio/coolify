@@ -58,6 +58,14 @@ class DomainFavicon
                 || ! DnsRecordHints::isPublicAddress($embeddedIp);
         }
 
+        // sslip.io writes an IPv6 address with dashes: fd00--1.sslip.io is fd00::1.
+        if (preg_match('/(?:^|\.)([0-9a-f]*-[0-9a-f-]*)\.(?:sslip|nip)\.io$/', $host, $matches) === 1) {
+            $embeddedIp = str_replace('-', ':', $matches[1]);
+
+            return filter_var($embeddedIp, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false
+                && ! DnsRecordHints::isPublicAddress($embeddedIp);
+        }
+
         return false;
     }
 }

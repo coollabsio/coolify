@@ -18,8 +18,7 @@ class ServerFilesFromServerJob implements ShouldBeEncrypted, ShouldBeUniqueUntil
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
-     * Only one sync per resource can wait in the queue. The compose parser dispatches
-     * this job once per volume on every parse, so without this the queue fills with copies.
+     * Only one sync per resource can wait in the queue, also when deployments follow each other quickly.
      */
     public int $uniqueFor = 600;
 

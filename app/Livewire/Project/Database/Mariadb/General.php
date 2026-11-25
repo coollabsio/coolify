@@ -6,6 +6,7 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Models\Server;
 use App\Models\StandaloneMariadb;
+use App\Services\ProjectConfig\ManagedResources;
 use App\Support\ValidationPatterns;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -129,7 +130,7 @@ class General extends Component
             return handleError($e, $this);
         }
 
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
+        $this->isPasswordHiddenForMember = ! ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->database);
     }
 
     private function syncData(bool $toModel = false): void
@@ -151,22 +152,23 @@ class General extends Component
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->save();
+            $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
+            $canSeeCredentials = ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->database);
             $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
             $this->mariadbRootPassword = $canSeeCredentials ? $this->database->mariadb_root_password : '';
             $this->mariadbUser = $this->database->mariadb_user;
             $this->mariadbPassword = $canSeeCredentials ? $this->database->mariadb_password : '';
             $this->mariadbDatabase = $this->database->mariadb_database;
-            $this->mariadbConf = $this->database->mariadb_conf;
+            $this->mariadbConf = $canSeeCredentials ? $this->database->mariadb_conf : null;
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
             $this->publicPort = $this->database->public_port;
             $this->publicPortTimeout = $this->database->public_port_timeout;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
-            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->customDockerRunOptions = $canSeeCredentials ? $this->database->custom_docker_run_options : null;
         }
     }
 

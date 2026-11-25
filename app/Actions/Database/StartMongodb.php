@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
@@ -89,6 +90,7 @@ class StartMongodb
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->database->fileStorages()->get();
+        array_push($this->commands, ...EnsureContentFilesOnServer::echoCommands($persistent_file_volumes, $this->database->destination->server));
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
         $this->add_custom_mongo_conf();
@@ -128,7 +130,7 @@ class StartMongodb
         }
 
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
-            $docker_compose['services'][$container_name]['logging'] = generate_fluentd_configuration();
+            $docker_compose['services'][$container_name]['logging'] = generate_log_drain_configuration($this->database->destination->server);
         }
 
         if (count($this->database->ports_mappings_array) > 0) {
@@ -248,7 +250,7 @@ class StartMongodb
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
-        $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
+        array_push($this->commands, ...$this->pullImageCommands("{$this->configuration_dir}/docker-compose.yml"));
         if ($this->database->enable_ssl) {
             $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml run --rm --no-deps --user root --entrypoint chown $container_name mongodb:mongodb /etc/mongo/certs/server.pem < /dev/null";
         }
@@ -283,10 +285,7 @@ class StartMongodb
                 continue;
             }
             $name = $persistentStorage->name;
-            $local_persistent_volumes_names[$name] = [
-                'name' => $name,
-                'external' => false,
-            ];
+            $local_persistent_volumes_names[$name] = $persistentStorage->dockerComposeVolumeDefinition();
         }
 
         return $local_persistent_volumes_names;
@@ -311,19 +310,19 @@ class StartMongodb
             }
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MONGO_INITDB_ROOT_USERNAME'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MONGO_INITDB_ROOT_USERNAME')) {
             $environment_variables->push("MONGO_INITDB_ROOT_USERNAME={$this->database->mongo_initdb_root_username}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MONGO_INITDB_ROOT_PASSWORD'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MONGO_INITDB_ROOT_PASSWORD')) {
             $environment_variables->push("MONGO_INITDB_ROOT_PASSWORD={$this->database->mongo_initdb_root_password}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MONGO_INITDB_DATABASE'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MONGO_INITDB_DATABASE')) {
             $environment_variables->push("MONGO_INITDB_DATABASE={$this->database->mongo_initdb_database}");
         }
 
-        add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
+        $this->addCoolifyEnvironmentVariables($environment_variables);
 
         return $environment_variables->all();
     }
@@ -370,6 +369,8 @@ class StartMongodb
         $content = $this->database->mongo_conf;
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
+        // The container user must read the read-only mount; a strict server umask leaves the file unreadable.
+        $this->commands[] = "chmod 644 $this->configuration_dir/{$filename}";
     }
 
     private function add_default_database()

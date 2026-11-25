@@ -189,7 +189,8 @@ test('service backup executions label the S3 storage of the service team after a
         'database_id' => $this->serviceDatabase->id,
         'database_type' => $this->serviceDatabase->getMorphClass(),
     ]);
-    ScheduledDatabaseBackupExecution::create(['scheduled_database_backup_id' => $schedule->id, 'status' => 'success']);
+    ScheduledDatabaseBackupExecution::create(['scheduled_database_backup_id' => $schedule->id, 'status' => 'success'])
+        ->s3Replicas()->create(['s3_storage_id' => $ownS3->id, 's3_uploaded' => true]);
     $component = Livewire::test(BackupExecutions::class, ['service' => $this->service]);
     session(['currentTeam' => $this->teamB]);
 

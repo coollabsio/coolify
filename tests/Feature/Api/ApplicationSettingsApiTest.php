@@ -54,7 +54,9 @@ function recommendedApplicationSettingsPayload(): array
         'include_source_commit_in_build' => true,
         'is_env_sorting_enabled' => true,
         'is_pr_deployments_public_enabled' => true,
+        'use_production_values_in_previews' => false,
         'stop_grace_period' => 45,
+        'rolling_update_drain_seconds' => 12,
         'docker_images_to_keep' => 7,
         'is_gzip_enabled' => false,
         'is_stripprefix_enabled' => false,
@@ -343,6 +345,18 @@ test('validates stop grace period bounds', function (int $stopGracePeriod) {
 })->with([
     'below minimum' => 0,
     'above maximum' => 3601,
+]);
+
+test('validates rolling update drain time bounds', function (int $seconds) {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'rolling_update_drain_seconds' => $seconds,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('rolling_update_drain_seconds');
+})->with([
+    'below minimum' => -1,
+    'above maximum' => 301,
 ]);
 
 test('validates Docker image retention bounds', function (int $dockerImagesToKeep) {
@@ -635,4 +649,147 @@ test('PATCH /api/v1/applications/{uuid} rejects a non-string container name pref
         ->assertJsonValidationErrors('custom_container_name_prefix');
 
     expect($this->application->fresh()->settings->custom_container_name_prefix)->toBeNull();
+});
+
+test('PATCH /api/v1/applications/{uuid} sets the Traefik certificate resolver', function (?string $resolver) {
+    $this->application->settings->update(['traefik_certificate_resolver' => 'previous']);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['traefik_certificate_resolver' => $resolver])
+        ->assertOk();
+
+    expect($this->application->fresh()->settings->traefik_certificate_resolver)->toBe($resolver);
+})->with([
+    'custom resolver' => ['cloudflare'],
+    'no resolver' => ['none'],
+    'server setting' => [null],
+]);
+
+test('PATCH /api/v1/applications/{uuid} rejects an unsafe Traefik certificate resolver', function (mixed $resolver) {
+    $this->application->settings->update(['traefik_certificate_resolver' => 'previous']);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", ['traefik_certificate_resolver' => $resolver])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('traefik_certificate_resolver');
+
+    expect($this->application->fresh()->settings->traefik_certificate_resolver)->toBe('previous');
+})->with([
+    'label injection' => ['a.b=c'],
+    'whitespace' => ['lets encrypt'],
+    'non-string' => [['cloudflare']],
+]);
+
+test('application creation accepts a Traefik certificate resolver', function () {
+    Queue::fake();
+
+    $response = $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/resolver-test',
+            'git_branch' => 'main',
+            'build_pack' => 'nixpacks',
+            'ports_exposes' => '3000',
+            'traefik_certificate_resolver' => 'none',
+        ])
+        ->assertCreated();
+
+    expect(Application::where('uuid', $response->json('uuid'))->firstOrFail()->settings->traefik_certificate_resolver)->toBe('none');
+});
+
+test('application creation rejects an unsafe Traefik certificate resolver', function () {
+    Queue::fake();
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/resolver-test',
+            'git_branch' => 'main',
+            'build_pack' => 'nixpacks',
+            'ports_exposes' => '3000',
+            'traefik_certificate_resolver' => 'a.b=c',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('traefik_certificate_resolver');
+
+    expect(Application::query()->where('git_repository', 'like', '%resolver-test%')->exists())->toBeFalse();
+});
+
+test('PATCH /api/v1/applications/{uuid} turns off label management and keeps custom labels with new domains', function () {
+    $this->application->settings->update(['is_container_label_readonly_enabled' => true]);
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'custom_labels' => base64_encode('sentinel-label=true'),
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'is_container_label_readonly_enabled' => false,
+            'domains' => 'https://new.example.com',
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+
+    expect($application->settings->is_container_label_readonly_enabled)->toBeFalse()
+        ->and($application->fqdn)->toBe('https://new.example.com')
+        ->and(base64_decode($application->custom_labels))->toBe('sentinel-label=true');
+});
+
+test('PATCH /api/v1/applications/{uuid} regenerates labels when label management is turned back on', function () {
+    $this->application->settings->update(['is_container_label_readonly_enabled' => false]);
+    $this->application->update([
+        'fqdn' => 'https://app.example.com',
+        'custom_labels' => base64_encode('sentinel-label=true'),
+    ]);
+
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'is_container_label_readonly_enabled' => true,
+        ])
+        ->assertOk();
+
+    $application = $this->application->fresh();
+    $labels = $application->parseContainerLabels();
+
+    expect($application->settings->is_container_label_readonly_enabled)->toBeTrue()
+        ->and($labels)->not->toContain('sentinel-label=true')
+        ->and($labels)->toContain('app.example.com');
+});
+
+test('application creation keeps custom labels when label management is off', function () {
+    Queue::fake();
+
+    $response = $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->postJson('/api/v1/applications/public', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'server_uuid' => $this->server->uuid,
+            'git_repository' => 'https://gitlab.com/coolify/readonly-labels-test',
+            'git_branch' => 'main',
+            'build_pack' => 'nixpacks',
+            'ports_exposes' => '3000',
+            'domains' => 'https://app.example.com',
+            'custom_labels' => base64_encode('sentinel-label=true'),
+            'is_container_label_readonly_enabled' => false,
+        ])
+        ->assertCreated();
+
+    $application = Application::where('uuid', $response->json('uuid'))->firstOrFail();
+
+    expect($application->settings->is_container_label_readonly_enabled)->toBeFalse()
+        ->and(base64_decode($application->custom_labels))->toBe('sentinel-label=true');
+});
+
+test('rejects an invalid is_container_label_readonly_enabled value', function () {
+    $this->withHeaders(applicationSettingsApiHeaders($this->bearerToken))
+        ->patchJson("/api/v1/applications/{$this->application->uuid}", [
+            'is_container_label_readonly_enabled' => 'not-a-boolean',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('is_container_label_readonly_enabled');
 });

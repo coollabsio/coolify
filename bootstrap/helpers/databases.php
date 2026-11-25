@@ -9,6 +9,7 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -17,13 +18,17 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
+use App\Services\Access\AccessResolver;
+use App\Support\DeletesEmptyDirectories;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\File\Exception\FileNotFoundException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-function create_standalone_postgresql($environmentId, StandaloneDocker|SwarmDocker $destination, ?array $otherData = null, string $databaseImage = 'postgres:16-alpine'): StandalonePostgresql
+function create_standalone_postgresql($environmentId, StandaloneDocker|SwarmDocker $destination, ?array $otherData = null, string $databaseImage = 'postgres:18-alpine'): StandalonePostgresql
 {
     $database = new StandalonePostgresql;
     $database->uuid = new_public_id();
@@ -184,12 +189,30 @@ function create_standalone_clickhouse($environment_id, StandaloneDocker|SwarmDoc
     return $database;
 }
 
+function create_standalone_influxdb($environment_id, StandaloneDocker|SwarmDocker $destination, ?array $otherData = null): StandaloneInfluxdb
+{
+    $database = new StandaloneInfluxdb;
+    $database->uuid = new_public_id();
+    $database->name = 'influxdb-database-'.$database->uuid;
+    $database->influxdb_admin_password = Str::password(length: 64, symbols: false);
+    $database->influxdb_admin_token = Str::password(length: 64, symbols: false);
+    $database->environment_id = $environment_id;
+    $database->destination_id = $destination->id;
+    $database->destination_type = $destination->getMorphClass();
+    if ($otherData) {
+        $database->fill($otherData);
+    }
+    $database->save();
+
+    return $database;
+}
+
 function create_standalone_sqlite($environment_id, StandaloneDocker|SwarmDocker $destination, ?array $otherData = null): StandaloneSqlite
 {
     $database = new StandaloneSqlite;
     $database->uuid = new_public_id();
     $database->name = 'sqlite-database-'.$database->uuid;
-    $database->image = 'peakimages/sqlite:3.53.4-v0.1.0';
+    $database->image = 'peakimages/sqlite:3.54.1-v0.3.0';
     $database->environment_id = $environment_id;
     $database->destination_id = $destination->id;
     $database->destination_type = $destination->getMorphClass();
@@ -235,7 +258,7 @@ function streamBackupFromServer(Server $server, string $filename, string $conten
 
     $disk = Storage::build([
         'driver' => 'sftp',
-        'host' => $server->ip,
+        'host' => formatHostForUrl($server->ip),
         'port' => (int) $server->port,
         'username' => $server->user,
         'privateKey' => $privateKey->getKeyLocation(),
@@ -275,6 +298,12 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
         $filenames = [$filenames];
     }
 
+    if (! $s3->isS3()) {
+        deleteBackupsFromFileStorage($filenames, $s3);
+
+        return;
+    }
+
     $disk = Storage::build([
         'driver' => 's3',
         'key' => $s3->key,
@@ -282,8 +311,9 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
         'region' => $s3->region,
         'bucket' => $s3->bucket,
         'endpoint' => $s3->endpoint,
-        'use_path_style_endpoint' => true,
+        'use_path_style_endpoint' => $s3->usesPathStyleEndpoint(),
         'aws_url' => $s3->awsUrl(),
+        'http' => ['verify' => ! $s3->skip_tls_verification],
         'throw' => true,
     ]);
 
@@ -295,6 +325,52 @@ function deleteBackupsS3(string|array|null $filenames, S3Storage $s3): void
 
     if (! $deleted) {
         throw new RuntimeException('One or more S3 backup files could not be deleted.');
+    }
+}
+
+/**
+ * Deletes backup files from an SFTP, FTPS, or WebDAV storage. A file that is gone already counts as deleted, as on S3.
+ *
+ * @param  array<int, string>  $filenames
+ */
+function deleteBackupsFromFileStorage(array $filenames, S3Storage $storage): void
+{
+    try {
+        $disk = $storage->filesystem();
+        foreach ($filenames as $filename) {
+            if ($disk->exists($filename) && ! $disk->delete($filename)) {
+                throw new RuntimeException("{$filename} could not be deleted.");
+            }
+        }
+    } catch (Throwable $exception) {
+        throw new RuntimeException('One or more backup files could not be deleted from the '.$storage->type->label().' storage.', previous: $exception);
+    }
+
+    deleteEmptyFileStorageDirectories($disk, $filenames);
+}
+
+/**
+ * Deletes the directories of deleted backup files that are empty now, and their empty parents, below the base path of
+ * the storage. The server refuses a directory with content, so a file that another backup writes now stays.
+ *
+ * @param  array<int, string>  $filenames
+ */
+function deleteEmptyFileStorageDirectories(FilesystemAdapter $disk, array $filenames): void
+{
+    $adapter = $disk->getAdapter();
+    if (! $adapter instanceof DeletesEmptyDirectories) {
+        return;
+    }
+
+    $directories = collect($filenames)->map(fn (string $filename): string => dirname(trim($filename, '/')))->unique();
+    foreach ($directories as $directory) {
+        try {
+            while ($directory !== '.' && $directory !== '' && $adapter->deleteEmptyDirectory($directory)) {
+                $directory = dirname($directory);
+            }
+        } catch (Throwable $exception) {
+            Log::warning('Could not delete an empty backup directory: '.$exception->getMessage());
+        }
     }
 }
 
@@ -500,14 +576,13 @@ function deleteOldBackupsFromS3($backup): Collection
 
 function isPublicPortAlreadyUsed(Server $server, int $port, ?string $id = null): bool
 {
+    // A member limited to some projects must still see the ports of every database on the server.
+    $databases = app(AccessResolver::class)->withoutVisibilityScope(fn () => $server->databases());
+
+    $query = $databases->where('public_port', $port)->where('is_public', true);
     if ($id) {
-        $foundDatabase = $server->databases()->where('public_port', $port)->where('is_public', true)->where('id', '!=', $id)->first();
-    } else {
-        $foundDatabase = $server->databases()->where('public_port', $port)->where('is_public', true)->first();
-    }
-    if ($foundDatabase) {
-        return true;
+        $query = $query->where('id', '!=', $id);
     }
 
-    return false;
+    return $query->isNotEmpty();
 }

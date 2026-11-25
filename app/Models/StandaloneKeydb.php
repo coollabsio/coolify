@@ -5,16 +5,20 @@ namespace App\Models;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
+use App\Traits\HasImageScans;
+use App\Traits\HasLogRedactionSetting;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
+use App\Traits\HasStars;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneKeydb extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasMetrics, HasSafeStringAttribute, HasSecretManager, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasImageScans, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, HasStars, ScopedByAccessGrants, SoftDeletes;
 
     protected $fillable = [
         'uuid',
@@ -54,7 +58,16 @@ class StandaloneKeydb extends BaseModel
         'health_check_start_period',
     ];
 
-    protected $appends = ['internal_db_url', 'external_db_url', 'server_status'];
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
+
+    /**
+     * Free-form configuration that can embed credentials. Only users who can
+     * update the database and `read:sensitive` tokens may read it.
+     */
+    public const CONFIGURATION_ATTRIBUTES = [
+        'keydb_conf',
+        'custom_docker_run_options',
+    ];
 
     /**
      * Sensitive fields hidden by default in serialized output (toArray/toJson).
@@ -63,6 +76,7 @@ class StandaloneKeydb extends BaseModel
      */
     protected $hidden = [
         'keydb_password',
+        ...self::CONFIGURATION_ATTRIBUTES,
         'internal_db_url',
         'external_db_url',
         // Internal start-command state, not part of the API.
@@ -70,6 +84,7 @@ class StandaloneKeydb extends BaseModel
     ];
 
     protected $casts = [
+        'include_coolify_default_variables' => 'boolean',
         'health_check_enabled' => 'boolean',
         'health_check_interval' => 'integer',
         'health_check_timeout' => 'integer',
@@ -197,6 +212,9 @@ class StandaloneKeydb extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
+            if ($storage->is_external) {
+                continue;
+            }
             instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
         }
     }
@@ -334,9 +352,10 @@ class StandaloneKeydb extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $serverHost = formatHostForUrl($serverIp);
                     $scheme = $this->enable_ssl ? 'rediss' : 'redis';
                     $encodedPass = rawurlencode($this->connectionPassword());
-                    $url = "{$scheme}://:{$encodedPass}@{$serverIp}:{$this->public_port}/0";
+                    $url = "{$scheme}://:{$encodedPass}@{$serverHost}:{$this->public_port}/0";
 
                     if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
                         $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';
@@ -401,6 +420,15 @@ class StandaloneKeydb extends BaseModel
         }
 
         return $environmentVariable;
+    }
+
+    /**
+     * Whether the password variable is locked (shown once) or reads a locked shared variable.
+     * The form, the connection URLs, and the API must then not show the password.
+     */
+    public function isCredentialLocked(): bool
+    {
+        return (bool) $this->serverPasswordEnvironmentVariable()?->isLockedForLogs();
     }
 
     /**

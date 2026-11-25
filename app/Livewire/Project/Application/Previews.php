@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Application;
 
+use App\Actions\Application\ApproveForkPreviewCommit;
 use App\Actions\Docker\GetContainersStatus;
 use App\Events\ServiceStatusChanged;
 use App\Jobs\DeleteResourceJob;
@@ -23,6 +24,10 @@ class Previews extends Component
     public bool $isPreviewDeploymentsEnabled = false;
 
     public bool $isPrDeploymentsPublicEnabled = false;
+
+    public bool $isPrDeploymentsPublicApprovalRequired = true;
+
+    public bool $useProductionValuesInPreviews = true;
 
     public string $deployment_uuid;
 
@@ -48,6 +53,8 @@ class Previews extends Component
     {
         $this->isPreviewDeploymentsEnabled = $this->application->settings->is_preview_deployments_enabled;
         $this->isPrDeploymentsPublicEnabled = $this->application->settings->is_pr_deployments_public_enabled ?? false;
+        $this->isPrDeploymentsPublicApprovalRequired = $this->application->settings->is_pr_deployments_public_approval_required ?? true;
+        $this->useProductionValuesInPreviews = $this->application->settings->use_production_values_in_previews ?? true;
         $this->pull_requests = collect();
         $this->parameters = get_route_parameters();
         $this->syncDockerTags();
@@ -59,10 +66,27 @@ class Previews extends Component
         $this->validate([
             'isPreviewDeploymentsEnabled' => 'boolean',
             'isPrDeploymentsPublicEnabled' => 'boolean',
+            'useProductionValuesInPreviews' => 'boolean',
         ]);
 
         $this->application->settings->is_preview_deployments_enabled = $this->isPreviewDeploymentsEnabled;
         $this->application->settings->is_pr_deployments_public_enabled = $this->isPrDeploymentsPublicEnabled;
+        $this->application->settings->use_production_values_in_previews = $this->useProductionValuesInPreviews;
+        $this->saveApplicationSettingsWithAudit($this->application);
+
+        $this->dispatch('success', 'Settings saved.');
+        $this->dispatch('configurationChanged');
+    }
+
+    /**
+     * Saves only the fork approval policy, so that a stale value in another save cannot turn approval off.
+     */
+    public function saveForkApprovalSetting(): void
+    {
+        $this->authorize('update', $this->application);
+        $this->validate(['isPrDeploymentsPublicApprovalRequired' => 'boolean']);
+
+        $this->application->settings->is_pr_deployments_public_approval_required = $this->isPrDeploymentsPublicApprovalRequired;
         $this->saveApplicationSettingsWithAudit($this->application);
 
         $this->dispatch('success', 'Settings saved.');
@@ -80,8 +104,8 @@ class Previews extends Component
     private function syncDockerTags(): void
     {
         $this->previewDockerTags = [];
-        foreach ($this->application->previews as $key => $preview) {
-            $this->previewDockerTags[$key] = $preview->docker_registry_image_tag;
+        foreach ($this->application->previews as $preview) {
+            $this->previewDockerTags[$preview->id] = $preview->docker_registry_image_tag;
         }
     }
 
@@ -98,7 +122,7 @@ class Previews extends Component
             if (! $this->application->isGithubAppSource()) {
                 throw new \Exception('Loading pull requests is only supported for GitHub App sources.');
             }
-            ['rate_limit_remaining' => $rate_limit_remaining, 'data' => $data] = githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/pulls");
+            ['rate_limit_remaining' => $rate_limit_remaining, 'data' => $data] = githubApi(source: $this->application->source, endpoint: '/repos/'.gitRepositorySlug($this->application->git_repository).'/pulls');
             $this->rate_limit_remaining = $rate_limit_remaining;
             $this->pull_requests = $data->sortBy('number')->values();
         } catch (\Throwable $e) {
@@ -118,16 +142,8 @@ class Previews extends Component
                 throw new \Exception('Preview not found');
             }
 
-            $previewKey = $this->application->previews->search(function ($item) use ($preview_id) {
-                return $item->id == $preview_id;
-            });
-
-            if ($previewKey === false) {
-                throw new \Exception('Preview not found');
-            }
-
-            $this->validateOnly("previewDockerTags.{$previewKey}");
-            $preview->docker_registry_image_tag = $this->previewDockerTags[$previewKey] ?? null;
+            $this->validateOnly("previewDockerTags.{$preview->id}");
+            $preview->docker_registry_image_tag = $this->previewDockerTags[$preview->id] ?? null;
             $changedFields = $preview->isDirty('docker_registry_image_tag') ? ['docker_registry_image_tag'] : [];
             $preview->save();
             if ($changedFields !== []) {
@@ -155,7 +171,7 @@ class Previews extends Component
                     ]);
                     $this->auditPreviewEvent('ui.application.preview_created', $pull_request_id);
                 }
-                $found->generate_preview_fqdn_compose();
+                $found->generate_preview_fqdn_compose(keepExistingDomains: ! $found->wasRecentlyCreated);
                 $this->application->refresh();
                 $this->syncDockerTags();
             } else {
@@ -173,7 +189,7 @@ class Previews extends Component
                 if ($found && $this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()) {
                     $this->saveDockerTagWithAudit($found, $docker_registry_image_tag);
                 }
-                $found->generate_preview_fqdn(generateWithoutApplicationDomain: true);
+                $found->generate_preview_fqdn(generateWithoutApplicationDomain: true, keepExistingDomains: true);
                 $this->application->refresh();
                 $this->syncDockerTags();
                 $this->dispatch('update_links');
@@ -206,6 +222,7 @@ class Previews extends Component
     {
         try {
             $this->authorize('deploy', $this->application);
+            $this->authorize('update', $this->application);
 
             $this->add($pull_request_id, $pull_request_html_url, $docker_registry_image_tag);
             $this->deploy($pull_request_id, $pull_request_html_url, force_rebuild: false, docker_registry_image_tag: $docker_registry_image_tag);
@@ -221,6 +238,7 @@ class Previews extends Component
             $this->setDeploymentUuid();
             $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
             if (! $found && (! is_null($pull_request_html_url) || ($this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()))) {
+                $this->authorize('update', $this->application);
                 $found = ApplicationPreview::create([
                     'application_id' => $this->application->id,
                     'pull_request_id' => $pull_request_id,
@@ -229,7 +247,8 @@ class Previews extends Component
                 ]);
                 $this->auditPreviewEvent('ui.application.preview_created', $pull_request_id);
             }
-            if ($found && $this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()) {
+            if ($found && $this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty() && $docker_registry_image_tag !== $found->docker_registry_image_tag) {
+                $this->authorize('update', $this->application);
                 $this->saveDockerTagWithAudit($found, $docker_registry_image_tag);
             }
             $result = queue_application_deployment(
@@ -238,7 +257,7 @@ class Previews extends Component
                 force_rebuild: $force_rebuild,
                 pull_request_id: $pull_request_id,
                 git_type: $found->git_type ?? null,
-                docker_registry_image_tag: $docker_registry_image_tag,
+                docker_registry_image_tag: $this->application->build_pack === 'dockerimage' ? $found?->docker_registry_image_tag : null,
             );
             if ($result['status'] === 'queue_full') {
                 $this->dispatch('error', 'Deployment queue full', $result['message']);
@@ -259,6 +278,39 @@ class Previews extends Component
             ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    /**
+     * An admin approves the reviewed commit of a fork pull request and deploys it.
+     */
+    public function approveForkCommit(int $previewId, string $commit): void
+    {
+        $preview = $this->application->previews()->whereKey($previewId)->firstOrFail();
+        $this->authorize('approve', $preview);
+
+        try {
+            $result = ApproveForkPreviewCommit::run($preview, $commit);
+            $this->application->refresh();
+            if ($result['status'] === 'queue_full') {
+                $this->dispatch('error', 'Deployment queue full', $result['message']);
+
+                return;
+            }
+            if ($result['status'] === 'skipped') {
+                $this->dispatch('success', 'Deployment skipped', $result['message']);
+
+                return;
+            }
+
+            $this->redirectRoute('project.application.deployment.show', [
+                'project_uuid' => $this->application->environment->project->uuid,
+                'application_uuid' => $this->application->uuid,
+                'deployment_uuid' => $result['deployment_uuid'],
+                'environment_uuid' => $this->application->environment->uuid,
+            ]);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 
@@ -385,6 +437,7 @@ class Previews extends Component
 
             // Refresh the application and its previews relationship to reflect the soft delete
             $this->application->load('previews');
+            unset($this->previewDockerTags[$preview->id]);
             $this->dispatch('update_links');
             $this->dispatch('success', 'Preview deletion started. It may take a few moments to complete.');
         } catch (\Throwable $e) {

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Sleep;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -22,144 +23,67 @@ beforeEach(function () {
 });
 
 afterEach(function () {
+    @unlink(storage_path('app/versions.json'));
     Mockery::close();
 });
 
-it('uses max of CDN and cache versions', function () {
-    // CDN has older version
-    Http::fake([
-        '*' => Http::response([
-            'coolify' => ['v4' => ['version' => '4.0.0']],
-            'traefik' => ['v3.5' => '3.5.6'],
-        ], 200),
-    ]);
-
-    // Cache has newer version
-    File::shouldReceive('exists')
-        ->with(base_path('versions.json'))
-        ->andReturn(true);
-
-    File::shouldReceive('get')
-        ->with(base_path('versions.json'))
-        ->andReturn(json_encode(['coolify' => ['v4' => ['version' => '4.0.10']]]));
-
-    File::shouldReceive('put')
-        ->once()
-        ->with(base_path('versions.json'), Mockery::on(function ($json) {
-            $data = json_decode($json, true);
-
-            // Should use cached version (4.0.10), not CDN version (4.0.0)
-            return $data['coolify']['v4']['version'] === '4.0.10';
-        }));
-
-    Cache::shouldReceive('forget')->once();
-
+it('keeps the local versions.json when the CDN serves an older Coolify version', function () {
+    Http::fake(['*' => Http::response(['stable' => ['coolify' => ['version' => '4.0.0'], 'traefik' => ['v3.5' => '3.5.6']]], 200)]);
+    File::put(storage_path('app/versions.json'), json_encode(['stable' => ['coolify' => ['version' => '4.0.10']]]));
     config(['constants.coolify.version' => '4.0.5']);
 
-    // Mock instanceSettings function
-    $this->app->instance('App\Models\InstanceSettings', function () {
-        return $this->settings;
-    });
-
-    $job = new CheckForUpdatesJob;
-    $job->handle();
-});
-
-it('never downgrades from current running version', function () {
-    // CDN has older version
-    Http::fake([
-        '*' => Http::response([
-            'coolify' => ['v4' => ['version' => '4.0.0']],
-            'traefik' => ['v3.5' => '3.5.6'],
-        ], 200),
-    ]);
-
-    // Cache also has older version
-    File::shouldReceive('exists')
-        ->with(base_path('versions.json'))
-        ->andReturn(true);
-
-    File::shouldReceive('get')
-        ->with(base_path('versions.json'))
-        ->andReturn(json_encode(['coolify' => ['v4' => ['version' => '4.0.5']]]));
-
-    File::shouldReceive('put')
-        ->once()
-        ->with(base_path('versions.json'), Mockery::on(function ($json) {
-            $data = json_decode($json, true);
-
-            // Should use running version (4.0.10), not CDN (4.0.0) or cache (4.0.5)
-            return $data['coolify']['v4']['version'] === '4.0.10';
-        }));
-
-    Cache::shouldReceive('forget')->once();
-
-    // Running version is newest
-    config(['constants.coolify.version' => '4.0.10']);
-
     Log::shouldReceive('warning')
         ->once()
         ->with('CDN served older Coolify version than cache', Mockery::type('array'));
+
+    expect(refresh_versions_file())->toMatchArray(['coolify' => ['version' => '4.0.10']])
+        ->and(json_decode(File::get(storage_path('app/versions.json')), true))->toBe(['stable' => ['coolify' => ['version' => '4.0.10']]]);
+});
+
+it('never offers a version below the running version', function () {
+    Http::fake(['*' => Http::response(['stable' => ['coolify' => ['version' => '4.0.0']]], 200)]);
+    config(['constants.coolify.version' => '4.0.10']);
 
     Log::shouldReceive('warning')
         ->once()
         ->with('Version downgrade prevented in CheckForUpdatesJob', Mockery::type('array'));
 
-    $this->app->instance('App\Models\InstanceSettings', function () {
-        return $this->settings;
-    });
-
-    $job = new CheckForUpdatesJob;
-    $job->handle();
+    expect(data_get(refresh_versions_file(), 'coolify.version'))->toBe('4.0.10');
 });
 
-it('preserves other component versions when preventing Coolify downgrade', function () {
-    // CDN has older Coolify but newer Traefik
+it('keeps the CDN versions of the other components when it keeps the running Coolify version', function () {
     Http::fake([
         '*' => Http::response([
-            'coolify' => ['v4' => ['version' => '4.0.0']],
-            'traefik' => ['v3.6' => '3.6.2'],
-            'sentinel' => ['version' => '1.0.5'],
+            'stable' => [
+                'coolify' => ['version' => '4.0.0'],
+                'traefik' => ['v3.6' => '3.6.2'],
+                'sentinel' => ['version' => '1.0.5'],
+            ],
         ], 200),
     ]);
-
-    File::shouldReceive('exists')->andReturn(true);
-    File::shouldReceive('get')
-        ->andReturn(json_encode([
-            'coolify' => ['v4' => ['version' => '4.0.5']],
-            'traefik' => ['v3.5' => '3.5.6'],
-        ]));
-
-    File::shouldReceive('put')
-        ->once()
-        ->with(base_path('versions.json'), Mockery::on(function ($json) {
-            $data = json_decode($json, true);
-            // Coolify should use running version
-            expect($data['coolify']['v4']['version'])->toBe('4.0.10');
-            // Traefik should use CDN version (newer)
-            expect($data['traefik']['v3.6'])->toBe('3.6.2');
-            // Sentinel should use CDN version
-            expect($data['sentinel']['version'])->toBe('1.0.5');
-
-            return true;
-        }));
-
-    Cache::shouldReceive('forget')->once();
-
     config(['constants.coolify.version' => '4.0.10']);
 
-    Log::shouldReceive('warning')
-        ->once()
-        ->with('CDN served older Coolify version than cache', Mockery::type('array'));
+    expect(refresh_versions_file())->toMatchArray([
+        'coolify' => ['version' => '4.0.10'],
+        'traefik' => ['v3.6' => '3.6.2'],
+        'sentinel' => ['version' => '1.0.5'],
+    ]);
+});
 
-    Log::shouldReceive('warning')
-        ->once()
-        ->with('Version downgrade prevented in CheckForUpdatesJob', Mockery::type('array'));
+it('keeps the local versions.json when the CDN fetch fails', function () {
+    Http::fake(['*' => Http::response('', 500)]);
+    File::shouldReceive('replace')->never();
+    Cache::shouldReceive('forget')->never();
 
-    $this->app->instance('App\Models\InstanceSettings', function () {
-        return $this->settings;
-    });
+    expect(refresh_versions_file())->toBeNull();
+});
 
-    $job = new CheckForUpdatesJob;
-    $job->handle();
+it('makes only one CDN request for a manual check, so the web request does not wait for retries', function () {
+    Sleep::fake();
+    Http::fake(['*' => Http::response('error code: 1200', 503, ['Retry-After' => '60'])]);
+
+    (new CheckForUpdatesJob(cdnTries: 1))->handle();
+
+    Http::assertSentCount(1);
+    Sleep::assertNeverSlept();
 });

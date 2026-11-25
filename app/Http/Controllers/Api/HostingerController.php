@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Actions\Server\ValidateServer;
 use App\Enums\ProxyTypes;
 use App\Exceptions\RateLimitException;
+use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
 use App\Models\Server;
@@ -18,6 +19,8 @@ use OpenApi\Attributes as OA;
 
 class HostingerController extends Controller
 {
+    use RequiresDeployAbility;
+
     #[OA\Get(
         path: '/hostinger/data-centers',
         operationId: 'get-hostinger-data-centers',
@@ -122,6 +125,7 @@ class HostingerController extends Controller
         responses: [
             new OA\Response(response: 201, description: 'Hostinger VPS purchased and linked to a Coolify server.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token needs the deploy permission for a post-install script or extra SSH keys.'),
             new OA\Response(response: 422, description: 'Validation failed.'),
             new OA\Response(response: 429, description: 'Hostinger rate limit exceeded.'),
         ]
@@ -180,6 +184,21 @@ class HostingerController extends Controller
                 'message' => 'Validation failed.',
                 'errors' => $errors,
             ], 422);
+        }
+
+        if ($request->filled('post_install_script_id') || $request->array('public_key_ids')) {
+            $forbidden = $this->deployAbilityForbiddenResponse($request, 'A post-install script or extra SSH keys run as root on the new server, so it needs a token with the deploy permission.');
+            if ($forbidden) {
+                return $forbidden;
+            }
+        }
+
+        $request->offsetSet('instant_validate', $request->filled('instant_validate') ? $request->boolean('instant_validate') : $this->hasDeployAbility($request));
+        if ($request->instant_validate) {
+            $forbidden = $this->deployAbilityForbiddenResponse($request, 'Instant validation installs Docker and starts the proxy on the new server, so it needs a token with the deploy permission.');
+            if ($forbidden) {
+                return $forbidden;
+            }
         }
 
         $team = Team::find($teamId);
@@ -256,8 +275,8 @@ class HostingerController extends Controller
 
             $ipAddress = $server->fresh()->ip;
 
-            if ($request->boolean('instant_validate') && ! $server->hasPlaceholderIp()) {
-                ValidateServer::dispatch($server);
+            if ($request->instant_validate) {
+                ValidateNewCloudServerJob::dispatch($server);
             }
 
             auditLog('api.hostinger_virtual_machine.created', [

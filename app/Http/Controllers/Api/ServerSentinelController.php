@@ -20,6 +20,7 @@ class ServerSentinelController extends Controller
         'sentinel_metrics_history_days',
         'sentinel_push_interval_seconds',
         'sentinel_custom_url',
+        'is_sentinel_pull_enabled',
         'traffic_topn',
         'traffic_sample_threshold',
         'traffic_retention_1h_days',
@@ -28,6 +29,10 @@ class ServerSentinelController extends Controller
         'geoip_refresh_days',
         'geoip_maxmind_license_key',
         'traffic_ip_mode',
+        'is_container_log_archive_enabled',
+        'log_archive_max_file_mb',
+        'log_archive_max_total_mb',
+        'log_archive_retention_days',
     ];
 
     private function findServerForTeam(int $teamId, string $uuid): ?Server
@@ -50,6 +55,7 @@ class ServerSentinelController extends Controller
             'sentinel_metrics_refresh_rate_seconds' => (int) $settings->sentinel_metrics_refresh_rate_seconds,
             'sentinel_metrics_history_days' => (int) $settings->sentinel_metrics_history_days,
             'sentinel_push_interval_seconds' => (int) $settings->sentinel_push_interval_seconds,
+            'is_sentinel_pull_enabled' => (bool) $settings->is_sentinel_pull_enabled,
             'sentinel_updated_at' => $server->sentinel_updated_at,
             'traffic_topn' => (int) $settings->traffic_topn,
             'traffic_sample_threshold' => (int) $settings->traffic_sample_threshold,
@@ -58,6 +64,10 @@ class ServerSentinelController extends Controller
             'is_geoip_enabled' => (bool) $settings->is_geoip_enabled,
             'geoip_refresh_days' => (int) $settings->geoip_refresh_days,
             'traffic_ip_mode' => TrafficIpMode::forServer($server)->value,
+            'is_container_log_archive_enabled' => (bool) $settings->is_container_log_archive_enabled,
+            'log_archive_max_file_mb' => (int) $settings->log_archive_max_file_mb,
+            'log_archive_max_total_mb' => (int) $settings->log_archive_max_total_mb,
+            'log_archive_retention_days' => (int) $settings->log_archive_retention_days,
         ];
 
         if ($this->canReadSensitive()) {
@@ -93,6 +103,7 @@ class ServerSentinelController extends Controller
                         new OA\Property(property: 'sentinel_metrics_history_days', type: 'integer'),
                         new OA\Property(property: 'sentinel_push_interval_seconds', type: 'integer'),
                         new OA\Property(property: 'sentinel_custom_url', type: 'string', description: 'Only present with read:sensitive.'),
+                        new OA\Property(property: 'is_sentinel_pull_enabled', type: 'boolean', description: 'Coolify reads Sentinel reports over SSH instead of Sentinel pushing them to the Coolify URL.'),
                         new OA\Property(property: 'sentinel_updated_at', type: 'string', nullable: true),
                         new OA\Property(property: 'traffic_topn', type: 'integer'),
                         new OA\Property(property: 'traffic_sample_threshold', type: 'integer'),
@@ -101,6 +112,10 @@ class ServerSentinelController extends Controller
                         new OA\Property(property: 'is_geoip_enabled', type: 'boolean'),
                         new OA\Property(property: 'geoip_refresh_days', type: 'integer'),
                         new OA\Property(property: 'traffic_ip_mode', type: 'string', enum: ['full', 'anonymized', 'off'], description: 'How Sentinel stores client IPs for the Top IPs breakdown.'),
+                        new OA\Property(property: 'is_container_log_archive_enabled', type: 'boolean', description: 'Sentinel keeps the logs of Coolify-managed containers in files, so they stay readable after the container is removed.'),
+                        new OA\Property(property: 'log_archive_max_file_mb', type: 'integer'),
+                        new OA\Property(property: 'log_archive_max_total_mb', type: 'integer'),
+                        new OA\Property(property: 'log_archive_retention_days', type: 'integer'),
                         new OA\Property(property: 'geoip_maxmind_license_key', type: 'string', description: 'Only present with read:sensitive.'),
                     ],
                     type: 'object',
@@ -130,7 +145,7 @@ class ServerSentinelController extends Controller
 
     #[OA\Patch(
         summary: 'Update Sentinel settings',
-        description: 'Update Sentinel settings for a server owned by the authenticated team. Changing token/metrics timing fields may restart Sentinel.',
+        description: 'Update Sentinel settings for a server owned by the authenticated team. Changing token/metrics timing fields may restart Sentinel. Needs a token with the write and deploy permissions.',
         path: '/servers/{uuid}/sentinel',
         operationId: 'update-server-sentinel',
         security: [['bearerAuth' => []]],
@@ -149,6 +164,7 @@ class ServerSentinelController extends Controller
                     new OA\Property(property: 'sentinel_metrics_history_days', type: 'integer', minimum: 1),
                     new OA\Property(property: 'sentinel_push_interval_seconds', type: 'integer', minimum: 10),
                     new OA\Property(property: 'sentinel_custom_url', type: 'string', nullable: true),
+                    new OA\Property(property: 'is_sentinel_pull_enabled', type: 'boolean', description: 'Coolify reads Sentinel reports over SSH. Use it when the server cannot reach Coolify. Restarts Sentinel.'),
                     new OA\Property(property: 'traffic_topn', type: 'integer', maximum: 1000, minimum: 1),
                     new OA\Property(property: 'traffic_sample_threshold', type: 'integer', minimum: 0),
                     new OA\Property(property: 'traffic_retention_1h_days', type: 'integer', maximum: 365, minimum: 1),
@@ -157,6 +173,10 @@ class ServerSentinelController extends Controller
                     new OA\Property(property: 'geoip_refresh_days', type: 'integer', minimum: 1),
                     new OA\Property(property: 'geoip_maxmind_license_key', type: 'string', nullable: true),
                     new OA\Property(property: 'traffic_ip_mode', type: 'string', enum: ['full', 'anonymized', 'off'], description: 'How Sentinel stores client IPs: full, anonymized (IPv4 /24, IPv6 /48), or off.'),
+                    new OA\Property(property: 'is_container_log_archive_enabled', type: 'boolean', description: 'Keep the logs of Coolify-managed containers after the container is removed. The size and retention limits need Sentinel 1.1.8 or later.'),
+                    new OA\Property(property: 'log_archive_max_file_mb', type: 'integer', maximum: 1024, minimum: 1, description: 'Size in MB at which an archive file is rotated. One rotated file is kept.'),
+                    new OA\Property(property: 'log_archive_max_total_mb', type: 'integer', maximum: 102400, minimum: 1, description: 'Total archive size in MB. Sentinel deletes the oldest files above it.'),
+                    new OA\Property(property: 'log_archive_retention_days', type: 'integer', maximum: 365, minimum: 1, description: 'Sentinel deletes archive files that were not written for this many days.'),
                 ],
                 type: 'object',
             ),
@@ -165,6 +185,7 @@ class ServerSentinelController extends Controller
             new OA\Response(response: 200, description: 'Updated Sentinel settings.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 403, description: 'The token needs the write and deploy permissions.'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
             new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],
@@ -196,6 +217,7 @@ class ServerSentinelController extends Controller
             'sentinel_metrics_history_days' => 'integer|min:1',
             'sentinel_push_interval_seconds' => 'integer|min:10',
             'sentinel_custom_url' => 'nullable|url',
+            'is_sentinel_pull_enabled' => 'boolean',
             'traffic_topn' => 'integer|min:1|max:1000',
             'traffic_sample_threshold' => 'integer|min:0',
             'traffic_retention_1h_days' => 'integer|min:1|max:365',
@@ -204,6 +226,10 @@ class ServerSentinelController extends Controller
             'geoip_refresh_days' => 'integer|min:1',
             'geoip_maxmind_license_key' => 'nullable|string|max:255',
             'traffic_ip_mode' => 'string|in:full,anonymized,off',
+            'is_container_log_archive_enabled' => 'boolean',
+            'log_archive_max_file_mb' => 'integer|min:1|max:1024',
+            'log_archive_max_total_mb' => 'integer|min:1|max:102400',
+            'log_archive_retention_days' => 'integer|min:1|max:365',
         ]);
 
         $extraFields = array_diff(array_keys($request->all()), self::ALLOWED_FIELDS);

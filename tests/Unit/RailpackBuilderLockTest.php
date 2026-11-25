@@ -41,3 +41,32 @@ test('a held shared lock prevents stopping the builder', function () {
     expect($process->getExitCode())->toBe(0);
     expect($process->getOutput())->toBe('built');
 });
+
+test('concurrent builds bootstrap the builder one at a time', function () {
+    $directory = sys_get_temp_dir().'/railpack-bootstrap-'.bin2hex(random_bytes(8));
+    mkdir($directory);
+
+    try {
+        // The fake bootstrap takes time, like buildkitd that starts but does not listen yet.
+        $setup = "docker() { if [ \"\$2\" = inspect ]; then echo start >> {$directory}/log; sleep 0.3; echo end >> {$directory}/log; fi; }; ";
+        $script = str_replace(
+            ['/root/.docker/buildx/coolify-railpack.lock', '/root/.docker/buildx/coolify-railpack-bootstrap.lock'],
+            [$directory.'/builder.lock', $directory.'/bootstrap.lock'],
+            $setup.railpackBuilderLockedScript(railpackBuilderBootstrapScript().'; true'),
+        );
+
+        $builds = [new Process(['bash', '-c', $script]), new Process(['bash', '-c', $script])];
+        foreach ($builds as $build) {
+            $build->start();
+        }
+        foreach ($builds as $build) {
+            $build->wait();
+            expect($build->getExitCode())->toBe(0);
+        }
+
+        expect(file($directory.'/log', FILE_IGNORE_NEW_LINES))->toBe(['start', 'end', 'start', 'end']);
+    } finally {
+        array_map('unlink', glob($directory.'/*'));
+        rmdir($directory);
+    }
+});

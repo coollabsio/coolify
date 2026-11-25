@@ -63,7 +63,7 @@ it('flushes every key with the engine CLI', function (string $model, array $attr
         ->assertReturned(true)
         ->assertDispatched('success');
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "sudo bash -c 'docker exec {$database->uuid} sh -c '\\''REDISCLI_AUTH=\"\$REDIS_PASSWORD\" {$cli} FLUSHALL ASYNC'\\'''"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "sudo bash -c 'docker exec {$database->uuid} sh -c '\\''REDISCLI_AUTH=\"\$REDIS_PASSWORD\" {$cli} FLUSHALL ASYNC'\\'''"));
     expect(AuditEvent::query()->where('event', 'ui.database.flushed')->where('resource_uuid', $database->uuid)->exists())->toBeTrue();
 })->with([
     'redis' => [StandaloneRedis::class, [], 'redis-cli'],

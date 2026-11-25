@@ -2,12 +2,18 @@
 
 namespace App\Models;
 
+use App\Enums\LogDrainType;
 use App\Enums\ServerRole;
 use App\Enums\TrafficIpMode;
+use App\Helpers\SshMultiplexingHelper;
+use App\Jobs\RefreshImageScanSummariesJob;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -25,10 +31,6 @@ use OpenApi\Attributes as OA;
         'is_build_server' => ['type' => 'boolean', 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use server_role instead. true when server_role is build.'],
         'is_cloudflare_tunnel' => ['type' => 'boolean'],
         'is_jump_server' => ['type' => 'boolean'],
-        'is_logdrain_axiom_enabled' => ['type' => 'boolean'],
-        'is_logdrain_custom_enabled' => ['type' => 'boolean'],
-        'is_logdrain_highlight_enabled' => ['type' => 'boolean'],
-        'is_logdrain_newrelic_enabled' => ['type' => 'boolean'],
         'is_metrics_enabled' => ['type' => 'boolean'],
         'is_traffic_analytics_enabled' => ['type' => 'boolean'],
         'traffic_topn' => ['type' => 'integer'],
@@ -38,19 +40,41 @@ use OpenApi\Attributes as OA;
         'is_geoip_enabled' => ['type' => 'boolean'],
         'geoip_refresh_days' => ['type' => 'integer'],
         'traffic_ip_mode' => ['type' => 'string', 'enum' => ['full', 'anonymized', 'off']],
+        'log_archive_max_file_mb' => ['type' => 'integer'],
+        'log_archive_max_total_mb' => ['type' => 'integer'],
+        'log_archive_retention_days' => ['type' => 'integer'],
+        'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'],
         'is_reachable' => ['type' => 'boolean'],
+        'ssh_host_key' => ['type' => 'string', 'nullable' => true, 'description' => 'Pinned SSH host key(s) of the server, one "type base64" line per key.'],
+        'ssh_host_key_source' => ['type' => 'string', 'nullable' => true, 'enum' => ['tofu', 'upgrade', 'transfer', 'manual']],
+        'ssh_host_key_trusted_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
+        'ssh_host_key_pending' => ['type' => 'string', 'nullable' => true, 'description' => 'Host key that the server sent when it did not match the pinned key.'],
+        'is_ssh_host_key_check_disabled' => ['type' => 'boolean'],
+        'is_ssh_host_key_check_enforced' => ['type' => 'boolean', 'description' => 'Refuse a changed host key on this server, also when the instance only warns.'],
+        'ssh_host_key_fingerprints' => ['type' => 'array', 'items' => ['type' => 'string'], 'readOnly' => true, 'description' => 'SHA256 fingerprints of the pinned host keys, as `ssh-keygen -lf` shows them.'],
+        'ssh_host_key_pending_fingerprints' => ['type' => 'array', 'items' => ['type' => 'string'], 'readOnly' => true, 'description' => 'SHA256 fingerprints of the host key that did not match.'],
         'is_sentinel_enabled' => ['type' => 'boolean'],
+        'is_sentinel_pull_enabled' => ['type' => 'boolean', 'description' => 'Coolify reads Sentinel reports over SSH instead of Sentinel pushing them.'],
         'is_swarm_manager' => ['type' => 'boolean'],
         'is_swarm_worker' => ['type' => 'boolean'],
         'is_terminal_enabled' => ['type' => 'boolean'],
+        'is_container_log_archive_enabled' => ['type' => 'boolean', 'description' => 'Sentinel keeps the logs of containers after they are removed.'],
         'is_usable' => ['type' => 'boolean'],
-        'logdrain_axiom_api_key' => ['type' => 'string'],
-        'logdrain_axiom_dataset_name' => ['type' => 'string'],
-        'logdrain_custom_config' => ['type' => 'string'],
-        'logdrain_custom_config_parser' => ['type' => 'string'],
-        'logdrain_highlight_project_id' => ['type' => 'string'],
-        'logdrain_newrelic_base_uri' => ['type' => 'string'],
-        'logdrain_newrelic_license_key' => ['type' => 'string'],
+        'logdrain_type' => ['type' => 'string', 'nullable' => true, 'enum' => ['newrelic', 'axiom', 'cloudwatch', 'custom'], 'description' => 'The active log drain, or null when no log drain is enabled.'],
+        'is_logdrain_newrelic_enabled' => ['type' => 'boolean', 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'is_logdrain_axiom_enabled' => ['type' => 'boolean', 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'is_logdrain_custom_enabled' => ['type' => 'boolean', 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'is_logdrain_cloudwatch_enabled' => ['type' => 'boolean', 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_newrelic_license_key' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_newrelic_base_uri' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_axiom_dataset_name' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_axiom_api_key' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_axiom_domain' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_custom_config' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_custom_config_parser' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_cloudwatch_region' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_cloudwatch_group' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
+        'logdrain_cloudwatch_stream_prefix' => ['type' => 'string', 'nullable' => true, 'deprecated' => true, 'readOnly' => true, 'description' => 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'],
         'sentinel_metrics_history_days' => ['type' => 'integer'],
         'sentinel_metrics_refresh_rate_seconds' => ['type' => 'integer'],
         'sentinel_token' => ['type' => 'string'],
@@ -71,14 +95,56 @@ use OpenApi\Attributes as OA;
 )]
 class ServerSetting extends Model
 {
+    /**
+     * Allowed Traefik certificate resolver names; also keeps the value safe inside generated labels.
+     */
+    public const string TRAEFIK_CERTIFICATE_RESOLVER_PATTERN = '/^[A-Za-z0-9_-]+$/';
+
+    /**
+     * Resolver value that turns the resolver off (no certresolver label) on a resource or server.
+     */
+    public const string TRAEFIK_CERTIFICATE_RESOLVER_NONE = 'none';
+
     public const int DEFAULT_SENTINEL_METRICS_REFRESH_RATE_SECONDS = 10;
 
     public const int DEFAULT_SENTINEL_METRICS_HISTORY_DAYS = 7;
 
     public const int DEFAULT_SENTINEL_PUSH_INTERVAL_SECONDS = 60;
 
+    /** Memory limit of each scanner container (Syft, Grype, regctl), in MB. */
+    public const int DEFAULT_IMAGE_SCAN_MEMORY_MB = 1024;
+
+    /** @var list<int> */
+    public const array IMAGE_SCAN_MEMORY_OPTIONS_MB = [1024, 2048, 4096, 8192];
+
+    /** Time limit of one Syft run and of one Grype run, in seconds. */
+    public const int DEFAULT_IMAGE_SCAN_TIMEOUT_SECONDS = 600;
+
+    /** @var list<int> */
+    public const array IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS = [300, 600, 1200, 1800, 3600];
+
+    /** CPUs of each scanner container. */
+    public const float DEFAULT_IMAGE_SCAN_CPUS = 1.0;
+
+    /** @var list<float> */
+    public const array IMAGE_SCAN_CPU_OPTIONS = [0.5, 1.0, 2.0, 4.0];
+
+    /** Days between two rescans of the running images. 0: only deployments and manual scans scan images. */
+    public const int DEFAULT_IMAGE_RESCAN_DAYS = 1;
+
+    /** @var list<int> */
+    public const array IMAGE_RESCAN_DAYS_OPTIONS = [1, 3, 7, 14, 30, 0];
+
     protected $fillable = [
         'server_id',
+        'is_image_scan_enabled',
+        'image_scan_memory_mb',
+        'image_candidate_scans_today',
+        'image_candidate_scans_date',
+        'image_scan_syft_timeout',
+        'image_scan_grype_timeout',
+        'image_scan_cpus',
+        'image_rescan_days',
         'is_swarm_manager',
         'is_jump_server',
         'is_build_server',
@@ -87,18 +153,12 @@ class ServerSetting extends Model
         'is_usable',
         'wildcard_domain',
         'is_cloudflare_tunnel',
-        'is_logdrain_newrelic_enabled',
-        'logdrain_newrelic_license_key',
-        'logdrain_newrelic_base_uri',
-        'is_logdrain_highlight_enabled',
-        'logdrain_highlight_project_id',
-        'is_logdrain_axiom_enabled',
-        'logdrain_axiom_dataset_name',
-        'logdrain_axiom_api_key',
+        'cloudflare_tunnel_id',
+        'cloudflare_tunnel_account_id',
+        'cloudflare_tunnel_integration_token_id',
         'is_swarm_worker',
-        'is_logdrain_custom_enabled',
-        'logdrain_custom_config',
-        'logdrain_custom_config_parser',
+        'logdrain_type',
+        'logdrain_config',
         'concurrent_builds',
         'dynamic_timeout',
         'force_disabled',
@@ -116,8 +176,10 @@ class ServerSetting extends Model
         'sentinel_metrics_history_days',
         'sentinel_push_interval_seconds',
         'sentinel_custom_url',
+        'is_sentinel_pull_enabled',
         'server_disk_usage_notification_threshold',
         'is_sentinel_debug_enabled',
+        'is_container_log_archive_enabled',
         'server_disk_usage_check_frequency',
         'server_disk_usage_notification_interval_hours',
         'is_terminal_enabled',
@@ -134,10 +196,21 @@ class ServerSetting extends Model
         'geoip_refresh_days',
         'geoip_maxmind_license_key',
         'traffic_ip_mode',
+        'log_archive_max_file_mb',
+        'log_archive_max_total_mb',
+        'log_archive_retention_days',
+        'traefik_certificate_resolver',
         'docker_version',
         'docker_version_checked_at',
         'compose_version',
         'compose_version_checked_at',
+        'patch_check_frequency',
+        'patch_check_result',
+        'patch_check_error',
+        'patch_checked_at',
+        'is_auto_security_updates_enabled',
+        'auto_security_updates_time',
+        'auto_security_updates_last_run',
     ];
 
     /**
@@ -148,18 +221,32 @@ class ServerSetting extends Model
      */
     protected $attributes = [
         'is_traffic_analytics_enabled' => false,
+        'is_sentinel_pull_enabled' => false,
+        'is_image_scan_enabled' => false,
+        'image_scan_memory_mb' => self::DEFAULT_IMAGE_SCAN_MEMORY_MB,
+        'image_candidate_scans_today' => 0,
+        'image_scan_syft_timeout' => self::DEFAULT_IMAGE_SCAN_TIMEOUT_SECONDS,
+        'image_scan_grype_timeout' => self::DEFAULT_IMAGE_SCAN_TIMEOUT_SECONDS,
+        'image_scan_cpus' => self::DEFAULT_IMAGE_SCAN_CPUS,
+        'image_rescan_days' => self::DEFAULT_IMAGE_RESCAN_DAYS,
     ];
 
     protected $casts = [
         'force_disabled' => 'boolean',
+        'image_scan_syft_timeout' => 'integer',
+        'image_scan_grype_timeout' => 'integer',
+        'image_scan_cpus' => 'float',
+        'image_rescan_days' => 'integer',
         'force_docker_cleanup' => 'boolean',
         'docker_cleanup_threshold' => 'integer',
         'sentinel_token' => 'encrypted',
+        'is_sentinel_pull_enabled' => 'boolean',
         'is_reachable' => 'boolean',
         'is_usable' => 'boolean',
         'is_build_server' => 'boolean',
         'server_role' => ServerRole::class,
         'is_terminal_enabled' => 'boolean',
+        'is_container_log_archive_enabled' => 'boolean',
         'disable_application_image_retention' => 'boolean',
         'connection_timeout' => 'integer',
         'is_traffic_analytics_enabled' => 'boolean',
@@ -170,11 +257,27 @@ class ServerSetting extends Model
         'is_geoip_enabled' => 'boolean',
         'geoip_refresh_days' => 'integer',
         'geoip_maxmind_license_key' => 'encrypted',
+        'logdrain_type' => LogDrainType::class,
+        'logdrain_config' => 'encrypted:array',
         'traffic_ip_mode' => TrafficIpMode::class,
+        'log_archive_max_file_mb' => 'integer',
+        'log_archive_max_total_mb' => 'integer',
+        'log_archive_retention_days' => 'integer',
         'docker_version_checked_at' => 'datetime',
         'compose_version_checked_at' => 'datetime',
         'backup_compression_cpu_percentage' => 'integer',
         'server_disk_usage_notification_interval_hours' => 'integer',
+        'patch_check_result' => 'array',
+        'patch_checked_at' => 'datetime',
+        'is_auto_security_updates_enabled' => 'boolean',
+        'auto_security_updates_last_run' => 'array',
+        'is_image_scan_enabled' => 'boolean',
+        'image_scan_memory_mb' => 'integer',
+        'image_candidate_scans_today' => 'integer',
+        'image_candidate_scans_date' => 'date',
+        'ssh_host_key_trusted_at' => 'datetime',
+        'is_ssh_host_key_check_disabled' => 'boolean',
+        'is_ssh_host_key_check_enforced' => 'boolean',
     ];
 
     /**
@@ -186,12 +289,12 @@ class ServerSetting extends Model
         'is_build_server',
         'sentinel_token',
         'sentinel_custom_url',
-        'logdrain_newrelic_license_key',
-        'logdrain_axiom_api_key',
-        'logdrain_custom_config',
-        'logdrain_custom_config_parser',
+        'logdrain_config',
         'geoip_maxmind_license_key',
     ];
+
+    /** @var list<string>|null */
+    private static ?array $columnsWithoutPatchCheckResult = null;
 
     protected static function booted()
     {
@@ -208,11 +311,24 @@ class ServerSetting extends Model
             }
         });
         static::updated(function ($settings) {
+            // A save that sets the key too (a transfer import) already has the key of the new address.
+            if ($settings->wasChanged('is_cloudflare_tunnel') && ! $settings->wasChanged('ssh_host_key')) {
+                $settings->forgetSshHostKey('cloudflare_tunnel_changed');
+            }
+            if ($settings->wasChanged('ssh_host_key') && $settings->server) {
+                SshMultiplexingHelper::deleteStaleKnownHostsFiles($settings->server->uuid, $settings->ssh_host_key);
+            }
+            // The stored security statuses mark a result stale by the rescan days of its server.
+            if ($settings->wasChanged('image_rescan_days') && $settings->server) {
+                RefreshImageScanSummariesJob::dispatch((int) $settings->server->team_id, (int) $settings->server->id);
+            }
             if (
                 $settings->wasChanged('sentinel_token') ||
                 $settings->wasChanged('sentinel_custom_url') ||
+                $settings->wasChanged('is_sentinel_pull_enabled') ||
                 $settings->wasChanged('is_metrics_enabled') ||
                 $settings->wasChanged('is_sentinel_debug_enabled') ||
+                $settings->wasChanged('is_container_log_archive_enabled') ||
                 $settings->wasChanged('sentinel_metrics_refresh_rate_seconds') ||
                 $settings->wasChanged('sentinel_metrics_history_days') ||
                 $settings->wasChanged('sentinel_push_interval_seconds') ||
@@ -223,7 +339,10 @@ class ServerSetting extends Model
                 $settings->wasChanged('is_geoip_enabled') ||
                 $settings->wasChanged('geoip_refresh_days') ||
                 $settings->wasChanged('geoip_maxmind_license_key') ||
-                $settings->wasChanged('traffic_ip_mode')
+                $settings->wasChanged('traffic_ip_mode') ||
+                $settings->wasChanged('log_archive_max_file_mb') ||
+                $settings->wasChanged('log_archive_max_total_mb') ||
+                $settings->wasChanged('log_archive_retention_days')
             ) {
                 // Only recreate Sentinel when it is already enabled. Otherwise a change to a
                 // traffic/geoip tuning knob would turn Sentinel on as a side effect, because
@@ -233,6 +352,22 @@ class ServerSetting extends Model
                 }
             }
         });
+    }
+
+    /**
+     * The saved config of a log drain type, or of the active type. Each type keeps its own
+     * values, so a user can switch the destination without losing them.
+     *
+     * @return array<string, mixed>
+     */
+    public function logDrainConfig(?LogDrainType $type = null): array
+    {
+        $type ??= $this->logdrain_type;
+        if (! $type) {
+            return [];
+        }
+
+        return (array) data_get($this->logdrain_config ?? [], $type->value, []);
     }
 
     public function effectiveServerRole(): ServerRole
@@ -307,7 +442,9 @@ class ServerSetting extends Model
     {
         $url = $this->sentinel_custom_url;
 
-        if ($this->server->isLocalhost() && $url === 'http://host.docker.internal:8000') {
+        // The local Sentinel runs on the coolify network. A host gateway URL leaves that network
+        // through the host INPUT chain, where host firewalls such as UFW drop it.
+        if ($this->server->isLocalhost() && strtolower((string) parse_url((string) $url, PHP_URL_HOST)) === 'host.docker.internal') {
             $url = null;
         }
 
@@ -330,7 +467,7 @@ class ServerSetting extends Model
         return match (true) {
             filled($fqdn) => $fqdn,
             filled($publicIpv4) => 'http://'.$publicIpv4.':8000',
-            filled($publicIpv6) => 'http://'.$publicIpv6.':8000',
+            filled($publicIpv6) => 'http://'.formatHostForUrl($publicIpv6).':8000',
             default => null,
         };
     }
@@ -392,7 +529,7 @@ class ServerSetting extends Model
         }
 
         $request = request();
-        $host = strtolower($request->getHost());
+        $host = normalizeIpAddress(strtolower($request->getHost()));
 
         if (
             $host === 'localhost' ||
@@ -423,5 +560,131 @@ class ServerSetting extends Model
                 return translate_cron_expression($value);
             }
         );
+    }
+
+    /**
+     * Selects every column except patch_check_result, which holds the full update list of the last patch
+     * check (often tens of kilobytes). Use it for instance-wide server loops that do not read the result.
+     */
+    public function scopeWithoutPatchCheckResult(Builder $query): Builder
+    {
+        self::$columnsWithoutPatchCheckResult ??= array_values(array_diff(Schema::getColumnListing($this->getTable()), ['patch_check_result']));
+
+        return $query->select(self::$columnsWithoutPatchCheckResult);
+    }
+
+    /**
+     * Summary of the saved patch check, or null when the server was never checked.
+     * Results saved before security and reboot detection count as 0 and false.
+     *
+     * @return array{updates: int, security: int, reboot_required: bool, error: ?string, checked_at: Carbon}|null
+     */
+    public function patchStatus(): ?array
+    {
+        if ($this->patch_checked_at === null) {
+            return null;
+        }
+
+        $result = $this->patch_check_result ?? [];
+
+        return [
+            'updates' => (int) ($result['total_updates'] ?? 0),
+            'security' => (int) ($result['security_updates'] ?? 0),
+            'reboot_required' => ($result['reboot_required'] ?? null) === true,
+            'error' => filled($this->patch_check_error) ? $this->patch_check_error : null,
+            'checked_at' => $this->patch_checked_at,
+        ];
+    }
+
+    /**
+     * Remove the pinned and the pending host key after the address of the server changed, so that the next
+     * connection trusts the key of the new address. Only an admin can change the address.
+     */
+    public function forgetSshHostKey(string $reason): void
+    {
+        if (blank($this->ssh_host_key) && blank($this->ssh_host_key_pending)) {
+            return;
+        }
+        $previousFingerprints = self::sshHostKeyFingerprints($this->ssh_host_key);
+        $cleared = [
+            'ssh_host_key' => null,
+            'ssh_host_key_source' => null,
+            'ssh_host_key_trusted_at' => null,
+            'ssh_host_key_pending' => null,
+        ];
+        // A query update, so that other unsaved changes stay unsaved and the model events do not run again.
+        self::query()->whereKey($this->getKey())->update($cleared);
+        $this->forceFill($cleared)->syncOriginalAttributes(array_keys($cleared));
+        if ($this->server) {
+            SshMultiplexingHelper::deleteStaleKnownHostsFiles($this->server->uuid, null);
+        }
+
+        auditLog('server.ssh_host_key.forgotten', [
+            'team_id' => $this->server?->team_id,
+            'server_uuid' => $this->server?->uuid,
+            'reason' => $reason,
+            'previous_fingerprints' => $previousFingerprints,
+        ]);
+    }
+
+    /**
+     * Read SSH host keys from public key lines ("type base64 [comment]") or known_hosts lines
+     * ("host type base64"). Returns the keys as "type base64" lines, or null when there is no valid key.
+     */
+    public static function normalizeSshHostKeys(?string $input): ?string
+    {
+        $keys = [];
+        foreach (preg_split('/\R/', (string) $input) as $line) {
+            $fields = preg_split('/\s+/', trim($line), -1, PREG_SPLIT_NO_EMPTY);
+            if ($fields === [] || str_starts_with($fields[0], '#') || str_starts_with($fields[0], '@')) {
+                continue;
+            }
+            if (! self::isSshHostKeyType($fields[0])) {
+                array_shift($fields);
+            }
+            [$type, $blob] = [$fields[0] ?? '', $fields[1] ?? ''];
+            if (self::isSshHostKeyType($type) && self::sshKeyBlobType($blob) === $type) {
+                $keys[] = "{$type} {$blob}";
+            }
+        }
+
+        return $keys === [] ? null : implode("\n", array_values(array_unique($keys)));
+    }
+
+    /**
+     * The SHA256 fingerprints of host key lines, in the format of `ssh-keygen -lf`.
+     *
+     * @return list<string>
+     */
+    public static function sshHostKeyFingerprints(?string $keys): array
+    {
+        return collect(explode("\n", (string) $keys))
+            ->filter()
+            ->map(function (string $line) {
+                [$type, $blob] = explode(' ', $line, 2);
+
+                return 'SHA256:'.rtrim(base64_encode(hash('sha256', base64_decode($blob), true)), '=')." ({$type})";
+            })
+            ->values()
+            ->all();
+    }
+
+    private static function isSshHostKeyType(string $type): bool
+    {
+        return preg_match('/^(ssh-(ed25519|rsa|dss)|ecdsa-sha2-nistp(256|384|521)|sk-(ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com)$/', $type) === 1;
+    }
+
+    /**
+     * The key type that is encoded in the first field of an SSH public key blob.
+     */
+    private static function sshKeyBlobType(string $blob): ?string
+    {
+        $decoded = base64_decode($blob, true);
+        if ($decoded === false || strlen($decoded) < 4) {
+            return null;
+        }
+        $length = unpack('N', substr($decoded, 0, 4))[1];
+
+        return strlen($decoded) >= 4 + $length ? substr($decoded, 4, $length) : null;
     }
 }

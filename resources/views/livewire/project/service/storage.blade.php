@@ -16,6 +16,7 @@
             $resource->getMorphClass() == 'App\Models\StandaloneKeydb' ||
             $resource->getMorphClass() == 'App\Models\StandaloneDragonfly' ||
             $resource->getMorphClass() == 'App\Models\StandaloneClickhouse' ||
+            $resource->getMorphClass() == 'App\Models\StandaloneInfluxdb' ||
             $resource->getMorphClass() == 'App\Models\StandaloneMongodb' ||
             $resource->getMorphClass() == 'App\Models\StandaloneMysql' ||
             $resource->getMorphClass() == 'App\Models\StandaloneSqlite')
@@ -53,7 +54,8 @@
                                     x-transition.origin.top.left
                                     class="listbox-panel left-0! right-auto! z-[90]! w-52! min-w-52! sm:left-auto! sm:right-0!">
                                     <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
-                                        @click="volumeModalOpen = true; dropdownOpen = false">
+                                        @click="volumeModalOpen = true; dropdownOpen = false"
+                                        wire:click="loadExistingVolumes">
                                         <x-reicon name="storages" class="size-3.5 shrink-0 opacity-70" />
                                         Volume mount
                                     </button>
@@ -120,11 +122,45 @@
                                             <form class="flex w-full flex-col gap-4"
                                                 wire:submit='submitPersistentVolume'>
                                                 <p class="text-[13px] leading-5 text-neutral-500 dark:text-fg-dim">
-                                                    Mount a Docker volume inside the container.
+                                                    Mount a Docker volume inside the container. Coolify adds the
+                                                    prefix <code class="break-all">{{ $resource->uuid }}-</code> to the
+                                                    name of a new volume, so that the volume name is unique on the server.
+                                                    An existing volume keeps its name.
                                                 </p>
                                                 <div class="flex flex-col gap-4">
-                                                    <x-forms.input canGate="update" :canResource="$resource" placeholder="pv-name"
-                                                        id="name" label="Name" required helper="Volume name." />
+                                                    <div class="relative" wire:key="existing-volumes-loading"
+                                                        @if ($existingVolumesLoaded) wire:loading.block wire:target="loadExistingVolumes" @endif>
+                                                        <x-forms.listbox htmlId="existing_volume_loading" :wire="false" disabled
+                                                            label="Existing Volume" placeholder="Loading volumes from the server…"
+                                                            helper="Select an existing Docker volume, or create a new one." />
+                                                        <x-loading compact class="pointer-events-none absolute right-8" style="bottom: 0; height: 2rem" />
+                                                    </div>
+                                                    @if ($existingVolumesLoaded)
+                                                        <div wire:key="existing-volumes-{{ md5(json_encode($existingVolumes)) }}"
+                                                            wire:loading.remove wire:target="loadExistingVolumes">
+                                                            <x-forms.listbox searchable live id="existing_volume"
+                                                                label="Existing Volume" placeholder="Create a new volume"
+                                                                searchPlaceholder="Search volumes on this server"
+                                                                searchEmptyText="No matching volume"
+                                                                helper="Select an existing Docker volume, or create a new one."
+                                                                :options="collect($existingVolumes)
+                                                                    ->map(fn (string $volume) => ['value' => $volume, 'label' => $volume])
+                                                                    ->prepend(['value' => '', 'label' => 'Create a new volume'])
+                                                                    ->all()"
+                                                                canGate="update" :canResource="$resource" />
+                                                        </div>
+                                                    @endif
+                                                    @if (filled($existing_volume))
+                                                        <x-callout type="warning" title="Data corruption risk" class="p-3">
+                                                            If another container writes to this volume at the same time, data can become corrupted.
+                                                            Coolify does not delete or copy an existing volume.
+                                                        </x-callout>
+                                                    @endif
+                                                    @if (blank($existing_volume))
+                                                        <x-forms.input canGate="update" :canResource="$resource"
+                                                            placeholder="pv-name" id="name" label="Name" required
+                                                            helper="Name for the new volume." />
+                                                    @endif
                                                     <x-forms.input canGate="update" :canResource="$resource"
                                                         placeholder="/tmp/root" id="mount_path" label="Destination Path"
                                                         required helper="Directory inside the container." />

@@ -46,4 +46,37 @@ namespace {
             ->toContain("git -c 'url.https://x-access-token:review%20token%2Fwith%2Bsymbols@github.com/.insteadOf=https://github.com/' submodule sync")
             ->toContain("git -c 'url.https://x-access-token:review%20token%2Fwith%2Bsymbols@github.com/.insteadOf=https://github.com/' submodule update --init --recursive");
     });
+
+    test('the compose file submodule step uses the github app credentials of the clone', function () {
+        $application = new Application;
+        $application->forceFill([
+            'uuid' => 'test-app-uuid',
+            'git_repository' => 'coollabsio/private-app',
+            'git_branch' => 'main',
+            'git_commit_sha' => 'HEAD',
+            'base_directory' => '/',
+            'docker_compose_location' => '/infra/docker-compose.yml',
+        ]);
+
+        $settings = new ApplicationSetting;
+        $settings->is_git_shallow_clone_enabled = true;
+        $settings->is_git_submodules_enabled = true;
+        $settings->is_git_lfs_enabled = false;
+        $application->setRelation('settings', $settings);
+
+        $source = new GithubApp;
+        $source->forceFill([
+            'html_url' => 'https://github.com',
+            'api_url' => 'https://api.github.com',
+            'is_public' => false,
+        ]);
+        $application->setRelation('source', $source);
+
+        $commands = (new ReflectionMethod(Application::class, 'composeFileReadCommands'))->invoke($application, 'test-uuid', '2.47.0');
+
+        expect($commands->implode("\n"))
+            ->toContain('--no-checkout')
+            // The step is quoted for `sh -c`, so compare without the outer quotes.
+            ->toContain(substr(escapeshellarg("git -c 'url.https://x-access-token:review%20token%2Fwith%2Bsymbols@github.com/.insteadOf=https://github.com/' submodule update --init --recursive --depth=1"), 1, -1));
+    });
 }

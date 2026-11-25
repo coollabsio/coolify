@@ -17,6 +17,7 @@
     scope: 'global',
     serverTimingHudEnabled: localStorage.getItem('coolify.serverTimingHud.enabled') !== '0',
     developerCommandsEnabled: @js(app()->environment('local')),
+    vulnerabilitiesUrl: @js(route('vulnerabilities')),
 
     get showServerTimingCommand() {
         if (!this.developerCommandsEnabled) return false;
@@ -65,6 +66,10 @@
 
     openPageItem(item) {
         this.closeModal();
+        if (item.action) {
+            item.action();
+            return;
+        }
         if (item.element) {
             if (item.element.id) history.replaceState(null, '', '#' + item.element.id);
             window.scrollToSettingsSection?.(item.element);
@@ -99,6 +104,12 @@
             if (!item.search_text) return false;
             return item.search_text.toLowerCase().includes(query);
         }).slice(0, 20);
+
+        // A vulnerability ID opens the Security page with that search (resources/js/vulnerability-search.js).
+        const vulnerability = window.vulnerabilitySearchItem?.(this.searchQuery, this.vulnerabilitiesUrl);
+        if (vulnerability) {
+            return [vulnerability, ...results].slice(0, 20);
+        }
 
         return results;
     },
@@ -252,12 +263,12 @@
             const exactMatchCommands = [
                 'new project', 'new server', 'new team', 'new storage', 'new s3',
                 'new private key', 'new privatekey', 'new key',
-                'new github app', 'new github', 'new source',
+                'new github app', 'new github', 'new source', 'new canvas',
                 'new public', 'new public git', 'new public repo', 'new public repository',
                 'new private github', 'new private gh', 'new private deploy', 'new deploy key',
                 'new dockerfile', 'new docker compose', 'new compose', 'new docker image', 'new image',
                 'new postgresql', 'new postgres', 'new mysql', 'new mariadb',
-                'new redis', 'new keydb', 'new dragonfly', 'new mongodb', 'new mongo', 'new clickhouse', 'new sqlite'
+                'new redis', 'new valkey', 'new keydb', 'new dragonfly', 'new mongodb', 'new mongo', 'new clickhouse', 'new influxdb', 'new influx', 'new sqlite'
             ];
             if (this.scope === 'global' && exactMatchCommands.includes(trimmed)) {
                 const matchingItem = this.creatableItems.find(item => {
@@ -408,7 +419,7 @@
                     <span class="command-palette-header-icon" :class="showLoadingSpinner && 'is-loading'">
                         <svg x-show="!showLoadingSpinner" class="size-4" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                             <path fill-rule="evenodd" clip-rule="evenodd"
-                                d="M11.5 2.75C6.66751 2.75 2.75 6.66751 2.75 11.5C2.75 16.3325 6.66751 20.25 11.5 20.25C16.3325 20.25 20.25 16.3325 20.25 11.5C20.25 6.66751 16.3325 2.75 11.5 2.75ZM1.25 11.5C1.25 5.83908 5.83908 1.25 11.5 1.25C17.1609 1.25 21.75 5.83908 21.75 11.5C21.75 14.0605 20.8111 16.4017 19.2589 18.1982L22.5303 21.4697C22.8232 21.7626 22.8232 22.2374 22.5303 22.5303C22.2374 22.8232 21.7626 22.8232 21.4697 22.5303L18.1982 19.2589C16.4017 20.8111 14.0605 21.75 11.5 21.75C5.83908 21.75 1.25 17.1609 1.25 11.5Z"
+                                d="M16.489 17.5497C14.8753 18.922 12.7843 19.75 10.5 19.75C5.39137 19.75 1.25 15.6086 1.25 10.5C1.25 5.39137 5.39137 1.25 10.5 1.25C15.6086 1.25 19.75 5.39137 19.75 10.5C19.75 12.7843 18.922 14.8753 17.5497 16.489L22.5303 21.4697C22.8232 21.7626 22.8232 22.2374 22.5303 22.5303C22.2374 22.8232 21.7626 22.8232 21.4697 22.5303L16.489 17.5497ZM2.75 10.5C2.75 6.21979 6.21979 2.75 10.5 2.75C14.7802 2.75 18.25 6.21979 18.25 10.5C18.25 12.589 17.4235 14.485 16.0796 15.8788C16.0408 15.905 16.004 15.9353 15.9697 15.9697C15.9353 16.004 15.905 16.0408 15.8788 16.0796C14.485 17.4235 12.589 18.25 10.5 18.25C6.21979 18.25 2.75 14.7802 2.75 10.5Z"
                                 fill="currentColor" />
                         </svg>
                         <svg x-show="showLoadingSpinner" x-cloak class="size-4 animate-spin" viewBox="0 0 24 24" fill="none"
@@ -668,7 +679,7 @@
                         <template x-if="pageResults.length > 0 && !$wire.isSelectingResource">
                         <div class="command-palette-section">
                             <div class="command-palette-group-label">This page</div>
-                            <template x-for="item in pageResults" :key="item.href">
+                            <template x-for="item in pageResults" :key="item.key ?? item.href">
                                 <a :href="item.element ? (item.element.id ? '#' + item.element.id : '#') : item.href" @click.prevent="openPageItem(item)"
                                     class="search-result-item command-palette-item">
                                     <div class="command-palette-item-main">
@@ -852,8 +863,7 @@
                                 <x-reicon name="x" class="size-4" />
                             </button>
                         </header>
-                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                            style="-webkit-overflow-scrolling: touch;">
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
                             <livewire:project.add-empty key="create-modal-project" />
                         </div>
                     </div>
@@ -895,8 +905,7 @@
                                 <x-reicon name="x" class="size-4" />
                             </button>
                         </header>
-                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                            style="-webkit-overflow-scrolling: touch;">
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
                             <livewire:team.create key="create-modal-team" />
                         </div>
                     </div>
@@ -938,8 +947,7 @@
                                 <x-reicon name="x" class="size-4" />
                             </button>
                         </header>
-                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                            style="-webkit-overflow-scrolling: touch;">
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
                             <livewire:storage.create key="create-modal-storage" />
                         </div>
                     </div>
@@ -981,8 +989,7 @@
                                 <x-reicon name="x" class="size-4" />
                             </button>
                         </header>
-                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                            style="-webkit-overflow-scrolling: touch;">
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
                             <livewire:security.private-key.create key="create-modal-private-key" />
                         </div>
                     </div>
@@ -1024,8 +1031,7 @@
                                 <x-reicon name="x" class="size-4" />
                             </button>
                         </header>
-                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                            style="-webkit-overflow-scrolling: touch;">
+                        <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
                             <livewire:source.github.create key="create-modal-source" />
                         </div>
                     </div>

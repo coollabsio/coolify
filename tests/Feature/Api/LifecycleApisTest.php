@@ -14,6 +14,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use App\Models\Team;
 use App\Models\User;
 use App\Notifications\Database\BackupMissing;
@@ -169,6 +170,20 @@ describe('POST /api/v1/databases/{uuid}/clone', function () {
             ->and(NotificationThrottle::wasSent($clonedBackup, BackupMissing::class))->toBeFalse();
     });
 
+    test('clones a Redis database with one REDIS_USERNAME variable', function () {
+        $database = create_standalone_redis($this->environment->id, $this->destination, ['image' => 'redis:7.2']);
+
+        $response = $this->withHeaders($this->headers)
+            ->postJson("/api/v1/databases/{$database->uuid}/clone", [
+                'destination_uuid' => $this->destination->uuid,
+            ]);
+
+        $response->assertCreated();
+        $cloned = StandaloneRedis::where('uuid', $response->json('uuid'))->firstOrFail();
+        expect($cloned->runtime_environment_variables()->where('key', 'REDIS_USERNAME')->count())->toBe(1)
+            ->and($cloned->runtime_environment_variables()->where('key', 'REDIS_PASSWORD')->count())->toBe(1);
+    });
+
     test('creates renamed volumes when cloning a database with clone_volumes', function () {
         // Prevent remote stop/clone/start from running in unit tests.
         Bus::fake();
@@ -317,14 +332,14 @@ describe('DELETE resource endpoints', function () {
             ->assertOk();
 
         $response->assertJson([
-            'message' => 'Server is not reachable. The service will be removed from Coolify only; Docker resources may remain.',
+            'message' => 'Service deletion request queued.',
         ]);
 
         expect(Service::find($service->id))->toBeNull()
             ->and(Service::withTrashed()->find($service->id)?->trashed())->toBeTrue();
         Queue::assertPushed(
             DeleteResourceJob::class,
-            fn (DeleteResourceJob $job): bool => $job->deleteFromCoolifyOnly
+            fn (DeleteResourceJob $job): bool => $job->resource->is($service) && ! $job->deleteFromCoolifyOnly
         );
     });
 

@@ -487,6 +487,38 @@ describe('GitHub App Webhook HMAC', function () {
         $response->assertOk();
         expect($response->getContent())->toContain('Invalid signature');
     });
+
+    test('rejects push with forged hash when APP_ENV is local', function () {
+        config()->set('app.env', 'local');
+
+        $team = Team::factory()->create();
+        GithubApp::create([
+            'uuid' => (string) str()->uuid(),
+            'name' => 'github-app-webhook-local-test',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'app_id' => 1234567890,
+            'webhook_secret' => 'app-secret',
+            'team_id' => $team->id,
+        ]);
+
+        $payload = json_encode([
+            'ref' => 'refs/heads/main',
+            'repository' => ['id' => 987654321],
+            'after' => 'abc1234',
+            'commits' => [],
+        ]);
+
+        $response = $this->call('POST', '/webhooks/source/github/events', [], [], [], [
+            'HTTP_X-GitHub-Event' => 'push',
+            'HTTP_X-GitHub-Hook-Installation-Target-Id' => '1234567890',
+            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, 'wrong-secret'),
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        expect($response->getContent())->toContain('Invalid signature');
+    });
 });
 
 describe('GitLab Manual Webhook HMAC', function () {
@@ -628,6 +660,62 @@ describe('Bitbucket Manual Webhook HMAC', function () {
         $content = $response->getContent();
         expect($content)->not->toContain('No matching application or invalid signature.');
         expect($content)->not->toContain('Webhook secret not configured');
+    });
+
+    test('matches a bitbucket data center push by project key and slug', function (string $gitRepository) {
+        $app = createApplicationWithWebhook(branch: 'master', overrides: ['git_repository' => $gitRepository]);
+
+        // Shape of the documented repo:refs_changed payload: the repository has no links.
+        $payload = json_encode([
+            'eventKey' => 'repo:refs_changed',
+            'repository' => ['slug' => 'repo', 'project' => ['key' => '~USER']],
+            'changes' => [[
+                'ref' => ['id' => 'refs/heads/master', 'displayId' => 'master', 'type' => 'BRANCH'],
+                'refId' => 'refs/heads/master',
+                'fromHash' => 'ecddabb624f6f5ba43816f5926e580a5f680a932',
+                'toHash' => '2502c69be7e8570a0fb7a7e2ef1df150433c9549',
+                'type' => 'UPDATE',
+            ]],
+            'commits' => [['message' => 'Fix the build']],
+        ]);
+        $hmac = hash_hmac('sha256', $payload, $app->manual_webhook_secret_bitbucket);
+
+        $response = $this->call('POST', '/webhooks/source/bitbucket/events/manual', [], [], [], [
+            'HTTP_X-Event-Key' => 'repo:refs_changed',
+            'HTTP_X-Hub-Signature' => "sha256={$hmac}",
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        expect($response->getContent())->toContain('Server is not functional');
+    })->with([
+        'ssh' => 'ssh://git@bitbucket.example.com:7999/~user/repo.git',
+        'https' => 'https://bitbucket.example.com/scm/~user/repo.git',
+        'https with context path' => 'https://example.com/bitbucket/scm/~user/repo.git',
+    ]);
+
+    test('returns 429 when the deployment queue is full', function () {
+        $app = createApplicationWithWebhook();
+        $server = $app->destination->server;
+        $server->update(['ip' => '10.0.0.10']);
+        $server->settings->update(['is_reachable' => true, 'is_usable' => true, 'force_disabled' => false, 'deployment_queue_limit' => 0]);
+        $app->settings->update(['is_auto_deploy_enabled' => true]);
+
+        $payload = json_encode([
+            'repository' => ['full_name' => 'test-org/test-repo'],
+            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => str_repeat('a', 40)]]]]],
+        ]);
+        $hmac = hash_hmac('sha256', $payload, $app->manual_webhook_secret_bitbucket);
+
+        $response = $this->call('POST', '/webhooks/source/bitbucket/events/manual', [], [], [], [
+            'HTTP_X-Event-Key' => 'repo:push',
+            'HTTP_X-Hub-Signature' => "sha256={$hmac}",
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertStatus(429)
+            ->assertHeader('Retry-After', 60)
+            ->assertSee('Deployment queue is full.');
     });
 });
 
@@ -917,139 +1005,38 @@ describe('Manual Webhook Repository Matching', function () {
         ],
     ]);
 
-    test('github matches ssh git repository URL exactly', function () {
-        $app = createApplicationWithWebhook(overrides: [
-            'git_repository' => 'git@github.com:test-org/test-repo.git',
-        ]);
-        $secret = $app->manual_webhook_secret_github;
+    test('signed pushes deploy applications whose repository URL names the pushed repository', function (string $provider, string $gitRepository) {
+        Queue::fake();
+        $application = makeWebhookApplicationServerFunctional(createApplicationWithWebhook(overrides: [
+            'git_repository' => $gitRepository,
+        ]));
 
-        $payload = json_encode([
-            'ref' => 'refs/heads/main',
-            'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc1234',
-            'commits' => [],
-        ]);
+        sendManualWebhookPush($this, $provider, $application)->assertOk();
 
-        $response = $this->call('POST', '/webhooks/source/github/events/manual', [], [], [], [
-            'HTTP_X-GitHub-Event' => 'push',
-            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, $secret),
-            'CONTENT_TYPE' => 'application/json',
-        ], $payload);
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeTrue();
+    })->with(['github', 'gitlab', 'bitbucket', 'gitea'])->with([
+        'scp-style' => 'git@git.example.com:test-org/test-repo.git',
+        'scp-style with custom port' => 'git@10.0.0.80:2222/test-org/test-repo.git',
+        'scp-style with custom user and port' => 'custom-user@git.example.com:2222/test-org/test-repo.git',
+        'ssh scheme with custom port' => 'ssh://git@10.0.0.80:2222/test-org/test-repo.git',
+        'https with different case' => 'https://github.com/Test-Org/Test-Repo.git',
+        'https under a sub-path' => 'https://git.example.com/gitea/test-org/test-repo.git',
+        'ssh scheme under a sub-path' => 'ssh://gitea@git.example.com:12345/gitea/test-org/test-repo.git',
+    ]);
 
-        $response->assertOk();
-        expect($response->getContent())->not->toContain('No applications found');
-    });
+    test('signed pushes do not deploy applications for another repository', function (string $provider, string $gitRepository) {
+        Queue::fake();
+        $application = makeWebhookApplicationServerFunctional(createApplicationWithWebhook(overrides: [
+            'git_repository' => $gitRepository,
+        ]));
 
-    test('github matches an ssh repository URL with a non-git username', function () {
-        $app = createApplicationWithWebhook(overrides: [
-            'git_repository' => 'custom-user@git.example.com:test-org/test-repo.git',
-        ]);
-        $secret = $app->manual_webhook_secret_github;
+        sendManualWebhookPush($this, $provider, $application)->assertOk();
 
-        $payload = json_encode([
-            'ref' => 'refs/heads/main',
-            'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc1234',
-            'commits' => [],
-        ]);
-
-        $response = $this->call('POST', '/webhooks/source/github/events/manual', [], [], [], [
-            'HTTP_X-GitHub-Event' => 'push',
-            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, $secret),
-            'CONTENT_TYPE' => 'application/json',
-        ], $payload);
-
-        $response->assertOk();
-        expect($response->getContent())->not->toContain('No applications found');
-    });
-
-    test('github matches an ssh repository URL with a non-git username and custom port', function () {
-        $app = createApplicationWithWebhook(overrides: [
-            'git_repository' => 'custom-user@git.example.com:2222/test-org/test-repo.git',
-        ]);
-        $secret = $app->manual_webhook_secret_github;
-
-        $payload = json_encode([
-            'ref' => 'refs/heads/main',
-            'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc1234',
-            'commits' => [],
-        ]);
-
-        $response = $this->call('POST', '/webhooks/source/github/events/manual', [], [], [], [
-            'HTTP_X-GitHub-Event' => 'push',
-            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, $secret),
-            'CONTENT_TYPE' => 'application/json',
-        ], $payload);
-
-        $response->assertOk();
-        expect($response->getContent())->not->toContain('No applications found');
-    });
-
-    test('gitlab matches scp-style ssh repository URL with custom port', function () {
-        $app = createApplicationWithWebhook(overrides: [
-            'git_repository' => 'git@gitlab.example.com:2222/services/xyz.git',
-            'git_branch' => 'master',
-        ]);
-        $secret = $app->manual_webhook_secret_gitlab;
-
-        $response = $this->postJson('/webhooks/source/gitlab/events/manual', [
-            'object_kind' => 'push',
-            'ref' => 'refs/heads/master',
-            'project' => ['path_with_namespace' => 'services/xyz'],
-            'after' => 'abc1234',
-            'commits' => [],
-        ], [
-            'X-Gitlab-Token' => $secret,
-        ]);
-
-        $response->assertOk();
-        expect($response->getContent())->not->toContain('No applications found');
-    });
-
-    test('gitlab matches scp-style ssh repository URL without port', function () {
-        $app = createApplicationWithWebhook(overrides: [
-            'git_repository' => 'git@gitlab.example.com:services/xyz.git',
-            'git_branch' => 'master',
-        ]);
-        $secret = $app->manual_webhook_secret_gitlab;
-
-        $response = $this->postJson('/webhooks/source/gitlab/events/manual', [
-            'object_kind' => 'push',
-            'ref' => 'refs/heads/master',
-            'project' => ['path_with_namespace' => 'services/xyz'],
-            'after' => 'abc1234',
-            'commits' => [],
-        ], [
-            'X-Gitlab-Token' => $secret,
-        ]);
-
-        $response->assertOk();
-        expect($response->getContent())->not->toContain('No applications found');
-    });
-
-    test('github matches repository case-insensitively', function () {
-        $app = createApplicationWithWebhook(overrides: [
-            'git_repository' => 'https://github.com/Test-Org/Test-Repo.git',
-        ]);
-        $secret = $app->manual_webhook_secret_github;
-
-        $payload = json_encode([
-            'ref' => 'refs/heads/main',
-            'repository' => ['full_name' => 'test-org/test-repo'],
-            'after' => 'abc1234',
-            'commits' => [],
-        ]);
-
-        $response = $this->call('POST', '/webhooks/source/github/events/manual', [], [], [], [
-            'HTTP_X-GitHub-Event' => 'push',
-            'HTTP_X-Hub-Signature-256' => 'sha256='.hash_hmac('sha256', $payload, $secret),
-            'CONTENT_TYPE' => 'application/json',
-        ], $payload);
-
-        $response->assertOk();
-        expect($response->getContent())->not->toContain('No applications found');
-    });
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
+    })->with(['github', 'gitlab', 'bitbucket', 'gitea'])->with([
+        'other owner' => 'git@10.0.0.80:2222/other-org/test-repo.git',
+        'owner that ends with the pushed owner' => 'https://git.example.com/other-test-org/test-repo.git',
+    ]);
 });
 
 describe('Webhook Secret Auto-Generation', function () {

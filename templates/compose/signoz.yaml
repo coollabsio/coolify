@@ -144,6 +144,51 @@ services:
               <user_scripts_path>/var/lib/clickhouse/user_scripts/</user_scripts_path>
               <user_defined_executable_functions_config>*function.xml</user_defined_executable_functions_config>
           </clickhouse>
+      - type: bind
+        source: ./clickhouse/system-logs.xml
+        target: /etc/clickhouse-server/config.d/system-logs.xml
+        content: |
+          <?xml version="1.0"?>
+          <clickhouse>
+              <query_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+                  <flush_interval_milliseconds>30000</flush_interval_milliseconds>
+              </query_log>
+              <query_thread_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+              </query_thread_log>
+              <query_metric_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+              </query_metric_log>
+              <query_views_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+              </query_views_log>
+              <part_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+              </part_log>
+              <metric_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+                  <flush_interval_milliseconds>30000</flush_interval_milliseconds>
+              </metric_log>
+              <asynchronous_metric_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+              </asynchronous_metric_log>
+              <trace_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+                  <flush_interval_milliseconds>30000</flush_interval_milliseconds>
+              </trace_log>
+              <error_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+              </error_log>
+              <processors_profile_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+                  <flush_interval_milliseconds>30000</flush_interval_milliseconds>
+              </processors_profile_log>
+              <text_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+                  <flush_interval_milliseconds>30000</flush_interval_milliseconds>
+              </text_log>
+          </clickhouse>
 
   signoz:
     image: signoz/signoz:v0.137.1

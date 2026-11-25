@@ -54,19 +54,6 @@
                             confirmationText="{{ $resourceName }}"
                             confirmationLabel="Enter the resource name to confirm permanent deletion"
                             shortConfirmationLabel="Resource name" />
-                        @if ($resource instanceof \App\Models\Service)
-                            <x-modal-confirmation title="Remove service from Coolify only?"
-                                buttonTitle="Remove from Coolify only"
-                                isErrorButton submitAction="deleteFromCoolifyOnly"
-                                :actions="[
-                                    'Permanently remove this service from Coolify.',
-                                    'Leave all containers, volumes, networks, and configuration files on the server.',
-                                ]"
-                                warningMessage="Coolify will no longer track or manage the Docker resources for this service. Use this only when normal cleanup cannot complete."
-                                confirmationText="{{ $resourceName }}"
-                                confirmationLabel="Enter the resource name to confirm metadata-only deletion"
-                                shortConfirmationLabel="Resource name" />
-                        @endif
                     @else
                         <x-forms.button isError disabled tooltip="You do not have permission to delete this resource.">
                             Delete {{ $resourceLabel }}

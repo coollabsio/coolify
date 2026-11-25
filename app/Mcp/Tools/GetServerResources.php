@@ -4,12 +4,13 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesTeam;
-use App\Models\Server;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class GetServerResources extends Tool
 {
     protected string $name = 'get_server_resources';
@@ -35,7 +36,7 @@ class GetServerResources extends Tool
             return $this->mcpError($request, 'uuid argument is required.');
         }
 
-        $server = Server::whereTeamId($teamId)->whereUuid($uuid)->first();
+        $server = $this->visibleServers($request, $teamId)->whereUuid($uuid)->first();
         if (! $server) {
             return $this->mcpError($request, "Server [{$uuid}] not found.", ['resource_uuid' => $uuid]);
         }

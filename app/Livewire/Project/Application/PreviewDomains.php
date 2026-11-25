@@ -28,6 +28,15 @@ class PreviewDomains extends Component
 
     public ?string $newDomainService = null;
 
+    /**
+     * Parsed once on mount and on save. Each parse queues a file sync job, so the
+     * 2-second DNS poll must not parse the compose file on every render.
+     *
+     * @var array<int, string>
+     */
+    #[Locked]
+    public array $composeServices = [];
+
     public array $editingDomainParts = ['scheme' => 'https', 'host' => '', 'port' => '', 'path' => ''];
 
     public ?int $editingIndex = null;
@@ -45,7 +54,8 @@ class PreviewDomains extends Component
         $this->authorize('view', $this->preview->application);
         $this->refreshDomains();
         if ($this->preview->application->build_pack === 'dockercompose') {
-            $this->newDomainService = $this->composeServices()[0] ?? null;
+            $this->composeServices = $this->composeServices();
+            $this->newDomainService = $this->composeServices[0] ?? null;
         }
     }
 
@@ -53,7 +63,6 @@ class PreviewDomains extends Component
     {
         return view('livewire.project.application.preview-domains', [
             'isCompose' => $this->preview->application->build_pack === 'dockercompose',
-            'composeServices' => $this->composeServices(),
         ]);
     }
 
@@ -61,7 +70,7 @@ class PreviewDomains extends Component
     {
         $this->authorize('update', $this->preview->application);
         if ($this->preview->application->build_pack === 'dockercompose'
-            && ($this->newDomainService === null || ! in_array($this->newDomainService, $this->composeServices(), true))) {
+            && ($this->newDomainService === null || ! in_array($this->newDomainService, $this->composeServices, true))) {
             $this->addError('newDomainService', 'Select a valid Compose service.');
 
             return;
@@ -96,7 +105,7 @@ class PreviewDomains extends Component
         $domain = $this->domainRows[$index]['url'] ?? DomainPortOverrides::withoutPort($domain);
         $this->newDomainParts = DomainUrlParts::empty();
         $this->newDomainService = $this->preview->application->build_pack === 'dockercompose'
-            ? ($this->composeServices()[0] ?? null)
+            ? ($this->composeServices[0] ?? null)
             : null;
         $this->forceUseUnknownPort = false;
         $this->dispatch('close-preview-domain-add', previewId: $this->preview->id);
@@ -455,6 +464,7 @@ class PreviewDomains extends Component
         if ($this->preview->application->build_pack === 'dockercompose') {
             try {
                 $composeServices = $this->composeServices(failOnError: true);
+                $this->composeServices = $composeServices;
             } catch (\Throwable) {
                 $this->refreshDomains();
                 $this->dispatch('error', 'Compose configuration could not be parsed. Preview domains were not changed.');

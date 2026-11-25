@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\New;
 
 use App\Models\Application;
+use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\Project;
@@ -52,7 +53,7 @@ class PublicGitRepository extends Component
 
     private object $repository_url_parsed;
 
-    public GithubApp|GitlabApp|string $git_source = 'other';
+    public GithubApp|GitlabApp|GiteaApp|string $git_source = 'other';
 
     public string $git_host;
 
@@ -72,7 +73,7 @@ class PublicGitRepository extends Component
             'isStatic' => 'required|boolean',
             'publish_directory' => 'nullable|string',
             'build_pack' => 'required|string',
-            'base_directory' => 'nullable|string',
+            'base_directory' => ValidationPatterns::directoryPathRules(),
             'docker_compose_location' => ValidationPatterns::filePathRules(),
             'git_branch' => ['required', 'string', new ValidGitBranch],
         ];
@@ -139,7 +140,7 @@ class PublicGitRepository extends Component
                 throw new \RuntimeException('Invalid repository URL: '.$validator->errors()->first('repository_url'));
             }
 
-            $httpsRepositoryUrl = scpStyleGitUrlToHttps($this->repository_url);
+            $httpsRepositoryUrl = sshGitUrlToHttps($this->repository_url);
             if (is_string($httpsRepositoryUrl)) {
                 $this->repository_url = $httpsRepositoryUrl;
             }
@@ -198,7 +199,7 @@ class PublicGitRepository extends Component
         return $this->unsavedApplicationForDetection(
             $this->git_repository,
             $this->git_branch,
-            $this->git_source instanceof GithubApp || $this->git_source instanceof GitlabApp ? $this->git_source : null,
+            $this->git_source instanceof GithubApp || $this->git_source instanceof GitlabApp || $this->git_source instanceof GiteaApp ? $this->git_source : null,
         );
     }
 
@@ -228,7 +229,7 @@ class PublicGitRepository extends Component
             $this->git_branch = 'main';
         }
         if ($this->git_host === 'github.com') {
-            $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
+            $this->git_source = GithubApp::query()->whereKey(0)->where('is_public', true)->first();
 
             return;
         }
@@ -275,8 +276,13 @@ class PublicGitRepository extends Component
 
     public function submit()
     {
+        if ($this->usesConfigFile()) {
+            $this->previewConfigFile();
+
+            return;
+        }
         try {
-            $this->authorize('create', Application::class);
+            $this->base_directory = ValidationPatterns::normalizeDirectoryPath($this->base_directory);
 
             $this->validate();
 
@@ -312,6 +318,7 @@ class PublicGitRepository extends Component
 
             $project = Project::ownedByCurrentTeam()->where('uuid', $project_uuid)->firstOrFail();
             $environment = $project->environments()->where('uuid', $environment_uuid)->firstOrFail();
+            $this->authorize('create', [Application::class, $environment]);
 
             if ($this->git_source === 'other') {
                 $application_init = [
@@ -351,7 +358,6 @@ class PublicGitRepository extends Component
             }
             if ($this->build_pack === 'dockercompose') {
                 $application_init['docker_compose_location'] = $this->docker_compose_location;
-                $application_init['base_directory'] = $this->base_directory;
             }
             $application = new Application($application_init);
             $application->save();

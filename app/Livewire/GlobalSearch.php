@@ -6,12 +6,14 @@ use App\Models\Application;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\Environment;
+use App\Models\GithubApp;
 use App\Models\IntegrationToken;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -19,8 +21,10 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
+use App\Services\Access\AccessResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
 class GlobalSearch extends Component
@@ -178,6 +182,7 @@ class GlobalSearch extends Component
             'new github app' => 'source',
             'new github' => 'source',
             'new source' => 'source',
+            'new canvas' => 'canvas',
 
             // Applications - Git-based
             'new public' => 'public',
@@ -186,6 +191,8 @@ class GlobalSearch extends Component
             'new public repository' => 'public',
             'new private github' => 'private-gh-app',
             'new private gh' => 'private-gh-app',
+            'new private gitea' => 'private-gitea-app',
+            'new gitea' => 'private-gitea-app',
             'new private deploy' => 'private-deploy-key',
             'new deploy key' => 'private-deploy-key',
 
@@ -202,12 +209,15 @@ class GlobalSearch extends Component
             'new mysql' => 'mysql',
             'new mariadb' => 'mariadb',
             'new redis' => 'redis',
+            'new valkey' => 'redis',
             'new keydb' => 'keydb',
             'new dragonfly' => 'dragonfly',
             'new sqlite' => 'sqlite',
             'new mongodb' => 'mongodb',
             'new mongo' => 'mongodb',
             'new clickhouse' => 'clickhouse',
+            'new influxdb' => 'influxdb',
+            'new influx' => 'influxdb',
         ];
 
         foreach ($resourceMap as $command => $type) {
@@ -235,15 +245,19 @@ class GlobalSearch extends Component
             return true;
         }
 
+        if ($type === 'source') {
+            return $user->can('create', GithubApp::class);
+        }
+
         // Applications, Databases, Services, and other resources
         if (in_array($type, [
-            'project', 'source',
+            'project',
             // Applications
-            'public', 'private-gh-app', 'private-deploy-key',
+            'public', 'private-gh-app', 'private-gitea-app', 'private-deploy-key',
             'dockerfile', 'docker-compose-empty', 'docker-image',
             // Databases
             'postgresql', 'mysql', 'mariadb', 'redis', 'keydb',
-            'dragonfly', 'mongodb', 'clickhouse', 'sqlite',
+            'dragonfly', 'mongodb', 'clickhouse', 'influxdb', 'sqlite',
         ]) || str_starts_with($type, 'one-click-service-')) {
             return $user->can('createAnyResource');
         }
@@ -253,390 +267,423 @@ class GlobalSearch extends Component
 
     private function loadSearchableItems()
     {
-        // Try to get from Redis cache first
-        $cacheKey = self::getCacheKey(auth()->user()->currentTeam()->id);
+        $teamWide = $this->actorCoversWholeTeam();
 
-        $resources = Cache::remember($cacheKey, 300, function () {
-            $items = collect();
-            $team = auth()->user()->currentTeam();
-
-            // Get all applications
-            $applications = Application::ownedByCurrentTeam()
-                ->with(['environment.project', 'previews:id,application_id,pull_request_id'])
-                ->get()
-                ->map(function ($app) {
-                    // Collect all FQDNs from the application
-                    $fqdns = collect([]);
-
-                    // For regular applications
-                    if ($app->fqdn) {
-                        $fqdns = collect(explode(',', $app->fqdn))->map(fn ($fqdn) => trim($fqdn));
-                    }
-
-                    // For docker compose based applications
-                    if ($app->build_pack === 'dockercompose' && $app->docker_compose_domains) {
-                        try {
-                            $composeDomains = json_decode($app->docker_compose_domains, true);
-                            if (is_array($composeDomains)) {
-                                foreach ($composeDomains as $serviceName => $domains) {
-                                    if (is_array($domains)) {
-                                        $fqdns = $fqdns->merge($domains);
-                                    }
-                                }
-                            }
-                        } catch (\Exception $e) {
-                            // Ignore JSON parsing errors
-                        }
-                    }
-
-                    $fqdnsString = $fqdns->implode(' ');
-
-                    // Add PR search terms if preview is enabled
-                    $prSearchTerms = '';
-                    if ($app->preview_enabled ?? false) {
-                        $prIds = collect($app->previews ?? [])
-                            ->pluck('pull_request_id')
-                            ->map(fn ($id) => "pr-{$id} pr{$id} {$id}")
-                            ->implode(' ');
-                        $prSearchTerms = $prIds;
-                    }
-
-                    return [
-                        'id' => $app->id,
-                        'name' => $app->name,
-                        'type' => 'application',
-                        'uuid' => $app->uuid,
-                        'description' => $app->description,
-                        'link' => $app->link(),
-                        'project' => $app->environment->project->name ?? null,
-                        'environment' => $app->environment->name ?? null,
-                        'fqdns' => $fqdns->take(2)->implode(', '), // Show first 2 FQDNs in UI
-                        'search_text' => strtolower($app->name.' '.$app->description.' '.$fqdnsString.' '.$app->uuid.' '.$prSearchTerms.' application applications app apps'),
-                    ];
-                });
-
-            // Get all services
-            $services = Service::ownedByCurrentTeam()
-                ->with(['environment.project', 'applications', 'databases'])
-                ->get()
-                ->map(function ($service) {
-                    // Collect all FQDNs from service applications
-                    $fqdns = collect([]);
-                    foreach ($service->applications as $app) {
-                        if ($app->fqdn) {
-                            $appFqdns = collect(explode(',', $app->fqdn))->map(fn ($fqdn) => trim($fqdn));
-                            $fqdns = $fqdns->merge($appFqdns);
-                        }
-                    }
-                    $fqdnsString = $fqdns->implode(' ');
-
-                    // Collect service component names for container search
-                    $serviceAppNames = collect($service->applications ?? [])->pluck('name')->implode(' ');
-                    $serviceDbNames = collect($service->databases ?? [])->pluck('name')->implode(' ');
-
-                    return [
-                        'id' => $service->id,
-                        'name' => $service->name,
-                        'type' => 'service',
-                        'uuid' => $service->uuid,
-                        'description' => $service->description,
-                        'link' => $service->link(),
-                        'project' => $service->environment->project->name ?? null,
-                        'environment' => $service->environment->name ?? null,
-                        'fqdns' => $fqdns->take(2)->implode(', '), // Show first 2 FQDNs in UI
-                        'search_text' => strtolower($service->name.' '.$service->description.' '.$fqdnsString.' '.$service->uuid.' '.$serviceAppNames.' '.$serviceDbNames.' service services'),
-                    ];
-                });
-
-            // Get all standalone databases
-            $databases = collect();
-
-            // PostgreSQL
-            $databases = $databases->merge(
-                StandalonePostgresql::ownedByCurrentTeam()
-                    ->with(['environment.project'])
-                    ->get()
-                    ->map(function ($db) {
-                        return [
-                            'id' => $db->id,
-                            'name' => $db->name,
-                            'type' => 'database',
-                            'subtype' => 'postgresql',
-                            'uuid' => $db->uuid,
-                            'description' => $db->description,
-                            'link' => $db->link(),
-                            'project' => $db->environment->project->name ?? null,
-                            'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' '.$db->uuid.' postgresql '.$db->description.' database databases db'),
-                        ];
-                    })
-            );
-
-            // MySQL
-            $databases = $databases->merge(
-                StandaloneMysql::ownedByCurrentTeam()
-                    ->with(['environment.project'])
-                    ->get()
-                    ->map(function ($db) {
-                        return [
-                            'id' => $db->id,
-                            'name' => $db->name,
-                            'type' => 'database',
-                            'subtype' => 'mysql',
-                            'uuid' => $db->uuid,
-                            'description' => $db->description,
-                            'link' => $db->link(),
-                            'project' => $db->environment->project->name ?? null,
-                            'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' '.$db->uuid.' mysql '.$db->description.' database databases db'),
-                        ];
-                    })
-            );
-
-            // MariaDB
-            $databases = $databases->merge(
-                StandaloneMariadb::ownedByCurrentTeam()
-                    ->with(['environment.project'])
-                    ->get()
-                    ->map(function ($db) {
-                        return [
-                            'id' => $db->id,
-                            'name' => $db->name,
-                            'type' => 'database',
-                            'subtype' => 'mariadb',
-                            'uuid' => $db->uuid,
-                            'description' => $db->description,
-                            'link' => $db->link(),
-                            'project' => $db->environment->project->name ?? null,
-                            'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' '.$db->uuid.' mariadb '.$db->description.' database databases db'),
-                        ];
-                    })
-            );
-
-            // MongoDB
-            $databases = $databases->merge(
-                StandaloneMongodb::ownedByCurrentTeam()
-                    ->with(['environment.project'])
-                    ->get()
-                    ->map(function ($db) {
-                        return [
-                            'id' => $db->id,
-                            'name' => $db->name,
-                            'type' => 'database',
-                            'subtype' => 'mongodb',
-                            'uuid' => $db->uuid,
-                            'description' => $db->description,
-                            'link' => $db->link(),
-                            'project' => $db->environment->project->name ?? null,
-                            'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' '.$db->uuid.' mongodb '.$db->description.' database databases db'),
-                        ];
-                    })
-            );
-
-            // Redis
-            $databases = $databases->merge(
-                StandaloneRedis::ownedByCurrentTeam()
-                    ->with(['environment.project'])
-                    ->get()
-                    ->map(function ($db) {
-                        return [
-                            'id' => $db->id,
-                            'name' => $db->name,
-                            'type' => 'database',
-                            'subtype' => 'redis',
-                            'uuid' => $db->uuid,
-                            'description' => $db->description,
-                            'link' => $db->link(),
-                            'project' => $db->environment->project->name ?? null,
-                            'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' '.$db->uuid.' redis '.$db->description.' database databases db'),
-                        ];
-                    })
-            );
-
-            // KeyDB
-            $databases = $databases->merge(
-                StandaloneKeydb::ownedByCurrentTeam()
-                    ->with(['environment.project'])
-                    ->get()
-                    ->map(function ($db) {
-                        return [
-                            'id' => $db->id,
-                            'name' => $db->name,
-                            'type' => 'database',
-                            'subtype' => 'keydb',
-                            'uuid' => $db->uuid,
-                            'description' => $db->description,
-                            'link' => $db->link(),
-                            'project' => $db->environment->project->name ?? null,
-                            'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' '.$db->uuid.' keydb '.$db->description.' database databases db'),
-                        ];
-                    })
-            );
-
-            // Dragonfly
-            $databases = $databases->merge(
-                StandaloneDragonfly::ownedByCurrentTeam()
-                    ->with(['environment.project'])
-                    ->get()
-                    ->map(function ($db) {
-                        return [
-                            'id' => $db->id,
-                            'name' => $db->name,
-                            'type' => 'database',
-                            'subtype' => 'dragonfly',
-                            'uuid' => $db->uuid,
-                            'description' => $db->description,
-                            'link' => $db->link(),
-                            'project' => $db->environment->project->name ?? null,
-                            'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' '.$db->uuid.' dragonfly '.$db->description.' database databases db'),
-                        ];
-                    })
-            );
-
-            // Clickhouse
-            $databases = $databases->merge(
-                StandaloneClickhouse::ownedByCurrentTeam()
-                    ->with(['environment.project'])
-                    ->get()
-                    ->map(function ($db) {
-                        return [
-                            'id' => $db->id,
-                            'name' => $db->name,
-                            'type' => 'database',
-                            'subtype' => 'clickhouse',
-                            'uuid' => $db->uuid,
-                            'description' => $db->description,
-                            'link' => $db->link(),
-                            'project' => $db->environment->project->name ?? null,
-                            'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' '.$db->uuid.' clickhouse '.$db->description.' database databases db'),
-                        ];
-                    })
-            );
-
-            // SQLite
-            $databases = $databases->merge(
-                StandaloneSqlite::ownedByCurrentTeam()
-                    ->with(['environment.project'])
-                    ->get()
-                    ->map(function ($db) {
-                        return [
-                            'id' => $db->id,
-                            'name' => $db->name,
-                            'type' => 'database',
-                            'subtype' => 'sqlite',
-                            'uuid' => $db->uuid,
-                            'description' => $db->description,
-                            'link' => $db->link(),
-                            'project' => $db->environment->project->name ?? null,
-                            'environment' => $db->environment->name ?? null,
-                            'search_text' => strtolower($db->name.' '.$db->uuid.' sqlite '.$db->description.' database databases db'),
-                        ];
-                    })
-            );
-
-            // Get all servers
-            $servers = Server::ownedByCurrentTeam()
-                ->get()
-                ->map(function ($server) {
-                    return [
-                        'id' => $server->id,
-                        'name' => $server->name,
-                        'type' => 'server',
-                        'uuid' => $server->uuid,
-                        'description' => $server->description,
-                        'link' => $server->url(),
-                        'project' => null,
-                        'environment' => null,
-                        'search_text' => strtolower($server->name.' '.$server->ip.' '.$server->description.' server servers'),
-                    ];
-                });
-            // Get all projects
-            $projects = Project::ownedByCurrentTeam()
-                ->withCount(['environments', 'applications', 'services'])
-                ->get()
-                ->map(function ($project) {
-                    $resourceCount = $project->applications_count + $project->services_count;
-                    $resourceSummary = $resourceCount > 0
-                        ? "{$resourceCount} resource".($resourceCount !== 1 ? 's' : '')
-                        : 'No resources';
-
-                    return [
-                        'id' => $project->id,
-                        'name' => $project->name,
-                        'type' => 'project',
-                        'uuid' => $project->uuid,
-                        'description' => $project->description,
-                        'link' => $project->navigateTo(),
-                        'project' => null,
-                        'environment' => null,
-                        'resource_count' => $resourceSummary,
-                        'environment_count' => $project->environments_count,
-                        'search_text' => strtolower($project->name.' '.$project->description.' project projects'),
-                    ];
-                });
-
-            // Get all environments
-            $environments = Environment::ownedByCurrentTeam()
-                ->with('project')
-                ->withCount(['applications', 'services'])
-                ->get()
-                ->map(function ($environment) {
-                    $resourceCount = $environment->applications_count + $environment->services_count;
-                    $resourceSummary = $resourceCount > 0
-                        ? "{$resourceCount} resource".($resourceCount !== 1 ? 's' : '')
-                        : 'No resources';
-
-                    // Build description with project context
-                    $descriptionParts = [];
-                    if ($environment->project) {
-                        $descriptionParts[] = "Project: {$environment->project->name}";
-                    }
-                    if ($environment->description) {
-                        $descriptionParts[] = $environment->description;
-                    }
-                    if (empty($descriptionParts)) {
-                        $descriptionParts[] = $resourceSummary;
-                    }
-
-                    return [
-                        'id' => $environment->id,
-                        'name' => $environment->name,
-                        'type' => 'environment',
-                        'uuid' => $environment->uuid,
-                        'description' => implode(' • ', $descriptionParts),
-                        'link' => route('project.resource.index', [
-                            'project_uuid' => $environment->project->uuid,
-                            'environment_uuid' => $environment->uuid,
-                        ]),
-                        'project' => $environment->project->name ?? null,
-                        'environment' => null,
-                        'resource_count' => $resourceSummary,
-                        'search_text' => strtolower($environment->name.' '.$environment->description.' '.$environment->project->name.' environment'),
-                    ];
-                });
-
-            // Merge all collections
-            $items = $items->merge($applications)
-                ->merge($services)
-                ->merge($databases)
-                ->merge($servers)
-                ->merge($projects)
-                ->merge($environments);
-
-            return $items->toArray();
-        });
+        // The team cache holds every resource of the team, so members limited to some projects
+        // never read or write it. Their index is built from the queries the access grants filter.
+        $resources = $teamWide
+            ? Cache::remember(self::getCacheKey(auth()->user()->currentTeam()->id), 300, fn () => $this->searchableResources(includeServers: true))
+            : $this->searchableResources(includeServers: false);
 
         // Navigation depends on the user's permissions, so it is not part of the team-wide cache
-        $this->allSearchableItems = $this->navigationItems()->merge($resources)->values()->all();
+        $this->allSearchableItems = $this->navigationItems($teamWide)->merge($resources)->values()->all();
     }
 
-    private function navigationItems(): Collection
+    private function actorCoversWholeTeam(): bool
+    {
+        return app(AccessResolver::class)->coversWholeTeam(auth()->user(), auth()->user()->currentTeam()->id);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function searchableResources(bool $includeServers): array
+    {
+        $items = collect();
+
+        // Get all applications
+        $applications = Application::ownedByCurrentTeam()
+            ->with(['environment.project', 'previews:id,application_id,pull_request_id'])
+            ->get()
+            ->map(function ($app) {
+                // Collect all FQDNs from the application
+                $fqdns = collect([]);
+
+                // For regular applications
+                if ($app->fqdn) {
+                    $fqdns = collect(explode(',', $app->fqdn))->map(fn ($fqdn) => trim($fqdn));
+                }
+
+                // For docker compose based applications
+                if ($app->build_pack === 'dockercompose' && $app->docker_compose_domains) {
+                    try {
+                        $composeDomains = json_decode($app->docker_compose_domains, true);
+                        if (is_array($composeDomains)) {
+                            foreach ($composeDomains as $serviceName => $domains) {
+                                if (is_array($domains)) {
+                                    $fqdns = $fqdns->merge($domains);
+                                }
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        // Ignore JSON parsing errors
+                    }
+                }
+
+                $fqdnsString = $fqdns->implode(' ');
+
+                // Add PR search terms if preview is enabled
+                $prSearchTerms = '';
+                if ($app->preview_enabled ?? false) {
+                    $prIds = collect($app->previews ?? [])
+                        ->pluck('pull_request_id')
+                        ->map(fn ($id) => "pr-{$id} pr{$id} {$id}")
+                        ->implode(' ');
+                    $prSearchTerms = $prIds;
+                }
+
+                return [
+                    'id' => $app->id,
+                    'name' => $app->name,
+                    'type' => 'application',
+                    'uuid' => $app->uuid,
+                    'description' => $app->description,
+                    'link' => $app->link(),
+                    'project' => $app->environment->project->name ?? null,
+                    'environment' => $app->environment->name ?? null,
+                    'fqdns' => $fqdns->take(2)->implode(', '), // Show first 2 FQDNs in UI
+                    'search_text' => strtolower($app->name.' '.$app->description.' '.$fqdnsString.' '.$app->uuid.' '.$prSearchTerms.' application applications app apps'),
+                ];
+            });
+
+        // Get all services
+        $services = Service::ownedByCurrentTeam()
+            ->with(['environment.project', 'applications', 'databases'])
+            ->get()
+            ->map(function ($service) {
+                // Collect all FQDNs from service applications
+                $fqdns = collect([]);
+                foreach ($service->applications as $app) {
+                    if ($app->fqdn) {
+                        $appFqdns = collect(explode(',', $app->fqdn))->map(fn ($fqdn) => trim($fqdn));
+                        $fqdns = $fqdns->merge($appFqdns);
+                    }
+                }
+                $fqdnsString = $fqdns->implode(' ');
+
+                // Collect service component names for container search
+                $serviceAppNames = collect($service->applications ?? [])->pluck('name')->implode(' ');
+                $serviceDbNames = collect($service->databases ?? [])->pluck('name')->implode(' ');
+
+                return [
+                    'id' => $service->id,
+                    'name' => $service->name,
+                    'type' => 'service',
+                    'uuid' => $service->uuid,
+                    'description' => $service->description,
+                    'link' => $service->link(),
+                    'project' => $service->environment->project->name ?? null,
+                    'environment' => $service->environment->name ?? null,
+                    'fqdns' => $fqdns->take(2)->implode(', '), // Show first 2 FQDNs in UI
+                    'search_text' => strtolower($service->name.' '.$service->description.' '.$fqdnsString.' '.$service->uuid.' '.$serviceAppNames.' '.$serviceDbNames.' service services'),
+                ];
+            });
+
+        // Get all standalone databases
+        $databases = collect();
+
+        // PostgreSQL
+        $databases = $databases->merge(
+            StandalonePostgresql::ownedByCurrentTeam()
+                ->with(['environment.project'])
+                ->get()
+                ->map(function ($db) {
+                    return [
+                        'id' => $db->id,
+                        'name' => $db->name,
+                        'type' => 'database',
+                        'subtype' => 'postgresql',
+                        'uuid' => $db->uuid,
+                        'description' => $db->description,
+                        'link' => $db->link(),
+                        'project' => $db->environment->project->name ?? null,
+                        'environment' => $db->environment->name ?? null,
+                        'search_text' => strtolower($db->name.' '.$db->uuid.' postgresql '.$db->description.' database databases db'),
+                    ];
+                })
+        );
+
+        // MySQL
+        $databases = $databases->merge(
+            StandaloneMysql::ownedByCurrentTeam()
+                ->with(['environment.project'])
+                ->get()
+                ->map(function ($db) {
+                    return [
+                        'id' => $db->id,
+                        'name' => $db->name,
+                        'type' => 'database',
+                        'subtype' => 'mysql',
+                        'uuid' => $db->uuid,
+                        'description' => $db->description,
+                        'link' => $db->link(),
+                        'project' => $db->environment->project->name ?? null,
+                        'environment' => $db->environment->name ?? null,
+                        'search_text' => strtolower($db->name.' '.$db->uuid.' mysql '.$db->description.' database databases db'),
+                    ];
+                })
+        );
+
+        // MariaDB
+        $databases = $databases->merge(
+            StandaloneMariadb::ownedByCurrentTeam()
+                ->with(['environment.project'])
+                ->get()
+                ->map(function ($db) {
+                    return [
+                        'id' => $db->id,
+                        'name' => $db->name,
+                        'type' => 'database',
+                        'subtype' => 'mariadb',
+                        'uuid' => $db->uuid,
+                        'description' => $db->description,
+                        'link' => $db->link(),
+                        'project' => $db->environment->project->name ?? null,
+                        'environment' => $db->environment->name ?? null,
+                        'search_text' => strtolower($db->name.' '.$db->uuid.' mariadb '.$db->description.' database databases db'),
+                    ];
+                })
+        );
+
+        // MongoDB
+        $databases = $databases->merge(
+            StandaloneMongodb::ownedByCurrentTeam()
+                ->with(['environment.project'])
+                ->get()
+                ->map(function ($db) {
+                    return [
+                        'id' => $db->id,
+                        'name' => $db->name,
+                        'type' => 'database',
+                        'subtype' => 'mongodb',
+                        'uuid' => $db->uuid,
+                        'description' => $db->description,
+                        'link' => $db->link(),
+                        'project' => $db->environment->project->name ?? null,
+                        'environment' => $db->environment->name ?? null,
+                        'search_text' => strtolower($db->name.' '.$db->uuid.' mongodb '.$db->description.' database databases db'),
+                    ];
+                })
+        );
+
+        // Redis
+        $databases = $databases->merge(
+            StandaloneRedis::ownedByCurrentTeam()
+                ->with(['environment.project'])
+                ->get()
+                ->map(function ($db) {
+                    return [
+                        'id' => $db->id,
+                        'name' => $db->name,
+                        'type' => 'database',
+                        'subtype' => 'redis',
+                        'uuid' => $db->uuid,
+                        'description' => $db->description,
+                        'link' => $db->link(),
+                        'project' => $db->environment->project->name ?? null,
+                        'environment' => $db->environment->name ?? null,
+                        'search_text' => strtolower($db->name.' '.$db->uuid.' redis valkey '.$db->description.' database databases db'),
+                    ];
+                })
+        );
+
+        // KeyDB
+        $databases = $databases->merge(
+            StandaloneKeydb::ownedByCurrentTeam()
+                ->with(['environment.project'])
+                ->get()
+                ->map(function ($db) {
+                    return [
+                        'id' => $db->id,
+                        'name' => $db->name,
+                        'type' => 'database',
+                        'subtype' => 'keydb',
+                        'uuid' => $db->uuid,
+                        'description' => $db->description,
+                        'link' => $db->link(),
+                        'project' => $db->environment->project->name ?? null,
+                        'environment' => $db->environment->name ?? null,
+                        'search_text' => strtolower($db->name.' '.$db->uuid.' keydb '.$db->description.' database databases db'),
+                    ];
+                })
+        );
+
+        // Dragonfly
+        $databases = $databases->merge(
+            StandaloneDragonfly::ownedByCurrentTeam()
+                ->with(['environment.project'])
+                ->get()
+                ->map(function ($db) {
+                    return [
+                        'id' => $db->id,
+                        'name' => $db->name,
+                        'type' => 'database',
+                        'subtype' => 'dragonfly',
+                        'uuid' => $db->uuid,
+                        'description' => $db->description,
+                        'link' => $db->link(),
+                        'project' => $db->environment->project->name ?? null,
+                        'environment' => $db->environment->name ?? null,
+                        'search_text' => strtolower($db->name.' '.$db->uuid.' dragonfly '.$db->description.' database databases db'),
+                    ];
+                })
+        );
+
+        // Clickhouse
+        $databases = $databases->merge(
+            StandaloneClickhouse::ownedByCurrentTeam()
+                ->with(['environment.project'])
+                ->get()
+                ->map(function ($db) {
+                    return [
+                        'id' => $db->id,
+                        'name' => $db->name,
+                        'type' => 'database',
+                        'subtype' => 'clickhouse',
+                        'uuid' => $db->uuid,
+                        'description' => $db->description,
+                        'link' => $db->link(),
+                        'project' => $db->environment->project->name ?? null,
+                        'environment' => $db->environment->name ?? null,
+                        'search_text' => strtolower($db->name.' '.$db->uuid.' clickhouse '.$db->description.' database databases db'),
+                    ];
+                })
+        );
+
+        // InfluxDB
+        $databases = $databases->merge(
+            StandaloneInfluxdb::ownedByCurrentTeam()
+                ->with(['environment.project'])
+                ->get()
+                ->map(function ($db) {
+                    return [
+                        'id' => $db->id,
+                        'name' => $db->name,
+                        'type' => 'database',
+                        'subtype' => 'influxdb',
+                        'uuid' => $db->uuid,
+                        'description' => $db->description,
+                        'link' => $db->link(),
+                        'project' => $db->environment->project->name ?? null,
+                        'environment' => $db->environment->name ?? null,
+                        'search_text' => strtolower($db->name.' '.$db->uuid.' influxdb '.$db->description.' database databases db'),
+                    ];
+                })
+        );
+
+        // SQLite
+        $databases = $databases->merge(
+            StandaloneSqlite::ownedByCurrentTeam()
+                ->with(['environment.project'])
+                ->get()
+                ->map(function ($db) {
+                    return [
+                        'id' => $db->id,
+                        'name' => $db->name,
+                        'type' => 'database',
+                        'subtype' => 'sqlite',
+                        'uuid' => $db->uuid,
+                        'description' => $db->description,
+                        'link' => $db->link(),
+                        'project' => $db->environment->project->name ?? null,
+                        'environment' => $db->environment->name ?? null,
+                        'search_text' => strtolower($db->name.' '.$db->uuid.' sqlite '.$db->description.' database databases db'),
+                    ];
+                })
+        );
+
+        // Get all servers
+        $servers = ($includeServers ? Server::ownedByCurrentTeam()->get() : collect())
+            ->map(function ($server) {
+                return [
+                    'id' => $server->id,
+                    'name' => $server->name,
+                    'type' => 'server',
+                    'uuid' => $server->uuid,
+                    'description' => $server->description,
+                    'link' => $server->url(),
+                    'project' => null,
+                    'environment' => null,
+                    'search_text' => strtolower($server->name.' '.$server->ip.' '.$server->description.' server servers'),
+                ];
+            });
+        // Get all projects
+        $projects = Project::ownedByCurrentTeam()
+            ->withCount(['environments', 'applications', 'services'])
+            ->get()
+            ->map(function ($project) {
+                $resourceCount = $project->applications_count + $project->services_count;
+                $resourceSummary = $resourceCount > 0
+                    ? "{$resourceCount} resource".($resourceCount !== 1 ? 's' : '')
+                    : 'No resources';
+
+                return [
+                    'id' => $project->id,
+                    'name' => $project->name,
+                    'type' => 'project',
+                    'uuid' => $project->uuid,
+                    'description' => $project->description,
+                    'link' => $project->navigateTo(),
+                    'project' => null,
+                    'environment' => null,
+                    'resource_count' => $resourceSummary,
+                    'environment_count' => $project->environments_count,
+                    'search_text' => strtolower($project->name.' '.$project->description.' project projects'),
+                ];
+            });
+
+        // Get all environments
+        $environments = Environment::ownedByCurrentTeam()
+            ->with('project')
+            ->withCount(['applications', 'services'])
+            ->get()
+            ->map(function ($environment) {
+                $resourceCount = $environment->applications_count + $environment->services_count;
+                $resourceSummary = $resourceCount > 0
+                    ? "{$resourceCount} resource".($resourceCount !== 1 ? 's' : '')
+                    : 'No resources';
+
+                // Build description with project context
+                $descriptionParts = [];
+                if ($environment->project) {
+                    $descriptionParts[] = "Project: {$environment->project->name}";
+                }
+                if ($environment->description) {
+                    $descriptionParts[] = $environment->description;
+                }
+                if (empty($descriptionParts)) {
+                    $descriptionParts[] = $resourceSummary;
+                }
+
+                return [
+                    'id' => $environment->id,
+                    'name' => $environment->name,
+                    'type' => 'environment',
+                    'uuid' => $environment->uuid,
+                    'description' => implode(' • ', $descriptionParts),
+                    'link' => route('project.resource.index', [
+                        'project_uuid' => $environment->project->uuid,
+                        'environment_uuid' => $environment->uuid,
+                    ]),
+                    'project' => $environment->project->name ?? null,
+                    'environment' => null,
+                    'resource_count' => $resourceSummary,
+                    'search_text' => strtolower($environment->name.' '.$environment->description.' '.$environment->project->name.' environment'),
+                ];
+            });
+
+        // Merge all collections
+        $items = $items->merge($applications)
+            ->merge($services)
+            ->merge($databases)
+            ->merge($servers)
+            ->merge($projects)
+            ->merge($environments);
+
+        return $items->toArray();
+    }
+
+    private function navigationItems(bool $teamWide): Collection
     {
         $user = auth()->user();
         $team = $user->currentTeam();
@@ -672,7 +719,7 @@ class GlobalSearch extends Component
                 'search_text' => 'destinations docker networks',
             ],
             [
-                'name' => 'Security',
+                'name' => 'Keys & Tokens',
                 'type' => 'navigation',
                 'description' => 'Manage private keys and API tokens',
                 'link' => route('security.private-key.index'),
@@ -797,6 +844,20 @@ class GlobalSearch extends Component
                 'link' => route('team.audit-log'),
                 'search_text' => 'team audit log activity history events',
             ] : null,
+            [
+                'name' => 'Security',
+                'type' => 'navigation',
+                'description' => 'What each resource of your team needs, from its last image scan',
+                'link' => route('vulnerabilities'),
+                'search_text' => 'vulnerabilities cve ghsa image scanning fixable packages security',
+            ],
+            [
+                'name' => 'Team Image Scanning',
+                'type' => 'navigation',
+                'description' => 'Scan rules and ignored vulnerabilities of the team',
+                'link' => route('team.image-scanning'),
+                'search_text' => 'team image scanning vulnerabilities cve scan rules alert block deploys ignored security',
+            ],
             isInstanceAdmin() ? [
                 'name' => 'Team Admin View',
                 'type' => 'navigation',
@@ -915,6 +976,13 @@ class GlobalSearch extends Component
                     'search_text' => 'settings updates auto update upgrade version frequency',
                 ],
                 [
+                    'name' => 'Image Scanning Settings',
+                    'type' => 'navigation',
+                    'description' => 'Allow image scanning, the vulnerability database, and default scan rules',
+                    'link' => route('settings.image-scanning'),
+                    'search_text' => 'settings image scanning vulnerabilities cve scan rules grype database mirror alert block deploys security',
+                ],
+                [
                     'name' => 'Instance Backup',
                     'type' => 'navigation',
                     'description' => 'Back up the Coolify instance database',
@@ -936,6 +1004,20 @@ class GlobalSearch extends Component
                     'search_text' => 'settings authentication oauth sso login providers github google gitlab azure',
                 ],
             );
+        }
+
+        if (! $teamWide) {
+            $projectPages = [
+                route('dashboard'),
+                route('project.index'),
+                route('shared-variables.project.index'),
+                route('shared-variables.environment.index'),
+                route('profile'),
+                route('profile.appearance'),
+                route('security.api-tokens'),
+                route('vulnerabilities'),
+            ];
+            $navigation = $navigation->whereIn('link', $projectPages)->values();
         }
 
         return $navigation;
@@ -1149,8 +1231,8 @@ class GlobalSearch extends Component
         // Storage - can be created if user is admin or owner
         if ($user->isAdmin() || $user->isOwner()) {
             $items->push([
-                'name' => 'S3 Storage',
-                'description' => 'Add S3 storage for backups and file uploads',
+                'name' => 'Storage',
+                'description' => 'Add S3, SFTP, FTPS, or WebDAV storage for backups',
                 'quickcommand' => '(type: new storage)',
                 'type' => 'storage',
                 'category' => 'Quick Actions',
@@ -1170,8 +1252,8 @@ class GlobalSearch extends Component
             ]);
         }
 
-        // GitHub Source - can be created if user has createAnyResource permission
-        if ($user->can('createAnyResource')) {
+        // GitHub Source - can be created if user can create a GitHub App
+        if ($user->can('create', GithubApp::class)) {
             $items->push([
                 'name' => 'GitHub App',
                 'description' => 'Connect a GitHub app for source control',
@@ -1179,6 +1261,18 @@ class GlobalSearch extends Component
                 'type' => 'source',
                 'category' => 'Quick Actions',
                 'component' => 'source.github.create',
+            ]);
+        }
+
+        // Canvas - deploy resources visually; can be used if user has createAnyResource permission
+        if ($user->can('createAnyResource')) {
+            $items->push([
+                'name' => 'Canvas',
+                'description' => 'Deploy resources visually on the deploy canvas',
+                'quickcommand' => '(type: new canvas)',
+                'type' => 'canvas',
+                'category' => 'Quick Actions',
+                'route' => 'deploy-canvas',
             ]);
         }
 
@@ -1200,6 +1294,15 @@ class GlobalSearch extends Component
                 'description' => 'Deploy private repositories through GitHub Apps',
                 'quickcommand' => '(type: new private github)',
                 'type' => 'private-gh-app',
+                'category' => 'Applications',
+                'resourceType' => 'application',
+            ]);
+
+            $items->push([
+                'name' => 'Private Repository (Gitea App)',
+                'description' => 'Deploy private repositories through Gitea Apps',
+                'quickcommand' => '(type: new private gitea)',
+                'type' => 'private-gitea-app',
                 'category' => 'Applications',
                 'resourceType' => 'application',
             ]);
@@ -1276,12 +1379,12 @@ class GlobalSearch extends Component
             ]);
 
             $items->push([
-                'name' => 'Redis',
-                'description' => 'In-memory data structure store',
-                'quickcommand' => '(type: new redis)',
+                'name' => 'Redis / Valkey',
+                'description' => 'In-memory data structure store (Redis or Valkey)',
+                'quickcommand' => '(type: new redis or new valkey)',
                 'type' => 'redis',
                 'category' => 'Databases',
-                'logo' => 'svgs/redis.svg',
+                'logo' => 'svgs/resources/redis-valkey.svg',
                 'resourceType' => 'database',
             ]);
 
@@ -1326,6 +1429,16 @@ class GlobalSearch extends Component
             ]);
 
             $items->push([
+                'name' => 'InfluxDB',
+                'description' => 'Time series database for metrics and events',
+                'quickcommand' => '(type: new influxdb)',
+                'type' => 'influxdb',
+                'category' => 'Databases',
+                'logo' => 'svgs/resources/influxdb.svg',
+                'resourceType' => 'database',
+            ]);
+
+            $items->push([
                 'name' => 'SQLite',
                 'description' => 'Lightweight file-based relational database',
                 'quickcommand' => '(type: new sqlite)',
@@ -1359,6 +1472,13 @@ class GlobalSearch extends Component
 
         if (! $item) {
             return;
+        }
+
+        // If it has a route, it's a page-based quick action
+        if (isset($item['route'])) {
+            $this->dispatch('closeSearchModal');
+
+            return redirectRoute($this, $item['route']);
         }
 
         // If it has a component, it's a modal-based resource
@@ -1398,8 +1518,11 @@ class GlobalSearch extends Component
 
     public function loadServers()
     {
+        if (! auth()->user()->can('createAnyResource')) {
+            return;
+        }
         $this->loadingServers = true;
-        $servers = Server::isUsable()->get()->sortBy('name');
+        $servers = Server::isUsable()->get()->filter(fn (Server $server) => Gate::allows('placeResource', $server))->sortBy('name');
         $this->availableServers = $servers->map(fn ($s) => [
             'id' => $s->id,
             'name' => $s->name,
@@ -1424,6 +1547,9 @@ class GlobalSearch extends Component
 
     public function loadDestinations()
     {
+        if (! auth()->user()->can('createAnyResource')) {
+            return;
+        }
         $this->loadingDestinations = true;
         $server = Server::ownedByCurrentTeam()->find($this->selectedServerId);
 

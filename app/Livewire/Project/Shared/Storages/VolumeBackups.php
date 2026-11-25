@@ -11,6 +11,8 @@ use App\Models\LocalPersistentVolume;
 use App\Models\S3Storage;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\Service;
+use App\Traits\ListensToTeamChannel;
+use App\Traits\PreparesBackupDownloads;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\RedirectResponse;
@@ -24,6 +26,8 @@ use Throwable;
 class VolumeBackups extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
+    use PreparesBackupDownloads;
     use WithPagination;
 
     public LocalPersistentVolume|LocalFileVolume $storage;
@@ -33,6 +37,9 @@ class VolumeBackups extends Component
     public ?ScheduledVolumeBackup $backup = null;
 
     public string $section = 'general';
+
+    /** The page shows the backup actions in the top header bar instead. */
+    public bool $actionsInHeader = false;
 
     public string $frequency = 'daily';
 
@@ -66,6 +73,15 @@ class VolumeBackups extends Component
     public int $missingBackupNotificationDays = 0;
 
     public int $perPage = 10;
+
+    public function getListeners(): array
+    {
+        if ($this->section !== 'executions') {
+            return [];
+        }
+
+        return $this->teamChannelListeners(['BackupCreated' => '$refresh']);
+    }
 
     public function updatedPerPage(): void
     {
@@ -133,7 +149,7 @@ class VolumeBackups extends Component
 
     public function save(): void
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('manageBackups', $this->resource);
 
         if (! $this->validateSettings()) {
             return;
@@ -150,7 +166,7 @@ class VolumeBackups extends Component
 
     public function updatedS3StorageIds(): void
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('manageBackups', $this->resource);
 
         if (! $this->validateSettings()) {
             return;
@@ -163,7 +179,7 @@ class VolumeBackups extends Component
 
     public function toggleS3(): void
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('manageBackups', $this->resource);
 
         if (! $this->saveToS3 && $this->selectedS3StorageIds()->isEmpty()) {
             $this->dispatch('error', 'Select a usable S3 storage before enabling S3 backups.');
@@ -183,7 +199,7 @@ class VolumeBackups extends Component
 
     public function toggleEnabled(): void
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('manageBackups', $this->resource);
 
         if (! $this->backup) {
             if (! $this->validateSettings()) {
@@ -205,7 +221,7 @@ class VolumeBackups extends Component
 
     public function backupNow(): Redirector|RedirectResponse|null
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('manageBackups', $this->resource);
 
         if (! $this->backup) {
             if (! $this->validateSettings()) {
@@ -230,7 +246,7 @@ class VolumeBackups extends Component
 
     public function delete(?string $password = null, array $selectedActions = []): bool|string
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('delete', $this->resource);
 
         if (! verifyPasswordConfirmation($password, $this)) {
             return 'The provided password is incorrect.';
@@ -266,7 +282,7 @@ class VolumeBackups extends Component
 
     public function cleanupFailed(): void
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('delete', $this->resource);
 
         $deletedCount = $this->backup?->executions()
             ->where('status', 'failed')
@@ -285,7 +301,7 @@ class VolumeBackups extends Component
 
     public function cleanupDeleted(): void
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('delete', $this->resource);
 
         $deletedCount = $this->backup?->executions()
             ->where('local_storage_deleted', true)
@@ -306,7 +322,7 @@ class VolumeBackups extends Component
 
     public function retryRecovery(int $executionId): void
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('manageBackups', $this->resource);
 
         $execution = $this->backup?->executions()->whereKey($executionId)->first();
         if (! $execution || ! $execution->hasPendingRecovery()) {
@@ -329,9 +345,31 @@ class VolumeBackups extends Component
         $this->dispatch('success', 'Backup recovery queued.');
     }
 
+    public function downloadBackup(int $executionId): void
+    {
+        $this->authorize('manageBackups', $this->resource);
+
+        $execution = $this->backup?->executions()->whereKey($executionId)->first();
+        if (! $execution) {
+            $this->dispatch('error', 'Backup execution not found.');
+
+            return;
+        }
+
+        try {
+            $this->prepareBackupDownload(
+                $execution->local_storage_deleted ? null : $this->backup->server(),
+                $execution->filename,
+                route('download.volume-backup', $execution->id),
+            );
+        } catch (Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
     public function deleteBackup(int $executionId, string $password, array $selectedActions = []): bool|string
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('delete', $this->resource);
 
         if (! verifyPasswordConfirmation($password, $this)) {
             return 'The provided password is incorrect.';
@@ -383,6 +421,7 @@ class VolumeBackups extends Component
         return view('livewire.project.shared.storages.volume-backups', [
             'executions' => $executions ?? collect(),
             'latestExecution' => $this->backup?->executions()->first(),
+            's3Downloads' => $this->s3BackupDownloadsEnabled(),
             'deleteScheduleCheckboxes' => [
                 ['id' => 'delete_associated_backups_locally', 'label' => 'Delete all local archives created by this schedule.'],
                 ['id' => 'delete_associated_backups_s3', 'label' => 'Delete all S3 archives created by this schedule.'],
@@ -414,6 +453,9 @@ class VolumeBackups extends Component
     private function persistBackup(bool $enabled): ScheduledVolumeBackup
     {
         $backup = $this->storage->scheduledBackups()->firstOrNew();
+        if ($backup->newS3StorageIds($this->selectedS3StorageIds())->isNotEmpty()) {
+            $this->authorize('useTeamCredentials', $this->resource);
+        }
         $backup->fill([
             'team_id' => $this->resourceTeamId(),
             'frequency' => $this->frequency,

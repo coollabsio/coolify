@@ -22,8 +22,11 @@ class Webhook extends Component
     #[Validate(['boolean'])]
     public bool $webhookEnabled = false;
 
-    #[Validate(['nullable', new SafeWebhookUrl])]
+    #[Validate(['required_if:webhookEnabled,true', 'nullable', new SafeWebhookUrl])]
     public ?string $webhookUrl = null;
+
+    #[Validate(['nullable', 'string', 'max:4096', 'not_regex:/[\r\n]/'])]
+    public ?string $webhookAuthorizationHeader = null;
 
     #[Validate(['boolean'])]
     public bool $deploymentSuccessWebhookNotifications = false;
@@ -68,7 +71,13 @@ class Webhook extends Component
     public bool $serverPatchWebhookNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $serverAutoUpdateWebhookNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $traefikOutdatedWebhookNotifications = true;
+
+    #[Validate(['boolean'])]
+    public bool $imageVulnerabilitiesWebhookNotifications = false;
 
     public function mount()
     {
@@ -88,6 +97,7 @@ class Webhook extends Component
             $this->validate();
             $this->settings->webhook_enabled = $this->webhookEnabled;
             $this->settings->webhook_url = $this->webhookUrl;
+            $this->settings->webhook_authorization_header = filled($this->webhookAuthorizationHeader) ? $this->webhookAuthorizationHeader : null;
 
             $this->settings->deployment_success_webhook_notifications = $this->deploymentSuccessWebhookNotifications;
             $this->settings->deployment_failure_webhook_notifications = $this->deploymentFailureWebhookNotifications;
@@ -103,7 +113,9 @@ class Webhook extends Component
             $this->settings->server_reachable_webhook_notifications = $this->serverReachableWebhookNotifications;
             $this->settings->server_unreachable_webhook_notifications = $this->serverUnreachableWebhookNotifications;
             $this->settings->server_patch_webhook_notifications = $this->serverPatchWebhookNotifications;
+            $this->settings->server_auto_update_webhook_notifications = $this->serverAutoUpdateWebhookNotifications;
             $this->settings->traefik_outdated_webhook_notifications = $this->traefikOutdatedWebhookNotifications;
+            $this->settings->image_vulnerabilities_webhook_notifications = $this->imageVulnerabilitiesWebhookNotifications;
 
             $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
@@ -111,9 +123,9 @@ class Webhook extends Component
             refreshSession();
         } else {
             $this->webhookEnabled = $this->settings->webhook_enabled;
-            $this->webhookUrl = auth()->user()->can('update', $this->settings)
-                ? $this->settings->webhook_url
-                : null;
+            $canUpdate = auth()->user()->can('update', $this->settings);
+            $this->webhookUrl = $canUpdate ? $this->settings->webhook_url : null;
+            $this->webhookAuthorizationHeader = $canUpdate ? $this->settings->webhook_authorization_header : null;
 
             $this->deploymentSuccessWebhookNotifications = $this->settings->deployment_success_webhook_notifications;
             $this->deploymentFailureWebhookNotifications = $this->settings->deployment_failure_webhook_notifications;
@@ -129,7 +141,9 @@ class Webhook extends Component
             $this->serverReachableWebhookNotifications = $this->settings->server_reachable_webhook_notifications;
             $this->serverUnreachableWebhookNotifications = $this->settings->server_unreachable_webhook_notifications;
             $this->serverPatchWebhookNotifications = $this->settings->server_patch_webhook_notifications;
+            $this->serverAutoUpdateWebhookNotifications = $this->settings->server_auto_update_webhook_notifications;
             $this->traefikOutdatedWebhookNotifications = $this->settings->traefik_outdated_webhook_notifications;
+            $this->imageVulnerabilitiesWebhookNotifications = $this->settings->image_vulnerabilities_webhook_notifications;
         }
     }
 

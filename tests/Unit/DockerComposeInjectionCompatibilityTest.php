@@ -12,9 +12,7 @@ function composeTemplateFiles(): array
 }
 
 test('every service template passes the Compose injection validator', function (string $file) {
-    validateDockerComposeForInjection(file_get_contents($file));
-
-    expect(true)->toBeTrue();
+    expect(fn () => validateDockerComposeForInjection(file_get_contents($file)))->not->toThrow(Exception::class);
 })->with(composeTemplateFiles());
 
 test('the service template corpus is not empty', function () {
@@ -22,9 +20,7 @@ test('the service template corpus is not empty', function () {
 });
 
 test('realistic application Compose files pass the injection validator', function (string $compose) {
-    validateDockerComposeForInjection($compose);
-
-    expect(true)->toBeTrue();
+    expect(fn () => validateDockerComposeForInjection($compose))->not->toThrow(Exception::class);
 })->with([
     'long syntax volumes, bind mounts and named volumes' => <<<'YAML'
 services:
@@ -241,7 +237,17 @@ test('service network list entries accept the same variables as network names', 
     'plain variable' => ['$NET'],
     'variable mixed with text' => ['${COMPOSE_PROJECT_NAME}_default'],
     'text with a variable default' => ['app-${ENV:-prod}'],
+    'required variable' => ['${NET?error}'],
+    'required non-empty variable with a message' => ['${NET:?NET must be set}'],
+    'variable with an alternative value' => ['${NET:+proxy}'],
+    'text with a required variable' => ['app-${ENV?error}'],
 ]);
+
+test('a network name field can be a required variable', function () {
+    $compose = "services:\n  web:\n    image: nginx\n    networks:\n      - example\nnetworks:\n  example:\n    name: '\${CONTAINER_NAME?error}'\n";
+
+    expect(fn () => validateDockerComposeForInjection($compose))->not->toThrow(Exception::class);
+});
 
 test('unsafe service network list entries with variables are rejected', function (string $network) {
     $compose = "services:\n  web:\n    image: nginx\n    networks:\n      - '{$network}'\n";
@@ -254,6 +260,9 @@ test('unsafe service network list entries with variables are rejected', function
     'default with command substitution' => ['${NET:-$(id)}'],
     'default with a space' => ['${NET:-x y}'],
     'default with backticks' => ['${NET:-`id`}'],
+    'error message with command substitution' => ['${NET?$(id)}'],
+    'error message with a separator' => ['${NET:?x;id}'],
+    'alternative value with a space' => ['${NET:+x y}'],
 ]);
 
 test('a service network key with a variable is rejected because Compose does not interpolate keys', function () {

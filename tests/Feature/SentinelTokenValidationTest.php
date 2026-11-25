@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Server\Sentinel;
 use App\Livewire\Server\Show;
 use App\Models\InstanceSettings;
 use App\Models\Server;
@@ -193,6 +194,30 @@ describe('ServerSetting::ensureSentinelUrl', function () {
             ->and($this->server->settings->fresh()->sentinel_custom_url)->toBe($url);
     });
 
+    it('replaces a local host gateway endpoint on any port, because the Coolify network firewall can block it', function (string $legacyUrl) {
+        $this->server->update(['ip' => 'host.docker.internal']);
+        DB::table('server_settings')->where('id', $this->server->settings->id)->update([
+            'sentinel_custom_url' => $legacyUrl,
+        ]);
+
+        $url = $this->server->settings->fresh()->ensureSentinelUrl();
+
+        expect($url)->toBe('http://coolify:8080')
+            ->and($this->server->settings->fresh()->sentinel_custom_url)->toBe($url);
+    })->with([
+        'custom APP_PORT' => 'http://host.docker.internal:8010',
+        'trailing slash' => 'http://host.docker.internal:8000/',
+        'uppercase host' => 'HTTP://Host.Docker.Internal:8010',
+    ]);
+
+    it('keeps a host gateway endpoint for a remote server', function () {
+        DB::table('server_settings')->where('id', $this->server->settings->id)->update([
+            'sentinel_custom_url' => 'http://host.docker.internal:8010',
+        ]);
+
+        expect($this->server->settings->fresh()->ensureSentinelUrl())->toBe('http://host.docker.internal:8010');
+    });
+
     it('preserves an explicit custom URL for the local server', function () {
         $this->server->update(['ip' => 'host.docker.internal']);
         DB::table('server_settings')->where('id', $this->server->settings->id)->update([
@@ -252,3 +277,18 @@ describe('generated sentinel tokens are valid', function () {
         expect($settings->fresh()->sentinel_token)->toBe($returned);
     });
 });
+
+it('warns for public HTTP Sentinel endpoints even on localhost', function (int $serverId, string $url, bool $insecure) {
+    $component = new Sentinel;
+    $component->server = new Server;
+    $component->server->id = $serverId;
+    $component->sentinelCustomUrl = $url;
+
+    expect($component->isPushUrlInsecure())->toBe($insecure);
+})->with([
+    'local public HTTP' => [0, 'http://public.example.com', true],
+    'local internal HTTP' => [0, 'http://coolify:8080', false],
+    'local HTTPS' => [0, 'https://public.example.com', false],
+    'remote HTTP' => [1, 'http://public.example.com', true],
+    'remote internal address' => [1, 'http://coolify:8080', true],
+]);

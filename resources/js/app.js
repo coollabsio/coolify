@@ -1,14 +1,52 @@
+import { copyTextToClipboard } from './clipboard.js';
 import { initializeCopyButtonComponent } from './copy-button.js';
+import { initializeNumberStepperComponent } from './number-stepper.js';
 import { initializeRuntimeLogsComponent } from './runtime-logs.js';
-import { initializeSettingsSidebarAccordionComponent } from './settings-sidebar-accordion.js';
 import { initializeTerminalComponent } from './terminal.js';
+import { parseItermColors } from './iterm-colors.js';
 import './traffic-globe.js';
+import './traffic-table.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
 import { registerLivewireUpdateDedupe } from './livewire-update-dedupe.js';
 import { parseSubmitAction } from './modal-confirmation.js';
+import { dismissSecurityCallout, securityCallout } from './security-callout.js';
+import { initializeStarredMenu, starredMenuCommands } from './starred-menu.js';
+import { vulnerabilitySearchItem } from './vulnerability-search.js';
+
+// The canvases (Svelte, Svelte Flow) load only on pages that have one. After the
+// import, each canvas mounts itself, also after later Livewire SPA navigation.
+const canvases = [
+    { selector: '[data-deploy-canvas]', load: () => import('./canvas/deploy/index.js').then((m) => m.initializeDeployCanvas()) },
+    { selector: '[data-environment-canvas]', load: () => import('./canvas/environment/index.js').then((m) => m.initializeEnvironmentCanvas()) },
+];
+const loadCanvases = () => {
+    for (const canvas of canvases) {
+        if (!canvas.loading && document.querySelector(canvas.selector)) {
+            canvas.loading = canvas.load();
+        }
+    }
+};
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadCanvases);
+} else {
+    loadCanvases();
+}
+document.addEventListener('livewire:navigated', loadCanvases);
 
 // Used by the modal-confirmation Blade component to call its submitAction.
 window.parseModalSubmitAction = parseSubmitAction;
+
+// Used by the command palette (global-search.blade.php) for vulnerability IDs.
+window.vulnerabilitySearchItem = vulnerabilitySearchItem;
+
+// Used by the dashboard security callout (dashboard.blade.php).
+window.securityCallout = securityCallout;
+window.dismissSecurityCallout = dismissSecurityCallout;
+
+// Used by the log viewers to copy logs that a Livewire call still loads.
+window.copyTextToClipboard = copyTextToClipboard;
+// The Custom theme dialog (themeControls in layouts/base.blade.php) imports iTerm2 color files with it.
+window.parseItermColors = parseItermColors;
 
 document.addEventListener('livewire:init', () => {
     registerLivewireRequestFailureHandler(window.Livewire);
@@ -28,8 +66,9 @@ document.addEventListener('livewire:navigated', () => {
 // available before Alpine processes terminal markup after wire:navigate.
 document.addEventListener('alpine:init', initializeTerminalComponent);
 document.addEventListener('alpine:init', initializeCopyButtonComponent);
+document.addEventListener('alpine:init', initializeNumberStepperComponent);
 document.addEventListener('alpine:init', initializeRuntimeLogsComponent);
-document.addEventListener('alpine:init', initializeSettingsSidebarAccordionComponent);
+document.addEventListener('alpine:init', initializeStarredMenu);
 
 /**
  * Smooth-scroll a settings section into view, then flash its border for 500ms
@@ -38,6 +77,29 @@ document.addEventListener('alpine:init', initializeSettingsSidebarAccordionCompo
  *
  * @param {string|HTMLElement} target Section id or element
  */
+/** A resource favicon loaded: show it in place of the logo. */
+window.resourceLogoLoaded = function resourceLogoLoaded(img) {
+  img.closest('[data-resource-logo]')?.querySelector('[data-resource-logo-image]')?.setAttribute('hidden', '');
+  img.removeAttribute('hidden');
+};
+
+/** A resource logo failed to load: drop a favicon, try the fallback URL of a logo, then show the resource type icon instead. */
+window.resourceLogoError = function resourceLogoError(img) {
+  if (img.hasAttribute('data-resource-logo-favicon')) {
+    img.remove();
+    return;
+  }
+  if (img.dataset.fallback && img.src !== img.dataset.fallback) {
+    img.src = img.dataset.fallback;
+    return;
+  }
+  const wrapper = img.closest('[data-resource-logo]');
+  wrapper?.querySelector('[data-resource-logo-image]')?.setAttribute('hidden', '');
+  if (!wrapper?.querySelector('[data-resource-logo-favicon]:not([hidden])')) {
+    wrapper?.querySelector('[data-resource-logo-icon]')?.removeAttribute('hidden');
+  }
+};
+
 window.scrollToSettingsSection = function scrollToSettingsSection(target) {
     const el = typeof target === 'string' ? document.getElementById(target) : target;
     if (!el) {
@@ -176,7 +238,7 @@ window.currentPageSearchItems = function currentPageSearchItems() {
         items.push({ label, breadcrumb: 'Section', search_text: label + ' section', href: 'section-' + index, element: section });
     });
 
-    return items;
+    return [...items, ...starredMenuCommands()];
 };
 
 // When a settings sub-section link navigates across pages (href="route#section-id"),

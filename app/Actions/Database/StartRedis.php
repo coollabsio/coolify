@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Exceptions\DatabaseStartException;
 use App\Helpers\SslHelper;
 use App\Models\SslCertificate;
@@ -86,6 +87,7 @@ class StartRedis
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->database->fileStorages()->get();
+        array_push($this->commands, ...EnsureContentFilesOnServer::echoCommands($persistent_file_volumes, $this->database->destination->server));
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
         $this->add_custom_redis();
@@ -106,8 +108,7 @@ class StartRedis
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
                         'CMD-SHELL',
-                        'redis-cli',
-                        'ping',
+                        $this->healthCheckCommand(),
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -131,7 +132,7 @@ class StartRedis
         }
 
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
-            $docker_compose['services'][$container_name]['logging'] = generate_fluentd_configuration();
+            $docker_compose['services'][$container_name]['logging'] = generate_log_drain_configuration($this->database->destination->server);
         }
 
         if (count($this->database->ports_mappings_array) > 0) {
@@ -196,7 +197,7 @@ class StartRedis
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
-        $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
+        array_push($this->commands, ...$this->pullImageCommands("{$this->configuration_dir}/docker-compose.yml"));
         if ($this->database->enable_ssl) {
             $this->commands[] = "chown -R 999:999 $this->configuration_dir/ssl/server.key $this->configuration_dir/ssl/server.crt";
         }
@@ -234,10 +235,7 @@ class StartRedis
                 continue;
             }
             $name = $persistentStorage->name;
-            $local_persistent_volumes_names[$name] = [
-                'name' => $name,
-                'external' => false,
-            ];
+            $local_persistent_volumes_names[$name] = $persistentStorage->dockerComposeVolumeDefinition();
         }
 
         return $local_persistent_volumes_names;
@@ -268,10 +266,6 @@ class StartRedis
 
                 if ($env->key === 'REDIS_USERNAME') {
                     $this->resolvedRedisUsername = $this->database->resolveSecretManagerEnvironmentVariableValue($env);
-
-                    if (! $usesSecretManager) {
-                        $this->database->update(['redis_username' => $this->resolvedRedisUsername]);
-                    }
                 }
             } else {
                 if ($env->key === 'REDIS_USERNAME' && ! $usesSecretManager) {
@@ -286,7 +280,7 @@ class StartRedis
             }
         }
 
-        add_coolify_default_environment_variables($this->database, $environment_variables, $environment_variables);
+        $this->addCoolifyEnvironmentVariables($environment_variables);
 
         return $environment_variables->all();
     }
@@ -340,6 +334,20 @@ class StartRedis
             && strpbrk($this->resolvedRedisPassword, "\\'\";&|<> \t\r\n") !== false;
 
         return $keepsUnquotedPassword ? $this->resolvedRedisPassword : escapeshellarg($this->resolvedRedisPassword);
+    }
+
+    /**
+     * The healthcheck pings with the server password and requires PONG, because redis-cli exits 0 on
+     * error replies (NOAUTH, LOADING). A custom redis.conf with its own requirepass has a password that
+     * Coolify does not know, so that check only requires that the server replies.
+     */
+    private function healthCheckCommand(): string
+    {
+        if (str_contains((string) $this->database->redis_conf, 'requirepass')) {
+            return "redis-cli ping | grep -qE 'PONG|NOAUTH'";
+        }
+
+        return 'redis-cli -a '.$this->requirePassArgument().' --no-auth-warning ping | grep -q PONG';
     }
 
     private function add_custom_redis()

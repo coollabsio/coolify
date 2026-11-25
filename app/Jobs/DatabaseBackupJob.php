@@ -3,12 +3,16 @@
 namespace App\Jobs;
 
 use App\Events\BackupCreated;
+use App\Helpers\SshMultiplexingHelper;
+use App\Helpers\SshRetryHandler;
+use App\Models\NotificationThrottle;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -18,11 +22,16 @@ use App\Models\Team;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
 use App\Notifications\Database\BackupSuccessWithS3Warning;
-use App\Rules\SafeWebhookUrl;
+use App\Notifications\ScheduledJobRecovered;
+use App\Services\HorizonNodeDrainer;
+use App\Services\RcloneTransfer;
 use App\Services\ScheduledJobDeliveryService;
+use App\Services\Security\SensitiveDataRedactor;
 use App\Support\BackupCompression;
 use App\Support\ClickhouseBackupCommand;
 use App\Support\DatabaseOperationReservation;
+use App\Support\InfluxdbBackupCommand;
+use App\Support\PostgresUser;
 use App\Support\ResourceStartActivity;
 use App\Support\ValidationPatterns;
 use Carbon\Carbon;
@@ -53,7 +62,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
 
     public Server $server;
 
-    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneClickhouse|StandaloneSqlite|ServiceDatabase $database;
+    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite|ServiceDatabase $database;
 
     public ?string $container_name = null;
 
@@ -92,6 +101,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
      */
     public ?string $executionUuidPrefix = null;
 
+    /**
+     * Unix time when the backup timeout of this run ends. Set when handle() starts.
+     */
+    private ?int $deadline = null;
+
     public function __construct(public ScheduledDatabaseBackup $backup, public ?string $occurrenceUuid = null)
     {
         $this->onQueue(crons_queue());
@@ -113,6 +127,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         $failed = false;
+        $this->deadline = Carbon::now()->getTimestamp() + (int) ($this->backup->timeout ?? 3600);
 
         try {
             $databasesToBackup = null;
@@ -129,7 +144,10 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->server = $this->database->service->server;
             } else {
                 $this->database = data_get($this->backup, 'database');
-                $this->server = $this->database->destination->server;
+                // The coolify-db container always runs on the Coolify host, whatever its destination row says.
+                $this->server = $this->database instanceof StandalonePostgresql && $this->database->isInstanceDatabase()
+                    ? Server::find(0)
+                    : $this->database->destination->server;
             }
             if (is_null($this->server)) {
                 throw new \Exception('Server not found?!');
@@ -165,25 +183,21 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 // The container name is validated above, so it is a safe folder name. Keep the folder of earlier releases.
                 $this->directory_name = $serviceName.'-'.$this->container_name;
                 $escapedContainerName = escapeshellarg($this->container_name);
+                $configuredDatabases = $this->configuredDatabasesToBackup();
                 if (str($databaseType)->contains('postgres')) {
-                    $commands[] = "docker exec {$escapedContainerName} env | grep POSTGRES_";
+                    $commands[] = "docker exec {$escapedContainerName} env | grep -E '^(POSTGRES|PGUSER=)'";
                     $envs = instant_remote_process($commands, $this->server, true, false, null, disableMultiplexing: true);
                     $envs = str($envs)->explode("\n");
 
-                    $user = $envs->filter(function ($env) {
-                        return str($env)->startsWith('POSTGRES_USER=');
-                    })->first();
-                    if ($user) {
-                        $this->database->postgres_user = str($user)->after('POSTGRES_USER=')->value();
-                    } else {
-                        $this->database->postgres_user = 'postgres';
-                    }
+                    $this->database->postgres_user = PostgresUser::fromEnvLines($envs);
 
                     $db = $envs->filter(function ($env) {
                         return str($env)->startsWith('POSTGRES_DB=');
                     })->first();
 
-                    if ($db) {
+                    if (filled($configuredDatabases)) {
+                        $databasesToBackup = $configuredDatabases;
+                    } elseif ($db) {
                         $databasesToBackup = str($db)->after('POSTGRES_DB=')->value();
                     } else {
                         $databasesToBackup = $this->database->postgres_user;
@@ -210,10 +224,14 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         return str($env)->startsWith('MYSQL_DATABASE=');
                     })->first();
 
-                    if ($db) {
+                    if (filled($configuredDatabases)) {
+                        $databasesToBackup = $configuredDatabases;
+                    } elseif ($db) {
                         $databasesToBackup = str($db)->after('MYSQL_DATABASE=')->value();
                     } else {
-                        throw new \Exception('MYSQL_DATABASE not found');
+                        $this->recordUndeterminedDatabases('MYSQL_DATABASE');
+
+                        return;
                     }
                 } elseif (str($databaseType)->contains('mariadb')) {
                     $commands[] = "docker exec {$escapedContainerName} env";
@@ -233,22 +251,17 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         }
                     }
 
-                    $db = $envs->filter(function ($env) {
-                        return str($env)->startsWith('MARIADB_DATABASE=');
-                    })->first();
+                    $db = $envs->first(fn ($env) => str($env)->startsWith('MARIADB_DATABASE='))
+                        ?? $envs->first(fn ($env) => str($env)->startsWith('MYSQL_DATABASE='));
 
-                    if ($db) {
-                        $databasesToBackup = str($db)->after('MARIADB_DATABASE=')->value();
+                    if (filled($configuredDatabases)) {
+                        $databasesToBackup = $configuredDatabases;
+                    } elseif ($db) {
+                        $databasesToBackup = str($db)->after('=')->value();
                     } else {
-                        $db = $envs->filter(function ($env) {
-                            return str($env)->startsWith('MYSQL_DATABASE=');
-                        })->first();
+                        $this->recordUndeterminedDatabases('MARIADB_DATABASE or MYSQL_DATABASE');
 
-                        if ($db) {
-                            $databasesToBackup = str($db)->after('MYSQL_DATABASE=')->value();
-                        } else {
-                            throw new \Exception('MARIADB_DATABASE or MYSQL_DATABASE not found');
-                        }
+                        return;
                     }
                 } elseif (str($databaseType)->contains('mongo')) {
                     $databasesToBackup = ['*'];
@@ -297,6 +310,8 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     $databasesToBackup = [$this->database->mariadb_database];
                 } elseif ($this->database instanceof StandaloneClickhouse) {
                     $databasesToBackup = [$this->database->clickhouse_db];
+                } elseif ($this->database instanceof StandaloneInfluxdb) {
+                    $databasesToBackup = [$this->database->influxdb_bucket];
                 } elseif ($this->database instanceof StandaloneSqlite) {
                     $databasesToBackup = $this->database->sqlite_databases;
                 } else {
@@ -312,12 +327,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
             $this->backup_dir = backup_dir().'/databases/'.str($this->team->name)->slug().'-'.$this->team->id.'/'.$this->directory_name;
-            if ($this->database->name === 'coolify-db') {
+            if ($this->database instanceof StandalonePostgresql && $this->database->isInstanceDatabase()) {
                 $databasesToBackup = ['coolify'];
                 $this->directory_name = $this->container_name = 'coolify-db';
                 $ip = Str::slug($this->server->ip);
                 $this->backup_dir = backup_dir().'/coolify'."/coolify-db-$ip";
             }
+            $runHadProblem = false;
             foreach ($databasesToBackup as $database) {
                 // Reset per-database state, so a failure before this database's execution exists
                 // does not mark the previous database's execution failed or delete its backup file.
@@ -427,6 +443,18 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         ]);
                         BackupCreated::dispatch($this->team->id);
                         $this->backup_standalone_clickhouse($database);
+                    } elseif ($this->database instanceof StandaloneInfluxdb) {
+                        $this->backup_file = '/influxdb-backup-'.Carbon::now()->timestamp."-{$this->backup_log_uuid}.tar.gz";
+                        $this->backup_location = $this->backup_dir.$this->backup_file;
+                        $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                            'uuid' => $this->backup_log_uuid,
+                            'database_name' => $database,
+                            'filename' => $this->backup_location,
+                            'scheduled_database_backup_id' => $this->backup->id,
+                            'local_storage_deleted' => false,
+                        ]);
+                        BackupCreated::dispatch($this->team->id);
+                        $this->backup_standalone_influxdb($database);
                     } elseif ($this->database instanceof StandaloneSqlite) {
                         $this->backup_file = "/sqlite-backup-$database-".Carbon::now()->timestamp."-{$this->backup_log_uuid}.gz";
                         $this->backup_location = $this->backup_dir.$this->backup_file;
@@ -443,7 +471,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         throw new \Exception('Unsupported database type');
                     }
 
-                    $size = $this->calculate_size();
+                    $size = $this->size = (int) $this->calculate_size();
 
                     // Verify local backup succeeded
                     if ($size > 0) {
@@ -452,20 +480,29 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         throw new \Exception('Local backup file is empty or was not created');
                     }
                 } catch (Throwable $e) {
+                    $runHadProblem = true;
                     // Local backup failed: the partial file is not tracked, so retention would never remove it.
                     deleteBackupsLocally($this->backup_location, $this->server);
+                    $failureMessage = $this->redact($this->error_output ?? $this->backup_output ?? $e->getMessage());
+                    $exitCodeReason = $this->exitCodeReason($e->getCode());
+                    if ($exitCodeReason !== null) {
+                        $failureMessage = $exitCodeReason."\n\n".$failureMessage;
+                    }
                     if ($this->backup_log) {
                         $this->backup_log->update([
                             'status' => 'failed',
-                            'message' => $this->error_output ?? $this->backup_output ?? $e->getMessage(),
+                            'message' => $failureMessage,
                             'size' => $size,
                             'filename' => null,
                             's3_uploaded' => null,
                             'finished_at' => Carbon::now()->toImmutable(),
                         ]);
                     }
+                    if (HorizonNodeDrainer::wasMoved(HorizonNodeDrainer::DATABASE_BACKUP, $this->backup->id)) {
+                        return;
+                    }
                     try {
-                        $this->team?->notify(new BackupFailed($this->backup, $this->database, $this->error_output ?? $this->backup_output ?? $e->getMessage(), $database));
+                        $this->team?->notify(new BackupFailed($this->backup, $this->database, $failureMessage, $database));
                     } catch (Throwable $notifyException) {
                         Log::channel('scheduled-errors')->warning('Failed to send backup failure notification', [
                             'backup_id' => $this->backup->uuid,
@@ -490,18 +527,21 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         }
                     } catch (Throwable $e) {
                         // S3 upload failed but local backup succeeded
-                        $s3UploadError = $e->getMessage();
+                        $s3UploadError = $this->redact($e->getMessage());
                     }
                 }
 
                 // Step 3: Update status and send notifications based on results
+                if ($s3UploadError) {
+                    $runHadProblem = true;
+                }
                 if ($localBackupSucceeded) {
-                    $message = $this->backup_output;
+                    $message = $this->backup_output === null ? null : $this->redact($this->backup_output);
 
                     if ($s3UploadError) {
                         $message = $message
-                            ? $message."\n\nWarning: S3 upload failed: ".$s3UploadError
-                            : 'Warning: S3 upload failed: '.$s3UploadError;
+                            ? $message."\n\nWarning: Storage upload failed: ".$s3UploadError
+                            : 'Warning: Storage upload failed: '.$s3UploadError;
                     }
 
                     $this->backup_log->update([
@@ -532,6 +572,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             }
             if ($this->backup_log && $this->backup_log->status === 'success') {
                 $this->removeExpiredBackups();
+            }
+            if (! $runHadProblem) {
+                $this->notifyIfRecovered();
             }
         } catch (Throwable $e) {
             $failed = true;
@@ -565,9 +608,37 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         }
     }
 
+    /**
+     * Seconds left of the backup timeout. The timeout limits the complete run (every database, dump and
+     * upload), so a run that takes too long fails inside handle(), where the cleanup runs, and not when the
+     * worker kills the job.
+     */
     private function commandTimeout(): int
     {
-        return (int) ($this->backup->timeout ?? 3600);
+        $timeout = (int) ($this->backup->timeout ?? 3600);
+        if ($this->deadline === null) {
+            return $timeout;
+        }
+
+        $remaining = $this->deadline - Carbon::now()->getTimestamp();
+        if ($remaining < 1) {
+            throw new \RuntimeException("The backup timeout of {$timeout} seconds has passed.", 124);
+        }
+
+        return $remaining;
+    }
+
+    /**
+     * Runs the commands that write the backup file. They run only once: an SSH retry replays the batch, and
+     * a dump that lost its SSH connection can still run in the database container, so a second dump would
+     * write into the same file.
+     *
+     * @param  list<string>  $commands
+     */
+    private function runBackupCommands(array $commands): void
+    {
+        $output = trim((string) instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true, maxAttempts: 1));
+        $this->backup_output = $output === '' ? null : $output;
     }
 
     private function backupFilenamePart(string $database): string
@@ -639,11 +710,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     }
                 }
             }
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
-            $this->backup_output = trim($this->backup_output);
-            if ($this->backup_output === '') {
-                $this->backup_output = null;
-            }
+            $this->runBackupCommands($commands);
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;
@@ -667,7 +734,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             return array_map('trim', explode('|', $databases));
         }
 
-        if ($type->contains(['postgres', 'mysql', 'mariadb', 'clickhouse', 'sqlite'])) {
+        if ($type->contains(['postgres', 'mysql', 'mariadb', 'clickhouse', 'influxdb', 'sqlite'])) {
             return array_map('trim', explode(',', $databases));
         }
 
@@ -692,15 +759,13 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 // Validate and escape database name to prevent command injection
                 validateShellSafePath($database, 'database name');
                 $escapedDatabase = escapeshellarg($database);
-                $backupCommand .= " {$escapedContainerName} pg_dump --format=custom --no-acl --no-owner --username $escapedUsername $escapedDatabase > {$escapedBackupLocation}";
+                // Keep owners and privileges in the archive: services such as Supabase need them,
+                // and the restore skips them unless "Keep owners and privileges" is selected.
+                $backupCommand .= " {$escapedContainerName} pg_dump --format=custom --username $escapedUsername $escapedDatabase > {$escapedBackupLocation}";
             }
 
             $commands[] = $backupCommand;
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
-            $this->backup_output = trim($this->backup_output);
-            if ($this->backup_output === '') {
-                $this->backup_output = null;
-            }
+            $this->runBackupCommands($commands);
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;
@@ -723,11 +788,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $escapedDatabase = escapeshellarg($database);
                 $commands[] = "docker exec {$escapedContainerName} mysqldump -u root -p$escapedPassword $escapedDatabase > {$escapedBackupLocation}";
             }
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
-            $this->backup_output = trim($this->backup_output);
-            if ($this->backup_output === '') {
-                $this->backup_output = null;
-            }
+            $this->runBackupCommands($commands);
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;
@@ -750,11 +811,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $escapedDatabase = escapeshellarg($database);
                 $commands[] = "docker exec {$escapedContainerName} mariadb-dump -u root -p$escapedPassword $escapedDatabase > {$escapedBackupLocation}";
             }
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
-            $this->backup_output = trim($this->backup_output);
-            if ($this->backup_output === '') {
-                $this->backup_output = null;
-            }
+            $this->runBackupCommands($commands);
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;
@@ -773,16 +830,34 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 backupDirectory: $this->backup_dir,
             )];
 
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
-            $this->backup_output = trim($this->backup_output);
-            if ($this->backup_output === '') {
-                $this->backup_output = null;
-            }
+            $this->runBackupCommands($commands);
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;
         } finally {
             $cleanupCommand = ClickhouseBackupCommand::cleanup($this->container_name, $archiveName);
+            instant_remote_process([$cleanupCommand], $this->server, false, false, null, disableMultiplexing: true);
+        }
+    }
+
+    private function backup_standalone_influxdb(string $bucket): void
+    {
+        $archiveName = ltrim($this->backup_file, '/');
+
+        try {
+            $commands = [...$this->backupDirectoryCommands(), ...InfluxdbBackupCommand::make(
+                containerName: $this->container_name,
+                bucket: $bucket,
+                archiveName: $archiveName,
+                backupDirectory: $this->backup_dir,
+            )];
+
+            $this->runBackupCommands($commands);
+        } catch (Throwable $e) {
+            $this->add_to_error_output($e->getMessage());
+            throw $e;
+        } finally {
+            $cleanupCommand = InfluxdbBackupCommand::cleanup($this->container_name, $archiveName);
             instant_remote_process([$cleanupCommand], $this->server, false, false, null, disableMultiplexing: true);
         }
     }
@@ -797,15 +872,31 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $script = 'f=$(mktemp) && sqlite3 -readonly '.escapeshellarg(StandaloneSqlite::DATA_DIRECTORY.'/'.$database).' \'.timeout 10000\' "VACUUM INTO \'$f\'" && cat "$f"; s=$?; rm -f "$f"; exit $s';
             $dumpCommand = 'docker exec '.escapeshellarg($this->container_name).' sh -c '.escapeshellarg($script);
             $commands[] = $this->buildCompressedDumpCommand($dumpCommand, escapeshellarg($this->backup_location));
-            $this->backup_output = instant_remote_process($this->writeBackupFileAsRoot($commands), $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
-            $this->backup_output = trim($this->backup_output);
-            if ($this->backup_output === '') {
-                $this->backup_output = null;
-            }
+            $this->runBackupCommands($commands);
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
             throw $e;
         }
+    }
+
+    /**
+     * Explains exit codes of a dump that was stopped from outside. The dump tool cannot report these
+     * itself, so its output ends after the last progress line without an error.
+     */
+    private function exitCodeReason(int|string $exitCode): ?string
+    {
+        return match ($exitCode) {
+            124 => 'The backup stopped with exit code 124: it did not finish within the backup timeout of '.((int) ($this->backup->timeout ?? 3600)).' seconds. '
+                .'The timeout counts for the complete run: the dumps and S3 uploads of all databases. Increase the timeout in the backup settings.',
+            137 => 'The backup stopped with exit code 137: the dump process or the database container was killed (SIGKILL). '
+                .'This is usually the out-of-memory killer: the dump runs inside the database container and shares its memory limit. '
+                .'Check the memory limit of the database and the kernel log (dmesg) on the server.',
+            143 => 'The backup stopped with exit code 143: the dump process or the database container was terminated (SIGTERM), '
+                .'for example because the database was stopped or restarted during the backup.',
+            255 => 'The backup stopped with exit code 255: the SSH connection to the server closed. '
+                .'Check the network connection and the SSH server log on the server.',
+            default => null,
+        };
     }
 
     private function add_to_backup_output($output): void
@@ -856,7 +947,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 's3_storage_id' => null,
             ]);
 
-            throw new \Exception('S3 storage configuration is missing or has been deleted (S3 storage ID: '.($previousS3StorageId ?? 'null').'). S3 backup has been disabled for this schedule.');
+            throw new \Exception('Backup storage configuration is missing or has been deleted (storage ID: '.($previousS3StorageId ?? 'null').'). Uploads to a backup storage are disabled for this schedule.');
         }
 
         $failures = [];
@@ -867,7 +958,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 $this->upload_to_s3($storage);
                 $uploaded = true;
             } catch (Throwable $e) {
-                $uploadError = $e->getMessage();
+                $uploadError = $this->redact($e->getMessage());
                 $failures[] = "{$storage->name}: {$uploadError}";
             }
 
@@ -878,7 +969,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     'message' => $uploadError,
                 ]);
             } catch (Throwable $e) {
-                $failures[] = "{$storage->name}: {$e->getMessage()}";
+                $failures[] = "{$storage->name}: {$this->redact($e->getMessage())}";
             }
         }
 
@@ -891,8 +982,6 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     protected function upload_to_s3(S3Storage $s3): void
     {
         try {
-            $key = $s3->key;
-            $secret = $s3->secret;
             $bucket = $s3->bucket;
             $endpoint = $s3->endpoint;
             $s3->testConnection(shouldSave: true);
@@ -901,6 +990,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             } else {
                 $network = $this->database->destination->network;
             }
+            if (! $s3->isS3()) {
+                $this->uploadWithRclone($s3, $network);
+
+                return;
+            }
             $safeNetwork = escapeshellarg($network);
 
             $fullImageName = $this->getFullImageName();
@@ -908,22 +1002,23 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             // Remove a leftover helper in the same batch, so a replayed batch does not fail with a name conflict.
             $commands[] = "docker rm -f backup-of-{$this->backup_log_uuid} >/dev/null 2>&1 || true";
             $mount = escapeshellarg($this->backupMountSource().':'.$this->backup_location.':ro');
-            $commands[] = "docker run -d --network {$safeNetwork} --name backup-of-{$this->backup_log_uuid} --rm -v {$mount} {$fullImageName}";
+            $commands[] = "docker run -d --network {$safeNetwork} --name backup-of-{$this->backup_log_uuid} --rm {$s3->minioClientEnvOptions()} -v {$mount} {$fullImageName}";
 
-            // Escape S3 credentials to prevent command injection
-            $escapedEndpoint = escapeshellarg($endpoint);
-            $escapedKey = escapeshellarg($key);
-            $escapedSecret = escapeshellarg($secret);
-            $escapedBackupLocation = escapeshellarg($this->backup_location);
-            $escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");
-            $resolveOptions = collect(SafeWebhookUrl::minioClientResolveOptions($endpoint, $s3->trustedInternalHosts()))
-                ->map(fn (string $resolveOption): string => '--resolve '.escapeshellarg($resolveOption))
-                ->implode(' ');
-            $resolveOptions = $resolveOptions === '' ? '' : ' '.$resolveOptions;
-
-            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc alias set{$resolveOptions} temporary {$escapedEndpoint} {$escapedKey} {$escapedSecret}";
-            $commands[] = "docker exec backup-of-{$this->backup_log_uuid} mc cp {$escapedBackupLocation} {$escapedS3Destination}";
             instant_remote_process($commands, $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true);
+            if ($s3->usesCurlTransfer()) {
+                $uploadCommand = $s3->prepareCurlUpload($this->server, "backup-of-{$this->backup_log_uuid}", $this->backup_location, ltrim($this->backup_dir, '/').'/'.basename($this->backup_location));
+            } else {
+                $escapedBackupLocation = escapeshellarg($this->backup_location);
+                $escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");
+                $resolveOptions = $s3->minioClientResolveOptions($this->server, $fullImageName, $network);
+                $partSizeOption = S3Storage::minioClientPartSizeOption($this->size);
+                $this->setMinioClientAlias($this->server, "backup-of-{$this->backup_log_uuid}", $s3, $resolveOptions);
+                $uploadCommand = "docker exec {$partSizeOption} backup-of-{$this->backup_log_uuid} mc cp{$resolveOptions} {$escapedBackupLocation} {$escapedS3Destination}";
+            }
+            S3Storage::retryMinioClientUpload(fn () => instant_remote_process(
+                [$uploadCommand],
+                $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true,
+            ));
 
         } catch (Throwable $e) {
             $this->add_to_error_output($e->getMessage());
@@ -932,6 +1027,42 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $command = dockerRemoveCommand("backup-of-{$this->backup_log_uuid}");
             instant_remote_process([$command], $this->server, true, false, null, disableMultiplexing: true);
         }
+    }
+
+    /**
+     * Uploads the backup file to an SFTP, FTPS, or WebDAV storage. The caller removes the container.
+     */
+    private function uploadWithRclone(S3Storage $storage, string $network): void
+    {
+        $transfer = new RcloneTransfer($storage, $this->server, "backup-of-{$this->backup_log_uuid}");
+        $transfer->start([$this->backupMountSource().':'.$this->backup_location.':ro'], $network, $this->commandTimeout());
+        $transfer->upload($this->backup_location, $this->backup_location, $this->commandTimeout());
+    }
+
+    /**
+     * Sets the `temporary` mc alias in a helper container. The S3 keys go to mc through the stdin of the
+     * SSH process, so they are not in the arguments of any process on Coolify or on the server.
+     */
+    private function setMinioClientAlias(Server $server, string $container, S3Storage $s3, string $resolveOptions): void
+    {
+        $remoteCommand = ($server->isNonRoot() ? 'sudo ' : '').'docker exec -i '.escapeshellarg($container)
+            .' mc alias set'.$resolveOptions.$s3->minioClientAliasOptions().' temporary '.escapeshellarg($s3->endpoint).' >/dev/null';
+        $timeout = (int) config('constants.ssh.command_timeout');
+
+        SshRetryHandler::retry(
+            function () use ($server, $remoteCommand, $s3, $timeout) {
+                $sshCommand = SshMultiplexingHelper::generateSshStdinCommand($server, $remoteCommand, disableMultiplexing: true, commandTimeout: $timeout);
+                $process = runSshProcess($sshCommand, $timeout, $s3->key."\n".$s3->secret."\n");
+
+                if ($process->exitCode() !== 0) {
+                    excludeCertainErrors($process->errorOutput(), $process->exitCode());
+                }
+            },
+            [
+                'server' => $server->ip,
+                'function' => 'setMinioClientAlias',
+            ],
+        );
     }
 
     private function getFullImageName(): string
@@ -1048,6 +1179,66 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         ]);
     }
 
+    /**
+     * Databases picked in the backup settings of a service database. They take priority over the
+     * database that the container env names, as for standalone databases.
+     *
+     * @return string|array<int, string>|null
+     */
+    /**
+     * After a run without problems, tell the team once that a backup that failed before works again.
+     */
+    private function notifyIfRecovered(): void
+    {
+        $wasFailing = NotificationThrottle::release($this->backup, BackupFailed::class);
+        $hadS3Warning = NotificationThrottle::release($this->backup, BackupSuccessWithS3Warning::class);
+        if (! $wasFailing && ! $hadS3Warning) {
+            return;
+        }
+
+        try {
+            $this->team?->notify(new ScheduledJobRecovered(
+                failureEvent: 'backup_failure',
+                title: "Database backup for {$this->database->name} works again.",
+                webhookEvent: 'backup_recovered',
+                url: $this->database->link() ?? base_url(),
+                webhookData: ['database_name' => $this->database->name, 'database_uuid' => $this->database->uuid, 'backup_uuid' => $this->backup->uuid],
+            ));
+        } catch (Throwable $e) {
+            Log::channel('scheduled-errors')->warning('Failed to send backup recovery notification', [
+                'backup_id' => $this->backup->uuid,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function configuredDatabasesToBackup(): string|array|null
+    {
+        if ($this->backup->dump_all) {
+            return ['all'];
+        }
+
+        return $this->backup->databases_to_backup;
+    }
+
+    /**
+     * Show a run that cannot start because no database is known in the execution list, and notify the team.
+     */
+    private function recordUndeterminedDatabases(string $envNames): void
+    {
+        $message = "No database to back up: the container does not set {$envNames}. Select \"All databases\" or enter the databases to back up in the backup settings.";
+        $this->recordSkippedBackup($message);
+        $this->logSkippedRun('no_databases_determined');
+        try {
+            $this->team->notify(new BackupFailed($this->backup, $this->database, $message, 'unknown'));
+        } catch (Throwable $e) {
+            Log::channel('scheduled-errors')->warning('Failed to send backup failure notification', [
+                'backup_id' => $this->backup->uuid,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     private function markStaleExecutionsAsFailed(): void
     {
         try {
@@ -1100,7 +1291,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         foreach ($unfinished as $execution) {
             $execution->update([
                 'status' => 'failed',
-                'message' => 'Job permanently failed after '.$this->attempts().' attempts: '.($exception?->getMessage() ?? 'Unknown error'),
+                'message' => $this->redact('Job permanently failed after '.$this->attempts().' attempts: '.($exception?->getMessage() ?? 'Unknown error')),
                 'size' => 0,
                 'filename' => null,
                 'finished_at' => Carbon::now(),
@@ -1111,7 +1302,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        $output = $this->backup_output ?? $exception?->getMessage() ?? 'Unknown error';
+        $output = $this->redact($this->backup_output ?? $exception?->getMessage() ?? 'Unknown error');
         $databaseNames = $unfinished->isEmpty() ? ['unknown'] : $unfinished->map(fn (ScheduledDatabaseBackupExecution $execution) => $execution->database_name ?? 'unknown');
         foreach ($databaseNames as $databaseName) {
             try {
@@ -1123,6 +1314,31 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                 ]);
             }
         }
+    }
+
+    /**
+     * Redact the backed-up database credentials and the key and secret of every S3 destination from text that is stored or sent in notifications.
+     */
+    private function redact(string $text): string
+    {
+        try {
+            $database = $this->database ?? $this->backup->database;
+            $s3 = $this->s3 ?? $this->backup->s3;
+            $lockedSecrets = [$this->postgres_password, $this->mongo_root_password, $s3?->key, $s3?->secret];
+            foreach ($this->backup->selectedS3Storages() as $storage) {
+                $lockedSecrets[] = $storage->key;
+                $lockedSecrets[] = $storage->secret;
+            }
+            foreach (array_keys($database?->getAttributes() ?? []) as $attribute) {
+                if (str_contains($attribute, 'password')) {
+                    $lockedSecrets[] = $database->getAttribute($attribute);
+                }
+            }
+        } catch (Throwable) {
+            return SensitiveDataRedactor::FAILURE_MESSAGE;
+        }
+
+        return app(SensitiveDataRedactor::class)->redactText($text, lockedSecrets: array_filter($lockedSecrets, fn ($secret): bool => is_string($secret) && $secret !== ''));
     }
 
     /**

@@ -81,3 +81,20 @@ it('streams a backup file with the requested content type', function () {
 
     expect($contents)->toBe('backup contents');
 });
+
+it('brackets an IPv6 server address for the sftp host', function (string $ip) {
+    $server = backupDownloadServer();
+    $server->forceFill(['ip' => $ip]);
+
+    $disk = Mockery::mock();
+    $disk->shouldReceive('exists')->once()->andReturnFalse();
+    Storage::shouldReceive('build')
+        ->once()
+        ->withArgs(fn (array $config): bool => $config['host'] === '[2a01:4f8::1]')
+        ->andReturn($disk);
+
+    streamBackupFromServer($server, '/backups/archive.tar.gz', 'application/gzip');
+})->with([
+    'raw' => '2a01:4f8::1',
+    'bracketed' => '[2a01:4f8::1]',
+])->throws(FileNotFoundException::class);

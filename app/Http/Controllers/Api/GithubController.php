@@ -247,6 +247,10 @@ class GithubController extends Controller
             ], 422);
         }
 
+        if (! isCloud() && $request->boolean('is_system_wide')) {
+            $this->authorize('makeSystemWide', GithubApp::class);
+        }
+
         try {
             // Verify the private key belongs to the team
             $privateKey = PrivateKey::where('uuid', $request->input('private_key_uuid'))
@@ -470,6 +474,18 @@ class GithubController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
+        $errors = [];
+        foreach (['owner' => $owner, 'repo' => $repo] as $field => $value) {
+            if (! preg_match('/^[A-Za-z0-9_.-]+$/', (string) $value) || in_array($value, ['.', '..'], true)) {
+                $errors[$field] = ["The {$field} is invalid."];
+            }
+        }
+        if ($errors) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
 
         try {
             $githubApp = GithubApp::where('id', $github_app_id)
@@ -481,7 +497,7 @@ class GithubController extends Controller
             $response = Http::GitHub($githubApp->api_url, $token)
                 ->timeout(20)
                 ->retry(3, 200, throw: false)
-                ->get("/repos/{$owner}/{$repo}/branches");
+                ->get('/repos/'.rawurlencode($owner).'/'.rawurlencode($repo).'/branches');
 
             if ($response->status() !== 200) {
                 return response()->json([
@@ -661,6 +677,10 @@ class GithubController extends Controller
             }
             if (isset($payload['html_url']) && ! filled($payload['api_url'] ?? null)) {
                 $payload['api_url'] = githubApiUrlFromHtmlUrl($payload['html_url']);
+            }
+
+            if (! isCloud() && filter_var($payload['is_system_wide'] ?? false, FILTER_VALIDATE_BOOLEAN) && ! $githubApp->is_system_wide) {
+                $this->authorize('makeSystemWide', GithubApp::class);
             }
 
             // Handle private_key_uuid -> private_key_id conversion

@@ -3,6 +3,10 @@
         {{ $github_app->name ?: 'GitHub App' }} | Sources | Coolify
     </x-slot>
 
+    @if (session('error'))
+        <span x-data x-init="$wire.dispatch('error', @js(session('error')))" />
+    @endif
+
     @if (data_get($github_app, 'app_id'))
         @php
             $githubAppRouteParameters = ['github_app_uuid' => $github_app->uuid];
@@ -30,7 +34,7 @@
                     'label' => 'Danger Zone',
                     'route' => 'source.github.danger',
                     'active' => $activeTab === 'danger',
-                    'icon' => 'shield-alert',
+                    'icon' => 'danger',
                 ],
             ];
         @endphp
@@ -43,12 +47,14 @@
         @if ($showSettingsSidebar)
             <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
                 <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
-                    <aside class="application-settings-navigation min-w-0 xl:self-start"
+                    <x-main-nav-menu back-label="Sources" back-title="Back to Integrations" :name="$github_app->name ?: 'GitHub App'"
                         data-settings-search-items="{{ json_encode(settingsSearchItems(['GitHub App' => $settingsMenuItems], $githubAppRouteParameters)) }}">
                         <nav aria-label="GitHub App settings"
-                            class="grid grid-cols-2 gap-0.5 border-y border-neutral-200 py-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-1 xl:border-y-0 xl:py-0 dark:border-white/[0.06]">
-                            <div class="nav-section hidden xl:block">Settings</div>
+                            class="grid grid-cols-1 gap-0.5">
                             @foreach ($settingsMenuItems as $menuItem)
+                                @if ($menuItem['label'] === 'Danger Zone')
+                                    <div class="col-span-full my-2 border-t border-neutral-200 dark:border-white/[0.06]" aria-hidden="true"></div>
+                                @endif
                                 <a wire:key="github-app-settings-{{ str($menuItem['label'])->slug() }}"
                                     @class([
                                         'menu-item',
@@ -61,7 +67,7 @@
                                 </a>
                             @endforeach
                         </nav>
-                    </aside>
+                    </x-main-nav-menu>
 
                     <div class="min-w-0">
                         @if (!data_get($github_app, 'installation_id') && $activeTab === 'general')
@@ -79,11 +85,13 @@
                                                 source to an application.
                                             </p>
                                         </div>
+                                        @can('update', $github_app)
                                         <a class="button shrink-0 button-highlighted"
                                             href="{{ getInstallationPath($github_app) }}">
                                             Install repositories
                                             <x-external-link />
                                         </a>
+                                        @endcan
                                     </div>
                                 </x-application.settings-section>
                             </div>
@@ -106,7 +114,7 @@
                                     description="Connection and authentication settings for this private GitHub source.">
                                     <x-slot:actions>
                                         @if ($isConnected)
-                                            <x-forms.button type="button" canGate="view" :canResource="$github_app"
+                                            <x-forms.button type="button" canGate="update" :canResource="$github_app"
                                                 wire:click.prevent="testConnection">
                                                 Test connection
                                             </x-forms.button>
@@ -134,6 +142,7 @@
                                             label="Organization" placeholder="Personal account when empty" />
 
                                         @if (!isCloud())
+                                            @can('makeSystemWide', \App\Models\GithubApp::class)
                                             <div class="lg:col-span-2">
                                                 <x-forms.listbox canGate="update" :canResource="$github_app" id="isSystemWide" label="Availability" :options="[
                                                     ['value' => false, 'label' => 'Only this team'],
@@ -142,6 +151,7 @@
                                                     helper="System-wide GitHub Apps can be used by every team on this Coolify instance."
                                                     :disabled="!auth()->user()->can('update', $github_app)" />
                                             </div>
+                                            @endcan
                                             @if ($isSystemWide)
                                                 <div class="lg:col-span-2">
                                                     <x-callout type="warning" title="Shared with every team">
@@ -311,6 +321,13 @@
                                 ]"
                                 helper="Write access lets Coolify post deployment status and links on pull requests." />
 
+                            <x-forms.listbox id="deployment_status_permissions"
+                                label="GitHub deployments" :options="[
+                                    ['value' => false, 'label' => 'Do not create GitHub deployments'],
+                                    ['value' => true, 'label' => 'Create GitHub deployments'],
+                                ]"
+                                helper="Deployments (write) access lets Coolify show each deployment and its status on GitHub, so pull requests show the preview as deployed." />
+
                             <x-forms.listbox id="github_runners" label="GitHub Actions runners"
                                 :disabled="blank($github_app->organization)"
                                 :options="[
@@ -323,7 +340,7 @@
 
                             <button type="button"
                                 class="button mt-auto w-full justify-center button-highlighted"
-                                x-on:click.prevent="createGithubApp(webhookEndpoint, useCustomWebhookEndpoint, customWebhookEndpoint, $wire.preview_deployment_permissions, {{ Illuminate\Support\Js::from($administration) }}, $wire.github_runners)">
+                                x-on:click.prevent="createGithubApp(webhookEndpoint, useCustomWebhookEndpoint, customWebhookEndpoint, $wire.preview_deployment_permissions, $wire.deployment_status_permissions, {{ Illuminate\Support\Js::from($administration) }}, $wire.github_runners)">
                                 Register with GitHub
                             </button>
                         </div>
@@ -361,9 +378,10 @@
             </x-callout>
         @endcan
 
+        @can('update', $github_app)
         <script>
             function createGithubApp(webhook_endpoint, use_custom_webhook_endpoint, custom_webhook_endpoint,
-                preview_deployment_permissions, administration, github_runners) {
+                preview_deployment_permissions, deployment_status_permissions, administration, github_runners) {
                 const {
                     organization,
                     html_url
@@ -399,6 +417,9 @@
                 if (preview_deployment_permissions) {
                     default_permissions.pull_requests = 'write';
                     default_events.push('pull_request');
+                }
+                if (deployment_status_permissions) {
+                    default_permissions.deployments = 'write';
                 }
                 if (administration) {
                     default_permissions.administration = 'write';
@@ -438,5 +459,6 @@
                 form.submit();
             }
         </script>
+        @endcan
     @endif
 </div>

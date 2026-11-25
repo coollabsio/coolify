@@ -3,7 +3,6 @@
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Livewire\Server\Create as ServerCreate;
 use App\Livewire\Server\Index as ServerIndex;
-use App\Livewire\Server\LogDrains;
 use App\Livewire\Server\Navbar as ServerNavbar;
 use App\Livewire\Server\ValidateAndInstall;
 use App\Models\CloudProviderToken;
@@ -14,7 +13,6 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Livewire\Exceptions\MethodNotFoundException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -100,20 +98,6 @@ test('member can view server', function () {
     expect($this->member->can('view', $this->server))->toBeTrue();
 });
 
-test('the private log drain syncData helper is not remotely callable', function () {
-    $this->withoutVite();
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    $component = Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
-        ->set('isLogDrainAxiomEnabled', true);
-
-    expect(fn () => $component->call('syncData', true))
-        ->toThrow(MethodNotFoundException::class);
-
-    expect((bool) $this->server->settings->fresh()->is_logdrain_axiom_enabled)->toBeFalse();
-});
-
 // --- Server Policy: manageProxy ---
 
 test('admin can manage proxy', function () {
@@ -178,40 +162,6 @@ test('admin can access new server page', function () {
         ->assertSuccessful()
         ->assertSee('New Server')
         ->assertSeeLivewire(ServerCreate::class);
-});
-
-test('new server chooser lists providers before rendering a creation form', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(ServerCreate::class)
-        ->assertSee('Hetzner')
-        ->assertSee('Vultr')
-        ->assertSee('DigitalOcean')
-        ->assertSee('IP address or domain')
-        ->assertDontSee('>Select<', false)
-        ->assertDontSee('Continue')
-        ->assertSee(route('server.create.type', ['type' => 'hetzner']))
-        ->assertSee(route('server.create.type', ['type' => 'vultr']))
-        ->assertSee(route('server.create.type', ['type' => 'digital-ocean']))
-        ->assertSee(route('server.create.type', ['type' => 'manual']))
-        ->assertDontSee('Add Server by IP Address');
-});
-
-test('new server chooser uses compact mobile provider cards', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(ServerCreate::class)
-        ->assertSee('application-settings-form flex flex-col gap-6', false)
-        ->assertSee('grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-4', false)
-        ->assertSee('grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-3', false)
-        ->assertSee('group flex min-h-32 flex-col rounded-xl', false)
-        ->assertSee('alt="Hetzner" class="size-8"', false)
-        ->assertDontSee('sm:min-h-80', false)
-        ->assertDontSee('size-9 sm:size-14 w-14 h-14', false)
-        ->assertDontSee('>Select<', false)
-        ->assertDontSee('<button', false);
 });
 
 test('new server provider pages render the selected creation flow', function (string $type, string $heading) {

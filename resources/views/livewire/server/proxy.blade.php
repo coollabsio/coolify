@@ -62,31 +62,57 @@
                 <x-application.settings-section id="server-proxy-routing-section" title="Routing behavior"
                     helper="Control generated labels and requests that do not match a running resource.">
                     <div class="grid gap-4 lg:grid-cols-2">
-                        <x-forms.listbox id="generateExactLabels" label="Generated labels"
+                        <x-forms.listbox canGate="update" :canResource="$server" id="generateExactLabels"
+                            label="Generated labels"
                             helper="<ul class='list-disc space-y-1 pl-4'><li><span class='font-semibold'>All supported proxies:</span> Traefik and Caddy labels are both generated, so switching the proxy keeps routing working.</li><li><span class='font-semibold'>Active proxy only:</span> generates fewer labels, but all resources must be redeployed to become accessible again after each proxy switch.</li></ul>"
                             onChange="instantSave" :options="[
                                 ['value' => false, 'label' => 'Labels for all supported proxies'],
                                 ['value' => true, 'label' => 'Labels for the active proxy only'],
                             ]" />
-                        <x-forms.listbox id="redirectEnabled" label="Unknown requests"
-                            helper="Control the 503 response for unknown hosts and stopped services. Custom request handling shows an error page or redirects to a URL."
+                        <x-forms.listbox canGate="update" :canResource="$server" id="redirectEnabled"
+                            label="Unknown requests"
+                            helper="Custom request handling shows an error page or redirects to a URL. The default proxy response is 404 for all requests."
                             onChange="instantSaveRedirect" :options="[
-                                ['value' => false, 'label' => 'Return the default 503 response'],
+                                ['value' => false, 'label' => 'Return the default proxy response'],
                                 ['value' => true, 'label' => 'Use custom request handling'],
                             ]" />
                         @if ($redirectEnabled)
                             <x-forms.input canGate="update" :canResource="$server"
                                 placeholder="https://app.coolify.io" id="redirectUrl"
                                 label="Redirect URL"
-                                helper="Leave empty to return a 503 response instead of redirecting." />
+                                helper="Leave empty to show the error page instead of redirecting." />
+                        @endif
+                        @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
+                            <x-forms.input canGate="update" :canResource="$server" placeholder="letsencrypt"
+                                id="certificateResolver" label="Certificate resolver"
+                                helper="Traefik certificate resolver for generated HTTPS routes. Leave empty if Traefik uses your own certificates (for example Cloudflare Origin CA certificates in a dynamic configuration). Redeploy resources to apply the change." />
                         @endif
                     </div>
+                    @if ($redirectEnabled)
+                        <div class="mt-4 grid items-start gap-4 lg:grid-cols-2">
+                            <x-forms.listbox canGate="update" :canResource="$server" id="unknownHostStatus"
+                                label="Status for unknown hosts"
+                                helper="The status for domains that no resource on this server uses, when the Redirect URL is empty. With 404, search engines remove the URLs of deleted resources. The domains of resources on this server always get 503 while the resource is stopped, deploying or unhealthy, so they keep their search ranking."
+                                onChange="instantSaveUnknownHostStatus" :options="[
+                                    ['value' => 404, 'label' => '404 Not Found (recommended)'],
+                                    ['value' => 503, 'label' => '503 Service Unavailable'],
+                                ]" />
+                            @if (blank($redirectUrl) && $unknownHostStatus === 503)
+                                <x-callout type="info" title="New: 404 for unknown hosts">
+                                    Set <span class="font-semibold">Status for unknown hosts</span> to 404 so that
+                                    search engines remove the domains of deleted resources. The domains of resources on
+                                    this server keep the 503 response while the resource is stopped, deploying or
+                                    unhealthy.
+                                </x-callout>
+                            @endif
+                        </div>
+                    @endif
                     @if ($redirectEnabled && ! $server->isSwarm())
                         <div class="mt-4 flex flex-col gap-2">
                             <x-forms.textarea canGate="update" :canResource="$server" id="customErrorPage" rows="10"
                                 monospace label="Custom error page (HTML)"
                                 placeholder="Leave empty to use the Coolify default error page."
-                                helper="One self-contained HTML file (max {{ \App\Models\Server::PROXY_ERROR_PAGE_MAX_BYTES / 1024 }} KB) with inline CSS and images. Visitors see it with a 503 status for unknown domains and for stopped, deploying or unhealthy resources. A Redirect URL takes priority over this page." />
+                                helper="One self-contained HTML file (max {{ \App\Models\Server::PROXY_ERROR_PAGE_MAX_BYTES / 1024 }} KB) with inline CSS and images. Visitors see it for unknown domains with the status above, and with a 503 status for stopped, deploying or unhealthy resources. A Redirect URL takes priority over this page." />
                             @can('update', $server)
                                 <div class="flex gap-2">
                                     <x-forms.button type="button" wire:click="resetCustomErrorPage">Reset to
@@ -139,6 +165,9 @@
                                     v{{ ltrim($this->traefikVersionForWarning, 'v') }}. The latest patch
                                     for this branch is {{ $this->latestTraefikVersion }}. Test the update before applying it
                                     to production servers.
+                                    <a class="font-medium underline"
+                                        href="https://coolify.io/docs/core/networking/proxy/traefik/update"
+                                        target="_blank">Learn how to update Traefik.</a>
                                 </x-callout>
                             @endif
                             @if ($this->newerTraefikBranchAvailable)
@@ -146,15 +175,20 @@
                                     {{ $this->newerTraefikBranchAvailable }} is available (latest patch:
                                     {{ $this->latestNewerTraefikVersion }}). Review the Traefik changelog for breaking
                                     changes before upgrading.
+                                    <a class="font-medium underline"
+                                        href="https://coolify.io/docs/core/networking/proxy/traefik/update"
+                                        target="_blank">Learn how to update Traefik.</a>
                                 </x-callout>
                             @endif
                         @elseif ($this->outdatedCaddyImage)
                             <x-server.caddy-image-outdated-callout :image="$this->outdatedCaddyImage" />
                         @endif
 
-                        <div wire:loading.flex wire:target="loadProxyConfiguration"
-                            class="min-h-32 items-center justify-center">
-                            <x-loading text="Loading proxy configuration…" />
+                        <div wire:loading.flex wire:target="loadProxyConfiguration" role="status"
+                            class="mt-4 hidden flex-col gap-2">
+                            <span class="sr-only">Loading proxy configuration</span>
+                            <x-skeleton class="h-2.5 w-56 rounded-full" />
+                            <x-skeleton class="h-96 w-full rounded-lg" />
                         </div>
 
                         @if ($proxySettings)
@@ -175,6 +209,12 @@
                             </div>
                         @endif
                     </x-application.settings-section>
+
+                    @if ($proxySettings && $this->configurationVersions->isNotEmpty())
+                        @include('livewire.server.proxy-configuration-history', [
+                            'versions' => $this->configurationVersions,
+                        ])
+                    @endif
                 @endif
                 </fieldset>
             </form>

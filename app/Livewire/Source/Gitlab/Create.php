@@ -50,7 +50,7 @@ class Create extends Component
     public function createGitLabApp()
     {
         try {
-            $this->authorize('createAnyResource');
+            $this->authorize('create', GitlabApp::class);
 
             $this->html_url = rtrim($this->html_url, '/');
             $this->api_url = filled($this->api_url)
@@ -66,6 +66,10 @@ class Create extends Component
                 'is_system_wide' => 'required|bool',
                 'group_name' => 'nullable|string',
             ]);
+
+            if ($this->is_system_wide) {
+                $this->authorize('makeSystemWide', GitlabApp::class);
+            }
 
             $gitlab_app = GitlabApp::create([
                 'name' => $this->name,

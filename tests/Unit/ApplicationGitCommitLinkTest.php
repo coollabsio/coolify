@@ -47,7 +47,7 @@ it('does not generate commit links from incomplete repository URLs', function (s
     'git protocol' => 'git://git.example.com/coollabsio/coolify.git',
 ]);
 
-it('converts scp-style remotes with generic usernames into https repository links', function (string $repository, string $expectedBranch, string $expectedCommits, string $expectedWebhook) {
+it('converts ssh remotes with generic usernames into https repository links', function (string $repository, string $expectedBranch, string $expectedCommits, string $expectedWebhook) {
     $application = new Application;
     $application->setRelation('source', null);
     $application->git_repository = $repository;
@@ -75,5 +75,11 @@ it('converts scp-style remotes with generic usernames into https repository link
         'https://git.example.com/organization/repository/tree/main/',
         'https://git.example.com/organization/repository/commits/main',
         'https://git.example.com/organization/repository/settings/hooks',
+    ],
+    'ssh scheme with port' => [
+        'ssh://git@gitea.example.com:2222/organization/repository.git',
+        'https://gitea.example.com/organization/repository/tree/main/',
+        'https://gitea.example.com/organization/repository/commits/main',
+        'https://gitea.example.com/organization/repository/settings/hooks',
     ],
 ]);

@@ -34,6 +34,7 @@ class ApplicationPreview extends BaseModel
         'last_online_at',
         'domain_dns_statuses',
         'domain_port_overrides',
+        'keeps_production_values',
     ];
 
     protected $hidden = [
@@ -44,6 +45,9 @@ class ApplicationPreview extends BaseModel
         'pull_request_id' => 'integer',
         'domain_dns_statuses' => 'array',
         'domain_port_overrides' => 'array',
+        'is_fork_pull_request' => 'boolean',
+        'approved_at' => 'datetime',
+        'keeps_production_values' => 'boolean',
     ];
 
     protected static function booted(): void
@@ -54,10 +58,13 @@ class ApplicationPreview extends BaseModel
 
             if (data_get($preview, 'application.build_pack') === 'dockercompose') {
                 $composeFile = $application->parse(pull_request_id: $preview->pull_request_id);
-                foreach ($preview->generatedComposeVolumeNames($application, collect(data_get($composeFile, 'volumes', []))) as $volumeName) {
+                $volumeNames = $preview->generatedComposeVolumeNames($application, collect(data_get($composeFile, 'volumes', [])));
+                foreach ($volumeNames as $volumeName) {
                     // Docker does not remove a volume that a container still uses, also with -f.
                     instant_remote_process(['docker volume rm -f '.escapeshellarg($volumeName)], $server, false);
                 }
+                // The compose parser stores preview volumes on the application, not on the preview
+                $application->persistentStorages()->whereIn('name', $volumeNames)->delete();
                 $preview->removeComposePreviewNetwork($application, $server);
             } else {
                 // Regular application volume cleanup
@@ -173,6 +180,113 @@ class ApplicationPreview extends BaseModel
         return self::where('application_id', $application_id)->where('pull_request_id', $pull_request_id)->firstOrFail();
     }
 
+    /**
+     * Store if the pull request comes from a fork. Each webhook event of the pull request sets it.
+     *
+     * The webhook also reports the head commit. A pending approval of an older commit becomes
+     * invalid at once, so that an admin cannot approve it before the new deployment runs. An
+     * unknown head (null or `HEAD`) also clears it; the deployment job records it again.
+     */
+    public function markForkPullRequest(bool $isFork, ?string $headCommit): void
+    {
+        if ($this->is_fork_pull_request !== $isFork) {
+            $this->forceFill(['is_fork_pull_request' => $isFork])->save();
+        }
+
+        $headCommit = strtolower((string) $headCommit);
+        $cleared = static::query()
+            ->whereKey($this->getKey())
+            ->whereNotNull('pending_approval_commit')
+            ->where('pending_approval_commit', '!=', $headCommit)
+            ->update(['pending_approval_commit' => null]);
+        if ($cleared > 0) {
+            $this->pending_approval_commit = null;
+            $this->syncOriginalAttribute('pending_approval_commit');
+        }
+    }
+
+    /**
+     * A fork pull request runs code that the repository owner did not review. Each of its commits
+     * waits for an admin, unless the admin turned on public previews without approval. A pull
+     * request with an unknown origin (null) counts as a fork.
+     */
+    public function forkCommitNeedsApproval(string $commit): bool
+    {
+        if ($this->is_fork_pull_request === false || ! $this->forkApprovalIsRequired()) {
+            return false;
+        }
+
+        return blank($this->approved_commit) || ! hash_equals($this->approved_commit, $commit);
+    }
+
+    /**
+     * Approval is off only when the admin turned on public previews without approval.
+     */
+    public function forkApprovalIsRequired(): bool
+    {
+        $settings = $this->application?->settings;
+
+        return ! ($settings?->is_pr_deployments_public_enabled && ! $settings->is_pr_deployments_public_approval_required);
+    }
+
+    /**
+     * A saved pending commit blocks the deployment only while approval is required.
+     */
+    public function isWaitingForApproval(): bool
+    {
+        return filled($this->pending_approval_commit) && $this->forkApprovalIsRequired();
+    }
+
+    public function markWaitingForApproval(string $commit): void
+    {
+        $this->forceFill(['pending_approval_commit' => $commit])->save();
+    }
+
+    public function approveCommit(string $commit): void
+    {
+        $this->forceFill([
+            'approved_commit' => $commit,
+            'approved_at' => now(),
+            'pending_approval_commit' => null,
+        ])->save();
+    }
+
+    /**
+     * Link to the pending commit inside the pull request, so that a reviewer sees the commit
+     * that an approval deploys, also when the pull request got newer commits. Falls back to
+     * the pull request link for providers without a known commit link (Bitbucket).
+     */
+    public function pendingApprovalCommitUrl(): ?string
+    {
+        $url = rtrim((string) $this->pull_request_html_url, '/');
+        $commit = (string) $this->pending_approval_commit;
+        if ($url === '' || ! preg_match('/^[0-9a-f]{40}([0-9a-f]{24})?$/i', $commit)) {
+            return $url === '' ? null : $url;
+        }
+
+        if (preg_match('#/-/merge_requests/\d+$#', $url)) {
+            return "{$url}/diffs?commit_id={$commit}";
+        }
+
+        if (preg_match('#/(pull|pulls)/\d+$#', $url)) {
+            return "{$url}/commits/{$commit}";
+        }
+
+        return $url;
+    }
+
+    /**
+     * @return 'waiting_for_approval'|'approved'|null
+     */
+    public function approvalStatus(): ?string
+    {
+        if ($this->isWaitingForApproval()) {
+            return 'waiting_for_approval';
+        }
+
+        return filled($this->approved_commit) ? 'approved' : null;
+    }
+
     public function isRunning()
     {
         return (bool) str($this->status)->startsWith('running');
@@ -193,8 +307,23 @@ class ApplicationPreview extends BaseModel
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
 
-    public function generate_preview_fqdn(bool $generateWithoutApplicationDomain = false)
+    /**
+     * Set the preview domains from the preview URL template.
+     *
+     * With $keepExistingDomains, domains already stored on the preview (for example custom
+     * domains set in the UI) are kept, and only an empty preview gets generated domains.
+     */
+    public function generate_preview_fqdn(bool $generateWithoutApplicationDomain = false, bool $keepExistingDomains = false)
     {
+        if ($keepExistingDomains && filled($this->fqdn)) {
+            $normalized = DomainPortOverrides::normalize($this->fqdn, $this->domain_port_overrides);
+            $this->fqdn = $normalized['fqdn'];
+            $this->domain_port_overrides = $normalized['overrides'];
+            $this->save();
+
+            return $this;
+        }
+
         $applicationFqdn = $this->application->fqdn;
         if (! $applicationFqdn && $generateWithoutApplicationDomain) {
             $applicationFqdn = generateUrl(
@@ -218,7 +347,13 @@ class ApplicationPreview extends BaseModel
         return $this;
     }
 
-    public function generate_preview_fqdn_compose(bool $generateWithoutApplicationDomain = false)
+    /**
+     * Set the preview domain of every compose service from the preview URL template.
+     *
+     * With $keepExistingDomains, a service that already has domains on the preview keeps them,
+     * and only services without a preview domain get generated domains.
+     */
+    public function generate_preview_fqdn_compose(bool $generateWithoutApplicationDomain = false, bool $keepExistingDomains = false)
     {
         $applicationDomains = json_decode($this->application->docker_compose_domains ?: '[]', true) ?: [];
         $previewDomains = json_decode(data_get($this, 'docker_compose_domains') ?: '[]', true) ?: [];
@@ -259,6 +394,21 @@ class ApplicationPreview extends BaseModel
         $docker_compose_domains = [];
         $previewPortOverrides = [];
         foreach ($serviceNames as $service_name) {
+            $existingPreviewDomains = $keepExistingDomains
+                ? DomainPortOverrides::normalize(getComposeServiceDomainString($previewDomains, $service_name), $this->domain_port_overrides)
+                : ['fqdn' => null, 'overrides' => null];
+            if (filled($existingPreviewDomains['fqdn'])) {
+                $docker_compose_domains = putComposeServiceDomain(
+                    $docker_compose_domains,
+                    $service_name,
+                    $existingPreviewDomains['fqdn'],
+                    $serviceNames,
+                );
+                $previewPortOverrides = array_merge($previewPortOverrides, $existingPreviewDomains['overrides'] ?? []);
+
+                continue;
+            }
+
             $domain_string = getComposeServiceDomainString($applicationDomains, $service_name);
 
             if (empty($domain_string)) {
@@ -337,6 +487,10 @@ class ApplicationPreview extends BaseModel
         $previewFqdn = str_replace('{{random}}', $random, $template);
         $previewFqdn = str_replace('{{domain}}', $host, $previewFqdn);
         $previewFqdn = str_replace('{{pr_id}}', (string) $this->pull_request_id, $previewFqdn);
+        if (preg_match('#^(https?)://(.*)$#i', $previewFqdn, $matches)) {
+            $schema = strtolower($matches[1]);
+            $previewFqdn = $matches[2];
+        }
         $previewUrl = "{$schema}://{$previewFqdn}{$path}";
         $sourceCanonical = DomainPortOverrides::withoutPort($sourceDomain);
         $port = $url->getPort() ?? ($this->application->domain_port_overrides[$sourceCanonical] ?? null);

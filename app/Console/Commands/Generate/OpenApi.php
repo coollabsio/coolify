@@ -21,9 +21,6 @@ class OpenApi extends Command
         $process = Process::env(['XDEBUG_MODE' => 'off'])->run([
             './vendor/bin/openapi',
             'app',
-            // Server transfer endpoints are development-only (isDev()), so they stay out of the public docs.
-            '--exclude',
-            'Http/Controllers/Api/ServerTransferController.php',
             '-o',
             'openapi.yaml',
             '--version',

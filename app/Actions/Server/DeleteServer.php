@@ -19,6 +19,15 @@ class DeleteServer
     public function handle(int $serverId, bool $deleteFromHetzner = false, ?int $hetznerServerId = null, ?int $cloudProviderTokenId = null, ?int $teamId = null, bool $deleteFromVultr = false, ?string $vultrInstanceId = null, bool $deleteFromDigitalOcean = false, ?int $digitalOceanDropletId = null, bool $deleteFromHostinger = false, ?int $hostingerVirtualMachineId = null)
     {
         $server = Server::withTrashed()->find($serverId);
+        // Another Coolify instance manages the cloud server of a transferred server.
+        if ($server?->isTransferredAway()) {
+            $deleteFromHetzner = $deleteFromVultr = $deleteFromDigitalOcean = $deleteFromHostinger = false;
+        }
+
+        // A Sentinel that keeps running would push to Coolify for a server that no longer exists.
+        if ($server && ! $server->isTransferredAway() && ! $deleteFromHetzner && ! $deleteFromVultr && ! $deleteFromDigitalOcean) {
+            $this->stopSentinel($server);
+        }
 
         // Delete from Hetzner even if server is already gone from Coolify
         if ($deleteFromHetzner && ($hetznerServerId || ($server && $server->hetzner_server_id))) {
@@ -70,6 +79,22 @@ class DeleteServer
         }
     }
 
+    private function stopSentinel(Server $server): void
+    {
+        if (! $server->settings?->is_sentinel_enabled || ! $server->isFunctional()) {
+            return;
+        }
+
+        try {
+            instant_remote_process(['docker rm -f coolify-sentinel'], $server, false, timeout: 30, maxAttempts: 1);
+        } catch (\Throwable $e) {
+            logger()->warning('Failed to stop Sentinel before deleting the server', [
+                'error' => $e->getMessage(),
+                'server_id' => $server->id,
+            ]);
+        }
+    }
+
     private function deleteFromHetznerById(int $hetznerServerId, ?int $cloudProviderTokenId, int $teamId): void
     {
         try {
@@ -108,7 +133,7 @@ class DeleteServer
 
             // Notify the team about the failure
             $team = Team::find($teamId);
-            $team?->notify(new HetznerDeletionFailed($hetznerServerId, $teamId, $e->getMessage()));
+            $team?->notify(new HetznerDeletionFailed($hetznerServerId, $teamId, remove_iip($e->getMessage())));
         }
     }
 

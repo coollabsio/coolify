@@ -1,13 +1,14 @@
 # Versions
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
-ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine
+ARG BASE_IMAGE=docker.io/serversideup/php:8.4-fpm-nginx-alpine-v5.0.3@sha256:72189e423ff5e4e1acf5ced07cec52b6dfac3c7db80c542c97f160eb80744f20
+ARG DISTRO=alpine-3.24
 # https://github.com/cloudflare/cloudflared/releases
-ARG CLOUDFLARED_VERSION=2025.7.0
+ARG CLOUDFLARED_VERSION=2026.10.3
 # https://www.postgresql.org/support/versioning/
 # Note: We are using version 18 of the postgres client (while still using postgres 15 for the postgres server) as version 15 has been removed from Alpine 3.23+ https://pkgs.alpinelinux.org/packages?name=postgresql*-client&branch=v3.23&repo=&arch=x86_64&origin=&flagged=&maintainer=
 ARG POSTGRES_VERSION=18
 # https://nginx.org/en/linux_packages.html
-ARG NGINX_VERSION=1.31.2-r1
+ARG NGINX_VERSION=1.31.8-r1
 # https://pecl.php.net/package/uv
 ARG PHP_UV_VERSION=0.3.0
 
@@ -19,7 +20,7 @@ FROM ghcr.io/coollabsio/mx:0.1.0 AS minio-client
 # =================================================================
 # Final Stage: Production image
 # =================================================================
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
+FROM ${BASE_IMAGE}
 
 ARG USER_ID
 ARG GROUP_ID
@@ -70,6 +71,7 @@ RUN apk add --no-cache \
     git-lfs \
     jq \
     lsof \
+    procps \
     vim
 
 # Install PHP extensions
@@ -114,6 +116,32 @@ RUN mkdir -p /etc/nginx/conf.d && \
 # Install MinIO client
 COPY --from=minio-client /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
+
+ARG BASE_IMAGE
+ARG DISTRO
+ARG COOLIFY_VERSION
+ARG CREATED
+ARG GIT_SHA
+
+LABEL org.opencontainers.image.title="Coolify Development" \
+    org.opencontainers.image.description="The development image of Coolify, it runs the checkout that Docker Compose mounts into it." \
+    org.opencontainers.image.version="${COOLIFY_VERSION}" \
+    org.opencontainers.image.revision="${GIT_SHA}" \
+    org.opencontainers.image.created="${CREATED}" \
+    org.opencontainers.image.licenses="Apache-2.0" \
+    org.opencontainers.image.authors="coolLabs" \
+    org.opencontainers.image.vendor="coolLabs" \
+    org.opencontainers.image.url="https://coolify.io" \
+    org.opencontainers.image.documentation="https://github.com/coollabsio/coolify/blob/main/CONTRIBUTING.md" \
+    org.opencontainers.image.source="https://github.com/coollabsio/coolify" \
+    org.opencontainers.image.base.name="${BASE_IMAGE%@*}" \
+    org.opencontainers.image.base.digest="${BASE_IMAGE#*@}" \
+    io.coolify.image.version="${COOLIFY_VERSION}" \
+    io.coolify.image.distro="${DISTRO}" \
+    io.coolify.image.variant="development" \
+    io.coolify.image.flavor="" \
+    io.coolify.image.shell="busybox" \
+    io.coolify.image.package-manager="apk"
 
 # Stay as root for s6 init so bind-mounted workspaces work even when the host
 # tree is root-owned (CI, Jean, rootful Docker). PHP-FPM/nginx still run as

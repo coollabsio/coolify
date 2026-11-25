@@ -39,7 +39,8 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->withoutVite();
-    Queue::fake([CheckDomainDnsJob::class]);
+    // A new hostname of an automatic DNS zone also queues a record; DnsProviderManagementTest and DnsApiTest cover that.
+    Queue::fake([CheckDomainDnsJob::class, ConfigureDnsRecordJob::class]);
     config()->set('app.maintenance.store', 'array');
     config()->set('app.id', 'test-instance');
 

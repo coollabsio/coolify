@@ -100,7 +100,13 @@ class Ntfy extends Component
     public bool $serverPatchNtfyNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $serverAutoUpdateNtfyNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $traefikOutdatedNtfyNotifications = true;
+
+    #[Validate(['boolean'])]
+    public bool $imageVulnerabilitiesNtfyNotifications = false;
 
     public function mount()
     {
@@ -155,7 +161,9 @@ class Ntfy extends Component
             $this->settings->server_reachable_ntfy_notifications = $this->serverReachableNtfyNotifications;
             $this->settings->server_unreachable_ntfy_notifications = $this->serverUnreachableNtfyNotifications;
             $this->settings->server_patch_ntfy_notifications = $this->serverPatchNtfyNotifications;
+            $this->settings->server_auto_update_ntfy_notifications = $this->serverAutoUpdateNtfyNotifications;
             $this->settings->traefik_outdated_ntfy_notifications = $this->traefikOutdatedNtfyNotifications;
+            $this->settings->image_vulnerabilities_ntfy_notifications = $this->imageVulnerabilitiesNtfyNotifications;
 
             $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
@@ -197,7 +205,9 @@ class Ntfy extends Component
             $this->serverReachableNtfyNotifications = $this->settings->server_reachable_ntfy_notifications;
             $this->serverUnreachableNtfyNotifications = $this->settings->server_unreachable_ntfy_notifications;
             $this->serverPatchNtfyNotifications = $this->settings->server_patch_ntfy_notifications;
+            $this->serverAutoUpdateNtfyNotifications = $this->settings->server_auto_update_ntfy_notifications;
             $this->traefikOutdatedNtfyNotifications = $this->settings->traefik_outdated_ntfy_notifications;
+            $this->imageVulnerabilitiesNtfyNotifications = $this->settings->image_vulnerabilities_ntfy_notifications;
         }
     }
 

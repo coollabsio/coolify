@@ -247,7 +247,7 @@ class Actions extends Component
                 'stripe_comment' => 'Subscription cancelled immediately by user at '.now()->toDateTimeString(),
             ]);
 
-            $team->subscriptionEnded();
+            $team->subscriptionEnded($subscription);
 
             $this->auditSubscriptionChange('cancelled', ['cancel_at_period_end' => false]);
 

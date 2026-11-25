@@ -1,6 +1,7 @@
 <?php
 
 use App\Events\ServiceChecked;
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Jobs\PushServerUpdateJob;
 use App\Models\Environment;
 use App\Models\Project;
@@ -10,6 +11,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
@@ -103,6 +105,7 @@ test('database is not marked exited when an incomplete containers snapshot is em
 });
 
 test('database is marked exited when a complete containers snapshot is empty', function () {
+    Queue::fake([NotifyResourceStoppedJob::class]);
     $team = Team::factory()->create();
     $database = createPushUpdatePostgresql($team, [
         'status' => 'running:healthy',

@@ -174,6 +174,53 @@ describe('PATCH /api/v1/applications/{uuid}/envs/bulk', function () {
 
         $response->assertStatus(422);
     });
+
+    test('keeps one row per key and preview flag when the same key is sent more than once', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+            'Content-Type' => 'application/json',
+        ])->patchJson("/api/v1/applications/{$application->uuid}/envs/bulk", [
+            'data' => [
+                ['key' => 'DUPLICATED', 'value' => 'first'],
+                ['key' => 'DUPLICATED', 'value' => 'second'],
+                ['key' => 'PREVIEW_ONLY', 'value' => 'preview-b', 'is_preview' => true],
+                ['key' => 'SHARED', 'value' => 'production-a'],
+                ['key' => 'SHARED', 'value' => 'preview-a', 'is_preview' => true],
+            ],
+        ]);
+
+        $response->assertStatus(201);
+
+        $rows = EnvironmentVariable::where('resourceable_type', Application::class)
+            ->where('resourceable_id', $application->id)
+            ->whereIn('key', ['DUPLICATED', 'PREVIEW_ONLY', 'SHARED'])
+            ->get();
+
+        $counts = $rows->countBy(fn ($env) => $env->key.'|'.($env->is_preview ? 'preview' : 'production'))->all();
+        ksort($counts);
+
+        expect($counts)->toBe([
+            'DUPLICATED|preview' => 1,
+            'DUPLICATED|production' => 1,
+            'PREVIEW_ONLY|preview' => 1,
+            'SHARED|preview' => 1,
+            'SHARED|production' => 1,
+        ]);
+
+        $valueOf = fn (string $key, bool $isPreview) => $rows
+            ->first(fn ($env) => $env->key === $key && $env->is_preview === $isPreview)
+            ->value;
+
+        expect($valueOf('DUPLICATED', false))->toBe('second')
+            ->and($valueOf('SHARED', false))->toBe('production-a')
+            ->and($valueOf('SHARED', true))->toBe('preview-a');
+    });
 });
 
 describe('PATCH /api/v1/services/{uuid}/envs/bulk', function () {

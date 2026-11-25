@@ -25,8 +25,8 @@
                 'failed' => 'Failed',
                 default => ucfirst($executionStatus),
             };
-            $server = data_get($task, 'application.destination.server')
-                ?? data_get($task, 'service.destination.server');
+            $server = data_get($this->task, 'application.destination.server')
+                ?? data_get($this->task, 'service.destination.server');
         @endphp
         <div class="border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]"
             wire:key="task-execution-{{ data_get($execution, 'id') }}">

@@ -14,8 +14,39 @@
         $activeFilterLabels->push(str($environmentFilter)->headline()->toString());
     }
     $activeFilterText = $activeFilterLabels->implode(', ');
+    $canBulkEdit = auth()->user()?->can('manageEnvironment', $resource) ?? false;
 @endphp
-<div class="flex flex-col gap-4" wire:init="loadEnvironmentVariables">
+<div class="flex flex-col gap-4" wire:init="loadEnvironmentVariables"
+    x-data="{
+        selectedIds: [],
+        pageIds() {
+            return Array.from(this.$root.querySelectorAll('[data-env-select-id]'), (el) => Number(el.dataset.envSelectId));
+        },
+        get allSelected() {
+            const ids = this.pageIds();
+            return ids.length > 0 && ids.every((id) => this.selectedIds.includes(id));
+        },
+        get someSelected() {
+            return this.selectedIds.length > 0 && !this.allSelected;
+        },
+        isSelected(id) {
+            return this.selectedIds.includes(id);
+        },
+        toggleSelected(id) {
+            this.selectedIds = this.isSelected(id)
+                ? this.selectedIds.filter((selectedId) => selectedId !== id)
+                : [...this.selectedIds, id];
+        },
+        toggleAll() {
+            this.selectedIds = this.allSelected ? [] : this.pageIds();
+        },
+        applyAvailability(field, value) {
+            if (this.selectedIds.length === 0) return;
+            this.$wire.bulkUpdateAvailability(field, value, this.selectedIds);
+        },
+    }"
+    x-on:environment-variable-selection-reset.window="selectedIds = []"
+    x-on:focus-compose-environment-variable.window="const key = $event.detail.key; const focus = () => { const row = document.querySelector(`[data-env-key='${CSS.escape(key)}']`); if (!row) return false; row.scrollIntoView({ behavior: 'smooth', block: 'center' }); row.querySelector('[data-env-settings-trigger]')?.click(); return true; }; if (!focus()) { $wire.focusComposeEnvironmentVariable(key).then(() => requestAnimationFrame(focus)); }">
     <x-application.settings-section id="environment-variables-section" title="Environment variables"
         helper="Environment variables (secrets) for this resource.">
         @can('manageEnvironment', $resource)
@@ -27,32 +58,49 @@
             </x-slot:actions>
         @endcan
         @if ($view === 'normal')
-            @if ($resourceClass === 'App\Models\Application')
-                <div class="grid w-full items-end gap-4 sm:grid-cols-2">
-                    @if (data_get($resource, 'build_pack') !== 'dockercompose')
-                        <x-forms.listbox id="is_env_sorting_enabled" label="Environment variable order"
-                            onChange="instantSave"
-                            helper="Controls how environment variables are ordered in the list and written to the generated .env file on deploy."
+            <div class="flex w-full flex-col gap-4">
+                @if ($resourceClass === 'App\Models\Application')
+                    <div class="grid w-full items-end gap-4 sm:grid-cols-2">
+                        @if (data_get($resource, 'build_pack') !== 'dockercompose')
+                            <x-forms.listbox id="is_env_sorting_enabled" label="Environment variable order"
+                                onChange="instantSave"
+                                helper="Controls how environment variables are ordered in the list and written to the generated .env file on deploy."
+                                :options="[
+                                    ['value' => false, 'label' => 'Creation order'],
+                                    ['value' => true, 'label' => 'Alphabetical'],
+                                ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
+                        @endif
+                        <x-forms.listbox id="use_build_secrets" label="Build secrets" onChange="instantSave"
+                            helper="Docker BuildKit secrets keep values out of the final image for enhanced security during builds. Requires Docker 18.09+ with BuildKit support."
                             :options="[
-                                ['value' => false, 'label' => 'Creation order'],
-                                ['value' => true, 'label' => 'Alphabetical'],
+                                ['value' => false, 'label' => 'Standard build arguments'],
+                                ['value' => true, 'label' => 'Docker BuildKit secrets'],
                             ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
-                    @endif
-                    <x-forms.listbox id="use_build_secrets" label="Build secrets" onChange="instantSave"
-                        helper="Docker BuildKit secrets keep values out of the final image for enhanced security during builds. Requires Docker 18.09+ with BuildKit support."
-                        :options="[
-                            ['value' => false, 'label' => 'Standard build arguments'],
-                            ['value' => true, 'label' => 'Docker BuildKit secrets'],
-                        ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
-                </div>
-            @else
-                <p class="text-sm text-neutral-500 dark:text-fg-dim">Manage this resource's environment variables below.</p>
-            @endif
+                    </div>
+                @endif
+                <x-forms.checkbox instantSave="saveCoolifyDefaultVariables" id="include_coolify_default_variables"
+                    label="Include Coolify default variables"
+                    helper="Adds COOLIFY_APP_NAME, COOLIFY_PROJECT_NAME, COOLIFY_ENVIRONMENT_NAME and COOLIFY_SERVER_IP to the container at runtime. A variable that you define with the same name wins. Takes effect after the next deploy or restart."
+                    :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
+                @if ($this->hasLogRedactionSetting())
+                    <div class="grid w-full items-end gap-4 sm:grid-cols-2">
+                        <x-forms.listbox id="redact_all_env_values_in_logs" label="Environment values in logs"
+                            onChange="saveLogRedactionSetting"
+                            helper="Hide every environment variable value in deployment logs, scheduled task output, copied or downloaded logs, and logs from the API and MCP. Live log streaming is not changed. Locked variables and known secret formats are always hidden."
+                            :options="[
+                                ['value' => true, 'label' => 'Hide all values'],
+                                ['value' => false, 'label' => 'Hide locked values only'],
+                            ]" :disabled="! auth()->user()->can('manageEnvironment', $resource)" />
+                    </div>
+                @endif
+            </div>
         @else
             <form wire:submit.prevent='submit' class="flex w-full flex-col gap-4">
                 @can('manageEnvironment', $resource)
                     <x-callout type="info" title="Note">
                         Inline comments with space before # (e.g., <code class="font-mono">KEY=value #comment</code>) are stripped.
+                        To set flags, put <code class="font-mono"># coolify: literal buildtime=false runtime=false</code>
+                        directly above a variable line. Without this line, the flags of a variable do not change.
                     </x-callout>
                     <x-forms.textarea rows="10" class="whitespace-pre-wrap font-sans" id="variables"
                         wire:model="variables" label="Production"></x-forms.textarea>
@@ -73,7 +121,7 @@
         @endif
     </x-application.settings-section>
 
-    {{-- Toolbar: search left; filter and add right --}}
+    {{-- Toolbar: search left; mass update (selected rows), filter, and add right --}}
     @if ($view === 'normal')
         <x-table.toolbar class="mt-2" aria-busy="{{ ! $readyToLoad ? 'true' : 'false' }}">
             <x-slot:search>
@@ -81,6 +129,37 @@
                     loading-target="search,loadEnvironmentVariables" wire:model.live.debounce.300ms="search"
                     :disabled="! $readyToLoad" />
             </x-slot:search>
+            @can('manageEnvironment', $resource)
+                <div class="table-availability" x-cloak x-show="selectedIds.length > 0">
+                    <x-table.dropdown panel-class="w-60!">
+                        <x-slot:trigger>
+                            <button type="button" aria-haspopup="listbox" :aria-expanded="open"
+                                x-bind:title="`Change build time / runtime availability of ${selectedIds.length} selected ${selectedIds.length === 1 ? 'variable' : 'variables'}`"
+                                class="button button-highlighted">
+                                <x-reicon name="sliders" class="size-3.5 shrink-0" />
+                                <span>Mass update</span>
+                                <span x-text="selectedIds.length"
+                                    class="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-white/[0.07] dark:text-fg-dim"></span>
+                            </button>
+                        </x-slot:trigger>
+                        <span class="block px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-fg-faint">Build time</span>
+                        <button type="button" class="listbox-option" @click="applyAvailability('is_buildtime', true); open = false">
+                            <span>Available during build</span>
+                        </button>
+                        <button type="button" class="listbox-option" @click="applyAvailability('is_buildtime', false); open = false">
+                            <span>Not available during build</span>
+                        </button>
+                        <div class="my-1 border-t border-neutral-200 dark:border-white/10"></div>
+                        <span class="block px-2 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-fg-faint">Runtime</span>
+                        <button type="button" class="listbox-option" @click="applyAvailability('is_runtime', true); open = false">
+                            <span>Available in the container</span>
+                        </button>
+                        <button type="button" class="listbox-option" @click="applyAvailability('is_runtime', false); open = false">
+                            <span>Not available in the container</span>
+                        </button>
+                    </x-table.dropdown>
+                </div>
+            @endcan
             <x-table.filter :active-count="$activeFilterCount" :active-text="$activeFilterText"
                 reset-action="clearFilters">
                         @foreach ([
@@ -98,7 +177,7 @@
                                 @endphp
                                 <span @class([
                                     'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
-                                    'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $selected,
+                                    'border-coollabs bg-coollabs text-white dark:border-brand dark:bg-brand dark:text-white' => $selected,
                                     'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => ! $selected,
                                 ])>
                                     @if ($selected)
@@ -116,7 +195,7 @@
                                     <span>{{ $label }}</span>
                                     <span @class([
                                         'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
-                                        'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $environmentFilter === $value,
+                                        'border-coollabs bg-coollabs text-white dark:border-brand dark:bg-brand dark:text-white' => $environmentFilter === $value,
                                         'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => $environmentFilter !== $value,
                                     ])>
                                         @if ($environmentFilter === $value)
@@ -139,7 +218,7 @@
                                     @endphp
                                     <span @class([
                                         'flex size-4 shrink-0 items-center justify-center rounded-[5px] border',
-                                        'border-coollabs bg-coollabs text-white dark:border-warning dark:bg-warning dark:text-black' => $serviceSelected,
+                                        'border-coollabs bg-coollabs text-white dark:border-brand dark:bg-brand dark:text-white' => $serviceSelected,
                                         'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]' => ! $serviceSelected,
                                     ])>
                                         @if ($serviceSelected)
@@ -152,14 +231,17 @@
                             @endforeach
                         @endif
             </x-table.filter>
-            <x-table.sort>
-                        @foreach (['default' => 'Default order', 'name_asc' => 'Name A–Z', 'name_desc' => 'Name Z–A'] as $value => $label)
-                            <button type="button" class="listbox-option" wire:click="setTableSort('{{ $value }}')" @click="open = false">
-                                <span>{{ $label }}</span>
-                                @if ($tableSort === $value)<span>✓</span>@endif
-                            </button>
-                        @endforeach
-            </x-table.sort>
+            {{-- The table header, with its Name sort, is hidden on small screens (app.css, max-width: 768px). --}}
+            <div class="min-[769px]:hidden">
+                <x-table.sort>
+                            @foreach (['default' => 'Default order', 'name_asc' => 'Name A–Z', 'name_desc' => 'Name Z–A'] as $value => $label)
+                                <button type="button" class="listbox-option" wire:click="setTableSort('{{ $value }}')" @click="open = false">
+                                    <span>{{ $label }}</span>
+                                    @if ($tableSort === $value)<span>✓</span>@endif
+                                </button>
+                            @endforeach
+                </x-table.sort>
+            </div>
                 @can('manageEnvironment', $resource)
                     {{-- Do not disable Add based on readyToLoad: modal-input uses wire:ignore, so a
                          disabled attribute painted on first load would never re-enable. --}}
@@ -171,7 +253,7 @@
                                 Add
                             </button>
                         </x-slot:content>
-                        <livewire:project.shared.environment-variable.add :resource="$resource" />
+                        <livewire:project.shared.environment-variable.add :resource="$resource" :showPreview="$showPreview" />
                     </x-modal-input>
                 @endcan
         </x-table.toolbar>
@@ -180,9 +262,9 @@
     @if ($view === 'normal')
         @if (! $readyToLoad)
             <div id="environment-table-section"
-                class="application-settings-section-body mt-1 flex min-h-40 w-full scroll-mt-28 items-center justify-center"
-                wire:loading.class="opacity-100" wire:target="loadEnvironmentVariables">
-                <x-loading text="Loading environment variables..." />
+                class="application-settings-section-body is-flush mt-1 w-full scroll-mt-28" role="status">
+                <span class="sr-only">Loading environment variables</span>
+                <x-skeleton.table flush :rows="6" />
             </div>
         @else
             @php
@@ -198,13 +280,19 @@
                     <x-empty size="sm" title="No environment variables found"
                         description="No variables match your search." />
                 @elseif ($totalRows > 0)
-                    <div class="data-table w-full">
+                    <div class="data-table w-full" x-bind:class="{ 'env-table-has-selection': selectedIds.length > 0 }">
                         <div class="environment-table-scroll relative">
                             <div class="transition-all"
                                 wire:loading.class="pointer-events-none opacity-40 blur-[2px]"
-                                wire:target="toggleVariableFilter,toggleServiceFilter,clearFilters,setEnvironmentFilter,setTableSort,setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage">
-                            <div class="data-table-header env-table-grid {{ $showEnvironmentType ? '' : 'env-table-grid-no-type' }}">
-                            <span>Name</span>
+                                wire:target="toggleVariableFilter,toggleServiceFilter,clearFilters,setEnvironmentFilter,setTableSort,setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage,bulkUpdateAvailability">
+                            <div class="data-table-header env-table-grid {{ $showEnvironmentType ? '' : 'env-table-grid-no-type' }} {{ $canBulkEdit ? 'env-table-grid-selectable' : '' }}">
+                            @if ($canBulkEdit)
+                                <x-table.checkbox label="Select all environment variables on this page"
+                                    x-bind:checked="allSelected" x-effect="$el.indeterminate = someSelected"
+                                    x-on:change="toggleAll()" />
+                            @endif
+                            <x-table.sort-header label="Name" asc="name_asc" desc="name_desc"
+                                action="setTableSort" :current="$tableSort" />
                             <span class="text-center">Managed</span>
                             @if ($showEnvironmentType)
                                 <span>Type</span>
@@ -213,7 +301,7 @@
                             <span class="text-center">Multiline</span>
                             <span class="text-center">Buildtime</span>
                             <span class="text-center">Runtime</span>
-                            <span></span>
+                            <span class="text-right">Actions</span>
                         </div>
                             @php $renderedScope = null; @endphp
                             @foreach ($this->environmentVariablePageRows as $row)
@@ -225,17 +313,20 @@
                             @endif
                             @if ($row['kind'] === 'managed')
                                 <livewire:project.shared.environment-variable.show wire:key="{{ $row['id'] }}"
-                                    :env="$row['environmentVariable']" :type="$resource->type()" :showEnvironmentType="$showEnvironmentType" />
+                                    :env="$row['environmentVariable']" :type="$resource->type()"
+                                    :composeInfo="$row['composeInfo']" :showEnvironmentType="$showEnvironmentType"
+                                    :sameAsProduction="$row['sameAsProduction']" :selectable="$canBulkEdit" />
                             @else
                                 <livewire:project.shared.environment-variable.show-hardcoded
                                     wire:key="{{ $row['id'] }}" :env="$row['environmentVariable']"
                                     :isPreview="$row['scope'] === 'preview'" :showEnvironmentType="$showEnvironmentType"
-                                    :resourceableType="get_class($resource)" :resourceableId="$resource->id" />
+                                    :resourceableType="get_class($resource)" :resourceableId="$resource->id"
+                                    :selectable="$canBulkEdit" />
                             @endif
                             @endforeach
                             </div>
                             <x-table.loading
-                                target="toggleVariableFilter,toggleServiceFilter,clearFilters,setEnvironmentFilter,setTableSort,setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage"
+                                target="toggleVariableFilter,toggleServiceFilter,clearFilters,setEnvironmentFilter,setTableSort,setEnvironmentVariablePage,previousEnvironmentVariablePage,nextEnvironmentVariablePage,bulkUpdateAvailability"
                                 text="Loading environment variables..." />
                         </div>
                         <x-table-pagination :from="$firstVisibleRow" :to="$lastVisibleRow" :total="$totalRows"

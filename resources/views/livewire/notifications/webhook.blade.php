@@ -18,10 +18,19 @@
                 <div class="grid gap-4 lg:grid-cols-2">
                     <div class="lg:col-span-2">
                         @can('update', $settings)
-                            <x-forms.input type="password" required id="webhookUrl" label="Webhook URL"
+                            <x-forms.input type="password" :required="$webhookEnabled" id="webhookUrl" label="Webhook URL"
                                 helper="Coolify sends POST requests to this HTTP or HTTPS endpoint." />
                         @else
                             <x-forms.input disabled label="Webhook URL" value="Hidden (only admins can view)" />
+                        @endcan
+                    </div>
+                    <div class="lg:col-span-2">
+                        @can('update', $settings)
+                            <x-forms.input type="password" id="webhookAuthorizationHeader" label="Authorization Header"
+                                placeholder="Bearer your-token"
+                                helper="Optional. Coolify sends this value in the Authorization header of each request, for example: Bearer your-token." />
+                        @else
+                            <x-forms.input disabled label="Authorization Header" value="Hidden (only admins can view)" />
                         @endcan
                     </div>
                 </div>

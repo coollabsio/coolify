@@ -1,6 +1,7 @@
 <?php
 
 use App\Exceptions\NonReportableException;
+use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
 use App\Notifications\Channels\EmailChannel;
@@ -13,6 +14,7 @@ use Tests\TestCase;
 uses(TestCase::class, RefreshDatabase::class);
 
 beforeEach(function () {
+    InstanceSettings::forceCreate(['id' => 0]);
     $this->resendStub = null;
     $this->team = Team::factory()->create();
     $user = User::factory()->create(['email' => 'test@example.com']);
@@ -28,11 +30,22 @@ beforeEach(function () {
     ]);
     $this->team->refresh();
 
+    // A test notification shows every error to the user and never counts as a delivery failure.
     $this->notification = new class extends Notification
     {
+        public bool $isTestNotification = true;
+
         public function toMail(object $notifiable): MailMessage
         {
             return (new MailMessage)->subject('Test Email')->line('Test');
+        }
+    };
+
+    $this->deliveryNotification = new class extends Notification
+    {
+        public function toMail(object $notifiable): MailMessage
+        {
+            return (new MailMessage)->subject('Deployment')->line('Deployed');
         }
     };
 });
@@ -164,4 +177,53 @@ it('sends successfully when Resend returns an email id', function () {
 
     expect(fn () => (new EmailChannel)->send($this->team, $this->notification))
         ->not->toThrow(Throwable::class);
+});
+
+it('counts an invalid team Resend key as a delivery failure without a retry', function () {
+    $this->resendStub = fakeResendResponse(401, ['statusCode' => 401, 'name' => 'validation_error', 'message' => 'API key is invalid']);
+
+    (new EmailChannel)->send($this->team, $this->deliveryNotification);
+
+    $settings = $this->team->emailNotificationSettings->fresh();
+    expect($settings->failure_count)->toBe(1)
+        ->and($settings->resend_enabled)->toBeTrue();
+});
+
+it('disables team Resend after three invalid key failures in a row', function () {
+    $this->resendStub = fakeResendResponse(401, ['statusCode' => 401, 'name' => 'validation_error', 'message' => 'API key is invalid']);
+
+    foreach (range(1, 3) as $attempt) {
+        (new EmailChannel)->send($this->team, $this->deliveryNotification);
+    }
+
+    $settings = $this->team->emailNotificationSettings->fresh();
+    expect($settings->resend_enabled)->toBeFalse()
+        ->and($settings->failure_count)->toBe(0)
+        ->and($settings->resend_api_key)->toBe('test_api_key');
+});
+
+it('retries temporary Resend errors without counting them', function () {
+    $this->resendStub = fakeResendResponse(500, ['statusCode' => 500, 'name' => 'application_error', 'message' => 'Internal server error.']);
+
+    expect(fn () => (new EmailChannel)->send($this->team, $this->deliveryNotification))
+        ->toThrow(Exception::class, 'Failed to send email via Resend: Internal server error.');
+
+    expect($this->team->emailNotificationSettings->fresh()->failure_count)->toBe(0);
+});
+
+it('does not count Resend errors for test emails', function () {
+    $this->resendStub = fakeResendResponse(401, ['statusCode' => 401, 'name' => 'validation_error', 'message' => 'API key is invalid']);
+
+    expect(fn () => (new EmailChannel)->send($this->team, $this->notification))->toThrow(NonReportableException::class);
+
+    expect($this->team->emailNotificationSettings->fresh()->failure_count)->toBe(0);
+});
+
+it('resets the failure count after a successful delivery', function () {
+    $this->team->emailNotificationSettings->increment('failure_count', 2);
+    $this->resendStub = fakeResendResponse(200, ['id' => '49a3999c-0ce1-4ea6-ab68-afcd6dc2e794']);
+
+    (new EmailChannel)->send($this->team, $this->deliveryNotification);
+
+    expect($this->team->emailNotificationSettings->fresh()->failure_count)->toBe(0);
 });

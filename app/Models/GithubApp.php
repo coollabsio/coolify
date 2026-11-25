@@ -35,6 +35,7 @@ class GithubApp extends BaseModel
         'contents',
         'metadata',
         'pull_requests',
+        'deployments',
         'administration',
         'organization_self_hosted_runners',
         'actions',
@@ -50,6 +51,8 @@ class GithubApp extends BaseModel
         'type' => 'string',
         'webhook_events' => 'array',
         'runner_group_id' => 'integer',
+        'client_secret' => 'encrypted',
+        'webhook_secret' => 'encrypted',
     ];
 
     protected $hidden = [
@@ -57,10 +60,38 @@ class GithubApp extends BaseModel
         'webhook_secret',
     ];
 
+    /**
+     * Installation token kept in memory, so one job does not request a new token for each GitHub call.
+     *
+     * @var array{credentials: string, token: string, expires_at: int}|null
+     */
+    private ?array $installationTokenInMemory = null;
+
+    public function installationToken(?int $timeout = null): string
+    {
+        $credentials = implode('|', [$this->api_url, $this->app_id, $this->installation_id, $this->private_key_id]);
+        $cached = $this->installationTokenInMemory;
+
+        if ($cached && $cached['credentials'] === $credentials && $cached['expires_at'] > now()->getTimestamp()) {
+            return $cached['token'];
+        }
+
+        $token = generateGithubToken($this, 'installation', $timeout);
+
+        // GitHub installation tokens expire after one hour; renew them well before that.
+        $this->installationTokenInMemory = [
+            'credentials' => $credentials,
+            'token' => $token,
+            'expires_at' => now()->addMinutes(50)->getTimestamp(),
+        ];
+
+        return $token;
+    }
+
     protected static function booted(): void
     {
         static::deleting(function (GithubApp $github_app) {
-            $applications_count = Application::where('source_id', $github_app->id)->count();
+            $applications_count = $github_app->applications()->count();
             if ($applications_count > 0) {
                 throw new \Exception('You cannot delete this GitHub App because it is in use by '.$applications_count.' application(s). Delete them first.');
             }
@@ -80,7 +111,8 @@ class GithubApp extends BaseModel
                 $isUsedElsewhere = $privateKey->servers()->exists()
                     || $privateKey->applications()->exists()
                     || $privateKey->githubApps()->where('id', '!=', $github_app->id)->exists()
-                    || $privateKey->gitlabApps()->exists();
+                    || $privateKey->gitlabApps()->exists()
+                    || $privateKey->giteaApps()->exists();
 
                 if (! $isUsedElsewhere) {
                     $privateKey->delete();
@@ -116,6 +148,24 @@ class GithubApp extends BaseModel
     public function runnerConfigs()
     {
         return $this->hasMany(GithubRunnerConfig::class);
+    }
+
+    /**
+     * Whether Coolify can create GitHub Deployments and their statuses with this App.
+     */
+    public function canSyncDeployments(): bool
+    {
+        return ! $this->is_public && $this->missingDeploymentRequirements() === [];
+    }
+
+    /**
+     * Permissions that GitHub deployments need but the App does not have.
+     *
+     * @return array<int, string>
+     */
+    public function missingDeploymentRequirements(): array
+    {
+        return $this->deployments === 'write' ? [] : ['Repository permission "Deployments": write'];
     }
 
     /**
@@ -164,5 +214,20 @@ class GithubApp extends BaseModel
         }
 
         return filled($this->app_id) && filled($this->installation_id);
+    }
+
+    /**
+     * The settings page of this App at GitHub.
+     */
+    public function settingsUrl(): string
+    {
+        $name = encodeGithubPathSegment($this->name);
+        $organization = normalizeGithubOrganization($this->organization);
+
+        if (filled($organization)) {
+            return rtrim($this->html_url, '/').'/organizations/'.encodeGithubPathSegment($organization)."/settings/apps/{$name}";
+        }
+
+        return rtrim($this->html_url, '/')."/settings/apps/{$name}";
     }
 }

@@ -276,7 +276,7 @@
                 <div class="px-2 py-2 text-sm text-neutral-500 dark:text-fg-dim">
                     <div>No shared variables found in <span class="font-semibold" x-text="currentScope"></span> scope.</div>
                     <a :href="getScopeUrl(currentScope)"
-                       class="mt-1 inline-block text-xs text-coollabs hover:underline dark:text-warning"
+                       class="mt-1 inline-block text-xs text-coollabs hover:underline dark:text-brand-light"
                        target="_blank">
                         Add <span x-text="currentScope"></span> variables →
                     </a>

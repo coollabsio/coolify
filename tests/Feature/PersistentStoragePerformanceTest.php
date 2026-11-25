@@ -24,9 +24,11 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     $this->withoutVite();
     config(['app.maintenance.store' => 'array', 'cache.default' => 'array']);
-    Process::fake(fn ($process) => Process::result(
-        output: str_contains($process->command, 'readlink -f') ? 'OK' : ''
-    ));
+    Process::fake(fn ($process) => Process::result(output: match (true) {
+        str_contains(remoteProcessScript($process), 'empty-directory') => remoteFileStatesOutput('missing'),
+        str_contains(remoteProcessScript($process), 'readlink -f') => 'OK',
+        default => '',
+    }));
     InstanceSettings::unguarded(fn () => InstanceSettings::updateOrCreate(
         ['id' => 0],
         ['id' => 0, 'is_dns_validation_enabled' => false]

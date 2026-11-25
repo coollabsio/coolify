@@ -36,11 +36,6 @@ class TerminalAccess extends Component
         try {
             $this->authorize('update', $this->server);
 
-            // Check if user is admin or owner
-            if (! auth()->user()->isAdmin()) {
-                throw new \Exception('Only team administrators and owners can modify terminal access.');
-            }
-
             // Verify password
             if (! verifyPasswordConfirmation($password, $this)) {
                 return 'The provided password is incorrect.';

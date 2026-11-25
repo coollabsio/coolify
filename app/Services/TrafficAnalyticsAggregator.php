@@ -161,6 +161,12 @@ class TrafficAnalyticsAggregator
             $this->breakdowns[$dimension][$value] ??= ['value' => $value, 'requests' => 0, 'bytesOut' => 0];
             $this->breakdowns[$dimension][$value]['requests'] += (int) ($data['requests'] ?? 0);
             $this->breakdowns[$dimension][$value]['bytesOut'] += (int) ($data['bytesOut'] ?? 0);
+
+            // City rows carry coordinates; the first server that has them wins.
+            if (isset($data['lat'], $data['lon'])) {
+                $this->breakdowns[$dimension][$value]['lat'] ??= (float) $data['lat'];
+                $this->breakdowns[$dimension][$value]['lon'] ??= (float) $data['lon'];
+            }
         }
     }
 
@@ -205,7 +211,7 @@ class TrafficAnalyticsAggregator
     }
 
     /**
-     * @return array<string, array<int, array{value: string, requests: int, bytesOut: int}>>
+     * @return array<string, array<int, array{value: string, requests: int, bytesOut: int, lat?: float, lon?: float}>>
      */
     public function breakdowns(int $limit = 50): array
     {

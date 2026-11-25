@@ -17,6 +17,7 @@ use Cron\CronExpression;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -191,6 +192,7 @@ class ScheduledJobManager implements ShouldQueue
         // Process Docker cleanups - don't let failures stop the job manager
         try {
             if ($this->includes('docker-cleanups')) {
+                DockerCleanupJob::failInterruptedExecutions();
                 $this->processDockerCleanups();
             }
         } catch (\Throwable $e) {
@@ -740,7 +742,7 @@ class ScheduledJobManager implements ShouldQueue
 
     private function getServersForCleanupQuery(): Builder
     {
-        $query = Server::with('settings')
+        $query = Server::with(['settings' => fn (HasOne $query) => $query->withoutPatchCheckResult()])
             ->whereNotNull('ip')
             ->where('ip', '!=', '')
             ->whereNotIn('ip', Server::PLACEHOLDER_IPS);

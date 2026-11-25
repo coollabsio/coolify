@@ -127,13 +127,14 @@ function contentHostPathUseServerUser(string $user): void
 }
 
 /**
- * Fakes the server: `test -f`/`test -d` print NOK (the file is missing), the symlink check prints OK.
+ * Fakes the server: every checked path is missing, the symlink check prints OK.
  */
 function contentHostPathFakeServer(): void
 {
     Process::fake(fn ($process) => Process::result(output: match (true) {
-        str_contains($process->command, 'readlink -f') => 'OK',
-        str_contains($process->command, 'test -') => 'NOK',
+        str_contains(remoteProcessScript($process), 'empty-directory') => remoteFileStatesOutput('missing'),
+        str_contains(remoteProcessScript($process), 'readlink -f') => 'OK',
+        str_contains(remoteProcessScript($process), 'test -') => 'NOK',
         default => '',
     }));
 }
@@ -165,8 +166,8 @@ function contentHostPathAssertWritten(string $path, string $content, string $use
     $escapedParent = escapeshellarg(dirname($path));
     $base64 = base64_encode($content);
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "{$sudo}mkdir -p {$escapedParent}"));
-    Process::assertRan(fn ($process) => str_contains($process->command, "echo '{$base64}' | {$sudo}base64 -d | {$sudo}tee {$escapedPath} > /dev/null"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "{$sudo}mkdir -p {$escapedParent}"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "echo '{$base64}' | {$sudo}base64 -d | {$sudo}tee {$escapedPath} > /dev/null"));
 }
 
 /**
@@ -217,7 +218,7 @@ test('the application parser stores a content volume at its host path and Coolif
     contentHostPathAssertWritten($writePath, $content, $user);
 })->with(contentHostPathTargets())->with(['root', 'coolify']);
 
-test('loading files for a service writes content at its host path', function (string $target, string $content, string $user) {
+test('loading files for a service writes content inside the resource directory', function (string $target, string $content, string $user) {
     contentHostPathUseServerUser($user);
     $service = contentHostPathService(CONTENT_HOST_PATH_COMPOSE);
     serviceParser($service);
@@ -230,9 +231,28 @@ test('loading files for a service writes content at its host path', function (st
     $sudo = $user === 'root' ? '' : 'sudo ';
     $escapedPath = escapeshellarg($writePath);
     $base64 = base64_encode($content);
-    Process::assertRan(fn ($process) => str_contains($process->command, "{$sudo}mkdir -p -- \"$({$sudo}dirname -- {$escapedPath})\""));
-    Process::assertRan(fn ($process) => str_contains($process->command, "echo '{$base64}' | {$sudo}base64 -d | {$sudo}tee -- {$escapedPath}"));
-})->with(contentHostPathTargets())->with(['root', 'coolify']);
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "{$sudo}mkdir -p -- \"$({$sudo}dirname -- {$escapedPath})\""));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "echo '{$base64}' | {$sudo}base64 -d | {$sudo}tee -- {$escapedPath}"));
+})->with([
+    'home directory' => ['/etc/b.conf', 'b'],
+    'bare relative path' => ['/etc/c.conf', 'c'],
+])->with(['root', 'coolify']);
+
+// A token with only the write permission can save a Compose file. Content outside the resource
+// directory is written when the resource is deployed or started, not when its files are loaded.
+test('loading files for a service does not write content outside the resource directory', function (string $target, string $content) {
+    $service = contentHostPathService(CONTENT_HOST_PATH_COMPOSE);
+    serviceParser($service);
+    $fileVolume = LocalFileVolume::query()->where('mount_path', $target)->sole();
+
+    contentHostPathFakeServer();
+    getFilesystemVolumesFromServer($fileVolume->resource, true);
+
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), base64_encode($content)));
+})->with([
+    'absolute host file' => ['/etc/a.conf', 'a'],
+    'parent directory' => ['/etc/d.conf', 'd'],
+]);
 
 test('a quote in a content path is shell-escaped in every write command', function (string $user) {
     contentHostPathUseServerUser($user);
@@ -245,12 +265,10 @@ test('a quote in a content path is shell-escaped in every write command', functi
 
     contentHostPathFakeServer();
     $fileVolume->saveStorageOnServer();
-    getFilesystemVolumesFromServer($fileVolume->resource, true);
 
     $sudo = $user === 'root' ? '' : 'sudo ';
-    Process::assertRan(fn ($process) => str_contains($process->command, "{$sudo}tee '/etc/my'\\''app/app.conf' > /dev/null"));
-    Process::assertRan(fn ($process) => str_contains($process->command, "{$sudo}tee -- '/etc/my'\\''app/app.conf'"));
-    Process::assertRan(fn ($process) => str_contains($process->command, "{$sudo}mkdir -p '/etc/my'\\''app'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "{$sudo}tee '/etc/my'\\''app/app.conf' > /dev/null"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "{$sudo}mkdir -p '/etc/my'\\''app'"));
 })->with(['root', 'coolify']);
 
 test('the parsers reject shell injection in a content volume source', function () {
@@ -277,8 +295,8 @@ test('a bind mount without content keeps its administrator-selected host path', 
     contentHostPathFakeServer();
     $fileVolume->saveStorageOnServer();
 
-    Process::assertRan(fn ($process) => str_contains($process->command, "mkdir -p '/srv/shared'"));
-    Process::assertDidntRun(fn ($process) => str_contains($process->command, 'readlink -f'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "mkdir -p '/srv/shared'"));
+    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'readlink -f'));
 });
 
 test('the service stack form saves content volumes with host paths', function () {
@@ -340,11 +358,10 @@ test('the application General form rejects shell injection in a content volume s
 function contentHostPathFakeGitCompose(string $compose): void
 {
     Process::fake(function ($process) use ($compose) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
 
         return Process::result(output: match (true) {
-            str_contains($command, 'git --version') => 'git version 2.43.0',
-            str_contains($command, 'head -c') => $compose,
+            str_contains($command, 'git cat-file blob') => $compose,
             default => '',
         });
     });
@@ -409,4 +426,16 @@ test('the service API rejects shell injection in a content volume source', funct
 
     expect($service->fresh()->docker_compose_raw)->toBe(CONTENT_HOST_PATH_SAFE_COMPOSE)
         ->and(LocalFileVolume::query()->count())->toBe(0);
+});
+
+test('loading files for a service does not create directories outside the resource directory', function () {
+    $compose = "services:\n  app:\n    image: nginx:alpine\n    volumes:\n      - type: bind\n        source: /etc/cron.d/coolify-test\n        target: /data\n";
+    $service = contentHostPathService($compose);
+    serviceParser($service);
+    $fileVolume = LocalFileVolume::query()->sole();
+
+    contentHostPathFakeServer();
+    getFilesystemVolumesFromServer($fileVolume->resource, true);
+
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), '/etc/cron.d/coolify-test') && str_contains(remoteProcessScript($process), 'mkdir'));
 });
