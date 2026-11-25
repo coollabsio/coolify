@@ -6,7 +6,9 @@ use App\Jobs\EvaluatePush;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Services\DeployTriggers\AffectedRunnerException;
 use App\Services\DeployTriggers\Contract\EvaluateRequest;
 use App\Services\DeployTriggers\EvaluationRequestBuilder;
@@ -419,4 +421,22 @@ it('marks the last error of a failed dry run as coming from evaluate now', funct
     expect(ApplicationDeploymentQueue::query()->count())->toBe(0)
         ->and($this->web->refresh()->trigger_set['last_error'])->toBe('server unreachable')
         ->and($this->web->trigger_set['last_error_dry_run'])->toBeTrue();
+
+it('sends the git credential of an application only to a server of that application', function () {
+    $runner = FakeAffectedRunner::respondWith(epRespond([]));
+    $key = PrivateKey::factory()->create(['team_id' => $this->fixture['team']->id]);
+    // The credential comes from web, which runs on a server with a higher id than the server of api.
+    $webServer = Server::factory()->create(['team_id' => $this->fixture['team']->id]);
+    $webServer->settings->update(['is_reachable' => true, 'is_usable' => true, 'force_disabled' => false]);
+    $webDestination = StandaloneDocker::query()->where('server_id', $webServer->id)->firstOrFail();
+    $this->web->forceFill(['private_key_id' => $key->id, 'git_repository' => 'git@github.com:acme/mono.git', 'destination_id' => $webDestination->id])->save();
+    $this->api->forceFill(['git_repository' => 'git@github.com:acme/mono.git'])->save();
+    foreach ([$this->web, $this->api] as $application) {
+        $application->forceFill(['trigger_base_commit' => EP_BASE])->save();
+    }
+
+    epRun(epContext(['repositoryUrl' => 'git@github.com:acme/mono.git']), [$this->web->refresh(), $this->api->refresh()]);
+
+    expect($runner->accesses[0]->files['id_key'] ?? null)->toBe(rtrim($key->private_key, "\n")."\n")
+        ->and($runner->servers[0]->id)->toBe($webServer->id);
 });

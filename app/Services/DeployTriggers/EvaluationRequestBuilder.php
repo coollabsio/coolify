@@ -44,8 +44,8 @@ class EvaluationRequestBuilder
             return ['server' => null, 'request' => null, 'access' => null, 'candidates' => $candidates, 'prechecked' => $prechecked];
         }
 
-        $first = reset($remaining)->application;
-        $access = $first->gitAccessForAffected();
+        ['server' => $server, 'application' => $owner] = $this->server(collect($remaining)->map(fn (TriggerCandidate $c): Application => $c->application)->unique('id')->values());
+        $access = ($owner ?? reset($remaining)->application)->gitAccessForAffected();
         $fetchRefs = [$context->ref];
         if ($context->pullRequest !== null && collect($remaining)->contains(fn (TriggerCandidate $c): bool => $c->preview === null)) {
             $fetchRefs[] = "refs/heads/{$context->pullRequest->targetBranch}";
@@ -60,7 +60,7 @@ class EvaluationRequestBuilder
             limits: EvaluateRequest::defaultLimits((int) config('constants.coolify.push_evaluation.max_mirror_bytes', EvaluateRequest::DEFAULT_MAX_MIRROR_BYTES)),
         );
 
-        return ['server' => $this->server($applications), 'request' => $request, 'access' => $access, 'candidates' => $candidates, 'prechecked' => $prechecked];
+        return ['server' => $server, 'request' => $request, 'access' => $access, 'candidates' => $candidates, 'prechecked' => $prechecked];
     }
 
     private function candidate(Application $application, PushContext $context): TriggerCandidate
@@ -131,20 +131,38 @@ class EvaluationRequestBuilder
     }
 
     /**
-     * The lowest-id functional server among the build servers of the candidates, else their destination servers.
+     * A functional server that already clones the repository for one of the applications, and that application.
+     * Its git credential then never reaches a server that the application does not deploy with.
      *
      * @param  Collection<int, Application>  $applications
+     * @return array{server: ?Server, application: ?Application}
      */
-    private function server(Collection $applications): ?Server
+    private function server(Collection $applications): array
     {
-        $teamId = $applications->first()?->environment?->project?->team_id;
-        $usesBuildServer = $applications->contains(fn (Application $application): bool => (bool) $application->settings?->is_build_server_enabled);
-        $buildServers = $usesBuildServer && $teamId !== null
-            ? Server::query()->where('team_id', $teamId)->whereRelation('settings', 'is_build_server', true)->orderBy('id')->get()
-            : collect();
+        foreach ($applications as $application) {
+            $server = $this->cloningServers($application)->sortBy('id')->first(fn (Server $server): bool => $server->isFunctional());
+            if ($server !== null) {
+                return ['server' => $server, 'application' => $application];
+            }
+        }
 
-        $pick = fn (Collection $servers): ?Server => $servers->sortBy('id')->first(fn (Server $server): bool => $server->isFunctional());
+        return ['server' => null, 'application' => null];
+    }
 
-        return $pick($buildServers) ?? $pick($applications->map(fn (Application $application) => $application->destination?->server)->filter()->unique('id'));
+    /**
+     * The build servers that build the application, else its destination server.
+     *
+     * @return Collection<int, Server>
+     */
+    private function cloningServers(Application $application): Collection
+    {
+        $server = $application->destination?->server;
+        if ($server === null) {
+            return collect();
+        }
+
+        $buildsElsewhere = (bool) $application->settings?->is_build_server_enabled || $application->mustBuildOnBuildServer($server);
+
+        return $buildsElsewhere ? $application->buildServerCandidates($server) : collect([$server]);
     }
 }
