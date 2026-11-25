@@ -767,9 +767,20 @@ function clone_service(Service $source, StandaloneDocker|SwarmDocker $destinatio
                 continue;
             }
 
-            if ($keepDomains && $newResource instanceof ServiceApplication) {
-                $newResource->fill(['fqdn' => $sourceResource->fqdn])->save();
-            }
+            // parse() creates the child rows with default settings, so the settings that a user changed come from the source.
+            // Domains and public ports stay only for a parser migration: a normal clone runs next to its source.
+            $newResource->fill($sourceResource->only([
+                'human_name', 'description', 'exclude_from_status', 'is_log_drain_enabled', 'is_include_timestamps',
+                'is_gzip_enabled', 'is_stripprefix_enabled',
+                ...($newResource instanceof ServiceApplication
+                    ? ['redirect', 'is_force_https_enabled', 'is_permanent_redirect_enabled', 'traefik_certificate_resolver']
+                    : ['custom_type', 'public_port_timeout']),
+                ...match (true) {
+                    ! $keepDomains => [],
+                    $newResource instanceof ServiceApplication => ['fqdn', 'noindex_domains', 'domain_port_overrides'],
+                    default => ['is_public', 'public_port'],
+                },
+            ]))->save();
 
             // A legacy parser removes `content` from the stored Compose file, so the parse of the clone
             // cannot tell a file mount from a directory mount. The source rows know it.
