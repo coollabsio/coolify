@@ -7,8 +7,8 @@
 @endphp
 <div class="flex flex-col gap-3">
     <x-forms.checkbox instantSave id="isSmartTriggersEnabled" label="Smart deploy triggers"
-        helper="Deploy on a Git push only when files this application uses change."
-        :disabled="! auth()->user()->can('update', $application)" />
+        helper="Deploy on a Git push only when files this application uses change." canGate="update"
+        :canResource="$application" />
 
     <div class="rounded-lg border border-neutral-200 p-3 text-sm dark:border-white/[0.08]">
         <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
