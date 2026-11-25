@@ -1528,7 +1528,10 @@ class Application extends BaseModel
 
     public function hasDeploymentsInLastDays(int $days = 7): bool
     {
-        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('created_at', '>=', now()->subDays($days))->exists();
+        return ApplicationDeploymentQueue::where('application_id', $this->id)
+            ->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)
+            ->where('created_at', '>=', now()->subDays($days))
+            ->exists();
     }
 
     /**
@@ -1558,6 +1561,7 @@ class Application extends BaseModel
                 'success' => ApplicationDeploymentStatus::FINISHED->value,
                 'in progress' => ApplicationDeploymentStatus::IN_PROGRESS->value,
                 'cancelled' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+                'skipped' => ApplicationDeploymentStatus::SKIPPED->value,
             ];
 
             $deployments->where(function ($query) use ($search, $normalizedSearch, $statusAliases) {
