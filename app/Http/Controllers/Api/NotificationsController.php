@@ -90,6 +90,7 @@ class NotificationsController extends Controller
                     'traefik_outdated_discord_notifications' => 'sometimes|boolean',
                     'image_vulnerabilities_discord_notifications' => 'sometimes|boolean',
                     'discord_ping_enabled' => 'sometimes|boolean',
+                    'discord_ping_text' => 'sometimes|nullable|string|max:500',
                 ],
             ],
             'slack' => [

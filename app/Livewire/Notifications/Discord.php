@@ -79,6 +79,9 @@ class Discord extends Component
     #[Validate(['boolean'])]
     public bool $discordPingEnabled = true;
 
+    #[Validate(['nullable', 'string', 'max:500'])]
+    public ?string $discordPingText = null;
+
     public function mount()
     {
         try {
@@ -117,6 +120,7 @@ class Discord extends Component
             $this->settings->image_vulnerabilities_discord_notifications = $this->imageVulnerabilitiesDiscordNotifications;
 
             $this->settings->discord_ping_enabled = $this->discordPingEnabled;
+            $this->settings->discord_ping_text = $this->discordPingText;
 
             $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
@@ -147,6 +151,7 @@ class Discord extends Component
             $this->imageVulnerabilitiesDiscordNotifications = $this->settings->image_vulnerabilities_discord_notifications;
 
             $this->discordPingEnabled = $this->settings->discord_ping_enabled;
+            $this->discordPingText = $this->settings->discord_ping_text;
         }
     }
 

@@ -257,6 +257,7 @@ describe('PATCH /api/v1/notifications/*', function () {
                 'discord_enabled' => true,
                 'discord_webhook_url' => 'https://discord.com/api/webhooks/123/abc',
                 'discord_ping_enabled' => false,
+                'discord_ping_text' => '<@&123456789>',
                 'deployment_success_discord_notifications' => true,
             ]);
 
@@ -268,6 +269,7 @@ describe('PATCH /api/v1/notifications/*', function () {
         expect($settings->discord_enabled)->toBeTrue()
             ->and($settings->discord_webhook_url)->toBe('https://discord.com/api/webhooks/123/abc')
             ->and($settings->discord_ping_enabled)->toBeFalse()
+            ->and($settings->discord_ping_text)->toBe('<@&123456789>')
             ->and($settings->deployment_success_discord_notifications)->toBeTrue();
     });
 
