@@ -295,6 +295,33 @@
                             class="font-medium underline underline-offset-2">Open SSH host keys</a>
                     </x-callout>
                 @endif
+                @php
+                    $triggerReason = $application_deployment_queue->trigger_reason;
+                    $isSkippedPush = $application_deployment_queue->status === 'skipped';
+                    $skippedCount = (int) ($application_deployment_queue->skipped_count ?? 1);
+                @endphp
+                @if (is_array($triggerReason))
+                    <x-callout type="info" class="mb-2 shrink-0"
+                        title="{{ $isSkippedPush ? 'Skipped '.$skippedCount.' '.str('push')->plural($skippedCount) : 'Why this deployed' }}">
+                        <p>{{ data_get($triggerReason, 'reason') }}</p>
+                        @foreach (array_slice(data_get($triggerReason, 'matches', []), 0, 5) as $match)
+                            <p wire:key="trigger-match-{{ md5(json_encode($match)) }}" class="mt-1 text-xs">
+                                <code>{{ data_get($match, 'file') }}</code>
+                                @if (filled(data_get($match, 'via')))
+                                    ({{ implode(' → ', data_get($match, 'via')) }})
+                                @endif
+                            </p>
+                        @endforeach
+                        @if ($isSkippedPush && filled($application_deployment_queue->first_skipped_commit) && $skippedCount > 1)
+                            <p class="mt-1 text-xs">Commits <code>{{ substr($application_deployment_queue->first_skipped_commit, 0, 7) }}</code>…<code>{{ substr($application_deployment_queue->commit, 0, 7) }}</code></p>
+                        @endif
+                        @if ($isSkippedPush)
+                            @can('deploy', $application)
+                                <x-forms.button type="button" class="mt-2" wire:click="deploySkippedPush">Deploy anyway</x-forms.button>
+                            @endcan
+                        @endif
+                    </x-callout>
+                @endif
                 <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
                     class="logs-viewer flex min-h-0 w-full flex-col overflow-hidden bg-white text-neutral-800 dark:bg-log dark:text-neutral-100"
                     :class="fullscreen ? 'h-full' : 'flex-1 rounded-xl border shadow-sm'">

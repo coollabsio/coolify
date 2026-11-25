@@ -213,7 +213,7 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             ->orderBy('id')
             ->get()
             ->filter(fn (Application $application): bool => $application->git_branch === $branch
-                && ($this->context->pullRequest !== null ? $application->isPRDeployable() : $application->isDeployable()))
+                && ($this->dryRun || ($this->context->pullRequest !== null ? $application->isPRDeployable() : $application->isDeployable())))
             ->values();
     }
 }

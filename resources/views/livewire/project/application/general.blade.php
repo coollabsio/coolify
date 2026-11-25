@@ -292,6 +292,11 @@
                                             x-bind:disabled="shouldDisable()" />
                                     </div>
                                 @endif
+                                @if ($this->application->supportsWatchPaths() || $this->application->is_public_repository())
+                                    <div class="pt-4">
+                                        <livewire:project.application.deploy-triggers :application="$application" wire:key="deploy-triggers-{{ $application->uuid }}" />
+                                    </div>
+                                @endif
                             </div>
                         @else
                             <x-forms.repository-paths class="lg:grid-cols-2" base="baseDirectory"
@@ -313,6 +318,11 @@
                                         helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
                                         placeholder="src/pages/**" id="watchPaths" label="Watch paths"
                                         x-bind:disabled="!canUpdate" />
+                                </div>
+                            @endif
+                            @if ($this->application->supportsWatchPaths() || $this->application->is_public_repository())
+                                <div class="pb-4">
+                                    <livewire:project.application.deploy-triggers :application="$application" wire:key="deploy-triggers-{{ $application->uuid }}" />
                                 </div>
                             @endif
                             @if ($application->could_set_build_commands() && ($buildPack === 'nixpacks' || $buildPack === 'railpack'))

@@ -235,6 +235,9 @@
                                 $statusLabel = 'Blocked';
                                 $statusType = 'error';
                             }
+                            if ($deploymentStatus === 'skipped' && (int) data_get($deployment, 'skipped_count', 1) > 1) {
+                                $statusLabel = 'Skipped · '.(int) data_get($deployment, 'skipped_count').' pushes';
+                            }
                             $pullRequestId = (int) data_get($deployment, 'pull_request_id', 0);
                             $sourceLabel = match (true) {
                                 (bool) data_get($deployment, 'is_webhook') && $pullRequestId > 0 => 'Webhook · PR #' . $pullRequestId,

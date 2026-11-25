@@ -46,7 +46,7 @@ class EvaluationRequestBuilder
 
         $request = new EvaluateRequest(
             repositoryUrl: $access->repositoryUrl,
-            mirrorKey: EvaluateRequest::mirrorKeyFor($context->teamId, $context->repositoryUrl),
+            mirrorKey: EvaluateRequest::mirrorKeyFor($context->teamId, strtolower(preg_replace('/\.git\z/', '', rtrim($access->repositoryUrl, '/')))),
             gitEnv: $access->env,
             gitConfig: $access->config,
             after: $context->after,

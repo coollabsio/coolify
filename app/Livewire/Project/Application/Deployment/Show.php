@@ -10,12 +10,13 @@ use App\Models\EnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Services\ImageScan\SecurityCard;
 use App\Traits\AuditsApplicationSettings;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 use Throwable;
 
 class Show extends Component
 {
-    use AuditsApplicationSettings;
+    use AuditsApplicationSettings, AuthorizesRequests;
 
     public Application $application;
 
@@ -75,6 +76,45 @@ class Show extends Component
             ? false
             : $this->application->settings->is_debug_enabled;
         $this->isKeepAliveOn();
+    }
+
+    /**
+     * Deploys the commit of a skipped push without evaluating it again.
+     */
+    public function deploySkippedPush()
+    {
+        try {
+            $this->authorize('deploy', $this->application);
+            $row = $this->application_deployment_queue->refresh();
+            if ($row->status !== ApplicationDeploymentStatus::SKIPPED->value) {
+                $this->dispatch('error', 'Only a skipped push can be deployed anyway.');
+
+                return;
+            }
+
+            $deploymentUuid = new_public_id();
+            $result = queue_application_deployment(
+                application: $this->application,
+                deployment_uuid: $deploymentUuid,
+                pull_request_id: (int) $row->pull_request_id,
+                commit: $row->commit,
+                git_type: $row->git_type,
+            );
+            if ($result['status'] === 'queue_full') {
+                $this->dispatch('error', 'Deployment queue full', $result['message']);
+
+                return;
+            }
+
+            return redirectRoute($this, 'project.application.deployment.show', [
+                'project_uuid' => $this->application->environment->project->uuid,
+                'environment_uuid' => $this->application->environment->uuid,
+                'application_uuid' => $this->application->uuid,
+                'deployment_uuid' => $result['deployment_uuid'] ?? $deploymentUuid,
+            ]);
+        } catch (Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     /**
