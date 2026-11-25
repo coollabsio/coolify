@@ -121,14 +121,14 @@ class DeployTriggers extends Component
     }
 
     /**
-     * @return array{state: 'none'|'not_narrowable'|'watch_paths'|'disabled_instance'|'disabled'|'evaluated', display: list<string>, resolvers: list<string>, anchor: ?string, notes: list<string>, lastError: ?string, lastErrorFromEvaluateNow: bool, evaluatedCommit: ?string}
+     * @return array{state: 'none'|'not_narrowable'|'watch_paths'|'disabled_instance'|'disabled'|'evaluated', display: list<array{path: string, source: ?string, excluded: bool}>, resolvers: list<string>, anchor: ?string, notes: list<string>, lastError: ?string, lastErrorFromEvaluateNow: bool, evaluatedCommit: ?string}
      */
     #[Computed]
     public function triggerSummary(): array
     {
         $set = $this->application->trigger_set ?? [];
         $summary = [
-            'display' => array_values(array_filter($set['display'] ?? [], 'is_string')),
+            'display' => array_values(array_map(self::displayLine(...), array_filter($set['display'] ?? [], 'is_string'))),
             'resolvers' => array_values(array_filter($set['resolvers'] ?? [], 'is_string')),
             'anchor' => is_string($set['anchor']['package'] ?? null) ? $set['anchor']['package'] : null,
             'notes' => array_values(array_filter(array_map(fn (mixed $note): ?string => is_array($note) ? ($note['reason'] ?? null) : null, $set['widened'] ?? []))),
@@ -147,6 +147,31 @@ class DeployTriggers extends Component
         };
 
         return ['state' => $state, ...$summary];
+    }
+
+    /**
+     * Splits a stored line such as `workspace: packages/ui/**` into the path and where it comes from.
+     *
+     * @return array{path: string, source: ?string, excluded: bool}
+     */
+    private static function displayLine(string $line): array
+    {
+        [$limit, $path] = str_contains($line, ': ') ? explode(': ', $line, 2) : [null, $line];
+        $excluded = str_starts_with($path, '!');
+
+        return [
+            'path' => ltrim($path, '!'),
+            'source' => match ($limit) {
+                'build_context' => 'Build context',
+                'dockerfile' => 'Dockerfile',
+                'compose' => 'Compose file',
+                'workspace' => 'Workspace dependency',
+                'symlink' => 'Symlink target',
+                null => null,
+                default => str($limit)->replace('_', ' ')->ucfirst()->toString(),
+            },
+            'excluded' => $excluded,
+        ];
     }
 
     public function render()

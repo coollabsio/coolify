@@ -348,3 +348,12 @@ it('deploys when a submodule changes that holds files of the set', function (arr
     'copied below it' => [[], ['Dockerfile' => "FROM node\nCOPY vendor/lib/src ./src\n"]],
     'base directory below it' => [['buildPack' => 'railpack', 'baseDirectory' => '/vendor/lib/app', 'dockerfileLocation' => null], []],
 ]);
+
+it('shows root files as files and leaves out the paths that do not exist yet', function () {
+    $built = (new TriggerSetBuilder)->build(builderApp(['dockerfileLocation' => '/apps/web/Dockerfile']), monorepo())->toArray();
+
+    expect($built['display'])->toContain('workspace: package.json', 'workspace: pnpm-lock.yaml', 'workspace: apps/web/**', 'workspace: packages/ui/**')
+        ->not->toContain('workspace: package.json/**', 'workspace: yarn.lock/**', 'workspace: yarn.lock')
+        // The rules still cover a lockfile that a later push adds.
+        ->and(affects($built, 'yarn.lock'))->toBeTrue();
+});

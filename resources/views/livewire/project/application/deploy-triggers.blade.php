@@ -35,9 +35,14 @@
                 <p class="text-neutral-600 dark:text-fg-dim">Not evaluated yet. The next push evaluates it.</p>
                 @break
             @default
-                <ul class="font-mono text-xs text-neutral-800 dark:text-fg">
+                <ul class="flex flex-col gap-1 text-xs">
                     @foreach ($summary['display'] as $line)
-                        <li wire:key="trigger-path-{{ md5($line) }}">{{ $line }}</li>
+                        <li wire:key="trigger-path-{{ md5(json_encode($line)) }}" class="flex flex-wrap items-baseline justify-between gap-x-3">
+                            <span @class(['font-mono break-all', 'text-neutral-800 dark:text-fg' => ! $line['excluded'], 'text-neutral-500 line-through dark:text-fg-faint' => $line['excluded']])>{{ $line['path'] }}</span>
+                            @if ($line['source'])
+                                <span class="text-neutral-500 dark:text-fg-faint">{{ $line['excluded'] ? $line['source'].', excluded' : $line['source'] }}</span>
+                            @endif
+                        </li>
                     @endforeach
                 </ul>
                 <p class="mt-2 text-xs text-neutral-500 dark:text-fg-faint">

@@ -38,12 +38,15 @@ final class TriggerSetBuilder
     /** @var array<string, list<string>> package name => tsconfig path aliases that point into it */
     private array $aliases = [];
 
+    private ?RepositorySnapshot $snapshot = null;
+
     /**
      * @param  list<string>  $referencedPackages  packages the application's files reference without declaring them
      */
     public function build(EvaluateApplicationInput $application, RepositorySnapshot $snapshot, array $referencedPackages = []): BuiltTriggerSet
     {
         $this->rulesets = $this->display = $this->limits = $this->widened = $this->explicitPaths = $this->aliases = [];
+        $this->snapshot = $snapshot;
         ['context' => $context, 'dockerfile' => $dockerfile, 'compose' => $compose, 'ignoreFiles' => $ignoreFiles] = self::locations($application);
         $snapshot->prefetch(array_values(array_filter([$dockerfile, $compose, ...$ignoreFiles, ...JsWorkspaces::manifestPaths($snapshot), ...self::tsconfigPaths($snapshot), ...$snapshot->symlinks()])));
 
@@ -416,10 +419,40 @@ final class TriggerSetBuilder
             if ($limit === 'workspace' && $rule['action'] === 'exclude') {
                 continue;
             }
-            $path = $rule['kind'] === 'dir' ? ($rule['path'] === '' ? '**' : $rule['path'].'/**') : ($rule['path'] ?? $rule['pattern']);
-            $this->display[] = "{$limit}: ".($rule['action'] === 'exclude' ? '!' : '').$path;
+            $path = $this->displayPath($rule);
+            if ($path !== null) {
+                $this->display[] = "{$limit}: ".($rule['action'] === 'exclude' ? '!' : '').$path;
+            }
         }
         $this->display = array_values(array_unique($this->display));
+    }
+
+    /**
+     * How a rule reads in the UI: a file as itself, a directory with `/**`. An include rule for a path that does not
+     * exist yet, such as a lockfile of another package manager, still matches it but is left out of the list.
+     *
+     * @param  array<string, string>  $rule
+     */
+    private function displayPath(array $rule): ?string
+    {
+        if ($rule['kind'] === 'glob') {
+            return $rule['pattern'];
+        }
+        $path = $rule['path'];
+        if ($path === '') {
+            return '**';
+        }
+        if ($this->snapshot?->has($path)) {
+            return $path;
+        }
+        if ($this->snapshot?->directoryExists($path)) {
+            return $path.'/**';
+        }
+        if ($rule['action'] === 'include' && $this->snapshot !== null) {
+            return null;
+        }
+
+        return $rule['kind'] === 'dir' ? $path.'/**' : $path;
     }
 
     private function widen(string $scope, string $reason): void

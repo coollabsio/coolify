@@ -258,3 +258,13 @@ it('updates the trigger state after the general settings change', function () {
 
     $component->dispatch('configurationChanged')->assertSee('builds from the root of the repository');
 });
+
+it('names where each trigger path comes from', function () {
+    $this->application->forceFill(['trigger_set' => [
+        'display' => ['build_context: apps/web/**', 'workspace: packages/ui/**', 'build_context: !apps/web/test/**'], 'evaluated_commit' => str_repeat('a', 40),
+    ]])->save();
+
+    Livewire::test(DeployTriggers::class, ['application' => $this->application->refresh()])
+        ->assertSeeInOrder(['apps/web/**', 'Build context', 'packages/ui/**', 'Workspace dependency', 'apps/web/test/**', 'Build context, excluded'])
+        ->assertDontSee('workspace:');
+});
