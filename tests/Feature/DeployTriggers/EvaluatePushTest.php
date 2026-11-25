@@ -61,7 +61,7 @@ function epRespond(array $decisions): Closure
 {
     return function (EvaluateRequest $request) use ($decisions): string {
         return json_encode([
-            'schema_version' => 1, 'tool_version' => '1.0.0', 'after' => $request->after ?? EP_AFTER, 'diffs' => [], 'errors' => [],
+            'after' => $request->after ?? EP_AFTER,
             'applications' => array_map(fn (string $id) => [
                 'id' => $id, 'decision' => $decisions[$id][0] ?? 'deploy', 'reason_code' => $decisions[$id][1] ?? 'matched',
                 'reason' => 'because', 'base' => EP_BASE, 'matches' => [['file' => 'apps/x/a.ts', 'rule' => 'workspace', 'via' => ['apps/x']]],
@@ -107,14 +107,6 @@ it('deploys every candidate when the runner fails and stores the last error', fu
     expect(ApplicationDeploymentQueue::query()->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)->count())->toBe(2)
         ->and(ApplicationDeploymentQueue::query()->first()->trigger_reason['reason_code'])->toBe('evaluation_failed')
         ->and($this->web->refresh()->trigger_set['last_error'])->toBe('server unreachable');
-});
-
-it('deploys every candidate when the response breaks the contract', function () {
-    FakeAffectedRunner::respondWith('{"schema_version":2}');
-
-    epRun(epContext(), [$this->web, $this->api]);
-
-    expect(ApplicationDeploymentQueue::query()->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)->count())->toBe(2);
 });
 
 it('deploys smart apps and uses legacy watch paths when no server can evaluate', function () {

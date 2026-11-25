@@ -4,6 +4,7 @@ namespace Tests\Support;
 
 use App\Models\Server;
 use App\Services\DeployTriggers\AffectedRunner;
+use App\Services\DeployTriggers\Contract\ApplicationDecision;
 use App\Services\DeployTriggers\Contract\EvaluateRequest;
 use App\Services\DeployTriggers\Contract\EvaluateResponse;
 use App\Services\DeployTriggers\GitAccess;
@@ -11,7 +12,7 @@ use Closure;
 use Throwable;
 
 /**
- * Replays evaluation output for EvaluatePush tests and records the requests.
+ * Replays decisions given as JSON for EvaluatePush tests and records the requests.
  */
 final class FakeAffectedRunner implements AffectedRunner
 {
@@ -66,6 +67,13 @@ final class FakeAffectedRunner implements AffectedRunner
             throw $this->failure;
         }
 
-        return EvaluateResponse::fromJson(($this->respond)($request), $request);
+        $data = json_decode(($this->respond)($request), true, flags: JSON_THROW_ON_ERROR);
+        $decisions = [];
+        foreach ($data['applications'] as $item) {
+            $decisions[$item['id']] = new ApplicationDecision($item['id'], $item['decision'], $item['reason_code'], $item['reason'] ?? '',
+                $item['base'] ?? null, $item['matches'] ?? [], $item['lockfile'] ?? null, $item['trigger_set'] ?? null);
+        }
+
+        return new EvaluateResponse($data['after'], $decisions);
     }
 }

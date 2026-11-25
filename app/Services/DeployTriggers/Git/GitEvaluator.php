@@ -74,7 +74,7 @@ final class GitEvaluator implements AffectedRunner
             }
         }
 
-        return new EvaluateResponse($after, [], $this->checkReferences($decisions, $pending, $session, $after), []);
+        return new EvaluateResponse($after, $this->checkReferences($decisions, $pending, $session, $after));
     }
 
     /**

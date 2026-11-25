@@ -4,8 +4,6 @@ namespace App\Services\DeployTriggers\Contract;
 
 final readonly class ApplicationDecision
 {
-    public const SKIP_REASON_CODES = ['no_match', 'watch_paths_no_match'];
-
     /**
      * @param  'deploy'|'skip'  $decision
      * @param  list<array<string, mixed>>  $matches
