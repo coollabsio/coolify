@@ -361,3 +361,14 @@ it('rejects vault references in service and database values that read a source t
     'service' => ['service', ['compose' => "services:\n  web:\n    image: 'nginx:alpine'\n"]],
     'database' => ['postgresql', []],
 ]);
+
+it('writes the IP allowlist, rejects an invalid one, and keeps build secrets on for a new application', function () {
+    expect($this->application->fresh()->settings->use_build_secrets)->toBeTrue();
+
+    $app = childWrite(['ip_allowlist' => '10.0.0.0/8, 192.168.1.10']);
+    expect($app->ip_allowlist)->toBe('10.0.0.0/8,192.168.1.10')
+        ->and($this->adapter->read($app, $this->ctx)['ip_allowlist'])->toBe($this->adapter->canonical('api', childWriteDesired(['ip_allowlist' => '10.0.0.0/8, 192.168.1.10']))['ip_allowlist']);
+
+    $errors = $this->adapter->validate('api', childWriteDesired(['ip_allowlist' => 'not-an-ip']), $this->ctx);
+    expect(array_map(fn ($e) => $e->path, $errors))->toBe(['resources.api.ip_allowlist']);
+});

@@ -569,6 +569,12 @@
                         }
                     }
                 },
+                "ip_allowlist": {
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
                 "labels": {
                     "type": [
                         "string",
@@ -938,6 +944,12 @@
                             ]
                         },
                         "is_pr_deployments_public_enabled": {
+                            "type": [
+                                "boolean",
+                                "null"
+                            ]
+                        },
+                        "is_pr_deployments_public_approval_required": {
                             "type": [
                                 "boolean",
                                 "null"
