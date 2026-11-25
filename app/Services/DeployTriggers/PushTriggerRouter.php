@@ -65,7 +65,9 @@ final class PushTriggerRouter
     public function dispatch(): void
     {
         foreach ($this->deferred as $teamId => $applicationIds) {
-            EvaluatePush::dispatch($this->context->withTeam($teamId), $applicationIds);
+            $context = $this->context->withTeam($teamId);
+            $context->recordArrival();
+            EvaluatePush::dispatch($context, $applicationIds);
         }
     }
 

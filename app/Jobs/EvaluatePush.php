@@ -88,7 +88,7 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
      */
     public function failed(Throwable $exception): void
     {
-        if ($this->dryRun) {
+        if ($this->dryRun || $this->isSuperseded()) {
             return;
         }
 
@@ -113,6 +113,10 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
+        if ($this->isSuperseded()) {
+            return;
+        }
+
         $applications = $this->candidates();
         if ($applications->isEmpty()) {
             return;
@@ -262,6 +266,14 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         return true;
     }
 
+    /**
+     * A newer push of the branch arrived while this one waited, and its evaluation compares with the deployed state.
+     */
+    private function isSuperseded(): bool
+    {
+        return ! $this->dryRun && $this->context->isSuperseded();
+    }
+
     private function fallbackCandidate(Application $application): TriggerCandidate
     {
         $pullRequest = $this->context->pullRequest;
@@ -295,6 +307,12 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
      */
     private function newestDeploymentIsThisPush(Application $application): bool
     {
+        $pullRequest = $this->context->pullRequest;
+        // A closed or deleted preview keeps its rows: a reopened pull request at the same head deploys again.
+        if ($pullRequest !== null && ! ApplicationPreview::query()->where('application_id', $application->id)->where('pull_request_id', $pullRequest->number)->exists()) {
+            return false;
+        }
+
         $newest = ApplicationDeploymentQueue::query()
             ->where('application_id', $application->id)
             ->where('pull_request_id', $this->context->pullRequest?->number ?? 0)

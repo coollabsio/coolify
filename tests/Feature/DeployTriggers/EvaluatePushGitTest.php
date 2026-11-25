@@ -9,6 +9,7 @@ use App\Services\DeployTriggers\AffectedRunner;
 use App\Services\DeployTriggers\EvaluationSlots;
 use App\Services\DeployTriggers\Git\GitEvaluator;
 use App\Services\DeployTriggers\PushContext;
+use App\Services\DeployTriggers\PushTriggerRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
@@ -117,4 +118,21 @@ it('decides the next push from the stored sets without reading the tree again', 
     expect(collect($this->mirror->scripts)->filter(fn (string $script) => str_contains($script, '--full-tree')))->toBeEmpty()
         ->and(ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)->count())->toBe(1)
         ->and(ApplicationDeploymentQueue::query()->where('application_id', $this->api->id)->where('status', ApplicationDeploymentStatus::SKIPPED->value)->count())->toBe(1);
+});
+
+it('drops an older push that is evaluated after a newer push of the same branch arrived', function () {
+    $older = pushCommit($this, ['apps/api/index.ts' => 'older']);
+    $newer = pushCommit($this, ['apps/api/index.ts' => 'newer']);
+    $context = fn (string $after) => new PushContext(provider: 'gitlab', teamId: $this->fixture['team']->id, repositoryUrl: 'file://'.$this->source, ref: 'refs/heads/main', after: $after, commitMessage: 'change');
+    Queue::fake([ApplicationDeploymentJob::class, EvaluatePush::class]);
+    foreach ([$older, $newer] as $after) {
+        $router = PushTriggerRouter::forPush($context($after));
+        $router->defer($this->api);
+        $router->dispatch();
+    }
+
+    (new EvaluatePush($context($newer), [$this->api->id]))->handle();
+    (new EvaluatePush($context($older), [$this->api->id]))->handle();
+
+    expect(ApplicationDeploymentQueue::query()->where('application_id', $this->api->id)->pluck('commit')->all())->toBe([$newer]);
 });

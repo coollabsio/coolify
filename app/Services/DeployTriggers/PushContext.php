@@ -2,6 +2,8 @@
 
 namespace App\Services\DeployTriggers;
 
+use Illuminate\Support\Facades\Cache;
+
 /**
  * One Git push (or pull request update) as the webhook saw it.
  */
@@ -40,5 +42,25 @@ final readonly class PushContext
     public function laneKey(): string
     {
         return sha1("{$this->teamId}|{$this->repositoryUrl}|{$this->ref}");
+    }
+
+    /**
+     * Remembers this push as the newest of its branch. Webhooks arrive in push order, evaluations may not run in it.
+     */
+    public function recordArrival(): void
+    {
+        if ($this->after !== null) {
+            Cache::put('deploy-triggers:lane-head:'.$this->laneKey(), $this->after, now()->addDay());
+        }
+    }
+
+    /**
+     * Whether a newer push of the same branch arrived after this one. Its evaluation covers this push.
+     */
+    public function isSuperseded(): bool
+    {
+        $head = Cache::get('deploy-triggers:lane-head:'.$this->laneKey());
+
+        return is_string($head) && $this->after !== null && $head !== $this->after;
     }
 }

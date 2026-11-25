@@ -395,3 +395,18 @@ it('evaluates a push back to an older deployed commit after a newer deployment',
 
     expect($runner->requests)->toHaveCount(1);
 });
+
+it('recreates the preview when a closed pull request is reopened at the same head', function () {
+    FakeAffectedRunner::unsupported();
+    $fixture = deployTriggerFixture();
+    $application = deployTriggerApplication($fixture, ['base_directory' => '/apps/web', 'git_repository' => 'https://github.com/acme/mono']);
+    $application->settings->update(['is_preview_deployments_enabled' => true]);
+    $head = str_repeat('b', 40);
+    // The preview deployed at the head, then the pull request closed: the preview is gone, its queue row stays.
+    ApplicationDeploymentQueue::create(['application_id' => $application->id, 'deployment_uuid' => 'pr-old', 'pull_request_id' => 7, 'status' => ApplicationDeploymentStatus::FINISHED->value, 'commit' => $head]);
+
+    (new EvaluatePush(new PushContext(provider: 'github', teamId: $fixture['team']->id, repositoryUrl: 'https://github.com/acme/mono', ref: 'refs/pull/7/head', after: $head,
+        pullRequest: new PullRequestContext(7, 'main', false, 'github', 'https://github.com/acme/mono/pull/7')), [$application->id]))->handle();
+
+    expect(ApplicationPreview::query()->where('application_id', $application->id)->where('pull_request_id', 7)->exists())->toBeTrue();
+});
