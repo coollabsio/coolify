@@ -372,3 +372,12 @@ it('writes the IP allowlist, rejects an invalid one, and keeps build secrets on 
     $errors = $this->adapter->validate('api', childWriteDesired(['ip_allowlist' => 'not-an-ip']), $this->ctx);
     expect(array_map(fn ($e) => $e->path, $errors))->toBe(['resources.api.ip_allowlist']);
 });
+
+it('reads back secret manager settings with empty values as the file has them', function () {
+    IntegrationToken::factory()->create(['team_id' => $this->fx['team']->id, 'provider' => 'doppler', 'name' => 'doppler-prod', 'capabilities' => ['secrets']]);
+    $desired = childWriteDesired(['secret_manager' => ['token' => 'doppler-prod', 'settings' => ['project' => 'api', 'config' => '']]]);
+
+    $app = childWrite($desired);
+
+    expect($this->adapter->read($app, $this->ctx)['secret_manager'])->toBe($this->adapter->canonical('api', $desired)['secret_manager']);
+});

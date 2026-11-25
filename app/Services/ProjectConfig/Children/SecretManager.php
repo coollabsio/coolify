@@ -64,7 +64,8 @@ class SecretManager implements ChildRecords
 
         $entries = [];
         foreach ($sources as $source) {
-            $settings = $source['settings'];
+            // write() does not store empty values, so they are not part of the state.
+            $settings = array_filter($source['settings'], fn ($value) => filled($value));
             ksort($settings);
             $entry = ['name' => $source['name'], 'token' => $source['token']];
             if ($settings !== []) {
