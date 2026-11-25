@@ -116,6 +116,7 @@ class ApplicationSetting extends Model
         'is_image_scan_enabled' => 'boolean',
         'image_builds_by_team' => 'boolean',
         'is_auto_cancel_queued_deployments_enabled' => 'boolean',
+        'is_smart_triggers_enabled' => 'boolean',
         'is_auto_cancel_building_deployments_enabled' => 'boolean',
     ];
 
@@ -169,6 +170,7 @@ class ApplicationSetting extends Model
         'stop_grace_period',
         'rolling_update_drain_seconds',
         'is_auto_cancel_queued_deployments_enabled',
+        'is_smart_triggers_enabled',
         'is_auto_cancel_building_deployments_enabled',
     ];
 

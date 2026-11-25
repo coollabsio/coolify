@@ -175,6 +175,9 @@ class ApplicationDeploymentQueue extends Model
         'scan_gate_result',
         'scan_gate_bypassed_by',
         'deploy_started_at',
+        'trigger_reason',
+        'skipped_count',
+        'first_skipped_commit',
     ];
 
     /**
@@ -195,6 +198,8 @@ class ApplicationDeploymentQueue extends Model
         'pull_request_id' => 'integer',
         'finished_at' => 'datetime',
         'scan_gate_result' => 'array',
+        'trigger_reason' => 'array',
+        'skipped_count' => 'integer',
         'deploy_started_at' => 'datetime',
         'configuration_snapshot' => EncryptedArrayCast::class,
         'configuration_diff' => EncryptedArrayCast::class,

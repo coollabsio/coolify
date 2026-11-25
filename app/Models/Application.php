@@ -333,6 +333,8 @@ class Application extends BaseModel
             'manual_webhook_secret_bitbucket' => 'encrypted',
             'manual_webhook_secret_gitea' => 'encrypted',
             'noindex_domains' => 'array',
+            'trigger_set' => 'array',
+            'trigger_scan' => 'array',
             'domain_dns_statuses' => 'array',
             'domain_port_overrides' => 'array',
             'docker_compose_image_overrides' => 'array',

@@ -48,6 +48,8 @@ class ApplicationPreview extends BaseModel
         'is_fork_pull_request' => 'boolean',
         'approved_at' => 'datetime',
         'keeps_production_values' => 'boolean',
+        'trigger_set' => 'array',
+        'trigger_scan' => 'array',
     ];
 
     protected static function booted(): void

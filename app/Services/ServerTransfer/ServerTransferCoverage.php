@@ -184,6 +184,8 @@ final class ServerTransferCoverage
 
     private const RUNTIME = 'Runtime state: the target sets it again when it manages the server.';
 
+    private const DERIVED_TRIGGER_STATE = 'Derived trigger state; the target rebuilds it on the first push, which deploys because no base exists.';
+
     private const FROM_COMPOSE = 'The target sets it again when it parses the Docker Compose file of the service.';
 
     /**
@@ -272,12 +274,16 @@ final class ServerTransferCoverage
         Application::class => [
             'environment_id' => self::LINKED, 'destination_type' => self::LINKED, 'destination_id' => self::LINKED,
             'source_type' => self::LINKED, 'source_id' => self::LINKED, 'private_key_id' => self::LINKED,
+            'trigger_base_commit' => self::DERIVED_TRIGGER_STATE, 'trigger_set' => self::DERIVED_TRIGGER_STATE,
+            'trigger_scan' => self::DERIVED_TRIGGER_STATE,
         ],
         ApplicationSetting::class => ['application_id' => self::LINKED, 'has_unlinked_config_file' => self::RUNTIME],
         ApplicationPreview::class => [
             'application_id' => self::LINKED, 'last_online_at' => self::RUNTIME, 'domain_dns_statuses' => self::RUNTIME,
             'restart_count' => self::RUNTIME, 'restart_limit_reached' => self::RUNTIME, 'last_restart_at' => self::RUNTIME,
             'last_restart_type' => self::RUNTIME,
+            'trigger_base_commit' => self::DERIVED_TRIGGER_STATE, 'trigger_set' => self::DERIVED_TRIGGER_STATE,
+            'trigger_scan' => self::DERIVED_TRIGGER_STATE,
         ],
         EnvironmentVariable::class => ['resourceable_type' => self::LINKED, 'resourceable_id' => self::LINKED],
         LocalPersistentVolume::class => [
