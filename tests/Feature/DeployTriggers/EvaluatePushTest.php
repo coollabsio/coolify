@@ -421,6 +421,7 @@ it('marks the last error of a failed dry run as coming from evaluate now', funct
     expect(ApplicationDeploymentQueue::query()->count())->toBe(0)
         ->and($this->web->refresh()->trigger_set['last_error'])->toBe('server unreachable')
         ->and($this->web->trigger_set['last_error_dry_run'])->toBeTrue();
+});
 
 it('sends the git credential of an application only to a server of that application', function () {
     $runner = FakeAffectedRunner::respondWith(epRespond([]));
