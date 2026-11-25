@@ -18,6 +18,7 @@ services:
       - REDIS_URL=redis://default:${SERVICE_PASSWORD_REDIS}@redis:6379
       - BACKEND_INTERNAL_URL=http://localhost:3000
       - TEMPORAL_ADDRESS=temporal:7233
+      - DISABLE_REGISTRATION=${DISABLE_REGISTRATION:-false}
 
       # Cloudflare R2 Settings
       - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID}
