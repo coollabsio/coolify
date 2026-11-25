@@ -27,6 +27,11 @@ final readonly class PushContext
         public ?PullRequestContext $pullRequest = null,
     ) {}
 
+    public function withTeam(int $teamId): self
+    {
+        return new self(...[...get_object_vars($this), 'teamId' => $teamId]);
+    }
+
     public function uniqueKey(): string
     {
         return sha1("{$this->teamId}|{$this->repositoryUrl}|{$this->ref}|".($this->after ?? 'tip'));

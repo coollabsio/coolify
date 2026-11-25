@@ -9,6 +9,7 @@ use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
 use App\Http\Controllers\Webhook\Concerns\RoutesConfigPushes;
+use App\Http\Controllers\Webhook\Concerns\RoutesPushTriggers;
 use App\Jobs\CleanupGithubRunnerJob;
 use App\Jobs\GithubAppPermissionJob;
 use App\Jobs\ProcessGithubPullRequestWebhook;
@@ -18,6 +19,8 @@ use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GithubRunnerExecution;
 use App\Models\PrivateKey;
+use App\Services\DeployTriggers\PushContext;
+use App\Services\DeployTriggers\PushTriggerRouter;
 use App\Services\GithubRunner\GithubRunnerApi;
 use App\Services\GithubRunner\GithubRunnerContainer;
 use App\Services\ServerTransfer\TransferFinishChecklist;
@@ -37,6 +40,7 @@ class Github extends Controller
     use MatchesManualWebhookApplications;
     use ReadsWebhookPushPayload;
     use RoutesConfigPushes;
+    use RoutesPushTriggers;
 
     public function manual(Request $request)
     {
@@ -154,64 +158,56 @@ class Github extends Controller
                     }
                     if ($x_github_event === 'push') {
                         if ($application->isDeployable()) {
-                            if ($this->webhookPushMatchesWatchPaths($application, $changed_files)) {
-                                if ($skip_deploy_commits ?? false) {
-                                    $return_payloads->push([
-                                        'application' => $application->name,
-                                        'status' => 'skipped',
-                                        'message' => 'All commits contain [skip cd] or [skip ci]. Skipping deployment.',
-                                        'application_uuid' => $application->uuid,
-                                        'application_name' => $application->name,
-                                    ]);
-
-                                    continue;
-                                }
-                                $deployment_uuid = new_public_id();
-                                $result = queue_application_deployment(
-                                    application: $application,
-                                    deployment_uuid: $deployment_uuid,
-                                    force_rebuild: false,
-                                    commit: $commit ?? 'HEAD',
-                                    is_webhook: true,
-                                );
-                                if ($result['status'] === 'queue_full') {
-                                    return response($result['message'], 429)->header('Retry-After', 60);
-                                } elseif ($result['status'] === 'skipped') {
-                                    $return_payloads->push([
-                                        'application' => $application->name,
-                                        'status' => 'skipped',
-                                        'message' => $result['message'],
-                                    ]);
-                                } else {
-                                    auditLog('webhook.deployment.queued', [
-                                        'provider' => 'github',
-                                        'mode' => 'manual',
-                                        'application_uuid' => $application->uuid,
-                                        'application_name' => $application->name,
-                                        'deployment_uuid' => $result['deployment_uuid'],
-                                        'commit' => $commit,
-                                        'repository' => $full_name ?? null,
-                                    ]);
-                                    $return_payloads->push([
-                                        'application' => $application->name,
-                                        'status' => 'success',
-                                        'message' => 'Deployment queued.',
-                                        'application_uuid' => $application->uuid,
-                                        'application_name' => $application->name,
-                                        'deployment_uuid' => $result['deployment_uuid'],
-                                    ]);
-                                }
-                            } else {
-                                $paths = str($application->watch_paths)->explode("\n");
+                            if ($skip_deploy_commits ?? false) {
                                 $return_payloads->push([
-                                    'status' => 'failed',
-                                    'message' => 'Changed files do not match watch paths. Ignoring deployment.',
+                                    'application' => $application->name,
+                                    'status' => 'skipped',
+                                    'message' => 'All commits contain [skip cd] or [skip ci]. Skipping deployment.',
                                     'application_uuid' => $application->uuid,
                                     'application_name' => $application->name,
-                                    'details' => [
-                                        'changed_files' => $changed_files,
-                                        'watch_paths' => $paths,
-                                    ],
+                                ]);
+
+                                continue;
+                            }
+                            $triggers ??= PushTriggerRouter::forPush($this->githubPushContext($payload, null, $full_name, $changed_files));
+                            if ($this->deferPushIfEvaluated($triggers, $application, $return_payloads)) {
+                                continue;
+                            }
+                            $deployment_uuid = new_public_id();
+                            $result = queue_application_deployment(
+                                application: $application,
+                                deployment_uuid: $deployment_uuid,
+                                force_rebuild: false,
+                                commit: $commit ?? 'HEAD',
+                                is_webhook: true,
+                            );
+                            if ($result['status'] === 'queue_full') {
+                                $triggers->dispatch();
+
+                                return response($result['message'], 429)->header('Retry-After', 60);
+                            } elseif ($result['status'] === 'skipped') {
+                                $return_payloads->push([
+                                    'application' => $application->name,
+                                    'status' => 'skipped',
+                                    'message' => $result['message'],
+                                ]);
+                            } else {
+                                auditLog('webhook.deployment.queued', [
+                                    'provider' => 'github',
+                                    'mode' => 'manual',
+                                    'application_uuid' => $application->uuid,
+                                    'application_name' => $application->name,
+                                    'deployment_uuid' => $result['deployment_uuid'],
+                                    'commit' => $commit,
+                                    'repository' => $full_name ?? null,
+                                ]);
+                                $return_payloads->push([
+                                    'application' => $application->name,
+                                    'status' => 'success',
+                                    'message' => 'Deployment queued.',
+                                    'application_uuid' => $application->uuid,
+                                    'application_name' => $application->name,
+                                    'deployment_uuid' => $result['deployment_uuid'],
                                 ]);
                             }
                         } else {
@@ -257,6 +253,8 @@ class Github extends Controller
                     }
                 }
             }
+
+            ($triggers ?? null)?->dispatch();
 
             return $this->manualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
         } catch (InvalidWebhookPayloadException $e) {
@@ -531,60 +529,52 @@ class Github extends Controller
                     }
                     if ($x_github_event === 'push') {
                         if ($application->isDeployable()) {
-                            if ($this->webhookPushMatchesWatchPaths($application, $changed_files)) {
-                                if ($skip_deploy_commits ?? false) {
-                                    $return_payloads->push([
-                                        'application' => $application->name,
-                                        'status' => 'skipped',
-                                        'message' => 'All commits contain [skip cd] or [skip ci]. Skipping deployment.',
-                                        'application_uuid' => $application->uuid,
-                                        'application_name' => $application->name,
-                                    ]);
-
-                                    continue;
-                                }
-                                $deployment_uuid = new_public_id();
-                                $result = queue_application_deployment(
-                                    application: $application,
-                                    deployment_uuid: $deployment_uuid,
-                                    commit: $commit ?? 'HEAD',
-                                    force_rebuild: false,
-                                    is_webhook: true,
-                                );
-                                if ($result['status'] === 'queue_full') {
-                                    return response($result['message'], 429)->header('Retry-After', 60);
-                                }
-                                if ($result['status'] !== 'skipped' && ! empty($result['deployment_uuid'])) {
-                                    auditLog('webhook.deployment.queued', [
-                                        'provider' => 'github',
-                                        'mode' => 'app',
-                                        'application_uuid' => $application->uuid,
-                                        'application_name' => $application->name,
-                                        'deployment_uuid' => $result['deployment_uuid'],
-                                        'commit' => $commit,
-                                        'github_app_id' => $github_app->id,
-                                    ]);
-                                }
+                            if ($skip_deploy_commits ?? false) {
                                 $return_payloads->push([
-                                    'status' => $result['status'],
-                                    'message' => $result['message'],
+                                    'application' => $application->name,
+                                    'status' => 'skipped',
+                                    'message' => 'All commits contain [skip cd] or [skip ci]. Skipping deployment.',
                                     'application_uuid' => $application->uuid,
                                     'application_name' => $application->name,
-                                    'deployment_uuid' => $result['deployment_uuid'] ?? null,
                                 ]);
-                            } else {
-                                $paths = str($application->watch_paths)->explode("\n");
-                                $return_payloads->push([
-                                    'status' => 'failed',
-                                    'message' => 'Changed files do not match watch paths. Ignoring deployment.',
+
+                                continue;
+                            }
+                            $triggers ??= PushTriggerRouter::forPush($this->githubPushContext($payload, $github_app, $full_name ?? null, $changed_files));
+                            if ($this->deferPushIfEvaluated($triggers, $application, $return_payloads)) {
+                                continue;
+                            }
+                            $deployment_uuid = new_public_id();
+                            $result = queue_application_deployment(
+                                application: $application,
+                                deployment_uuid: $deployment_uuid,
+                                commit: $commit ?? 'HEAD',
+                                force_rebuild: false,
+                                is_webhook: true,
+                            );
+                            if ($result['status'] === 'queue_full') {
+                                $triggers->dispatch();
+
+                                return response($result['message'], 429)->header('Retry-After', 60);
+                            }
+                            if ($result['status'] !== 'skipped' && ! empty($result['deployment_uuid'])) {
+                                auditLog('webhook.deployment.queued', [
+                                    'provider' => 'github',
+                                    'mode' => 'app',
                                     'application_uuid' => $application->uuid,
                                     'application_name' => $application->name,
-                                    'details' => [
-                                        'changed_files' => $changed_files,
-                                        'watch_paths' => $paths,
-                                    ],
+                                    'deployment_uuid' => $result['deployment_uuid'],
+                                    'commit' => $commit,
+                                    'github_app_id' => $github_app->id,
                                 ]);
                             }
+                            $return_payloads->push([
+                                'status' => $result['status'],
+                                'message' => $result['message'],
+                                'application_uuid' => $application->uuid,
+                                'application_name' => $application->name,
+                                'deployment_uuid' => $result['deployment_uuid'] ?? null,
+                            ]);
                         } else {
                             $return_payloads->push([
                                 'status' => 'failed',
@@ -629,6 +619,8 @@ class Github extends Controller
                 }
             }
 
+            ($triggers ?? null)?->dispatch();
+
             return response($return_payloads);
         } catch (InvalidWebhookPayloadException $e) {
             return response($e->getMessage());
@@ -651,6 +643,29 @@ class Github extends Controller
      *
      * @throws InvalidWebhookPayloadException When the before or after value is not a commit SHA.
      */
+    /**
+     * @param  Collection<int, string>|null  $changedFiles
+     */
+    private function githubPushContext(mixed $payload, ?GithubApp $githubApp, ?string $fullName, ?Collection $changedFiles): PushContext
+    {
+        $fullName ??= $this->manualWebhookRepositoryFullName(data_get($payload, 'repository.full_name'));
+        $forced = data_get($payload, 'forced');
+
+        return new PushContext(
+            provider: $githubApp ? 'github' : 'github_manual',
+            teamId: 0,
+            repositoryUrl: rtrim($githubApp?->html_url ?? 'https://github.com', '/').'/'.$fullName,
+            ref: 'refs/heads/'.$this->webhookPushBranch(data_get($payload, 'ref')),
+            after: $this->webhookCommitSha($payload, 'after'),
+            before: $this->webhookCommitSha($payload, 'before'),
+            forced: is_bool($forced) ? $forced : null,
+            commitMessage: $this->webhookString(data_get($payload, 'head_commit.message')),
+            githubAppId: $githubApp?->id,
+            repositoryFullName: $fullName,
+            payloadChangedFiles: $changedFiles?->values()->all(),
+        );
+    }
+
     private function githubPushComparedFiles(GithubApp $githubApp, mixed $payload): ?Collection
     {
         $before = $this->webhookCommitSha($payload, 'before');

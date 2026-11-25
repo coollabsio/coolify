@@ -1135,8 +1135,9 @@ describe('Manual Webhook Push Payloads Without Commits', function () {
         $response = sendSignedManualWebhook($this, $provider, $application, $payload);
 
         $response->assertOk();
-        expect($response->getContent())->toContain('Deployment queued');
-        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeTrue();
+        expect($response->getContent())->toMatch('/Deployment queued|evaluating/');
+        runPushedEvaluations();
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->where('status', '!=', 'skipped')->exists())->toBeTrue();
     })->with(['github', 'gitlab', 'gitea'])
         ->with(['missing', 'null'])
         ->with(['no watch paths' => null, 'watch paths' => 'src/**']);
@@ -1149,8 +1150,9 @@ describe('Manual Webhook Push Payloads Without Commits', function () {
         $response = sendSignedManualWebhook($this, $provider, $application, $payload);
 
         $response->assertOk();
-        expect($response->getContent())->toContain('Changed files do not match watch paths');
-        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
+        expect($response->getContent())->toMatch('/Changed files do not match watch paths|evaluating/');
+        runPushedEvaluations();
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->where('status', '!=', 'skipped')->exists())->toBeFalse();
     })->with(['github', 'gitlab', 'gitea']);
 
     test('a push that deletes the branch does not queue a deployment', function (string $provider, ?string $watchPaths) {
@@ -1268,6 +1270,7 @@ describe('App Webhook Push Payloads Without Commits', function () {
         ], $payload);
 
         $response->assertOk();
+        runPushedEvaluations();
         expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeTrue();
     });
 

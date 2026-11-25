@@ -55,3 +55,16 @@ it('describes an evaluating application for the webhook response', function () {
 
     expect($this->router->responseEntry($web))->toMatchArray(['application' => 'web', 'status' => 'evaluating']);
 });
+
+it('dispatches one job per team', function () {
+    $mine = deployTriggerApplication($this->fixture, ['base_directory' => '/apps/web']);
+    $otherFixture = deployTriggerFixture();
+    $theirs = deployTriggerApplication($otherFixture, ['base_directory' => '/apps/web']);
+
+    $this->router->defer($mine);
+    $this->router->defer($theirs);
+    $this->router->dispatch();
+
+    Queue::assertPushed(EvaluatePush::class, 2);
+    Queue::assertPushed(EvaluatePush::class, fn (EvaluatePush $job) => $job->context->teamId === $otherFixture['team']->id && $job->applicationIds === [$theirs->id]);
+});

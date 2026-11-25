@@ -252,3 +252,14 @@ it('chooses the lowest-id functional destination server', function () {
         ->and($runner->servers[0]->id)->toBe($this->fixture['server']->id)
         ->and($runner->requests[0]->applicationIds())->toEqualCanonicalizing([$this->web->uuid, $this->api->uuid]);
 });
+
+it('filters watch path apps with the webhook file list while the base is unknown', function () {
+    $runner = FakeAffectedRunner::respondWith(epRespond([]));
+    $this->api->update(['watch_paths' => 'apps/api/**']);
+    $this->api->forceFill(['trigger_base_commit' => null])->save();
+
+    epRun(epContext(['payloadChangedFiles' => ['apps/web/a.ts']]), [$this->api]);
+
+    expect(ApplicationDeploymentQueue::query()->where('application_id', $this->api->id)->sole()->status)->toBe(ApplicationDeploymentStatus::SKIPPED->value)
+        ->and($runner->requests)->toBe([]);
+});

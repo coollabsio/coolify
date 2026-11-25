@@ -10,6 +10,7 @@ use App\Services\DeployTriggers\Contract\ApplicationDecision;
 use App\Services\DeployTriggers\EvaluationRequestBuilder;
 use App\Services\DeployTriggers\EvaluationSlots;
 use App\Services\DeployTriggers\GithubFastPath;
+use App\Services\DeployTriggers\LegacyWatchPaths;
 use App\Services\DeployTriggers\PushContext;
 use App\Services\DeployTriggers\TriggerCandidate;
 use App\Services\DeployTriggers\TriggerRecorder;
@@ -193,20 +194,9 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 
     private function withoutHelper(TriggerCandidate $candidate): ApplicationDecision
     {
-        if ($candidate->mode === 'smart') {
-            return ApplicationDecision::deployBecause($candidate->id, 'helper_unsupported', 'The helper image of the server cannot evaluate pushes, so it deploys.');
-        }
-
-        $files = $this->context->payloadChangedFiles;
-        if ($files === null) {
-            return ApplicationDecision::deployBecause($candidate->id, 'no_file_list', 'The webhook has no list of changed files, so it deploys.');
-        }
-
-        $matched = Application::matchPaths(collect($files), collect(explode("\n", (string) $candidate->application->watch_paths)));
-
-        return $matched->isEmpty()
-            ? new ApplicationDecision($candidate->id, 'skip', 'watch_paths_no_match', 'None of the changed files match the watch paths.', $candidate->base)
-            : new ApplicationDecision($candidate->id, 'deploy', 'watch_paths_matched', "{$matched->first()} matches the watch paths.", $candidate->base, [['file' => $matched->first(), 'rule' => 'watch_paths']]);
+        return $candidate->mode === 'smart'
+            ? ApplicationDecision::deployBecause($candidate->id, 'helper_unsupported', 'The helper image of the server cannot evaluate pushes, so it deploys.')
+            : LegacyWatchPaths::decide($candidate, $this->context->payloadChangedFiles);
     }
 
     /**

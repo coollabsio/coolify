@@ -11,7 +11,7 @@ use App\Models\InstanceSettings;
  */
 final class PushTriggerRouter
 {
-    /** @var list<int> */
+    /** @var array<int, list<int>> team id => application ids */
     private array $deferred = [];
 
     private function __construct(private readonly PushContext $context) {}
@@ -31,7 +31,7 @@ final class PushTriggerRouter
             return TriggerRoute::Evaluate;
         }
 
-        $enabled = (bool) InstanceSettings::get()->is_smart_triggers_enabled
+        $enabled = (bool) (InstanceSettings::query()->whereKey(0)->value('is_smart_triggers_enabled') ?? true)
             && (bool) ($application->settings?->is_smart_triggers_enabled ?? true);
 
         return $enabled && $application->isNarrowable() ? TriggerRoute::Evaluate : TriggerRoute::DeployNow;
@@ -39,15 +39,16 @@ final class PushTriggerRouter
 
     public function defer(Application $application): void
     {
-        if (! in_array($application->id, $this->deferred, true)) {
-            $this->deferred[] = $application->id;
+        $teamId = (int) ($application->team()?->id ?? $this->context->teamId);
+        if (! in_array($application->id, $this->deferred[$teamId] ?? [], true)) {
+            $this->deferred[$teamId][] = $application->id;
         }
     }
 
     public function dispatch(): void
     {
-        if ($this->deferred !== []) {
-            EvaluatePush::dispatch($this->context, $this->deferred);
+        foreach ($this->deferred as $teamId => $applicationIds) {
+            EvaluatePush::dispatch($this->context->withTeam($teamId), $applicationIds);
         }
     }
 
