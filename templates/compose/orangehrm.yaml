@@ -8,7 +8,7 @@
 
 services:
   orangehrm:
-    image: orangehrm/orangehrm:latest
+    image: orangehrm/orangehrm:5.9
     platform: linux/amd64
     environment:
       - SERVICE_URL_ORANGEHRM_80

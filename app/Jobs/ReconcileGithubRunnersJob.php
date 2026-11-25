@@ -31,6 +31,8 @@ class ReconcileGithubRunnersJob implements ShouldBeUnique, ShouldQueue
 
     private const PROVISIONING_TIMEOUT_MINUTES = 20;
 
+    private const DEFAULT_CAPACITY_WAIT_TIMEOUT_MINUTES = 60;
+
     public function __construct()
     {
         $this->onQueue('high');
@@ -168,10 +170,10 @@ class ReconcileGithubRunnersJob implements ShouldBeUnique, ShouldQueue
             ->groupBy('github_app_id');
 
         foreach ($queued as $githubAppId => $executions) {
+            // Disabled configurations count too: disabling pauses admission, it does not drop the queue.
             $timeout = (int) (GithubRunnerConfig::query()
                 ->where('github_app_id', $githubAppId)
-                ->where('is_enabled', true)
-                ->max('capacity_wait_timeout') ?? 0);
+                ->max('capacity_wait_timeout') ?? self::DEFAULT_CAPACITY_WAIT_TIMEOUT_MINUTES);
 
             foreach ($executions as $execution) {
                 if (($execution->queued_at ?? $execution->created_at)->lt(now()->subMinutes($timeout))) {

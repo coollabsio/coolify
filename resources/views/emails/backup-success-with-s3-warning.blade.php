@@ -1,6 +1,10 @@
 <x-emails.layout>
 Database backup for {{ $name }} @if($database_name)(db:{{ $database_name }})@endif with frequency of {{ $frequency }} succeeded locally but failed to upload to the backup storage.
 
+@isset($trigger)
+Trigger: {{ $trigger }}
+@endisset
+
 Storage Error: {{ $s3_error }}
 
 @if($s3_storage_url)

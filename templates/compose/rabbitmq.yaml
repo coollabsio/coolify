@@ -7,7 +7,7 @@
 
 services:
   rabbitmq:
-    image: rabbitmq:3-management
+    image: rabbitmq:4-management
     hostname: "rabbitmq"
     environment:
       - SERVICE_URL_RABBITMQ_15672

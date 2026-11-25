@@ -184,12 +184,13 @@ class StackForm extends Component
             $this->authorize('update', $this->service);
             $this->validate();
             $this->syncData(true);
+            $isComposeChanged = $this->service->isDirty('docker_compose_raw');
 
             // Validate for command injection BEFORE any database operations
             validateDockerComposeForInjection($this->service->docker_compose_raw);
 
-            // Use transaction to ensure atomicity - if parse fails, save is rolled back
-            DB::transaction(function () {
+            // Use transaction to ensure atomicity - if parse or the Compose check fails, save is rolled back
+            DB::transaction(function () use ($isComposeChanged) {
                 $this->service->save();
                 if (auth()->user()->can('manageEnvironment', $this->service)) {
                     $lockedKeys = $this->lockedFieldKeys();
@@ -198,6 +199,9 @@ class StackForm extends Component
                     );
                 }
                 $this->service->parse();
+                if ($isComposeChanged) {
+                    $this->service->ensureDockerComposeAccepted();
+                }
             });
             // Refresh and write files after a successful commit
             $this->service->refresh();

@@ -308,10 +308,12 @@ class RefreshCandidates
         return match ($status) {
             'no_better' => "No newer version of {$name} is better yet. Coolify checks again every day.",
             'cannot_compare' => 'Coolify cannot compare versions of this image. Check the image page for a newer version.',
-            'auth_required' => "Coolify cannot read the tags of {$name}. Log in to {$image->registry} on {$server}.",
-            'failed' => data_get($result, 'error') === 'daily_limit'
-                ? "Coolify reached the daily limit of version checks on {$server}. It checks again tomorrow."
-                : "Coolify could not check for newer versions of {$name}. It tries again tomorrow.",
+            'auth_required' => "Cannot read the tags of {$name}. Log in to {$image->registry} on {$server}.",
+            'failed' => match (data_get($result, 'error')) {
+                'daily_limit' => "Daily limit of version checks reached on {$server}. Coolify checks again tomorrow.",
+                'registry_tls' => "Untrusted certificate on {$image->registry}. Install its CA on {$server}.",
+                default => "Coolify could not check for newer versions of {$name}. It tries again tomorrow.",
+            },
             default => null,
         };
     }
@@ -660,7 +662,7 @@ class RefreshCandidates
                 return null;
             }
 
-            $created = $this->runStep($this->commands->sbomFromRegistry($this->image->qualifiedName().'@'.$digest, $platform, $hex, $this->auth), 'sbom', ScanImage::sbomStepTimeout($this->commands->server));
+            $created = $this->runStep($this->commands->sbomFromRegistry($this->image->qualifiedName().'@'.$digest, $platform, $hex, $this->auth), 'sbom', ScanImage::registrySbomStepTimeout($this->commands->server));
             $packages = $created !== null && $created['code'] === 0 ? $this->runStep($this->commands->packages($hex), 'packages', self::TIMEOUT_PACKAGES) : null;
             if ($packages === null || $packages['code'] !== 0) {
                 $this->error ??= 'scan';
@@ -775,6 +777,11 @@ class RefreshCandidates
 
             return null;
         }
+        if ($result['tls']) {
+            $this->error ??= 'registry_tls';
+
+            return null;
+        }
         if ($this->loginRead || $this->anonymousWorked) {
             $this->error ??= 'registry';
 
@@ -794,6 +801,11 @@ class RefreshCandidates
         $result = $this->runStep($commands(), $step, self::TIMEOUT_REGISTRY);
         if ($result !== null && $result['code'] === 0) {
             return $this->payload($result)[0];
+        }
+        if ($result !== null && $result['tls']) {
+            $this->error ??= 'registry_tls';
+
+            return null;
         }
 
         $this->authRequired = true;
@@ -815,7 +827,7 @@ class RefreshCandidates
     }
 
     /**
-     * @param  array{code: int, size: ?int, payload: string}  $grype
+     * @param  array{code: int, size: ?int, tls: bool, payload: string}  $grype
      * @return array{findings: list<Finding>, eol: ?array{name: string, version: string}, truncated: bool}
      */
     private function report(array $grype): array
@@ -830,7 +842,7 @@ class RefreshCandidates
      * Null when the batch did not run or printed no marker for $step.
      *
      * @param  list<string>  $commands
-     * @return array{code: int, size: ?int, payload: string}|null
+     * @return array{code: int, size: ?int, tls: bool, payload: string}|null
      */
     private function runStep(array $commands, string $step, int $timeout): ?array
     {
@@ -840,13 +852,13 @@ class RefreshCandidates
             return null;
         }
 
-        return ['code' => $parsed['exit_codes'][$step], 'size' => $parsed['sizes'][$step] ?? null, 'payload' => $parsed['payload']];
+        return ['code' => $parsed['exit_codes'][$step], 'size' => $parsed['sizes'][$step] ?? null, 'tls' => in_array($step, $parsed['tls'], true), 'payload' => $parsed['payload']];
     }
 
     /**
      * Output over the limit was cut by `head -c`: keep only its complete lines.
      *
-     * @param  array{code: int, size: ?int, payload: string}  $result
+     * @param  array{code: int, size: ?int, tls: bool, payload: string}  $result
      * @return array{0: string, 1: bool}
      */
     private function payload(array $result): array

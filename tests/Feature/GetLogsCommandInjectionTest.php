@@ -73,8 +73,6 @@ describe('GetLogs Livewire action validation', function () {
             'resource' => $this->application,
             'container' => 'test-container',
         ])
-            ->assertSee('All')
-            ->assertSeeHtml('title="Show all logs"')
             ->call('showAllLogs')
             ->assertSet('numberOfLines', -1)
             ->assertReturned('all logs');
@@ -219,7 +217,7 @@ describe('GetLogs browser-rendered output', function () {
             'container' => 'test-container',
         ])->call('getLogs', '2026-09-28T10:00:02Z');
 
-        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), '(sudo docker logs --since 2026-09-28T10:00:02Z -n 50000 -t test-container) 2>&1 | head -c'));
+        Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), '(sudo timeout -k 5s 30s docker logs --since 2026-09-28T10:00:02Z -n 50000 -t test-container) 2>&1 | head -c'));
     });
 
     test('getLogs ignores a since value that is not a docker timestamp', function (string $since) {

@@ -127,3 +127,26 @@ test('validate rejects garbage database port values', function (array $attribute
     'public port too high' => [['public_port' => 70000], 'public_port'],
     'public port text' => [['public_port' => '5432; id'], 'public_port'],
 ]);
+
+test('validate rejects compose domains that are not http or https URLs', function () {
+    $bundle = bundleTestMinimalBundle();
+    $bundle['projects'] = [['environments' => [['applications' => [[
+        'attributes' => ['docker_compose_domains' => json_encode(['web' => ['domain' => 'ftp://app.example.com']])],
+        'previews' => [['docker_compose_domains' => json_encode(['web' => ['domain' => 'https://pr-1.example.com,ftp://pr-1.example.com']])]],
+    ]]]]]];
+
+    $errors = ServerTransferBundle::validate($bundle)['errors'];
+
+    expect($errors)->toHaveCount(2)
+        ->and($errors[0])->toContain('applications.0.docker_compose_domains.web.domain')
+        ->and($errors[1])->toContain('previews.0.docker_compose_domains.web.domain');
+});
+
+test('validate accepts valid compose domains', function () {
+    $bundle = bundleTestMinimalBundle();
+    $bundle['projects'] = [['environments' => [['applications' => [[
+        'attributes' => ['docker_compose_domains' => json_encode(['web' => ['domain' => 'https://app.example.com'], 'db' => ['domain' => '']])],
+    ]]]]]];
+
+    expect(ServerTransferBundle::validate($bundle)['errors'])->toBe([]);
+});

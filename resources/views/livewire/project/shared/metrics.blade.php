@@ -119,7 +119,7 @@
                         xaxis: {
                             type: 'datetime',
                             labels: {
-                                datetimeUTC: true,
+                                datetimeUTC: false,
                                 style: {
                                     colors: textColor,
                                 },
@@ -159,11 +159,10 @@
                             custom: ({ series, seriesIndex, dataPointIndex, w }) => {
                                 const value = series[seriesIndex][dataPointIndex];
                                 const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
-                                const date = new Date(timestamp);
 
                                 return `<div class="apexcharts-tooltip-custom">
                                     <div class="apexcharts-tooltip-custom-value">CPU: <span class="apexcharts-tooltip-value-bold">${value}%</span></div>
-                                    <div class="apexcharts-tooltip-custom-title">${date.toLocaleString(undefined, { timeZone: 'UTC', hour12: false })} UTC</div>
+                                    ${window.chartTooltipTime(timestamp)}
                                 </div>`;
                             },
                         },
@@ -183,7 +182,7 @@
                             xaxis: {
                                 type: 'datetime',
                                 labels: {
-                                    datetimeUTC: true,
+                                    datetimeUTC: false,
                                     style: {
                                         colors: textColor,
                                     },
@@ -282,7 +281,7 @@
                         xaxis: {
                             type: 'datetime',
                             labels: {
-                                datetimeUTC: true,
+                                datetimeUTC: false,
                                 style: {
                                     colors: textColor,
                                 },
@@ -318,11 +317,10 @@
                             custom: ({ series, seriesIndex, dataPointIndex, w }) => {
                                 const value = series[seriesIndex][dataPointIndex];
                                 const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
-                                const date = new Date(timestamp);
 
                                 return `<div class="apexcharts-tooltip-custom">
                                     <div class="apexcharts-tooltip-custom-value">Memory: <span class="apexcharts-tooltip-value-bold">${value} MB</span></div>
-                                    <div class="apexcharts-tooltip-custom-title">${date.toLocaleString(undefined, { timeZone: 'UTC', hour12: false })} UTC</div>
+                                    ${window.chartTooltipTime(timestamp)}
                                 </div>`;
                             },
                         },
@@ -342,7 +340,7 @@
                             xaxis: {
                                 type: 'datetime',
                                 labels: {
-                                    datetimeUTC: true,
+                                    datetimeUTC: false,
                                     style: {
                                         colors: textColor,
                                     },

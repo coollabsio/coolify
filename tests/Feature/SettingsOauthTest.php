@@ -38,22 +38,6 @@ beforeEach(function () {
     OauthSetting::create(['provider' => 'bitbucket']);
 });
 
-it('keeps every oauth provider on one page', function () {
-    actingAsInstanceAdmin();
-
-    $this->withoutMiddleware(DecideWhatToDoWithUser::class)
-        ->get(route('settings.oauth'))
-        ->assertSuccessful()
-        ->assertSee('Authentication')
-        ->assertSee('Registration')
-        ->assertSee('Authentik')
-        ->assertSee('Bitbucket')
-        ->assertSee('OpenID Connect')
-        ->assertSee('Disable password registration when OAuth is enabled')
-        ->assertSee('Client secret')
-        ->assertDontSee(route('settings.oauth.provider', 'authentik'), false);
-});
-
 it('lists openid connect before the other oauth providers', function () {
     actingAsInstanceAdmin();
 

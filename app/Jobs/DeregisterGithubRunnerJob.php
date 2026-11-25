@@ -12,13 +12,16 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Best effort: a failure is logged and never blocks the deletion.
+ * Best effort: a failure is logged and never blocks the deletion. GitHub refuses to remove a runner
+ * that still has a job, so a failed removal is retried a few times.
  */
 class DeregisterGithubRunnerJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $tries = 1;
+    public const RETRY_DELAY_SECONDS = 60;
+
+    public $tries = 5;
 
     public $timeout = 120;
 
@@ -37,6 +40,11 @@ class DeregisterGithubRunnerJob implements ShouldQueue
         try {
             (new GithubRunnerApi($githubApp))->deleteRunner($this->runnerId);
         } catch (\Throwable $e) {
+            if ($this->attempts() < $this->tries) {
+                $this->release(self::RETRY_DELAY_SECONDS * $this->attempts());
+
+                return;
+            }
             Log::warning('Could not remove GitHub runner', ['github_app_id' => $this->githubAppId, 'runner_id' => $this->runnerId, 'error' => $e->getMessage()]);
         }
     }

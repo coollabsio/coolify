@@ -352,8 +352,7 @@ class Index extends Component
                 return 'The provided password is incorrect.';
             }
 
-            $deleteUserAccount = app(DeleteUserAccount::class);
-            $deleteUserAccount->handle(Auth::user(), removeTeamResources: $deleteUserAccount->removesTeamResources(Auth::user()));
+            app(DeleteUserAccount::class)->handle(Auth::user());
             auditLog('ui.user.account_deleted', ['resource' => 'user']);
 
             Auth::guard('web')->logout();
@@ -392,7 +391,7 @@ class Index extends Component
         $deleteUserAccount = app(DeleteUserAccount::class);
 
         return view('livewire.profile.index', [
-            'accountDeletionBlockers' => $deleteUserAccount->blockers(Auth::user(), $deleteUserAccount->removesTeamResources(Auth::user())),
+            'accountDeletionBlockers' => $deleteUserAccount->blockers(Auth::user()),
             'accountDeletionActions' => $deleteUserAccount->confirmationActions(Auth::user()),
         ]);
     }

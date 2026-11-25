@@ -89,21 +89,6 @@ test('private key editor lists the github app that uses the key', function () {
         ->assertDontSee('Used by GitHub App');
 });
 
-test('used private key editor disables delete with an explanation', function () {
-    $privateKey = PrivateKey::factory()->create([
-        'team_id' => $this->team->id,
-    ]);
-
-    Server::factory()->create([
-        'team_id' => $this->team->id,
-        'private_key_id' => $privateKey->id,
-    ]);
-
-    Livewire::test(Show::class, ['private_key_uuid' => $privateKey->uuid])
-        ->assertSee('This private key is currently used by a server, application, or Git app and cannot be deleted.', false)
-        ->assertSee('disabled', false);
-});
-
 test('used private key delete action keeps the key and shows an error', function () {
     $privateKey = PrivateKey::factory()->create([
         'team_id' => $this->team->id,

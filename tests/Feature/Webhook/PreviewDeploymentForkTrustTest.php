@@ -172,3 +172,15 @@ it('queues no preview deployment for a pull request from a fork without public p
         ->and(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse()
         ->and(ApplicationPreview::query()->where('application_id', $application->id)->exists())->toBeFalse();
 })->with($deliveries);
+
+it('records whether the pull request branch is in the repository, so only such a preview deploys its own Compose file', function (string $delivery, bool $fromFork) {
+    $application = forkTrustApplication($delivery);
+    $application->settings->update(['is_pr_deployments_public_enabled' => true]);
+
+    sendForkTrustPullRequest($this, $delivery, $application, fromFork: $fromFork)->assertOk();
+
+    expect(ApplicationPreview::query()->where('application_id', $application->id)->where('pull_request_id', 7)->value('is_same_repository'))->toBe(! $fromFork);
+})->with($deliveries)->with([
+    'same repository' => [false],
+    'fork' => [true],
+]);

@@ -17,7 +17,7 @@ it('reads the images of a Compose file again after the file changes, also on the
 
     $application->docker_compose = Yaml::dump(['services' => ['web' => ['image' => 'caddy:2'], 'cache' => ['image' => '${CACHE_IMAGE:-redis:7}']]]);
 
-    expect(ResourceScans::composeServiceNames($application))->toBe(['caddy' => 'web']);
+    expect(ResourceScans::composeServiceNames($application))->toBe(['caddy' => 'web', 'redis' => 'cache']);
 });
 
 it('reads no images of a Compose file that is not valid YAML, every time', function () {

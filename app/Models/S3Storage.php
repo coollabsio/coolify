@@ -23,6 +23,8 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Sleep;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use League\Flysystem\Filesystem;
 use League\Flysystem\FilesystemAdapter as FlysystemAdapter;
@@ -51,6 +53,19 @@ class S3Storage extends BaseModel
      * Waits before the second and the third attempt of an upload with the MinIO client.
      */
     private const MINIO_CLIENT_UPLOAD_RETRY_DELAYS_MS = [10_000, 30_000];
+
+    /**
+     * The MinIO client option that sends Content-MD5 with each upload request. An Object Lock bucket on AWS rejects
+     * uploads without it. `mc` adds it by itself only when the key can read the lock configuration of the bucket.
+     */
+    public const MINIO_CLIENT_CHECKSUM_OPTION = ' --checksum=MD5';
+
+    /**
+     * Part of the error of AWS when an upload to an Object Lock bucket has no Content-MD5 or checksum header.
+     */
+    public const CHECKSUM_REQUIRED_ERROR = 'content-md5 or x-amz-checksum';
+
+    private const MINIO_CLIENT_STAT_TIMEOUT_SECONDS = 60;
 
     /**
      * The most parts that an upload with the MinIO client uses. Most providers accept 10000 parts, but some, like
@@ -559,6 +574,7 @@ class S3Storage extends BaseModel
                 if ($adapter instanceof SftpFilesystemAdapter && $this->sftp_host_key === null) {
                     $this->pinSftpHostKey((string) $adapter->presentedHostKey(), $shouldSave);
                 }
+                $this->assertWritable($disk);
             }
 
             $this->unusable_email_sent = false;
@@ -593,6 +609,33 @@ class S3Storage extends BaseModel
             if ($shouldSave) {
                 $this->save();
             }
+        }
+    }
+
+    /**
+     * Creates the base directory, then writes and deletes a small file, as a backup upload does. Listing alone passes
+     * on a directory that the user cannot create or write, for example "/backups" on a Hetzner Storage Box.
+     */
+    private function assertWritable(FilesystemAdapter $disk): void
+    {
+        $adapter = $disk->getAdapter();
+        $file = '.coolify-write-test-'.Str::lower(Str::random(12));
+
+        try {
+            if ($adapter instanceof SftpFilesystemAdapter) {
+                $adapter->createRootDirectory($this->basePath());
+            }
+            $disk->getDriver()->write($file, 'coolify');
+        } catch (\Throwable $exception) {
+            $directory = $this->basePath() === '' ? 'the login directory' : '"'.$this->basePath().'"';
+
+            throw new \RuntimeException('Coolify cannot write to '.$directory.' on the storage: '.$exception->getMessage(), previous: $exception);
+        }
+
+        try {
+            $disk->getDriver()->delete($file);
+        } catch (\Throwable) {
+            // Some servers allow uploads but not deletes. Backups still work there.
         }
     }
 
@@ -933,14 +976,77 @@ class S3Storage extends BaseModel
     /**
      * Runs an upload of a local file with the MinIO client again when it fails, for example after a short network
      * outage. A timeout is not retried, because another full attempt can pass the timeout of the backup job.
+     *
+     * An upload can fail after the object is complete in the bucket, for example when the provider answers a
+     * repeated `CompleteMultipartUpload` with "multipart completion is already in progress". So after each failure,
+     * and again before each new attempt, $isUploaded checks the bucket, and a complete object ends the upload.
+     *
+     * When the bucket requires a checksum, the next attempt starts at once and gets MINIO_CLIENT_CHECKSUM_OPTION.
+     * Other uploads never get the option, so providers that do not support it work as before.
+     *
+     * @param  callable(string): mixed  $upload  receives the checksum option for the `mc` command, or an empty string
+     * @param  callable(): bool  $isUploaded
      */
-    public static function retryMinioClientUpload(callable $upload): mixed
+    public static function retryMinioClientUpload(callable $upload, callable $isUploaded): void
     {
-        return retry(
-            self::MINIO_CLIENT_UPLOAD_RETRY_DELAYS_MS,
-            $upload,
-            when: fn (\Throwable $exception): bool => $exception->getCode() !== self::REMOTE_COMMAND_TIMEOUT_EXIT_CODE,
-        );
+        $delays = self::MINIO_CLIENT_UPLOAD_RETRY_DELAYS_MS;
+        $checksumOption = '';
+        while (true) {
+            try {
+                $upload($checksumOption);
+
+                return;
+            } catch (\Throwable $exception) {
+                if ($isUploaded()) {
+                    return;
+                }
+                if ($checksumOption === '' && str_contains(strtolower($exception->getMessage()), self::CHECKSUM_REQUIRED_ERROR)) {
+                    $checksumOption = self::MINIO_CLIENT_CHECKSUM_OPTION;
+
+                    continue;
+                }
+                $delay = array_shift($delays);
+                if ($delay === null || $exception->getCode() === self::REMOTE_COMMAND_TIMEOUT_EXIT_CODE) {
+                    throw $exception;
+                }
+                Sleep::for($delay)->milliseconds();
+                if ($isUploaded()) {
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * Whether $key exists in the bucket with $size bytes. It runs `mc stat` with the alias `temporary` in $container,
+     * so it works only after the alias is set. Any error counts as "not uploaded".
+     */
+    public function minioClientObjectHasSize(Server $server, string $container, string $key, int $size, string $resolveOptions): bool
+    {
+        try {
+            $output = instant_remote_process(
+                ['docker exec '.escapeshellarg($container).' mc stat --json'.$resolveOptions.' '.escapeshellarg('temporary/'.$this->bucket.'/'.ltrim($key, '/'))],
+                $server,
+                throwError: false,
+                timeout: self::MINIO_CLIENT_STAT_TIMEOUT_SECONDS,
+                disableMultiplexing: true,
+                maxAttempts: 1,
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return self::minioClientStatHasSize((string) $output, $size);
+    }
+
+    /**
+     * Whether the `mc stat --json` output describes one object of $size bytes.
+     */
+    public static function minioClientStatHasSize(string $statOutput, int $size): bool
+    {
+        $stat = json_decode(trim($statOutput), true);
+
+        return is_array($stat) && data_get($stat, 'status') === 'success' && data_get($stat, 'type') === 'file' && data_get($stat, 'size') === $size;
     }
 
     /**

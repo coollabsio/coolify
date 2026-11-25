@@ -7,7 +7,7 @@
 
 services:
   dokuwiki:
-    image: lscr.io/linuxserver/dokuwiki:latest
+    image: lscr.io/linuxserver/dokuwiki:version-2026-07-14c
     environment:
       - SERVICE_URL_DOKUWIKI
       - PUID=1000

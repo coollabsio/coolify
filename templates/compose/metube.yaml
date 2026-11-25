@@ -6,7 +6,7 @@
 
 services:
   metube:
-    image: ghcr.io/alexta69/metube:latest
+    image: ghcr.io/alexta69/metube:2026.11.14
     environment:
       - SERVICE_URL_METUBE_8081
       - UID=1000

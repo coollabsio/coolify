@@ -2,9 +2,12 @@
 
 namespace App\Support;
 
+use League\Flysystem\Config;
 use League\Flysystem\PathPrefixer;
 use League\Flysystem\PhpseclibV3\SftpAdapter;
+use League\Flysystem\UnableToCreateDirectory;
 use League\Flysystem\UnableToReadFile;
+use League\Flysystem\UnableToWriteFile;
 use Throwable;
 
 /**
@@ -39,6 +42,36 @@ class SftpFilesystemAdapter extends SftpAdapter implements DeletesEmptyDirectori
         if ($downloaded === false) {
             throw UnableToReadFile::fromLocation($path);
         }
+    }
+
+    /**
+     * Adds the SFTP status of the server, for example "SSH_FX_PERMISSION_DENIED", to the error.
+     */
+    public function write(string $path, string $contents, Config $config): void
+    {
+        try {
+            parent::write($path, $contents, $config);
+        } catch (UnableToWriteFile $exception) {
+            $error = $this->connections->provideConnection()->getLastSFTPError();
+
+            throw $error === '' ? $exception : UnableToWriteFile::atLocation($path, $error, $exception);
+        }
+    }
+
+    /**
+     * Creates the base directory with its parents, as rclone does before the first upload.
+     */
+    public function createRootDirectory(string $root): void
+    {
+        if ($root === '') {
+            return;
+        }
+        $connection = $this->connections->provideConnection();
+        if ($connection->is_dir($root) || $connection->mkdir($root, -1, true) || $connection->is_dir($root)) {
+            return;
+        }
+
+        throw UnableToCreateDirectory::atLocation($root, $connection->getLastSFTPError());
     }
 
     /**

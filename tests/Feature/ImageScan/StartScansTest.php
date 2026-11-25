@@ -174,6 +174,28 @@ describe('service start', function () {
         ]);
     });
 
+    it('scans the image that a variable of the service sets, with its value or its default', function () {
+        $service = startScansService();
+        $service->environment_variables()->create(['key' => 'APP_RELEASE', 'value' => 'v1.4.3', 'is_preview' => false]);
+        $proxy = startScansServiceApplication($service, 'artifacts.plane.so/makeplane/plane-proxy:${APP_RELEASE:-v1.0.0}');
+        $cache = startScansServiceDatabase($service, 'valkey/valkey:${CACHE_VERSION:-7.2.15-alpine}');
+        $scanned = [];
+        ScanImage::shouldRun()->twice()
+            ->withArgs(function ($server, $resource, $ref) use (&$scanned) {
+                $scanned[] = [$resource::class, $resource->getKey(), $ref];
+
+                return true;
+            })
+            ->andReturn(new ImageScan);
+
+        (new ScanResourceImagesJob($service))->handle();
+
+        expect($scanned)->toBe([
+            [ServiceApplication::class, $proxy->id, 'artifacts.plane.so/makeplane/plane-proxy:v1.4.3'],
+            [ServiceDatabase::class, $cache->id, 'valkey/valkey:7.2.15-alpine'],
+        ]);
+    });
+
     it('scans the database image in the job', function () {
         $database = create_standalone_postgresql($this->environment->id, $this->destination);
         ScanImage::shouldRun()->once()

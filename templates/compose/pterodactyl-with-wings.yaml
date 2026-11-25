@@ -24,7 +24,7 @@ services:
     volumes:
       - 'pterodactyl-db:/var/lib/mysql'
   redis:
-    image: 'redis:alpine'
+    image: 'redis:8.10.3-alpine'
     healthcheck:
       test:
         - CMD-SHELL
@@ -109,7 +109,7 @@ services:
       - MAIL_PASSWORD=$MAIL_PASSWORD
       - MAIL_ENCRYPTION=$MAIL_ENCRYPTION
   wings:
-    image: 'ghcr.io/pterodactyl/wings:v1.13.4'
+    image: 'ghcr.io/pterodactyl/wings:v1.13.5'
     restart: unless-stopped
     ports:
       - "2022:2022"

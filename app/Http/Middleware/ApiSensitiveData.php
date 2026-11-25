@@ -22,6 +22,8 @@ class ApiSensitiveData
         // can read the secrets of those resources, but not of the servers they run on.
         $request->attributes->add([
             'can_read_sensitive' => $canReadSensitive,
+            // Members read the secrets of each resource that their grants allow, see canReadResourceSecretsFromApi().
+            'has_read_sensitive_ability' => $hasTokenPermission,
             'can_read_server_sensitive' => $canReadSensitive
                 && app(AccessResolver::class)->coversWholeTeam($request->user(), (int) $teamId),
         ]);

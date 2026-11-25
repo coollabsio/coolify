@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Actions\Application\CleanupCancelledDeployment;
 use App\Actions\Application\StopApplication;
+use App\Actions\Database\DeleteScheduledDatabaseBackup;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Service\DeleteService;
 use App\Actions\Service\StopService;
@@ -11,7 +13,10 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Models\LocalFileVolume;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledVolumeBackup;
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
@@ -45,6 +50,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         public bool $deleteConfigurations = true,
         public bool $dockerCleanup = true,
         public bool $deleteFromCoolifyOnly = false,
+        public bool $deleteBackups = false,
     ) {
         $this->onQueue('high');
     }
@@ -58,9 +64,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         }
 
         if ($this->deleteFromCoolifyOnly) {
-            // No remote calls on this path: remove only the schedule records, so the scheduler does
-            // not keep running backups of volumes that no longer exist in Coolify.
-            $this->volumeBackupSchedules()->each->delete();
+            // No remote calls on this path: the backup files stay, and only their schedule records go.
             $this->deleteLocalResource();
 
             return;
@@ -69,6 +73,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         try {
             switch ($this->resource->type()) {
                 case 'application':
+                    $this->cancelActiveDeployments($this->resource);
                     StopApplication::run($this->resource, previewDeployments: true, dockerCleanup: $this->dockerCleanup);
                     break;
                 case 'standalone-postgresql':
@@ -123,14 +128,8 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        try {
-            $this->deleteScheduledVolumeBackups();
-        } catch (\Throwable $e) {
-            Log::warning('Remote backup cleanup failed while deleting resource; continuing with local deletion.', [
-                'resource_id' => $this->resource->id,
-                'resource_type' => $this->resource->type(),
-                'error' => $e->getMessage(),
-            ]);
+        if ($this->deleteBackups) {
+            $this->deleteBackupFiles();
         }
 
         $maintenanceServers = data_get($this->resource, 'is_maintenance_enabled') ? $this->resource->maintenanceServers() : null;
@@ -153,6 +152,9 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
     private function deleteLocalResource(): void
     {
         DB::transaction(function (): void {
+            // Without this, the scheduler keeps running backups of volumes that no longer exist in Coolify.
+            $this->volumeBackupSchedules()->each->delete();
+
             if ($this->resource instanceof Service) {
                 app(DeleteService::class)->deleteLocal($this->resource);
 
@@ -188,13 +190,54 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             || $this->resource instanceof StandaloneSqlite;
     }
 
-    private function deleteScheduledVolumeBackups(): void
+    /**
+     * Deletes the volume and database backup files of the resource, locally and on S3, with their schedules. A schedule
+     * whose files cannot be deleted does not stop the others; its record goes with the resource.
+     */
+    private function deleteBackupFiles(): void
     {
         $server = data_get($this->resource, 'server') ?? data_get($this->resource, 'destination.server');
+        $errors = [];
 
-        foreach ($this->volumeBackupSchedules() as $backup) {
-            DeleteScheduledVolumeBackup::run($backup, $server);
+        foreach ($this->volumeBackupSchedules()->concat($this->databaseBackupSchedules()) as $backup) {
+            try {
+                if ($backup instanceof ScheduledVolumeBackup) {
+                    DeleteScheduledVolumeBackup::run($backup, $server, deleteLocalArchives: $server !== null);
+                } else {
+                    DeleteScheduledDatabaseBackup::run($backup, $server, deleteLocalBackups: $server !== null);
+                }
+            } catch (\Throwable $e) {
+                $errors[] = $e->getMessage();
+            }
         }
+
+        if ($errors === []) {
+            return;
+        }
+
+        Log::warning('Backup cleanup failed while deleting resource; continuing with local deletion.', [
+            'resource_id' => $this->resource->id,
+            'resource_type' => $this->resource->type(),
+            'errors' => $errors,
+        ]);
+        $this->resource->team()?->notify(new GeneralNotification(
+            "'{$this->resource->name}' was removed from Coolify, but some of its backup files could not be deleted and may still exist on the server or on S3. Coolify no longer manages them. Error: ".remove_iip(implode(' ', array_unique($errors))),
+            success: false,
+        ));
+    }
+
+    /**
+     * @return Collection<int, ScheduledDatabaseBackup>
+     */
+    private function databaseBackupSchedules(): Collection
+    {
+        $databases = match (true) {
+            $this->resource instanceof Service => $this->resource->databases()->get(),
+            $this->isDatabase() => collect([$this->resource]),
+            default => collect(),
+        };
+
+        return $databases->flatMap(fn ($database) => $database->scheduledBackups()->get());
     }
 
     /**
@@ -209,6 +252,47 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         return $resources->flatMap(fn ($resource) => $resource->persistentStorages()->get()
             ->concat($resource->fileStorages()->get())
             ->flatMap(fn ($storage) => $storage->scheduledBackups()->get()));
+    }
+
+    /**
+     * The deployment records go with the application, and CleanupHelperContainersJob keeps helper containers
+     * without a record. A running build would go on, on the deployment or build server, until it ends.
+     */
+    private function cancelActiveDeployments(Application $application): void
+    {
+        $teamId = $application->team()?->id;
+        if ($teamId === null) {
+            return;
+        }
+
+        $activeDeployments = ApplicationDeploymentQueue::where('application_id', $application->id)
+            ->whereIn('status', [
+                ApplicationDeploymentStatus::QUEUED->value,
+                ApplicationDeploymentStatus::IN_PROGRESS->value,
+            ])
+            ->get();
+
+        foreach ($activeDeployments as $deployment) {
+            $deployment->update([
+                'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+                'finished_at' => now(),
+            ]);
+            $deployment->addLogEntry('Deployment cancelled: the application was deleted.', 'stderr');
+            try {
+                CleanupCancelledDeployment::run($deployment, $teamId);
+            } catch (\Throwable $e) {
+                Log::warning('Helper container cleanup failed while deleting application.', [
+                    'deployment_uuid' => $deployment->deployment_uuid,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // The cancelled deployments free their build slots for queued deployments of other applications.
+        Server::whereTeamId($teamId)
+            ->whereKey($activeDeployments->pluck('server_id')->filter()->unique())
+            ->get()
+            ->each(fn (Server $server) => next_after_cancel($server));
     }
 
     private function deleteApplicationPreview(): void
@@ -293,6 +377,27 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
         } catch (\Throwable $e) {
             // Log the error but don't fail the job
             \Log::warning('Error stopping preview containers for application '.$application->uuid.', PR #'.$pull_request_id.': '.$e->getMessage());
+        }
+
+        try {
+            if ($pull_request_id !== 0) {
+                // Older versions wrote the Compose file of a preview to the folder of the application.
+                $legacyComposeFile = $application->workdir().'/'.addPreviewDeploymentSuffix('docker-compose', $pull_request_id).'.yaml';
+                $previewFileMounts = $application->fileStorages
+                    ->reject(fn (LocalFileVolume $storage) => $storage->is_host_file)
+                    ->map(fn (LocalFileVolume $storage) => $storage->forPullRequest($pull_request_id))
+                    ->filter(fn (LocalFileVolume $storage) => $storage->isForPullRequest())
+                    ->map(fn (LocalFileVolume $storage) => $storage->resolvedFsPath($application->workdir())->value())
+                    ->filter(fn (string $path) => str_starts_with($path, $application->workdir().'/'))
+                    ->map(fn (string $path) => 'rm -rf '.escapeshellarg($path));
+                instant_remote_process([
+                    'rm -rf '.escapeshellarg($application->deploymentWorkdir($pull_request_id)),
+                    'rm -f '.escapeshellarg($legacyComposeFile),
+                    ...$previewFileMounts->values()->all(),
+                ], $server, false);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Error removing the preview folder of application '.$application->uuid.', PR #'.$pull_request_id.': '.$e->getMessage());
         }
 
         // Finally, force delete to trigger resource cleanup

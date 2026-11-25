@@ -728,13 +728,14 @@ final class SecurityStatus
     }
 
     /**
-     * A version or base check that Coolify cannot finish by itself: the registry needs a login (`auth_required`), or
-     * the server reached the daily limit of checks (`failed` with `daily_limit`). Other failures and a busy lock
-     * (`failed` with `lock_busy`) are tried again, so they stay check_needed.
+     * A version or base check that Coolify cannot finish by itself: the registry needs a login (`auth_required`), the
+     * server does not trust the certificate of the registry (`failed` with `registry_tls`), or the server reached the
+     * daily limit of checks (`failed` with `daily_limit`). Other failures and a busy lock (`failed` with `lock_busy`)
+     * are tried again, so they stay check_needed.
      */
     public static function isBlockedCheck(mixed $status, mixed $error): bool
     {
-        return $status === 'auth_required' || ($status === 'failed' && $error === 'daily_limit');
+        return $status === 'auth_required' || ($status === 'failed' && in_array($error, ['daily_limit', 'registry_tls'], true));
     }
 
     private static function ownerName(Model $owner): ?string

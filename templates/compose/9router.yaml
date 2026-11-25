@@ -7,7 +7,7 @@
 
 services:
   9router:
-    image: decolua/9router:0.5.65
+    image: decolua/9router:0.5.116
     volumes:
       - '9router:/app/data'
     environment:

@@ -7,7 +7,7 @@
 
 services:
   easyappointments:
-    image: alextselegidis/easyappointments:latest
+    image: alextselegidis/easyappointments:1.6.1
     environment:
       - SERVICE_URL_EASYAPPOINTMENTS_80
       - BASE_URL=${SERVICE_URL_EASYAPPOINTMENTS}

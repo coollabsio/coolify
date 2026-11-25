@@ -277,12 +277,15 @@
                                 </li>
                             @endforeach
                             @foreach ($checkboxes as $checkbox)
-                                <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
-                                    <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
-                                        <span class="shrink-0" aria-hidden="true">-</span>
-                                        <span>{{ $checkbox['label'] }}</span>
-                                    </li>
-                                </template>
+                                {{-- A checkbox can list its own `actions`. They replace its label here. --}}
+                                @foreach ($checkbox['actions'] ?? [$checkbox['label']] as $checkboxAction)
+                                    <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
+                                        <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
+                                            <span class="shrink-0" aria-hidden="true">-</span>
+                                            <span>{{ $checkboxAction }}</span>
+                                        </li>
+                                    </template>
+                                @endforeach
                                 @if (isset($checkbox['default_warning']))
                                     <template x-if="!selectedActions.includes('{{ $checkbox['id'] }}')">
                                         <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">

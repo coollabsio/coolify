@@ -60,6 +60,20 @@ it('parses a digest reference without a tag', function () use ($imageRefDigest) 
         ->and((string) $ref)->toBe("ghcr.io/a/b@{$imageRefDigest}");
 });
 
+it('reads a tag and digest reference by its digest, as Docker does', function (string $input, string $registry, string $repository, string $short) use ($imageRefDigest) {
+    $ref = ImageRef::parse("{$input}@{$imageRefDigest}");
+
+    expect($ref->registry)->toBe($registry)
+        ->and($ref->repository)->toBe($repository)
+        ->and($ref->tag)->toBeNull()
+        ->and($ref->digest)->toBe($imageRefDigest)
+        ->and((string) $ref)->toBe("{$short}@{$imageRefDigest}");
+})->with([
+    'official image' => ['redis:7-alpine', 'docker.io', 'library/redis', 'redis'],
+    'registry with a port' => ['localhost:5000/team/app:1.2', 'localhost:5000', 'team/app', 'localhost:5000/team/app'],
+    'registry with a port, no tag' => ['localhost:5000/team/app', 'localhost:5000', 'team/app', 'localhost:5000/team/app'],
+]);
+
 it('refuses references that are not valid image names', function (string $input) {
     ImageRef::parse($input);
 })->with([
@@ -71,7 +85,8 @@ it('refuses references that are not valid image names', function (string $input)
     'empty tag' => 'nginx:',
     'digest without hash' => 'nginx@sha256',
     'uppercase digest' => 'nginx@sha256:'.str_repeat('AB', 32),
-    'tag and digest' => 'nginx:1@sha256:'.str_repeat('ab', 32),
+    'bad tag before digest' => 'nginx:$(id)@sha256:'.str_repeat('ab', 32),
+    'empty tag before digest' => 'nginx:@sha256:'.str_repeat('ab', 32),
     'empty' => '',
 ])->throws(InvalidArgumentException::class);
 

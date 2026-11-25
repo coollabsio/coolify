@@ -29,9 +29,13 @@ class LookupGitAppRepository
         $gitRepository = gitRepositorySlug($gitRepository);
         $response = Http::GitHub($githubApp->api_url, $token)
             ->timeout(20)
-            ->retry(3, 200, throw: false)
+            ->retry(3, 200, isTransientGithubFailure(...), throw: false)
             ->get("/repos/{$gitRepository}");
 
+        $rateLimitMessage = githubRateLimitMessage($response);
+        if ($rateLimitMessage !== null) {
+            throw new RuntimeException($rateLimitMessage, 429);
+        }
         if ($response->status() === 404 || $response->status() === 403) {
             throw new RuntimeException('Repository not found or not accessible by the GitHub App.', 404);
         }

@@ -7,7 +7,7 @@
 
 services:
   api:
-    image: ghcr.io/plastic-labs/honcho:v3.0.12
+    image: ghcr.io/plastic-labs/honcho:v3.6.1
     entrypoint: ["sh", "docker/entrypoint.sh"]
     environment:
       - SERVICE_URL_API_8000
@@ -31,7 +31,7 @@ services:
         condition: service_healthy
 
   deriver:
-    image: ghcr.io/plastic-labs/honcho:v3.0.12
+    image: ghcr.io/plastic-labs/honcho:v3.6.1
     entrypoint: ["/app/.venv/bin/python", "-m", "src.deriver"]
     environment:
       - DB_CONNECTION_URI=postgresql+psycopg://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@database:5432/postgres
@@ -50,7 +50,7 @@ services:
         condition: service_healthy
 
   database:
-    image: pgvector/pgvector:pg15
+    image: pgvector/pgvector:0.8.7-pg15
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
@@ -64,7 +64,7 @@ services:
       retries: 5
 
   redis:
-    image: redis:8.2
+    image: redis:8.10
     volumes:
       - honcho_redis_data:/data
     healthcheck:

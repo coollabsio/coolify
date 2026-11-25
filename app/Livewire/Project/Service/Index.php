@@ -106,7 +106,6 @@ class Index extends Component
     protected $rules = [
         'humanName' => 'nullable',
         'description' => 'nullable',
-        'image' => 'required',
         'excludeFromStatus' => 'required|boolean',
         'publicPort' => 'nullable|integer|min:1|max:65535',
         'publicPortTimeout' => 'nullable|integer|min:1',
@@ -410,7 +409,7 @@ class Index extends Component
     {
         try {
             $this->authorize('update', $this->serviceDatabase);
-            $this->validate();
+            $this->validate($this->rulesFor($this->serviceDatabase));
             $this->syncDatabaseData(true);
             $changedFields = auditChangedFields($this->serviceDatabase);
             $this->serviceDatabase->save();
@@ -471,6 +470,16 @@ class Index extends Component
             $this->certificateResolverName = $this->certificateResolverMode === 'custom' ? $resolver : null;
             $this->maxRestartCount = $this->serviceApplication->max_restart_count ?? 0;
         }
+    }
+
+    /**
+     * A compose service that has only a `build` key has no image, so its image stays optional.
+     *
+     * @return array<string, mixed>
+     */
+    private function rulesFor(ServiceApplication|ServiceDatabase $persistedPart): array
+    {
+        return [...$this->rules, 'image' => filled($persistedPart->image) ? 'required' : 'nullable'];
     }
 
     private function validateCertificateResolver(): void
@@ -685,7 +694,7 @@ class Index extends Component
                 $this->forceRemovePort = false;
             }
 
-            $this->validate();
+            $this->validate($this->rulesFor($persistedApplication));
             $changedFields = auditChangedFields($this->serviceApplication);
             $this->serviceApplication->save();
             $this->auditServiceSubResourceUpdate($this->serviceApplication, $changedFields);

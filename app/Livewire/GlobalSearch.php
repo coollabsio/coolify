@@ -1846,6 +1846,7 @@ class GlobalSearch extends Component
             ] + service_logo_urls(data_get($service, 'logo')) + array_filter([
                 'amd_only' => data_get($service, 'amd_only') ? true : null,
                 'arm_only' => data_get($service, 'arm_only') ? true : null,
+                'outdated' => data_get($service, 'outdated') ? true : null,
             ]));
         }
 

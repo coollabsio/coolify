@@ -42,13 +42,13 @@
                 <x-application.settings-subsection id="api-section" title="API and MCP">
                     <div class="grid gap-4 lg:grid-cols-2">
                         <x-forms.listbox id="is_api_enabled" label="API access"
-                            helper="Allow authenticated requests to the Coolify REST API." onChange="instantSave"
+                            helper="Allow authenticated requests to the Coolify REST API. This setting does not control the MCP server." onChange="instantSave"
                             :options="[
                                 ['value' => true, 'label' => 'Enabled'],
                                 ['value' => false, 'label' => 'Disabled'],
                             ]" />
                         <x-forms.listbox id="is_mcp_server_enabled" label="MCP server"
-                            helper="Expose the authenticated Streamable HTTP endpoint at /mcp." onChange="instantSave"
+                            helper="Expose the authenticated Streamable HTTP endpoint at /mcp. MCP can read and change resources while API access is disabled. Disable this to remove MCP access." onChange="instantSave"
                             :options="[
                                 ['value' => true, 'label' => 'Enabled'],
                                 ['value' => false, 'label' => 'Disabled'],

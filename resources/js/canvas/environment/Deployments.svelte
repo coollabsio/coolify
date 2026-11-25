@@ -13,6 +13,7 @@
     finished: ['Success', 'ok'],
     failed: ['Failed', 'bad'],
     'cancelled-by-user': ['Cancelled', 'idle'],
+    skipped: ['Skipped', 'idle'],
   };
   const status = value => STATUS[value] || [String(value || 'Unknown').replace(/[-_]/g, ' '), 'idle'];
 

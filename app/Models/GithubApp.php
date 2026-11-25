@@ -27,6 +27,7 @@ class GithubApp extends BaseModel
         'custom_port',
         'app_id',
         'installation_id',
+        'installation_account',
         'client_id',
         'client_secret',
         'webhook_secret',
@@ -214,6 +215,15 @@ class GithubApp extends BaseModel
         }
 
         return filled($this->app_id) && filled($this->installation_id);
+    }
+
+    /**
+     * The account that installed this App, or the organization that owns it when the installation account is not known yet.
+     * One App can be installed on several accounts, and each installation is its own source.
+     */
+    public function accountName(): ?string
+    {
+        return $this->installation_account ?: normalizeGithubOrganization($this->organization);
     }
 
     /**

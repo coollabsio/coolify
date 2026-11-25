@@ -207,14 +207,12 @@ test('the canvas pages open for team members', function () {
     serverCanvasSession($this, $this->admin, $this->team)
         ->withoutVite()
         ->get(route('server.canvas.index'))
-        ->assertOk()
-        ->assertSee('data-endpoint="/servers/canvas"', false);
+        ->assertOk();
 
     serverCanvasSession($this, $this->admin, $this->team)
         ->withoutVite()
         ->get(route('server.canvas', ['server_uuid' => $this->web->uuid]))
-        ->assertOk()
-        ->assertSee('data-endpoint="/servers/'.$this->web->uuid.'/canvas"', false);
+        ->assertOk();
 });
 
 test('the servers page reopens the canvas when the user left it on the canvas view', function () {

@@ -27,4 +27,4 @@ it('redacts secrets when Laravel creates a configured log channel', function (st
     expect($record->message)->toBe('password='.REDACTED);
     expect($record->context['token'])->toBe(REDACTED);
     expect($record->context['user_email'])->toBe($channel === 'audit' ? 'admin@example.com' : REDACTED);
-})->with(['single', 'audit']);
+})->with(['single', 'daily', 'audit']);

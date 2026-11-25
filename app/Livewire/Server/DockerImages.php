@@ -94,7 +94,7 @@ class DockerImages extends Component
             }
             $containersByImage = $this->containersByImage();
             $this->images = format_docker_command_output_to_json(
-                instant_remote_process(["docker image ls --no-trunc --format '{{json .}}'"], $this->server, false)
+                instant_remote_process([remoteCommandWithTimeout("docker image ls --no-trunc --format '{{json .}}'", 30)], $this->server, false, timeout: 45)
             )
                 ->map(fn (array $image) => $this->summarize($image, $containersByImage))
                 ->values()
@@ -142,9 +142,10 @@ class DockerImages extends Component
     private function containersByImage(): array
     {
         $output = instant_remote_process(
-            ["docker ps -a --no-trunc --format '{{.ID}}' | xargs -r docker container inspect --format '{{.Image}}#{{.Name}}' 2>/dev/null || true"],
+            [remoteCommandWithTimeout("docker ps -a --no-trunc --format '{{.ID}}'", 30).' | xargs -r '.remoteCommandWithTimeout("docker container inspect --format '{{.Image}}#{{.Name}}'", 30).' 2>/dev/null || true'],
             $this->server,
-            false
+            false,
+            timeout: 45,
         );
 
         return str($output ?? '')->explode("\n")
@@ -162,7 +163,7 @@ class DockerImages extends Component
     private function diskUsage(): ?array
     {
         $row = format_docker_command_output_to_json(
-            instant_remote_process(["docker system df --format '{{json .}}'"], $this->server, false)
+            instant_remote_process([remoteCommandWithTimeout("docker system df --format '{{json .}}'", 30)], $this->server, false, timeout: 45)
         )->firstWhere('Type', 'Images');
 
         if (! $row) {

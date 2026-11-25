@@ -19,6 +19,7 @@ use App\Http\Middleware\EnsureTeamTerminalApiEnabled;
 use App\Http\Middleware\EnsureTeamWideAccess;
 use App\Http\Middleware\EnsureTokenBelongsToCurrentTeamMember;
 use App\Http\Middleware\KeepConcurrentTeamSwitch;
+use App\Http\Middleware\PreventHtmlTransform;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\RequirePassword;
@@ -86,7 +87,7 @@ class Kernel extends HttpKernel
             CheckForcePasswordReset::class,
             DecideWhatToDoWithUser::class,
             RequireTeamTwoFactor::class,
-
+            PreventHtmlTransform::class,
         ],
 
         'api' => [

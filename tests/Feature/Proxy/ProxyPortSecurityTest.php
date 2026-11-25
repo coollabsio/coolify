@@ -67,7 +67,7 @@ it('builds port checks only from normalized integer ports', function () {
     expect($script)
         ->toContain("grep -q '\"443/tcp\"'")
         ->toContain("sport = ':443'")
-        ->toContain("nc -z -w1 127.0.0.1 '443'")
+        ->toContain(':01BB [0-9A-F]+:[0-9A-F]+ 0A ')
         ->not->toContain('$(', '`', ';id')
         ->and(fn () => $method->invoke(new CheckProxy, '80;id', 'coolify-proxy'))
         ->toThrow(TypeError::class);

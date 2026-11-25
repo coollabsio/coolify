@@ -34,7 +34,7 @@ beforeEach(function () {
     $this->environment = Environment::factory()->create(['project_id' => $this->project->id]);
 
     Cache::flush();
-    Cache::forever('coolify:service-templates-bundle', [
+    Cache::forever(service_templates_cache_key(), [
         'fetched_at' => now()->toIso8601String(),
         'json' => json_encode(['demo' => ['compose' => base64_encode("services:\n  app:\n    image: nginx:2\n")]]),
     ]);

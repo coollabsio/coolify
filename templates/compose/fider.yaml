@@ -7,7 +7,10 @@
 
 services:
   fider:
-    image: getfider/fider:stable
+    image: getfider/fider:v0.40.0
+    depends_on:
+      database:
+        condition: service_healthy
     environment:
       - SERVICE_URL_FIDER_3000
       - BASE_URL=$SERVICE_URL_FIDER
@@ -31,7 +34,7 @@ services:
       timeout: 10s
       retries: 10
   database:
-    image: postgres:12
+    image: postgres:17
     volumes:
       - pg_data:/var/lib/postgresql/data
     environment:

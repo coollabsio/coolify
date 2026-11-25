@@ -11,10 +11,24 @@
         monacoContent: @entangle($id),
         monacoLanguage: '',
         monacoLoader: true,
+        monacoLoaderInterval: null,
         monacoFontSize: '15px',
         monacoId: $id('monaco-editor'),
         isDarkMode() {
             return document.documentElement.classList.contains('dark') || localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        },
+        destroy() {
+            clearInterval(this.monacoLoaderInterval);
+            this.disposeMonacoEditor(this.$refs.monacoEditorElement);
+        },
+        disposeMonacoEditor(element) {
+            // The editor lives on the DOM node, not in Alpine state. Alpine can
+            // init the same element again, and Monaco does not remove its DOM.
+            element._monacoThemeObserver?.disconnect();
+            element._monacoEditor?.dispose();
+            element._monacoThemeObserver = null;
+            element._monacoEditor = null;
+            element.replaceChildren();
         },
         monacoEditor(editor) {
             editor.onDidChangeModelContent((e) => {
@@ -41,8 +55,9 @@
             monacoEditorAddLoaderScriptToHead();
         }
         checkTheme();
-        let monacoLoaderInterval = setInterval(() => {
+        monacoLoaderInterval = setInterval(() => {
             if (typeof _amdLoaderGlobal !== 'undefined') {
+                clearInterval(monacoLoaderInterval);
                 require.config({ paths: { 'vs': `/js/monaco-editor-${monacoVersion}/min/vs` } });
                 let proxy = URL.createObjectURL(new Blob([`self.MonacoEnvironment={baseUrl:'${window.location.origin}/js/monaco-editor-${monacoVersion}/min'};importScripts('${window.location.origin}/js/monaco-editor-${monacoVersion}/min/vs/base/worker/workerMain.js');`], { type: 'text/javascript' }));
                 window.MonacoEnvironment = { getWorkerUrl: () => proxy };
@@ -93,6 +108,11 @@
                         });
                     }
                     @endif
+                    const editorElement = $refs.monacoEditorElement;
+                    if (!editorElement.isConnected) {
+                        return;
+                    }
+                    disposeMonacoEditor(editorElement);
                     const sharedEditorOptions = {
                         theme: document.documentElement.classList.contains('dark') ? 'coolify-dark' : 'vs',
                         wordWrap: 'on',
@@ -121,7 +141,7 @@
 
                     let editor;
                     @if ($isDiff)
-                    const diffEditor = monaco.editor.createDiffEditor($refs.monacoEditorElement, {
+                    const diffEditor = monaco.editor.createDiffEditor(editorElement, {
                         ...sharedEditorOptions,
                         readOnly: '{{ $readonly ?? false }}',
                         originalEditable: false,
@@ -135,13 +155,15 @@
                         modified: monaco.editor.createModel(monacoContent ?? '', '{{ $language }}'),
                     });
                     editor = diffEditor.getModifiedEditor();
+                    editorElement._monacoEditor = diffEditor;
                     document.getElementById(monacoId).diffEditor = diffEditor;
                     @else
-                    editor = monaco.editor.create($refs.monacoEditorElement, {
+                    editor = monaco.editor.create(editorElement, {
                         ...sharedEditorOptions,
                         value: monacoContent ?? '',
                         readOnly: '{{ $readonly ?? false }}',
                     });
+                    editorElement._monacoEditor = editor;
                     @endif
         
                     const observer = new MutationObserver((mutations) => {
@@ -157,6 +179,7 @@
                         attributes: true,
                         attributeFilter: ['class']
                     });
+                    editorElement._monacoThemeObserver = observer;
         
                     monacoEditor(editor);
 
@@ -175,7 +198,6 @@
         
         
                 });
-                clearInterval(monacoLoaderInterval);
                 monacoLoader = false;
         
             }

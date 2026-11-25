@@ -30,6 +30,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✓ | What | Value to set |
 |---|---|---|
 | ✅ | Wildcard domain | `http://{ip}.sslip.io` style, not empty |
+| ✅ | Public IPv4 and IPv6 (remote server, General) | `95.217.1.10`, `2a01:4f8::10` |
 | ✅ | Concurrent builds, dynamic timeout, deployment queue limit, connection timeout | 3, 1800, 5, 20 |
 | ✅ | Server timezone | `Europe/Budapest` |
 | ✅ | Docker cleanup | force cleanup on, frequency `0 4 * * *`, threshold 70, delete unused volumes on, delete unused networks on |

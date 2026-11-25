@@ -500,7 +500,7 @@ describe('check needed reasons', function () {
         foreach ([SecurityStatus::forResource($application), SecurityStatus::stored($application)] as $security) {
             expect($security->status)->toBe(SecurityStatusType::CheckNeeded)
                 ->and($security->checkReason)->toBe('images_unchecked')
-                ->and($security->checkContext)->toBe(['checked' => 1, 'total' => 2]);
+                ->and($security->checkContext)->toBe(['checked' => 1, 'total' => 3]);
         }
     })->with(['failed row', 'image without a row']);
 

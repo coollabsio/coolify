@@ -24,16 +24,16 @@ class ScheduledTasksController extends Controller
             'application_id',
             'service_id',
         ]);
-        if (! $this->canReadSensitive()) {
+        if (! $this->canReadSensitive($task)) {
             $task->makeHidden(['command']);
         }
 
         return serializeApiResponse($task);
     }
 
-    private function canReadSensitive(): bool
+    private function canReadSensitive(ScheduledTask $task): bool
     {
-        return request()->attributes->get('can_read_sensitive', false) === true;
+        return canReadResourceSecretsFromApi($task->application ?? $task->service);
     }
 
     /**
@@ -260,9 +260,9 @@ class ScheduledTasksController extends Controller
 
         $request->validate(apiPaginationRules());
         [$executions, $headers] = apiPaginate($task->executions()->orderBy('id', 'desc'), $request);
-        $executions = $executions->map(function ($execution) {
+        $executions = $executions->map(function ($execution) use ($task) {
             $execution->makeHidden(['id', 'scheduled_task_id']);
-            if (! $this->canReadSensitive()) {
+            if (! $this->canReadSensitive($task)) {
                 $execution->makeHidden(['message']);
             }
 

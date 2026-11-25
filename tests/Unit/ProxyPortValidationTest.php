@@ -145,3 +145,15 @@ it('still rejects malformed ports inside Docker Compose merge tags', function ()
     expect(fn () => ProxyPortParser::fromConfiguration("services:\n  traefik:\n    ports: !override\n      - '\$(id):80'\n"))
         ->toThrow(InvalidArgumentException::class);
 });
+
+it('returns the host addresses of each published proxy port', function (array $ports, array $expected) {
+    $configuration = Yaml::dump(['services' => ['traefik' => ['ports' => $ports]]], 8, 2);
+
+    expect(ProxyPortParser::hostAddressesByPort($configuration))->toBe($expected);
+})->with([
+    'default ports bind all addresses' => [['80:80', '443:443'], [80 => null, 443 => null]],
+    'wildcard host IPs bind all addresses' => [['0.0.0.0:80:80', '[::]:443:443'], [80 => null, 443 => null]],
+    'specific host IPs' => [['203.0.113.5:443:443', '[2001:DB8:0::1]:443:443', '203.0.113.5:443:443/udp'], [443 => ['203.0.113.5', '2001:db8::1']]],
+    'one wildcard entry wins over a specific one' => [['203.0.113.5:443:443', '443:443'], [443 => null]],
+    'long syntax and variable defaults' => [[['target' => 80, 'published' => 80, 'host_ip' => '203.0.113.5'], '${BIND_IP:-198.51.100.7}:443:443'], [80 => ['203.0.113.5'], 443 => ['198.51.100.7']]],
+]);

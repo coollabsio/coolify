@@ -7,7 +7,7 @@
 
 services:
   unleash:
-    image: 'unleashorg/unleash-server:latest'
+    image: 'unleashorg/unleash-server:8.3.1'
     environment:
       - SERVICE_URL_UNLEASH_4242
       - UNLEASH_URL=${SERVICE_URL_UNLEASH}
