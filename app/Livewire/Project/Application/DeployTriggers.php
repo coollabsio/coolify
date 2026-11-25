@@ -128,7 +128,7 @@ class DeployTriggers extends Component
     {
         $set = $this->application->trigger_set ?? [];
         $summary = [
-            'display' => array_values(array_map(self::displayLine(...), array_filter($set['display'] ?? [], 'is_string'))),
+            'display' => array_values(array_map(fn (string $line): array => self::displayLine($line, $set['anchor']['dir'] ?? null), array_filter($set['display'] ?? [], 'is_string'))),
             'resolvers' => array_values(array_filter($set['resolvers'] ?? [], 'is_string')),
             'anchor' => is_string($set['anchor']['package'] ?? null) ? $set['anchor']['package'] : null,
             'notes' => array_values(array_filter(array_map(fn (mixed $note): ?string => is_array($note) ? ($note['reason'] ?? null) : null, $set['widened'] ?? []))),
@@ -154,21 +154,26 @@ class DeployTriggers extends Component
      *
      * @return array{path: string, source: ?string, excluded: bool}
      */
-    private static function displayLine(string $line): array
+    private static function displayLine(string $line, mixed $anchorDirectory): array
     {
         [$limit, $path] = str_contains($line, ': ') ? explode(': ', $line, 2) : [null, $line];
         $excluded = str_starts_with($path, '!');
+        $path = ltrim($path, '!');
 
         return [
-            'path' => ltrim($path, '!'),
-            'source' => match ($limit) {
-                'build_context' => 'Build context',
-                'dockerfile' => 'Dockerfile',
-                'compose' => 'Compose file',
-                'workspace' => 'Workspace dependency',
-                'symlink' => 'Symlink target',
-                null => null,
-                default => str($limit)->replace('_', ' ')->ucfirst()->toString(),
+            'path' => $path,
+            'source' => match (true) {
+                $limit === 'workspace' && is_string($anchorDirectory) && $path === $anchorDirectory.'/**' => 'Application package',
+                $limit === 'workspace' && str_ends_with($path, '/**') && ! str_starts_with($path, '*') => 'Workspace package',
+                $limit === 'workspace' => 'Workspace file',
+                default => match ($limit) {
+                    'build_context' => 'Build context',
+                    'dockerfile' => 'Dockerfile',
+                    'compose' => 'Compose file',
+                    'symlink' => 'Symlink target',
+                    null => null,
+                    default => str($limit)->replace('_', ' ')->ucfirst()->toString(),
+                },
             },
             'excluded' => $excluded,
         ];

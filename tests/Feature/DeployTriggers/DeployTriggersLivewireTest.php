@@ -261,10 +261,23 @@ it('updates the trigger state after the general settings change', function () {
 
 it('names where each trigger path comes from', function () {
     $this->application->forceFill(['trigger_set' => [
-        'display' => ['build_context: apps/web/**', 'workspace: packages/ui/**', 'build_context: !apps/web/test/**'], 'evaluated_commit' => str_repeat('a', 40),
+        'display' => ['build_context: apps/web/**', 'workspace: apps/web/**', 'workspace: packages/ui/**', 'workspace: pnpm-lock.yaml', 'build_context: !apps/web/test/**'],
+        'anchor' => ['package' => '@acme/web', 'dir' => 'apps/web'], 'evaluated_commit' => str_repeat('a', 40),
     ]])->save();
 
     Livewire::test(DeployTriggers::class, ['application' => $this->application->refresh()])
-        ->assertSeeInOrder(['apps/web/**', 'Build context', 'packages/ui/**', 'Workspace dependency', 'apps/web/test/**', 'Build context, excluded'])
+        ->assertSeeInOrder(['apps/web/**', 'Build context', 'apps/web/**', 'Application package', 'packages/ui/**', 'Workspace package',
+            'pnpm-lock.yaml', 'Workspace file', 'apps/web/test/**', 'Build context, excluded'])
         ->assertDontSee('workspace:');
+});
+
+it('shows no duration for a skipped push', function () {
+    $row = skippedRow($this->application);
+    $row->forceFill(['created_at' => now()->subMinutes(5), 'finished_at' => now()])->save();
+
+    Livewire::test(Index::class, [
+        'project_uuid' => $this->fixture['environment']->project->uuid,
+        'environment_uuid' => $this->fixture['environment']->uuid,
+        'application_uuid' => $this->application->uuid,
+    ])->assertDontSee('05m 00s');
 });
