@@ -173,6 +173,20 @@ class Github extends Controller
                             if ($this->deferPushIfEvaluated($triggers, $application, $return_payloads)) {
                                 continue;
                             }
+                            if (! $this->webhookPushMatchesWatchPaths($application, $changed_files)) {
+                                $return_payloads->push([
+                                    'status' => 'failed',
+                                    'message' => 'Changed files do not match watch paths. Ignoring deployment.',
+                                    'application_uuid' => $application->uuid,
+                                    'application_name' => $application->name,
+                                    'details' => [
+                                        'changed_files' => $changed_files,
+                                        'watch_paths' => str($application->watch_paths)->explode("\n"),
+                                    ],
+                                ]);
+
+                                continue;
+                            }
                             $deployment_uuid = new_public_id();
                             $result = queue_application_deployment(
                                 application: $application,
@@ -542,6 +556,20 @@ class Github extends Controller
                             }
                             $triggers ??= PushTriggerRouter::forPush($this->githubPushContext($payload, $github_app, $full_name ?? null, $changed_files));
                             if ($this->deferPushIfEvaluated($triggers, $application, $return_payloads)) {
+                                continue;
+                            }
+                            if (! $this->webhookPushMatchesWatchPaths($application, $changed_files)) {
+                                $return_payloads->push([
+                                    'status' => 'failed',
+                                    'message' => 'Changed files do not match watch paths. Ignoring deployment.',
+                                    'application_uuid' => $application->uuid,
+                                    'application_name' => $application->name,
+                                    'details' => [
+                                        'changed_files' => $changed_files,
+                                        'watch_paths' => str($application->watch_paths)->explode("\n"),
+                                    ],
+                                ]);
+
                                 continue;
                             }
                             $deployment_uuid = new_public_id();

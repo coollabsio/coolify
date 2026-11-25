@@ -5,6 +5,7 @@ namespace App\Services\DeployTriggers;
 use App\Jobs\EvaluatePush;
 use App\Models\Application;
 use App\Models\InstanceSettings;
+use App\Services\DeployTriggers\Contract\Sha;
 
 /**
  * Decides per application whether a webhook push deploys now or is evaluated first (spec §2).
@@ -23,7 +24,7 @@ final class PushTriggerRouter
 
     public function route(Application $application): TriggerRoute
     {
-        if (! $application->git_based()) {
+        if (! $application->git_based() || ! Sha::isValid($this->context->after)) {
             return TriggerRoute::DeployNow;
         }
 

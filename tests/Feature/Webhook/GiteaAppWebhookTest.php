@@ -169,6 +169,7 @@ describe('Gitea App webhook push', function () {
         sendGiteaAppWebhook($this, 'push', giteaAppWebhookPayload('push'))
             ->assertOk()
             ->assertSee('gitea-app-webhook-app');
+        runPushedEvaluations();
 
         expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->where('commit', 'e83c5163316f89bfbde7d9ab23ca2e25604af290')->exists())->toBeTrue()
             ->and(ApplicationDeploymentQueue::query()->where('application_id', $otherGiteaApplication->id)->exists())->toBeFalse()
