@@ -1,0 +1,71 @@
+# documentation: https://github.com/nesquena/hermes-webui
+# slogan: Hermes Agent - autonomous AI agent with persistent memory, scheduling, and a self-hosted web chat UI.
+# category: ai
+# tags: ai, agent, llm, chatbot, hermes, openrouter, anthropic, openai
+# logo: svgs/hermes-agent.png
+# port: 8787
+
+services:
+  hermes-agent:
+    image: 'nousresearch/hermes-agent:v2026.9.24'
+    command: 'gateway run'
+    environment:
+      - HERMES_HOME=/home/hermes/.hermes
+      - WIKI_PATH=/home/hermes/.hermes/wiki
+      - GATEWAY_ALLOW_ALL_USERS=true
+      - HERMES_REDACT_SECRETS=true
+      - HERMES_UID=1000
+      - HERMES_GID=1000
+      - 'HERMES_ENABLE_PROJECT_PLUGINS=${HERMES_ENABLE_PROJECT_PLUGINS:-true}'
+      - 'HERMES_OPTIONAL_SKILLS=${HERMES_OPTIONAL_SKILLS:-}'
+      - 'HERMES_ALLOW_PRIVATE_URLS=${HERMES_ALLOW_PRIVATE_URLS:-false}'
+      - 'FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}'
+      - 'FIRECRAWL_API_URL=${FIRECRAWL_API_URL:-https://api.firecrawl.dev}'
+      - 'OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}'
+      - 'ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}'
+      - 'OPENAI_API_KEY=${OPENAI_API_KEY:-}'
+      - 'GOOGLE_API_KEY=${GOOGLE_API_KEY:-}'
+      - API_SERVER_ENABLED=true
+      - API_SERVER_HOST=0.0.0.0
+      - 'API_SERVER_KEY=${SERVICE_PASSWORD_64_HERMESAPI}'
+    volumes:
+      - 'hermes-home:/home/hermes/.hermes'
+      - 'hermes-skills:/home/hermes/.hermes/skills'
+      - 'hermes-agent-src:/opt/hermes'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'test -d /home/hermes/.hermes || exit 1'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  hermes-webui:
+    image: 'ghcr.io/nesquena/hermes-webui:0.52.458'
+    depends_on:
+      - hermes-agent
+    environment:
+      - SERVICE_URL_HERMESWEBUI_8787
+      - SERVICE_USER_HERMESWEBUI
+      - SERVICE_PASSWORD_HERMESWEBUI
+      - HERMES_WEBUI_HOST=0.0.0.0
+      - HERMES_WEBUI_PORT=8787
+      - HERMES_WEBUI_STATE_DIR=/home/hermeswebui/.hermes/webui
+      - WANTED_UID=1000
+      - WANTED_GID=1000
+      - HERMES_WEBUI_USERNAME=${SERVICE_USER_HERMESWEBUI}
+      - HERMES_WEBUI_PASSWORD=${SERVICE_PASSWORD_HERMESWEBUI}
+      - HERMES_API_URL=http://hermes-agent:8642
+      - 'HERMES_WEBUI_GATEWAY_API_KEY=${SERVICE_PASSWORD_64_HERMESAPI}'
+    volumes:
+      - 'hermes-home:/home/hermeswebui/.hermes'
+      - 'hermes-agent-src:/home/hermeswebui/.hermes/hermes-agent:ro'
+      - 'hermes-workspace:/workspace'
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://127.0.0.1:8787/health'
+      interval: 30s
+      timeout: 5s
+      retries: 3

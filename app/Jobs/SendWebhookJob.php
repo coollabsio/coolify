@@ -2,6 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Models\WebhookNotificationSettings;
+use App\Rules\SafeWebhookUrl;
+use App\Traits\HandlesNotificationResponse;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -9,10 +12,12 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 
 class SendWebhookJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, HandlesNotificationResponse, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
      * The number of times the job may be attempted.
@@ -30,7 +35,9 @@ class SendWebhookJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(
         public array $payload,
-        public string $webhookUrl
+        public string $webhookUrl,
+        public ?WebhookNotificationSettings $settings = null,
+        public ?string $authorizationHeader = null,
     ) {
         $this->onQueue('high');
     }
@@ -40,21 +47,36 @@ class SendWebhookJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function handle(): void
     {
-        if (isDev()) {
-            ray('Sending webhook notification', [
-                'url' => $this->webhookUrl,
-                'payload' => $this->payload,
+        $validator = Validator::make(
+            ['webhook_url' => $this->webhookUrl],
+            ['webhook_url' => ['required', 'url', new SafeWebhookUrl]]
+        );
+
+        if ($validator->fails()) {
+            Log::warning('SendWebhookJob: blocked unsafe webhook URL', [
+                'url' => SafeWebhookUrl::redactedUrlForLog($this->webhookUrl),
+                'errors' => $validator->errors()->all(),
             ]);
+
+            return;
         }
 
-        $response = Http::post($this->webhookUrl, $this->payload);
-
-        if (isDev()) {
-            ray('Webhook response', [
-                'status' => $response->status(),
-                'body' => $response->body(),
-                'successful' => $response->successful(),
+        try {
+            $httpOptions = SafeWebhookUrl::httpClientOptions($this->webhookUrl);
+        } catch (\RuntimeException $e) {
+            Log::warning('SendWebhookJob: blocked unsafe webhook URL at send time', [
+                'url' => SafeWebhookUrl::redactedUrlForLog($this->webhookUrl),
+                'error' => $e->getMessage(),
             ]);
+
+            return;
         }
+
+        $response = $this->sendNotificationRequest('Webhook', $this->webhookUrl, fn () => Http::withOptions($httpOptions)
+            ->when(filled($this->authorizationHeader), fn ($request) => $request->withHeaders(['Authorization' => $this->authorizationHeader]))
+            ->post($this->webhookUrl, $this->payload));
+
+        // 401/403: the endpoint rejects us, 404/410: the endpoint does not exist anymore.
+        $this->handleNotificationResponse($response, 'Webhook', in_array($response->status(), [401, 403, 404, 410], true));
     }
 }

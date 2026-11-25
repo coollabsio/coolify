@@ -2,9 +2,13 @@
 
 ## Changes
 
-<!-- Describe what changes were made and why in your own words. This "Changes" section must be human-written and not AI-generated. -->
+<!-- List what changes were made in your own words. This "Changes" section must be human-written and not AI-generated. -->
 
 -
+
+## Why
+
+<!-- Explain why these changes are needed, what they try to achieve, and why they make sense for Coolify. This "Why" section must be human-written and not AI-generated. -->
 
 ## Issues
 
@@ -22,7 +26,7 @@
 
 ## Preview
 
-<!-- Screenshot or short video showing your changes in action. Mandatory for bounty claims and new features. -->
+<!-- Screenshot or short video showing your changes in action. Mandatory for new features. -->
 
 ## AI Assistance
 
@@ -46,6 +50,6 @@
 
 > [!IMPORTANT]
 >
-> - [ ] I have read and understood the [contributor guidelines](https://github.com/coollabsio/coolify/blob/v4.x/CONTRIBUTING.md). If I have failed to follow any guideline, I understand that this PR may be closed without review.
+> - [ ] I have read and understood the [contributor guidelines](https://github.com/coollabsio/coolify/blob/HEAD/CONTRIBUTING.md). If I have failed to follow any guideline, I understand that this PR may be closed without review.
 > - [ ] I have searched [existing issues](https://github.com/coollabsio/coolify/issues) and [pull requests](https://github.com/coollabsio/coolify/pulls) (including closed ones) to ensure this isn't a duplicate.
 > - [ ] I have tested all the changes thoroughly with a local development instance of Coolify and I am confident that they will work as expected when a maintainer tests them.

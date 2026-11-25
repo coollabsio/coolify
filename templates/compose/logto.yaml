@@ -3,6 +3,7 @@
 # category: auth
 # tags: logto,identity,login,authentication,oauth,oidc,openid
 # logo: svgs/logto_dark.svg
+# port: 3001
 
 services:
   logto:
@@ -10,7 +11,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    entrypoint: ["sh", "-c", "npm run cli db seed -- --swe && npm start"]
+    entrypoint: ["sh", "-c", "npm run cli db seed -- --swe && npm run alteration deploy latest && npm start"]
     environment:
       - SERVICE_URL_LOGTO
       - TRUST_PROXY_HEADER=1

@@ -4,7 +4,13 @@ namespace App\Policies;
 
 use App\Models\EnvironmentVariable;
 use App\Models\User;
+use App\Services\ProjectConfig\ManagedResources;
+use Illuminate\Support\Facades\Gate;
 
+/**
+ * An environment variable is part of its resource's configuration: listing it needs view on the resource,
+ * reading its value needs viewSensitive, and every change needs manageEnvironment (write access).
+ */
 class EnvironmentVariablePolicy
 {
     /**
@@ -20,7 +26,15 @@ class EnvironmentVariablePolicy
      */
     public function view(User $user, EnvironmentVariable $environmentVariable): bool
     {
-        return true;
+        return $this->allowsOnResource($user, 'view', $environmentVariable);
+    }
+
+    /**
+     * Determine whether the user can read the value.
+     */
+    public function viewSensitive(User $user, EnvironmentVariable $environmentVariable): bool
+    {
+        return $this->allowsOnResource($user, 'viewSensitive', $environmentVariable);
     }
 
     /**
@@ -28,7 +42,7 @@ class EnvironmentVariablePolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->isAdmin();
     }
 
     /**
@@ -36,7 +50,11 @@ class EnvironmentVariablePolicy
      */
     public function update(User $user, EnvironmentVariable $environmentVariable): bool
     {
-        return true;
+        if (ManagedResources::isManaged($environmentVariable->resourceable) && ($environmentVariable->config_meta['form'] ?? null) !== 'required') {
+            return false;
+        }
+
+        return $this->allowsOnResource($user, 'manageEnvironment', $environmentVariable);
     }
 
     /**
@@ -44,7 +62,11 @@ class EnvironmentVariablePolicy
      */
     public function delete(User $user, EnvironmentVariable $environmentVariable): bool
     {
-        return true;
+        if (ManagedResources::isManaged($environmentVariable->resourceable)) {
+            return false;
+        }
+
+        return $this->allowsOnResource($user, 'manageEnvironment', $environmentVariable);
     }
 
     /**
@@ -52,7 +74,7 @@ class EnvironmentVariablePolicy
      */
     public function restore(User $user, EnvironmentVariable $environmentVariable): bool
     {
-        return true;
+        return false;
     }
 
     /**
@@ -60,7 +82,7 @@ class EnvironmentVariablePolicy
      */
     public function forceDelete(User $user, EnvironmentVariable $environmentVariable): bool
     {
-        return true;
+        return false;
     }
 
     /**
@@ -68,6 +90,13 @@ class EnvironmentVariablePolicy
      */
     public function manageEnvironment(User $user, EnvironmentVariable $environmentVariable): bool
     {
-        return true;
+        return $this->allowsOnResource($user, 'manageEnvironment', $environmentVariable);
+    }
+
+    private function allowsOnResource(User $user, string $ability, EnvironmentVariable $environmentVariable): bool
+    {
+        $resource = $environmentVariable->resourceable;
+
+        return $resource !== null && Gate::forUser($user)->allows($ability, $resource);
     }
 }

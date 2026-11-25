@@ -1,101 +1,46 @@
 <div>
     <x-slot:title>
-        Notifications | Coolify
+        Discord Notifications | Coolify
     </x-slot>
-    <x-notification.navbar />
-    <form wire:submit='submit' class="flex flex-col gap-4 pb-4">
-        <div class="flex items-center gap-2">
-            <h2>Discord</h2>
-            <x-forms.button canGate="update" :canResource="$settings" type="submit">
-                Save
-            </x-forms.button>
-            @if ($discordEnabled)
-                <x-forms.button canGate="sendTest" :canResource="$settings" class="normal-case dark:text-white btn btn-xs no-animation btn-primary"
-                    wire:click="sendTestNotification">
-                    Send Test Notification
-                </x-forms.button>
-            @else
-                <x-forms.button canGate="sendTest" :canResource="$settings" disabled class="normal-case dark:text-white btn btn-xs no-animation btn-primary">
-                    Send Test Notification
-                </x-forms.button>
-            @endif
-        </div>
-        <div class="w-48">
-            <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="instantSaveDiscordEnabled" id="discordEnabled" label="Enabled" />
-        </div>
-        <x-forms.input canGate="update" :canResource="$settings" type="password"
-            helper="Create a Discord Server and generate a Webhook URL. <br><a class='inline-block underline dark:text-white' href='https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks' target='_blank'>Webhook Documentation</a>"
-            required id="discordWebhookUrl" label="Webhook URL" />
-        <div class="flex items-end gap-2 {{ $discordPingType !== 'custom' ? 'w-48' : '' }}">
-            <x-forms.select canGate="update" :canResource="$settings" wire:model.live="discordPingType" id="discordPingType"
-                label="Ping on Critical Events"
-                helper="Choose who gets pinged when a critical event triggers a notification.">
-                <option value="none">None</option>
-                <option value="here">@here</option>
-                <option value="everyone">@everyone</option>
-                <option value="custom">Custom</option>
-            </x-forms.select>
-            @if ($discordPingType === 'custom')
-                <x-forms.input canGate="update" :canResource="$settings" id="discordCustomPingText"
-                    label="Custom Ping Text"
-                    placeholder="Hey <@&123456789> notification from Coolify!"
-                    helper="This text is sent alongside the notification embed. You can combine text with mentions.<br><br><span class='text-helper'>Example</span><ul class='list-disc pl-4'><li>Hey &lt;@123456789&gt; a notification from Coolify!</li><li>&lt;@&amp;987654321&gt; deployment failed!</li></ul><br><span class='text-helper'>Syntax</span><ul class='list-disc pl-4'><li>&lt;@USER_ID&gt; — ping a user</li><li>&lt;@&amp;ROLE_ID&gt; — ping a role</li><li>@here — pings only online or idle members who can see the channel</li><li>@everyone — pings all members who can see the channel, regardless of status</li></ul>" />
-            @endif
-        </div>
-    </form>
-    <h2 class="mt-4">Notification Settings</h2>
-    <p class="mb-4">
-        Select events for which you would like to receive Discord notifications.
-    </p>
-    <div class="flex flex-col gap-4 max-w-2xl">
-        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
-            <h3 class="font-medium mb-3">Deployments</h3>
-            <div class="flex flex-col gap-1.5 pl-1">
-                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="deploymentSuccessDiscordNotifications"
-                    label="Deployment Success" />
-                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="deploymentFailureDiscordNotifications"
-                    label="Deployment Failure" />
-                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel"
-                    helper="Send a notification when a container status changes. It will notify for Stopped and Restarted events of a container."
-                    id="statusChangeDiscordNotifications" label="Container Status Changes" />
-            </div>
-        </div>
-        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
-            <h3 class="font-medium mb-3">Backups</h3>
-            <div class="flex flex-col gap-1.5 pl-1">
-                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="backupSuccessDiscordNotifications"
-                    label="Backup Success" />
-                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="backupFailureDiscordNotifications"
-                    label="Backup Failure" />
-            </div>
-        </div>
-        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
-            <h3 class="font-medium mb-3">Scheduled Tasks</h3>
-            <div class="flex flex-col gap-1.5 pl-1">
-                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="scheduledTaskSuccessDiscordNotifications"
-                    label="Scheduled Task Success" />
-                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="scheduledTaskFailureDiscordNotifications"
-                    label="Scheduled Task Failure" />
-            </div>
-        </div>
-        <div class="border dark:border-coolgray-300 border-neutral-200 p-4 rounded-lg">
-            <h3 class="font-medium mb-3">Server</h3>
-            <div class="flex flex-col gap-1.5 pl-1">
-                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="dockerCleanupSuccessDiscordNotifications"
-                    label="Docker Cleanup Success" />
-                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="dockerCleanupFailureDiscordNotifications"
-                    label="Docker Cleanup Failure" />
-                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverDiskUsageDiscordNotifications"
-                    label="Server Disk Usage" />
-                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverReachableDiscordNotifications"
-                    label="Server Reachable" />
-                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverUnreachableDiscordNotifications"
-                    label="Server Unreachable" />
-                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="serverPatchDiscordNotifications"
-                    label="Server Patching" />
-                <x-forms.checkbox canGate="update" :canResource="$settings" instantSave="saveModel" id="traefikOutdatedDiscordNotifications"
-                    label="Traefik Proxy Outdated" />
-            </div>
-        </div>
+
+    <x-notification.settings-layout>
+    <div class="application-settings-form flex flex-col gap-6">
+        <form wire:submit="submit">
+            <x-unsaved-bar action="submit" />
+            <x-application.settings-section title="Discord"
+                description="Send team notifications to a Discord channel through an incoming webhook.">
+                <x-slot:actions>
+                    <x-notification.channel-actions :enabled="$discordEnabled" enabledProperty="discordEnabled"
+                        toggleMethod="instantSaveDiscordEnabled" :canUpdate="auth()->user()->can('update', $settings)"
+                        :canResource="$settings" />
+                </x-slot:actions>
+
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.listbox canGate="update" :canResource="$settings" id="discordPingEnabled" label="Critical event mention"
+                        helper="Mention people in Discord when a critical event occurs."
+                        onChange="instantSaveDiscordPingEnabled"
+                        :disabled="!auth()->user()->can('update', $settings)" :options="[
+                            ['value' => true, 'label' => 'Mention'],
+                            ['value' => false, 'label' => 'Do not mention'],
+                        ]" />
+                    @if ($discordPingEnabled)
+                        <x-forms.input canGate="update" :canResource="$settings" id="discordPingText" label="Mention text"
+                            placeholder="@here"
+                            helper="Text sent with critical events. Leave empty to use @here.<br><br>Examples: @everyone, &lt;@USER_ID&gt; (user), &lt;@&amp;ROLE_ID&gt; (role). You can add more mentions and text." />
+                    @endif
+                    <div class="lg:col-span-2">
+                        @can('update', $settings)
+                            <x-forms.input type="password" :required="$discordEnabled" id="discordWebhookUrl" label="Webhook URL"
+                                helper="Create an incoming webhook in your Discord server settings." />
+                        @else
+                            <x-forms.input disabled label="Webhook URL" value="Hidden (only admins can view)" />
+                        @endcan
+                    </div>
+                </div>
+            </x-application.settings-section>
+        </form>
+
+        <x-notification.event-grid :settings="$settings" channel="discord" />
     </div>
+    </x-notification.settings-layout>
 </div>

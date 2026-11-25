@@ -20,10 +20,12 @@ class DiscordChannel
             return;
         }
 
-        if ($message->isCritical) {
-            $message->pingText = $discordSettings->getPingText();
+        if ($discordSettings->discord_ping_enabled) {
+            $message->pingText = $discordSettings->pingText();
+        } else {
+            $message->isCritical = false;
         }
 
-        SendMessageToDiscordJob::dispatch($message, $discordSettings->discord_webhook_url);
+        SendMessageToDiscordJob::dispatch($message, $discordSettings->discord_webhook_url, data_get($notification, 'isTestNotification', false) ? null : $discordSettings);
     }
 }

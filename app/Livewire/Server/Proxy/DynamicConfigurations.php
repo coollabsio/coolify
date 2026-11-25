@@ -3,11 +3,22 @@
 namespace App\Livewire\Server\Proxy;
 
 use App\Models\Server;
+use App\Traits\ListensToTeamChannel;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class DynamicConfigurations extends Component
 {
+    use AuthorizesRequests;
+    use ListensToTeamChannel;
+
+    public const MAX_CONFIGURATION_FILE_SIZE_BYTES = 1024 * 1024;
+
+    public const MAX_TOTAL_CONFIGURATION_SIZE_BYTES = 5 * 1024 * 1024;
+
+    public const MAX_CONFIGURATION_FILES = 100;
+
     public ?Server $server = null;
 
     public $parameters = [];
@@ -16,11 +27,11 @@ class DynamicConfigurations extends Component
 
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ProxyStatusChangedUI" => 'loadDynamicConfigurations',
             'loadDynamicConfigurations',
+            ...$this->teamChannelListeners([
+                'ProxyStatusChangedUI' => 'loadDynamicConfigurations',
+            ]),
         ];
     }
 
@@ -35,16 +46,50 @@ class DynamicConfigurations extends Component
 
     public function loadDynamicConfigurations()
     {
+        try {
+            $this->authorize('view', $this->server);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
         $proxy_path = $this->server->proxyPath();
-        $files = instant_remote_process(["mkdir -p $proxy_path/dynamic && ls -1 {$proxy_path}/dynamic"], $this->server);
+        $fileLimit = self::MAX_CONFIGURATION_FILES + 1;
+        $files = instant_remote_process(["mkdir -p $proxy_path/dynamic && ls -1 {$proxy_path}/dynamic | head -n {$fileLimit}"], $this->server);
         $files = collect(explode("\n", $files))->filter(fn ($file) => ! empty($file));
         $files = $files->map(fn ($file) => trim($file));
         $files = $files->sort();
+        if (! auth()->user()?->can('update', $this->server)) {
+            // Members see file names only; contents can hold credentials.
+            $this->contents = $files->take(self::MAX_CONFIGURATION_FILES)
+                ->mapWithKeys(fn ($file) => [str_replace('.', '|', $file) => null]);
+            $this->dispatch('$refresh');
+
+            return;
+        }
         $contents = collect([]);
-        foreach ($files as $file) {
+        $skippedFiles = collect([]);
+        $totalBytes = 0;
+        if ($files->count() > self::MAX_CONFIGURATION_FILES) {
+            $skippedFiles->push('additional files');
+        }
+        foreach ($files->take(self::MAX_CONFIGURATION_FILES) as $file) {
             $without_extension = str_replace('.', '|', $file);
-            $content = instant_remote_process(["cat {$proxy_path}/dynamic/{$file}"], $this->server);
-            $contents[$without_extension] = $content ?? '';
+            $filePath = escapeshellarg("{$proxy_path}/dynamic/{$file}");
+            $readLimit = self::MAX_CONFIGURATION_FILE_SIZE_BYTES + 1;
+            $content = instant_remote_process(["head -c {$readLimit} {$filePath}"], $this->server);
+            $content = $content ?? '';
+            $contentBytes = strlen($content);
+
+            if ($contentBytes > self::MAX_CONFIGURATION_FILE_SIZE_BYTES || $totalBytes + $contentBytes > self::MAX_TOTAL_CONFIGURATION_SIZE_BYTES) {
+                $skippedFiles->push($file);
+
+                continue;
+            }
+
+            $contents[$without_extension] = $content;
+            $totalBytes += $contentBytes;
+        }
+        if ($skippedFiles->isNotEmpty()) {
+            $this->dispatch('warning', 'Some dynamic configurations were not loaded because they exceed the safe display limits: '.$skippedFiles->implode(', '));
         }
         $this->contents = $contents;
         $this->dispatch('$refresh');

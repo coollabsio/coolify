@@ -2,6 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Application;
+use App\Services\UploadStorageService;
+use App\Support\DatabaseBackupFileValidator;
+use App\Support\StaticSiteArchive;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller as BaseController;
@@ -11,13 +17,42 @@ use Pion\Laravel\ChunkUpload\Receiver\FileReceiver;
 
 class UploadController extends BaseController
 {
+    use AuthorizesRequests;
+
+    private const MAX_BYTES = 10 * 1024 * 1024 * 1024; // 10 GiB
+
+    private const ALLOWED_EXTENSIONS = DatabaseBackupFileValidator::ALLOWED_EXTENSIONS;
+
     public function upload(Request $request)
     {
         $databaseIdentifier = request()->route('databaseUuid');
         $resource = getResourceByUuid($databaseIdentifier, data_get(auth()->user()->currentTeam(), 'id'));
         if (is_null($resource)) {
-            return response()->json(['error' => 'You do not have permission for this database'], 500);
+            return response()->json(['error' => 'Database not found.'], 404);
         }
+
+        $this->authorize('uploadBackup', $resource);
+
+        // The instance admin sent uploads to an S3 storage, so they must not use disk space on this instance.
+        if (UploadStorageService::configuredStorage() !== null) {
+            return response()->json(['error' => 'Uploads go to an S3 storage on this instance. Reload the page.'], 409);
+        }
+
+        $chunk = $request->file('file');
+        $originalName = $chunk instanceof UploadedFile ? $chunk->getClientOriginalName() : null;
+        if (blank($originalName) || ! self::hasAllowedExtension($originalName)) {
+            return response()->json([
+                'error' => 'Unsupported file type. Allowed extensions: '.implode(', ', self::ALLOWED_EXTENSIONS),
+            ], 422);
+        }
+
+        $declaredTotalSize = (int) $request->input('dzTotalFilesize', 0);
+        if ($declaredTotalSize > self::MAX_BYTES) {
+            return response()->json([
+                'error' => 'File exceeds maximum allowed size of '.self::formatMaxSize().'.',
+            ], 422);
+        }
+
         $receiver = new FileReceiver('file', $request, HandlerFactory::classFromRequest($request));
 
         if ($receiver->isUploaded() === false) {
@@ -40,29 +75,40 @@ class UploadController extends BaseController
             'status' => true,
         ]);
     }
-    // protected function saveFileToS3($file)
-    // {
-    //     $fileName = $this->createFilename($file);
 
-    //     $disk = Storage::disk('s3');
-    //     // It's better to use streaming Streaming (laravel 5.4+)
-    //     $disk->putFileAs('photos', $file, $fileName);
+    /**
+     * A chunk of a static site archive. With application_uuid, it is a new version of that archive site,
+     * staged for the team of the application. Without, it is for a new site in the current team.
+     */
+    public function uploadStaticArchive(Request $request): JsonResponse
+    {
+        $applicationUuid = $request->input('application_uuid');
+        if (filled($applicationUuid)) {
+            $application = Application::query()->where('uuid', $applicationUuid)->where('is_archive_source', true)->first();
+            if (! $application) {
+                return response()->json(['message' => 'Application not found.'], 404);
+            }
+            $this->authorize('update', $application);
+            $this->authorize('deploy', $application);
+            $teamId = (int) $application->team()->id;
+        } else {
+            $this->authorize('create', Application::class);
+            $teamId = (int) auth()->user()->currentTeam()->id;
+        }
 
-    //     // for older laravel
-    //     // $disk->put($fileName, file_get_contents($file), 'public');
-    //     $mime = str_replace('/', '-', $file->getMimeType());
+        return StaticSiteArchive::receiveUpload($request, $teamId);
+    }
 
-    //     // We need to delete the file when uploaded to s3
-    //     unlink($file->getPathname());
-
-    //     return response()->json([
-    //         'path' => $disk->url($fileName),
-    //         'name' => $fileName,
-    //         'mime_type' => $mime
-    //     ]);
-    // }
     protected function saveFile(UploadedFile $file, string $resourceIdentifier)
     {
+        if (! DatabaseBackupFileValidator::isUploadAllowed($file, self::MAX_BYTES)) {
+            @unlink($file->getPathname());
+
+            return response()->json([
+                'error' => 'Uploaded file failed validation.',
+            ], 422);
+        }
+
         $mime = str_replace('/', '-', $file->getMimeType());
         $filePath = "upload/{$resourceIdentifier}";
         $finalPath = storage_path('app/'.$filePath);
@@ -73,13 +119,13 @@ class UploadController extends BaseController
         ]);
     }
 
-    protected function createFilename(UploadedFile $file)
+    private static function hasAllowedExtension(string $name): bool
     {
-        $extension = $file->getClientOriginalExtension();
-        $filename = str_replace('.'.$extension, '', $file->getClientOriginalName()); // Filename without extension
+        return DatabaseBackupFileValidator::hasAllowedExtension($name);
+    }
 
-        $filename .= '_'.md5(time()).'.'.$extension;
-
-        return $filename;
+    private static function formatMaxSize(): string
+    {
+        return (self::MAX_BYTES / (1024 * 1024 * 1024)).' GiB';
     }
 }

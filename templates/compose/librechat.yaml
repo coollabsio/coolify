@@ -7,7 +7,7 @@
 
 services:
   librechat:
-    image: ghcr.io/danny-avila/librechat-dev-api:latest
+    image: ghcr.io/danny-avila/librechat-dev-api:6ecd1b510faaa593ad954fb6276c18e5f12a8e53 # Released on April 2
     environment:
       - SERVICE_URL_LIBRECHAT_3080
       - DOMAIN_CLIENT=${SERVICE_URL_LIBRECHAT}
@@ -64,7 +64,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://127.0.0.1:3080/api/health",
+          "http://127.0.0.1:3080/health",
         ]
       interval: 5s
       timeout: 10s
@@ -92,7 +92,7 @@ services:
       retries: 3
 
   meilisearch:
-    image: getmeili/meilisearch:v1.12.3
+    image: getmeili/meilisearch:v1.35.1
     environment:
       - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILI}
       - MEILI_NO_ANALYTICS=${MEILI_NO_ANALYTICS:-false}
@@ -107,7 +107,7 @@ services:
       retries: 15
 
   vectordb:
-    image: ankane/pgvector:latest
+    image: ankane/pgvector:v0.5.1 # pgvector by ankane is archived and not maintained, in future we have to swap this image to something else that is well maintained
     environment:
       - POSTGRES_DB=rag
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
@@ -129,7 +129,7 @@ services:
       start_period: 10s
 
   rag-api:
-    image: ghcr.io/danny-avila/librechat-rag-api-dev-lite:latest
+    image: ghcr.io/danny-avila/librechat-rag-api-dev-lite:v0.7.3
     environment:
       - POSTGRES_DB=rag
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}

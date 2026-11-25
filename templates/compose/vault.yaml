@@ -1,0 +1,25 @@
+# documentation: https://developer.hashicorp.com/vault/docs/deploy/run-container
+# slogan: HashiCorp Vault securely stores and controls access to secrets.
+# category: security
+# tags: vault,hashicorp,secrets,security,encryption
+# port: 8200
+
+services:
+  vault:
+    image: 'hashicorp/vault:${VAULT_VERSION:-latest}'
+    command: server
+    environment:
+      - SERVICE_URL_VAULT_8200
+      - VAULT_ADDR=http://127.0.0.1:8200
+      - VAULT_API_ADDR=${SERVICE_URL_VAULT_8200}
+      - 'VAULT_LOCAL_CONFIG={"ui":true,"disable_mlock":true,"storage":{"file":{"path":"/vault/file"}},"listener":{"tcp":{"address":"0.0.0.0:8200","tls_disable":true}}}'
+    volumes:
+      - vault-data:/vault/file
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'wget -qO- "http://127.0.0.1:8200/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200" >/dev/null || exit 1'
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s

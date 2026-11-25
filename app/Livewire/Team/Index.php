@@ -4,15 +4,24 @@ namespace App\Livewire\Team;
 
 use App\Models\Team;
 use App\Models\TeamInvitation;
+use App\Services\TeamAvatarStorageService;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class Index extends Component
 {
     use AuthorizesRequests;
+    use WithFileUploads;
+
+    private const TOGGLES = [
+        'is_mcp_server_enabled',
+        'is_build_server_fallback_enabled',
+        'is_two_factor_required',
+        'is_terminal_api_enabled',
+    ];
 
     public $invitations = [];
 
@@ -23,11 +32,35 @@ class Index extends Component
 
     public ?string $description = null;
 
+    public bool $is_mcp_server_enabled = true;
+
+    public bool $is_terminal_api_enabled = false;
+
+    public bool $is_build_server_fallback_enabled = true;
+
+    public bool $is_two_factor_required = false;
+
+    public $avatar;
+
+    /**
+     * Toggle values as loaded on this page. A save writes only the toggles
+     * that changed from these values, so a stale page cannot revert a toggle
+     * that another administrator changed in the meantime.
+     *
+     * @var array<string, bool>
+     */
+    #[Locked]
+    public array $loadedToggles = [];
+
     protected function rules(): array
     {
         return [
             'name' => ValidationPatterns::nameRules(),
             'description' => ValidationPatterns::descriptionRules(),
+            'is_mcp_server_enabled' => 'boolean',
+            'is_build_server_fallback_enabled' => 'boolean',
+            'is_two_factor_required' => 'boolean',
+            'is_terminal_api_enabled' => 'boolean',
         ];
     }
 
@@ -57,10 +90,22 @@ class Index extends Component
             // Sync TO model (before save)
             $this->team->name = $this->name;
             $this->team->description = $this->description;
+            foreach (self::TOGGLES as $toggle) {
+                if ($this->{$toggle} !== ($this->loadedToggles[$toggle] ?? null)) {
+                    $this->team->{$toggle} = $this->{$toggle};
+                }
+            }
         } else {
             // Sync FROM model (on load/refresh)
             $this->name = $this->team->name;
             $this->description = $this->team->description;
+            // Null can appear after Team::create() when the DB default is not
+            // hydrated onto the in-memory model stored in session.
+            $this->is_mcp_server_enabled = (bool) ($this->team->is_mcp_server_enabled ?? true);
+            $this->is_build_server_fallback_enabled = (bool) ($this->team->is_build_server_fallback_enabled ?? true);
+            $this->is_two_factor_required = (bool) $this->team->is_two_factor_required;
+            $this->is_terminal_api_enabled = (bool) ($this->team->is_terminal_api_enabled ?? false);
+            $this->loadedToggles = collect(self::TOGGLES)->mapWithKeys(fn (string $toggle) => [$toggle => $this->{$toggle}])->all();
         }
     }
 
@@ -74,6 +119,40 @@ class Index extends Component
         }
     }
 
+    public function uploadAvatar(TeamAvatarStorageService $avatarStorage): bool
+    {
+        try {
+            $this->authorize('update', $this->team);
+            $this->validate([
+                'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120', 'dimensions:max_width=6000,max_height=6000'],
+            ]);
+            $avatarStorage->storeTeam($this->team, $this->avatar);
+            $this->reset('avatar');
+            refreshSession();
+            $this->dispatch('team-avatar-updated');
+            $this->dispatch('success', 'Team avatar updated.');
+
+            return true;
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return false;
+        }
+    }
+
+    public function removeAvatar(TeamAvatarStorageService $avatarStorage): void
+    {
+        try {
+            $this->authorize('update', $this->team);
+            $avatarStorage->deleteTeam($this->team);
+            refreshSession();
+            $this->dispatch('team-avatar-updated');
+            $this->dispatch('success', 'Team avatar removed.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
     public function render()
     {
         return view('livewire.team.index');
@@ -84,34 +163,27 @@ class Index extends Component
         $this->validate();
         try {
             $this->authorize('update', $this->team);
+            if ($this->is_two_factor_required && ! $this->loadedToggles['is_two_factor_required'] && ! $this->team->is_two_factor_required && blank(auth()->user()->two_factor_confirmed_at)) {
+                $this->is_two_factor_required = false;
+                $this->dispatch('error', 'Enable two-factor authentication on your profile before you require it for the team.');
+
+                return;
+            }
             $this->syncData(true);
+            $terminalApiChanged = $this->team->isDirty('is_terminal_api_enabled');
             $this->team->save();
+            if ($terminalApiChanged) {
+                auditLog('ui.team.terminal_api_updated', [
+                    'team_id' => $this->team->id,
+                    'is_terminal_api_enabled' => $this->team->is_terminal_api_enabled,
+                ], 'warning');
+            }
+            $this->syncData(false);
             refreshSession();
+            $this->dispatch('team-updated');
             $this->dispatch('success', 'Team updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-    }
-
-    public function delete()
-    {
-        $currentTeam = currentTeam();
-        $this->authorize('delete', $currentTeam);
-        $currentTeam->delete();
-
-        $currentTeam->members->each(function ($user) use ($currentTeam) {
-            if ($user->id === Auth::id()) {
-                return;
-            }
-            $user->teams()->detach($currentTeam);
-            $session = DB::table('sessions')->where('user_id', $user->id)->first();
-            if ($session) {
-                DB::table('sessions')->where('id', $session->id)->delete();
-            }
-        });
-
-        refreshSession();
-
-        return redirect()->route('team.index');
     }
 }

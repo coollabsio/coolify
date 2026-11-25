@@ -47,27 +47,6 @@ test('database backup rejects command injection with newlines', function () {
         ->toThrow(Exception::class);
 });
 
-test('database backup escapes shell arguments properly', function () {
-    $database = "test'db";
-    $escaped = escapeshellarg($database);
-
-    expect($escaped)->toBe("'test'\\''db'");
-});
-
-test('database backup escapes shell arguments with double quotes', function () {
-    $database = 'test"db';
-    $escaped = escapeshellarg($database);
-
-    expect($escaped)->toBe("'test\"db'");
-});
-
-test('database backup escapes shell arguments with spaces', function () {
-    $database = 'test database';
-    $escaped = escapeshellarg($database);
-
-    expect($escaped)->toBe("'test database'");
-});
-
 test('database backup accepts legitimate database names', function () {
     expect(fn () => validateShellSafePath('postgres', 'database name'))
         ->not->toThrow(Exception::class);

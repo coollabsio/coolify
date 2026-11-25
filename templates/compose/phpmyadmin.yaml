@@ -3,6 +3,7 @@
 # category: database
 # tags: database management
 # logo: svgs/phpmyadmin.svg
+# port: 80
 
 services:
   phpmyadmin:

@@ -1,28 +1,97 @@
 <?php
 
+use App\Actions\Shared\MigrateResourceToDestination;
 use App\Enums\BuildPackTypes;
+use App\Enums\HttpBasicAuthHashAlgorithm;
 use App\Enums\RedirectTypes;
 use App\Enums\StaticImageTypes;
+use App\Models\Application;
+use App\Models\ApplicationSetting;
+use App\Models\Environment;
+use App\Models\EnvironmentVariable;
+use App\Models\ServerSetting;
+use App\Models\Service;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
+use App\Rules\ManualWebhookSecret;
+use App\Rules\ValidGitBranch;
+use App\Rules\ValidIpAllowlist;
+use App\Support\ValidationPatterns;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection as SupportCollection;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 function getTeamIdFromToken()
 {
-    $token = auth()->user()->currentAccessToken();
+    $user = auth()->user();
+    $token = $user?->currentAccessToken();
+    $teamId = data_get($token, 'team_id');
 
-    return data_get($token, 'team_id');
+    if (! $user || is_null($teamId) || ! $user->teams()->where('teams.id', $teamId)->exists()) {
+        return null;
+    }
+
+    return $teamId;
 }
 function invalidTokenResponse()
 {
     return response()->json(['message' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api-reference/authorization'], 400);
 }
 
+/**
+ * Validation rules of the page and per_page query parameters of a paginated list endpoint.
+ *
+ * @return array<string, list<string>>
+ */
+function apiPaginationRules(int $maxPerPage = 100): array
+{
+    return [
+        'page' => ['nullable', 'integer', 'min:1', 'max:'.(intdiv(PHP_INT_MAX, $maxPerPage) + 1)],
+        'per_page' => ['nullable', 'integer', 'min:1', 'max:'.$maxPerPage],
+    ];
+}
+
+/**
+ * Page a list query in the standard API style: the body stays a plain array, and the X-Total-Count header gives the total.
+ * Without page or per_page in the request, the full list is returned without the header, unless $alwaysPaginate is set.
+ *
+ * @return array{0: SupportCollection, 1: array<string, int>} the items and the response headers
+ */
+function apiPaginate(EloquentBuilder|QueryBuilder|Relation $query, Request $request, int $defaultPerPage = 50, bool $alwaysPaginate = false): array
+{
+    if (! $alwaysPaginate && ! $request->filled('page') && ! $request->filled('per_page')) {
+        return [$query->get(), []];
+    }
+
+    $total = (clone $query)->count();
+    $items = $query->forPage((int) ($request->query('page') ?: 1), (int) ($request->query('per_page') ?: $defaultPerPage))->get();
+
+    return [$items, ['X-Total-Count' => $total]];
+}
+
+/**
+ * Filter a list query by a case-insensitive literal substring of a column.
+ * Both operands are lowercased, and the LIKE wildcards in $value (%, _, \) match only themselves.
+ */
+function apiWhereContains(EloquentBuilder $query, string $column, string $value): EloquentBuilder
+{
+    return $query->whereRaw("LOWER({$column}) LIKE ? ESCAPE '\\'", ['%'.addcslashes(mb_strtolower($value), '%_\\').'%']);
+}
+
 function serializeApiResponse($data)
 {
     if ($data instanceof Collection) {
         return $data->map(function ($d) {
-            $d = collect($d)->sortKeys();
+            $d = collect(apiEnvironmentVariableDisplayValue($d))->sortKeys();
             $created_at = data_get($d, 'created_at');
             $updated_at = data_get($d, 'updated_at');
             if ($created_at) {
@@ -47,10 +116,10 @@ function serializeApiResponse($data)
                 $d = $d->prepend($d['id'], 'id');
             }
 
-            return $d;
+            return removeServerProxySecretsFromApiPayload($d);
         });
     } else {
-        $d = collect($data)->sortKeys();
+        $d = collect(apiEnvironmentVariableDisplayValue($data))->sortKeys();
         $created_at = data_get($d, 'created_at');
         $updated_at = data_get($d, 'updated_at');
         if ($created_at) {
@@ -75,40 +144,245 @@ function serializeApiResponse($data)
             $d = $d->prepend($d['id'], 'id');
         }
 
-        return $d;
+        return removeServerProxySecretsFromApiPayload($d);
     }
 }
 
-function sharedDataApplications()
+/**
+ * Serialize an environment variable with its display value, so a reference to a
+ * locked shared variable keeps its reference text instead of the locked value.
+ */
+function apiEnvironmentVariableDisplayValue(mixed $data): mixed
+{
+    if (! $data instanceof EnvironmentVariable || in_array('real_value', $data->getHidden(), true)) {
+        return $data;
+    }
+
+    return [...$data->toArray(), 'real_value' => $data->displayRealValue()];
+}
+
+/**
+ * Validation rules for the `compose_services` field of an environment variable of the resource.
+ * Null or an empty list means all Compose services; a list must only name services of the resource.
+ *
+ * @return array<string, mixed>
+ */
+function composeServicesValidationRules(mixed $resource): array
+{
+    return [
+        'compose_services' => ['nullable', 'array', function (string $attribute, mixed $value, Closure $fail) use ($resource): void {
+            $requested = is_array($value) ? array_values(array_filter($value, 'is_string')) : [];
+            if ($requested === []) {
+                return;
+            }
+            $available = composeServiceNamesForEnvironmentScope($resource);
+            if ($available === []) {
+                $fail('Only Docker Compose resources with a loaded Compose file can limit a variable to services. For a new Compose application, deploy it once or reload its Compose file first.');
+
+                return;
+            }
+            $unknown = array_values(array_diff($requested, $available));
+            if ($unknown !== []) {
+                $fail('Unknown Compose services: '.implode(', ', $unknown).'. Available services: '.implode(', ', $available).'.');
+            }
+        }],
+        'compose_services.*' => 'string',
+    ];
+}
+
+/**
+ * Remove the saved proxy configuration and validation logs from every
+ * serialized server in an API payload, including nested ones such as
+ * `destination.server`, unless the token can read sensitive server data.
+ * The saved proxy configuration often contains DNS provider API tokens.
+ *
+ * @template T
+ *
+ * @param  T  $payload
+ * @return T
+ */
+function removeServerProxySecretsFromApiPayload(mixed $payload): mixed
+{
+    if (canReadServerSecretsFromApi()) {
+        return $payload;
+    }
+
+    return removeServerProxySecrets($payload);
+}
+
+/**
+ * True when the API token can read server secrets (Sentinel token, log drain keys, proxy configuration).
+ * A token limited to some projects, environments, or resources cannot, because servers are team-level.
+ */
+function canReadServerSecretsFromApi(): bool
+{
+    return request()->attributes->get('can_read_server_sensitive', false) === true;
+}
+
+/**
+ * @template T
+ *
+ * @param  T  $value
+ * @return T
+ */
+function removeServerProxySecrets(mixed $value): mixed
+{
+    if (! is_array($value) && ! $value instanceof SupportCollection) {
+        return $value;
+    }
+
+    $proxy = $value['proxy'] ?? null;
+    if (is_array($proxy)) {
+        unset($proxy['last_saved_proxy_configuration']);
+        $value['proxy'] = $proxy;
+        unset($value['validation_logs']);
+    }
+
+    foreach ($value as $key => $item) {
+        if (is_array($item) || $item instanceof SupportCollection) {
+            $value[$key] = removeServerProxySecrets($item);
+        }
+    }
+
+    return $value;
+}
+
+/**
+ * Re-expose a model's `$hidden` sensitive fields when the current API request
+ * carries the `read:sensitive` or `root` token ability (set by the
+ * ApiSensitiveData middleware).
+ */
+function exposeSensitiveFields(Model $model): Model
+{
+    if (request()->attributes->get('can_read_sensitive', false) === true && filled($model->getHidden())) {
+        $model->makeVisible($model->getHidden());
+    }
+
+    return $model;
+}
+
+/**
+ * Hide the locked (shown once) values that a serialized resource still contains, also for tokens
+ * that can read sensitive data: the generated compose of an application or service, and the
+ * connection URLs of a database with a locked password.
+ *
+ * @template T of array|SupportCollection
+ *
+ * @param  T  $payload
+ * @return T
+ */
+function redactLockedApiResourceValues(Model $resource, array|SupportCollection $payload): array|SupportCollection
+{
+    if (($resource instanceof Application || $resource instanceof Service) && filled($payload['docker_compose'] ?? null)) {
+        $payload['docker_compose'] = redactLockedValuesInGeneratedCompose($payload['docker_compose'], $resource);
+    }
+
+    $urlKeys = array_filter(['internal_db_url', 'external_db_url'], fn (string $key): bool => filled($payload[$key] ?? null));
+    if ($urlKeys !== [] && method_exists($resource, 'isCredentialLocked') && $resource->isCredentialLocked()) {
+        foreach ($urlKeys as $key) {
+            $payload[$key] = null;
+        }
+    }
+
+    return $payload;
+}
+
+/**
+ * Serialize a resource for a list API response: sensitive fields when the token can read them,
+ * without locked values.
+ */
+function serializeApiResource(Model $resource): array
+{
+    return redactLockedApiResourceValues($resource, exposeSensitiveFields($resource)->toArray());
+}
+
+/**
+ * Shared validation rules for application create and update API endpoints.
+ *
+ * Pass the existing application on update so unchanged manual webhook secrets
+ * are accepted even when they predate the minimum length.
+ */
+function sharedDataApplications(?Application $application = null): array
 {
     return [
         'git_repository' => 'string',
-        'git_branch' => 'string',
+        'git_branch' => ['string', new ValidGitBranch],
+        'git_https_username' => ['string', 'nullable', 'max:255', 'regex:/^[^:\r\n]*$/'],
+        'git_https_password' => ['string', 'nullable', 'max:2048', 'regex:/^[^\r\n]*$/'],
         'build_pack' => Rule::enum(BuildPackTypes::class),
         'is_static' => 'boolean',
         'is_spa' => 'boolean',
         'is_auto_deploy_enabled' => 'boolean',
         'is_force_https_enabled' => 'boolean',
+        'is_preview_deployments_enabled' => 'boolean',
+        'use_build_secrets' => 'boolean',
+        'is_git_submodules_enabled' => 'boolean',
+        'is_git_lfs_enabled' => 'boolean',
+        'is_git_shallow_clone_enabled' => 'boolean',
+        'is_auto_cancel_queued_deployments_enabled' => 'boolean',
+        'is_auto_cancel_building_deployments_enabled' => 'boolean',
+        'disable_build_cache' => 'boolean',
+        'inject_build_args_to_dockerfile' => 'boolean',
+        'include_source_commit_in_build' => 'boolean',
+        'include_network_hosts_in_build' => 'boolean',
+        'is_env_sorting_enabled' => 'boolean',
+        'redact_all_env_values_in_logs' => 'boolean',
+        'include_coolify_default_variables' => 'boolean',
+        'is_pr_deployments_public_enabled' => 'boolean',
+        'is_pr_deployments_public_approval_required' => 'boolean',
+        'use_production_values_in_previews' => 'boolean',
+        'is_gzip_enabled' => 'boolean',
+        'is_stripprefix_enabled' => 'boolean',
+        'is_permanent_redirect_enabled' => 'boolean',
+        'ip_allowlist' => ['nullable', 'string', new ValidIpAllowlist],
+        'traefik_certificate_resolver' => ['nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
+        'is_container_label_readonly_enabled' => 'boolean',
+        'is_raw_compose_deployment_enabled' => 'boolean',
+        'is_log_drain_enabled' => 'boolean',
+        'is_gpu_enabled' => 'boolean',
+        'gpu_driver' => 'string|nullable',
+        'gpu_count' => ['string', 'nullable', 'regex:'.ApplicationSetting::GPU_COUNT_PATTERN],
+        'gpu_device_ids' => 'string|nullable',
+        'gpu_options' => ['string', 'nullable', function (string $attribute, mixed $value, Closure $fail): void {
+            if (ApplicationSetting::parseGpuOptions($value) === null) {
+                $fail('The gpu_options must be key=value pairs or a YAML mapping.');
+            }
+        }],
+        'is_consistent_container_name_enabled' => 'boolean',
+        'is_image_scan_enabled' => 'boolean',
+        'custom_internal_name' => ['nullable', ...ValidationPatterns::containerNameRules()],
+        'custom_container_name_prefix' => 'string|nullable|max:'.ApplicationSetting::MAX_CONTAINER_NAME_PREFIX_LENGTH,
+        'preview_url_template' => 'string',
+        'max_restart_count' => 'integer|min:0',
+        'stop_grace_period' => 'nullable|integer|min:'.MIN_STOP_GRACE_PERIOD_SECONDS.'|max:'.MAX_STOP_GRACE_PERIOD_SECONDS,
+        'rolling_update_drain_seconds' => 'integer|min:0|max:'.MAX_ROLLING_UPDATE_DRAIN_SECONDS,
+        'docker_images_to_keep' => 'integer|min:0|max:100',
         'static_image' => Rule::enum(StaticImageTypes::class),
-        'domains' => 'string|nullable',
+        'domains' => ValidationPatterns::applicationDomainRules(),
+        'noindex_domains' => 'array|nullable',
+        'noindex_domains.*' => 'string',
         'redirect' => Rule::enum(RedirectTypes::class),
         'git_commit_sha' => ['string', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/'],
-        'docker_registry_image_name' => 'string|nullable',
-        'docker_registry_image_tag' => 'string|nullable',
-        'install_command' => 'string|nullable',
-        'build_command' => 'string|nullable',
-        'start_command' => 'string|nullable',
+        'docker_registry_image_name' => ValidationPatterns::dockerImageNameRules(),
+        'docker_registry_image_tag' => ValidationPatterns::dockerImageTagRules(),
+        'install_command' => ValidationPatterns::shellSafeCommandRules(),
+        'build_command' => ValidationPatterns::shellSafeCommandRules(),
+        'start_command' => ValidationPatterns::shellSafeCommandRules(),
         'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/',
-        'ports_mappings' => 'string|regex:/^(\d+:\d+)(,\d+:\d+)*$/|nullable',
+        'ports_mappings' => ValidationPatterns::portMappingRules(),
         'custom_network_aliases' => 'string|nullable',
-        'base_directory' => \App\Support\ValidationPatterns::directoryPathRules(),
-        'publish_directory' => \App\Support\ValidationPatterns::directoryPathRules(),
+        'base_directory' => ValidationPatterns::directoryPathRules(),
+        'publish_directory' => ValidationPatterns::directoryPathRules(),
         'health_check_enabled' => 'boolean',
         'health_check_type' => 'string|in:http,cmd',
         'health_check_command' => ['nullable', 'string', 'max:1000', 'regex:/^[a-zA-Z0-9 \-_.\/:=@,+]+$/'],
-        'health_check_path' => ['string', 'regex:#^[a-zA-Z0-9/\-_.~%]+$#'],
+        'health_check_path' => ['string', 'regex:#^[a-zA-Z0-9/\-_.~%,;]+$#'],
         'health_check_port' => 'integer|nullable|min:1|max:65535',
-        'health_check_host' => ['string', 'regex:/^[a-zA-Z0-9.\-_]+$/'],
+        'health_check_host' => ['string', function (string $attribute, mixed $value, Closure $fail): void {
+            if (! ValidationPatterns::isValidHealthCheckHost($value)) {
+                $fail('The health check host must be a hostname or an IP address.');
+            }
+        }],
         'health_check_method' => 'string|in:GET,HEAD,POST,OPTIONS',
         'health_check_return_code' => 'numeric',
         'health_check_scheme' => 'string|in:http,https',
@@ -125,26 +399,164 @@ function sharedDataApplications()
         'limits_cpuset' => 'string|nullable',
         'limits_cpu_shares' => 'numeric',
         'custom_labels' => 'string|nullable',
-        'custom_docker_run_options' => \App\Support\ValidationPatterns::shellSafeCommandRules(2000),
+        'custom_docker_run_options' => ValidationPatterns::shellSafeCommandRules(2000),
         // Security: deployment commands are intentionally arbitrary shell (e.g. "php artisan migrate").
         // Access is gated by API token authentication. Commands run inside the app container, not the host.
         'post_deployment_command' => 'string|nullable',
-        'post_deployment_command_container' => \App\Support\ValidationPatterns::containerNameRules(),
+        'post_deployment_command_container' => ValidationPatterns::containerNameRules(),
         'pre_deployment_command' => 'string|nullable',
-        'pre_deployment_command_container' => \App\Support\ValidationPatterns::containerNameRules(),
-        'manual_webhook_secret_github' => 'string|nullable',
-        'manual_webhook_secret_gitlab' => 'string|nullable',
-        'manual_webhook_secret_bitbucket' => 'string|nullable',
-        'manual_webhook_secret_gitea' => 'string|nullable',
-        'dockerfile_location' => \App\Support\ValidationPatterns::filePathRules(),
-        'dockerfile_target_build' => \App\Support\ValidationPatterns::dockerTargetRules(),
-        'docker_compose_location' => \App\Support\ValidationPatterns::filePathRules(),
+        'pre_deployment_command_container' => ValidationPatterns::containerNameRules(),
+        'manual_webhook_secret_github' => ['nullable', 'string', new ManualWebhookSecret($application?->manual_webhook_secret_github)],
+        'manual_webhook_secret_gitlab' => ['nullable', 'string', new ManualWebhookSecret($application?->manual_webhook_secret_gitlab)],
+        'manual_webhook_secret_bitbucket' => ['nullable', 'string', new ManualWebhookSecret($application?->manual_webhook_secret_bitbucket)],
+        'manual_webhook_secret_gitea' => ['nullable', 'string', new ManualWebhookSecret($application?->manual_webhook_secret_gitea)],
+        'dockerfile_location' => ValidationPatterns::filePathRules(),
+        'dockerfile_target_build' => ValidationPatterns::dockerTargetRules(),
+        'docker_compose_location' => ValidationPatterns::filePathRules(),
         'docker_compose' => 'string|nullable',
         'docker_compose_domains' => 'array|nullable',
-        'docker_compose_custom_start_command' => \App\Support\ValidationPatterns::shellSafeCommandRules(),
-        'docker_compose_custom_build_command' => \App\Support\ValidationPatterns::shellSafeCommandRules(),
+        'docker_compose_custom_start_command' => ValidationPatterns::shellSafeCommandRules(),
+        'docker_compose_custom_build_command' => ValidationPatterns::shellSafeCommandRules(),
         'is_container_label_escape_enabled' => 'boolean',
+        'is_preserve_repository_enabled' => 'boolean',
+        'http_basic_auth_hash_algorithm' => Rule::enum(HttpBasicAuthHashAlgorithm::class),
+        'http_basic_auth_bcrypt_cost' => 'integer|min:4|max:14',
+        'http_basic_auth_argon2id_memory_cost' => 'integer|min:8192|max:262144',
+        'http_basic_auth_argon2id_time_cost' => 'integer|min:1|max:12',
     ];
+}
+
+function moveResourceToEnvironment(Request $request, $resource, string $resourceType, int $teamId): JsonResponse
+{
+
+    $validator = Validator::make($request->all(), [
+        'environment_uuid' => 'required|string',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => $validator->errors(),
+        ], 422);
+    }
+
+    $extraFields = array_diff(array_keys($request->all()), ['environment_uuid']);
+    if (! empty($extraFields)) {
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => collect($extraFields)->mapWithKeys(fn ($field) => [$field => 'This field is not allowed.'])->toArray(),
+        ], 422);
+    }
+
+    $newEnvironment = Environment::ownedByCurrentTeamAPI($teamId)
+        ->whereUuid($request->environment_uuid)
+        ->first();
+
+    if (! $newEnvironment) {
+        return response()->json(['message' => 'Target environment not found or not owned by your team.'], 404);
+    }
+
+    Gate::authorize('update', $newEnvironment);
+
+    if ($resource->environment_id === $newEnvironment->id) {
+        return response()->json(['message' => "$resourceType is already in this environment."], 400);
+    }
+
+    $oldEnvironment = $resource->environment()->with('project')->first();
+
+    $resource->update(['environment_id' => $newEnvironment->id]);
+
+    auditLog('api.'.str($resourceType)->lower()->value().'.moved', [
+        'team_id' => $teamId,
+        'resource_uuid' => $resource->uuid,
+        'resource_type' => str($resourceType)->lower()->value(),
+        'from_project_uuid' => $oldEnvironment?->project?->uuid,
+        'from_environment_uuid' => $oldEnvironment?->uuid,
+        'to_project_uuid' => $newEnvironment->project->uuid,
+        'to_environment_uuid' => $newEnvironment->uuid,
+    ]);
+
+    return response()->json([
+        'message' => "$resourceType moved successfully.",
+        'uuid' => $resource->uuid,
+        'project_uuid' => $newEnvironment->project->uuid,
+        'environment_uuid' => $newEnvironment->uuid,
+    ]);
+}
+
+function migrateResourceToDestination(Request $request, $resource, string $resourceType, int $teamId): JsonResponse
+{
+    if (! isDev()) {
+        abort(404);
+    }
+
+    $validator = Validator::make($request->all(), [
+        'destination_uuid' => 'required|string',
+        'migrate_volumes' => 'boolean',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => $validator->errors(),
+        ], 422);
+    }
+
+    $allowedFields = ['destination_uuid', 'migrate_volumes'];
+    $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+    if (! empty($extraFields)) {
+        return response()->json([
+            'message' => 'Validation failed.',
+            'errors' => collect($extraFields)->mapWithKeys(fn ($field) => [$field => 'This field is not allowed.'])->toArray(),
+        ], 422);
+    }
+
+    Gate::authorize('update', $resource);
+
+    $destination = StandaloneDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first()
+        ?? SwarmDocker::ownedByCurrentTeamAPI($teamId)->where('uuid', $request->destination_uuid)->first();
+
+    if (! $destination || ! $destination->server?->canHostResources()) {
+        return response()->json(['message' => 'Destination not found.'], 404);
+    }
+    Gate::authorize('placeResource', $destination->server);
+
+    $sourceDestination = $resource->destination;
+    $migrateVolumes = $request->boolean('migrate_volumes', true);
+
+    try {
+        $result = MigrateResourceToDestination::run(
+            $resource,
+            $destination,
+            $migrateVolumes,
+        );
+    } catch (ValidationException $e) {
+        return response()->json([
+            'message' => collect($e->errors())->flatten()->first() ?? $e->getMessage(),
+            'errors' => $e->errors(),
+        ], 422);
+    }
+
+    auditLog('api.'.str($resourceType)->lower()->value().'.migrated', [
+        'team_id' => $teamId,
+        'resource_uuid' => $resource->uuid,
+        'resource_type' => str($resourceType)->lower()->value(),
+        'from_destination_uuid' => $sourceDestination?->uuid,
+        'to_destination_uuid' => $destination->uuid,
+        'from_server_id' => $sourceDestination?->server_id,
+        'to_server_id' => $destination->server_id,
+        'migrate_volumes' => $migrateVolumes,
+        'async' => $result['async'],
+        'volume_jobs' => $result['volume_jobs'],
+    ]);
+
+    return response()->json([
+        'message' => $result['message'],
+        'uuid' => $resource->uuid,
+        'destination_uuid' => $destination->uuid,
+        'async' => $result['async'],
+        'volume_jobs' => $result['volume_jobs'],
+    ]);
 }
 
 function validateIncomingRequest(Request $request)
@@ -183,15 +595,54 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('domains');
     $request->offsetUnset('instant_deploy');
     $request->offsetUnset('github_app_uuid');
+    $request->offsetUnset('gitea_app_uuid');
     $request->offsetUnset('private_key_uuid');
     $request->offsetUnset('use_build_server');
+    $request->offsetUnset('use_build_secrets');
     $request->offsetUnset('is_static');
     $request->offsetUnset('is_spa');
     $request->offsetUnset('is_auto_deploy_enabled');
     $request->offsetUnset('is_force_https_enabled');
+    $request->offsetUnset('is_preview_deployments_enabled');
     $request->offsetUnset('connect_to_docker_network');
     $request->offsetUnset('force_domain_override');
     $request->offsetUnset('autogenerate_domain');
     $request->offsetUnset('is_container_label_escape_enabled');
+    $request->offsetUnset('is_preserve_repository_enabled');
+    $request->offsetUnset('include_source_commit_in_build');
+    $request->offsetUnset('include_network_hosts_in_build');
+    $request->offsetUnset('is_git_submodules_enabled');
+    $request->offsetUnset('is_git_lfs_enabled');
+    $request->offsetUnset('is_git_shallow_clone_enabled');
+    $request->offsetUnset('is_auto_cancel_queued_deployments_enabled');
+    $request->offsetUnset('is_auto_cancel_building_deployments_enabled');
+    $request->offsetUnset('disable_build_cache');
+    $request->offsetUnset('inject_build_args_to_dockerfile');
+    $request->offsetUnset('is_env_sorting_enabled');
+    $request->offsetUnset('redact_all_env_values_in_logs');
+    $request->offsetUnset('include_coolify_default_variables');
+    $request->offsetUnset('is_pr_deployments_public_enabled');
+    $request->offsetUnset('is_pr_deployments_public_approval_required');
+    $request->offsetUnset('use_production_values_in_previews');
+    $request->offsetUnset('stop_grace_period');
+    $request->offsetUnset('rolling_update_drain_seconds');
+    $request->offsetUnset('docker_images_to_keep');
+    $request->offsetUnset('is_gzip_enabled');
+    $request->offsetUnset('is_stripprefix_enabled');
+    $request->offsetUnset('is_permanent_redirect_enabled');
+    $request->offsetUnset('traefik_certificate_resolver');
+    $request->offsetUnset('is_container_label_readonly_enabled');
+    $request->offsetUnset('is_raw_compose_deployment_enabled');
+    $request->offsetUnset('is_log_drain_enabled');
+    $request->offsetUnset('is_gpu_enabled');
+    $request->offsetUnset('gpu_driver');
+    $request->offsetUnset('gpu_count');
+    $request->offsetUnset('gpu_device_ids');
+    $request->offsetUnset('gpu_options');
+    $request->offsetUnset('is_consistent_container_name_enabled');
+    $request->offsetUnset('is_image_scan_enabled');
+    $request->offsetUnset('custom_internal_name');
+    $request->offsetUnset('custom_container_name_prefix');
     $request->offsetUnset('docker_compose_raw');
+    $request->offsetUnset('tags');
 }

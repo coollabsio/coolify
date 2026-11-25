@@ -1,0 +1,127 @@
+<?php
+
+namespace App\Mcp\Tools;
+
+use App\Actions\Application\CleanupCancelledDeployment;
+use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\SyncGithubDeploymentJob;
+use App\Mcp\Concerns\BuildsResponse;
+use App\Mcp\Concerns\ChecksTokenAbilities;
+use App\Mcp\Concerns\ResolvesTeam;
+use App\Models\ApplicationDeploymentQueue;
+use App\Models\Server;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Mcp\Request;
+use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
+use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
+
+#[IsReadOnly(false)]
+#[IsDestructive]
+#[IsIdempotent]
+class CancelDeployment extends Tool
+{
+    protected string $name = 'cancel_deployment';
+
+    protected string $description = 'Cancel a queued or in-progress deployment by deployment UUID for the authenticated team. Requires deploy ability.';
+
+    use BuildsResponse;
+    use ChecksTokenAbilities;
+    use ResolvesTeam;
+
+    public function shouldRegister(): bool
+    {
+        return $this->currentTokenCan('deploy');
+    }
+
+    public function handle(Request $request): Response
+    {
+        if ($error = $this->ensureAbility($request, 'deploy', $this->name)) {
+            return $error;
+        }
+
+        $teamId = $this->resolveTeamId($request);
+        if (is_null($teamId)) {
+            return $this->mcpError($request, 'Invalid token.');
+        }
+
+        $uuid = $request->get('uuid');
+        if (! is_string($uuid) || $uuid === '') {
+            return $this->mcpError($request, 'uuid argument is required.');
+        }
+
+        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $uuid)->first();
+        if (! $deployment) {
+            return $this->mcpError($request, "Deployment [{$uuid}] not found.", ['resource_uuid' => $uuid]);
+        }
+
+        // Match deployment_by_uuid: authorize by application ownership, not server ownership.
+        // Server-scoped checks allow a shared-server host team to cancel another team's deployment.
+        // Include soft-deleted apps so in-flight deploys remain cancellable after app delete.
+        $application = $deployment->application()->withTrashed()->first();
+        if (! $application || data_get($application->team(), 'id') !== (int) $teamId) {
+            return $this->mcpError($request, "Deployment [{$uuid}] not found.", ['resource_uuid' => $uuid]);
+        }
+
+        $cancellable = [
+            ApplicationDeploymentStatus::QUEUED->value,
+            ApplicationDeploymentStatus::IN_PROGRESS->value,
+        ];
+
+        $updated = ApplicationDeploymentQueue::whereKey($deployment->getKey())
+            ->whereIn('status', $cancellable)
+            ->update(['status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value]);
+
+        if ($updated !== 1) {
+            $deployment->refresh();
+
+            return $this->mcpError($request, "Deployment cannot be cancelled. Current status: {$deployment->status}", ['resource_uuid' => $uuid]);
+        }
+
+        $deployment->status = ApplicationDeploymentStatus::CANCELLED_BY_USER->value;
+
+        try {
+            $deployment->addLogEntry('Deployment cancelled by user via MCP.', 'stderr');
+            CleanupCancelledDeployment::run($deployment, (int) $teamId);
+        } catch (\Throwable) {
+            // Cancellation is still recorded even if the helper container cleanup fails.
+        }
+
+        try {
+            // The query update above fires no model event.
+            SyncGithubDeploymentJob::dispatchFor($deployment);
+        } catch (\Throwable $e) {
+            \Log::warning("Failed to queue the GitHub deployment sync after cancelling deployment {$deployment->id}: {$e->getMessage()}");
+        }
+
+        auditLog('mcp.deployment.cancelled', [
+            'team_id' => $teamId,
+            'deployment_uuid' => $uuid,
+            'application_id' => $deployment->application_id,
+            'server_id' => $deployment->server_id,
+        ]);
+
+        try {
+            $deploymentServer = Server::whereTeamId($teamId)->find($deployment->server_id);
+            next_after_cancel($deploymentServer, $application);
+        } catch (\Throwable $e) {
+            \Log::warning("Failed to advance deployment queue after cancelling deployment {$deployment->id}: {$e->getMessage()}");
+        }
+
+        return $this->mcpSuccess($request, $this->respond([
+            'ok' => true,
+            'message' => 'Deployment cancelled successfully.',
+            'deployment_uuid' => $uuid,
+            'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+        ]), ['resource_uuid' => $uuid]);
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'uuid' => $schema->string()->description('Deployment UUID.')->required(),
+        ];
+    }
+}

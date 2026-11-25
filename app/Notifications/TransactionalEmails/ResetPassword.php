@@ -54,7 +54,10 @@ class ResetPassword extends Notification
 
     protected function buildMailMessage($url)
     {
+        $from = mail_from_identity($this->settings);
         $mail = new MailMessage;
+        $mail->from($from['address'], $from['name']);
+        $mail->withSymfonyMessage(fn ($message) => prevent_mail_from_header_folding($message, $this->settings));
         $mail->subject('Coolify: Reset Password');
         $mail->view('emails.reset-password', ['url' => $url, 'count' => config('auth.passwords.'.config('auth.defaults.passwords').'.expire')]);
 
@@ -67,9 +70,12 @@ class ResetPassword extends Notification
             return call_user_func(static::$createUrlCallback, $notifiable, $this->token);
         }
 
-        return url(route('password.reset', [
+        $path = route('password.reset', [
             'token' => $this->token,
             'email' => $notifiable->getEmailForPasswordReset(),
-        ], false));
+        ], false);
+
+        // Use server-side config (FQDN / public IP) instead of request host
+        return rtrim(base_url(), '/').$path;
     }
 }

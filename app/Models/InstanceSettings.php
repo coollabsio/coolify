@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasSmtpServers;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Once;
@@ -9,12 +10,97 @@ use Spatie\Url\Url;
 
 class InstanceSettings extends Model
 {
-    protected $guarded = [];
+    use HasSmtpServers;
+
+    protected $attributes = [
+        'is_dashboard_force_https_enabled' => true,
+    ];
+
+    protected $fillable = [
+        'custom_theme',
+        'public_ipv4',
+        'public_ipv6',
+        'fqdn',
+        'public_port_min',
+        'public_port_max',
+        'do_not_track',
+        'is_auto_update_enabled',
+        'is_backup_before_update_enabled',
+        'auto_update_target_version',
+        'auto_update_started_at',
+        'is_registration_enabled',
+        'disable_registration_when_oauth_enabled',
+        'next_channel',
+        'smtp_enabled',
+        'smtp_from_address',
+        'smtp_from_name',
+        'notification_from_address',
+        'notification_from_name',
+        'smtp_recipients',
+        'smtp_host',
+        'smtp_port',
+        'smtp_encryption',
+        'smtp_username',
+        'smtp_password',
+        'smtp_timeout',
+        'smtp_ehlo_domain',
+        'resend_enabled',
+        'resend_api_key',
+        'resend_from_address',
+        'resend_from_name',
+        'is_dns_validation_enabled',
+        'custom_dns_servers',
+        'domain_connect_private_key',
+        'instance_name',
+        'is_api_enabled',
+        'allowed_ips',
+        'auto_update_frequency',
+        'update_check_frequency',
+        'update_channel',
+        'update_custom_tag',
+        'previous_update_channel',
+        'new_version_available',
+        'instance_timezone',
+        'helper_version',
+        'disable_two_step_confirmation',
+        'is_sponsorship_popup_enabled',
+        'dev_helper_version',
+        'is_wire_navigate_enabled',
+        'is_mcp_server_enabled',
+        'is_terminal_api_enabled',
+        'webhook_allowed_internal_hosts',
+        'webhook_allow_localhost',
+        'avatar_storage_type',
+        'avatar_s3_storage_id',
+        'image_cdn_url',
+        'file_download_s3_storage_id',
+        'upload_s3_storage_id',
+        'is_dashboard_force_https_enabled',
+        'is_passkey_enabled',
+    ];
+
+    protected $hidden = [
+        'smtp_from_address',
+        'smtp_from_name',
+        'notification_from_address',
+        'notification_from_name',
+        'smtp_recipients',
+        'smtp_host',
+        'smtp_username',
+        'smtp_password',
+        'resend_api_key',
+        'resend_from_address',
+        'resend_from_name',
+        'domain_connect_private_key',
+        'sentinel_token',
+    ];
 
     protected $casts = [
         'smtp_enabled' => 'boolean',
         'smtp_from_address' => 'encrypted',
         'smtp_from_name' => 'encrypted',
+        'notification_from_address' => 'encrypted',
+        'notification_from_name' => 'encrypted',
         'smtp_recipients' => 'encrypted',
         'smtp_host' => 'encrypted',
         'smtp_port' => 'integer',
@@ -24,26 +110,97 @@ class InstanceSettings extends Model
 
         'resend_enabled' => 'boolean',
         'resend_api_key' => 'encrypted',
+        'resend_from_address' => 'encrypted',
+        'resend_from_name' => 'encrypted',
+        'domain_connect_private_key' => 'encrypted',
 
         'allowed_ip_ranges' => 'array',
         'is_auto_update_enabled' => 'boolean',
+        'is_backup_before_update_enabled' => 'boolean',
+        'auto_update_started_at' => 'datetime',
+        'is_registration_enabled' => 'boolean',
+        'disable_registration_when_oauth_enabled' => 'boolean',
         'auto_update_frequency' => 'string',
         'update_check_frequency' => 'string',
         'sentinel_token' => 'encrypted',
         'is_wire_navigate_enabled' => 'boolean',
+        'is_mcp_server_enabled' => 'boolean',
+        'is_terminal_api_enabled' => 'boolean',
+        'webhook_allowed_internal_hosts' => 'array',
+        'webhook_allow_localhost' => 'boolean',
+        'is_dashboard_force_https_enabled' => 'boolean',
+        'is_passkey_enabled' => 'boolean',
+        'server_validation_rate_limit_seconds' => 'integer',
+        'server_validation_max_failures_per_ip' => 'integer',
+        'server_validation_max_failures_per_team' => 'integer',
     ];
 
     protected static function booted(): void
     {
+        static::creating(function ($settings) {
+            if (blank($settings->getAttributes()['auto_update_frequency'] ?? null)) {
+                $settings->auto_update_frequency = self::randomAutoUpdateFrequency();
+            }
+        });
+
+        static::created(function () {
+            Once::flush();
+        });
+
         static::updated(function ($settings) {
             // Clear once() cache so subsequent calls get fresh data
             Once::flush();
 
-            // Clear trusted hosts cache when FQDN changes
-            if ($settings->wasChanged('fqdn')) {
-                \Cache::forget('instance_settings_fqdn_host');
+            if ($settings->wasChanged(['fqdn', 'public_ipv4', 'public_ipv6'])) {
+                ServerSetting::followInstanceUrlChange(
+                    ServerSetting::instanceSentinelUrl($settings->getOriginal('fqdn'), $settings->getOriginal('public_ipv4'), $settings->getOriginal('public_ipv6')),
+                    ServerSetting::instanceSentinelUrl($settings->fqdn, $settings->public_ipv4, $settings->public_ipv6),
+                );
             }
         });
+    }
+
+    /**
+     * Daily auto update at a random minute after midnight, so instances do not all pull images from the registry in the same second.
+     */
+    public static function randomAutoUpdateFrequency(): string
+    {
+        return random_int(0, 59).' 0 * * *';
+    }
+
+    /**
+     * After a switch to a more stable channel, the instance keeps the updates of the channel it left until the stable release of its version is out.
+     */
+    public function switchUpdateChannel(string $channel): void
+    {
+        $from = $this->getOriginal('update_channel');
+        $this->update_channel = $channel;
+        if ($channel === $from) {
+            return;
+        }
+
+        $channels = ['stable', 'preview', 'nightly'];
+        $fromRank = array_search($from, $channels, true);
+        $toRank = array_search($channel, $channels, true);
+        $followed = $this->getOriginal('previous_update_channel');
+        $this->previous_update_channel = match (true) {
+            $fromRank === false || $toRank === false || $toRank >= $fromRank => null,
+            array_search($followed, $channels, true) > $fromRank => $followed,
+            default => $from,
+        };
+    }
+
+    public function isPasswordRegistrationAllowed(): bool
+    {
+        if (! $this->is_registration_enabled) {
+            return false;
+        }
+
+        if (! $this->disable_registration_when_oauth_enabled) {
+            return true;
+        }
+
+        return ! OauthSetting::where('enabled', true)->exists();
     }
 
     public function fqdn(): Attribute

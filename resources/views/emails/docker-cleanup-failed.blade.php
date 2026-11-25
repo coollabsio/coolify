@@ -5,4 +5,8 @@ Docker Cleanup on {{ $name }} FAILED with the following error:
 {{ $text }}
 </pre>
 
+@isset($reminder)
+{{ $reminder }}
+@endisset
+
 </x-emails.layout>

@@ -2,7 +2,10 @@
 
 namespace App\Livewire\Project\Shared\ScheduledTask;
 
+use App\Models\Application;
 use App\Models\ScheduledTask;
+use App\Models\Service;
+use App\Models\StandalonePostgresql;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Locked;
@@ -36,12 +39,18 @@ class Add extends Component
 
     public int $timeout = 300;
 
+    public bool $useShell = true;
+
+    #[Locked]
+    public string $serverTimezone = 'UTC';
+
     protected $rules = [
         'name' => 'required|string',
         'command' => 'required|string',
         'frequency' => 'required|string',
         'container' => 'nullable|string',
         'timeout' => 'required|integer|min:60|max:36000',
+        'useShell' => 'boolean',
     ];
 
     protected $validationAttributes = [
@@ -50,6 +59,7 @@ class Add extends Component
         'frequency' => 'frequency',
         'container' => 'container',
         'timeout' => 'timeout',
+        'useShell' => 'run in a shell',
     ];
 
     public function mount()
@@ -59,17 +69,19 @@ class Add extends Component
         // Get the resource based on type and id
         switch ($this->type) {
             case 'application':
-                $this->resource = \App\Models\Application::findOrFail($this->id);
+                $this->resource = Application::ownedByCurrentTeam()->findOrFail($this->id);
                 break;
             case 'service':
-                $this->resource = \App\Models\Service::findOrFail($this->id);
+                $this->resource = Service::ownedByCurrentTeam()->findOrFail($this->id);
                 break;
             case 'standalone-postgresql':
-                $this->resource = \App\Models\StandalonePostgresql::findOrFail($this->id);
+                $this->resource = StandalonePostgresql::ownedByCurrentTeam()->findOrFail($this->id);
                 break;
             default:
                 throw new \Exception('Invalid resource type');
         }
+
+        $this->serverTimezone = getServerTimezone($this->resource->destination?->server);
 
         if ($this->containerNames->count() > 0) {
             $this->container = $this->containerNames->first();
@@ -99,7 +111,7 @@ class Add extends Component
         }
     }
 
-    public function saveScheduledTask()
+    private function saveScheduledTask(): void
     {
         try {
             $task = new ScheduledTask;
@@ -108,7 +120,8 @@ class Add extends Component
             $task->frequency = $this->frequency;
             $task->container = $this->container;
             $task->timeout = $this->timeout;
-            $task->team_id = currentTeam()->id;
+            $task->use_shell = $this->useShell;
+            $task->team_id = $this->resource->team()->id;
 
             switch ($this->type) {
                 case 'application':
@@ -122,10 +135,18 @@ class Add extends Component
                     break;
             }
             $task->save();
+            auditLog('ui.scheduled_task.created', [
+                'team_id' => $task->team_id,
+                'scheduled_task_uuid' => $task->uuid,
+                'scheduled_task_name' => $task->name,
+                'resource_type' => $this->type,
+                'resource_uuid' => $this->resource->uuid,
+                'resource_name' => $this->resource->name,
+            ]);
             $this->dispatch('refreshTasks');
             $this->dispatch('success', 'Scheduled task added.');
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            handleError($e, $this);
         }
     }
 
@@ -136,5 +157,6 @@ class Add extends Component
         $this->frequency = '';
         $this->container = '';
         $this->timeout = 300;
+        $this->useShell = true;
     }
 }

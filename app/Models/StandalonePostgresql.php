@@ -2,22 +2,99 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasDatabaseHealthCheck;
+use App\Traits\HasImageScans;
+use App\Traits\HasLogRedactionSetting;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\HasSecretManager;
+use App\Traits\HasStars;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandalonePostgresql extends BaseModel
 {
-    use ClearsGlobalSearchCache, HasFactory, HasMetrics, HasSafeStringAttribute, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasImageScans, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, HasStars, ScopedByAccessGrants, SoftDeletes;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'uuid',
+        'name',
+        'description',
+        'postgres_user',
+        'postgres_password',
+        'postgres_db',
+        'postgres_initdb_args',
+        'postgres_host_auth_method',
+        'postgres_conf',
+        'init_scripts',
+        'status',
+        'image',
+        'is_public',
+        'public_port',
+        'ports_mappings',
+        'limits_memory',
+        'limits_memory_swap',
+        'limits_memory_swappiness',
+        'limits_memory_reservation',
+        'limits_cpus',
+        'limits_cpuset',
+        'limits_cpu_shares',
+        'started_at',
+        'restart_count',
+        'last_restart_at',
+        'last_restart_type',
+        'last_online_at',
+        'public_port_timeout',
+        'enable_ssl',
+        'ssl_mode',
+        'is_log_drain_enabled',
+        'is_include_timestamps',
+        'custom_docker_run_options',
+        'destination_type',
+        'destination_id',
+        'environment_id',
+        'health_check_enabled',
+        'health_check_interval',
+        'health_check_timeout',
+        'health_check_retries',
+        'health_check_start_period',
+    ];
 
     protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
 
+    /**
+     * Free-form configuration that can embed credentials. Only users who can
+     * update the database and `read:sensitive` tokens may read it.
+     */
+    public const CONFIGURATION_ATTRIBUTES = [
+        'postgres_conf',
+        'custom_docker_run_options',
+    ];
+
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability.
+     */
+    protected $hidden = [
+        'postgres_password',
+        'init_scripts',
+        ...self::CONFIGURATION_ATTRIBUTES,
+        'internal_db_url',
+        'external_db_url',
+    ];
+
     protected $casts = [
+        'include_coolify_default_variables' => 'boolean',
+        'health_check_enabled' => 'boolean',
+        'health_check_interval' => 'integer',
+        'health_check_timeout' => 'integer',
+        'health_check_retries' => 'integer',
+        'health_check_start_period' => 'integer',
         'init_scripts' => 'array',
         'postgres_password' => 'encrypted',
         'public_port_timeout' => 'integer',
@@ -59,7 +136,7 @@ class StandalonePostgresql extends BaseModel
         });
         static::saving(function ($database) {
             if ($database->isDirty('status')) {
-                $database->forceFill(['last_online_at' => now()]);
+                $database->last_online_at = now();
             }
         });
     }
@@ -114,14 +191,18 @@ class StandalonePostgresql extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
-            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+            if ($storage->is_external) {
+                continue;
+            }
+            instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
         }
     }
 
     public function isConfigurationChanged(bool $save = false)
     {
         $newConfigHash = $this->image.$this->ports_mappings.$this->postgres_initdb_args.$this->postgres_host_auth_method;
-        $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
+        $newConfigHash .= $this->healthCheckConfigurationHash();
+        $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {
@@ -205,6 +286,10 @@ class StandalonePostgresql extends BaseModel
 
     public function link()
     {
+        if ($this->isInstanceDatabase()) {
+            return route('settings.backup');
+        }
+
         if (data_get($this, 'environment.project.uuid')) {
             return route('project.database.configuration', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
@@ -240,6 +325,11 @@ class StandalonePostgresql extends BaseModel
 
     public function team()
     {
+        // The instance database (coolify-db) has no environment and belongs to the root team.
+        if ($this->isInstanceDatabase()) {
+            return Team::find(0);
+        }
+
         return data_get($this, 'environment.project.team');
     }
 
@@ -253,6 +343,14 @@ class StandalonePostgresql extends BaseModel
     public function type(): string
     {
         return 'standalone-postgresql';
+    }
+
+    /**
+     * Coolify's own database is the instance sentinel row (id 0). Users can give any database the name "coolify-db".
+     */
+    public function isInstanceDatabase(): bool
+    {
+        return $this->id === 0;
     }
 
     protected function internalDbUrl(): Attribute
@@ -283,9 +381,10 @@ class StandalonePostgresql extends BaseModel
                     if (empty($serverIp)) {
                         return null;
                     }
+                    $serverHost = formatHostForUrl($serverIp);
                     $encodedUser = rawurlencode($this->postgres_user);
                     $encodedPass = rawurlencode($this->postgres_password);
-                    $url = "postgres://{$encodedUser}:{$encodedPass}@{$serverIp}:{$this->public_port}/{$this->postgres_db}";
+                    $url = "postgres://{$encodedUser}:{$encodedPass}@{$serverHost}:{$this->public_port}/{$this->postgres_db}";
                     if ($this->enable_ssl) {
                         $url .= "?sslmode={$this->ssl_mode}";
                         if (in_array($this->ssl_mode, ['verify-ca', 'verify-full'])) {

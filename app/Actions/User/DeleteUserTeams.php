@@ -140,6 +140,7 @@ class DeleteUserTeams
 
                 // Remove the current user from the team
                 $team->members()->detach($this->user->id);
+                RevokeUserTeamTokens::forUserTeam($this->user, $team->id);
 
                 $counts['transferred']++;
             } catch (\Exception $e) {
@@ -152,6 +153,7 @@ class DeleteUserTeams
         foreach ($preview['to_leave'] as $team) {
             try {
                 $team->members()->detach($this->user->id);
+                RevokeUserTeamTokens::forUserTeam($this->user, $team->id);
                 $counts['left']++;
             } catch (\Exception $e) {
                 \Log::error("Failed to remove user from team {$team->id}: ".$e->getMessage());

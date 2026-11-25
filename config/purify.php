@@ -1,5 +1,6 @@
 <?php
 
+use Stevebauman\Purify\Cache\CacheDefinitionCache;
 use Stevebauman\Purify\Definitions\Html5Definition;
 
 return [
@@ -47,6 +48,17 @@ return [
             'CSS.AllowedProperties' => 'font,font-size,font-weight,font-style,font-family,text-decoration,padding-left,color,background-color,text-align',
             'AutoFormat.AutoParagraph' => false,
             'AutoFormat.RemoveEmpty' => false,
+        ],
+
+        'validation_logs' => [
+            'Core.Encoding' => 'utf-8',
+            'HTML.Doctype' => 'HTML 4.01 Transitional',
+            'HTML.Allowed' => 'a[href|title|target|class],br,div[class],pre[class],span[class],p[class]',
+            'HTML.ForbiddenElements' => '',
+            'CSS.AllowedProperties' => '',
+            'AutoFormat.AutoParagraph' => false,
+            'AutoFormat.RemoveEmpty' => false,
+            'Attr.AllowedFrameTargets' => ['_blank'],
         ],
 
     ],
@@ -103,7 +115,7 @@ return [
 
     'serializer' => [
         'driver' => env('CACHE_STORE', env('CACHE_DRIVER', 'file')),
-        'cache' => \Stevebauman\Purify\Cache\CacheDefinitionCache::class,
+        'cache' => CacheDefinitionCache::class,
     ],
 
     // 'serializer' => [

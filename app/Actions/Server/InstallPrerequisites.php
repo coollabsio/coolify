@@ -33,6 +33,7 @@ class InstallPrerequisites
             $command = $command->merge([
                 "echo 'Installing Prerequisites...'",
                 'command -v curl >/dev/null || dnf install -y curl',
+                'command -v xargs >/dev/null || dnf install -y findutils',
                 'command -v wget >/dev/null || dnf install -y wget',
                 'command -v git >/dev/null || dnf install -y git',
                 'command -v jq >/dev/null || dnf install -y jq',
@@ -53,6 +54,8 @@ class InstallPrerequisites
                 "echo 'Installing Prerequisites for Arch Linux...'",
                 'pacman -Syu --noconfirm --needed curl wget git jq',
             ]);
+        } elseif ($supported_os_type->contains('alpine')) {
+            $command = $command->merge($this->getAlpinePrerequisiteCommands());
         } else {
             throw new \Exception('Unsupported OS type for prerequisites installation');
         }
@@ -60,5 +63,19 @@ class InstallPrerequisites
         $command->push("echo 'Prerequisites installed successfully.'");
 
         return remote_process($command, $server);
+    }
+
+    private function getAlpinePrerequisiteCommands(): array
+    {
+        return [
+            "echo 'Installing Prerequisites for Alpine Linux...'",
+            "sed -i '/^#.*\\/community/s/^#//' /etc/apk/repositories 2>/dev/null || true",
+            'apk update',
+            'command -v bash >/dev/null || apk add bash',
+            'command -v curl >/dev/null || apk add curl',
+            'command -v wget >/dev/null || apk add wget',
+            'command -v git >/dev/null || apk add git',
+            'command -v jq >/dev/null || apk add jq',
+        ];
     }
 }

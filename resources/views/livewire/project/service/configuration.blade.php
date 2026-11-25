@@ -2,202 +2,130 @@
     <x-slot:title>
         {{ data_get_str($service, 'name')->limit(10) }} > Configuration | Coolify
     </x-slot>
+
     <livewire:project.service.heading :service="$service" :parameters="$parameters" :query="$query" />
 
-    <div class="flex flex-col h-full gap-8 sm:flex-row">
-        <div class="sub-menu-wrapper">
-            <a class="sub-menu-item" target="_blank" href="{{ $service->documentation() }}"><span class="menu-item-label">Documentation</span>
-                <x-external-link /></a>
-            <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
-                href="{{ route('project.service.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">General</span></a>
-            <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
-                href="{{ route('project.service.environment-variables', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Environment Variables</span></a>
-            <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
-                href="{{ route('project.service.storages', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Persistent Storages</span></a>
-            <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
-                href="{{ route('project.service.scheduled-tasks.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Scheduled Tasks</span></a>
-            <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
-                href="{{ route('project.service.webhooks', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Webhooks</span></a>
-            <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
-                href="{{ route('project.service.resource-operations', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Resource Operations</span></a>
+    @php
+        $storageSections = $applications
+            ->concat($databases)
+            ->map(fn ($resource): array => [
+                'id' => 'storage-service-'.$resource->uuid,
+                'label' => Str::headline($resource->name),
+            ]);
+    @endphp
 
-            <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
-                href="{{ route('project.service.tags', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Tags</span></a>
+    <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
+        @if ($currentRoute !== 'project.service.template')
+            <livewire:project.service.template-update-banner :service="$service"
+                :href="route('project.service.template', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid])"
+                :wire:key="'tpl-banner-' . $service->uuid" />
+        @endif
+        <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+            <x-service.configuration-sidebar :service="$service" :current-route="$currentRoute"
+                :storage-sections="$storageSections" />
 
-            <a class='sub-menu-item' wire:current.exact="menu-item-active" {{ wireNavigate() }}
-                href="{{ route('project.service.danger', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid]) }}"><span class="menu-item-label">Danger Zone</span></a>
-        </div>
-        <div class="w-full">
-            @if ($currentRoute === 'project.service.configuration')
-                <livewire:project.service.stack-form :service="$service" />
-                <h3>Services</h3>
-                <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1">
-                    @if ($applications->isEmpty() && $databases->isEmpty())
-                        <div class="p-4 text-sm text-neutral-500">
-                            No services defined in this Docker Compose file.
-                        </div>
-                    @elseif($applications->isEmpty())
-                        <div class="p-4 text-sm text-neutral-500">
-                            No applications with domains defined. Only database services are available.
-                        </div>
-                    @endif
+            <div class="min-w-0">
+                @if ($currentRoute === 'project.service.configuration')
+                    <livewire:project.service.stack-form :service="$service" />
 
-                    @foreach ($applications as $application)
-                        <div @class([
-                            'border-l border-dashed border-red-500' => str(
-                                $application->status)->contains(['exited']),
-                            'border-l border-dashed border-success' => str(
-                                $application->status)->contains(['running']),
-                            'border-l border-dashed border-warning' => str(
-                                $application->status)->contains(['starting']),
-                            'flex gap-2 box-without-bg-without-border dark:bg-coolgray-100 bg-white dark:hover:text-neutral-300 group',
-                        ])>
-                            <div class="flex flex-row w-full">
-                                <div class="flex flex-col flex-1">
-                                    <div class="pb-2">
-                                        @if ($application->human_name)
-                                            {{ Str::headline($application->human_name) }}
-                                        @else
-                                            {{ Str::headline($application->name) }}
-                                        @endif
-                                        <span class="text-xs">({{ $application->image }})</span>
+                    <div class="mt-8" x-data="{
+                        viewMode: localStorage.getItem('service-compose-resources-view') || 'table',
+                        setViewMode(mode) {
+                            this.viewMode = mode;
+                            localStorage.setItem('service-compose-resources-view', mode);
+                        }
+                    }">
+                        <x-application.settings-section id="compose-resources-section" title="Compose resources"
+                            description="Applications and databases defined in this service." flush>
+                            <x-slot:actions>
+                                @if ($applications->isNotEmpty() || $databases->isNotEmpty())
+                                    <x-canvas-view-toggle />
+                                @endif
+                                <a class="button" target="_blank" href="{{ $service->documentation() }}">
+                                    Documentation
+                                    <x-reicon name="external-link" class="size-4" />
+                                </a>
+                            </x-slot:actions>
+
+                            <div :class="viewMode === 'grid'
+                                ? 'grid grid-cols-1 gap-3 p-3 sm:grid-cols-2'
+                                : 'overflow-x-auto rounded-lg'">
+                                @if ($applications->isNotEmpty() || $databases->isNotEmpty())
+                                    <div x-cloak x-show="viewMode === 'table'"
+                                        class="grid min-w-[48rem] grid-cols-[minmax(14rem,1fr)_minmax(12rem,1fr)_12rem_5rem] gap-3 border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
+                                        <div>Resource</div>
+                                        <div>Image</div>
+                                        <div class="justify-self-start">Status</div>
+                                        <span class="text-right">Actions</span>
                                     </div>
-                                    @if ($application->configuration_required)
-                                        <span class="text-xs text-error">(configuration required)</span>
-                                    @endif
-                                    @if ($application->description)
-                                        <span class="text-xs">{{ Str::limit($application->description, 60) }}</span>
-                                    @endif
-                                    @if ($application->fqdn)
-                                        <span class="flex gap-1 text-xs">{{ Str::limit($application->fqdn, 60) }}
-                                            @can('update', $service)
-                                                <x-modal-input title="Edit Domains" :closeOutside="false">
-                                                    <x-slot:content>
-                                                        <span class="cursor-pointer">
-                                                            <svg xmlns="http://www.w3.org/2000/svg"
-                                                                class="w-4 h-4 dark:text-warning text-coollabs"
-                                                                viewBox="0 0 24 24">
-                                                                <g fill="none" stroke="currentColor"
-                                                                    stroke-linecap="round" stroke-linejoin="round"
-                                                                    stroke-width="2">
-                                                                    <path
-                                                                        d="m12 15l8.385-8.415a2.1 2.1 0 0 0-2.97-2.97L9 12v3h3zm4-10l3 3" />
-                                                                    <path d="M9 7.07A7 7 0 0 0 10 21a7 7 0 0 0 6.929-6" />
-                                                                </g>
-                                                            </svg>
+                                @endif
 
-                                                        </span>
-                                                    </x-slot:content>
-                                                    <livewire:project.service.edit-domain
-                                                        applicationId="{{ $application->id }}"
-                                                        wire:key="edit-domain-{{ $application->id }}" />
-                                                </x-modal-input>
-                                            @endcan
-                                        </span>
-                                    @endif
-                                    <div class="pt-2 text-xs">{{ formatContainerStatus($application->status) }}</div>
-                                </div>
-                                <div class="flex items-center px-4">
-                                    <a class="mx-4 text-xs font-bold hover:underline" {{ wireNavigate() }}
-                                        href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $application->uuid]) }}">
-                                        Settings
-                                    </a>
-                                    @if (str($application->status)->contains('running'))
-                                        @can('update', $service)
-                                            <x-modal-confirmation title="Confirm Service Application Restart?"
-                                                buttonTitle="Restart"
-                                                submitAction="restartApplication({{ $application->id }})" :actions="[
-                                                    'The selected service application will be unavailable during the restart.',
-                                                    'If the service application is currently in use data could be lost.',
-                                                ]"
-                                                :confirmWithText="false" :confirmWithPassword="false"
-                                                step2ButtonText="Restart Service Container" />
-                                        @endcan
-                                    @endif
-                                </div>
-                            </div>
-                        </div>
-                    @endforeach
-                    @foreach ($databases as $database)
-                        <div @class([
-                            'border-l border-dashed border-red-500' => str($database->status)->contains(
-                                ['exited']),
-                            'border-l border-dashed border-success' => str($database->status)->contains(
-                                ['running']),
-                            'border-l border-dashed border-warning' => str($database->status)->contains(
-                                ['restarting']),
-                            'flex gap-2 box-without-bg-without-border dark:bg-coolgray-100 bg-white dark:hover:text-neutral-300 group',
-                        ])>
-                            <div class="flex flex-row w-full">
-                                <div class="flex flex-col flex-1">
-                                    <div class="pb-2">
-                                        @if ($database->human_name)
-                                            {{ Str::headline($database->human_name) }}
-                                        @else
-                                            {{ Str::headline($database->name) }}
-                                        @endif
-                                        <span class="text-xs">({{ $database->image }})</span>
+                                @if ($applications->isEmpty() && $databases->isEmpty())
+                                    <div class="p-4 sm:col-span-2">
+                                        <x-empty title="No compose resources"
+                                            description="No applications or databases are defined in this Docker Compose file."
+                                            icon-name="grid" />
                                     </div>
-                                    @if ($database->configuration_required)
-                                        <span class="text-xs text-error">(configuration required)</span>
-                                    @endif
-                                    @if ($database->description)
-                                        <span class="text-xs">{{ Str::limit($database->description, 60) }}</span>
-                                    @endif
-                                    <div class="text-xs">{{ formatContainerStatus($database->status) }}</div>
-                                </div>
-                                <div class="flex items-center px-4">
-                                    @if ($database->isBackupSolutionAvailable() || $database->is_migrated)
-                                        <a class="mx-4 text-xs font-bold hover:underline" {{ wireNavigate() }}
-                                            href="{{ route('project.service.database.backups', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}">
-                                            Backups
-                                        </a>
-                                    @endif
-                                    <a class="mx-4 text-xs font-bold hover:underline" {{ wireNavigate() }}
-                                        href="{{ route('project.service.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid, 'stack_service_uuid' => $database->uuid]) }}">
-                                        Settings
-                                    </a>
-                                    @if (str($database->status)->contains('running'))
-                                        @can('update', $service)
-                                            <x-modal-confirmation title="Confirm Service Database Restart?"
-                                                buttonTitle="Restart" submitAction="restartDatabase({{ $database->id }})"
-                                                :actions="[
-                                                    'This service database will be unavailable during the restart.',
-                                                    'If the service database is currently in use data could be lost.',
-                                                ]" :confirmWithText="false" :confirmWithPassword="false"
-                                                step2ButtonText="Restart Database" />
-                                        @endcan
-                                    @endif
-                                </div>
+                                @endif
+
+                                @foreach ($applications as $application)
+                                    <livewire:project.service.resource-card :service="$service" :resource="$application"
+                                        :parameters="$parameters"
+                                        wire:key="service-application-card-{{ $application->id }}" />
+                                @endforeach
+                                @foreach ($databases as $database)
+                                    <livewire:project.service.resource-card :service="$service" :resource="$database"
+                                        :parameters="$parameters"
+                                        wire:key="service-database-card-{{ $database->id }}" />
+                                @endforeach
                             </div>
+                        </x-application.settings-section>
+                    </div>
+                @elseif ($currentRoute === 'project.service.analytics')
+                    <livewire:project.service.analytics :service="$service"
+                        :lazy="(bool) ($service->server ?? $service->destination?->server)?->isTrafficAnalyticsEnabled()" />
+                @elseif ($currentRoute === 'project.service.domains')
+                    <livewire:project.service.domains :service="$service" />
+                @elseif ($currentRoute === 'project.service.maintenance')
+                    <livewire:project.shared.maintenance :resource="$service" />
+                @elseif ($currentRoute === 'project.service.environment-variables')
+                    <livewire:project.shared.environment-variable.all :resource="$service" />
+                    <livewire:project.shared.secret-manager-links :resource="$service" />
+                @elseif ($currentRoute === 'project.service.storages')
+                    <div class="space-y-6">
+                        <div
+                            class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] leading-5 text-amber-800 dark:border-warning/15 dark:bg-warning/[0.07] dark:text-amber-300/90">
+                            Service volume mounts are read-only here. Edit the Docker Compose file and reload it to change volumes.
                         </div>
-                    @endforeach
-                </div>
-            @elseif ($currentRoute === 'project.service.environment-variables')
-                <livewire:project.shared.environment-variable.all :resource="$service" />
-            @elseif ($currentRoute === 'project.service.storages')
-                <div class="flex gap-2 items-center">
-                    <h2>Storages</h2>
-                </div>
-                <div class="pb-4">Persistent storage to preserve data between deployments.</div>
-                @foreach ($applications as $application)
-                    <livewire:project.service.storage wire:key="application-{{ $application->id }}"
-                        :resource="$application" />
-                @endforeach
-                @foreach ($databases as $database)
-                    <livewire:project.service.storage wire:key="database-{{ $database->id }}" :resource="$database" />
-                @endforeach
-            @elseif ($currentRoute === 'project.service.scheduled-tasks.show')
-                <livewire:project.shared.scheduled-task.all :resource="$service" />
-            @elseif ($currentRoute === 'project.service.webhooks')
-                <livewire:project.shared.webhooks :resource="$service" />
-            @elseif ($currentRoute === 'project.service.resource-operations')
-                <livewire:project.shared.resource-operations :resource="$service" />
-            @elseif ($currentRoute === 'project.service.tags')
-                <livewire:project.shared.tags :resource="$service" />
-            @elseif ($currentRoute === 'project.service.danger')
-                <livewire:project.shared.danger :resource="$service" />
-            @endif
+                        @foreach ($applications as $application)
+                            <livewire:project.service.storage wire:key="application-{{ $application->id }}"
+                                :resource="$application" />
+                        @endforeach
+                        @foreach ($databases as $database)
+                            <livewire:project.service.storage wire:key="database-{{ $database->id }}"
+                                :resource="$database" />
+                        @endforeach
+                    </div>
+                @elseif ($currentRoute === 'project.service.scheduled-tasks.show')
+                    <livewire:project.shared.scheduled-task.all :resource="$service" />
+                @elseif ($currentRoute === 'project.service.webhooks')
+                    <livewire:project.shared.webhooks :resource="$service" />
+                @elseif ($currentRoute === 'project.service.resource-operations')
+                    <livewire:project.shared.resource-operations :resource="$service" />
+                @elseif ($currentRoute === 'project.service.vulnerabilities')
+                    <div class="flex flex-col gap-6">
+                        <livewire:image-scan.vulnerabilities resource-type="service" :resource-uuid="$service->uuid" />
+                        <livewire:image-scan.packages resource-type="service" :resource-uuid="$service->uuid" />
+                        <livewire:image-scan.scan-settings scope-type="service" :scope-uuid="$service->uuid" />
+                    </div>
+                @elseif ($currentRoute === 'project.service.tags')
+                    <livewire:project.shared.tags :resource="$service" />
+                @elseif ($currentRoute === 'project.service.danger')
+                    <livewire:project.shared.danger :resource="$service" />
+                @elseif ($currentRoute === 'project.service.template')
+                    <livewire:project.service.template-update :service="$service" />
+                @endif
+            </div>
         </div>
-    </div>
+    </section>
 </div>

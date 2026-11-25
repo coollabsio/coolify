@@ -16,11 +16,7 @@ class TaskSuccess extends CustomEmailNotification
     public function __construct(public ScheduledTask $task, public string $output)
     {
         $this->onQueue('high');
-        if ($task->application) {
-            $this->url = $task->application->taskLink($task->uuid);
-        } elseif ($task->service) {
-            $this->url = $task->service->taskLink($task->uuid);
-        }
+        $this->url = $task->url();
     }
 
     public function via(object $notifiable): array

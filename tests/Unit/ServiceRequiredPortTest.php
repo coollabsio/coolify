@@ -3,58 +3,6 @@
 use App\Models\Service;
 use App\Models\ServiceApplication;
 
-it('returns required port from service template', function () {
-    // Mock get_service_templates() function
-    $mockTemplates = collect([
-        'supabase' => [
-            'name' => 'Supabase',
-            'port' => '8000',
-        ],
-        'umami' => [
-            'name' => 'Umami',
-            'port' => '3000',
-        ],
-    ]);
-
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->name = 'supabase-xyz123';
-
-    // Mock the get_service_templates function to return our mock data
-    $service->shouldReceive('getRequiredPort')->andReturn(8000);
-
-    expect($service->getRequiredPort())->toBe(8000);
-});
-
-it('returns null for service without required port', function () {
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->name = 'cloudflared-xyz123';
-
-    // Mock to return null for services without port
-    $service->shouldReceive('getRequiredPort')->andReturn(null);
-
-    expect($service->getRequiredPort())->toBeNull();
-});
-
-it('requiresPort returns true when service has required port', function () {
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->shouldReceive('getRequiredPort')->andReturn(8000);
-    $service->shouldReceive('requiresPort')->andReturnUsing(function () use ($service) {
-        return $service->getRequiredPort() !== null;
-    });
-
-    expect($service->requiresPort())->toBeTrue();
-});
-
-it('requiresPort returns false when service has no required port', function () {
-    $service = Mockery::mock(Service::class)->makePartial();
-    $service->shouldReceive('getRequiredPort')->andReturn(null);
-    $service->shouldReceive('requiresPort')->andReturnUsing(function () use ($service) {
-        return $service->getRequiredPort() !== null;
-    });
-
-    expect($service->requiresPort())->toBeFalse();
-});
-
 it('extracts port from URL with http scheme', function () {
     $url = 'http://example.com:3000';
     $port = ServiceApplication::extractPortFromUrl($url);
@@ -196,6 +144,47 @@ YAML;
     $result = $app->getRequiredPort();
 
     expect($result)->toBe(3000);
+});
+
+it('falls back to the one-click template port when SERVICE_URL has no port suffix', function () {
+    $yaml = <<<'YAML'
+services:
+  wordpress:
+    environment:
+      - SERVICE_URL_WORDPRESS
+      - WORDPRESS_DB_HOST=mysql
+YAML;
+
+    $service = Mockery::mock(Service::class)->makePartial();
+    $service->docker_compose_raw = $yaml;
+    $service->shouldReceive('getRequiredPort')->andReturn(80);
+
+    $app = Mockery::mock(ServiceApplication::class)->makePartial();
+    $app->name = 'wordpress';
+    $app->shouldReceive('getAttribute')->with('service')->andReturn($service);
+    $app->service = $service;
+
+    expect($app->getRequiredPort())->toBe(80);
+});
+
+it('does not apply the template port to a container without SERVICE_URL or SERVICE_FQDN', function () {
+    $yaml = <<<'YAML'
+services:
+  mysql:
+    environment:
+      - MYSQL_DATABASE=wordpress
+YAML;
+
+    $service = Mockery::mock(Service::class)->makePartial();
+    $service->docker_compose_raw = $yaml;
+    $service->shouldReceive('getRequiredPort')->andReturn(80);
+
+    $app = Mockery::mock(ServiceApplication::class)->makePartial();
+    $app->name = 'mysql';
+    $app->shouldReceive('getAttribute')->with('service')->andReturn($service);
+    $app->service = $service;
+
+    expect($app->getRequiredPort())->toBeNull();
 });
 
 it('returns null for map-style environment without port', function () {

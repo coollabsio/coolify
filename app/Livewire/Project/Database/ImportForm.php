@@ -1,0 +1,829 @@
+<?php
+
+namespace App\Livewire\Project\Database;
+
+use App\Actions\Database\StartDatabaseImport;
+use App\Models\S3Storage;
+use App\Models\Server;
+use App\Models\ServiceDatabase;
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
+use App\Services\UploadStorageService;
+use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
+use App\Support\DatabaseImport\DatabaseImportException;
+use App\Support\DatabaseImport\DatabaseImportS3Upload;
+use App\Support\DatabaseImport\DatabaseImportSource;
+use App\Support\ValidationPatterns;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Storage;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
+use Livewire\Component;
+
+class ImportForm extends Component
+{
+    use AuthorizesRequests;
+
+    /**
+     * Validate that a string is safe for use as an S3 bucket name.
+     */
+    private function validateBucketName(string $bucket): bool
+    {
+        return ValidationPatterns::isValidS3BucketName($bucket);
+    }
+
+    /**
+     * Validate that a string is safe for use as an S3 path.
+     * Allows alphanumerics, dots, dashes, underscores, slashes, and common file characters.
+     */
+    private function validateS3Path(string $path): bool
+    {
+        // Must not be empty
+        if (empty($path)) {
+            return false;
+        }
+
+        // Must not contain dangerous shell metacharacters or command injection patterns
+        $dangerousPatterns = [
+            '..', // Directory traversal
+            '$(', // Command substitution
+            '`',  // Backtick command substitution
+            '|',  // Pipe
+            ';',  // Command separator
+            '&',  // Background/AND
+            '>',  // Redirect
+            '<',  // Redirect
+            "\n", // Newline
+            "\r", // Carriage return
+            "\0", // Null byte
+            "'",  // Single quote
+            '"',  // Double quote
+            '\\', // Backslash
+        ];
+
+        foreach ($dangerousPatterns as $pattern) {
+            if (str_contains($path, $pattern)) {
+                return false;
+            }
+        }
+
+        // Allow alphanumerics, dots, dashes, underscores, slashes, spaces, plus, equals, at
+        return preg_match('/^[a-zA-Z0-9.\-_\/\s+@=]+$/', $path) === 1;
+    }
+
+    /**
+     * Validate that a string is safe for use as a file path on the server.
+     */
+    private function validateServerPath(string $path): bool
+    {
+        // Must be an absolute path
+        if (! str_starts_with($path, '/')) {
+            return false;
+        }
+
+        // Must not contain dangerous shell metacharacters or command injection patterns
+        $dangerousPatterns = [
+            '..', // Directory traversal
+            '$(', // Command substitution
+            '`',  // Backtick command substitution
+            '|',  // Pipe
+            ';',  // Command separator
+            '&',  // Background/AND
+            '>',  // Redirect
+            '<',  // Redirect
+            "\n", // Newline
+            "\r", // Carriage return
+            "\0", // Null byte
+            "'",  // Single quote
+            '"',  // Double quote
+            '\\', // Backslash
+        ];
+
+        foreach ($dangerousPatterns as $pattern) {
+            if (str_contains($path, $pattern)) {
+                return false;
+            }
+        }
+
+        // Allow alphanumerics, dots, dashes, underscores, slashes, and spaces
+        return preg_match('/^[a-zA-Z0-9.\-_\/\s]+$/', $path) === 1;
+    }
+
+    public bool $unsupported = false;
+
+    // Store IDs instead of models for proper Livewire serialization
+    #[Locked]
+    public ?int $resourceId = null;
+
+    #[Locked]
+    public ?string $resourceType = null;
+
+    #[Locked]
+    public ?int $serverId = null;
+
+    // View-friendly properties to avoid computed property access in Blade
+    #[Locked]
+    public string $resourceUuid = '';
+
+    public string $resourceStatus = '';
+
+    #[Locked]
+    public string $resourceDbType = '';
+
+    public array $containers = [];
+
+    public bool $scpInProgress = false;
+
+    public bool $importRunning = false;
+
+    public ?string $filename = null;
+
+    public ?string $filesize = null;
+
+    public bool $isUploading = false;
+
+    public int $progress = 0;
+
+    public bool $error = false;
+
+    #[Locked]
+    public string $container;
+
+    public array $importCommands = [];
+
+    public bool $dumpAll = false;
+
+    public bool $replaceExisting = false;
+
+    /**
+     * PostgreSQL archives: restore owners and privileges instead of skipping them.
+     */
+    public bool $keepOwners = false;
+
+    /**
+     * MySQL and MariaDB all-databases backups: also restore the system databases (users, passwords and privileges).
+     */
+    public bool $restoreMysqlUsers = false;
+
+    /**
+     * SQLite: the database file to restore into. Always one of the database's own files.
+     */
+    public ?string $sqliteDatabase = null;
+
+    public string $restoreCommandText = '';
+
+    public string $customLocation = '';
+
+    /**
+     * The file source the user selected: 'upload' after a completed upload, 's3-upload' after a completed upload to an
+     * S3 storage, 'server' after a checked server path.
+     * Only the server sets it, so an import never falls back to an older upload.
+     */
+    #[Locked]
+    public ?string $fileSource = null;
+
+    public ?int $activityId = null;
+
+    /**
+     * The upload to an S3 storage that this form started. Only the server sets it.
+     */
+    #[Locked]
+    public ?string $s3UploadId = null;
+
+    // S3 Restore properties
+    public array $availableS3Storages = [];
+
+    public ?int $s3StorageId = null;
+
+    public string $s3Path = '';
+
+    public ?int $s3FileSize = null;
+
+    #[Computed]
+    public function resource()
+    {
+        if ($this->resourceId === null || $this->resourceType === null) {
+            return null;
+        }
+
+        return $this->resourceType::find($this->resourceId);
+    }
+
+    /**
+     * True when the instance admin selected an S3 storage for uploads, so the browser uploads there instead of to
+     * the Coolify instance.
+     */
+    #[Computed]
+    public function uploadsToS3(): bool
+    {
+        return UploadStorageService::configuredStorage() !== null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    #[Computed]
+    public function sqliteDatabaseFiles(): array
+    {
+        return $this->resource instanceof StandaloneSqlite ? $this->resource->databaseFiles() : [];
+    }
+
+    #[Computed]
+    public function server()
+    {
+        if ($this->serverId === null) {
+            return null;
+        }
+
+        return Server::query()->where('team_id', $this->resourceTeamId())->find($this->serverId);
+    }
+
+    /**
+     * Team of the loaded database. The session team can differ: a user can switch teams in
+     * another tab while this form stays open.
+     */
+    private function resourceTeamId(): ?int
+    {
+        return $this->resource?->team()?->id;
+    }
+
+    protected $listeners = [
+        'slideOverClosed' => 'resetActivityId',
+    ];
+
+    public function resetActivityId()
+    {
+        $this->activityId = null;
+    }
+
+    public function mount(Model $resource): void
+    {
+        $this->loadResource($resource);
+        $this->loadAvailableS3Storages();
+        $this->initializeRestoreOptions();
+    }
+
+    protected function initializeRestoreOptions(): void
+    {
+        $this->sqliteDatabase = $this->sqliteDatabaseFiles[0] ?? null;
+        $this->refreshRestoreCommandText();
+    }
+
+    public function updatedDumpAll(): void
+    {
+        $this->refreshRestoreCommandText();
+    }
+
+    public function updatedReplaceExisting(): void
+    {
+        $this->refreshRestoreCommandText();
+    }
+
+    public function updatedKeepOwners(): void
+    {
+        $this->refreshRestoreCommandText();
+    }
+
+    public function updatedRestoreMysqlUsers(): void
+    {
+        $this->refreshRestoreCommandText();
+    }
+
+    public function updatedSqliteDatabase(): void
+    {
+        if (! in_array($this->sqliteDatabase, $this->sqliteDatabaseFiles, true)) {
+            $this->sqliteDatabase = $this->sqliteDatabaseFiles[0] ?? null;
+        }
+        $this->refreshRestoreCommandText();
+    }
+
+    /**
+     * Preselects the SQLite file whose name matches the chosen backup, else the first file.
+     */
+    public function selectSqliteDatabaseFor(?string $backupName = null): void
+    {
+        if (! $this->resource instanceof StandaloneSqlite) {
+            return;
+        }
+        $this->sqliteDatabase = $this->resource->defaultRestoreFile($backupName);
+        $this->refreshRestoreCommandText();
+    }
+
+    /**
+     * Shows the exact script the import runs, so the confirmation matches the restore.
+     */
+    private function refreshRestoreCommandText(): void
+    {
+        $commands = app(DatabaseImportCommandBuilder::class);
+
+        try {
+            $this->restoreCommandText = $this->resource && $commands->supports($this->resource)
+                ? $commands->buildRestoreCommand($this->resource, '<temp_backup_file>', $this->dumpAll, $this->replaceExisting, $this->keepOwners, $this->sqliteDatabase, $this->restoreMysqlUsers)
+                : '';
+        } catch (\InvalidArgumentException) {
+            $this->restoreCommandText = '';
+        }
+    }
+
+    private function loadResource(Model $resource): void
+    {
+        $this->containers = [];
+
+        $this->authorize('view', $resource);
+
+        // Store IDs for Livewire serialization
+        $this->resourceId = $resource->id;
+        $this->resourceType = get_class($resource);
+
+        // Store view-friendly properties
+        $this->resourceStatus = $resource->status ?? '';
+
+        // Handle ServiceDatabase server access differently
+        if ($resource->getMorphClass() === ServiceDatabase::class) {
+            $server = $resource->service?->server;
+            if (! $server) {
+                abort(404, 'Server not found for this service database.');
+            }
+            $this->serverId = $server->id;
+            $this->container = $resource->name.'-'.$resource->service->uuid;
+            $this->resourceUuid = $resource->uuid; // Use ServiceDatabase's own UUID
+
+            // Determine database type for ServiceDatabase
+            $dbType = $resource->databaseType();
+            if (str_contains($dbType, 'postgres')) {
+                $this->resourceDbType = 'standalone-postgresql';
+            } elseif (str_contains($dbType, 'mysql')) {
+                $this->resourceDbType = 'standalone-mysql';
+            } elseif (str_contains($dbType, 'mariadb')) {
+                $this->resourceDbType = 'standalone-mariadb';
+            } elseif (str_contains($dbType, 'mongo')) {
+                $this->resourceDbType = 'standalone-mongodb';
+            } else {
+                $this->resourceDbType = $dbType;
+            }
+        } else {
+            $server = $resource->destination?->server;
+            if (! $server) {
+                abort(404, 'Server not found for this database.');
+            }
+            $this->serverId = $server->id;
+            $this->container = $resource->uuid;
+            $this->resourceUuid = $resource->uuid;
+            $this->resourceDbType = $resource->type();
+        }
+
+        if (str($resource->status)->startsWith('running')) {
+            $this->containers[] = $this->container;
+        }
+
+        if (
+            $resource->getMorphClass() === StandaloneRedis::class ||
+            $resource->getMorphClass() === StandaloneKeydb::class ||
+            $resource->getMorphClass() === StandaloneDragonfly::class ||
+            $resource->getMorphClass() === StandaloneClickhouse::class
+        ) {
+            $this->unsupported = true;
+        }
+
+        // Mark unsupported ServiceDatabase types (Redis, KeyDB, etc.)
+        if ($resource->getMorphClass() === ServiceDatabase::class) {
+            $dbType = $resource->databaseType();
+            if (str_contains($dbType, 'redis') || str_contains($dbType, 'keydb') ||
+                str_contains($dbType, 'dragonfly') || str_contains($dbType, 'clickhouse')) {
+                $this->unsupported = true;
+            }
+        }
+    }
+
+    public function checkFile()
+    {
+        $this->authorize('update', $this->resource);
+
+        if (filled($this->customLocation)) {
+            // Validate the custom location to prevent command injection
+            if (! $this->validateServerPath($this->customLocation)) {
+                $this->dispatch('error', 'Invalid file path. Path must be absolute and contain only safe characters (alphanumerics, dots, dashes, underscores, slashes).');
+
+                return;
+            }
+
+            if (! StartDatabaseImport::allowsSourcePath($this->resource, $this->customLocation)) {
+                $this->dispatch('error', StartDatabaseImport::OWN_BACKUPS_ONLY_MESSAGE);
+
+                return;
+            }
+
+            if (! $this->server) {
+                $this->dispatch('error', 'Server not found. Please refresh the page.');
+
+                return;
+            }
+
+            try {
+                if (! $this->serverFileExists($this->customLocation)) {
+                    $this->dispatch('error', 'The file does not exist or has been deleted.');
+
+                    return;
+                }
+                $this->filename = $this->customLocation;
+                $this->fileSource = 'server';
+                $this->discardStagedUpload();
+                $this->discardS3Upload();
+                $this->selectSqliteDatabaseFor($this->customLocation);
+                $this->dispatch('success', 'The file exists.');
+            } catch (\Throwable $e) {
+                return handleError($e, $this);
+            }
+        }
+    }
+
+    public function updatedCustomLocation(): void
+    {
+        if ($this->fileSource === 'server') {
+            $this->fileSource = null;
+        }
+    }
+
+    /**
+     * Called by the upload form after an upload is complete.
+     */
+    public function selectUploadedFile(string $name): void
+    {
+        $this->authorize('update', $this->resource);
+
+        if (! Storage::exists($this->stagedUploadPath())) {
+            $this->fileSource = null;
+            $this->dispatch('error', 'The uploaded file was not found. Please upload it again.');
+
+            return;
+        }
+
+        $this->fileSource = 'upload';
+        $this->customLocation = '';
+        $this->discardS3Upload();
+        $this->selectSqliteDatabaseFor($name);
+    }
+
+    /**
+     * Starts an upload from the browser to the instance's import storage and returns the presigned URLs of its
+     * parts. The browser PUTs the parts, then calls completeS3Upload().
+     *
+     * @return array{partSize: int, parts: list<array{number: int, url: string}>}|false
+     */
+    public function startS3Upload(string $filename, int $size): array|false
+    {
+        $this->authorizeS3Upload();
+        $this->discardS3Upload();
+        $this->fileSource = null;
+
+        try {
+            $started = DatabaseImportS3Upload::start($this->resource, (int) $this->resourceTeamId(), $filename, $size);
+            $this->s3UploadId = $started['upload']->marker['upload_id'];
+
+            return ['partSize' => $started['partSize'], 'parts' => $started['parts']];
+        } catch (DatabaseImportException $e) {
+            $this->dispatch('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+
+        return false;
+    }
+
+    /**
+     * Completes the upload to the import storage after the browser uploaded all parts, and selects it for the import.
+     */
+    public function completeS3Upload(): bool
+    {
+        $this->authorizeS3Upload();
+
+        $upload = $this->currentS3Upload();
+        if (! $upload) {
+            $this->dispatch('error', 'The upload was not found. Please upload the file again.');
+
+            return false;
+        }
+
+        try {
+            $upload->complete();
+        } catch (\Throwable $e) {
+            $this->discardS3Upload();
+            $e instanceof DatabaseImportException ? $this->dispatch('error', $e->getMessage()) : handleError($e, $this);
+
+            return false;
+        }
+
+        $this->fileSource = 's3-upload';
+        $this->filename = $upload->marker['name'];
+        $this->filesize = formatBytes($upload->marker['size']);
+        $this->error = false;
+        $this->customLocation = '';
+        $this->discardStagedUpload();
+        $this->selectSqliteDatabaseFor($upload->marker['name']);
+
+        return true;
+    }
+
+    /**
+     * Called by the browser when an upload to an S3 storage fails or the user cancels it.
+     */
+    public function abortS3Upload(): void
+    {
+        $this->authorizeS3Upload();
+        $this->discardS3Upload();
+        if ($this->fileSource === 's3-upload') {
+            $this->fileSource = null;
+        }
+    }
+
+    private function authorizeS3Upload(): void
+    {
+        $this->authorize('uploadBackup', $this->resource);
+        $this->authorize('update', $this->resource);
+    }
+
+    private function currentS3Upload(): ?DatabaseImportS3Upload
+    {
+        $upload = DatabaseImportS3Upload::find((int) $this->resourceTeamId(), $this->s3UploadId);
+
+        return $upload?->belongsTo($this->resource) ? $upload : null;
+    }
+
+    /**
+     * Delete the upload to an S3 storage that was not imported, when the user selects another source or file.
+     */
+    private function discardS3Upload(): void
+    {
+        $this->currentS3Upload()?->discard();
+        $this->s3UploadId = null;
+    }
+
+    private function stagedUploadPath(): string
+    {
+        return "upload/{$this->resource->uuid}/restore";
+    }
+
+    /**
+     * Delete an upload that was not imported when the user selects another source. Skipped while
+     * an import of this database runs, because that import can still copy the upload.
+     */
+    private function discardStagedUpload(): void
+    {
+        $lock = Cache::lock(StartDatabaseImport::lockKey($this->resource->uuid), 60);
+        if (! $lock->get()) {
+            return;
+        }
+
+        try {
+            Storage::delete($this->stagedUploadPath());
+        } finally {
+            $lock->release();
+        }
+    }
+
+    protected function serverFileExists(string $path): bool
+    {
+        $escapedPath = escapeshellarg($path);
+
+        return filled(instant_remote_process(["ls -l {$escapedPath}"], $this->server, throwError: false));
+    }
+
+    public function runImport(string $password = ''): bool|string
+    {
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
+        }
+
+        $this->authorize('update', $this->resource);
+
+        if (! ValidationPatterns::isValidContainerName($this->container)) {
+            $this->dispatch('error', 'Invalid container name.');
+
+            return true;
+        }
+
+        if (! in_array($this->fileSource, ['upload', 's3-upload', 'server'], true)) {
+            $this->dispatch('error', 'Please select a file to import.');
+
+            return true;
+        }
+
+        if (! $this->server) {
+            $this->dispatch('error', 'Server not found. Please refresh the page.');
+
+            return true;
+        }
+
+        try {
+            $this->importRunning = true;
+            if ($this->fileSource !== 'upload') {
+                $this->discardStagedUpload();
+            }
+            if ($this->fileSource !== 's3-upload') {
+                $this->discardS3Upload();
+            }
+            $source = match ($this->fileSource) {
+                'upload' => new DatabaseImportSource('upload', dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers),
+                's3-upload' => new DatabaseImportSource('s3-upload', uploadId: $this->s3UploadId, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers),
+                default => new DatabaseImportSource('server', path: $this->customLocation, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers),
+            };
+            $activity = StartDatabaseImport::run($this->resource, $source, (int) $this->resourceTeamId());
+            if ($this->fileSource === 's3-upload') {
+                // The import cleanup deletes the file now.
+                $this->s3UploadId = null;
+            }
+            $this->activityId = $activity->id;
+            $this->dispatch('activityMonitor', $activity->id);
+            $this->dispatch('databaserestore');
+            auditLog('ui.database.import_started', [
+                'team_id' => $this->resource->team()?->id,
+                'database_uuid' => $this->resource->uuid,
+                'database_name' => $this->resource->name,
+                'source' => $this->fileSource === 's3-upload' ? 's3_upload' : 'file',
+                'replace_existing' => $this->replaceExisting,
+            ]);
+        } catch (DatabaseImportException $e) {
+            $this->importRunning = false;
+            $this->dispatch('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            $this->importRunning = false;
+            handleError($e, $this);
+
+            return true;
+        } finally {
+            $this->filename = null;
+            $this->fileSource = null;
+            $this->importCommands = [];
+        }
+
+        return true;
+    }
+
+    public function loadAvailableS3Storages()
+    {
+        try {
+            $this->availableS3Storages = S3Storage::ownedByCurrentTeamAPI((int) $this->resourceTeamId(), ['id', 'name', 'description'])
+                ->where('is_usable', true)
+                ->get()
+                ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'description' => $s->description])
+                ->toArray();
+        } catch (\Throwable $e) {
+            $this->availableS3Storages = [];
+        }
+    }
+
+    public function updatedS3Path($value)
+    {
+        // Reset validation state when path changes
+        $this->s3FileSize = null;
+
+        // Ensure path starts with a slash
+        if ($value !== null && $value !== '') {
+            $this->s3Path = str($value)->trim()->start('/')->value();
+        }
+    }
+
+    public function updatedS3StorageId()
+    {
+        // Reset validation state when storage changes
+        $this->s3FileSize = null;
+    }
+
+    public function checkS3File()
+    {
+        $this->authorize('update', $this->resource);
+
+        if (! $this->s3StorageId) {
+            $this->dispatch('error', 'Please select a storage.');
+
+            return;
+        }
+
+        if (blank($this->s3Path)) {
+            $this->dispatch('error', 'Please provide a file path.');
+
+            return;
+        }
+
+        // Clean the path (remove leading slash if present)
+        $cleanPath = ltrim($this->s3Path, '/');
+
+        // Validate the S3 path early to prevent command injection in subsequent operations
+        if (! $this->validateS3Path($cleanPath)) {
+            $this->dispatch('error', 'Invalid file path. Path must contain only safe characters (alphanumerics, dots, dashes, underscores, slashes).');
+
+            return;
+        }
+
+        if (! StartDatabaseImport::allowsSourcePath($this->resource, $cleanPath)) {
+            $this->dispatch('error', StartDatabaseImport::OWN_BACKUPS_ONLY_MESSAGE);
+
+            return;
+        }
+
+        try {
+            $s3Storage = S3Storage::ownedByCurrentTeamAPI((int) $this->resourceTeamId())->findOrFail($this->s3StorageId);
+
+            // Validate bucket name early
+            if ($s3Storage->isS3() && ! $this->validateBucketName($s3Storage->bucket)) {
+                $this->dispatch('error', 'Invalid S3 bucket name. Bucket name must contain only letters, numbers, dots, and dashes, and must follow S3 bucket naming rules.');
+
+                return;
+            }
+
+            // Before testConnection(), which saves the host key of an SFTP storage in memory only.
+            $disk = $s3Storage->filesystem();
+            $s3Storage->testConnection();
+
+            // Check if file exists
+            if (! $disk->exists($cleanPath)) {
+                $this->dispatch('error', 'File not found in the storage. Please check the path.');
+
+                return;
+            }
+
+            // Get file size
+            $this->s3FileSize = $disk->size($cleanPath);
+            $this->selectSqliteDatabaseFor($cleanPath);
+
+            $this->dispatch('success', 'File found in the storage. Size: '.formatBytes($this->s3FileSize));
+        } catch (\Throwable $e) {
+            $this->s3FileSize = null;
+
+            return handleError($e, $this);
+        }
+    }
+
+    public function restoreFromS3(string $password = ''): bool|string
+    {
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
+        }
+
+        $this->authorize('update', $this->resource);
+
+        if (! ValidationPatterns::isValidContainerName($this->container)) {
+            $this->dispatch('error', 'Invalid container name.');
+
+            return true;
+        }
+
+        if (! $this->s3StorageId || blank($this->s3Path)) {
+            $this->dispatch('error', 'Please select a storage and provide a path first.');
+
+            return true;
+        }
+
+        if (is_null($this->s3FileSize)) {
+            $this->dispatch('error', 'Please check the file first by clicking "Check File".');
+
+            return true;
+        }
+
+        if (! $this->server) {
+            $this->dispatch('error', 'Server not found. Please refresh the page.');
+
+            return true;
+        }
+
+        try {
+            $this->importRunning = true;
+            $this->discardStagedUpload();
+            $this->discardS3Upload();
+            $source = new DatabaseImportSource('s3', path: $this->s3Path, s3StorageUuid: (string) $this->s3StorageId, dumpAll: $this->dumpAll, replaceExisting: $this->replaceExisting, keepOwners: $this->keepOwners, sqliteDatabase: $this->sqliteDatabase, restoreMysqlUsers: $this->restoreMysqlUsers);
+            $activity = StartDatabaseImport::run($this->resource, $source, (int) $this->resourceTeamId());
+            $this->activityId = $activity->id;
+            $this->dispatch('activityMonitor', $activity->id);
+            $this->dispatch('databaserestore');
+            auditLog('ui.database.restore_started', [
+                'team_id' => $this->resource->team()?->id,
+                'database_uuid' => $this->resource->uuid,
+                'database_name' => $this->resource->name,
+                'source' => 's3',
+                'replace_existing' => $this->replaceExisting,
+                'storage_id' => $this->s3StorageId,
+            ]);
+            $this->dispatch('info', 'Restoring database from the storage. Progress will be shown in the activity monitor...');
+        } catch (DatabaseImportException $e) {
+            $this->importRunning = false;
+            $this->dispatch('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            $this->importRunning = false;
+            handleError($e, $this);
+
+            return true;
+        }
+
+        return true;
+    }
+
+    public function buildRestoreCommand(string $tmpPath): string
+    {
+        return app(DatabaseImportCommandBuilder::class)->buildRestoreCommand($this->resource, $tmpPath, $this->dumpAll, $this->replaceExisting, $this->keepOwners, $this->sqliteDatabase, $this->restoreMysqlUsers);
+    }
+}

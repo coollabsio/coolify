@@ -2,13 +2,14 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Actions\Database\FlushDatabase;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\StandaloneSqlite;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Danger extends Component
 {
@@ -39,7 +40,7 @@ class Danger extends Component
     public function mount()
     {
         $parameters = get_route_parameters();
-        $this->modalId = new Cuid2;
+        $this->modalId = new_public_id();
         $this->projectUuid = data_get($parameters, 'project_uuid');
         $this->environmentUuid = data_get($parameters, 'environment_uuid');
 
@@ -73,7 +74,9 @@ class Danger extends Component
             'standalone-mariadb',
             'standalone-keydb',
             'standalone-dragonfly',
-            'standalone-clickhouse' => $this->resource->name ?? 'Database',
+            'standalone-clickhouse',
+            'standalone-influxdb',
+            'standalone-sqlite' => $this->resource->name ?? 'Database',
             'service' => $this->resource->name ?? 'Service',
             'service-application' => $this->resource->name ?? 'Service Application',
             'service-database' => $this->resource->name ?? 'Service Database',
@@ -98,6 +101,12 @@ class Danger extends Component
             return 'Resource not found.';
         }
 
+        if ($this->resource instanceof StandaloneSqlite && $this->resource->hasConnectedApplications()) {
+            $this->dispatch('error', 'This database volume is mounted by '.$this->resource->connectedApplicationNames()->implode(', ').'. Remove those mounts before deleting the database.');
+
+            return;
+        }
+
         if (! empty($selectedActions)) {
             $this->delete_volumes = in_array('delete_volumes', $selectedActions);
             $this->delete_connected_networks = in_array('delete_connected_networks', $selectedActions);
@@ -107,13 +116,14 @@ class Danger extends Component
 
         try {
             $this->authorize('delete', $this->resource);
+            // Soft delete first, so the environment page after the redirect does not list the resource.
             $this->resource->delete();
             DeleteResourceJob::dispatch(
                 $this->resource,
                 $this->delete_volumes,
                 $this->delete_connected_networks,
                 $this->delete_configurations,
-                $this->docker_cleanup
+                $this->docker_cleanup,
             );
 
             return redirectRoute($this, 'project.resource.index', [
@@ -122,6 +132,31 @@ class Danger extends Component
             ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    public function flush($password)
+    {
+        try {
+            $this->authorize('manage', $this->resource);
+
+            if (! verifyPasswordConfirmation($password, $this)) {
+                return 'The provided password is incorrect.';
+            }
+
+            FlushDatabase::run($this->resource);
+            auditLog('ui.database.flushed', [
+                'team_id' => $this->resource->team()?->id,
+                'database_uuid' => $this->resource->uuid,
+                'database_name' => $this->resource->name,
+            ]);
+            $this->dispatch('success', 'Database flushed.');
+
+            return true;
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return false;
         }
     }
 

@@ -8,16 +8,6 @@ use Tests\TestCase;
 
 class SshRetryMechanismTest extends TestCase
 {
-    public function test_ssh_retry_handler_exists()
-    {
-        $this->assertTrue(class_exists(\App\Helpers\SshRetryHandler::class));
-    }
-
-    public function test_ssh_retryable_trait_exists()
-    {
-        $this->assertTrue(trait_exists(\App\Traits\SshRetryable::class));
-    }
-
     public function test_retry_on_ssh_connection_errors()
     {
         $handler = new class
@@ -48,6 +38,24 @@ class SshRetryMechanismTest extends TestCase
                 "Failed to identify as retryable: $error"
             );
         }
+    }
+
+    public function test_generic_ssh_exit_255_error_is_retryable()
+    {
+        $handler = new class
+        {
+            use SshRetryable;
+
+            // Make methods public for testing
+            public function test_is_retryable_ssh_error($error)
+            {
+                return $this->isRetryableSshError($error);
+            }
+        };
+
+        $this->assertTrue(
+            $handler->test_is_retryable_ssh_error('SSH command failed with exit code: 255')
+        );
     }
 
     public function test_non_ssh_errors_are_not_retryable()
@@ -139,6 +147,32 @@ class SshRetryMechanismTest extends TestCase
 
         $this->assertEquals('success', $result);
         $this->assertEquals(3, $attemptCount);
+    }
+
+    public function test_retry_succeeds_after_generic_ssh_exit_255_failure()
+    {
+        $attemptCount = 0;
+
+        config([
+            'constants.ssh.max_retries' => 3,
+            'constants.ssh.retry_base_delay' => 0,
+        ]);
+
+        $result = SshRetryHandler::retry(
+            function () use (&$attemptCount) {
+                $attemptCount++;
+                if ($attemptCount === 1) {
+                    throw new \RuntimeException('SSH command failed with exit code: 255');
+                }
+
+                return 'success';
+            },
+            ['test' => 'generic_ssh_255_retry_test'],
+            true
+        );
+
+        $this->assertEquals('success', $result);
+        $this->assertEquals(2, $attemptCount);
     }
 
     public function test_retry_fails_after_max_attempts()

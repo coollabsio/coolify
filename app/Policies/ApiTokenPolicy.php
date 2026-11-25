@@ -2,7 +2,9 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
 use Laravel\Sanctum\PersonalAccessToken;
 
 class ApiTokenPolicy
@@ -12,11 +14,6 @@ class ApiTokenPolicy
      */
     public function viewAny(User $user): bool
     {
-        // Authorization temporarily disabled
-        /*
-        // Users can view their own API tokens
-        return true;
-        */
         return true;
     }
 
@@ -25,12 +22,7 @@ class ApiTokenPolicy
      */
     public function view(User $user, PersonalAccessToken $token): bool
     {
-        // Authorization temporarily disabled
-        /*
-        // Users can only view their own tokens
-        return $user->id === $token->tokenable_id && $token->tokenable_type === User::class;
-        */
-        return true;
+        return $this->belongsToUserAndCurrentTeam($user, $token);
     }
 
     /**
@@ -38,11 +30,6 @@ class ApiTokenPolicy
      */
     public function create(User $user): bool
     {
-        // Authorization temporarily disabled
-        /*
-        // All authenticated users can create their own API tokens
-        return true;
-        */
         return true;
     }
 
@@ -51,12 +38,7 @@ class ApiTokenPolicy
      */
     public function update(User $user, PersonalAccessToken $token): bool
     {
-        // Authorization temporarily disabled
-        /*
-        // Users can only update their own tokens
-        return $user->id === $token->tokenable_id && $token->tokenable_type === User::class;
-        */
-        return true;
+        return $this->belongsToUserAndCurrentTeam($user, $token);
     }
 
     /**
@@ -64,12 +46,7 @@ class ApiTokenPolicy
      */
     public function delete(User $user, PersonalAccessToken $token): bool
     {
-        // Authorization temporarily disabled
-        /*
-        // Users can only delete their own tokens
-        return $user->id === $token->tokenable_id && $token->tokenable_type === User::class;
-        */
-        return true;
+        return $this->belongsToUserAndCurrentTeam($user, $token);
     }
 
     /**
@@ -77,11 +54,6 @@ class ApiTokenPolicy
      */
     public function manage(User $user): bool
     {
-        // Authorization temporarily disabled
-        /*
-        // All authenticated users can manage their own API tokens
-        return true;
-        */
         return true;
     }
 
@@ -90,8 +62,7 @@ class ApiTokenPolicy
      */
     public function useRootPermissions(User $user): bool
     {
-        // Only admins and owners can use root permissions
-        return $user->isAdmin() || $user->isOwner();
+        return $user->isAdmin() || $user->isOwner() || $this->holdsSomewhere($user, AccessLevel::Root);
     }
 
     /**
@@ -99,11 +70,75 @@ class ApiTokenPolicy
      */
     public function useWritePermissions(User $user): bool
     {
-        // Authorization temporarily disabled
-        /*
-        // Only admins and owners can use write permissions
+        return $user->isAdmin() || $user->isOwner() || $this->holdsSomewhere($user, AccessLevel::Write);
+    }
+
+    /**
+     * Determine whether the user can use deploy permissions for API tokens.
+     */
+    public function useDeployPermissions(User $user): bool
+    {
+        return $user->isAdmin() || $user->isOwner() || $this->holdsSomewhere($user, AccessLevel::Deploy);
+    }
+
+    /**
+     * Determine whether the user can use terminal permissions for API tokens.
+     */
+    public function useTerminalPermissions(User $user): bool
+    {
         return $user->isAdmin() || $user->isOwner();
-        */
-        return true;
+    }
+
+    /**
+     * Determine whether the user can use read:sensitive permissions for API tokens.
+     */
+    public function useSensitivePermissions(User $user): bool
+    {
+        return $user->isAdmin() || $user->isOwner() || $this->holdsSomewhere($user, AccessLevel::ReadSensitive);
+    }
+
+    /**
+     * Determine whether the user can use delete permissions for API tokens.
+     */
+    public function useDeletePermissions(User $user): bool
+    {
+        return $user->isAdmin() || $user->isOwner() || $this->holdsSomewhere($user, AccessLevel::Delete);
+    }
+
+    /**
+     * True when a grant of the member in the current team gives the level somewhere.
+     * Creating the token still checks that the member holds it on every chosen scope.
+     */
+    private function holdsSomewhere(User $user, AccessLevel $level): bool
+    {
+        $teamId = $user->currentTeam()?->id;
+        if ($teamId === null) {
+            return false;
+        }
+
+        foreach (app(AccessResolver::class)->memberGrants($user, $teamId) ?? [] as $grant) {
+            foreach ($grant->levels as $granted) {
+                if (in_array($level, $granted->includes(), true)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function belongsToUserAndCurrentTeam(User $user, PersonalAccessToken $token): bool
+    {
+        if ($user->id !== $token->tokenable_id || $token->tokenable_type !== User::class) {
+            return false;
+        }
+
+        $currentTeamId = $user->currentTeam()?->id;
+
+        if ($currentTeamId === null || $token->team_id === null) {
+            return false;
+        }
+
+        return (string) $currentTeamId === (string) $token->team_id;
     }
 }

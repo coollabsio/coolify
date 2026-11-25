@@ -1,0 +1,61 @@
+<?php
+
+use App\Livewire\Project\Shared\ResourceOperations;
+use App\Livewire\Project\Shared\Tags;
+use App\Models\Application;
+use App\Models\Environment;
+use App\Models\Project;
+use App\Models\Server;
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+
+uses(RefreshDatabase::class);
+
+function resourcePermissionCalloutApplicationFor(string $role): Application
+{
+    $user = User::factory()->create();
+    $team = Team::factory()->create();
+    $user->teams()->attach($team, ['role' => $role]);
+
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $destination = $server->standaloneDockers()->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+
+    test()->actingAs($user);
+    session(['currentTeam' => $team]);
+
+    return Application::factory()->create([
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+}
+
+it('shows one insufficient permissions callout for resource operations when update is denied', function () {
+    $application = resourcePermissionCalloutApplicationFor('member');
+
+    $component = Livewire::test(ResourceOperations::class, ['resource' => $application])
+        ->assertSee('Insufficient permissions')
+        ->assertSee('permission to clone or move this resource')
+        ->assertSee('team administrator for access')
+        ->assertDontSee('Access Restricted')
+        ->assertDontSee("You don't have permission to clone resources")
+        ->assertDontSee("You don't have permission to move resources");
+
+    expect(substr_count($component->html(), 'Insufficient permissions'))->toBe(1);
+});
+
+it('shows the insufficient permissions callout for tags when update is denied', function () {
+    $application = resourcePermissionCalloutApplicationFor('member');
+
+    $component = Livewire::test(Tags::class, ['resource' => $application])
+        ->assertSee('Insufficient permissions')
+        ->assertSee('permission to manage tags for this resource')
+        ->assertDontSee('Access Restricted')
+        ->assertDontSee("You don't have permission to manage tags");
+
+    expect(substr_count($component->html(), 'Insufficient permissions'))->toBe(1);
+});

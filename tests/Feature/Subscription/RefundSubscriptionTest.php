@@ -5,6 +5,7 @@ use App\Models\Subscription;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Stripe\Exception\InvalidRequestException;
 use Stripe\Service\InvoiceService;
 use Stripe\Service\RefundService;
 use Stripe\Service\SubscriptionService;
@@ -85,6 +86,28 @@ describe('checkEligibility', function () {
         expect($result['current_period_end'])->toBe($periodEnd);
     });
 
+    test('returns eligible when subscription is set to cancel at period end', function () {
+        $this->subscription->update(['stripe_cancel_at_period_end' => true]);
+
+        $periodEnd = now()->addDays(20)->timestamp;
+        $stripeSubscription = (object) [
+            'status' => 'active',
+            'start_date' => now()->subDays(10)->timestamp,
+            'current_period_end' => $periodEnd,
+        ];
+
+        $this->mockSubscriptions
+            ->shouldReceive('retrieve')
+            ->with('sub_test_123')
+            ->andReturn($stripeSubscription);
+
+        $action = new RefundSubscription($this->mockStripe);
+        $result = $action->checkEligibility($this->team);
+
+        expect($result['eligible'])->toBeTrue();
+        expect($result['days_remaining'])->toBe(20);
+    });
+
     test('returns ineligible when subscription is not active', function () {
         $periodEnd = now()->addDays(25)->timestamp;
         $stripeSubscription = (object) [
@@ -141,7 +164,7 @@ describe('checkEligibility', function () {
         $this->mockSubscriptions
             ->shouldReceive('retrieve')
             ->with('sub_test_123')
-            ->andThrow(new \Stripe\Exception\InvalidRequestException('No such subscription'));
+            ->andThrow(new InvalidRequestException('No such subscription'));
 
         $action = new RefundSubscription($this->mockStripe);
         $result = $action->checkEligibility($this->team);
@@ -265,10 +288,11 @@ describe('execute', function () {
         expect($result['error'])->toContain('No payment intent');
     });
 
-    test('records refund and proceeds when cancel fails', function () {
+    test('records refund and preserves the subscription when cancel fails', function () {
         $stripeSubscription = (object) [
             'status' => 'active',
             'start_date' => now()->subDays(10)->timestamp,
+            'current_period_end' => now()->addDays(20)->timestamp,
         ];
 
         $this->mockSubscriptions
@@ -298,21 +322,24 @@ describe('execute', function () {
         $this->mockSubscriptions
             ->shouldReceive('cancel')
             ->with('sub_test_123')
-            ->andThrow(new \Exception('Stripe cancel API error'));
+            ->andThrow(new Exception('Stripe cancel API error'));
 
         $action = new RefundSubscription($this->mockStripe);
         $result = $action->execute($this->team);
 
-        // Should still succeed — refund went through
-        expect($result['success'])->toBeTrue();
-        expect($result['error'])->toBeNull();
+        expect($result['success'])->toBeFalse();
+        expect($result['error'])->toBe('Refund succeeded, but subscription cancellation failed.');
 
         $this->subscription->refresh();
         // Refund timestamp must be recorded
         expect($this->subscription->stripe_refunded_at)->not->toBeNull();
-        // Subscription should still be marked as ended locally
-        expect($this->subscription->stripe_invoice_paid)->toBeFalsy();
-        expect($this->subscription->stripe_subscription_id)->toBeNull();
+        expect($this->subscription->stripe_invoice_paid)->toBeTruthy();
+        expect($this->subscription->stripe_subscription_id)->toBe('sub_test_123');
+
+        $retry = $action->execute($this->team->fresh());
+
+        expect($retry['success'])->toBeFalse();
+        expect($retry['error'])->toContain('already been processed');
     });
 
     test('fails when subscription is past refund window', function () {

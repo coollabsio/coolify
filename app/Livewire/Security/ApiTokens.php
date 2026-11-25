@@ -2,76 +2,195 @@
 
 namespace App\Livewire\Security;
 
-use App\Models\InstanceSettings;
+use App\Enums\AccessLevel;
+use App\Enums\AccessScope;
+use App\Livewire\Forms\ApiTokenForm;
+use App\Models\Environment;
+use App\Models\Project;
+use App\Models\Server;
+use App\Services\Access\AccessResolver;
+use App\Services\Access\Grant;
+use Carbon\CarbonInterface;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Laravel\Sanctum\PersonalAccessToken;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class ApiTokens extends Component
 {
     use AuthorizesRequests;
 
-    public ?string $description = null;
+    public ApiTokenForm $form;
+
+    /**
+     * The token in the edit modal. The browser fills it from ApiTokenForm::valuesOf(), so opening the modal needs no request.
+     */
+    public ApiTokenForm $editForm;
 
     public $tokens = [];
 
-    public array $permissions = ['read'];
+    /**
+     * Search text of each listed token. Alpine filters and pages the list with it through $wire, so it must change with $tokens.
+     *
+     * @var list<array{id: string, search: string}>
+     */
+    #[Locked]
+    public array $tokenSearchIndex = [];
 
-    public $isApiEnabled;
+    public array $expirationOptions = [
+        7 => '7 days',
+        30 => '30 days',
+        60 => '60 days',
+        90 => '90 days',
+        365 => '1 year',
+    ];
 
+    #[Locked]
     public bool $canUseRootPermissions = false;
 
+    #[Locked]
     public bool $canUseWritePermissions = false;
+
+    #[Locked]
+    public bool $canUseDeployPermissions = false;
+
+    #[Locked]
+    public bool $canUseTerminalPermissions = false;
+
+    #[Locked]
+    public bool $canUseSensitivePermissions = false;
+
+    #[Locked]
+    public bool $canUseDeletePermissions = false;
+
+    #[Locked]
+    public bool $canUseTeamScope = false;
 
     public function render()
     {
-        return view('livewire.security.api-tokens');
+        return view('livewire.security.api-tokens', [
+            'scopeLabels' => $this->scopeLabels(),
+        ]);
+    }
+
+    /**
+     * @return Collection<string, string>
+     */
+    private function scopeLabels(): Collection
+    {
+        return collect($this->scopeOptions)->reject(fn (array $option) => $option['header'] ?? false)->pluck('label', 'value');
+    }
+
+    /**
+     * @param  list<string>  $selected
+     * @return list<string>
+     */
+    private function withoutCoveredScopes(array $selected): array
+    {
+        $parents = collect($this->scopeOptions)->pluck('parents', 'value');
+
+        return array_values(array_filter(
+            array_unique($selected),
+            fn (string $value) => array_intersect($parents[$value] ?? [], $selected) === [],
+        ));
+    }
+
+    /**
+     * Projects, environments, resources, and servers of the current team that the user can see, for the scope picker.
+     *
+     * Each option lists its "parents": the project and environment scopes that already include it.
+     * A project or environment is an option only when the member has a grant on all of it, because a token
+     * cannot have more access than its owner. Parents that a member sees only through a granted child are not options.
+     *
+     * @return list<array{value: string, label: string, header?: bool, parents?: list<string>}>
+     */
+    #[Computed]
+    public function scopeOptions(): array
+    {
+        $resolver = app(AccessResolver::class);
+        $memberGrants = $resolver->memberGrants(auth()->user(), currentTeam()->id);
+        $memberLayer = $memberGrants === null ? null : $resolver->resolve(currentTeam()->id, $memberGrants);
+
+        $projects = Project::query()->where('team_id', currentTeam()->id)->orderBy('name')->get(['id', 'uuid', 'name']);
+        $environments = Environment::query()->whereIn('project_id', $projects->pluck('id'))->get(['id', 'uuid', 'name', 'project_id']);
+        $selectableProjects = $projects->filter(fn (Project $project) => $memberLayer?->allows(AccessLevel::Read, $project->id) ?? true);
+        $selectableEnvironments = $environments->filter(fn (Environment $environment) => $memberLayer?->allows(AccessLevel::Read, $environment->project_id, $environment->id) ?? true);
+        $projectNames = $projects->pluck('name', 'id');
+        $projectUuids = $projects->pluck('uuid', 'id');
+        $environmentParents = $environments->mapWithKeys(fn (Environment $environment) => [
+            $environment->id => ["project:{$projectUuids[$environment->project_id]}", "environment:{$environment->uuid}"],
+        ]);
+        $environmentPaths = $environments->mapWithKeys(fn (Environment $environment) => [
+            $environment->id => $projectNames[$environment->project_id].' / '.$environment->name,
+        ]);
+
+        $resources = collect(AccessResolver::RESOURCE_MODELS)
+            ->flatMap(fn (string $model) => $model::query()->whereIn('environment_id', $environments->pluck('id'))->get(['uuid', 'name', 'environment_id']))
+            ->map(fn ($resource) => [
+                'value' => "resource:{$resource->uuid}",
+                'label' => $environmentPaths[$resource->environment_id].' / '.$resource->name,
+                'parents' => $environmentParents[$resource->environment_id],
+            ])
+            ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values();
+
+        // Server grants cover team-level server endpoints, so only users with access to the whole team can pick them.
+        $servers = $resolver->coversWholeTeam(auth()->user(), currentTeam()->id)
+            ? Server::query()->where('team_id', currentTeam()->id)->orderBy('name')->get(['id', 'uuid', 'name', 'server_metadata'])
+                ->reject(fn (Server $server) => $server->isTransferredAway())
+            : collect();
+
+        return [
+            ...($selectableProjects->isEmpty() ? [] : [['value' => '__projects', 'label' => 'Projects', 'header' => true]]),
+            ...$selectableProjects->map(fn (Project $project) => ['value' => "project:{$project->uuid}", 'label' => $project->name])->values()->all(),
+            ...($selectableEnvironments->isEmpty() ? [] : [['value' => '__environments', 'label' => 'Environments', 'header' => true]]),
+            ...$selectableEnvironments->map(fn (Environment $environment) => [
+                'value' => "environment:{$environment->uuid}",
+                'label' => $environmentPaths[$environment->id],
+                'parents' => ["project:{$projectUuids[$environment->project_id]}"],
+            ])
+                ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)->values()->all(),
+            ...($resources->isEmpty() ? [] : [['value' => '__resources', 'label' => 'Resources', 'header' => true]]),
+            ...$resources->all(),
+            ...($servers->isEmpty() ? [] : [['value' => '__servers', 'label' => 'Servers', 'header' => true]]),
+            ...$servers->map(fn (Server $server) => ['value' => "server:{$server->uuid}", 'label' => $server->name])->values()->all(),
+        ];
     }
 
     public function mount()
     {
-        $this->isApiEnabled = InstanceSettings::get()->is_api_enabled;
         $this->canUseRootPermissions = auth()->user()->can('useRootPermissions', PersonalAccessToken::class);
         $this->canUseWritePermissions = auth()->user()->can('useWritePermissions', PersonalAccessToken::class);
+        $this->canUseDeployPermissions = auth()->user()->can('useDeployPermissions', PersonalAccessToken::class);
+        $this->canUseTerminalPermissions = auth()->user()->can('useTerminalPermissions', PersonalAccessToken::class);
+        $this->canUseSensitivePermissions = auth()->user()->can('useSensitivePermissions', PersonalAccessToken::class);
+        $this->canUseDeletePermissions = auth()->user()->can('useDeletePermissions', PersonalAccessToken::class);
+        $this->canUseTeamScope = app(AccessResolver::class)->coversWholeTeam(auth()->user(), currentTeam()->id);
+        $this->form->scopeMode = $this->canUseTeamScope ? 'team' : 'selected';
         $this->getTokens();
     }
 
     private function getTokens()
     {
-        $this->tokens = auth()->user()->tokens->sortByDesc('created_at');
-    }
+        $this->tokens = auth()->user()->tokens()
+            ->where('team_id', currentTeam()->id)
+            ->latest()
+            ->get();
 
-    public function updatedPermissions($permissionToUpdate)
-    {
-        // Check if user is trying to use restricted permissions
-        if ($permissionToUpdate == 'root' && ! $this->canUseRootPermissions) {
-            $this->dispatch('error', 'You do not have permission to use root permissions.');
-            // Remove root from permissions if it was somehow added
-            $this->permissions = array_diff($this->permissions, ['root']);
-
-            return;
-        }
-
-        if (in_array($permissionToUpdate, ['write', 'write:sensitive']) && ! $this->canUseWritePermissions) {
-            $this->dispatch('error', 'You do not have permission to use write permissions.');
-            // Remove write permissions if they were somehow added
-            $this->permissions = array_diff($this->permissions, ['write', 'write:sensitive']);
-
-            return;
-        }
-
-        if ($permissionToUpdate == 'root') {
-            $this->permissions = ['root'];
-        } elseif ($permissionToUpdate == 'read:sensitive' && ! in_array('read', $this->permissions)) {
-            $this->permissions[] = 'read';
-        } elseif ($permissionToUpdate == 'deploy') {
-            $this->permissions = ['deploy'];
-        } else {
-            if (count($this->permissions) == 0) {
-                $this->permissions = ['read'];
-            }
-        }
-        sort($this->permissions);
+        $scopeLabels = $this->scopeLabels();
+        $this->tokenSearchIndex = $this->tokens->map(fn (PersonalAccessToken $token) => [
+            'id' => (string) $token->id,
+            'search' => Str::lower(collect([$token->name, ...($token->abilities ?? [])])
+                ->merge($token->scopes === null
+                    ? ['All resources in the team']
+                    : collect(Grant::listFrom($token->scopes))->map(fn (Grant $scope) => $scopeLabels[$scope->scope->value.':'.$scope->uuid] ?? null)->filter())
+                ->join(' ')),
+        ])->values()->all();
     }
 
     public function addNewToken()
@@ -79,21 +198,224 @@ class ApiTokens extends Component
         try {
             $this->authorize('create', PersonalAccessToken::class);
 
-            // Validate permissions based on user role
-            if (in_array('root', $this->permissions) && ! $this->canUseRootPermissions) {
-                throw new \Exception('You do not have permission to create tokens with root permissions.');
-            }
+            $teamId = currentTeam()->id;
+            ['permissions' => $permissions, 'scopes' => $storedScopes, 'expiresInDays' => $expiresInDays] = $this->validateTokenForm($this->form, $teamId);
+            $expiresAt = $this->limitTerminalTokenExpiry($permissions, filled($expiresInDays) ? now()->addDays((int) $expiresInDays) : null);
+            // One transaction, so a token never exists team-wide when saving its scopes fails.
+            $token = DB::transaction(function () use ($permissions, $expiresAt, $teamId, $storedScopes) {
+                $token = auth()->user()->createToken($this->form->description, $permissions, $expiresAt, $teamId);
+                $token->accessToken->forceFill(['scopes' => $storedScopes])->save();
 
-            if (array_intersect(['write', 'write:sensitive'], $this->permissions) && ! $this->canUseWritePermissions) {
-                throw new \Exception('You do not have permission to create tokens with write permissions.');
-            }
-
-            $this->validate([
-                'description' => 'required|min:3|max:255',
+                return $token;
+            });
+            auditLog('ui.api_token.created', [
+                'team_id' => $teamId,
+                'api_token_name' => $this->form->description,
+                'abilities' => $permissions,
+                'scopes' => $storedScopes,
+                'expires_at' => $expiresAt?->toIso8601String(),
             ]);
-            $token = auth()->user()->createToken($this->description, array_values($this->permissions));
             $this->getTokens();
-            session()->flash('token', $token->plainTextToken);
+            $this->form->reset();
+            $this->form->scopeMode = $this->canUseTeamScope ? 'team' : 'selected';
+            // Do NOT strip the numeric prefix (e.g. "69|...") — Sanctum uses it to index and look up tokens.
+            $this->dispatch('api-token-issued', token: $token->plainTextToken);
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    /**
+     * Save the edited token. The token value does not change, and the next request with it uses the new access.
+     */
+    public function updateToken(int $id)
+    {
+        try {
+            $token = $this->findOwnToken($id);
+            $this->authorize('update', $token);
+
+            $teamId = currentTeam()->id;
+            ['permissions' => $permissions, 'scopes' => $storedScopes, 'expiresInDays' => $expiresInDays] = $this->validateTokenForm($this->editForm, $teamId, editing: true);
+            $before = ['abilities' => $token->abilities, 'scopes' => $token->scopes, 'expires_at' => $token->expires_at?->toIso8601String()];
+
+            $token->forceFill([
+                'name' => $this->editForm->description,
+                'abilities' => $permissions,
+                'scopes' => $storedScopes,
+            ]);
+            if ($expiresInDays !== ApiTokenForm::KEEP_EXPIRY) {
+                $token->forceFill([
+                    'expires_at' => filled($expiresInDays) ? now()->addDays((int) $expiresInDays) : null,
+                    // A new expiry date needs a new expiration warning.
+                    'api_token_expiration_warning_sent_at' => null,
+                ]);
+            }
+            $limitedExpiry = $this->limitTerminalTokenExpiry($permissions, $token->expires_at);
+            if ($limitedExpiry != $token->expires_at) {
+                $token->forceFill(['expires_at' => $limitedExpiry, 'api_token_expiration_warning_sent_at' => null]);
+            }
+            $token->save();
+
+            auditLog('ui.api_token.updated', [
+                'team_id' => $teamId,
+                'api_token_name' => $token->name,
+                'before' => $before,
+                'after' => ['abilities' => $permissions, 'scopes' => $storedScopes, 'expires_at' => $token->expires_at?->toIso8601String()],
+            ]);
+            $this->editForm->reset();
+            $this->getTokens();
+            $this->dispatch('api-token-updated');
+            $this->dispatch('success', 'API token updated.');
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    /**
+     * Validate the form and check that the user may give the token this access.
+     * Never trust the $this->canUse* booleans: check the current user's access in the team again.
+     *
+     * @return array{permissions: list<string>, scopes: list<array{scope: string, uuid: string}>|null, expiresInDays: int|string|null}
+     */
+    private function validateTokenForm(ApiTokenForm $form, int $teamId, bool $editing = false): array
+    {
+        $expiryChoices = array_keys($this->expirationOptions);
+        if ($editing) {
+            $expiryChoices[] = ApiTokenForm::KEEP_EXPIRY;
+        }
+
+        $validated = $form->validate([
+            'description' => 'required|min:3|max:255',
+            'expiresInDays' => ['nullable', Rule::in($expiryChoices)],
+            'permissions' => 'required|array|min:1',
+            'permissions.*' => ['required', 'string', Rule::in(['read', 'read:sensitive', 'write', 'write:sensitive', 'deploy', 'delete', 'root', 'terminal'])],
+            'scopeMode' => ['required', Rule::in(['team', 'selected'])],
+            'selectedScopes' => ['exclude_unless:scopeMode,selected', 'required', 'array', 'min:1'],
+            'selectedScopes.*' => ['string', 'regex:/^(project|environment|resource|server):[A-Za-z0-9_-]+$/'],
+        ], [
+            'selectedScopes.required' => 'Select at least one project, environment, resource, or server.',
+        ]);
+        $permissions = array_values($validated['permissions']);
+        $form->selectedScopes = $this->withoutCoveredScopes($form->selectedScopes);
+        $scopes = $form->scopeMode === 'selected' ? $this->parseSelectedScopes($form->selectedScopes, $teamId) : null;
+
+        if (in_array('write:sensitive', $permissions, true) && ! auth()->user()->isAdminOfTeam($teamId)) {
+            throw new \Exception('You do not have permission to give tokens write:sensitive permissions.');
+        }
+        if (in_array('terminal', $permissions, true)) {
+            if (! auth()->user()->isAdminOfTeam($teamId)) {
+                throw new \Exception('You do not have permission to give tokens terminal permissions.');
+            }
+            if ($permissions !== ['terminal']) {
+                throw new \Exception('A terminal token must have only the terminal permission.');
+            }
+        }
+        $levels = AccessLevel::parseMany($permissions);
+        $grants = $scopes === null
+            ? [Grant::team($levels)]
+            : array_map(fn (Grant $scope) => new Grant($scope->scope, $scope->uuid, $levels), $scopes);
+        if (! app(AccessResolver::class)->userHolds(auth()->user(), $teamId, $grants)) {
+            throw new \Exception('A token cannot have more access than you have. Choose fewer permissions or narrower projects, environments, resources, or servers.');
+        }
+
+        return [
+            'permissions' => $permissions,
+            'scopes' => $scopes === null ? null : array_map(fn (Grant $scope) => ['scope' => $scope->scope->value, 'uuid' => $scope->uuid], $scopes),
+            'expiresInDays' => $validated['expiresInDays'] ?? null,
+        ];
+    }
+
+    /**
+     * Terminal tokens can run commands on servers, so they always expire after at most 90 days.
+     *
+     * @param  list<string>  $permissions
+     */
+    private function limitTerminalTokenExpiry(array $permissions, ?CarbonInterface $expiresAt): ?CarbonInterface
+    {
+        if (! in_array('terminal', $permissions, true)) {
+            return $expiresAt;
+        }
+
+        $maxExpiry = now()->addDays(90);
+
+        return $expiresAt === null || $expiresAt->greaterThan($maxExpiry) ? $maxExpiry : $expiresAt;
+    }
+
+    private function findOwnToken(int $id): PersonalAccessToken
+    {
+        return auth()->user()->tokens()
+            ->where('team_id', currentTeam()->id)
+            ->where('id', $id)
+            ->firstOrFail();
+    }
+
+    /**
+     * @param  list<string>  $selectedScopes
+     * @return list<Grant> scopes without levels; a token's levels are its abilities
+     */
+    private function parseSelectedScopes(array $selectedScopes, int $teamId): array
+    {
+        $resolver = app(AccessResolver::class);
+        $scopes = [];
+        foreach (array_unique($selectedScopes) as $selected) {
+            [$scope, $uuid] = explode(':', $selected, 2);
+            $grant = new Grant(AccessScope::from($scope), $uuid, []);
+            if ($grant->scope === AccessScope::Server && ! $resolver->coversWholeTeam(auth()->user(), $teamId)) {
+                throw new \Exception('Only users with access to the whole team can limit a token to servers.');
+            }
+            $layer = $resolver->resolve($teamId, [new Grant($grant->scope, $uuid, [AccessLevel::Read])]);
+            $existsInTeam = match ($grant->scope) {
+                AccessScope::Project => $layer->visibleProjectIds() !== [],
+                AccessScope::Environment => $layer->fullEnvironmentIds() !== [],
+                AccessScope::Resource => $layer->resourceUuids() !== [],
+                AccessScope::Server => $layer->serverUuids() !== [],
+                AccessScope::Team => false,
+            };
+            if (! $existsInTeam) {
+                throw new \Exception('A selected project, environment, resource, or server does not exist in this team.');
+            }
+            $scopes[] = $grant;
+        }
+
+        return $scopes;
+    }
+
+    /**
+     * Pause a token so it stops authenticating requests, or resume a paused token. The token value does not change.
+     * The caller sends the wanted state, so a stale page cannot resume a token that another page paused.
+     */
+    public function setPaused(int $id, bool $paused)
+    {
+        try {
+            $token = $this->findOwnToken($id);
+            $this->authorize('update', $token);
+
+            if ($token->isPaused() !== $paused) {
+                $token->forceFill(['paused_at' => $paused ? now() : null])->save();
+                auditLog($paused ? 'ui.api_token.paused' : 'ui.api_token.resumed', [
+                    'team_id' => currentTeam()->id,
+                    'api_token_name' => $token->name,
+                ]);
+            }
+            $this->getTokens();
+            $this->dispatch('success', $paused ? 'API token paused.' : 'API token resumed.');
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function roll(int $id)
+    {
+        try {
+            $token = $this->findOwnToken($id);
+            $this->authorize('update', $token);
+            $plainTextToken = $token->roll();
+            auditLog('ui.api_token.rolled', [
+                'team_id' => $token->team_id,
+                'api_token_name' => $token->name,
+            ]);
+            $this->getTokens();
+            $this->dispatch('api-token-issued', token: $plainTextToken);
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
@@ -102,9 +424,14 @@ class ApiTokens extends Component
     public function revoke(int $id)
     {
         try {
-            $token = auth()->user()->tokens()->where('id', $id)->firstOrFail();
+            $token = $this->findOwnToken($id);
             $this->authorize('delete', $token);
+            $tokenName = $token->name;
             $token->delete();
+            auditLog('ui.api_token.revoked', [
+                'team_id' => currentTeam()->id,
+                'api_token_name' => $tokenName,
+            ]);
             $this->getTokens();
         } catch (\Exception $e) {
             return handleError($e, $this);

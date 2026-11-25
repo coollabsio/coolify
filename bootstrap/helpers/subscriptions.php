@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\Team;
+use Stripe\BillingPortal\Session;
+use Stripe\Customer;
 use Stripe\Stripe;
 
 function isSubscriptionActive()
@@ -65,7 +67,7 @@ function getStripeCustomerPortalSession(Team $team)
         return null;
     }
 
-    return \Stripe\BillingPortal\Session::create([
+    return Session::create([
         'customer' => $stripe_customer_id,
         'return_url' => $return_url,
     ]);
@@ -80,6 +82,16 @@ function allowedPathsForUnsubscribedAccounts()
         'two-factor-challenge',
         'livewire/update',
         'admin',
+        // Account basics stay available without a paid plan.
+        'profile',
+        'profile/appearance',
+        'profile/passkeys/confirm',
+        'user/confirm-password',
+        'user/passkeys',
+        'user/passkeys/options',
+        'passkeys/confirm',
+        'passkeys/confirm/options',
+        ...allowedPathsForTwoFactorSetup(),
     ];
 }
 function allowedPathsForBoardingAccounts()
@@ -98,6 +110,30 @@ function allowedPathsForInvalidAccounts()
         'force-password-reset',
         'two-factor-challenge',
         'livewire/update',
+        ...allowedPathsForTwoFactorSetup(),
+    ];
+}
+/**
+ * Paths a user needs to configure 2FA when their team requires it.
+ *
+ * @return array<int, string>
+ */
+function allowedPathsForTwoFactorSetup(): array
+{
+    return [
+        'two-factor-required',
+        'two-factor-required/switch-team',
+        'two-factor-challenge',
+        'logout',
+        'user/confirm-password',
+        'user/confirmed-password-status',
+        'passkeys/confirm',
+        'passkeys/confirm/options',
+        'user/two-factor-authentication',
+        'user/confirmed-two-factor-authentication',
+        'user/two-factor-qr-code',
+        'user/two-factor-secret-key',
+        'user/two-factor-recovery-codes',
     ];
 }
 
@@ -114,7 +150,7 @@ function updateStripeCustomerEmail(Team $team, string $newEmail): void
 
     Stripe::setApiKey(config('subscription.stripe_api_key'));
 
-    \Stripe\Customer::update(
+    Customer::update(
         $stripe_customer_id,
         ['email' => $newEmail]
     );

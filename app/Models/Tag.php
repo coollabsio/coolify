@@ -2,13 +2,28 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use App\Traits\HasSafeStringAttribute;
+use OpenApi\Attributes as OA;
 
+#[OA\Schema(
+    description: 'Tag model',
+    type: 'object',
+    properties: [
+        new OA\Property(property: 'uuid', type: 'string'),
+        new OA\Property(property: 'name', type: 'string'),
+        new OA\Property(property: 'created_at', type: 'string'),
+        new OA\Property(property: 'updated_at', type: 'string'),
+    ]
+)]
 class Tag extends BaseModel
 {
-    use HasSafeStringAttribute;
+    use Auditable, HasSafeStringAttribute;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'team_id',
+    ];
 
     protected function customizeName($value)
     {

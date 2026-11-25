@@ -1,0 +1,696 @@
+<?php
+
+use App\Models\Server;
+use App\Models\ServerSetting;
+use App\Services\ImageScan\ScannerCommands;
+use Illuminate\Support\Facades\Process;
+use Tests\TestCase;
+
+uses(TestCase::class);
+
+const SCANNER_TEST_RUN_ID = 'run1234abcd';
+const SCANNER_TEST_INIT_IMAGE = 'alpine@sha256:2e0b81d60597f449baa56dc25d355367869d2dca4cd57e866f1e2b52af3eb55f';
+const SCANNER_TEST_HEX = 'aaaabbbbccccddddeeeeffff0000111122223333444455556666777788889999';
+
+beforeEach(function () {
+    $this->server = Mockery::mock(Server::class)->makePartial();
+    $this->server->shouldReceive('getAttribute')->with('user')->andReturn('ubuntu');
+    $this->server->shouldReceive('getAttribute')->with('settings')->andReturn(new ServerSetting);
+    $this->server->shouldReceive('setAttribute')->andReturnSelf();
+    $this->server->user = 'ubuntu';
+    $this->commands = new ScannerCommands($this->server, SCANNER_TEST_RUN_ID);
+});
+
+afterEach(function () {
+    Mockery::close();
+});
+
+/**
+ * @return array<string, list<string>>
+ */
+function scannerCommandLists(ScannerCommands $commands): array
+{
+    $auth = base64_encode(json_encode(['auths' => ['ghcr.io' => ['auth' => base64_encode('user:token')]]]));
+
+    return [
+        'prepare' => $commands->prepare(),
+        'dbUpdate' => $commands->dbUpdate(),
+        'dbStatus' => $commands->dbStatus(),
+        'scannerImages' => $commands->scannerImages(),
+        'inspect' => $commands->inspect('localhost:5000/team/app:1.2'),
+        'pull' => $commands->pull('localhost:5000/team/app:1.2'),
+        'diskFree' => $commands->diskFree(),
+        'diskUsage' => $commands->diskUsage(),
+        'sbomFromLocal' => $commands->sbomFromLocal('nginx', SCANNER_TEST_HEX),
+        'sbomFromHost' => $commands->sbomFromHost(),
+        'sbomFromRegistry' => $commands->sbomFromRegistry('ghcr.io/a/b@sha256:'.str_repeat('ab', 32), 'linux/amd64', 'cand-'.SCANNER_TEST_HEX, null),
+        'sbomFromRegistry with auth' => $commands->sbomFromRegistry('ghcr.io/a/b:1', 'linux/arm64/v8', 'cand-1', $auth),
+        'grype' => $commands->grype(SCANNER_TEST_HEX),
+        'packages' => $commands->packages(SCANNER_TEST_HEX),
+        'tags' => $commands->tags('nginx', null),
+        'tags with auth' => $commands->tags('ghcr.io/a/b', $auth),
+        'digest' => $commands->digest('nginx:1.27', null, null),
+        'digest with platform and auth' => $commands->digest('ghcr.io/a/b:1', 'linux/amd64', $auth),
+        'cleanup' => $commands->cleanup(),
+        'deleteScannerData' => $commands->deleteScannerData(),
+        'runningContainers' => $commands->runningContainers(),
+        'deleteSboms' => $commands->deleteSboms(['sha256:'.SCANNER_TEST_HEX]),
+    ];
+}
+
+/**
+ * Unwraps `sh -c '<script>'` lines so assertions read the script as the shell runs it.
+ *
+ * @param  list<string>  $commands
+ * @return list<string>
+ */
+function scannerUnwrapped(array $commands): array
+{
+    return array_map(function (string $line): string {
+        if (! str_starts_with($line, "sh -c '")) {
+            return $line;
+        }
+
+        return str_replace("'\\''", "'", substr($line, 7, -1));
+    }, $commands);
+}
+
+/**
+ * @param  list<string>  $commands
+ * @return list<string>
+ */
+function scannerDockerRuns(array $commands): array
+{
+    return array_values(array_filter(scannerUnwrapped($commands), fn (string $line) => str_contains($line, 'docker run') && ! str_contains($line, SCANNER_TEST_INIT_IMAGE)));
+}
+
+it('runs syft with one worker and without file metadata, so a large image fits in the memory limit', function () {
+    $syft = str_replace("'\\''", "'", (string) collect($this->commands->sbomFromLocal('nginx', SCANNER_TEST_HEX))->first(fn (string $line) => str_contains($line, 'docker-archive:')));
+
+    expect($syft)->toContain("-e 'SYFT_PARALLELISM=1' ")
+        ->and($syft)->toContain("-e 'SYFT_FILE_METADATA_SELECTION=none' ")
+        ->and($syft)->toContain('--memory 1024m --memory-swap 1024m');
+});
+
+it('runs every scanner container with the memory limit of the server', function () {
+    $server = Mockery::mock(Server::class)->makePartial();
+    $server->shouldReceive('getAttribute')->with('user')->andReturn('root');
+    $server->shouldReceive('getAttribute')->with('settings')->andReturn(new ServerSetting(['image_scan_memory_mb' => 4096]));
+    $commands = new ScannerCommands($server, SCANNER_TEST_RUN_ID);
+
+    $runs = collect(scannerCommandLists($commands))->flatMap(fn (array $list) => scannerDockerRuns($list));
+
+    expect($runs)->not->toBeEmpty()
+        ->and($runs->every(fn (string $line) => str_contains($line, '--memory 4096m --memory-swap 4096m ')))->toBeTrue();
+});
+
+it('asks Docker whether the memory limit stopped a scanner, then removes its container in the same script', function () {
+    $name = 'coolify-scan-'.SCANNER_TEST_RUN_ID;
+    $check = "if [ \"\$(docker inspect -f '{{.State.OOMKilled}}' {$name} 2>/dev/null)\" = true ]; then echo 'coolify-scan-oom %s'; fi; docker rm -f {$name} >/dev/null 2>&1";
+    $runs = [
+        'sbom' => $this->commands->sbomFromLocal('nginx', SCANNER_TEST_HEX),
+        'grype' => $this->commands->grype(SCANNER_TEST_HEX),
+        'packages' => $this->commands->packages(SCANNER_TEST_HEX),
+    ];
+
+    foreach ($runs as $step => $commands) {
+        $script = collect(scannerUnwrapped($commands))->first(fn (string $line) => str_contains($line, 'docker run'));
+
+        expect($script)->toContain(sprintf($check, $step))
+            ->and(strpos($script, 'docker run'))->toBeLessThan(strpos($script, 'docker inspect'))
+            ->and(strpos($script, 'docker inspect'))->toBeLessThan(strpos($script, 'echo "coolify-scan-exit'));
+    }
+
+    $registry = collect(scannerUnwrapped($this->commands->sbomFromRegistry('ghcr.io/a/b:1', 'linux/amd64', 'cand-1', null)))->first(fn (string $line) => str_contains($line, 'docker run'));
+    expect($registry)->toContain(sprintf($check, 'sbom'))
+        ->and(collect($this->commands->sbomFromLocal('nginx', SCANNER_TEST_HEX))->first(fn (string $line) => str_contains($line, 'docker save')))->not->toContain('OOMKilled');
+});
+
+it('reads the out of memory line only before the payload', function () {
+    $parsed = ScannerCommands::parseOutput("coolify-scan-oom grype\ncoolify-scan-exit grype 137 0\ncoolify-scan-payload\ncoolify-scan-oom packages");
+
+    expect($parsed['oom'])->toBe(['grype'])
+        ->and($parsed['exit_codes'])->toBe(['grype' => 137])
+        ->and(ScannerCommands::parseOutput("coolify-scan-exit grype 137 0\ncoolify-scan-payload\n")['oom'])->toBe([]);
+});
+
+it('starts every command list by removing a leftover scan container', function () {
+    foreach (scannerCommandLists($this->commands) as $name => $commands) {
+        expect($commands[0])->toBe('docker rm -f coolify-scan-'.SCANNER_TEST_RUN_ID.' >/dev/null 2>&1 || true', $name);
+    }
+});
+
+it('runs every scanner container with each hardening flag exactly once', function () {
+    $flags = ['--name coolify-scan-'.SCANNER_TEST_RUN_ID.' ', '--cap-drop ALL ', '--security-opt no-new-privileges ', '--read-only ',
+        '--pids-limit 256 ', '--user 65534:65534 ', '--cpus 1 ', '--memory 1024m ', '--memory-swap 1024m ',
+        "-e 'SYFT_CHECK_FOR_APP_UPDATE=false' ", "-e 'GRYPE_CHECK_FOR_APP_UPDATE=false' ", "-e 'XDG_CACHE_HOME=/scratch/cache' "];
+    $runs = 0;
+
+    foreach (scannerCommandLists($this->commands) as $name => $commands) {
+        foreach (scannerDockerRuns($commands) as $line) {
+            $runs++;
+            expect($line)->toMatch('/timeout -k 10 \d+ docker run /')
+                ->not->toContain('--rm ');
+            foreach ($flags as $flag) {
+                expect(substr_count($line, $flag))->toBe(1, "{$name}: {$flag}");
+            }
+        }
+    }
+
+    expect($runs)->toBe(13);
+});
+
+it('cuts the network only for runs that do not need a registry or the database download', function () {
+    $lists = scannerCommandLists($this->commands);
+
+    foreach (['dbStatus', 'sbomFromLocal', 'sbomFromHost', 'grype', 'packages'] as $name) {
+        expect(scannerDockerRuns($lists[$name]))->each->toContain('--network none ');
+    }
+    foreach (['dbUpdate', 'sbomFromRegistry', 'tags', 'digest'] as $name) {
+        expect(scannerDockerRuns($lists[$name]))->each->not->toContain('--network');
+    }
+});
+
+it('gives the work directory to the scanner user before a container uses it', function () {
+    $chown = "chown -R 65534:65534 '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."'";
+
+    foreach (scannerCommandLists($this->commands) as $name => $commands) {
+        $run = collect($commands)->search(fn (string $line) => str_contains($line, 'docker run') && ! str_contains($line, SCANNER_TEST_INIT_IMAGE));
+        if ($run === false) {
+            continue;
+        }
+
+        expect(array_search($chown, $commands, true))->toBeInt($name)->toBeLessThan($run, $name);
+    }
+});
+
+it('never gives a scanner the Docker socket', function () {
+    foreach (scannerCommandLists($this->commands) as $commands) {
+        expect(implode("\n", $commands))->not->toContain('docker.sock');
+    }
+});
+
+it('pins scanner images by digest', function () {
+    $all = implode("\n", array_merge(...array_values(scannerCommandLists($this->commands))));
+
+    expect($all)->toContain("'anchore/syft@sha256:4cc92b64ca74ffca4c94d4c8fcc01f217731375300be14d0b6eeb2e82eaa110a'")
+        ->toContain("'anchore/grype@sha256:621d56d1d68106b787022c81546f7e0a36202a25d1239f0c20195fab8c16f7ea'")
+        ->toContain("'regclient/regctl@sha256:45b57933c2b67bb1e280b4baaa220ef1ab212c81268ab19589fa1e83719c7c82'")
+        ->not->toMatch('/(syft|grype|regctl):latest/');
+});
+
+it('refuses to build commands with a scanner image digest that is not pinned', function (string $digest) {
+    config()->set('constants.image_scan.images.grype.digest', $digest);
+
+    (new ScannerCommands($this->server, SCANNER_TEST_RUN_ID))->grype(SCANNER_TEST_HEX);
+})->with(['latest', 'sha256:abc', 'sha256:'.str_repeat('A', 64), 'sha256:'.str_repeat('a', 64)."\n"])->throws(InvalidArgumentException::class);
+
+it('refuses a run ID that is not lowercase letters and digits', function (string $runId) {
+    new ScannerCommands($this->server, $runId);
+})->with(['short', 'UPPERCASE123', 'run-1234567', 'a;rm -rf /', str_repeat('a', 33)])->throws(InvalidArgumentException::class);
+
+it('passes image refs as escaped shell arguments', function () {
+    $digestRef = 'ghcr.io/a/b@sha256:'.str_repeat('ab', 32);
+    $script = fn (array $commands) => implode("\n", scannerUnwrapped($commands));
+
+    expect($script($this->commands->inspect('localhost:5000/team/app:1.2')))->toContain("'localhost:5000/team/app:1.2'")
+        ->and($script($this->commands->sbomFromRegistry($digestRef, 'linux/amd64', 'c1', null)))->toContain("'--platform' 'linux/amd64' 'registry:{$digestRef}'")
+        ->and($script($this->commands->digest($digestRef, null, null)))->toContain("'image' 'digest' '{$digestRef}'")
+        ->and($script($this->commands->tags('nginx:1', null)))->toContain("'tag' 'ls' 'docker.io/library/nginx'");
+});
+
+it('refuses values that could break out of the command', function (string $method, array $arguments) {
+    $this->commands->{$method}(...$arguments);
+})->with([
+    'image ref' => ['inspect', ['nginx;rm -rf /']],
+    'local sbom ref' => ['sbomFromLocal', ['nginx$(id)', SCANNER_TEST_HEX]],
+    'image id' => ['sbomFromLocal', ['nginx', 'sha256:'.SCANNER_TEST_HEX]],
+    'sbom name' => ['grype', ['../etc/passwd']],
+    'package sbom name' => ['packages', ['a b']],
+    'registry sbom name' => ['sbomFromRegistry', ['nginx', 'linux/amd64', 'x;id', null]],
+    'platform' => ['sbomFromRegistry', ['nginx', 'linux/amd64;id', 'c1', null]],
+    'digest platform' => ['digest', ['nginx', 'linux', null]],
+    'tags repository' => ['tags', ['nginx|id', null]],
+    'auth not base64' => ['tags', ['nginx', "abc'; id; '"]],
+    'auth with two registries' => ['tags', ['nginx', base64_encode(json_encode(['auths' => ['a.io' => ['auth' => 'x'], 'b.io' => ['auth' => 'y']]]))]],
+    'auth with a credential helper' => ['tags', ['nginx', base64_encode(json_encode(['auths' => ['a.io' => ['auth' => 'x']], 'credsStore' => 'desktop']))]],
+    'db url' => ['dbUpdate', ["https://x.io/db';id;'"]],
+    'db url scheme' => ['dbUpdate', ['file:///etc/passwd']],
+    'db url with a pipe' => ['dbUpdate', ['https://x.io/a|b']],
+    'db url with an ampersand' => ['dbUpdate', ['https://x.io/a?b=1&&c=2']],
+])->throws(InvalidArgumentException::class);
+
+it('writes the SBOM to a temp file and moves it into place after Syft succeeds', function () {
+    $commands = $this->commands->sbomFromLocal('nginx', SCANNER_TEST_HEX);
+    $index = collect($commands)->search(fn (string $line) => str_contains($line, 'docker-archive:'));
+    $syft = scannerUnwrapped($commands)[$index];
+    $tmp = '/data/coolify/image-scans/sboms/'.SCANNER_TEST_HEX.'.json.tmp-'.SCANNER_TEST_RUN_ID;
+    $final = '/data/coolify/image-scans/sboms/'.SCANNER_TEST_HEX.'.json';
+
+    expect($commands[$index])->toStartWith("sh -c 'ulimit -f 2097152; ")
+        ->and($syft)->toContain("> '{$tmp}' 2>/dev/null; rc=\$?; ")
+        ->and($syft)->toContain("if [ \$rc -eq 0 ]; then chown 65534:65534 '{$tmp}' && chmod 600 '{$tmp}' && mv -f '{$tmp}' '{$final}'; rc=\$?; fi; echo \"coolify-scan-exit sbom \$rc\"")
+        ->and($commands)->toContain("rm -f '{$tmp}' || true");
+});
+
+it('saves the local image by its ID so a moved tag cannot change the cached SBOM', function () {
+    $save = collect($this->commands->sbomFromLocal('nginx:1', SCANNER_TEST_HEX))->first(fn (string $line) => str_contains($line, 'docker save'));
+
+    expect($save)->toContain("docker save -o '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/in/image.tar' 'sha256:".SCANNER_TEST_HEX."' >/dev/null 2>&1")
+        ->not->toContain('nginx');
+});
+
+it('reads tool output through a size cap and prints an exit marker', function () {
+    foreach (['grype' => $this->commands->grype(SCANNER_TEST_HEX), 'packages' => $this->commands->packages(SCANNER_TEST_HEX), 'tags' => $this->commands->tags('nginx', null), 'digest' => $this->commands->digest('nginx', null, null), 'db-status' => $this->commands->dbStatus()] as $step => $commands) {
+        $all = implode("\n", scannerUnwrapped($commands));
+
+        expect($all)->toContain("head -c 10485761 '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/out' 2>/dev/null || true")
+            ->toContain('ulimit -f 40960; timeout ')
+            ->toContain("rc=\$?; if [ \"\$(docker inspect -f '{{.State.OOMKilled}}' coolify-scan-".SCANNER_TEST_RUN_ID." 2>/dev/null)\" = true ]; then echo 'coolify-scan-oom {$step}'; fi; docker rm -f coolify-scan-".SCANNER_TEST_RUN_ID." >/dev/null 2>&1; size=\$(wc -c < '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/out' 2>/dev/null | tr -cd 0-9); size=\${size:-0}; if [ \"\$size\" -ge 20971520 ]; then rc=0; fi; echo \"coolify-scan-exit {$step} \$rc \$size\"")
+            ->and(array_search('echo coolify-scan-payload', $commands, true))->toBeLessThan(collect($commands)->search(fn (string $line) => str_starts_with($line, 'head -c')))
+            ->and(end($commands))->toBe("rm -rf '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."' || true");
+    }
+});
+
+it('caps tool output on disk at twice the read limit in the blocks that sh counts', function () {
+    expect(ScannerCommands::OUTPUT_FILE_LIMIT_BLOCKS * 512)->toBe(2 * ScannerCommands::OUTPUT_LIMIT)
+        ->and(ScannerCommands::SBOM_FILE_LIMIT_BLOCKS * 512)->toBe(1024 ** 3);
+
+    foreach (scannerCommandLists($this->commands) as $name => $commands) {
+        foreach ($commands as $line) {
+            if (str_contains($line, 'docker run') && str_contains($line, '> ')) {
+                expect($line)->toStartWith("sh -c 'ulimit -f ", $name);
+            }
+        }
+    }
+});
+
+it('runs Grype with the default time limit and resources when the server has no settings', function () {
+    $run = scannerDockerRuns($this->commands->grype(SCANNER_TEST_HEX))[0];
+
+    expect($run)->toContain('; timeout -k 10 600 docker run ')
+        ->toContain('--cpus 1 --memory 1024m --memory-swap 1024m ');
+});
+
+function scannerServerWith(array $settings): Server
+{
+    $server = Mockery::mock(Server::class)->makePartial();
+    $server->shouldReceive('getAttribute')->with('user')->andReturn('root');
+    $server->shouldReceive('getAttribute')->with('settings')->andReturn(new ServerSetting($settings));
+
+    return $server;
+}
+
+it('runs the scanner containers with the time limits and CPUs of the server settings', function () {
+    $commands = new ScannerCommands(scannerServerWith(['image_scan_syft_timeout' => 1800, 'image_scan_grype_timeout' => 1200, 'image_scan_cpus' => 2.0]), SCANNER_TEST_RUN_ID);
+    $local = implode("\n", scannerUnwrapped($commands->sbomFromLocal('nginx', SCANNER_TEST_HEX)));
+
+    expect($local)->toContain('timeout -k 10 600 docker save ')
+        ->and(scannerDockerRuns($commands->sbomFromLocal('nginx', SCANNER_TEST_HEX))[0])->toContain('; timeout -k 10 1800 docker run ')
+        ->and(scannerDockerRuns($commands->sbomFromHost())[0])->toContain('; timeout -k 10 1800 docker run ')
+        ->and(scannerDockerRuns($commands->sbomFromRegistry('nginx:1', 'linux/amd64', 'cand-1', null))[0])->toContain('; timeout -k 10 1800 docker run ');
+
+    expect(scannerDockerRuns($commands->grype(SCANNER_TEST_HEX))[0])->toContain('; timeout -k 10 1200 docker run ')
+        ->toContain('--cpus 2 --memory 1024m ')
+        ->and(scannerDockerRuns($commands->packages(SCANNER_TEST_HEX))[0])->toContain('; timeout -k 10 300 docker run ')
+        ->toContain('--cpus 2 ');
+});
+
+it('keeps stored scanner limits inside the options', function () {
+    $server = scannerServerWith(['image_scan_syft_timeout' => 99999, 'image_scan_grype_timeout' => 5, 'image_scan_cpus' => 0.1]);
+
+    expect(ScannerCommands::syftTimeout($server))->toBe(3600)
+        ->and(ScannerCommands::grypeTimeout($server))->toBe(300)
+        ->and(ScannerCommands::cpus($server))->toBe('0.5');
+});
+
+it('mounts the database and the SBOM read-only for Grype', function () {
+    $run = scannerDockerRuns($this->commands->grype(SCANNER_TEST_HEX))[0];
+
+    expect($run)->toContain("--mount 'type=volume,src=coolify-grype-db,dst=/db,readonly'")
+        ->toContain("--mount 'type=bind,src=/data/coolify/image-scans/sboms/".SCANNER_TEST_HEX.".json,dst=/sbom/sbom.json,readonly'")
+        ->toContain("-e 'GRYPE_DB_AUTO_UPDATE=false'")
+        ->toContain('sbom:/sbom/sbom.json');
+});
+
+it('uploads the output templates from the resources', function () {
+    $templateLine = collect($this->commands->grype(SCANNER_TEST_HEX))->first(fn (string $line) => str_contains($line, 'base64 -d'));
+
+    preg_match("/^echo '([A-Za-z0-9+\\/=]+)' \\| base64 -d \\| tee '([^']+)' >\\/dev\\/null$/", $templateLine, $matches);
+
+    expect(base64_decode($matches[1], true))->toBe(file_get_contents(resource_path('image-scan/grype.tmpl')))
+        ->and($matches[2])->toBe('/data/coolify/image-scans/tmp-'.SCANNER_TEST_RUN_ID.'/tpl/grype.tmpl');
+});
+
+it('writes registry credentials for one registry into a private file mounted read-only', function () {
+    $auth = base64_encode(json_encode(['auths' => ['ghcr.io' => ['auth' => base64_encode('user:token')]]]));
+    $commands = $this->commands->tags('ghcr.io/a/b', $auth);
+    $config = '/data/coolify/image-scans/tmp-'.SCANNER_TEST_RUN_ID.'/auth/config.json';
+
+    expect($commands)->toContain("chmod 600 '{$config}'")
+        ->and(implode("\n", $commands))->toContain("| base64 -d | tee '{$config}' >/dev/null")
+        ->and(scannerDockerRuns($commands)[0])->toContain("-e 'DOCKER_CONFIG=/auth'")
+        ->toContain('dst=/auth,readonly');
+
+    expect(implode("\n", $this->commands->tags('ghcr.io/a/b', null)))->not->toContain('DOCKER_CONFIG')->not->toContain('/auth');
+});
+
+it('keeps registry credentials out of sudo arguments for a non-root SSH user', function () {
+    $secret = base64_encode('user:secret-token');
+    $auth = base64_encode(json_encode(['auths' => ['ghcr.io' => ['auth' => $secret]]]));
+    $written = base64_encode(json_encode(['auths' => ['ghcr.io' => ['auth' => $secret]]], JSON_UNESCAPED_SLASHES));
+    $lists = [
+        $this->commands->tags('ghcr.io/a/b', $auth),
+        $this->commands->digest('ghcr.io/a/b:1', null, $auth),
+        $this->commands->sbomFromRegistry('ghcr.io/a/b:1', 'linux/amd64', 'c1', $auth),
+    ];
+
+    foreach ($lists as $commands) {
+        $parsed = parseCommandsByLineForSudo(collect($commands), $this->server);
+
+        expect(implode("\n", $parsed))->not->toContain('sudo printf')->toContain("echo '{$written}' | sudo base64 -d");
+        foreach ($parsed as $line) {
+            $sudo = strpos($line, 'sudo');
+            $secretAt = strpos($line, $written);
+            expect($secretAt === false || $sudo === false || $sudo > $secretAt)->toBeTrue($line);
+        }
+    }
+});
+
+it('accepts credentials only for the registry of the image', function (string $key, string $ref) {
+    $auth = base64_encode(json_encode(['auths' => [$key => ['auth' => 'eA==']]]));
+
+    expect($this->commands->digest($ref, null, $auth))->toBeArray();
+})->with([
+    ['ghcr.io', 'ghcr.io/a/b:1'],
+    ['https://ghcr.io', 'ghcr.io/a/b:1'],
+    ['localhost:5000', 'localhost:5000/team/app:1.2'],
+    ['https://index.docker.io/v1/', 'nginx'],
+    ['index.docker.io', 'grafana/grafana'],
+    ['docker.io', 'nginx'],
+    ['registry-1.docker.io', 'nginx'],
+]);
+
+it('refuses credentials for another registry', function (string $key, string $ref) {
+    $auth = base64_encode(json_encode(['auths' => [$key => ['auth' => 'eA==']]]));
+
+    $this->commands->tags($ref, $auth);
+})->with([
+    ['ghcr.io', 'nginx'],
+    ['https://index.docker.io/v1/', 'ghcr.io/a/b'],
+    ['ghcr.io.evil.com', 'ghcr.io/a/b'],
+    ['localhost:5001', 'localhost:5000/app'],
+])->throws(InvalidArgumentException::class);
+
+it('removes the work directory, the leftover temp files, and the container in cleanup', function () {
+    expect($this->commands->cleanup())->toContain("rm -rf '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."' || true")
+        ->toContain("find '/data/coolify/image-scans/sboms' -maxdepth 1 -name '*.json.tmp-*' -mmin +60 -delete 2>/dev/null || true")
+        ->and($this->commands->deleteScannerData())->toContain("rm -rf '/data/coolify/image-scans' || true")
+        ->toContain('docker volume rm -f coolify-grype-db >/dev/null 2>&1 || true');
+});
+
+it('keeps every command list working for a non-root SSH user', function () {
+    foreach (scannerCommandLists($this->commands) as $name => $commands) {
+        $parsed = parseCommandsByLineForSudo(collect($commands), $this->server);
+
+        foreach ($parsed as $index => $line) {
+            $original = $commands[$index];
+
+            expect($line)->not->toContain('sudo sudo')
+                ->not->toContain('chown -h ubuntu');
+
+            if (str_starts_with($original, 'sh -c ')) {
+                expect($line)->toBe('sudo '.$original, $name)
+                    ->and(isSingleSudoShellScript($line))->toBeTrue($name)
+                    ->and(substr_count($line, 'sudo'))->toBe(1, $name);
+
+                continue;
+            }
+            if (str_starts_with($original, 'if ')) {
+                expect($line)->toMatch('/^if sudo (DOCKER_CONTEXT=default DOCKER_CONFIG="\$\(.+\)" )?(timeout -k 10 \d+ docker|docker image inspect) /', $name)
+                    ->toContain("; then echo 'coolify-scan-exit ")
+                    ->toEndWith('$?"; fi', $name);
+
+                continue;
+            }
+            if (str_starts_with($original, 'echo ')) {
+                expect($line)->toBe(str_replace(' | ', ' | sudo ', $original), $name)
+                    ->toMatch("/^echo (coolify-scan-payload|'[A-Za-z0-9+\\/=]+' \\| sudo base64 -d \\| sudo tee '[^']+' >\\/dev\\/null)$/", $name);
+
+                continue;
+            }
+
+            expect($line)->toMatch('/^sudo (docker|mkdir|chown|chmod|rm|head|df|find) /', $name);
+            if (str_ends_with($original, ' || true')) {
+                expect($line)->toEndWith(' || sudo true', $name);
+            }
+        }
+    }
+});
+
+it('pulls with the registry login of the non-root SSH user', function () {
+    $parsed = parseCommandsByLineForSudo(collect($this->commands->pull('ghcr.io/a/b:1')), $this->server);
+
+    expect($parsed[1])->toBe('if sudo DOCKER_CONTEXT=default DOCKER_CONFIG="$(sudo find "$HOME/.docker/config.json" -maxdepth 0 -exec dirname {} \\; 2>/dev/null)" timeout -k 10 600 docker pull \'ghcr.io/a/b:1\' >/dev/null 2>&1; then echo \'coolify-scan-exit pull 0\'; else echo "coolify-scan-exit pull $?"; fi');
+});
+
+it('keeps the docker root lookup inside the disk check for a non-root SSH user', function () {
+    $parsed = parseCommandsByLineForSudo(collect($this->commands->diskFree()), $this->server);
+
+    expect($parsed[2])->toBe("sudo df -P -B1 \"\$(sudo docker info -f '{{.DockerRootDir}}')\" | sudo awk 'NR==2 {printf \"%s \", \$4}'")
+        ->and($parsed[3])->toBe("sudo df -P -B1 '/data/coolify/image-scans' | sudo awk 'NR==2 {print \$4}'");
+});
+
+it('prints the image ID, the repo digest, the platform, and the size in one line', function () {
+    $commands = $this->commands->inspect('nginx:1');
+
+    expect($commands[2])->toBe('echo coolify-scan-payload')
+        ->and($commands[3])->toBe("docker image inspect --format '{{.Id}}|{{if .RepoDigests}}{{index .RepoDigests 0}}{{end}}|{{.Os}}/{{.Architecture}}|{{.Size}}' 'nginx:1' 2>/dev/null || true");
+});
+
+it('parses exit markers before the payload separator', function () {
+    $output = "coolify-scan-exit save 0\ncoolify-scan-exit sbom 0\ncoolify-scan-exit grype 0 12\ncoolify-scan-payload\n{\"a\":1}\ncoolify-scan-payload\n{\"b\":2}";
+
+    expect(ScannerCommands::parseOutput($output))->toBe([
+        'exit_codes' => ['save' => 0, 'sbom' => 0, 'grype' => 0],
+        'sizes' => ['grype' => 12],
+        'oom' => [],
+        'payload' => "{\"a\":1}\ncoolify-scan-payload\n{\"b\":2}",
+    ])->and(ScannerCommands::parseOutput("coolify-scan-exit save 0\ncoolify-scan-exit sbom 1"))->toBe([
+        'exit_codes' => ['save' => 0, 'sbom' => 1], 'sizes' => [], 'oom' => [], 'payload' => '',
+    ])->and(ScannerCommands::parseOutput(null))->toBe(['exit_codes' => [], 'sizes' => [], 'oom' => [], 'payload' => '']);
+});
+
+it('ignores payload lines that look like exit markers', function () {
+    $output = "coolify-scan-exit grype 2 9\ncoolify-scan-payload\ncoolify-scan-exit grype 0 9\n{}";
+
+    expect(ScannerCommands::parseOutput($output))->toBe([
+        'exit_codes' => ['grype' => 2],
+        'sizes' => ['grype' => 9],
+        'oom' => [],
+        'payload' => "coolify-scan-exit grype 0 9\n{}",
+    ]);
+});
+
+it('prints the bytes used by the database volume and the SBOM directory as markers', function () {
+    $commands = $this->commands->diskUsage();
+
+    expect($commands)->toHaveCount(3)
+        ->and($commands[1])->toContain('coolify-scan-exit disk-db 0')->toContain('docker volume inspect -f')->toContain('coolify-grype-db')
+        ->and($commands[2])->toContain('coolify-scan-exit disk-sboms 0')->toContain("'/data/coolify/image-scans'");
+
+    $parsed = ScannerCommands::parseOutput("coolify-scan-exit disk-db 0 1048576\ncoolify-scan-exit disk-sboms 0 0");
+
+    expect($parsed['sizes'])->toBe(['disk-db' => 1048576, 'disk-sboms' => 0]);
+});
+
+it('runs the disk usage check as one sudo shell script per line for a non-root SSH user', function () {
+    $commands = $this->commands->diskUsage();
+    $parsed = parseCommandsByLineForSudo(collect($commands), $this->server);
+
+    foreach (array_slice($parsed, 1, null, true) as $index => $line) {
+        expect($line)->toBe('sudo '.$commands[$index])
+            ->and(substr_count($line, 'sudo'))->toBe(1);
+    }
+});
+
+it('lists the image ID, the image ref, and the labels of every running container as JSON lines', function () {
+    $commands = $this->commands->runningContainers();
+    $script = scannerUnwrapped($commands)[1];
+
+    expect($commands)->toHaveCount(2)
+        ->and($script)->toContain('docker ps -q --no-trunc')
+        ->toContain('coolify-scan-exit containers')
+        ->toContain('echo coolify-scan-payload')
+        ->toContain('{"id":{{json .Image}},"ref":{{json .Config.Image}},"labels":{{json .Config.Labels}}}')
+        ->toContain('head -c '.(ScannerCommands::OUTPUT_LIMIT + 1));
+});
+
+it('deletes SBOM files by image ID in one command', function () {
+    $other = str_repeat('1', 64);
+    $commands = $this->commands->deleteSboms(['sha256:'.SCANNER_TEST_HEX, 'sha256:'.$other]);
+    $script = scannerUnwrapped($commands)[1];
+
+    expect($commands)->toHaveCount(2)
+        ->and($script)->toBe("rm -f '/data/coolify/image-scans/sboms/".SCANNER_TEST_HEX.".json' '/data/coolify/image-scans/sboms/{$other}.json'; echo \"coolify-scan-exit sbom-delete \$?\"");
+});
+
+it('refuses to delete an SBOM by an invalid image ID', function (string $imageId) {
+    $this->commands->deleteSboms([$imageId]);
+})->with([
+    'path' => ['sha256:../../etc/passwd'],
+    'short' => ['sha256:abc'],
+    'no prefix' => [SCANNER_TEST_HEX],
+])->throws(InvalidArgumentException::class);
+
+it('sets up the database volume inside a container instead of through a host path', function () {
+    foreach (['prepare' => $this->commands->prepare(), 'dbUpdate' => $this->commands->dbUpdate()] as $name => $commands) {
+        $all = implode("\n", $commands);
+        $setup = collect(scannerUnwrapped($commands))->first(fn (string $line) => str_contains($line, 'coolify-scan-exit db-volume'));
+
+        expect($all)->not->toContain('Mountpoint', $name)
+            ->and($setup)->toBeString($name)
+            ->toContain('docker volume create coolify-grype-db')
+            ->toContain('coolify-scan-exit db-volume')
+            ->toContain('--mount type=volume,src=coolify-grype-db,dst=/db ')
+            ->toContain('--network none ')
+            ->toContain('--cap-drop ALL --cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER ')
+            ->toContain('--security-opt no-new-privileges --read-only ')
+            ->toMatch('/timeout -k 10 120 docker run /')
+            ->toContain('chown 65534:65534 /db')
+            ->toContain('chown -h 65534:65534 /db/tmp')
+            ->not->toContain('docker.sock');
+    }
+});
+
+it('pulls the volume setup image before it is used', function () {
+    $commands = $this->commands->prepare();
+    $pull = collect($commands)->search(fn (string $line) => str_contains($line, 'docker pull '.escapeshellarg(SCANNER_TEST_INIT_IMAGE)));
+    $setup = collect($commands)->search(fn (string $line) => str_contains($line, 'coolify-scan-exit db-volume'));
+
+    expect($pull)->toBeInt()->and($setup)->toBeInt()->toBeGreaterThan($pull);
+});
+
+it('keeps the volume setup as one sudo shell line for a non-root SSH user', function () {
+    $setup = collect($this->commands->prepare())->first(fn (string $line) => str_contains($line, 'coolify-scan-exit db-volume'));
+    $parsed = parseCommandsByLineForSudo(collect([$setup]), $this->server);
+
+    expect($parsed)->toBe(['sudo '.$setup]);
+});
+
+it('keeps a fixed host match when an unfixed match of another package has the same vulnerability and version', function () {
+    $script = implode("\n", scannerUnwrapped($this->commands->grype(ScannerCommands::HOST_SBOM)));
+    preg_match("/\| (grep -v -F .*?) > '/", $script, $filter);
+    $lines = [
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-1","pkg":"linux-image","ver":"6.1"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-1","pkg":"linux-headers","ver":"6.1"}',
+        '{"fix":"fixed","fixv":["6.2"],"id":"CVE-1","pkg":"linux-libc-dev","ver":"6.1"}',
+        '{"fix":"wont-fix","fixv":[],"id":"CVE-2","pkg":"linux-image","ver":"6.1"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-1","pkg":"linux-image","ver":"6.0"}',
+    ];
+
+    $result = Process::input(implode("\n", $lines)."\n")->run(['sh', '-c', $filter[1]]);
+
+    expect($result->successful())->toBeTrue()
+        ->and(explode("\n", trim($result->output())))->toBe([$lines[0], $lines[2], $lines[4]]);
+});
+
+it('keeps one host match per package, and one line of the kernel image per kernel', function () {
+    $script = implode("\n", scannerUnwrapped($this->commands->grype(ScannerCommands::HOST_SBOM)));
+    preg_match("/\\| (grep -v -F .*?) > '/", $script, $filter);
+    $lines = [
+        '{"eol":null}',
+        '{"fix":"fixed","fixv":["3.0.15-1"],"id":"CVE-1","pkg":"libssl3","ver":"3.0.14-1"}',
+        '{"fix":"fixed","fixv":["3.0.15-1"],"id":"CVE-1","pkg":"openssl","ver":"3.0.14-1"}',
+        '{"fix":"fixed","fixv":["3.0.15-1"],"id":"CVE-1","pkg":"openssl","ver":"3.0.14-1"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-2","pkg":"linux-headers-6.1.0-18-common","ver":"6.1.76-1"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-2","pkg":"linux-image-6.1.0-18-amd64","ver":"6.1.76-1"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-2","pkg":"linux-libc-dev","ver":"6.1.76-1"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-3","pkg":"kernel-core","ver":"5.14.0-503.el9"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-3","pkg":"kernel-modules","ver":"5.14.0-503.el9"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-3","pkg":"kernelshark","ver":"5.14.0-503.el9"}',
+    ];
+
+    $result = Process::input(implode("\n", $lines)."\n")->run(['sh', '-c', $filter[1]]);
+
+    expect($result->successful())->toBeTrue()
+        ->and(explode("\n", trim($result->output())))->toBe([$lines[0], $lines[1], $lines[2], $lines[5], $lines[7], $lines[9]]);
+});
+
+it('runs the host grype step and prints the exit code of the run, or of the filter when the run succeeded', function (int $grypeExit, bool $writeFails, string $marker, array $kept) {
+    $dir = sys_get_temp_dir().'/coolify-scan-test-'.bin2hex(random_bytes(4));
+    mkdir($dir);
+    $lines = [
+        '{"eol":null}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-1","pkg":"linux-image","ver":"6.1"}',
+        '{"fix":"not-fixed","fixv":[],"id":"CVE-1","pkg":"linux-headers","ver":"6.1"}',
+        '{"fix":"wont-fix","fixv":[],"id":"CVE-2","pkg":"linux-image","ver":"6.1"}',
+    ];
+    file_put_contents("{$dir}/fixture", implode("\n", $lines)."\n");
+    file_put_contents("{$dir}/grype", "#!/bin/sh\ncat '{$dir}/fixture'\nexit {$grypeExit}\n");
+    chmod("{$dir}/grype", 0755);
+    if ($writeFails) {
+        mkdir("{$dir}/out");
+    }
+    $step = collect(scannerUnwrapped($this->commands->grype(ScannerCommands::HOST_SBOM)))->first(fn (string $line) => str_contains($line, 'coolify-scan-exit grype'));
+    $script = str_replace('/data/coolify/image-scans/tmp-'.SCANNER_TEST_RUN_ID, $dir, preg_replace('/timeout -k 10 \d+ docker run .*? 2>\/dev\/null; echo \$\? > /', "{$dir}/grype 2>/dev/null; echo \$? > ", $step, 1, $replaced));
+
+    $result = Process::run(['sh', '-c', $script]);
+    $output = is_file("{$dir}/out") ? file_get_contents("{$dir}/out") : '';
+    Process::run(['rm', '-rf', $dir]);
+
+    expect($replaced)->toBe(1)
+        ->and(trim($result->output()))->toMatch($marker)
+        ->and($output === '' ? [] : explode("\n", trim($output)))->toBe(array_map(fn (int $index) => $lines[$index], $kept));
+})->with([
+    'run and write succeed' => [0, false, '/coolify-scan-exit grype 0 88$/', [0, 1]],
+    'run fails' => [2, false, '/coolify-scan-exit grype 2 88$/', [0, 1]],
+    'write fails' => [0, true, '/coolify-scan-exit grype [1-9]\\d* 0$/', []],
+]);
+
+it('copies only the package databases of the host and scans the copy with the OS catalogers', function () {
+    $script = implode("\n", scannerUnwrapped($this->commands->sbomFromHost()));
+
+    expect($script)
+        ->toContain("cp -RL '/var/lib/dpkg/status' '/data/coolify/image-scans/tmp-".SCANNER_TEST_RUN_ID."/in/host/var/lib/dpkg/status'")
+        ->toContain("[ -e '/var/lib/rpm' ] && [ ! -L '/var/lib/rpm' ]")
+        ->toContain("'scan' 'dir:/in/host' '--override-default-catalogers' 'dpkg-db-cataloger,rpm-db-cataloger,apk-db-cataloger,alpm-db-cataloger'")
+        ->toContain('type=bind,src=/data/coolify/image-scans/tmp-'.SCANNER_TEST_RUN_ID.'/in,dst=/in,readonly')
+        ->toContain("mv -f '/data/coolify/image-scans/sboms/host.json.tmp-".SCANNER_TEST_RUN_ID."' '/data/coolify/image-scans/sboms/host.json'")
+        ->toContain("echo 'coolify-scan-exit copy 1'")
+        ->toContain("echo 'coolify-scan-exit copy 2'")
+        ->not->toContain('|| true; fi')
+        ->not->toContain('src=/,');
+});
+
+it('keeps one line per vulnerability and drops the problems that the distribution will not fix only from the host scan output', function () {
+    $host = implode("\n", scannerUnwrapped($this->commands->grype(ScannerCommands::HOST_SBOM)));
+
+    expect($host)->toContain('grep -v -F \'"fix":"wont-fix"\'')
+        ->toContain('if (k in at)')
+        ->and(implode("\n", scannerUnwrapped($this->commands->grype(SCANNER_TEST_HEX))))->not->toContain('grep -v')->not->toContain('k in at');
+});
+
+it('offers only the memory and CPU options that fit the server', function (array $metadata, array $memory, array $cpus) {
+    $server = (new Server)->forceFill(['server_metadata' => $metadata]);
+
+    expect(ScannerCommands::memoryOptionsMb($server))->toBe($memory)
+        ->and(ScannerCommands::cpuOptions($server))->toBe($cpus);
+})->with([
+    'not collected yet' => [[], [1024, 2048, 4096, 8192], [0.5, 1.0, 2.0, 4.0]],
+    '4 GB VM (3.8 GiB usable), 2 cores' => [['memory_bytes' => 4_080_000_000, 'cpus' => 2], [1024, 2048], [0.5, 1.0, 2.0]],
+    'exactly 8 GiB, 8 cores' => [['memory_bytes' => 8 * 1024 ** 3, 'cpus' => 8], [1024, 2048, 4096, 8192], [0.5, 1.0, 2.0, 4.0]],
+    'smaller than every option' => [['memory_bytes' => 512 * 1024 ** 2, 'cpus' => 1], [1024], [0.5, 1.0]],
+]);
+
+it('sizes the job timeouts for the highest time limit option', function () {
+    expect(ScannerCommands::MAX_SYFT_TIMEOUT)->toBe(max(ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS))
+        ->and(ScannerCommands::MAX_GRYPE_TIMEOUT)->toBe(max(ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS));
+});
+
+it('never passes Docker more CPUs than the server has', function () {
+    $server = scannerServerWith(['image_scan_cpus' => 4.0]);
+    $server->forceFill(['server_metadata' => ['cpus' => 2]]);
+
+    expect(ScannerCommands::cpus($server))->toBe('2');
+});

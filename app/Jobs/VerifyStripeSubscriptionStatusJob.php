@@ -9,6 +9,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Stripe\StripeClient;
 
 class VerifyStripeSubscriptionStatusJob implements ShouldBeEncrypted, ShouldQueue
 {
@@ -29,15 +30,19 @@ class VerifyStripeSubscriptionStatusJob implements ShouldBeEncrypted, ShouldQueu
         if (! $this->subscription->stripe_subscription_id &&
             $this->subscription->stripe_customer_id) {
             try {
-                $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
-                $subscriptions = $stripe->subscriptions->all([
+                $stripe = app(StripeClient::class);
+                $subscriptions = collect($stripe->subscriptions->all([
                     'customer' => $this->subscription->stripe_customer_id,
-                    'limit' => 1,
-                ]);
+                    'status' => 'all',
+                    'limit' => 10,
+                ])->data);
 
-                if ($subscriptions->data) {
+                $found = $subscriptions->first(fn ($sub) => in_array($sub->status, ['active', 'past_due'], true))
+                    ?? $subscriptions->first();
+
+                if ($found) {
                     $this->subscription->update([
-                        'stripe_subscription_id' => $subscriptions->data[0]->id,
+                        'stripe_subscription_id' => $found->id,
                     ]);
                 }
             } catch (\Exception $e) {
@@ -50,7 +55,7 @@ class VerifyStripeSubscriptionStatusJob implements ShouldBeEncrypted, ShouldQueu
         }
 
         try {
-            $stripe = new \Stripe\StripeClient(config('subscription.stripe_api_key'));
+            $stripe = app(StripeClient::class);
             $stripeSubscription = $stripe->subscriptions->retrieve(
                 $this->subscription->stripe_subscription_id
             );
@@ -84,7 +89,7 @@ class VerifyStripeSubscriptionStatusJob implements ShouldBeEncrypted, ShouldQueu
 
                     $team = $this->subscription->team;
                     if ($team) {
-                        $team->subscriptionEnded();
+                        $team->subscriptionEnded($this->subscription);
                     }
                     break;
 

@@ -2,10 +2,23 @@
 
 namespace App\Models;
 
+use App\Support\ValidationPatterns;
+use App\Traits\Auditable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 
 class SharedEnvironmentVariable extends Model
 {
+    use Auditable;
+
+    /**
+     * Flags that a "# coolify:" line of the developer view can set, with their defaults.
+     * Shared variables have no buildtime or runtime flags.
+     *
+     * @var array<string, bool>
+     */
+    public const DEV_VIEW_FLAG_DEFAULTS = ['literal' => false];
+
     protected $fillable = [
         // Core identification
         'key',
@@ -17,17 +30,51 @@ class SharedEnvironmentVariable extends Model
         'team_id',
         'project_id',
         'environment_id',
+        'server_id',
 
         // Boolean flags
         'is_multiline',
         'is_literal',
         'is_shown_once',
+
+        // Metadata
+        'version',
+    ];
+
+    protected $hidden = [
+        'value',
     ];
 
     protected $casts = [
         'key' => 'string',
         'value' => 'encrypted',
+        'is_literal' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        // A lock is permanent: no UI, API, or MCP path can unlock a variable and show its value again.
+        static::saving(function (SharedEnvironmentVariable $sharedVariable) {
+            if ($sharedVariable->exists && $sharedVariable->getOriginal('is_shown_once')) {
+                $sharedVariable->is_shown_once = true;
+            }
+        });
+    }
+
+    /**
+     * Scope shared environment variables to a team (API token team_id).
+     */
+    public static function ownedByCurrentTeamAPI(int $teamId)
+    {
+        return static::where('team_id', $teamId);
+    }
+
+    protected function key(): Attribute
+    {
+        return Attribute::make(
+            set: fn (string $value) => ValidationPatterns::validatedEnvironmentVariableKey($value),
+        );
+    }
 
     public function team()
     {
@@ -42,5 +89,10 @@ class SharedEnvironmentVariable extends Model
     public function environment()
     {
         return $this->belongsTo(Environment::class);
+    }
+
+    public function server()
+    {
+        return $this->belongsTo(Server::class);
     }
 }

@@ -6,7 +6,7 @@ class DiscordMessage
 {
     private array $fields = [];
 
-    public ?string $pingText = null;
+    public string $pingText = '@here';
 
     public function __construct(
         public string $title,
@@ -65,7 +65,7 @@ class DiscordMessage
                 ],
             ],
         ];
-        if ($this->pingText) {
+        if ($this->isCritical) {
             $payload['content'] = $this->pingText;
         }
 

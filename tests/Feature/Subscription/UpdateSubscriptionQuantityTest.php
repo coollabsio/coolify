@@ -7,6 +7,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Stripe\Exception\InvalidRequestException;
 use Stripe\Service\InvoiceService;
 use Stripe\Service\SubscriptionService;
 use Stripe\Service\TaxRateService;
@@ -46,7 +47,7 @@ beforeEach(function () {
             'data' => [(object) [
                 'id' => 'si_item_123',
                 'quantity' => 2,
-                'price' => (object) ['unit_amount' => 500, 'currency' => 'usd'],
+                'price' => (object) ['unit_amount' => 500, 'currency' => 'usd', 'recurring' => (object) ['interval' => 'month']],
             ]],
         ],
     ];
@@ -187,7 +188,7 @@ describe('UpdateSubscriptionQuantity::execute', function () {
     test('handles stripe API error gracefully', function () {
         $this->mockSubscriptions
             ->shouldReceive('retrieve')
-            ->andThrow(new \Stripe\Exception\InvalidRequestException('Subscription not found'));
+            ->andThrow(new InvalidRequestException('Subscription not found'));
 
         $action = new UpdateSubscriptionQuantity($this->mockStripe);
         $result = $action->execute($this->team, 5);
@@ -199,7 +200,7 @@ describe('UpdateSubscriptionQuantity::execute', function () {
     test('handles generic exception gracefully', function () {
         $this->mockSubscriptions
             ->shouldReceive('retrieve')
-            ->andThrow(new \RuntimeException('Network error'));
+            ->andThrow(new RuntimeException('Network error'));
 
         $action = new UpdateSubscriptionQuantity($this->mockStripe);
         $result = $action->execute($this->team, 5);
@@ -270,6 +271,46 @@ describe('UpdateSubscriptionQuantity::fetchPricePreview', function () {
         expect($result['preview']['tax_description'])->toContain('27%');
         expect($result['preview']['quantity'])->toBe(3);
         expect($result['preview']['currency'])->toBe('USD');
+        expect($result['preview']['billing_interval'])->toBe('month');
+    });
+
+    test('returns yearly billing interval for annual subscriptions', function () {
+        $yearlySubscriptionResponse = (object) [
+            'items' => (object) [
+                'data' => [(object) [
+                    'id' => 'si_item_123',
+                    'quantity' => 2,
+                    'price' => (object) ['unit_amount' => 500, 'currency' => 'usd', 'recurring' => (object) ['interval' => 'year']],
+                ]],
+            ],
+        ];
+
+        $this->mockSubscriptions
+            ->shouldReceive('retrieve')
+            ->with('sub_test_qty')
+            ->andReturn($yearlySubscriptionResponse);
+
+        $this->mockInvoices
+            ->shouldReceive('upcoming')
+            ->andReturn((object) [
+                'amount_due' => 1000,
+                'total' => 1000,
+                'subtotal' => 1000,
+                'tax' => 0,
+                'currency' => 'usd',
+                'lines' => (object) [
+                    'data' => [
+                        (object) ['amount' => 1000, 'proration' => false],
+                    ],
+                ],
+                'total_tax_amounts' => [],
+            ]);
+
+        $action = new UpdateSubscriptionQuantity($this->mockStripe);
+        $result = $action->fetchPricePreview($this->team, 2);
+
+        expect($result['success'])->toBeTrue();
+        expect($result['preview']['billing_interval'])->toBe('year');
     });
 
     test('returns preview without tax when no tax applies', function () {
@@ -336,7 +377,7 @@ describe('UpdateSubscriptionQuantity::fetchPricePreview', function () {
     test('handles Stripe API error gracefully', function () {
         $this->mockSubscriptions
             ->shouldReceive('retrieve')
-            ->andThrow(new \RuntimeException('API error'));
+            ->andThrow(new RuntimeException('API error'));
 
         $action = new UpdateSubscriptionQuantity($this->mockStripe);
         $result = $action->fetchPricePreview($this->team, 5);
