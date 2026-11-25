@@ -10,6 +10,7 @@ use App\Models\Server;
 use App\Notifications\ScheduledJobRecovered;
 use App\Notifications\Server\DockerCleanupFailed;
 use App\Notifications\Server\DockerCleanupSuccess;
+use App\Services\DeployTriggers\HelperCapability;
 use App\Services\ScheduledJobDeliveryService;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
@@ -115,6 +116,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                 return;
             }
 
+            $this->pruneGitMirrors();
             $this->usageBefore = $this->server->getDiskUsage();
 
             if ($this->manualCleanup || $this->server->settings->force_docker_cleanup) {
@@ -224,6 +226,21 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
             if (! $failed && $this->executionCacheKey()) {
                 Cache::forget($this->executionCacheKey());
             }
+        }
+    }
+
+    /**
+     * Removes push-evaluation mirrors that no push used for 14 days. A failure never fails the cleanup.
+     */
+    private function pruneGitMirrors(): void
+    {
+        $image = HelperCapability::image();
+        try {
+            instant_remote_process([
+                "docker volume inspect coolify-git-mirrors >/dev/null 2>&1 && docker run --rm -v coolify-git-mirrors:/mirrors {$image} coolify-affected mirror prune --days 14 >/dev/null 2>&1 || true",
+            ], $this->server, throwError: false, timeout: 300);
+        } catch (\Throwable) {
+            // Pruning is best effort.
         }
     }
 
