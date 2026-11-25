@@ -272,6 +272,18 @@ class User extends Authenticatable implements PasskeyUser, SendsEmail
 
     public function recreate_personal_team()
     {
+        // The root team always exists after install. Attach the root user to it again instead of
+        // inserting a second team with id 0.
+        if ($this->id === 0 && $rootTeam = Team::find(0)) {
+            if ($this->teams()->whereKey(0)->exists()) {
+                $this->teams()->updateExistingPivot(0, ['role' => 'owner']);
+            } else {
+                $this->teams()->attach(0, ['role' => 'owner']);
+            }
+
+            return $rootTeam;
+        }
+
         $team = [
             'name' => $this->name."'s Team",
             'personal_team' => true,
