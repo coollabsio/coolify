@@ -294,6 +294,23 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
      *
      * @return Collection<int, Application>
      */
+    private function newestDeploymentIsThisPush(Application $application): bool
+    {
+        $newest = ApplicationDeploymentQueue::query()
+            ->where('application_id', $application->id)
+            ->where('pull_request_id', $this->context->pullRequest?->number ?? 0)
+            ->where(fn ($query) => $query->where('restart_only', false)->orWhereNull('restart_only'))
+            ->orderByDesc('id')
+            ->first(['commit', 'status']);
+
+        return $newest !== null && $newest->commit === $this->context->after && in_array($newest->status, [
+            ApplicationDeploymentStatus::QUEUED->value,
+            ApplicationDeploymentStatus::IN_PROGRESS->value,
+            ApplicationDeploymentStatus::FINISHED->value,
+            ApplicationDeploymentStatus::SKIPPED->value,
+        ], true);
+    }
+
     private function candidates(): Collection
     {
         $branch = $this->context->pullRequest?->targetBranch ?? Str::after($this->context->ref, 'refs/heads/');
@@ -304,19 +321,9 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             ->get()
             ->filter(fn (Application $application): bool => $application->git_branch === $branch
                 && ($this->dryRun || ($this->context->pullRequest !== null ? $application->isPRDeployable() : $application->isDeployable())))
-            // A redelivered webhook of a push that already deployed or skipped changes nothing.
+            // A redelivered webhook changes nothing when the newest deployment of the application already is this push.
             ->reject(fn (Application $application): bool => ! $this->dryRun && $this->context->after !== null
-                && ApplicationDeploymentQueue::query()
-                    ->where('application_id', $application->id)
-                    ->where('pull_request_id', $this->context->pullRequest?->number ?? 0)
-                    ->where('commit', $this->context->after)
-                    ->whereIn('status', [
-                        ApplicationDeploymentStatus::QUEUED->value,
-                        ApplicationDeploymentStatus::IN_PROGRESS->value,
-                        ApplicationDeploymentStatus::FINISHED->value,
-                        ApplicationDeploymentStatus::SKIPPED->value,
-                    ])
-                    ->exists())
+                && $this->newestDeploymentIsThisPush($application))
             ->values();
     }
 }

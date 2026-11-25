@@ -406,3 +406,13 @@ it('does not drop a push of the commit that evaluate now looked at', function ()
 
     expect($runner->requests)->toHaveCount(1);
 });
+
+it('evaluates a push back to an older deployed commit after a newer deployment', function () {
+    $runner = FakeAffectedRunner::respondWith(epRespond([$this->web->uuid => ['deploy', 'matched']]));
+    ApplicationDeploymentQueue::create(['application_id' => $this->web->id, 'deployment_uuid' => 'old', 'pull_request_id' => 0, 'status' => ApplicationDeploymentStatus::FINISHED->value, 'commit' => EP_AFTER]);
+    ApplicationDeploymentQueue::create(['application_id' => $this->web->id, 'deployment_uuid' => 'newer', 'pull_request_id' => 0, 'status' => ApplicationDeploymentStatus::FINISHED->value, 'commit' => str_repeat('e', 40)]);
+
+    epRun(epContext(), [$this->web]);
+
+    expect($runner->requests)->toHaveCount(1);
+});
