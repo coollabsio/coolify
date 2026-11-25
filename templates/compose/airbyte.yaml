@@ -538,8 +538,6 @@ services:
             --from-literal=instance-admin-client-id="$AIRBYTE_ADMIN_CLIENT_ID" \
             --from-literal=instance-admin-client-secret="$AIRBYTE_ADMIN_CLIENT_SECRET" \
             --from-literal=jwt-signature-secret="$AIRBYTE_JWT_SIGNATURE_SECRET" \
-            --from-literal=dataplane-client-id= \
-            --from-literal=dataplane-client-secret= \
             --dry-run=client -o yaml | \
             /bin/kubectl --kubeconfig "$client_config" apply -f -
 
