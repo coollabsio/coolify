@@ -1,56 +1,130 @@
+@php
+    // Copy affordance reads the live Livewire value. The bound property comes
+    // either from the `id`-derived modelBinding or from a passthrough
+    // `wire:model` attribute (used by read-only fields like DB URLs). Resolve to a
+    // single JS expression here — a directive inside the <x-copy-button> tag would
+    // break Blade's component-tag compiler.
+    $copyResolve = null;
+    if ($copyable && $type === 'password') {
+        // Copy the field as shown: it includes unsaved edits and works without Livewire.
+        $copyResolve = "\$el.parentElement.querySelector('input').value";
+    } elseif ($copyable) {
+        $copyModel = $modelBinding !== 'null' ? $modelBinding : $attributes->get('wire:model');
+        $copyResolve = $copyModel
+            ? "\$wire.get('".$copyModel."')"
+            : (string) \Illuminate\Support\Js::from($value);
+    }
+@endphp
+
 <div @class([
     'flex-1' => $isMultiline,
     'w-full' => !$isMultiline,
 ])>
     @if ($label)
-        <label class="flex items-center gap-1 mb-1 text-sm font-medium">{{ $label }}
-            @if ($required)
-                <x-highlighted text="*" />
-            @endif
+        {{--
+            Fixed-height label row (h-4 = helper icon). Helper lives outside <label> so
+            side-by-side fields align whether a field has a helper, required mark, both, or neither.
+            Margin is only on this wrapper — mb-0! beats .application-settings-form label rules.
+        --}}
+        <div class="mb-1.5 flex h-4 w-full items-center gap-1.5">
+            <label class="mb-0! flex items-center gap-1 text-sm font-medium leading-4">{{ $label }}
+                @if ($required)
+                    <x-highlighted text="*" />
+                @elseif ($requiredWhen)
+                    <span x-cloak x-show="{{ $requiredWhen }}"><x-highlighted text="*" /></span>
+                @endif
+                @isset($labelSuffix)
+                    {{ $labelSuffix }}
+                @endisset
+            </label>
             @if ($helper)
                 <x-helper :helper="$helper" />
             @endif
-        </label>
+        </div>
     @endif
-    @if ($type === 'password')
-        <div class="relative" x-data="{ type: 'password' }">
-            @if ($allowToPeak)
-                <div x-on:click="changePasswordFieldType"
-                    class="absolute inset-y-0 right-0 flex items-center pr-2 cursor-pointer hover:dark:text-white">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" stroke-width="1.5"
-                        stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                        <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
-                        <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" />
-                    </svg>
-                </div>
-            @endif
-            <input value="{{ $value }}" {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
-                @if ($id !== 'null') wire:model={{ $id }} @endif
-                wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
-                wire:dirty.class="dark:focus:ring-warning dark:ring-warning" wire:loading.attr="disabled"
-                type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $id }}"
+    @if ($loading)
+        <div class="{{ $defaultClass }} flex w-full items-center text-neutral-500 dark:text-fg-dim" aria-busy="true">
+            <x-loading :text="$loadingText" />
+        </div>
+    @elseif ($type === 'password')
+        <div class="relative" x-data="{ type: 'password' }" @success.window="type = 'password'">
+            <input autocomplete="{{ $autocomplete }}" value="{{ $value }}"
+                x-bind:type="type"
+                x-bind:class="{ 'truncate': type === 'text' && ! $el.disabled }"
+                {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @if ($requiredWhen) x-bind:required="{{ $requiredWhen }}" @endif
+                @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]" @endif
+                wire:loading.attr="disabled"
+                @readonly($readonly) @disabled($disabled) id="{{ $htmlId }}"
                 name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
-                aria-placeholder="{{ $attributes->get('placeholder') }}">
+                aria-placeholder="{{ $attributes->get('placeholder') }}"
+                @if ($autofocus) x-ref="autofocusInput" autofocus @endif>
+            @if ($allowToPeak)
+                <button type="button" x-on:click="type = type === 'password' ? 'text' : 'password'"
+                    class="password-toggle flex absolute inset-y-0 right-0 z-10 items-center pr-2 cursor-pointer text-neutral-500 hover:text-black dark:text-neutral-400 dark:hover:text-white"
+                    aria-label="Toggle password visibility">
+                    {{-- Eye icon (shown when password is hidden) --}}
+                    <x-reicon name="eye" x-show="type === 'password'" class="size-[18px]" />
+                    {{-- Eye-off2 icon (shown when password is visible) --}}
+                    <x-reicon name="eye-off2" x-cloak x-show="type === 'text'" class="size-[18px]" />
+                </button>
+            @endif
+            @if ($copyable)
+                <x-copy-button :resolve="$copyResolve" label="Copy to clipboard"
+                    class="absolute top-1/2 z-10 -translate-y-1/2 {{ $allowToPeak ? 'right-8' : 'right-1' }}" />
+            @endif
 
         </div>
     @else
-        <input @if ($value) value="{{ $value }}" @endif
-            {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @readonly($readonly)
-            @if ($id !== 'null') wire:model={{ $id }} @endif
-            wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
-            wire:dirty.class="dark:focus:ring-warning dark:ring-warning" wire:loading.attr="disabled"
-            type="{{ $type }}" @disabled($disabled)
-            min="{{ $attributes->get('min') }}" max="{{ $attributes->get('max') }}"
-            @if ($id !== 'null') id={{ $id }} @endif name="{{ $name }}"
-            placeholder="{{ $attributes->get('placeholder') }}">
+        @if ($type === 'number')
+            <div class="relative" x-data="numberStepper">
+        @elseif ($copyable)
+            <div class="relative">
+        @endif
+        <input autocomplete="{{ $autocomplete }}" @if ($value) value="{{ $value }}" @endif
+            {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @if ($requiredWhen) x-bind:required="{{ $requiredWhen }}" @endif @readonly($readonly)
+            @if ($modelBinding !== 'null') wire:model={{ $modelBinding }} wire:dirty.class="[box-shadow:inset_4px_0_0_#6b16ed,inset_0_0_0_2px_#e5e5e5] dark:[box-shadow:inset_4px_0_0_#fcd452,inset_0_0_0_2px_#242424]" @endif
+            wire:loading.attr="disabled"
+            type="{{ $type }}" @disabled($disabled) min="{{ $attributes->get('min') }}"
+            max="{{ $attributes->get('max') }}" minlength="{{ $attributes->get('minlength') }}"
+            maxlength="{{ $attributes->get('maxlength') }}"
+            @if ($htmlId !== 'null') id={{ $htmlId }} @endif name="{{ $name }}"
+            placeholder="{{ $attributes->get('placeholder') }}"
+            @if ($autofocus) x-ref="autofocusInput" autofocus @endif>
+        @if ($type === 'number')
+                <div class="number-stepper">
+                    <button type="button" tabindex="-1" aria-label="Decrease" x-on:click="step(-1)"
+                        @disabled($disabled || $readonly)>
+                        <x-reicon name="minus" class="size-3.5" />
+                    </button>
+                    <button type="button" tabindex="-1" aria-label="Increase" x-on:click="step(1)"
+                        @disabled($disabled || $readonly)>
+                        <x-reicon name="plus" class="size-3.5" />
+                    </button>
+                </div>
+            </div>
+        @elseif ($copyable)
+                <x-copy-button :resolve="$copyResolve" label="Copy to clipboard"
+                    class="absolute top-1/2 right-1 z-10 -translate-y-1/2" />
+            </div>
+        @endif
     @endif
     @if (!$label && $helper)
         <x-helper :helper="$helper" />
     @endif
-    @error($id)
+    @error($modelBinding)
         <label class="label">
-            <span class="text-red-500 label-text-alt">{{ $message }}</span>
+            @php
+                preg_match('/(https?:\/\/\S+)$/', $message, $validationLinkMatches);
+                $validationLink = $validationLinkMatches[1] ?? null;
+            @endphp
+            <span class="text-red-500 label-text-alt">
+                @if ($validationLink)
+                    {{ str($message)->beforeLast($validationLink)->trim() }}
+                    <a class="font-medium underline" href="{{ $validationLink }}">Set them here.</a>
+                @else
+                    {{ $message }}
+                @endif
+            </span>
         </label>
     @enderror
 </div>

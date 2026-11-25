@@ -1,4 +1,13 @@
-<div>
+@php
+    $hasVolumes = $this->volumeCount > 0;
+    $hasFiles = $this->fileCount > 0;
+    $hasDirectories = $this->directoryCount > 0;
+    $tabButtonBase = 'h-7 rounded-md px-2.5 text-[12px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+    $tabButtonActive = 'bg-white text-black shadow-sm ring-1 ring-neutral-200 dark:bg-white/[0.09] dark:text-fg dark:ring-white/[0.08]';
+    $tabButtonInactive = 'text-neutral-500 hover:text-black dark:text-fg-faint dark:hover:text-fg';
+@endphp
+
+<div class="flex flex-col gap-6">
     @if (
         $resource->getMorphClass() == 'App\Models\Application' ||
             $resource->getMorphClass() == 'App\Models\StandalonePostgresql' ||
@@ -7,54 +16,526 @@
             $resource->getMorphClass() == 'App\Models\StandaloneKeydb' ||
             $resource->getMorphClass() == 'App\Models\StandaloneDragonfly' ||
             $resource->getMorphClass() == 'App\Models\StandaloneClickhouse' ||
-            $resource->getMorphClass() == 'App\Models\StandaloneMongodb')
-        <div class="flex items-center gap-2">
-            <h2>Storages</h2>
-            <x-helper
-                helper="For Preview Deployments, storage has a <span class='text-helper'>-pr-#PRNumber</span> in their
-                    volume
-                    name, example: <span class='text-helper'>-pr-1</span>" />
-            @if ($resource?->build_pack !== 'dockercompose')
-                <x-modal-input :closeOutside="false" buttonTitle="+ Add" title="New Persistent Storage">
-                    <livewire:project.shared.storages.add :resource="$resource" />
-                </x-modal-input>
-            @endif
-        </div>
-        <div class="pb-4">Persistent storage to preserve data between deployments.</div>
-        @if ($resource?->build_pack === 'dockercompose')
-            <span class="dark:text-warning text-coollabs">Please modify storage layout in your Docker Compose
-                file or reload the compose file to reread the storage layout.</span>
-        @else
-            @if ($resource->persistentStorages()->get()->count() === 0 && $resource->fileStorages()->get()->count() == 0)
-                <div class="pt-4">No storage found.</div>
-            @endif
-        @endif
+            $resource->getMorphClass() == 'App\Models\StandaloneMongodb' ||
+            $resource->getMorphClass() == 'App\Models\StandaloneMysql' ||
+            $resource->getMorphClass() == 'App\Models\StandaloneSqlite')
+        <x-application.settings-section id="storage-mounts-section" title="Persistent storage" :flush="true"
+            :helper="$resource instanceof \App\Models\Application && $resource->git_based()
+                ? 'Preview deployment volumes can use a -pr-#PRNumber suffix so each pull request receives isolated storage.'
+                : 'Mount volumes, files, or directories to preserve data between deployments.'">
+            <x-slot:actions>
+                @if ($resource?->build_pack !== 'dockercompose')
+                    @can('update', $resource)
+                        <div x-data="{
+                            dropdownOpen: false,
+                            volumeModalOpen: false,
+                            fileModalOpen: false,
+                            hostFileModalOpen: false,
+                            directoryModalOpen: false
+                        }"
+                            @close-storage-modal.window="
+                            if ($event.detail === 'volume') volumeModalOpen = false;
+                            if ($event.detail === 'file') fileModalOpen = false;
+                            if ($event.detail === 'host-file') hostFileModalOpen = false;
+                            if ($event.detail === 'directory') directoryModalOpen = false;
+                        ">
+                            <div class="relative" @click.outside="dropdownOpen = false">
+                                <x-forms.button
+                                    class="button-highlighted"
+                                    @click="dropdownOpen = !dropdownOpen" aria-haspopup="menu"
+                                    x-bind:aria-expanded="dropdownOpen">
+                                    <x-reicon name="plus" class="size-3.5" />
+                                    Add mount
+                                    <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                                </x-forms.button>
 
-        @if ($resource->persistentStorages()->get()->count() > 0)
-            <livewire:project.shared.storages.all :resource="$resource" />
-        @endif
-        @if ($resource->fileStorages()->get()->count() > 0)
-            <div class="flex flex-col gap-4 pt-4">
-                @foreach ($resource->fileStorages()->get()->sort() as $fileStorage)
-                    <livewire:project.service.file-storage :fileStorage="$fileStorage"
-                        wire:key="resource-{{ $fileStorage->uuid }}" />
-                @endforeach
+                                <div x-show="dropdownOpen" x-cloak role="menu"
+                                    x-transition.origin.top.left
+                                    class="listbox-panel left-0! right-auto! z-[90]! w-52! min-w-52! sm:left-auto! sm:right-0!">
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
+                                        @click="volumeModalOpen = true; dropdownOpen = false">
+                                        <x-reicon name="storages" class="size-3.5 shrink-0 opacity-70" />
+                                        Volume mount
+                                    </button>
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
+                                        @click="fileModalOpen = true; dropdownOpen = false">
+                                        <x-reicon name="file" class="size-3.5 shrink-0 opacity-70" />
+                                        File mount
+                                    </button>
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
+                                        @click="hostFileModalOpen = true; dropdownOpen = false">
+                                        <x-reicon name="file-content" class="size-3.5 shrink-0 opacity-70" />
+                                        Host file mount
+                                    </button>
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!" role="menuitem"
+                                        @click="directoryModalOpen = true; dropdownOpen = false">
+                                        <x-reicon name="folder" class="size-3.5 shrink-0 opacity-70" />
+                                        Directory mount
+                                    </button>
+                                </div>
+                            </div>
+
+                            {{-- Volume Modal --}}
+                            <template x-teleport="body">
+                                <div x-show="volumeModalOpen" @keydown.window.escape="volumeModalOpen=false"
+                                    class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
+                                    <div x-show="volumeModalOpen" x-transition:enter="ease-out duration-100"
+                                        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                                        x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                                        x-transition:leave-end="opacity-0" @click="volumeModalOpen=false"
+                                        class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
+                                    <div x-show="volumeModalOpen" x-trap.inert.noscroll="volumeModalOpen"
+                                        x-transition:enter="ease-out duration-100"
+                                        x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
+                                        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                                        x-transition:leave="ease-in duration-100"
+                                        x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                                        x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
+                                        class="application-settings-form application-settings-section relative w-full min-w-full lg:min-w-[36rem] lg:max-w-2xl">
+                                        <header>
+                                            <h3>Add volume mount</h3>
+                                            <button @click="volumeModalOpen=false"
+                                                class="flex size-7 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg">
+                                                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </header>
+                                        <div class="application-settings-section-body relative flex items-center justify-center w-auto"
+                                            x-init="$watch('volumeModalOpen', value => {
+                                                if (value) {
+                                                    $nextTick(() => {
+                                                        const input = $el.querySelector('input');
+                                                        input?.focus();
+                                                    })
+                                                }
+                                            })">
+                                            @if ($this->volumeUnavailableReason)
+                                                <x-callout type="warning" title="Volume mounts are unavailable" class="w-full">
+                                                    {{ $this->volumeUnavailableReason }}
+                                                </x-callout>
+                                            @else
+                                            <form class="flex w-full flex-col gap-4"
+                                                wire:submit='submitPersistentVolume'>
+                                                <p class="text-[13px] leading-5 text-neutral-500 dark:text-fg-dim">
+                                                    Mount a Docker volume inside the container. Coolify adds the
+                                                    prefix <code class="break-all">{{ $resource->uuid }}-</code> to the
+                                                    name, so that the volume name is unique on the server.
+                                                </p>
+                                                <div class="flex flex-col gap-4">
+                                                    <x-forms.input canGate="update" :canResource="$resource" placeholder="pv-name"
+                                                        id="name" label="Name" required helper="Volume name." />
+                                                    <x-forms.input canGate="update" :canResource="$resource"
+                                                        placeholder="/tmp/root" id="mount_path" label="Destination Path"
+                                                        required helper="Directory inside the container." />
+                                                    <div class="flex justify-end pt-2">
+                                                        <x-forms.button canGate="update" :canResource="$resource" type="submit">
+                                                            Add volume
+                                                        </x-forms.button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            {{-- File Modal --}}
+                            <template x-teleport="body">
+                                <div x-show="fileModalOpen" @keydown.window.escape="fileModalOpen=false"
+                                    class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
+                                    <div x-show="fileModalOpen" x-transition:enter="ease-out duration-100"
+                                        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                                        x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                                        x-transition:leave-end="opacity-0" @click="fileModalOpen=false"
+                                        class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
+                                    <div x-show="fileModalOpen" x-trap.inert.noscroll="fileModalOpen"
+                                        x-transition:enter="ease-out duration-100"
+                                        x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
+                                        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                                        x-transition:leave="ease-in duration-100"
+                                        x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                                        x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
+                                        class="application-settings-form application-settings-section relative w-full min-w-full lg:min-w-[36rem] lg:max-w-2xl">
+                                        <header>
+                                            <h3>Add file mount</h3>
+                                            <button @click="fileModalOpen=false"
+                                                class="flex size-7 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg">
+                                                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </header>
+                                        <div class="application-settings-section-body relative flex items-center justify-center w-auto"
+                                            x-init="$watch('fileModalOpen', value => {
+                                                if (value) {
+                                                    $nextTick(() => {
+                                                        const input = $el.querySelector('input');
+                                                        input?.focus();
+                                                    })
+                                                }
+                                            })">
+                                            <form class="flex w-full flex-col gap-4"
+                                                x-data="{
+                                                    hostPath: @js($this->fileStorageHostPath()),
+                                                    filePath: @entangle('file_storage_path'),
+                                                    sourcePath: @entangle('file_storage_source'),
+                                                    previewPath() {
+                                                        const source = (this.sourcePath || '').trim();
+                                                        if (source !== '') {
+                                                            return source.startsWith('/') ? source : `${this.hostPath}/${source.replace(/^\.\//, '')}`;
+                                                        }
+                                                        const path = (this.filePath || '').trim();
+
+                                                        return this.hostPath + (path === '' ? '/' : (path.startsWith('/') ? path : `/${path}`));
+                                                    },
+                                                }"
+                                                wire:submit='submitFileStorage'>
+                                                <p class="text-[13px] leading-5 text-neutral-500 dark:text-fg-dim">
+                                                    Create a managed file on the host and mount it inside the container.
+                                                </p>
+                                                <div class="flex flex-col gap-4">
+                                                    <div class="rounded-lg bg-neutral-100 p-3 text-xs ring-1 ring-neutral-200 dark:bg-white/[0.04] dark:ring-white/[0.07]">
+                                                        <div class="mb-1 font-medium">Host file path</div>
+                                                        <code class="break-all" x-text="previewPath()">{{ $this->fileStoragePreviewPath() }}</code>
+                                                    </div>
+                                                    <x-forms.input canGate="update" :canResource="$resource"
+                                                        placeholder="/etc/nginx/nginx.conf" id="file_storage_path"
+                                                        label="Destination Path" required
+                                                        x-on:input="filePath = $event.target.value"
+                                                        helper="File location inside the container" />
+                                                    <x-forms.input canGate="update" :canResource="$resource"
+                                                        placeholder="/srv/config/app.conf" id="file_storage_source"
+                                                        label="Source Path"
+                                                        x-on:input="sourcePath = $event.target.value"
+                                                        helper="Optional. File location on the host: an absolute path anywhere on the host, or a path relative to the resource directory. Empty: Coolify keeps the file in the resource directory. Coolify never deletes a file outside the resource directory." />
+                                                    <x-forms.textarea canGate="update" :canResource="$resource" label="Content"
+                                                        id="file_storage_content"></x-forms.textarea>
+                                                    <div class="flex justify-end pt-2">
+                                                        <x-forms.button canGate="update" :canResource="$resource" type="submit">
+                                                            Add file
+                                                        </x-forms.button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            {{-- Host File Modal --}}
+                            <template x-teleport="body">
+                                <div x-show="hostFileModalOpen" @keydown.window.escape="hostFileModalOpen=false"
+                                    class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
+                                    <div x-show="hostFileModalOpen" x-transition:enter="ease-out duration-100"
+                                        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                                        x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                                        x-transition:leave-end="opacity-0" @click="hostFileModalOpen=false"
+                                        class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
+                                    <div x-show="hostFileModalOpen" x-trap.inert.noscroll="hostFileModalOpen"
+                                        x-transition:enter="ease-out duration-100"
+                                        x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
+                                        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                                        x-transition:leave="ease-in duration-100"
+                                        x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                                        x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
+                                        class="application-settings-form application-settings-section relative w-full min-w-full lg:min-w-[36rem] lg:max-w-2xl">
+                                        <header>
+                                            <h3>Add host file mount</h3>
+                                            <button @click="hostFileModalOpen=false"
+                                                class="flex size-7 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg">
+                                                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </header>
+                                        <div class="application-settings-section-body relative flex items-center justify-center w-auto"
+                                            x-init="$watch('hostFileModalOpen', value => {
+                                                if (value) {
+                                                    $nextTick(() => {
+                                                        const input = $el.querySelector('input');
+                                                        input?.focus();
+                                                    })
+                                                }
+                                            })">
+                                            <form class="flex w-full flex-col gap-4"
+                                                wire:submit='submitHostFileStorage'>
+                                                <p class="text-[13px] leading-5 text-neutral-500 dark:text-fg-dim">
+                                                    Bind an existing host file into the container. Coolify will not modify
+                                                    or delete the source file.
+                                                </p>
+                                                <div class="flex flex-col gap-4">
+                                                    <x-forms.input canGate="update" :canResource="$resource"
+                                                        placeholder="/etc/nginx/nginx.conf"
+                                                        id="host_file_storage_source" label="Host File Path" required
+                                                        helper="Existing file on the host system." />
+                                                    <x-forms.input canGate="update" :canResource="$resource"
+                                                        placeholder="/etc/nginx/nginx.conf"
+                                                        id="host_file_storage_destination" label="Destination Path"
+                                                        required helper="File location inside the container." />
+                                                    <div class="flex justify-end pt-2">
+                                                        <x-forms.button canGate="update" :canResource="$resource" type="submit">
+                                                            Add host file
+                                                        </x-forms.button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+
+                            {{-- Directory Modal --}}
+                            <template x-teleport="body">
+                                <div x-show="directoryModalOpen" @keydown.window.escape="directoryModalOpen=false"
+                                    class="fixed top-0 left-0 lg:px-0 px-4 z-99 flex items-center justify-center w-screen h-screen">
+                                    <div x-show="directoryModalOpen" x-transition:enter="ease-out duration-100"
+                                        x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                                        x-transition:leave="ease-in duration-100" x-transition:leave-start="opacity-100"
+                                        x-transition:leave-end="opacity-0" @click="directoryModalOpen=false"
+                                        class="absolute inset-0 w-full h-full bg-black/20 backdrop-blur-xs"></div>
+                                    <div x-show="directoryModalOpen" x-trap.inert.noscroll="directoryModalOpen"
+                                        x-transition:enter="ease-out duration-100"
+                                        x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
+                                        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                                        x-transition:leave="ease-in duration-100"
+                                        x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+                                        x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
+                                        class="application-settings-form application-settings-section relative w-full min-w-full lg:min-w-[36rem] lg:max-w-2xl">
+                                        <header>
+                                            <h3>Add directory mount</h3>
+                                            <button @click="directoryModalOpen=false"
+                                                class="flex size-7 items-center justify-center rounded-md text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg">
+                                                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </header>
+                                        <div class="application-settings-section-body relative flex items-center justify-center w-auto"
+                                            x-init="$watch('directoryModalOpen', value => {
+                                                if (value) {
+                                                    $nextTick(() => {
+                                                        const input = $el.querySelector('input');
+                                                        input?.focus();
+                                                    })
+                                                }
+                                            })">
+                                            <form class="flex w-full flex-col gap-4"
+                                                wire:submit='submitFileStorageDirectory'>
+                                                <p class="text-[13px] leading-5 text-neutral-500 dark:text-fg-dim">
+                                                    Bind a directory from the host system into the container.
+                                                </p>
+                                                <div class="flex flex-col gap-4">
+                                                    <x-forms.input canGate="update" :canResource="$resource"
+                                                        placeholder="{{ application_configuration_dir() }}/{{ $resource->uuid }}/etc/nginx"
+                                                        id="file_storage_directory_source" label="Source Directory"
+                                                        required helper="Directory on the host: an absolute path anywhere on the host, or a path relative to the resource directory. Coolify creates it when it is missing, and never deletes a directory outside the resource directory." />
+                                                    <x-forms.input canGate="update" :canResource="$resource"
+                                                        placeholder="/etc/nginx" id="file_storage_directory_destination"
+                                                        label="Destination Directory" required
+                                                        helper="Directory inside the container." />
+                                                    <div class="flex justify-end pt-2">
+                                                        <x-forms.button canGate="update" :canResource="$resource" type="submit">
+                                                            Add directory
+                                                        </x-forms.button>
+                                                    </div>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    @endcan
+                @endif
+                @if ($hasVolumes || $hasFiles || $hasDirectories)
+                    <div
+                        class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
+                        <button type="button" wire:click="setActiveTab('volumes')"
+                            @disabled(!$hasVolumes)
+                            @class([$tabButtonBase, $activeTab === 'volumes' ? $tabButtonActive : $tabButtonInactive])>
+                            Volumes ({{ $this->volumeCount }})
+                        </button>
+                        <button type="button" wire:click="setActiveTab('files')"
+                            @disabled(!$hasFiles)
+                            @class([$tabButtonBase, $activeTab === 'files' ? $tabButtonActive : $tabButtonInactive])>
+                            Files ({{ $this->fileCount }})
+                        </button>
+                        <button type="button" wire:click="setActiveTab('directories')"
+                            @disabled(!$hasDirectories)
+                            @class([$tabButtonBase, $activeTab === 'directories' ? $tabButtonActive : $tabButtonInactive])>
+                            Directories ({{ $this->directoryCount }})
+                        </button>
+                    </div>
+                @endif
+            </x-slot:actions>
+
+        @if (!$hasVolumes && !$hasFiles && !$hasDirectories)
+            <x-empty size="sm" title="No persistent storage"
+                description="Add a volume, file, or directory mount to preserve data between deployments."
+                icon-name="storages" />
+        @elseif ($activeTab === 'volumes')
+            @if ($hasVolumes)
+                <livewire:project.shared.storages.all wire:key="volumes-{{ $resource->id }}"
+                    :resource="$resource" />
+            @else
+                <x-empty size="sm" title="No volumes configured"
+                    description="Switch tabs or add a volume mount." icon-name="storages" />
+            @endif
+        @elseif ($activeTab === 'files')
+            <div class="flex flex-col gap-4 p-4">
+                @if ($hasFiles)
+                    @foreach ($this->files as $fs)
+                        <livewire:project.service.file-storage :fileStorage="$fs"
+                            wire:key="file-{{ $fs->id }}" />
+                    @endforeach
+                @else
+                    <x-empty size="sm" title="No file mounts configured"
+                        description="Switch tabs or add a file mount." icon-name="file" />
+                @endif
+            </div>
+        @else
+            <div class="flex flex-col gap-4 p-4">
+                @if ($hasDirectories)
+                    @foreach ($this->directories as $fs)
+                        <livewire:project.service.file-storage :fileStorage="$fs"
+                            wire:key="directory-{{ $fs->id }}" />
+                    @endforeach
+                @else
+                    <x-empty size="sm" title="No directory mounts configured"
+                        description="Switch tabs or add a directory mount." icon-name="folder" />
+                @endif
             </div>
         @endif
+        </x-application.settings-section>
     @else
-        @if ($resource->persistentStorages()->get()->count() > 0)
-            <h3 class="pt-4">{{ Str::headline($resource->name) }} </h3>
-        @endif
-        @if ($resource->persistentStorages()->get()->count() > 0)
-            <livewire:project.shared.storages.all :resource="$resource" />
-        @endif
-        @if ($resource->fileStorages()->get()->count() > 0)
-            <div class="flex flex-col gap-4 pt-4">
-                @foreach ($resource->fileStorages()->get()->sort() as $fileStorage)
-                    <livewire:project.service.file-storage :fileStorage="$fileStorage"
-                        wire:key="resource-{{ $fileStorage->uuid }}" />
-                @endforeach
+        {{-- Service stack resources: one settings card + table per service --}}
+        <x-application.settings-section :id="'storage-service-'.$resource->uuid"
+            :title="Str::headline($resource->name)" :flush="true"
+            helper="Volume mounts for this compose service. Compose-managed mounts are read-only in the dashboard.">
+            <x-slot:actions>
+                @if ($hasVolumes || $hasFiles || $hasDirectories)
+                    <div
+                        class="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 p-1 dark:bg-white/[0.04]">
+                        <button type="button" wire:click="setActiveTab('volumes')"
+                            @disabled(!$hasVolumes)
+                            @class([$tabButtonBase, $activeTab === 'volumes' ? $tabButtonActive : $tabButtonInactive])>
+                            Volumes ({{ $this->volumeCount }})
+                        </button>
+                        <button type="button" wire:click="setActiveTab('files')"
+                            @disabled(!$hasFiles)
+                            @class([$tabButtonBase, $activeTab === 'files' ? $tabButtonActive : $tabButtonInactive])>
+                            Files ({{ $this->fileCount }})
+                        </button>
+                        <button type="button" wire:click="setActiveTab('directories')"
+                            @disabled(!$hasDirectories)
+                            @class([$tabButtonBase, $activeTab === 'directories' ? $tabButtonActive : $tabButtonInactive])>
+                            Directories ({{ $this->directoryCount }})
+                        </button>
+                    </div>
+                @endif
+            </x-slot:actions>
+
+            @if (!$hasVolumes && !$hasFiles && !$hasDirectories)
+                <x-empty size="sm" title="No storage found"
+                    description="No volumes, files, or directories are defined for this service."
+                    icon-name="storages" />
+            @elseif ($activeTab === 'volumes')
+                @if ($hasVolumes)
+                    <livewire:project.shared.storages.all
+                        wire:key="svc-volumes-{{ $resource->id }}"
+                        :resource="$resource" />
+                @else
+                    <x-empty size="sm" title="No volumes configured"
+                        description="This service has no volume mounts." icon-name="storages" />
+                @endif
+            @elseif ($activeTab === 'files')
+                <div class="flex flex-col gap-4 p-4">
+                    @if ($hasFiles)
+                        @foreach ($this->files as $fs)
+                            <livewire:project.service.file-storage :fileStorage="$fs"
+                                wire:key="file-{{ $fs->id }}" />
+                        @endforeach
+                    @else
+                        <x-empty size="sm" title="No file mounts configured"
+                            description="This service has no file mounts." icon-name="file" />
+                    @endif
+                </div>
+            @else
+                <div class="flex flex-col gap-4 p-4">
+                    @if ($hasDirectories)
+                        @foreach ($this->directories as $fs)
+                            <livewire:project.service.file-storage :fileStorage="$fs"
+                                wire:key="directory-{{ $fs->id }}" />
+                        @endforeach
+                    @else
+                        <x-empty size="sm" title="No directory mounts configured"
+                            description="This service has no directory mounts." icon-name="folder" />
+                    @endif
+                </div>
+            @endif
+        </x-application.settings-section>
+    @endif
+
+    @if (count($externalVolumes) > 0)
+        {{-- External Compose volumes: read-only, no storage entry, never removed by Coolify --}}
+        <x-application.settings-section :id="'external-volumes-'.$resource->uuid" title="External volumes"
+            :flush="true"
+            helper="Docker volumes that the Docker Compose file declares with external: true. Coolify mounts them as written.">
+            <div class="flex w-full flex-col">
+                <div
+                    class="border-b border-neutral-200 px-4 py-3 text-[13px] leading-5 text-neutral-500 dark:border-white/[0.08] dark:text-fg-dim">
+                    Managed outside Coolify. Coolify never removes these volumes.
+                </div>
+                <div class="data-table w-full">
+                    <div class="data-table-header external-volumes-table-grid">
+                        <span>Volume</span>
+                        <span>Docker volume</span>
+                        <span>Mount path</span>
+                        <span>Service</span>
+                    </div>
+                    @foreach ($externalVolumes as $externalVolume)
+                        <div class="env-table-item"
+                            wire:key="external-volume-{{ $externalVolume['service'] }}-{{ $externalVolume['key'] }}">
+                            <div
+                                class="data-table-row external-volumes-table-grid text-[13px] text-neutral-700 dark:text-fg-dim">
+                                <div class="min-w-0">
+                                    <span class="volumes-mobile-label volumes-field-label">Volume</span>
+                                    <span class="block min-w-0 truncate font-medium text-neutral-950 dark:text-fg"
+                                        title="{{ $externalVolume['key'] }}">{{ $externalVolume['key'] }}</span>
+                                    <span class="block text-xs text-neutral-500 dark:text-fg-dim">External volume</span>
+                                </div>
+                                <div class="min-w-0">
+                                    <span class="volumes-mobile-label volumes-field-label">Docker volume</span>
+                                    <span class="block min-w-0 truncate text-neutral-950 dark:text-fg"
+                                        title="{{ $externalVolume['dockerName'] }}">{{ $externalVolume['dockerName'] }}</span>
+                                </div>
+                                <div class="min-w-0">
+                                    <span class="volumes-mobile-label volumes-field-label">Mount path</span>
+                                    @foreach ($externalVolume['mountPaths'] as $mountPath)
+                                        <span class="block min-w-0 truncate text-neutral-950 dark:text-fg"
+                                            title="{{ $mountPath }}">{{ $mountPath }}</span>
+                                    @endforeach
+                                </div>
+                                <div class="min-w-0">
+                                    <span class="volumes-mobile-label volumes-field-label">Service</span>
+                                    <span class="block min-w-0 truncate"
+                                        title="{{ $externalVolume['service'] }}">{{ $externalVolume['service'] }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
             </div>
-        @endif
+        </x-application.settings-section>
     @endif
 </div>

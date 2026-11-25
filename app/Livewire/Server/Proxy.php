@@ -2,90 +2,492 @@
 
 namespace App\Livewire\Server;
 
-use App\Actions\Proxy\CheckConfiguration;
-use App\Actions\Proxy\SaveConfiguration;
-use App\Actions\Proxy\StartProxy;
+use App\Actions\Proxy\GetProxyConfiguration;
+use App\Actions\Proxy\SaveProxyConfiguration;
+use App\Enums\ProxyTypes;
 use App\Models\Server;
+use App\Models\ServerSetting;
+use App\Rules\SafeExternalUrl;
+use App\Traits\ListensToTeamChannel;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Proxy extends Component
 {
+    use AuthorizesRequests;
+    use ListensToTeamChannel;
+
     public Server $server;
 
     public ?string $selectedProxy = null;
 
-    public $proxy_settings = null;
+    public $proxySettings = null;
 
-    public ?string $redirect_url = null;
+    public bool $redirectEnabled = true;
 
-    protected $listeners = ['proxyStatusUpdated', 'saveConfiguration' => 'submit'];
+    public ?string $redirectUrl = null;
+
+    public ?string $customErrorPage = null;
+
+    public bool $generateExactLabels = false;
+
+    public ?string $certificateResolver = null;
+
+    /**
+     * Cache the versions.json file data in memory for this component instance.
+     * This avoids multiple file reads during a single request/render cycle.
+     */
+    protected ?array $cachedVersionsFile = null;
+
+    public function getListeners()
+    {
+        return [
+            'saveConfiguration' => 'submit',
+            ...$this->teamChannelListeners([
+                'ProxyStatusChangedUI' => '$refresh',
+            ]),
+        ];
+    }
+
+    protected function rules()
+    {
+        return [
+            'generateExactLabels' => 'required|boolean',
+            'redirectUrl' => ['nullable', new SafeExternalUrl],
+            'certificateResolver' => ['nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
+            'customErrorPage' => ['nullable', 'string', proxyPageSizeRule('custom error page')],
+        ];
+    }
 
     public function mount()
     {
         $this->selectedProxy = $this->server->proxyType();
-        $this->redirect_url = data_get($this->server, 'proxy.redirect_url');
+        $this->redirectEnabled = data_get($this->server, 'proxy.redirect_enabled', true);
+        $this->redirectUrl = data_get($this->server, 'proxy.redirect_url');
+        $this->customErrorPage = $this->server->proxy_error_page;
+        $this->syncData(false);
+        $this->clearAppliedTraefikBranchWarning();
     }
 
-    public function proxyStatusUpdated()
+    private function syncData(bool $toModel = false): void
     {
-        $this->dispatch('refresh')->self();
-    }
-
-    public function change_proxy()
-    {
-        $this->server->proxy = null;
-        $this->server->save();
-    }
-
-    public function select_proxy($proxy_type)
-    {
-        $this->server->proxy->set('status', 'exited');
-        $this->server->proxy->set('type', $proxy_type);
-        $this->server->save();
-        $this->selectedProxy = $this->server->proxy->type;
-        if ($this->selectedProxy !== 'NONE') {
-            StartProxy::run($this->server, false);
+        if ($toModel) {
+            $this->server->settings->generate_exact_labels = $this->generateExactLabels;
+            $this->server->settings->traefik_certificate_resolver = $this->certificateResolver ?: null;
+        } else {
+            $this->generateExactLabels = $this->server->settings->generate_exact_labels ?? false;
+            $this->certificateResolver = $this->server->settings->traefik_certificate_resolver;
         }
-        $this->dispatch('proxyStatusUpdated');
+    }
+
+    /**
+     * Get Traefik versions from cached data with in-memory optimization.
+     * Returns array like: ['v3.5' => '3.5.6', 'v3.6' => '3.6.2']
+     *
+     * This method adds an in-memory cache layer on top of the global
+     * get_traefik_versions() helper to avoid multiple calls during
+     * a single component lifecycle/render.
+     */
+    protected function getTraefikVersions(): ?array
+    {
+        // In-memory cache for this component instance (per-request)
+        if ($this->cachedVersionsFile !== null) {
+            return data_get($this->cachedVersionsFile, 'traefik');
+        }
+
+        // Load from global cached helper (Redis + filesystem)
+        $versionsData = get_versions_data();
+        if (! $versionsData) {
+            return null;
+        }
+
+        $this->cachedVersionsFile = $versionsData;
+        $traefikVersions = data_get($versionsData, 'traefik');
+
+        return is_array($traefikVersions) ? $traefikVersions : null;
+    }
+
+    /**
+     * @param  array<int, string>  $changedFields
+     */
+    private function auditProxyUpdate(array $changedFields): void
+    {
+        if ($changedFields === []) {
+            return;
+        }
+
+        auditLog('ui.server.proxy.updated', $this->proxyAuditContext([
+            'changed_fields' => $changedFields,
+        ]));
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function proxyAuditContext(array $context = []): array
+    {
+        return array_merge([
+            'team_id' => $this->server->team_id,
+            'server_uuid' => $this->server->uuid,
+            'server_name' => $this->server->name,
+        ], $context);
+    }
+
+    public function getConfigurationFilePathProperty(): string
+    {
+        return rtrim($this->server->proxyPath(), '/').'/docker-compose.yml';
+    }
+
+    public function changeProxy()
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $this->server->proxy = null;
+            $this->server->detected_traefik_version = null;
+            $this->server->traefik_outdated_info = null;
+            $this->server->save();
+
+            $this->dispatch('reloadWindow');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function selectProxy($proxy_type)
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $this->server->changeProxy($proxy_type, async: false);
+            $this->selectedProxy = $this->server->proxy->type;
+
+            $this->dispatch('reloadWindow');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function instantSave()
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $this->validate();
+            $this->saveSettings();
+            $this->dispatch('success', 'Settings saved.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    private function saveSettings(): void
+    {
+        $this->syncData(true);
+        $changedFields = auditChangedFields($this->server->settings);
+        $this->server->settings->save();
+        $this->auditProxyUpdate($changedFields);
+
+        // Coolify's own dashboard and catch-all routes use the resolver too.
+        if (in_array('traefik_certificate_resolver', $changedFields, true)) {
+            $this->server->setupDynamicProxyConfiguration();
+            $this->server->setupDefaultRedirect();
+        }
+    }
+
+    public function instantSaveRedirect()
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $redirectChanged = (bool) data_get($this->server->proxy, 'redirect_enabled', true) !== $this->redirectEnabled;
+            $this->server->proxy->redirect_enabled = $this->redirectEnabled;
+            $this->server->save();
+            $this->auditProxyUpdate($redirectChanged ? ['redirect_enabled'] : []);
+            $this->server->setupDefaultRedirect();
+            $this->dispatch('success', 'Proxy configuration saved.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function resetCustomErrorPage(): void
+    {
+        try {
+            $this->authorize('update', $this->server);
+            $this->server->proxy_error_page = null;
+            $this->server->save();
+            $this->customErrorPage = null;
+            $this->server->setupDefaultRedirect();
+            $this->dispatch('success', 'Default error page restored.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
     public function submit()
     {
         try {
-            SaveConfiguration::run($this->server, $this->proxy_settings);
-            $this->server->proxy->redirect_url = $this->redirect_url;
+            $this->authorize('update', $this->server);
+            $this->validate();
+            SaveProxyConfiguration::run($this->server, $this->proxySettings);
+            $this->server->proxy->redirect_url = $this->redirectUrl;
+            $this->server->proxy_error_page = filled($this->customErrorPage) ? $this->customErrorPage : null;
             $this->server->save();
-            $this->server->setupDefault404Redirect();
+            $this->saveSettings();
+            auditLog('ui.server.proxy.configuration_saved', $this->proxyAuditContext());
+            $this->server->setupDefaultRedirect();
+            $this->dispatch('refreshServerShow');
             $this->dispatch('success', 'Proxy configuration saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
 
-    public function reset_proxy_configuration()
+    public function resetProxyConfiguration()
     {
         try {
-            $this->proxy_settings = CheckConfiguration::run($this->server, true);
-            SaveConfiguration::run($this->server, $this->proxy_settings);
+            $this->authorize('update', $this->server);
+            // Explicitly regenerate default configuration
+            $this->proxySettings = GetProxyConfiguration::run($this->server, forceRegenerate: true);
+            SaveProxyConfiguration::run($this->server, $this->proxySettings);
             $this->server->save();
-            $this->dispatch('success', 'Proxy configuration saved.');
+            auditLog('ui.server.proxy.configuration_reset', $this->proxyAuditContext());
+            $this->dispatch('refreshServerShow');
+            $this->dispatch('success', 'Proxy configuration reset to default.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
 
+    /**
+     * The file can hold secrets; non-editors get no content instead of a 403 because x-init calls this.
+     */
     public function loadProxyConfiguration()
     {
         try {
-            $this->proxy_settings = CheckConfiguration::run($this->server);
-            if (str($this->proxy_settings)->contains('--api.dashboard=true') && str($this->proxy_settings)->contains('--api.insecure=true')) {
-                $this->dispatch('traefikDashboardAvailable', true);
-            } else {
-                $this->dispatch('traefikDashboardAvailable', false);
+            if (! auth()->user()?->can('update', $this->server)) {
+                $this->proxySettings = null;
+
+                return;
             }
 
+            $this->proxySettings = GetProxyConfiguration::run($this->server);
+            $this->clearAppliedTraefikBranchWarning();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function getTraefikVersionForWarningProperty(): ?string
+    {
+        if ($this->server->detected_traefik_version) {
+            return $this->server->detected_traefik_version;
+        }
+
+        if ($this->server->proxy->get('status') !== 'running' || $this->server->hasPendingProxyConfiguration()) {
+            return null;
+        }
+
+        $configuration = $this->server->proxy->get('last_saved_proxy_configuration');
+        if (! is_string($configuration) || ! preg_match('/^\s*image:\s*[\'\"]?traefik:(v?\d+\.\d+(?:\.\d+)?|latest)[\'\"]?\s*$/mi', $configuration, $matches)) {
+            return null;
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * The saved caddy-docker-proxy image when it is older than 2.9 (Caddy 2.7), else null.
+     */
+    public function getOutdatedCaddyImageProperty(): ?string
+    {
+        return $this->server->outdatedCaddyProxyImage();
+    }
+
+    /**
+     * Get the latest Traefik version for this server's current branch.
+     *
+     * This compares the server's detected version against available versions
+     * in versions.json to determine the latest patch for the current branch,
+     * or the newest available version if no current version is detected.
+     */
+    public function getLatestTraefikVersionProperty(): ?string
+    {
+        try {
+            $traefikVersions = $this->getTraefikVersions();
+
+            if (! $traefikVersions) {
+                return null;
+            }
+
+            // Get this server's current version
+            $currentVersion = $this->traefikVersionForWarning;
+
+            // If we have a current version, try to find matching branch
+            if ($currentVersion && $currentVersion !== 'latest') {
+                $current = ltrim($currentVersion, 'v');
+                if (preg_match('/^(\d+\.\d+)/', $current, $matches)) {
+                    $branch = "v{$matches[1]}";
+                    if (isset($traefikVersions[$branch])) {
+                        $version = $traefikVersions[$branch];
+
+                        return str_starts_with($version, 'v') ? $version : "v{$version}";
+                    }
+                }
+            }
+
+            // Return the newest available version
+            $newestVersion = collect($traefikVersions)
+                ->map(fn ($v) => ltrim($v, 'v'))
+                ->sortBy(fn ($v) => $v, SORT_NATURAL)
+                ->last();
+
+            return $newestVersion ? "v{$newestVersion}" : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public function getIsTraefikOutdatedProperty(): bool
+    {
+        if ($this->server->proxyType() !== ProxyTypes::TRAEFIK->value) {
+            return false;
+        }
+
+        $currentVersion = $this->traefikVersionForWarning;
+        if (! $currentVersion || $currentVersion === 'latest') {
+            return false;
+        }
+
+        $latestVersion = $this->latestTraefikVersion;
+        if (! $latestVersion) {
+            return false;
+        }
+
+        // Compare versions (strip 'v' prefix)
+        $current = ltrim($currentVersion, 'v');
+        $latest = ltrim($latestVersion, 'v');
+
+        return version_compare($current, $latest, '<');
+    }
+
+    /**
+     * Check if a newer Traefik branch (minor version) is available for this server.
+     * Returns the branch identifier (e.g., "v3.6") if a newer branch exists.
+     */
+    public function getNewerTraefikBranchAvailableProperty(): ?string
+    {
+        try {
+            if ($this->server->proxyType() !== ProxyTypes::TRAEFIK->value) {
+                return null;
+            }
+
+            // Get this server's current version
+            $currentVersion = $this->traefikVersionForWarning;
+            if (! $currentVersion || $currentVersion === 'latest') {
+                return null;
+            }
+
+            $configuredBranch = $this->getConfiguredTraefikBranch();
+
+            // Check if we have outdated info stored for this server (faster than computing)
+            $outdatedInfo = $this->server->traefik_outdated_info;
+            $storedCurrentVersion = ltrim((string) data_get($outdatedInfo, 'current'), 'v');
+            $detectedCurrentVersion = ltrim($currentVersion, 'v');
+            if ($storedCurrentVersion === $detectedCurrentVersion && data_get($outdatedInfo, 'type') === 'minor_upgrade') {
+                // Use the upgrade_target field if available (e.g., "v3.6")
+                if (isset($outdatedInfo['upgrade_target'])) {
+                    $upgradeTarget = str_starts_with($outdatedInfo['upgrade_target'], 'v')
+                        ? $outdatedInfo['upgrade_target']
+                        : "v{$outdatedInfo['upgrade_target']}";
+
+                    if ($configuredBranch && version_compare($configuredBranch, ltrim($upgradeTarget, 'v'), '>=')) {
+                        return null;
+                    }
+
+                    return $upgradeTarget;
+                }
+            }
+
+            // Fallback: compute from cached versions data
+            $traefikVersions = $this->getTraefikVersions();
+
+            if (! $traefikVersions) {
+                return null;
+            }
+
+            // Extract current branch (e.g., "3.5" from "3.5.6")
+            $current = ltrim($currentVersion, 'v');
+            if (! preg_match('/^(\d+\.\d+)/', $current, $matches)) {
+                return null;
+            }
+
+            $currentBranch = $matches[1];
+
+            // Find the newest branch that's greater than current
+            $newestBranch = null;
+            foreach ($traefikVersions as $branch => $version) {
+                $branchNum = ltrim($branch, 'v');
+                if (version_compare($branchNum, $currentBranch, '>')) {
+                    if (! $newestBranch || version_compare($branchNum, $newestBranch, '>')) {
+                        $newestBranch = $branchNum;
+                    }
+                }
+            }
+
+            if (! $newestBranch || ($configuredBranch && version_compare($configuredBranch, $newestBranch, '>='))) {
+                return null;
+            }
+
+            return "v{$newestBranch}";
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public function getLatestNewerTraefikVersionProperty(): ?string
+    {
+        $branch = $this->newerTraefikBranchAvailable;
+        $version = $branch ? ($this->getTraefikVersions()[$branch] ?? null) : null;
+
+        return $version ? 'v'.ltrim($version, 'v') : null;
+    }
+
+    private function getConfiguredTraefikBranch(): ?string
+    {
+        if ($this->server->proxy->get('status') !== 'running' || $this->server->hasPendingProxyConfiguration()) {
+            return null;
+        }
+
+        if (! is_string($this->proxySettings)) {
+            return null;
+        }
+
+        if (! preg_match('/^\s*image:\s*[\'\"]?traefik:v?(\d+\.\d+)(?:\.\d+)?[\'\"]?\s*$/mi', $this->proxySettings, $matches)) {
+            return null;
+        }
+
+        return $matches[1];
+    }
+
+    private function clearAppliedTraefikBranchWarning(): void
+    {
+        $outdatedInfo = $this->server->traefik_outdated_info;
+
+        if (data_get($outdatedInfo, 'type') !== 'minor_upgrade') {
+            return;
+        }
+
+        $configuredBranch = $this->getConfiguredTraefikBranch();
+        $upgradeTarget = ltrim((string) data_get($outdatedInfo, 'upgrade_target'), 'v');
+
+        if (! $configuredBranch || ! $upgradeTarget || version_compare($configuredBranch, $upgradeTarget, '<')) {
+            return;
+        }
+
+        Server::query()
+            ->whereKey($this->server->id)
+            ->where('traefik_outdated_info->type', data_get($outdatedInfo, 'type'))
+            ->where('traefik_outdated_info->current', data_get($outdatedInfo, 'current'))
+            ->where('traefik_outdated_info->upgrade_target', data_get($outdatedInfo, 'upgrade_target'))
+            ->update(['traefik_outdated_info' => null]);
     }
 }

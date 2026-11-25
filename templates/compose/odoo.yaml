@@ -1,19 +1,22 @@
 # documentation: https://www.odoo.com/
 # slogan: Odoo is a suite of open-source business apps that cover all your company needs.
+# category: productivity
 # tags: business, apps, CRM, eCommerce, accounting, inventory, point of sale, project management, open-source
 # logo: svgs/odoo.svg
 # port: 8069
 
 services:
   odoo:
-    image: odoo:17
+    image: odoo:20
+    command: --proxy-mode
     environment:
-      - SERVICE_FQDN_ODOO_8069
+      - SERVICE_URL_ODOO_8069
       - HOST=postgresql
       - USER=$SERVICE_USER_POSTGRES
       - PASSWORD=$SERVICE_PASSWORD_POSTGRES
     volumes:
       - odoo-web-data:/var/lib/odoo
+      - odoo-extra-addons:/mnt/extra-addons
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8069"]
       interval: 2s

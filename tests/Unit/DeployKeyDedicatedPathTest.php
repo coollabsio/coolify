@@ -1,0 +1,341 @@
+<?php
+
+use App\Jobs\ApplicationDeploymentJob;
+use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationSetting;
+use App\Models\GitlabApp;
+use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
+use App\Models\Server;
+use App\Traits\ExecuteRemoteCommand;
+use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+uses(TestCase::class, LazilyRefreshDatabase::class);
+
+afterEach(function () {
+    Mockery::close();
+});
+
+function commandStrings(array|Collection|string $commands): Collection
+{
+    if (is_string($commands)) {
+        return collect([$commands]);
+    }
+
+    return collect($commands)->map(fn ($command) => data_get($command, 'command') ?? $command[0] ?? $command);
+}
+
+function privateKeyMaterializationCommands(array|Collection|string $commands): Collection
+{
+    if (is_string($commands)) {
+        $commands = [$commands];
+    }
+
+    return collect($commands)->filter(fn ($command) => str(commandStrings([$command])->first())->contains('base64 -d | tee /root/.ssh/id_rsa_coolify_'));
+}
+
+function expectCommandListToContain(array|Collection|string $commands, string $expected): void
+{
+    expect(commandStrings($commands)->implode(' && '))->toContain($expected);
+}
+
+function expectCommandListNotToContain(array|Collection|string $commands, string $expected): void
+{
+    expect(commandStrings($commands)->implode(' && '))->not->toContain($expected);
+}
+
+function expectPrivateKeyMaterializationCommandsSkipLogging(array|Collection|string $commands): void
+{
+    $keyCommands = privateKeyMaterializationCommands($commands);
+
+    expect($keyCommands)->not->toBeEmpty();
+    $keyCommands->each(function ($command): void {
+        expect(data_get($command, 'skip_command_log'))->toBeTrue();
+    });
+}
+
+/**
+ * Git operations authenticate with the SSH key assigned in the UI. Coolify writes that key to a
+ * per-deployment path (/root/.ssh/id_rsa_coolify_<deployment_uuid>) instead of the shared
+ * /root/.ssh/id_rsa, so it can neither overwrite the server root's own key nor race with other
+ * concurrent operations on the same host. `-o IdentitiesOnly=yes` makes ssh offer only that key.
+ * On the host path an EXIT trap removes the key when the shell finishes; the docker path runs in an
+ * ephemeral container, so it needs no cleanup.
+ */
+$keyPath = '/root/.ssh/id_rsa_coolify_test-deployment-uuid';
+$gitSshFiles = '/root/.ssh/coolify_git_test-deployment-uuid.config /root/.ssh/coolify_git_test-deployment-uuid.known_hosts';
+
+it('keeps the deploy key out of the deployment log when ls-remote runs inside docker', function () use ($keyPath) {
+    Storage::fake('ssh-keys');
+    Storage::fake('ssh-mux');
+    config(['constants.ssh.mux_enabled' => false]);
+    InstanceSettings::forceCreate(['id' => 0]);
+    $serverKey = PrivateKey::factory()->create();
+    $server = Server::factory()->create([
+        'team_id' => $serverKey->team_id,
+        'private_key_id' => $serverKey->id,
+    ]);
+    $deployKey = 'deploy-key-material-that-must-stay-secret';
+    $application = new class extends Application
+    {
+        public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null)
+        {
+            return ['commands' => collect(), 'branch' => 'main', 'fullRepoUrl' => 'git@gitlab.com:user/repo.git'];
+        }
+    };
+    $stored = Application::factory()->create(['git_branch' => 'main']);
+    $application->setRawAttributes($stored->getAttributes(), true);
+    $application->exists = true;
+    $application->setRelation('settings', $stored->settings);
+    $application->setRelation('private_key', (new PrivateKey)->forceFill(['private_key' => $deployKey]));
+    $deployment = ApplicationDeploymentQueue::query()->create([
+        'application_id' => $application->id,
+        'deployment_uuid' => 'test-deployment-uuid',
+    ]);
+    Process::fake(['*' => Process::result(output: 'done')]);
+    $job = new class extends ApplicationDeploymentJob
+    {
+        public function __construct() {}
+    };
+    foreach ([
+        'application' => $application,
+        'application_deployment_queue' => $deployment,
+        'server' => $server,
+        'deployment_uuid' => 'test-deployment-uuid',
+        'pull_request_id' => 0,
+        'commit' => 'HEAD',
+        'rollback' => false,
+        'git_type' => 'other',
+        'customPort' => 22,
+        'saved_outputs' => collect(),
+    ] as $property => $value) {
+        (new ReflectionProperty(ApplicationDeploymentJob::class, $property))->setValue($job, $value);
+    }
+
+    (new ReflectionMethod(ApplicationDeploymentJob::class, 'check_git_if_build_needed'))->invoke($job);
+
+    $encodedKey = base64_encode($deployKey);
+    $storedLogs = $deployment->refresh()->getRawOriginal('logs');
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), $encodedKey) && str_contains(remoteProcessScript($process), "base64 -d | tee {$keyPath}"));
+    expect($storedLogs)
+        ->toContain('git ls-remote') // hidden commands with output are logged, so the key is absent only because its command is skipped
+        ->not->toContain($encodedKey)
+        ->not->toContain($deployKey);
+});
+
+it('supports skipping command log entries without adding a hidden command entry', function () {
+    Storage::fake('ssh-keys');
+    Storage::fake('ssh-mux');
+    config(['constants.ssh.mux_enabled' => false]);
+    InstanceSettings::forceCreate(['id' => 0]);
+    $privateKey = PrivateKey::factory()->create();
+    $server = Server::factory()->create([
+        'team_id' => $privateKey->team_id,
+        'private_key_id' => $privateKey->id,
+    ]);
+    $application = Application::factory()->create();
+    $deployment = ApplicationDeploymentQueue::query()->create([
+        'application_id' => $application->id,
+        'deployment_uuid' => fake()->uuid(),
+    ]);
+    $payload = base64_encode('private-deploy-key-material');
+    $command = "echo '{$payload}' | base64 -d | tee /root/.ssh/id_rsa_coolify_test";
+    Process::fake(['*' => Process::result(output: "materialized {$payload}")]);
+    $job = new class($server, $application, $deployment)
+    {
+        use ExecuteRemoteCommand;
+
+        public function __construct(
+            public Server $server,
+            public Application $application,
+            public ApplicationDeploymentQueue $application_deployment_queue,
+        ) {}
+    };
+
+    (new ReflectionMethod($job, 'executeCommandWithProcess'))->invoke(
+        $job, $command, false, null, true, false, true, true,
+    );
+
+    $storedLogs = $deployment->refresh()->getRawOriginal('logs');
+    $logs = json_decode($storedLogs, true, flags: JSON_THROW_ON_ERROR);
+    expect($logs)->toHaveCount(1)
+        ->and($logs[0]['command'])->toBeNull()
+        ->and($logs[0]['output'])->toBe('materialized '.REDACTED);
+    expect($storedLogs)->not->toContain($payload)->not->toContain($command);
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), $command));
+});
+
+it('writes a deploy key to a per-deployment path and cleans it up for ls-remote on the host', function () use ($keyPath, $gitSshFiles) {
+    $privateKey = Mockery::mock(PrivateKey::class)->makePartial();
+    $privateKey->shouldReceive('getAttribute')->with('private_key')->andReturn('fake-private-key');
+
+    $application = Mockery::mock(Application::class)->makePartial();
+    $application->git_branch = 'main';
+    $application->shouldReceive('deploymentType')->andReturn('deploy_key');
+    $application->shouldReceive('customRepository')->andReturn(['repository' => 'git@gitlab.com:user/repo.git', 'port' => 22]);
+    $application->shouldReceive('getAttribute')->with('private_key')->andReturn($privateKey);
+
+    $result = $application->generateGitLsRemoteCommands('test-deployment-uuid', false);
+
+    expectCommandListToContain($result['commands'], "tee {$keyPath}");
+    expectCommandListToContain($result['commands'], "-i {$keyPath} -o IdentitiesOnly=yes");
+    expectCommandListToContain($result['commands'], "trap 'rm -f {$keyPath} {$gitSshFiles}' EXIT"); // removed when the shell exits
+    expectCommandListNotToContain($result['commands'], 'tee /root/.ssh/id_rsa >'); // never overwrites the host root's own key
+    expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
+});
+
+it('writes a deploy key to a per-deployment path for ls-remote inside docker without a trap', function () use ($keyPath) {
+    $privateKey = Mockery::mock(PrivateKey::class)->makePartial();
+    $privateKey->shouldReceive('getAttribute')->with('private_key')->andReturn('fake-private-key');
+
+    $application = Mockery::mock(Application::class)->makePartial();
+    $application->git_branch = 'main';
+    $application->shouldReceive('deploymentType')->andReturn('deploy_key');
+    $application->shouldReceive('customRepository')->andReturn(['repository' => 'git@gitlab.com:user/repo.git', 'port' => 22]);
+    $application->shouldReceive('getAttribute')->with('private_key')->andReturn($privateKey);
+
+    $result = $application->generateGitLsRemoteCommands('test-deployment-uuid', true);
+
+    expectCommandListToContain($result['commands'], "tee {$keyPath}");
+    expectCommandListToContain($result['commands'], "-i {$keyPath} -o IdentitiesOnly=yes");
+    expectCommandListNotToContain($result['commands'], 'trap '); // ephemeral container, no cleanup needed
+    expectCommandListNotToContain($result['commands'], 'tee /root/.ssh/id_rsa >');
+    expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
+});
+
+it('writes a GitLab source private key to a per-deployment path with cleanup on the host', function () use ($keyPath, $gitSshFiles) {
+    $privateKey = Mockery::mock(PrivateKey::class)->makePartial();
+    $privateKey->shouldReceive('getAttribute')->with('private_key')->andReturn('fake-private-key');
+
+    $gitlabSource = Mockery::mock(GitlabApp::class)->makePartial();
+    $gitlabSource->shouldReceive('getMorphClass')->andReturn(GitlabApp::class);
+    $gitlabSource->shouldReceive('getAttribute')->with('html_url')->andReturn('https://gitlab.com');
+    $gitlabSource->shouldReceive('getAttribute')->with('privateKey')->andReturn($privateKey);
+    $gitlabSource->shouldReceive('getAttribute')->with('private_key_id')->andReturn(1);
+    $gitlabSource->shouldReceive('getAttribute')->with('custom_port')->andReturn(22);
+
+    $application = Mockery::mock(Application::class)->makePartial();
+    $application->git_branch = 'main';
+    $application->shouldReceive('deploymentType')->andReturn('source');
+    $application->shouldReceive('customRepository')->andReturn(['repository' => 'git@gitlab.com:user/repo.git', 'port' => 22]);
+    $application->shouldReceive('getAttribute')->with('source')->andReturn($gitlabSource);
+    $application->source = $gitlabSource;
+
+    $result = $application->generateGitLsRemoteCommands('test-deployment-uuid', false);
+
+    expectCommandListToContain($result['commands'], "tee {$keyPath}");
+    expectCommandListToContain($result['commands'], "-i {$keyPath} -o IdentitiesOnly=yes");
+    expectCommandListToContain($result['commands'], "trap 'rm -f {$keyPath} {$gitSshFiles}' EXIT");
+    expectCommandListNotToContain($result['commands'], 'tee /root/.ssh/id_rsa >');
+    expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
+});
+
+it('writes a deploy key to a per-deployment path and cleans it up when cloning on the host', function () use ($keyPath, $gitSshFiles) {
+    $privateKey = Mockery::mock(PrivateKey::class)->makePartial();
+    $privateKey->shouldReceive('getAttribute')->with('private_key')->andReturn('fake-private-key');
+
+    $settings = Mockery::mock(ApplicationSetting::class)->makePartial();
+    $settings->shouldReceive('getAttribute')->with('is_git_shallow_clone_enabled')->andReturn(false);
+    $settings->shouldReceive('getAttribute')->with('is_git_submodules_enabled')->andReturn(false);
+    $settings->shouldReceive('getAttribute')->with('is_git_lfs_enabled')->andReturn(false);
+
+    $application = Mockery::mock(Application::class)->makePartial();
+    $application->git_branch = 'main';
+    $application->shouldReceive('deploymentType')->andReturn('deploy_key');
+    $application->shouldReceive('customRepository')->andReturn(['repository' => 'git@gitlab.com:user/repo.git', 'port' => 22]);
+    $application->shouldReceive('getAttribute')->with('private_key')->andReturn($privateKey);
+    $application->shouldReceive('getAttribute')->with('settings')->andReturn($settings);
+    $application->shouldReceive('getAttribute')->with('git_commit_sha')->andReturn('HEAD');
+
+    // exec_in_docker = false → the loadComposeFile / host clone path
+    $result = $application->generateGitImportCommands('test-deployment-uuid', 0, null, false);
+
+    expectCommandListToContain($result['commands'], "tee {$keyPath}");
+    expectCommandListToContain($result['commands'], "-i {$keyPath} -o IdentitiesOnly=yes");
+    expectCommandListToContain($result['commands'], "trap 'rm -f {$keyPath} {$gitSshFiles}' EXIT");
+    expectCommandListNotToContain($result['commands'], 'tee /root/.ssh/id_rsa >');
+    expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
+});
+
+it('writes a GitLab source private key to a per-deployment path and cleans it up when cloning on the host', function () use ($keyPath, $gitSshFiles) {
+    $privateKey = Mockery::mock(PrivateKey::class)->makePartial();
+    $privateKey->shouldReceive('getAttribute')->with('private_key')->andReturn('fake-private-key');
+
+    $gitlabSource = Mockery::mock(GitlabApp::class)->makePartial();
+    $gitlabSource->shouldReceive('getMorphClass')->andReturn(GitlabApp::class);
+    $gitlabSource->shouldReceive('getAttribute')->with('html_url')->andReturn('https://gitlab.com');
+    $gitlabSource->shouldReceive('getAttribute')->with('privateKey')->andReturn($privateKey);
+    $gitlabSource->shouldReceive('getAttribute')->with('custom_port')->andReturn(22);
+
+    $settings = Mockery::mock(ApplicationSetting::class)->makePartial();
+    $settings->shouldReceive('getAttribute')->with('is_git_shallow_clone_enabled')->andReturn(false);
+    $settings->shouldReceive('getAttribute')->with('is_git_submodules_enabled')->andReturn(false);
+    $settings->shouldReceive('getAttribute')->with('is_git_lfs_enabled')->andReturn(false);
+
+    $application = Mockery::mock(Application::class)->makePartial();
+    $application->git_branch = 'main';
+    $application->source = $gitlabSource;
+    $application->shouldReceive('deploymentType')->andReturn('source');
+    $application->shouldReceive('customRepository')->andReturn(['repository' => 'git@gitlab.com:user/repo.git', 'port' => 22]);
+    $application->shouldReceive('getAttribute')->with('source')->andReturn($gitlabSource);
+    $application->shouldReceive('getAttribute')->with('settings')->andReturn($settings);
+    $application->shouldReceive('getAttribute')->with('git_commit_sha')->andReturn('HEAD');
+
+    $result = $application->generateGitImportCommands('test-deployment-uuid', 0, null, false);
+
+    expectCommandListToContain($result['commands'], "tee {$keyPath}");
+    expectCommandListToContain($result['commands'], "-i {$keyPath} -o IdentitiesOnly=yes");
+    expectCommandListToContain($result['commands'], "trap 'rm -f {$keyPath} {$gitSshFiles}' EXIT");
+    expectCommandListNotToContain($result['commands'], 'tee /root/.ssh/id_rsa >');
+    expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
+});
+
+it('uses the per-deployment deploy key for pull request fetches', function () use ($keyPath) {
+    $privateKey = Mockery::mock(PrivateKey::class)->makePartial();
+    $privateKey->shouldReceive('getAttribute')->with('private_key')->andReturn('fake-private-key');
+
+    $settings = Mockery::mock(ApplicationSetting::class)->makePartial();
+    $settings->shouldReceive('getAttribute')->with('is_git_shallow_clone_enabled')->andReturn(false);
+    $settings->shouldReceive('getAttribute')->with('is_git_submodules_enabled')->andReturn(false);
+    $settings->shouldReceive('getAttribute')->with('is_git_lfs_enabled')->andReturn(false);
+
+    $application = Mockery::mock(Application::class)->makePartial();
+    $application->git_branch = 'main';
+    $application->shouldReceive('deploymentType')->andReturn('deploy_key');
+    $application->shouldReceive('customRepository')->andReturn(['repository' => 'git@github.com:user/repo.git', 'port' => 22]);
+    $application->shouldReceive('getAttribute')->with('private_key')->andReturn($privateKey);
+    $application->shouldReceive('getAttribute')->with('settings')->andReturn($settings);
+    $application->shouldReceive('getAttribute')->with('git_commit_sha')->andReturn('HEAD');
+
+    $result = $application->generateGitImportCommands('test-deployment-uuid', 123, 'github', false);
+
+    expectCommandListToContain($result['commands'], "GIT_SSH_COMMAND=\"ssh -F /root/.ssh/coolify_git_test-deployment-uuid.config -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p 22 -o Port=22 -o LogLevel=ERROR -i {$keyPath} -o IdentitiesOnly=yes\" git fetch origin pull/123/head:pr-123-coolify");
+    expectCommandListNotToContain($result['commands'], '-i /root/.ssh/id_rsa" git fetch origin pull/123/head:pr-123-coolify');
+    expectCommandListNotToContain($result['commands'], 'StrictHostKeyChecking=no');
+    expectPrivateKeyMaterializationCommandsSkipLogging($result['commands']);
+});
+
+it('does not force a missing per-deployment key for other repository pull request fetches', function () use ($keyPath) {
+    $settings = Mockery::mock(ApplicationSetting::class)->makePartial();
+    $settings->shouldReceive('getAttribute')->with('is_git_shallow_clone_enabled')->andReturn(false);
+    $settings->shouldReceive('getAttribute')->with('is_git_submodules_enabled')->andReturn(false);
+    $settings->shouldReceive('getAttribute')->with('is_git_lfs_enabled')->andReturn(false);
+
+    $application = Mockery::mock(Application::class)->makePartial();
+    $application->git_branch = 'main';
+    $application->shouldReceive('deploymentType')->andReturn('other');
+    $application->shouldReceive('customRepository')->andReturn(['repository' => 'git@github.com:user/repo.git', 'port' => 22]);
+    $application->shouldReceive('getAttribute')->with('settings')->andReturn($settings);
+    $application->shouldReceive('getAttribute')->with('git_commit_sha')->andReturn('HEAD');
+
+    $result = $application->generateGitImportCommands('test-deployment-uuid', 123, 'github', false);
+
+    expectCommandListToContain($result['commands'], 'GIT_SSH_COMMAND="ssh -F /root/.ssh/coolify_git_test-deployment-uuid.config -o ConnectTimeout=30 -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -p 22 -o Port=22 -o LogLevel=ERROR -i /root/.ssh/id_rsa" git fetch origin pull/123/head:pr-123-coolify');
+    expectCommandListNotToContain($result['commands'], $keyPath);
+    expectCommandListNotToContain($result['commands'], 'StrictHostKeyChecking=no');
+});

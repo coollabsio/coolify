@@ -1,0 +1,19 @@
+# documentation: https://dbeaver.com/docs/cloudbeaver/
+# slogan: CloudBeaver is a lightweight web application designed for comprehensive data management.
+# category: devtools
+# tags: dbeaver, data management, data, database, mysql, postgres, sqlite, sql, mongodb
+# logo: svgs/cloudbeaver.svg
+# port: 8978
+
+services:
+  cloudbeaver:
+    image: dbeaver/cloudbeaver:26
+    volumes:
+      - cloudbeaver-data:/opt/cloudbeaver/workspace
+    environment:
+      - SERVICE_URL_CLOUDBEAVER_8978
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8978 && printf 'GET / HTTP/1.0\\r\\n\\r\\n' >&3 && head -n 1 <&3 | grep -q ' 200 '"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

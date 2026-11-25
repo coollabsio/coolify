@@ -11,21 +11,11 @@ class Show extends Component
 
     public $parameters = [];
 
-    protected $listeners = ['proxyStatusUpdated'];
-
-    public function proxyStatusUpdated()
-    {
-        $this->server->refresh();
-    }
-
     public function mount()
     {
         $this->parameters = get_route_parameters();
         try {
-            $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->first();
-            if (is_null($this->server)) {
-                return redirect()->route('server.index');
-            }
+            $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->firstOrFail();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

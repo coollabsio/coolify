@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="rustGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E67E22"/>
+      <stop offset="100%" style="stop-color:#D35400"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="24" width="112" height="80" rx="8" fill="url(#rustGrad)"/>
+  <rect x="20" y="38" width="88" height="12" rx="3" fill="#FFF" opacity="0.9"/>
+  <rect x="20" y="58" width="88" height="12" rx="3" fill="#FFF" opacity="0.7"/>
+  <rect x="20" y="78" width="88" height="12" rx="3" fill="#FFF" opacity="0.5"/>
+  <circle cx="28" cy="44" r="3" fill="#27AE60"/>
+  <circle cx="28" cy="64" r="3" fill="#27AE60"/>
+  <circle cx="28" cy="84" r="3" fill="#27AE60"/>
+</svg>

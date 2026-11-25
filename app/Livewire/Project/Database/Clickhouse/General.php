@@ -6,61 +6,165 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Models\Server;
 use App\Models\StandaloneClickhouse;
+use App\Support\ValidationPatterns;
+use App\Traits\ListensToTeamChannel;
 use Exception;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class General extends Component
 {
-    public Server $server;
+    use AuthorizesRequests;
+    use ListensToTeamChannel;
+
+    public ?Server $server = null;
 
     public StandaloneClickhouse $database;
 
-    public ?string $db_url = null;
+    public string $name;
 
-    public ?string $db_url_public = null;
+    public ?string $description = null;
 
-    protected $listeners = ['refresh'];
+    public string $clickhouseAdminUser;
 
-    protected $rules = [
-        'database.name' => 'required',
-        'database.description' => 'nullable',
-        'database.clickhouse_admin_user' => 'required',
-        'database.clickhouse_admin_password' => 'required',
-        'database.image' => 'required',
-        'database.ports_mappings' => 'nullable',
-        'database.is_public' => 'nullable|boolean',
-        'database.public_port' => 'nullable|integer',
-        'database.is_log_drain_enabled' => 'nullable|boolean',
-    ];
+    public string $clickhouseAdminPassword;
 
-    protected $validationAttributes = [
-        'database.name' => 'Name',
-        'database.description' => 'Description',
-        'database.clickhouse_admin_user' => 'Postgres User',
-        'database.clickhouse_admin_password' => 'Postgres Password',
-        'database.image' => 'Image',
-        'database.ports_mappings' => 'Port Mapping',
-        'database.is_public' => 'Is Public',
-        'database.public_port' => 'Public Port',
-    ];
+    public string $image;
+
+    public ?string $portsMappings = null;
+
+    public ?bool $isPublic = null;
+
+    public mixed $publicPort = null;
+
+    public mixed $publicPortTimeout = 3600;
+
+    public ?string $customDockerRunOptions = null;
+
+    public bool $isLogDrainEnabled = false;
+
+    public bool $isPasswordHiddenForMember = false;
+
+    /** Unnamed Docker volume that holds the current data; shown as a warning. */
+    #[Locked]
+    public ?string $anonymousDataVolume = null;
+
+    public function getListeners(): array
+    {
+        return $this->teamChannelListeners([
+            'DatabaseProxyStopped' => 'databaseProxyStopped',
+        ]);
+    }
 
     public function mount()
     {
-        $this->db_url = $this->database->internal_db_url;
-        $this->db_url_public = $this->database->external_db_url;
-        $this->server = data_get($this->database, 'destination.server');
+        try {
+            $this->authorize('view', $this->database);
+            $this->syncData();
+            $this->server = data_get($this->database, 'destination.server');
+            if (! $this->server) {
+                $this->dispatch('error', 'Database destination server is not configured.');
+
+                return;
+            }
+            $this->anonymousDataVolume = $this->database->anonymousDataVolume();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
+    }
+
+    protected function rules(): array
+    {
+        return [
+            'name' => ValidationPatterns::nameRules(),
+            'description' => ValidationPatterns::descriptionRules(),
+            'clickhouseAdminUser' => ValidationPatterns::databaseIdentifierRules(
+                enforcePattern: $this->clickhouseAdminUser !== $this->database->clickhouse_admin_user,
+            ),
+            'clickhouseAdminPassword' => ValidationPatterns::databasePasswordRules(
+                enforcePattern: $this->clickhouseAdminPassword !== $this->database->clickhouse_admin_password,
+            ),
+            'image' => 'required|string',
+            'portsMappings' => ValidationPatterns::portMappingRules(),
+            'isPublic' => 'nullable|boolean',
+            'publicPort' => 'nullable|integer|min:1|max:65535',
+            'publicPortTimeout' => 'nullable|integer|min:1',
+            'customDockerRunOptions' => 'nullable|string',
+            'isLogDrainEnabled' => 'nullable|boolean',
+        ];
+    }
+
+    protected function messages(): array
+    {
+        return array_merge(
+            ValidationPatterns::combinedMessages(),
+            ValidationPatterns::portMappingMessages(),
+            [
+                ...ValidationPatterns::databaseIdentifierMessages('clickhouseAdminUser', 'Admin User'),
+                ...ValidationPatterns::databasePasswordMessages('clickhouseAdminPassword', 'Admin Password'),
+                'image.required' => 'The Docker Image field is required.',
+                'image.string' => 'The Docker Image must be a string.',
+                'publicPort.integer' => 'The Public Port must be an integer.',
+                'publicPort.min' => 'The Public Port must be at least 1.',
+                'publicPort.max' => 'The Public Port must not exceed 65535.',
+                'publicPortTimeout.integer' => 'The Public Port Timeout must be an integer.',
+                'publicPortTimeout.min' => 'The Public Port Timeout must be at least 1.',
+            ]
+        );
+    }
+
+    private function syncData(bool $toModel = false): void
+    {
+        if ($toModel) {
+            $this->validate();
+            $this->database->name = $this->name;
+            $this->database->description = $this->description;
+            // After the first start the credentials are read-only, so autofilled values must not be saved.
+            if (! $this->database->started_at) {
+                $this->database->clickhouse_admin_user = $this->clickhouseAdminUser;
+                $this->database->clickhouse_admin_password = $this->clickhouseAdminPassword;
+            }
+            $this->database->image = $this->image;
+            $this->database->ports_mappings = $this->portsMappings;
+            $this->database->is_public = $this->isPublic;
+            $this->database->public_port = $this->publicPort ?: null;
+            $this->database->public_port_timeout = $this->publicPortTimeout ?: null;
+            $this->database->custom_docker_run_options = $this->customDockerRunOptions;
+            $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
+            $this->database->save();
+            $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
+        } else {
+            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
+            $this->name = $this->database->name;
+            $this->description = $this->database->description;
+            $this->clickhouseAdminUser = $this->database->clickhouse_admin_user;
+            $this->clickhouseAdminPassword = $canSeeCredentials ? $this->database->clickhouse_admin_password : '';
+            $this->image = $this->database->image;
+            $this->portsMappings = $this->database->ports_mappings;
+            $this->isPublic = $this->database->is_public;
+            $this->publicPort = $this->database->public_port;
+            $this->publicPortTimeout = $this->database->public_port_timeout;
+            $this->customDockerRunOptions = $canSeeCredentials ? $this->database->custom_docker_run_options : null;
+            $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
+        }
     }
 
     public function instantSaveAdvanced()
     {
         try {
+            $this->authorize('update', $this->database);
+
             if (! $this->server->isLogDrainEnabled()) {
-                $this->database->is_log_drain_enabled = false;
+                $this->isLogDrainEnabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
 
                 return;
             }
-            $this->database->save();
+            $this->syncData(true);
+
             $this->dispatch('success', 'Database updated.');
             $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
         } catch (Exception $e) {
@@ -71,48 +175,82 @@ class General extends Component
     public function instantSave()
     {
         try {
-            if ($this->database->is_public && ! $this->database->public_port) {
+            $this->authorize('update', $this->database);
+
+            if ($this->isPublic && ! $this->publicPort) {
                 $this->dispatch('error', 'Public port is required.');
-                $this->database->is_public = false;
+                $this->isPublic = false;
 
                 return;
             }
-            if ($this->database->is_public) {
-                if (! str($this->database->status)->startsWith('running')) {
-                    $this->dispatch('error', 'Database must be started to be publicly accessible.');
-                    $this->database->is_public = false;
+            if ($this->isPublic && ! str($this->database->status)->startsWith('running')) {
+                $this->dispatch('error', 'Database must be started to be publicly accessible.');
+                $this->isPublic = false;
 
-                    return;
-                }
+                return;
+            }
+            $this->syncData(true);
+            if ($this->isPublic) {
                 StartDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is now publicly accessible.');
             } else {
                 StopDatabaseProxy::run($this->database);
                 $this->dispatch('success', 'Database is no longer publicly accessible.');
             }
-            $this->db_url_public = $this->database->external_db_url;
-            $this->database->save();
+            $this->dispatch('databaseUpdated');
         } catch (\Throwable $e) {
-            $this->database->is_public = ! $this->database->is_public;
+            $this->authorize('update', $this->database);
+            $this->isPublic = ! $this->isPublic;
+            $this->syncData(true);
 
             return handleError($e, $this);
         }
     }
 
-    public function refresh(): void
+    public function keepCurrentDataVolume(): void
+    {
+        try {
+            $this->authorize('update', $this->database);
+
+            $volumeName = $this->database->anonymousDataVolume();
+            if ($volumeName === null) {
+                $this->anonymousDataVolume = null;
+                $this->dispatch('info', 'This database already uses its data volume.');
+
+                return;
+            }
+
+            $this->database->keepAnonymousDataVolume($volumeName);
+            $this->anonymousDataVolume = null;
+            $this->dispatch('success', 'The current data volume is now the data volume of this database. You can restart it safely.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    public function databaseProxyStopped(): void
     {
         $this->database->refresh();
+        $this->isPublic = $this->database->is_public;
+        $this->publicPort = $this->database->public_port;
+        $this->publicPortTimeout = $this->database->public_port_timeout;
+        $this->dispatch('databaseUpdated');
     }
 
     public function submit()
     {
         try {
-            if (str($this->database->public_port)->isEmpty()) {
-                $this->database->public_port = null;
+            $this->authorize('update', $this->database);
+
+            if ($this->portsMappings) {
+                $this->portsMappings = str($this->portsMappings)->replace(' ', '')->trim()->toString();
             }
-            $this->validate();
-            $this->database->save();
+            if (str($this->publicPort)->isEmpty()) {
+                $this->publicPort = null;
+            }
+            $this->syncData(true);
             $this->dispatch('success', 'Database updated.');
+            $this->dispatch('databaseUpdated');
         } catch (Exception $e) {
             return handleError($e, $this);
         } finally {

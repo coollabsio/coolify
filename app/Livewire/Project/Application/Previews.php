@@ -3,16 +3,28 @@
 namespace App\Livewire\Project\Application;
 
 use App\Actions\Docker\GetContainersStatus;
+use App\Events\ServiceStatusChanged;
+use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Support\ValidationPatterns;
+use App\Traits\AuditsApplicationSettings;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Validator;
 use Livewire\Component;
-use Spatie\Url\Url;
-use Visus\Cuid2\Cuid2;
 
 class Previews extends Component
 {
+    use AuditsApplicationSettings, AuthorizesRequests;
+
+    protected $listeners = ['previewDomainsChanged' => 'refreshPreviewDomains'];
+
     public Application $application;
+
+    public bool $isPreviewDeploymentsEnabled = false;
+
+    public bool $isPrDeploymentsPublicEnabled = false;
 
     public string $deployment_uuid;
 
@@ -22,20 +34,81 @@ class Previews extends Component
 
     public int $rate_limit_remaining;
 
-    protected $rules = [
-        'application.previews.*.fqdn' => 'string|nullable',
-    ];
+    public array $previewDockerTags = [];
+
+    public ?string $manualPullRequestId = null;
+
+    public ?string $manualDockerTag = null;
+
+    protected function rules(): array
+    {
+        return [
+            'previewDockerTags.*' => ValidationPatterns::dockerImageTagRules(),
+            'manualPullRequestId' => 'integer|min:1|nullable',
+            'manualDockerTag' => ValidationPatterns::dockerImageTagRules(),
+        ];
+    }
+
+    protected function validationAttributes(): array
+    {
+        return ['previewDockerTags.*' => 'docker tag'];
+    }
 
     public function mount()
     {
+        $this->isPreviewDeploymentsEnabled = $this->application->settings->is_preview_deployments_enabled;
+        $this->isPrDeploymentsPublicEnabled = $this->application->settings->is_pr_deployments_public_enabled ?? false;
         $this->pull_requests = collect();
         $this->parameters = get_route_parameters();
+        $this->syncDockerTags();
+    }
+
+    public function savePreviewSettings(): void
+    {
+        $this->authorize('update', $this->application);
+        $this->validate([
+            'isPreviewDeploymentsEnabled' => 'boolean',
+            'isPrDeploymentsPublicEnabled' => 'boolean',
+        ]);
+
+        $this->application->settings->is_preview_deployments_enabled = $this->isPreviewDeploymentsEnabled;
+        $this->application->settings->is_pr_deployments_public_enabled = $this->isPrDeploymentsPublicEnabled;
+        $this->saveApplicationSettingsWithAudit($this->application);
+
+        $this->dispatch('success', 'Settings saved.');
+        $this->dispatch('configurationChanged');
+    }
+
+    public function togglePreviewDeployments(): void
+    {
+        $this->authorize('update', $this->application);
+
+        $this->isPreviewDeploymentsEnabled = ! $this->isPreviewDeploymentsEnabled;
+        $this->savePreviewSettings();
+    }
+
+    private function syncDockerTags(): void
+    {
+        $this->previewDockerTags = [];
+        foreach ($this->application->previews as $preview) {
+            $this->previewDockerTags[$preview->id] = $preview->docker_registry_image_tag;
+        }
+    }
+
+    public function refreshPreviewDomains(): void
+    {
+        $this->application->refresh();
+        $this->syncDockerTags();
     }
 
     public function load_prs()
     {
         try {
-            ['rate_limit_remaining' => $rate_limit_remaining, 'data' => $data] = githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/pulls");
+            $this->authorize('update', $this->application);
+            if (! $this->application->isGithubAppSource()) {
+                throw new \Exception('Loading pull requests is only supported for GitHub App sources.');
+            }
+            ['rate_limit_remaining' => $rate_limit_remaining, 'data' => $data] = githubApi(source: $this->application->source, endpoint: '/repos/'.gitRepositorySlug($this->application->git_repository).'/pulls');
             $this->rate_limit_remaining = $rate_limit_remaining;
             $this->pull_requests = $data->sortBy('number')->values();
         } catch (\Throwable $e) {
@@ -45,59 +118,57 @@ class Previews extends Component
         }
     }
 
+    /**
+     * Asks GitHub whether the branch of the pull request is in the repository of the application, because the
+     * browser sends only the number. A pull request from a fork, or one that Coolify cannot check, is not.
+     */
+    private function isPullRequestFromRepository(int $pullRequestId): bool
+    {
+        if (! $this->application->isGithubAppSource()) {
+            return false;
+        }
+        try {
+            ['data' => $pullRequest] = githubApi(
+                source: $this->application->source,
+                endpoint: '/repos/'.gitRepositorySlug($this->application->git_repository)."/pulls/{$pullRequestId}",
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+        $headRepositoryId = data_get($pullRequest, 'head.repo.id');
+        $baseRepositoryId = data_get($pullRequest, 'base.repo.id');
+
+        return is_int($headRepositoryId) && $headRepositoryId === $baseRepositoryId;
+    }
+
     public function save_preview($preview_id)
     {
         try {
-            $success = true;
+            $this->authorize('update', $this->application);
             $preview = $this->application->previews->find($preview_id);
-            if (data_get_str($preview, 'fqdn')->isNotEmpty()) {
-                $preview->fqdn = str($preview->fqdn)->replaceEnd(',', '')->trim();
-                $preview->fqdn = str($preview->fqdn)->replaceStart(',', '')->trim();
-                $preview->fqdn = str($preview->fqdn)->trim()->lower();
-                if (! validate_dns_entry($preview->fqdn, $this->application->destination->server)) {
-                    $this->dispatch('error', 'Validating DNS failed.', "Make sure you have added the DNS records correctly.<br><br>$preview->fqdn->{$this->application->destination->server->ip}<br><br>Check this <a target='_blank' class='underline dark:text-white' href='https://coolify.io/docs/knowledge-base/dns-configuration'>documentation</a> for further help.");
-                    $success = false;
-                }
-                check_domain_usage(resource: $this->application, domain: $preview->fqdn);
-            }
 
             if (! $preview) {
                 throw new \Exception('Preview not found');
             }
-            $success && $preview->save();
-            $success && $this->dispatch('success', 'Preview saved.<br><br>Do not forget to redeploy the preview to apply the changes.');
+
+            $this->validateOnly("previewDockerTags.{$preview->id}");
+            $preview->docker_registry_image_tag = $this->previewDockerTags[$preview->id] ?? null;
+            $changedFields = $preview->isDirty('docker_registry_image_tag') ? ['docker_registry_image_tag'] : [];
+            $preview->save();
+            if ($changedFields !== []) {
+                $this->auditPreviewEvent('ui.application.preview_updated', $preview->pull_request_id, $changedFields);
+            }
+            $this->dispatch('success', 'Preview saved.<br><br>Do not forget to redeploy the preview to apply the changes.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
 
-    public function generate_preview($preview_id)
-    {
-        $preview = $this->application->previews->find($preview_id);
-        if (! $preview) {
-            $this->dispatch('error', 'Preview not found.');
-
-            return;
-        }
-        $fqdn = generateFqdn($this->application->destination->server, $this->application->uuid);
-
-        $url = Url::fromString($fqdn);
-        $template = $this->application->preview_url_template;
-        $host = $url->getHost();
-        $schema = $url->getScheme();
-        $random = new Cuid2(7);
-        $preview_fqdn = str_replace('{{random}}', $random, $template);
-        $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-        $preview_fqdn = str_replace('{{pr_id}}', $preview->pull_request_id, $preview_fqdn);
-        $preview_fqdn = "$schema://$preview_fqdn";
-        $preview->fqdn = $preview_fqdn;
-        $preview->save();
-        $this->dispatch('success', 'Domain generated.');
-    }
-
-    public function add(int $pull_request_id, ?string $pull_request_html_url = null)
+    public function add(int $pull_request_id, ?string $pull_request_html_url = null, ?string $docker_registry_image_tag = null)
     {
         try {
+            $this->authorize('update', $this->application);
+            $this->validatePreviewInput($pull_request_html_url, $docker_registry_image_tag);
             if ($this->application->build_pack === 'dockercompose') {
                 $this->setDeploymentUuid();
                 $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
@@ -108,21 +179,30 @@ class Previews extends Component
                         'pull_request_html_url' => $pull_request_html_url,
                         'docker_compose_domains' => $this->application->docker_compose_domains,
                     ]);
+                    $this->auditPreviewEvent('ui.application.preview_created', $pull_request_id);
+                    $found->recordSameRepository($this->isPullRequestFromRepository($pull_request_id));
                 }
-                $found->generate_preview_fqdn_compose();
+                $found->generate_preview_fqdn_compose(keepExistingDomains: ! $found->wasRecentlyCreated);
                 $this->application->refresh();
+                $this->syncDockerTags();
             } else {
                 $this->setDeploymentUuid();
                 $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
-                if (! $found && ! is_null($pull_request_html_url)) {
+                if (! $found && (! is_null($pull_request_html_url) || ($this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()))) {
                     $found = ApplicationPreview::create([
                         'application_id' => $this->application->id,
                         'pull_request_id' => $pull_request_id,
-                        'pull_request_html_url' => $pull_request_html_url,
+                        'pull_request_html_url' => $pull_request_html_url ?? '',
+                        'docker_registry_image_tag' => $docker_registry_image_tag,
                     ]);
+                    $this->auditPreviewEvent('ui.application.preview_created', $pull_request_id);
                 }
-                $this->application->generate_preview_fqdn($pull_request_id);
+                if ($found && $this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()) {
+                    $this->saveDockerTagWithAudit($found, $docker_registry_image_tag);
+                }
+                $found->generate_preview_fqdn(generateWithoutApplicationDomain: true, keepExistingDomains: true);
                 $this->application->refresh();
+                $this->syncDockerTags();
                 $this->dispatch('update_links');
                 $this->dispatch('success', 'Preview added.');
             }
@@ -131,63 +211,194 @@ class Previews extends Component
         }
     }
 
-    public function add_and_deploy(int $pull_request_id, ?string $pull_request_html_url = null)
-    {
-        $this->add($pull_request_id, $pull_request_html_url);
-        $this->deploy($pull_request_id, $pull_request_html_url);
-    }
-
-    public function deploy(int $pull_request_id, ?string $pull_request_html_url = null)
+    public function force_deploy_without_cache(int $pull_request_id, ?string $pull_request_html_url = null)
     {
         try {
+            $this->authorize('deploy', $this->application);
+
+            $dockerRegistryImageTag = null;
+            if ($this->application->build_pack === 'dockerimage') {
+                $dockerRegistryImageTag = $this->application->previews()
+                    ->where('pull_request_id', $pull_request_id)
+                    ->value('docker_registry_image_tag');
+            }
+
+            $this->deploy($pull_request_id, $pull_request_html_url, force_rebuild: true, docker_registry_image_tag: $dockerRegistryImageTag);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function add_and_deploy(int $pull_request_id, ?string $pull_request_html_url = null, ?string $docker_registry_image_tag = null)
+    {
+        try {
+            $this->authorize('deploy', $this->application);
+            $this->authorize('update', $this->application);
+
+            $this->add($pull_request_id, $pull_request_html_url, $docker_registry_image_tag);
+            $this->deploy($pull_request_id, $pull_request_html_url, force_rebuild: false, docker_registry_image_tag: $docker_registry_image_tag);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function deploy(int $pull_request_id, ?string $pull_request_html_url = null, bool $force_rebuild = false, ?string $docker_registry_image_tag = null)
+    {
+        try {
+            $this->authorize('deploy', $this->application);
+            $this->validatePreviewInput($pull_request_html_url, $docker_registry_image_tag);
             $this->setDeploymentUuid();
             $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
-            if (! $found && ! is_null($pull_request_html_url)) {
-                ApplicationPreview::create([
+            if (! $found && (! is_null($pull_request_html_url) || ($this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()))) {
+                $this->authorize('update', $this->application);
+                $found = ApplicationPreview::create([
                     'application_id' => $this->application->id,
                     'pull_request_id' => $pull_request_id,
-                    'pull_request_html_url' => $pull_request_html_url,
+                    'pull_request_html_url' => $pull_request_html_url ?? '',
+                    'docker_registry_image_tag' => $docker_registry_image_tag,
                 ]);
+                $this->auditPreviewEvent('ui.application.preview_created', $pull_request_id);
             }
-            queue_application_deployment(
+            if ($found && $this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty() && $docker_registry_image_tag !== $found->docker_registry_image_tag) {
+                $this->authorize('update', $this->application);
+                $this->saveDockerTagWithAudit($found, $docker_registry_image_tag);
+            }
+            $result = queue_application_deployment(
                 application: $this->application,
                 deployment_uuid: $this->deployment_uuid,
-                force_rebuild: false,
+                force_rebuild: $force_rebuild,
                 pull_request_id: $pull_request_id,
                 git_type: $found->git_type ?? null,
+                docker_registry_image_tag: $this->application->build_pack === 'dockerimage' ? $found?->docker_registry_image_tag : null,
             );
+            if ($result['status'] === 'queue_full') {
+                $this->dispatch('error', 'Deployment queue full', $result['message']);
+
+                return;
+            }
+            if ($result['status'] === 'skipped') {
+                $this->dispatch('success', 'Deployment skipped', $result['message']);
+
+                return;
+            }
 
             return redirect()->route('project.application.deployment.show', [
                 'project_uuid' => $this->parameters['project_uuid'],
                 'application_uuid' => $this->parameters['application_uuid'],
                 'deployment_uuid' => $this->deployment_uuid,
-                'environment_name' => $this->parameters['environment_name'],
+                'environment_uuid' => $this->parameters['environment_uuid'],
             ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
 
+    private function validatePreviewInput(?string $pullRequestHtmlUrl, ?string $dockerRegistryImageTag): void
+    {
+        Validator::make([
+            'pull_request_html_url' => $pullRequestHtmlUrl,
+            'docker_registry_image_tag' => $dockerRegistryImageTag,
+        ], [
+            'pull_request_html_url' => ['nullable', 'url:http,https', 'max:2048'],
+            'docker_registry_image_tag' => ValidationPatterns::dockerImageTagRules(),
+        ])->validate();
+    }
+
+    private function saveDockerTagWithAudit(ApplicationPreview $preview, string $dockerRegistryImageTag): void
+    {
+        $preview->docker_registry_image_tag = $dockerRegistryImageTag;
+        $changed = $preview->isDirty('docker_registry_image_tag');
+        $preview->save();
+        if ($changed) {
+            $this->auditPreviewEvent('ui.application.preview_updated', $preview->pull_request_id, ['docker_registry_image_tag']);
+        }
+    }
+
+    /** @param  array<int, string>  $changedFields */
+    private function auditPreviewEvent(string $event, int $pullRequestId, array $changedFields = []): void
+    {
+        auditLog($event, array_filter([
+            'team_id' => $this->application->team()?->id,
+            'application_uuid' => $this->application->uuid,
+            'application_name' => $this->application->name,
+            'pull_request_id' => $pullRequestId,
+            'changed_fields' => $changedFields,
+        ], fn ($value): bool => $value !== []));
+    }
+
     protected function setDeploymentUuid()
     {
-        $this->deployment_uuid = new Cuid2(7);
+        $this->deployment_uuid = new_public_id();
         $this->parameters['deployment_uuid'] = $this->deployment_uuid;
+    }
+
+    public function addDockerImagePreview()
+    {
+        $this->authorize('deploy', $this->application);
+        $this->manualPullRequestId = filled($this->manualPullRequestId) ? trim($this->manualPullRequestId) : null;
+        $this->manualDockerTag = filled($this->manualDockerTag) ? trim($this->manualDockerTag) : null;
+        $this->validateOnly('manualPullRequestId');
+        $this->validateOnly('manualDockerTag');
+
+        if ($this->application->build_pack !== 'dockerimage') {
+            $this->dispatch('error', 'Manual Docker Image previews are only available for Docker Image applications.');
+
+            return;
+        }
+
+        if ($this->manualPullRequestId === null || str($this->manualDockerTag)->isEmpty()) {
+            $this->dispatch('error', 'Both pull request id and docker tag are required.');
+
+            return;
+        }
+
+        $this->add_and_deploy((int) $this->manualPullRequestId, null, $this->manualDockerTag);
+
+        $this->manualPullRequestId = null;
+        $this->manualDockerTag = null;
+    }
+
+    private function stopContainers(array $containers, $server)
+    {
+        $containersToStop = collect($containers)->pluck('Names')->toArray();
+        $timeout = $this->application->settings->stopGracePeriodSeconds();
+
+        foreach ($containersToStop as $containerName) {
+            instant_remote_process(command: [
+                dockerStopCommand($timeout, $containerName, $server),
+                "docker rm -f $containerName",
+            ], server: $server, throwError: false);
+        }
     }
 
     public function stop(int $pull_request_id)
     {
         try {
+            $this->authorize('deploy', $this->application);
+            $server = $this->application->destination->server;
+
             if ($this->application->destination->server->isSwarm()) {
-                instant_remote_process(["docker stack rm {$this->application->uuid}-{$pull_request_id}"], $this->application->destination->server);
+                instant_remote_process(["docker stack rm {$this->application->uuid}-{$pull_request_id}"], $server);
             } else {
-                $containers = getCurrentApplicationContainerStatus($this->application->destination->server, $this->application->id, $pull_request_id);
-                foreach ($containers as $container) {
-                    $name = str_replace('/', '', $container['Names']);
-                    instant_remote_process(["docker rm -f $name"], $this->application->destination->server, throwError: false);
-                }
+                $containers = getCurrentApplicationContainerStatus($server, $this->application, $pull_request_id)->toArray();
+                $this->stopContainers($containers, $server);
             }
-            GetContainersStatus::dispatchSync($this->application->destination->server)->onQueue('high');
-            $this->dispatch('reloadWindow');
+
+            ApplicationPreview::where('application_id', $this->application->id)
+                ->where('pull_request_id', $pull_request_id)
+                ->update(['status' => 'exited']);
+            auditLog('ui.application.preview_stopped', [
+                'team_id' => $this->application->team()?->id,
+                'application_uuid' => $this->application->uuid,
+                'application_name' => $this->application->name,
+                'pull_request_id' => $pull_request_id,
+            ]);
+            ServiceStatusChanged::dispatch($this->application->environment->project->team->id);
+
+            GetContainersStatus::run($server);
+            $this->application->refresh();
+            $this->dispatch('containerStatusUpdated');
+            $this->dispatch('success', 'Preview Deployment stopped.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -196,19 +407,29 @@ class Previews extends Component
     public function delete(int $pull_request_id)
     {
         try {
-            if ($this->application->destination->server->isSwarm()) {
-                instant_remote_process(["docker stack rm {$this->application->uuid}-{$pull_request_id}"], $this->application->destination->server);
-            } else {
-                $containers = getCurrentApplicationContainerStatus($this->application->destination->server, $this->application->id, $pull_request_id);
-                foreach ($containers as $container) {
-                    $name = str_replace('/', '', $container['Names']);
-                    instant_remote_process(["docker rm -f $name"], $this->application->destination->server, throwError: false);
-                }
+            $this->authorize('delete', $this->application);
+            $preview = ApplicationPreview::where('application_id', $this->application->id)
+                ->where('pull_request_id', $pull_request_id)
+                ->first();
+
+            if (! $preview) {
+                $this->dispatch('error', 'Preview not found.');
+
+                return;
             }
-            ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first()->delete();
-            $this->application->refresh();
+
+            // Soft delete immediately for instant UI feedback
+            $preview->delete();
+            $this->auditPreviewEvent('ui.application.preview_deleted', $pull_request_id);
+
+            // Dispatch the job for async cleanup (container stopping + force delete)
+            DeleteResourceJob::dispatch($preview);
+
+            // Refresh the application and its previews relationship to reflect the soft delete
+            $this->application->load('previews');
+            unset($this->previewDockerTags[$preview->id]);
             $this->dispatch('update_links');
-            $this->dispatch('success', 'Preview deleted.');
+            $this->dispatch('success', 'Preview deletion started. It may take a few moments to complete.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

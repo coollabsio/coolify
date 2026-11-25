@@ -1,13 +1,16 @@
 # documentation: https://github.com/coollabsio/next-image-transformation
 # slogan: Drop-in replacement for Vercel's Nextjs image optimization service.
+# category: media
 # tags: nextjs,image,transformation,service
+# logo: coolify-logo.svg
 # port: 3000
+# outdated: true
 
 services:
   next-image-transformation:
-    image: ghcr.io/coollabsio/next-image-transformation:latest
+    image: ghcr.io/coollabsio/next-image-transformation:0.0.3
     environment:
-      - SERVICE_FQDN_TRANSFORMATION_3000
+      - SERVICE_URL_TRANSFORMATION_3000
       - NODE_ENV=production
       - ALLOWED_REMOTE_DOMAINS=${ALLOWED_REMOTE_DOMAINS:-*}
       - IMGPROXY_URL=${IMGPROXY_URL:-http://imgproxy:8080}
@@ -17,9 +20,9 @@ services:
       timeout: 10s
       retries: 5
   imgproxy:
-    image: darthsim/imgproxy
+    image: darthsim/imgproxy:v3.31.4
     environment:
-      - IMGPROXY_ENABLE_WEBP_DETECTION=true
+      - IMGPROXY_AUTO_WEBP=true
       - IMGPROXY_JPEG_PROGRESSIVE=true
       - IMGPROXY_USE_ETAG=true
     healthcheck:

@@ -2,14 +2,20 @@
 
 namespace App\Actions\Proxy;
 
+use App\Enums\ProxyTypes;
+use App\Helpers\SshMultiplexingHelper;
 use App\Models\Server;
+use App\Services\ProxyPortParser;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Process;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class CheckProxy
 {
     use AsAction;
 
-    public function handle(Server $server, $fromUI = false)
+    // It should return if the proxy should be started (true) or not (false)
+    public function handle(Server $server, $fromUI = false): bool
     {
         if (! $server->isFunctional()) {
             return false;
@@ -23,12 +29,8 @@ class CheckProxy
             return false;
         }
         $proxyType = $server->proxyType();
-        if (is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop) {
+        if ((is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop) && ! $fromUI) {
             return false;
-        }
-        ['uptime' => $uptime, 'error' => $error] = $server->validateConnection();
-        if (! $uptime) {
-            throw new \Exception($error);
         }
         if (! $server->isProxyShouldRun()) {
             if ($fromUI) {
@@ -37,8 +39,12 @@ class CheckProxy
                 return false;
             }
         }
+
+        // Determine proxy container name based on environment
+        $proxyContainerName = $server->isSwarm() ? 'coolify-proxy_traefik' : 'coolify-proxy';
+
         if ($server->isSwarm()) {
-            $status = getContainerStatus($server, 'coolify-proxy_traefik');
+            $status = getContainerStatus($server, $proxyContainerName);
             $server->proxy->set('status', $status);
             $server->save();
             if ($status === 'running') {
@@ -47,7 +53,7 @@ class CheckProxy
 
             return true;
         } else {
-            $status = getContainerStatus($server, 'coolify-proxy');
+            $status = getContainerStatus($server, $proxyContainerName);
             if ($status === 'running') {
                 $server->proxy->set('status', 'running');
                 $server->save();
@@ -57,31 +63,317 @@ class CheckProxy
             if ($server->settings->is_cloudflare_tunnel) {
                 return false;
             }
-            $ip = $server->ip;
-            if ($server->id === 0) {
-                $ip = 'host.docker.internal';
-            }
 
-            $connection80 = @fsockopen($ip, '80');
-            $connection443 = @fsockopen($ip, '443');
-            $port80 = is_resource($connection80) && fclose($connection80);
-            $port443 = is_resource($connection443) && fclose($connection443);
-            if ($port80) {
-                if ($fromUI) {
-                    throw new \Exception("Port 80 is in use.<br>You must stop the process using this port.<br>Docs: <a target='_blank' href='https://coolify.io/docs'>https://coolify.io/docs</a><br>Discord: <a target='_blank' href='https://coollabs.io/discord'>https://coollabs.io/discord</a>");
-                } else {
-                    return false;
+            $portsToCheck = [];
+            $publishesOnlyUncheckedPorts = false;
+
+            try {
+                if ($server->proxyType() !== ProxyTypes::NONE->value) {
+                    $proxyCompose = GetProxyConfiguration::run($server);
+                    $hostAddressesByPort = ProxyPortParser::hostAddressesByPort($proxyCompose);
+                    $portsToCheck = array_keys($hostAddressesByPort);
+                    $publishesOnlyUncheckedPorts = $portsToCheck === [] && ProxyPortParser::publishesOnlyUncheckedPorts($proxyCompose);
                 }
+            } catch (\Throwable $e) {
+                Log::error('Error checking proxy: '.$e->getMessage());
+
+                return false;
             }
-            if ($port443) {
-                if ($fromUI) {
-                    throw new \Exception("Port 443 is in use.<br>You must stop the process using this port.<br>Docs: <a target='_blank' href='https://coolify.io/docs'>https://coolify.io/docs</a><br>Discord: <a target='_blank' href='https://coollabs.io/discord'>https://coollabs.io/discord</a>");
-                } else {
-                    return false;
+            if (count($portsToCheck) === 0) {
+                // Variable ports such as `${HTTP_PORT}:80` are only resolved by Compose on start.
+                return $publishesOnlyUncheckedPorts;
+            }
+            // Check port conflicts in parallel
+            $conflicts = $this->checkPortConflictsInParallel($server, $hostAddressesByPort, $proxyContainerName);
+            foreach ($conflicts as $port => $conflict) {
+                if ($conflict) {
+                    if ($fromUI) {
+                        throw new \Exception("Port $port is in use.<br>You must stop the process using this port.<br><br>Docs: <a target='_blank' class='dark:text-white hover:underline' href='https://coolify.io/docs'>https://coolify.io/docs</a><br>Discord: <a target='_blank' class='dark:text-white hover:underline' href='https://coolify.io/discord'>https://coolify.io/discord</a>");
+                    } else {
+                        return false;
+                    }
                 }
             }
 
             return true;
         }
+    }
+
+    /**
+     * Check multiple ports for conflicts in parallel
+     * Returns an array with port => conflict_status mapping
+     *
+     * @param  array<int, list<string>|null>  $hostAddressesByPort  see ProxyPortParser::hostAddressesByPort()
+     */
+    private function checkPortConflictsInParallel(Server $server, array $hostAddressesByPort, string $proxyContainerName): array
+    {
+        if (empty($hostAddressesByPort)) {
+            return [];
+        }
+        $ports = array_keys($hostAddressesByPort);
+
+        try {
+            // Build concurrent port check commands
+            $results = Process::concurrently(function ($pool) use ($server, $hostAddressesByPort, $proxyContainerName) {
+                foreach ($hostAddressesByPort as $port => $hostAddresses) {
+                    $commands = $this->buildPortCheckCommands($server, $port, $proxyContainerName, $hostAddresses);
+                    $pool->command($commands['ssh_command'])->input($commands['input'])->timeout(10);
+                }
+            });
+
+            // Process results
+            $conflicts = [];
+
+            foreach ($ports as $index => $port) {
+                $result = $results[$index] ?? null;
+
+                if ($result) {
+                    $conflicts[$port] = $this->parsePortCheckResult($result);
+                } else {
+                    // If process failed, assume no conflict to avoid false positives
+                    $conflicts[$port] = false;
+                }
+            }
+
+            return $conflicts;
+        } catch (\Throwable $e) {
+            Log::warning('Parallel port checking failed: '.$e->getMessage().'. Falling back to sequential checking.');
+
+            // Fallback to sequential checking if parallel fails
+            $conflicts = [];
+            foreach ($ports as $port) {
+                $conflicts[$port] = $this->isPortConflict($server, $port, $proxyContainerName, $hostAddressesByPort[$port]);
+            }
+
+            return $conflicts;
+        }
+    }
+
+    /**
+     * Build the SSH command for checking a specific port
+     */
+    private function buildPortCheckCommands(Server $server, int $port, string $proxyContainerName, ?array $hostAddresses): array
+    {
+        $portCheckScript = $this->buildPortCheckScript($port, $proxyContainerName, $hostAddresses);
+
+        return [
+            'ssh_command' => SshMultiplexingHelper::generateSshBatchCommand($server),
+            'input' => SshMultiplexingHelper::sshBatchInput($portCheckScript),
+            'script' => $portCheckScript,
+        ];
+    }
+
+    /**
+     * Docker can bind a port on its host addresses when other listeners use other specific addresses.
+     * Returns an extended regular expression (for grep -E and preg_match) that matches only the listeners
+     * that block the bind, or null when the proxy binds all addresses: then every listener blocks it.
+     *
+     * @param  list<string>|null  $hostAddresses  normalized IPs from ProxyPortParser::hostAddressesByPort()
+     */
+    private function blockingListenerPattern(int $port, ?array $hostAddresses): ?string
+    {
+        if ($hostAddresses === null) {
+            return null;
+        }
+
+        $addresses = ['0\\.0\\.0\\.0', '\\*', '\\[::\\]', '::'];
+        foreach ($hostAddresses as $hostAddress) {
+            $address = str_replace('.', '\\.', $hostAddress);
+            array_push($addresses, $address, '\\['.$address.'\\]');
+        }
+
+        // ss: 100.64.0.1:443, [::]:443, *:443; netstat: :::443; lsof: TCP *:443 (LISTEN). %eth0 is an interface.
+        return '(^|[[:space:]])('.implode('|', $addresses).')(%[^[:space:]]+)?:'.$port.'([[:space:]]|$)';
+    }
+
+    /**
+     * @param  list<string>|null  $hostAddresses
+     */
+    private function buildPortCheckScript(int $port, string $proxyContainerName, ?array $hostAddresses = null): string
+    {
+        $blockingListenerPattern = $this->blockingListenerPattern($port, $hostAddresses);
+        $blockingListenerFilter = $blockingListenerPattern === null ? '' : ' | grep -E '.escapeshellarg($blockingListenerPattern);
+
+        $dockerPortPattern = escapeshellarg('"'.$port.'/tcp"');
+        $socketPort = escapeshellarg(':'.$port);
+        $portSuffixPattern = escapeshellarg(':'.$port.' ');
+        $listenerInProcNet = $this->listenerInProcNetCommand($port);
+
+        // First check if our own proxy is using this port (which is fine)
+        $getProxyContainerId = "docker ps -a --filter name=$proxyContainerName --format '{{.ID}}'";
+        $checkProxyPortScript = "
+            CONTAINER_ID=\$($getProxyContainerId);
+            if [ ! -z \"\$CONTAINER_ID\" ]; then
+                if docker inspect \$CONTAINER_ID --format '{{json .NetworkSettings.Ports}}' | grep -q $dockerPortPattern; then
+                    echo 'proxy_using_port';
+                    exit 0;
+                fi;
+            fi;
+        ";
+
+        // Command sets for different ways to check ports, ordered by preference
+        $portCheckScript = "
+            $checkProxyPortScript
+            
+            # Try ss command first
+            if command -v ss >/dev/null 2>&1; then
+                ss_output=\$(ss -Htuln state listening sport = $socketPort 2>/dev/null$blockingListenerFilter);
+                if [ -z \"\$ss_output\" ]; then
+                    echo 'port_free';
+                    exit 0;
+                fi;
+                count=\$(echo \"\$ss_output\" | grep -c $portSuffixPattern);
+                if [ \$count -eq 0 ]; then
+                    echo 'port_free';
+                    exit 0;
+                fi;
+                echo \"port_conflict|\$ss_output\";
+                exit 0;
+            fi;
+            
+            # Try netstat as fallback
+            if command -v netstat >/dev/null 2>&1; then
+                netstat_output=\$(netstat -tuln 2>/dev/null | grep $portSuffixPattern$blockingListenerFilter);
+                if [ -z \"\$netstat_output\" ]; then
+                    echo 'port_free';
+                    exit 0;
+                fi;
+                count=\$(echo \"\$netstat_output\" | grep -c 'LISTEN');
+                if [ \$count -eq 0 ]; then
+                    echo 'port_free';
+                    exit 0;
+                fi;
+                echo \"port_conflict|\$netstat_output\";
+                exit 0;
+            fi;
+            
+            # Final fallback without tools: the kernel socket table
+            if $listenerInProcNet; then
+                echo 'port_conflict|proc_net_tcp';
+            else
+                echo 'port_free';
+            fi;
+        ";
+
+        return $portCheckScript;
+    }
+
+    /**
+     * Parse the result from port check command
+     */
+    private function parsePortCheckResult($processResult): bool
+    {
+        return $processResult->exitCode() === 0
+            && str_starts_with(trim($processResult->output()), 'port_conflict|');
+    }
+
+    /**
+     * Sequential fallback of the parallel port check.
+     * Returns true when something other than our proxy container listens on the port.
+     */
+    private function isPortConflict(Server $server, int $port, string $proxyContainerName, ?array $hostAddresses = null): bool
+    {
+        $blockingListenerPattern = $this->blockingListenerPattern($port, $hostAddresses);
+
+        $dockerPortPattern = escapeshellarg('"'.$port.'/tcp"');
+        $socketPort = escapeshellarg(':'.$port);
+        $portSuffixPattern = escapeshellarg(':'.$port.' ');
+
+        // First check if our own proxy is using this port (which is fine)
+        try {
+            $getProxyContainerId = "docker ps -a --filter name=$proxyContainerName --format '{{.ID}}'";
+            $containerId = trim(instant_remote_process([$getProxyContainerId], $server));
+
+            if (! empty($containerId)) {
+                $checkProxyPort = "docker inspect $containerId --format '{{json .NetworkSettings.Ports}}' | grep $dockerPortPattern";
+                try {
+                    instant_remote_process([$checkProxyPort], $server);
+
+                    // Our proxy is using the port, which is fine
+                    return false;
+                } catch (\Throwable $e) {
+                    // Our container exists but not using this port
+                }
+            }
+        } catch (\Throwable $e) {
+            // Container not found or error checking, continue with regular checks
+        }
+
+        // Command sets for different ways to check ports, ordered by preference
+        $commandSets = [
+            // Set 1: Use ss to check listener counts by protocol stack
+            [
+                'available' => 'command -v ss >/dev/null 2>&1',
+                'check' => [
+                    // Get listening process details
+                    "ss_output=\$(ss -Htuln state listening sport = $socketPort 2>/dev/null) && echo \"\$ss_output\"",
+                    // Count IPv4 listeners
+                    "echo \"\$ss_output\" | grep -c $portSuffixPattern",
+                ],
+            ],
+            // Set 2: Use netstat as alternative to ss
+            [
+                'available' => 'command -v netstat >/dev/null 2>&1',
+                'check' => [
+                    // Get listening process details
+                    "netstat_output=\$(netstat -tuln 2>/dev/null) && echo \"\$netstat_output\" | grep $portSuffixPattern",
+                    // Count listeners
+                    "echo \"\$netstat_output\" | grep $portSuffixPattern | grep -c 'LISTEN'",
+                ],
+            ],
+        ];
+
+        // Try each command set until we find one available
+        foreach ($commandSets as $set) {
+            try {
+                // Check if the command is available
+                instant_remote_process([$set['available']], $server);
+
+                // Run the actual check commands
+                $output = instant_remote_process($set['check'], $server, true);
+                // Parse the output lines
+                $lines = explode("\n", trim($output));
+                // Get the detailed output and listener count
+                $details = trim(implode("\n", array_slice($lines, 0, -1)));
+                $count = intval(trim($lines[count($lines) - 1] ?? '0'));
+                if ($blockingListenerPattern !== null) {
+                    $blockingLines = preg_grep('~'.$blockingListenerPattern.'~', explode("\n", $details));
+                    $details = implode("\n", $blockingLines);
+                    $count = count($blockingLines);
+                }
+                // If no listeners or empty result, port is free
+                if ($count == 0 || empty($details)) {
+                    return false;
+                }
+
+                // Any other listener blocks the proxy. Our own proxy container was already checked above.
+                return true;
+
+            } catch (\Throwable $e) {
+                // This command set failed, try the next one
+                continue;
+            }
+        }
+
+        try {
+            $checkCommand = $this->listenerInProcNetCommand($port)." && echo 'in-use' || echo 'free'";
+            $result = instant_remote_process([$checkCommand], $server, true);
+
+            return trim($result) === 'in-use';
+        } catch (\Throwable $e) {
+            // If everything fails, assume the port is free to avoid false positives
+            return false;
+        }
+    }
+
+    /**
+     * Shell condition that is true when a TCP socket listens on the port on any address.
+     * It reads the kernel socket table, which lists the sockets of all users and needs no tool or root.
+     */
+    private function listenerInProcNetCommand(int $port): string
+    {
+        $listenPattern = escapeshellarg(sprintf('^ *[0-9]+: [0-9A-F]+:%04X [0-9A-F]+:[0-9A-F]+ 0A ', $port));
+
+        return "cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | grep -qE $listenPattern";
     }
 }

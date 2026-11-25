@@ -4,7 +4,9 @@ namespace App\Livewire\Project\New;
 
 use App\Models\Project;
 use App\Models\Server;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
 class Select extends Component
@@ -23,15 +25,25 @@ class Select extends Component
 
     public Collection|null|Server $servers;
 
-    public ?Collection $standaloneDockers;
+    public ?Collection $buildServers = null;
 
-    public ?Collection $swarmDockers;
+    public bool $onlyBuildServerAvailable = false;
+
+    public ?Collection $standaloneDockers = null;
+
+    public ?Collection $swarmDockers = null;
 
     public array $parameters;
 
     public Collection|array $services = [];
 
     public Collection|array $allServices = [];
+
+    /** Database types that ask for an image before the database is created. */
+    private const DATABASE_IMAGE_STEPS = [
+        'postgresql' => 'select-postgresql-type',
+        'redis' => 'select-redis-type',
+    ];
 
     public bool $isDatabase = false;
 
@@ -47,22 +59,44 @@ class Select extends Component
 
     public ?string $existingPostgresqlUrl = null;
 
-    public ?string $search = null;
-
     protected $queryString = [
         'server_id',
-        'search',
+        'type' => ['except' => ''],
+        'destination_uuid' => ['except' => '', 'as' => 'destination'],
     ];
 
     public function mount()
     {
-        $this->parameters = get_route_parameters();
-        if (isDev()) {
-            $this->existingPostgresqlUrl = 'postgres://coolify:password@coolify-db:5432';
+        try {
+            $this->parameters = get_route_parameters();
+            if (isDev()) {
+                $this->existingPostgresqlUrl = 'postgres://coolify:password@coolify-db:5432';
+            }
+            $projectUuid = data_get($this->parameters, 'project_uuid');
+            $project = Project::ownedByCurrentTeam()->whereUuid($projectUuid)->firstOrFail();
+            $this->environments = $project->environments;
+            $this->selectedEnvironment = $this->environments->where('uuid', data_get($this->parameters, 'environment_uuid'))->firstOrFail()->name;
+
+            // Check if we have all required params for the database image step
+            // This handles navigation from global search
+            $queryType = request()->query('type');
+            $queryServerId = request()->query('server_id');
+            $queryDestination = request()->query('destination');
+            $imageStep = self::DATABASE_IMAGE_STEPS[$queryType] ?? null;
+
+            if ($imageStep && $queryServerId !== null && $queryDestination) {
+                $server = Server::isUsable()->whereKey($queryServerId)->first();
+                if ($server && Gate::allows('placeResource', $server) && $this->findDestination($server, $queryDestination)) {
+                    $this->type = $queryType;
+                    $this->server_id = $server->id;
+                    $this->destination_uuid = $queryDestination;
+                    $this->server = $server;
+                    $this->current_step = $imageStep;
+                }
+            }
+        } catch (\Exception $e) {
+            return handleError($e, $this);
         }
-        $projectUuid = data_get($this->parameters, 'project_uuid');
-        $this->environments = Project::whereUuid($projectUuid)->first()->environments;
-        $this->selectedEnvironment = data_get($this->parameters, 'environment_name');
     }
 
     public function render()
@@ -72,56 +106,190 @@ class Select extends Component
 
     public function updatedSelectedEnvironment()
     {
+        $environmentUuid = $this->environments->where('name', $this->selectedEnvironment)->first()->uuid;
+
         return redirect()->route('project.resource.create', [
             'project_uuid' => $this->parameters['project_uuid'],
-            'environment_name' => $this->selectedEnvironment,
+            'environment_uuid' => $environmentUuid,
         ]);
     }
 
-    // public function addExistingPostgresql()
-    // {
-    //     try {
-    //         instantCommand("psql {$this->existingPostgresqlUrl} -c 'SELECT 1'");
-    //         $this->dispatch('success', 'Successfully connected to the database.');
-    //     } catch (\Throwable $e) {
-    //         return handleError($e, $this);
-    //     }
-    // }
-
-    public function updatedSearch()
+    public function loadServices()
     {
-        $this->loadServices();
-    }
+        $services = get_service_templates();
+        $templateLastUpdatedMap = $this->serviceTemplateLastUpdatedMap($services);
 
-    public function loadServices(bool $force = false)
-    {
-        try {
-            $this->loadingServices = true;
-            if (count($this->allServices) > 0 && ! $force) {
-                if (! $this->search) {
-                    $this->services = $this->allServices;
+        $services = collect($services)->map(function ($service, $key) use ($templateLastUpdatedMap) {
+            $serviceKey = (string) $key;
 
-                    return;
+            return [
+                'id' => $serviceKey,
+                'name' => str($serviceKey)->headline(),
+                'docsSlug' => str($serviceKey)->lower()->value(),
+                'templateLastUpdated' => $templateLastUpdatedMap[$serviceKey] ?? null,
+                'website' => $this->serviceWebsiteUrl(data_get($service, 'documentation')),
+            ] + service_logo_urls(data_get($service, 'logo')) + (array) $service;
+        })->all();
+
+        // Extract unique categories from services
+        $categories = collect($services)
+            ->pluck('category')
+            ->filter()
+            ->unique()
+            ->map(function ($category) {
+                // Handle multiple categories separated by comma
+                if (str_contains($category, ',')) {
+                    return collect(explode(',', $category))->map(fn ($cat) => trim($cat));
                 }
-                $this->services = $this->allServices->filter(function ($service, $key) {
-                    $tags = collect(data_get($service, 'tags', []));
 
-                    return str_contains(strtolower($key), strtolower($this->search)) || $tags->contains(function ($tag) {
-                        return str_contains(strtolower($tag), strtolower($this->search));
-                    });
-                });
-            } else {
-                $this->search = null;
-                $this->allServices = get_service_templates($force);
-                $this->services = $this->allServices->filter(function ($service, $key) {
-                    return str_contains(strtolower($key), strtolower($this->search));
-                });
-            }
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        } finally {
-            $this->loadingServices = false;
-        }
+                return [$category];
+            })
+            ->flatten()
+            ->unique()
+            ->map(function ($category) {
+                // Format common acronyms to uppercase
+                $acronyms = ['ai', 'api', 'ci', 'cd', 'cms', 'crm', 'erp', 'iot', 'vpn', 'vps', 'dns', 'ssl', 'tls', 'ssh', 'ftp', 'http', 'https', 'smtp', 'imap', 'pop3', 'sql', 'nosql', 'json', 'xml', 'yaml', 'csv', 'pdf', 'sms', 'mfa', '2fa', 'oauth', 'saml', 'jwt', 'rest', 'soap', 'grpc', 'graphql', 'websocket', 'webrtc', 'p2p', 'b2b', 'b2c', 'seo', 'sem', 'ppc', 'roi', 'kpi', 'ui', 'ux', 'ide', 'sdk', 'api', 'cli', 'gui', 'cdn', 'ddos', 'dos', 'xss', 'csrf', 'sqli', 'rce', 'lfi', 'rfi', 'ssrf', 'xxe', 'idor', 'owasp', 'gdpr', 'hipaa', 'pci', 'dss', 'iso', 'nist', 'cve', 'cwe', 'cvss'];
+                $lower = strtolower($category);
+
+                if (in_array($lower, $acronyms)) {
+                    return strtoupper($category);
+                }
+
+                return $category;
+            })
+            ->sort(SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
+        $gitBasedApplications = [
+            [
+                'id' => 'public',
+                'name' => 'Public Git Repository',
+                'description' => 'Deploy any public Git repository. Coolify builds it from source, no credentials required.',
+                'documentation' => 'https://coolify.io/docs/applications/ci-cd',
+                'logo' => resource_logo_url('public-repo'),
+            ],
+            [
+                'id' => 'private-deploy-key',
+                'name' => 'Private Git Repository (with Deploy Key)',
+                'description' => 'Deploy a private repository over SSH with a repository-scoped deploy key. Set the URL and branch manually, no automatic deploys.',
+                'documentation' => 'https://coolify.io/docs/applications/ci-cd/github/deploy-key',
+                'logo' => resource_logo_url('deploy-key'),
+            ],
+            [
+                'id' => 'private-gh-app',
+                'name' => 'Git Repository (with GitHub App)',
+                'description' => 'Deploy public or private GitHub repositories through a GitHub App, with automatic webhooks and pull request previews.',
+                'documentation' => 'https://coolify.io/docs/applications/ci-cd/github/setup-app',
+                'logo' => resource_logo_url('github-app'),
+                'logoDark' => resource_logo_url('github-app-dark'),
+            ],
+            [
+                'id' => 'private-gitlab-app',
+                'name' => 'Git Repository (with GitLab App)',
+                'description' => 'Deploy public or private GitLab projects through a GitLab App, with automatic webhooks and merge request previews.',
+                'logo' => resource_logo_url('gitlab-app'),
+            ],
+            [
+                'id' => 'private-gitea-app',
+                'name' => 'Git Repository (with Gitea / Forgejo App)',
+                'description' => 'Deploy public or private Gitea, Forgejo, or Codeberg repositories through a Gitea / Forgejo App, with automatic webhooks and pull request previews.',
+                'logo' => asset('svgs/gitea.svg'),
+            ],
+        ];
+        $dockerBasedApplications = [
+            [
+                'id' => 'dockerfile',
+                'name' => 'Dockerfile',
+                'description' => 'Deploy an application using a Dockerfile, without a Git repository.',
+                'documentation' => 'https://coolify.io/docs/applications/build-packs/dockerfile',
+                'logo' => resource_logo_url('dockerfile'),
+            ],
+            [
+                'id' => 'docker-compose-empty',
+                'name' => 'Docker Compose',
+                'description' => 'Deploy a multi-container application using a Docker Compose file, without a Git repository.',
+                'documentation' => 'https://coolify.io/docs/applications/build-packs/docker-compose',
+                'logo' => resource_logo_url('docker-compose'),
+            ],
+            [
+                'id' => 'docker-image',
+                'name' => 'Docker Image',
+                'description' => 'Deploy an application using a prebuilt image from any Docker registry, without a Git repository.',
+                'documentation' => 'https://coolify.io/docs/applications',
+                'logo' => resource_logo_url('docker-image'),
+            ],
+        ];
+        $databases = [
+            [
+                'id' => 'postgresql',
+                'name' => 'PostgreSQL',
+                'description' => 'An extensible relational database with strong SQL support.',
+                'logo' => resource_logo_url('postgres'),
+            ],
+            [
+                'id' => 'mysql',
+                'name' => 'MySQL',
+                'description' => 'A relational database for web and general-purpose applications.',
+                'logo' => resource_logo_url('mysql'),
+
+            ],
+            [
+                'id' => 'mariadb',
+                'name' => 'MariaDB',
+                'description' => 'A relational database and drop-in replacement for MySQL.',
+                'logo' => resource_logo_url('mariadb'),
+            ],
+            [
+                'id' => 'redis',
+                'name' => 'Redis / Valkey',
+                'description' => 'An in-memory key-value store for caching, queues, and sessions.',
+                'logo' => resource_logo_url('redis-valkey'),
+                'logoDark' => resource_logo_url('redis-valkey-dark'),
+            ],
+            [
+                'id' => 'keydb',
+                'name' => 'KeyDB',
+                'description' => 'A multithreaded, Redis-compatible in-memory store.',
+                'logo' => resource_logo_url('keydb'),
+                'logoDark' => resource_logo_url('keydb-dark'),
+            ],
+            [
+                'id' => 'dragonfly',
+                'name' => 'Dragonfly',
+                'description' => 'An in-memory datastore compatible with Redis and Memcached.',
+                'logo' => resource_logo_url('dragonfly'),
+                'logoDark' => resource_logo_url('dragonfly-dark'),
+            ],
+            [
+                'id' => 'mongodb',
+                'name' => 'MongoDB',
+                'description' => 'A NoSQL database that stores JSON-like documents.',
+                'logo' => resource_logo_url('mongodb'),
+            ],
+            [
+                'id' => 'clickhouse',
+                'name' => 'ClickHouse',
+                'description' => 'A column-oriented database for real-time analytics.',
+                'logo' => resource_logo_url('clickhouse'),
+            ],
+            [
+                'id' => 'sqlite',
+                'name' => 'SQLite',
+                'description' => 'A lightweight relational database stored in a single file.',
+                'logo' => resource_logo_url('sqlite'),
+                'experimental' => true,
+            ],
+
+        ];
+
+        return [
+            'serviceTemplatesLastUpdated' => $this->serviceTemplatesLastUpdated(),
+            'services' => $services,
+            'categories' => $categories,
+            'gitBasedApplications' => $gitBasedApplications,
+            'dockerBasedApplications' => $dockerBasedApplications,
+            'databases' => $databases,
+        ];
     }
 
     public function instantSave()
@@ -130,15 +298,111 @@ class Select extends Component
             $this->servers = $this->allServers;
         } else {
             if ($this->allServers instanceof Collection) {
-                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->filter(fn (Server $server) => $server->canHostResources());
             } else {
                 $this->servers = $this->allServers;
             }
         }
     }
 
+    /**
+     * Derive a website link from the documentation URL. Shared hosts keep the
+     * path that identifies the project, so the link does not open the host root. The ref tells the site that the
+     * visitor came from Coolify.
+     */
+    private function serviceWebsiteUrl(?string $documentation): ?string
+    {
+        $url = parse_url((string) $documentation);
+        if (! in_array($url['scheme'] ?? null, ['http', 'https'], true) || blank($url['host'] ?? null)) {
+            return null;
+        }
+
+        $projectPathSegments = [
+            'github.com' => 2,
+            'gitlab.com' => 2,
+            'codeberg.org' => 2,
+            'hub.docker.com' => 3,
+        ][str($url['host'])->lower()->chopStart('www.')->value()] ?? 0;
+
+        $projectPath = str($url['path'] ?? '')->explode('/')->filter()->take($projectPathSegments)->implode('/');
+
+        return rtrim("{$url['scheme']}://{$url['host']}/{$projectPath}", '/').'?ref=coolify.io';
+    }
+
+    private function serviceTemplatesLastUpdated(): ?string
+    {
+        $fetchedAt = get_service_templates_fetched_at();
+        if ($fetchedAt instanceof CarbonImmutable) {
+            return $fetchedAt
+                ->timezone(config('app.timezone'))
+                ->format('M j, Y H:i');
+        }
+
+        return $this->formatLastModified($this->serviceTemplatesPath());
+    }
+
+    private function serviceTemplateLastUpdatedMap(Collection $services): array
+    {
+        return $services
+            ->mapWithKeys(fn ($service, $serviceName) => [
+                (string) $serviceName => $this->serviceTemplateLastUpdatedFromPayload($service)
+                    ?? $this->serviceTemplateLastUpdated((string) $serviceName),
+            ])
+            ->all();
+    }
+
+    private function serviceTemplateLastUpdatedFromPayload(mixed $service): ?string
+    {
+        $timestamp = data_get($service, 'template_last_updated_at');
+
+        if (! is_string($timestamp) || $timestamp === '') {
+            return null;
+        }
+
+        try {
+            return CarbonImmutable::parse($timestamp)
+                ->timezone(config('app.timezone'))
+                ->format('M j, Y H:i');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function serviceTemplateLastUpdated(string $serviceName): ?string
+    {
+        foreach (['yaml', 'yml'] as $extension) {
+            $templatePath = base_path("templates/compose/{$serviceName}.{$extension}");
+
+            if (file_exists($templatePath)) {
+                return $this->formatLastModified($templatePath);
+            }
+        }
+
+        return null;
+    }
+
+    private function serviceTemplatesPath(): string
+    {
+        return base_path('templates/'.config('constants.services.file_name'));
+    }
+
+    private function formatLastModified(string $path): ?string
+    {
+        if (! file_exists($path)) {
+            return null;
+        }
+
+        return CarbonImmutable::createFromTimestamp(filemtime($path))
+            ->timezone(config('app.timezone'))
+            ->format('M j, Y H:i');
+    }
+
     public function setType(string $type)
     {
+        if (! str($type)->startsWith('one-click-service-')) {
+            $type = str($type)->lower()->slug()->value();
+        }
+
         if ($this->loading) {
             return;
         }
@@ -153,10 +417,11 @@ class Select extends Component
             case 'dragonfly':
             case 'clickhouse':
             case 'mongodb':
+            case 'sqlite':
                 $this->isDatabase = true;
                 $this->includeSwarm = false;
                 if ($this->allServers instanceof Collection) {
-                    $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+                    $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->filter(fn (Server $server) => $server->canHostResources());
                 } else {
                     $this->servers = $this->allServers;
                 }
@@ -166,7 +431,7 @@ class Select extends Component
             $this->isDatabase = true;
             $this->includeSwarm = false;
             if ($this->allServers instanceof Collection) {
-                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
+                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->filter(fn (Server $server) => $server->canHostResources());
             } else {
                 $this->servers = $this->allServers;
             }
@@ -176,23 +441,26 @@ class Select extends Component
 
             return;
         }
-        if (count($this->servers) === 1) {
+        if (count($this->servers) === 1 && $this->buildServers?->isEmpty()) {
             $server = $this->servers->first();
             if ($server instanceof Server) {
-                $this->setServer($server);
+                $this->setServer($server->id);
             }
         }
         if (! is_null($this->server)) {
             $foundServer = $this->servers->where('id', $this->server->id)->first();
             if ($foundServer) {
-                return $this->setServer($foundServer);
+                return $this->setServer($foundServer->id);
             }
         }
         $this->current_step = 'servers';
     }
 
-    public function setServer(Server $server)
+    public function setServer(int $serverId)
     {
+        $server = $this->servers?->firstWhere('id', $serverId);
+        abort_unless($server instanceof Server, 404);
+
         $this->server_id = $server->id;
         $this->server = $server;
         $this->standaloneDockers = $server->standaloneDockers;
@@ -202,6 +470,8 @@ class Select extends Component
             $docker = $this->standaloneDockers->first() ?? $this->swarmDockers->first();
             if ($docker) {
                 $this->setDestination($docker->uuid);
+
+                return $this->whatToDoNext();
             }
         }
         $this->current_step = 'destinations';
@@ -209,20 +479,50 @@ class Select extends Component
 
     public function setDestination(string $destination_uuid)
     {
+        abort_unless($this->server && $this->findDestination($this->server, $destination_uuid), 404);
+
         $this->destination_uuid = $destination_uuid;
 
+        return $this->whatToDoNext();
+    }
+
+    private function findDestination(Server $server, string $destinationUuid): ?object
+    {
+        return $server->standaloneDockers->concat($server->swarmDockers)->firstWhere('uuid', $destinationUuid);
+    }
+
+    public function setDatabaseImage(string $image)
+    {
         return redirect()->route('project.resource.create', [
             'project_uuid' => $this->parameters['project_uuid'],
-            'environment_name' => $this->parameters['environment_name'],
+            'environment_uuid' => $this->parameters['environment_uuid'],
             'type' => $this->type,
             'destination' => $this->destination_uuid,
             'server_id' => $this->server_id,
+            'database_image' => $image,
         ]);
+    }
+
+    public function whatToDoNext()
+    {
+        if (isset(self::DATABASE_IMAGE_STEPS[$this->type])) {
+            $this->current_step = self::DATABASE_IMAGE_STEPS[$this->type];
+        } else {
+            return redirect()->route('project.resource.create', [
+                'project_uuid' => $this->parameters['project_uuid'],
+                'environment_uuid' => $this->parameters['environment_uuid'],
+                'type' => $this->type,
+                'destination' => $this->destination_uuid,
+                'server_id' => $this->server_id,
+            ]);
+        }
     }
 
     public function loadServers()
     {
-        $this->servers = Server::isUsable()->get();
-        $this->allServers = $this->servers;
+        $this->servers = Server::isUsable()->get()->filter(fn (Server $server) => Gate::allows('placeResource', $server))->sortBy('name');
+        $this->buildServers = Server::isUsableBuildServer()->get()->sortBy('name');
+        $this->allServers = $this->servers->concat($this->buildServers);
+        $this->onlyBuildServerAvailable = $this->servers->isEmpty() && $this->buildServers->isNotEmpty();
     }
 }

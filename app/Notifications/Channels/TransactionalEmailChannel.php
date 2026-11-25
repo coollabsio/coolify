@@ -7,19 +7,21 @@ use Exception;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Mail;
-use Log;
 
 class TransactionalEmailChannel
 {
     public function send(User $notifiable, Notification $notification): void
     {
-        $settings = \App\Models\InstanceSettings::get();
-        if (! data_get($settings, 'smtp_enabled') && ! data_get($settings, 'resend_enabled')) {
-            Log::info('SMTP/Resend not enabled');
-
+        $settings = instanceSettings();
+        if (blank(enabled_email_provider($settings))) {
             return;
         }
-        $email = $notifiable->email;
+
+        // Check if notification has a custom recipient (for email changes)
+        $email = property_exists($notification, 'newEmail') && $notification->newEmail
+            ? $notification->newEmail
+            : $notifiable->email;
+
         if (! $email) {
             return;
         }
@@ -28,7 +30,7 @@ class TransactionalEmailChannel
         Mail::send(
             [],
             [],
-            fn (Message $message) => $message
+            fn (Message $message) => mail_from_message($message, $settings)
                 ->to($email)
                 ->subject($mailMessage->subject)
                 ->html((string) $mailMessage->render())
@@ -38,7 +40,7 @@ class TransactionalEmailChannel
     private function bootConfigs(): void
     {
         $type = set_transanctional_email_settings();
-        if (! $type) {
+        if (blank($type)) {
             throw new Exception('No email settings found.');
         }
     }

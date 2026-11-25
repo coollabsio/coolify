@@ -2,72 +2,97 @@
     @if ($limit_reached)
         <x-limit-reached name="servers" />
     @else
-        <form class="flex flex-col w-full gap-2" wire:submit='submit'>
-            <div class="flex w-full gap-2 flex-wrap sm:flex-nowrap">
-                <x-forms.input autofocus id="name" label="Name" required />
-                <x-forms.input id="description" label="Description" />
-            </div>
-            <div class="flex gap-2 flex-wrap sm:flex-nowrap">
-                <x-forms.input id="ip" label="IP Address/Domain" required
-                    helper="An IP Address (127.0.0.1) or domain (example.com)." />
-                <x-forms.input type="number" id="port" label="Port" required />
-            </div>
-            <x-forms.input id="user" label="User" required />
-            <div class="text-xs dark:text-warning text-coollabs ">Non-root user is experimental: <a
-                    class="font-bold underline" target="_blank"
-                    href="https://coolify.io/docs/knowledge-base/server/non-root-user">docs</a>.</div>
-            <x-forms.select label="Private Key" id="private_key_id">
-                <option disabled>Select a private key</option>
-                @foreach ($private_keys as $key)
-                    @if ($loop->first)
-                        <option selected value="{{ $key->id }}">{{ $key->name }}</option>
-                    @else
-                        <option value="{{ $key->id }}">{{ $key->name }}</option>
-                    @endif
-                @endforeach
-            </x-forms.select>
-            <div class="">
-                <x-forms.checkbox instantSave type="checkbox" id="is_build_server" label="Use it as a build server?" />
-            </div>
-            <div class="">
-                <h3 class="pt-6">Swarm <span class="text-xs text-neutral-500">(experimental)</span></h3>
-                <div class="pb-4">Read the docs <a class='dark:text-white'
-                        href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>.</div>
-                @if ($is_swarm_worker || $is_build_server)
-                    <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_manager"
-                        helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                        label="Is it a Swarm Manager?" />
-                @else
-                    <x-forms.checkbox type="checkbox" instantSave id="is_swarm_manager"
-                        helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                        label="Is it a Swarm Manager?" />
-                @endif
-                @if ($is_swarm_manager || $is_build_server)
-                    <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_worker"
-                        helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                        label="Is it a Swarm Worker?" />
-                @else
-                    <x-forms.checkbox type="checkbox" instantSave id="is_swarm_worker"
-                        helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/knowledge-base/docker/swarm' target='_blank'>here</a>."
-                        label="Is it a Swarm Worker?" />
-                @endif
-                @if ($is_swarm_worker && count($swarm_managers) > 0)
-                    <div class="py-4">
-                        <x-forms.select label="Select a Swarm Cluster" id="selected_swarm_cluster" required>
-                            @foreach ($swarm_managers as $server)
-                                @if ($loop->first)
-                                    <option selected value="{{ $server->id }}">{{ $server->name }}</option>
-                                @else
-                                    <option value="{{ $server->id }}">{{ $server->name }}</option>
-                                @endif
-                            @endforeach
-                        </x-forms.select>
+        @php
+            $privateKeyOptions = $private_keys
+                ->map(fn ($key) => ['value' => $key->id, 'label' => $key->name])
+                ->values()
+                ->all();
+        @endphp
+
+        <form wire:submit="submit">
+            <x-application.settings-section title="Connect a server"
+                description="Add an existing Linux server using its SSH connection details.">
+                <x-slot:actions>
+                    <button type="submit"
+                        class="button button-highlighted">
+                        Continue
+                        <x-reicon name="arrow-right" class="size-3.5" />
+                    </button>
+                </x-slot:actions>
+
+                <div class="mb-5">
+                    <x-forms.input id="ip" label="IP address or domain" required
+                        helper="For example 127.0.0.1 or server.example.com." />
+                </div>
+
+                <div class="mb-5">
+                    <div class="flex items-end gap-3">
+                        <div class="min-w-0 flex-1">
+                            <x-forms.listbox id="private_key_id" label="Private key"
+                                placeholder="Select a private key" :options="$privateKeyOptions" />
+                        </div>
+                        @can('create', App\Models\PrivateKey::class)
+                            <div x-data="{ dropdownOpen: false }" class="relative shrink-0"
+                                @click.outside="dropdownOpen = false"
+                                @keydown.escape.window="dropdownOpen = false">
+                                <button type="button" class="button" @click="dropdownOpen = !dropdownOpen"
+                                    aria-haspopup="menu" :aria-expanded="dropdownOpen">
+                                    <x-reicon name="plus" class="size-3.5" />
+                                    New key
+                                    <x-reicon name="chevron-down" class="size-3 opacity-55" />
+                                </button>
+                                <div x-cloak x-show="dropdownOpen" x-transition.origin.top.right role="menu"
+                                    class="listbox-panel left-auto! right-0! z-[90]! w-52! min-w-52!">
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        wire:click="generatePrivateKey('ed25519')"
+                                        @click="dropdownOpen = false" role="menuitem">
+                                        <x-reicon name="keys" class="size-3.5 shrink-0 opacity-70" />
+                                        Generate ED25519
+                                    </button>
+                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        wire:click="generatePrivateKey('rsa')" @click="dropdownOpen = false"
+                                        role="menuitem">
+                                        <x-reicon name="keys" class="size-3.5 shrink-0 opacity-70" />
+                                        Generate RSA
+                                    </button>
+                                    <x-modal-input title="Add Private Key Manually">
+                                        <x-slot:content>
+                                            <button type="button" @click="dropdownOpen = false"
+                                                class="listbox-option justify-start! gap-2.5!" role="menuitem">
+                                                <x-reicon name="plus" class="size-3.5 shrink-0 opacity-70" />
+                                                Add manually
+                                            </button>
+                                        </x-slot:content>
+                                        <livewire:security.private-key.create :modal_mode="true" from="server" />
+                                    </x-modal-input>
+                                </div>
+                            </div>
+                        @endcan
                     </div>
-                @endif
-            </div>
-            <x-forms.button type="submit">
-                Continue
-            </x-forms.button>
+                </div>
+
+                <div class="grid gap-4 border-t border-neutral-200 pt-4 lg:grid-cols-2 dark:border-white/[0.08]">
+                    <x-forms.input id="name" label="Name" required />
+                    <x-forms.input id="description" label="Description" />
+                </div>
+
+                <x-forms.collapsible class="mt-5 border-t border-neutral-200 pt-4 dark:border-white/[0.08]"
+                    content-class="flex flex-col gap-4">
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <x-forms.input id="user" label="User" required
+                            helper="Non-root SSH users are experimental." />
+                        <x-forms.input type="number" id="port" label="Port" required />
+                    </div>
+                    <x-forms.listbox id="server_role"
+                        helper="Choose whether this server runs deployments, application builds, or both. GitHub Actions runners need the Builds only or the Deployments and builds role."
+                        label="Server role" :options="[
+                            ['value' => 'deployment', 'label' => 'Deployments only', 'description' => 'Runs your resources. Images are built on a build server.'],
+                            ['value' => 'build', 'label' => 'Builds only', 'description' => 'The only role that builds images for other servers. Can also run GitHub Actions runners.'],
+                            ['value' => 'both', 'label' => 'Deployments and builds', 'description' => 'Builds and runs only the resources on this server. Not used as a build server for other servers. Can also run GitHub Actions runners.'],
+                        ]" />
+                </x-forms.collapsible>
+            </x-application.settings-section>
+            @include('livewire.server.new.partials.image-scanning')
         </form>
     @endif
 </div>

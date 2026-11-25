@@ -1,0 +1,49 @@
+# documentation: https://docs.checkmate.so/
+# slogan: An open source server and websites monitoring application
+# category: monitoring
+# tags: monitoring,server,uptime,healthcheck
+# logo: svgs/checkmate.png
+# port: 52345
+# outdated: true
+
+services:
+  checkmate:
+    image: 'ghcr.io/bluewave-labs/checkmate-backend-mono-multiarch:v3.9.2'
+    environment:
+      - SERVICE_URL_CHECKMATE_52345
+      - 'UPTIME_APP_API_BASE_URL=${SERVICE_URL_CHECKMATE}/api/v1'
+      - 'UPTIME_APP_CLIENT_HOST=${SERVICE_URL_CHECKMATE}'
+      - 'DB_CONNECTION_STRING=mongodb://mongodb:27017/uptime_db'
+      - 'CLIENT_HOST=${SERVICE_URL_CHECKMATE}'
+      - 'JWT_SECRET=${SERVICE_PASSWORD_64_JWT}'
+    depends_on:
+      - mongodb
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - '-e'
+        - "require('http').get('http://127.0.0.1:52345/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  mongodb:
+    image: 'ghcr.io/bluewave-labs/checkmate-mongo:v3.9.2'
+    command:
+      - mongod
+      - '--quiet'
+      - '--bind_ip_all'
+    volumes:
+      - 'checkmate-mongo:/data/db'
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - '--eval'
+        - "db.adminCommand('ping')"
+        - '--quiet'
+      interval: 5s
+      timeout: 30s
+      start_period: 10s
+
+

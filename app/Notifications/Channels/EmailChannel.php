@@ -2,77 +2,234 @@
 
 namespace App\Notifications\Channels;
 
+use App\Exceptions\NonReportableException;
+use App\Models\EmailNotificationSettings;
+use App\Models\InstanceSettings;
+use App\Models\Team;
+use App\Rules\SafeSmtpHost;
+use App\Services\Security\SensitiveDataRedactor;
+use App\Support\SmtpTransportFactory;
 use Exception;
-use Illuminate\Mail\Message;
 use Illuminate\Notifications\Notification;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
+use Resend;
+use Resend\Exceptions\ErrorException;
+use Resend\Exceptions\TransporterException;
+use RuntimeException;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
+use Symfony\Component\Mailer\Mailer;
+use Symfony\Component\Mime\Email;
 
 class EmailChannel
 {
+    public function __construct() {}
+
     public function send(SendsEmail $notifiable, Notification $notification): void
     {
+        $settings = null;
+        // Test notifications always show their error and never count as delivery failures.
+        $isTestNotification = data_get($notification, 'isTestNotification', false);
+
         try {
-            $this->bootConfigs($notifiable);
-            $recipients = $notifiable->getRecepients($notification);
+            // Get team and validate membership before proceeding
+            $team = data_get($notifiable, 'id');
+            $members = Team::find($team)->members;
+
+            $useInstanceEmailSettings = $notifiable->emailNotificationSettings->use_instance_email_settings;
+            $isTransactionalEmail = data_get($notification, 'isTransactionalEmail', false);
+            $customEmails = data_get($notification, 'emails', null);
+
+            if ($useInstanceEmailSettings || $isTransactionalEmail) {
+                $settings = instanceSettings();
+            } else {
+                $settings = $notifiable->emailNotificationSettings;
+            }
+
+            // Only the instance settings have a notification sender. A test email can ask for it explicitly.
+            $asNotification = $settings instanceof InstanceSettings
+                && (data_get($notification, 'usesNotificationSender') ?? ! $isTransactionalEmail);
+
+            $isResendEnabled = $settings->resend_enabled;
+            $isSmtpEnabled = $settings->smtp_enabled;
+
+            if ($customEmails) {
+                $recipients = [$customEmails];
+            } else {
+                $recipients = $notifiable->getRecipients();
+            }
+
+            // Validate team membership for all recipients
             if (count($recipients) === 0) {
                 throw new Exception('No email recipients found');
             }
 
+            // Skip team membership validation for test notifications
+            if (! $isTestNotification) {
+                foreach ($recipients as $recipient) {
+                    // Check if the recipient is part of the team
+                    if (! $members->contains('email', $recipient)) {
+                        $emailSettings = $notifiable->emailNotificationSettings;
+                        data_set($emailSettings, 'smtp_password', '********');
+                        data_set($emailSettings, 'resend_api_key', '********');
+                        send_internal_notification(sprintf(
+                            "Recipient is not part of the team: %s\nTeam: %s\nNotification: %s\nNotifiable: %s\nEmail Settings:\n%s",
+                            $recipient,
+                            $team,
+                            get_class($notification),
+                            get_class($notifiable),
+                            json_encode($emailSettings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+                        ));
+                        throw new Exception('Recipient is not part of the team');
+                    }
+                }
+            }
+
             $mailMessage = $notification->toMail($notifiable);
-            Mail::send(
-                [],
-                [],
-                fn (Message $message) => $message
-                    ->to($recipients)
+
+            if ($isResendEnabled) {
+                $resend = Resend::client($settings->resend_api_key);
+                $response = $resend->emails->send([
+                    'from' => mail_from_formatted($settings, $asNotification),
+                    'to' => $recipients,
+                    'subject' => $mailMessage->subject,
+                    'html' => (string) $mailMessage->render(),
+                ]);
+
+                // The Resend SDK only throws for error names it knows; any other API error is returned as a response.
+                if (blank($response->getAttribute('id'))) {
+                    $error = $response->toArray();
+                    $error['message'] = $error['message'] ?? 'Resend did not accept the email.';
+
+                    throw new ErrorException($error);
+                }
+            } elseif ($isSmtpEnabled) {
+                // The team's own SMTP host: check it again and connect to the checked address.
+                $connectAddress = null;
+                if ($settings instanceof EmailNotificationSettings) {
+                    try {
+                        $connectAddress = SafeSmtpHost::connectionAddress((string) $settings->smtp_host);
+                    } catch (RuntimeException $e) {
+                        if ($isTestNotification) {
+                            throw NonReportableException::fromException($e);
+                        }
+
+                        // A blocked host fails on every send. A host that did not resolve can be a
+                        // temporary DNS failure, so the job is retried and nothing is counted.
+                        if ($e->getCode() === SafeSmtpHost::HOST_NOT_ALLOWED) {
+                            $settings->recordDeliveryFailure($e->getMessage());
+
+                            return;
+                        }
+
+                        throw $e;
+                    }
+                }
+
+                $transport = SmtpTransportFactory::fromSettings(
+                    $settings,
+                    config('mail.mailers.smtp.local_domain'),
+                    $connectAddress,
+                );
+                $mailer = new Mailer($transport);
+
+                $email = mail_from_email(new Email, $settings, $asNotification)
+                    ->to(...$recipients)
                     ->subject($mailMessage->subject)
-                    ->html((string) $mailMessage->render())
-            );
-        } catch (Exception $e) {
-            $error = $e->getMessage();
-            if ($error === 'No email settings found.') {
-                throw $e;
+                    ->html((string) $mailMessage->render());
+
+                $mailer->send($email);
             }
-            ray($e->getMessage());
-            $message = "EmailChannel error: {$e->getMessage()}. Failed to send email to:";
-            if (isset($recipients)) {
-                $message .= implode(', ', $recipients);
+
+            if (! $isTestNotification && $settings instanceof EmailNotificationSettings) {
+                $settings->recordDeliverySuccess();
             }
-            if (isset($mailMessage)) {
-                $message .= " with subject: {$mailMessage->subject}";
+        } catch (ErrorException $e) {
+            ['status' => $statusCode, 'name' => $errorName] = self::resendErrorDetails($e);
+
+            // Map HTTP status codes and Resend error names to user-friendly messages.
+            // An invalid key comes back as 401 "validation_error"; an unverified domain as 403 "validation_error".
+            $userMessage = match (true) {
+                $errorName === 'restricted_api_key', $statusCode === 401 && $errorName === null => 'Your Resend API key has restricted permissions. Please use an API key with Full Access permissions.',
+                $statusCode === 401, $statusCode === 403 && $errorName !== 'validation_error' => 'Invalid Resend API key. Please verify your API key in the Resend dashboard and update it in settings.',
+                in_array($statusCode, [400, 422], true), $errorName === 'validation_error' => 'Email validation failed: '.$e->getErrorMessage(),
+                $statusCode === 429 && in_array($errorName, [null, 'rate_limit_exceeded'], true) => 'Resend rate limit exceeded. Please try again in a few minutes.',
+                default => 'Failed to send email via Resend: '.$e->getErrorMessage(),
+            };
+
+            if (! $isTestNotification && $settings instanceof EmailNotificationSettings) {
+                // The team's own settings: an invalid key or domain counts as a delivery failure, and
+                // other client errors are only logged. Neither is retried, because a retry fails again.
+                if (in_array($statusCode, [401, 403], true)) {
+                    $settings->recordDeliveryFailure($userMessage);
+
+                    return;
+                }
+
+                if (in_array($statusCode, [400, 422], true)) {
+                    Log::warning('Resend rejected the email', ['team_id' => $settings->team_id, 'reason' => $userMessage]);
+
+                    return;
+                }
+
+                throw new Exception($userMessage, $e->getCode(), $e);
             }
-            send_internal_notification($message);
+
+            // Log detailed error for admin debugging (redact sensitive data)
+            $emailSettings = $notifiable->emailNotificationSettings ?? instanceSettings();
+            data_set($emailSettings, 'smtp_password', '********');
+            data_set($emailSettings, 'resend_api_key', '********');
+
+            send_internal_notification(sprintf(
+                "Resend Error\nStatus Code: %s\nMessage: %s\nNotification: %s\nEmail Settings:\n%s",
+                $statusCode,
+                remove_iip($e->getErrorMessage()),
+                get_class($notification),
+                json_encode(app(SensitiveDataRedactor::class)->redactValue($emailSettings), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+            ));
+
+            // Don't report expected errors (invalid keys, validation) to error tracking
+            if (in_array($statusCode, [403, 401, 400, 422], true)) {
+                throw NonReportableException::fromException(new Exception($userMessage, $e->getCode(), $e));
+            }
+
+            throw new Exception($userMessage, $e->getCode(), $e);
+        } catch (TransportExceptionInterface $e) {
+            // SMTP 530/535: the SMTP server does not accept the username or password.
+            if (! $isTestNotification && $settings instanceof EmailNotificationSettings && in_array($e->getCode(), [530, 535], true)) {
+                $settings->recordDeliveryFailure('SMTP authentication failed. Please verify the SMTP username and password.');
+
+                return;
+            }
+
+            throw $e;
+        } catch (TransporterException $e) {
+            send_internal_notification('Resend Transport Error: '.remove_iip($e->getMessage()));
+            throw new Exception('Unable to connect to Resend API. Please check your internet connection and try again.');
+        } catch (\Throwable $e) {
+            // Check if this is a Resend domain verification error on cloud instances
+            if (isCloud() && str_contains($e->getMessage(), 'domain is not verified')) {
+                // Throw as NonReportableException so it won't go to error tracking
+                throw NonReportableException::fromException($e);
+            }
             throw $e;
         }
     }
 
-    private function bootConfigs($notifiable): void
+    /**
+     * Read the status code and error name from a Resend error.
+     *
+     * getErrorCode() and getErrorType() fail when a body has neither "code"/"statusCode"
+     * nor "type"/"name" (for example the legacy nested format), so read the raw contents.
+     *
+     * @return array{status: int, name: ?string}
+     */
+    private static function resendErrorDetails(ErrorException $e): array
     {
-        if (data_get($notifiable, 'use_instance_email_settings')) {
-            $type = set_transanctional_email_settings();
-            if (! $type) {
-                throw new Exception('No email settings found.');
-            }
+        $contents = (fn (): array => $this->contents)->call($e);
 
-            return;
-        }
-        config()->set('mail.from.address', data_get($notifiable, 'smtp_from_address', 'test@example.com'));
-        config()->set('mail.from.name', data_get($notifiable, 'smtp_from_name', 'Test'));
-        if (data_get($notifiable, 'resend_enabled')) {
-            config()->set('mail.default', 'resend');
-            config()->set('resend.api_key', data_get($notifiable, 'resend_api_key'));
-        }
-        if (data_get($notifiable, 'smtp_enabled')) {
-            config()->set('mail.default', 'smtp');
-            config()->set('mail.mailers.smtp', [
-                'transport' => 'smtp',
-                'host' => data_get($notifiable, 'smtp_host'),
-                'port' => data_get($notifiable, 'smtp_port'),
-                'encryption' => data_get($notifiable, 'smtp_encryption'),
-                'username' => data_get($notifiable, 'smtp_username'),
-                'password' => data_get($notifiable, 'smtp_password'),
-                'timeout' => data_get($notifiable, 'smtp_timeout'),
-                'local_domain' => null,
-            ]);
-        }
+        return [
+            'status' => (int) ($contents['code'] ?? $contents['statusCode'] ?? 0),
+            'name' => isset($contents['name']) ? (string) $contents['name'] : null,
+        ];
     }
 }

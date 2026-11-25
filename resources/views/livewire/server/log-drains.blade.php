@@ -1,120 +1,126 @@
 <div>
     <x-slot:title>
-        {{ data_get_str($server, 'name')->limit(10) }} > Server LogDrains | Coolify
+        {{ data_get_str($server, 'name')->limit(10) }} > Log Drains | Coolify
     </x-slot>
-    <x-server.navbar :server="$server" :parameters="$parameters" />
-    @if ($server->isFunctional())
-        <h2>Log Drains</h2>
-        <div class="pb-4">Sends service logs to 3rd party tools.</div>
-        <div class="flex flex-col gap-4 pt-4">
-            <div class="p-4 border dark:border-coolgray-300">
-                <form wire:submit='submit("newrelic")' class="flex flex-col">
-                    <h3>New Relic</h3>
-                    <div class="w-32">
-                        <x-forms.checkbox instantSave='instantSave("newrelic")'
-                            id="server.settings.is_logdrain_newrelic_enabled" label="Enabled" />
-                    </div>
-                    <div class="flex flex-col gap-4">
-                        <div class="flex flex-col w-full gap-2 xl:flex-row">
-                            @if ($server->isLogDrainEnabled())
-                                <x-forms.input disabled type="password" required
-                                    id="server.settings.logdrain_newrelic_license_key" label="License Key" />
-                                <x-forms.input disabled required id="server.settings.logdrain_newrelic_base_uri"
-                                    placeholder="https://log-api.eu.newrelic.com/log/v1"
-                                    helper="For EU use: https://log-api.eu.newrelic.com/log/v1<br>For US use: https://log-api.newrelic.com/log/v1"
-                                    label="Endpoint" />
-                            @else
-                                <x-forms.input type="password" required
-                                    id="server.settings.logdrain_newrelic_license_key" label="License Key" />
-                                <x-forms.input required id="server.settings.logdrain_newrelic_base_uri"
-                                    placeholder="https://log-api.eu.newrelic.com/log/v1"
-                                    helper="For EU use: https://log-api.eu.newrelic.com/log/v1<br>For US use: https://log-api.newrelic.com/log/v1"
-                                    label="Endpoint" />
-                            @endif
+
+    <livewire:server.navbar :server="$server" />
+
+    <div
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+        <x-server.sidebar :server="$server" activeMenu="log-drains" />
+
+        <div class="application-settings-form flex w-full flex-col gap-6">
+            @if ($server->isFunctional())
+                <x-application.settings-section id="server-log-drains-overview-section" title="Log drains"
+                    helper="Forward container logs from this server to one external destination.">
+                    <x-slot:actions>
+                        <x-status-badge :status="$server->isLogDrainEnabled() ? 'Active' : 'Not configured'"
+                            :type="$server->isLogDrainEnabled() ? 'success' : 'neutral'" />
+                    </x-slot:actions>
+                    <p class="text-sm leading-6 text-neutral-600 dark:text-fg-dim">
+                        Only one log drain can be active at a time. Disable the current destination before enabling
+                        another provider.
+                    </p>
+                </x-application.settings-section>
+
+                <form wire:submit="submit" class="contents">
+                    <x-unsaved-bar action="submit" />
+
+                    <x-application.settings-section id="server-new-relic-drain-section" title="New Relic"
+                        helper="Send logs through the New Relic Log API.">
+                        <div class="grid gap-4 lg:grid-cols-3">
+                            <x-forms.listbox canGate="update" :canResource="$server" id="isLogDrainNewRelicEnabled" label="Status"
+                                onChange="instantSave" :options="[
+                                    ['value' => false, 'label' => 'Disabled'],
+                                    ['value' => true, 'label' => 'Enabled'],
+                                ]"
+                                :disabled="$isLogDrainAxiomEnabled || $isLogDrainCustomEnabled || $isLogDrainCloudwatchEnabled || !auth()->user()->can('update', $server)" />
+                            <x-forms.input canGate="update" :canResource="$server" type="password" :required="$isLogDrainNewRelicEnabled"
+                                id="logDrainNewRelicLicenseKey" label="License key"
+                                :disabled="$server->isLogDrainEnabled()" />
+                            <x-forms.input canGate="update" :canResource="$server" :required="$isLogDrainNewRelicEnabled"
+                                id="logDrainNewRelicBaseUri" label="Endpoint"
+                                placeholder="https://log-api.eu.newrelic.com/log/v1"
+                                helper="Use the EU or US New Relic Log API endpoint."
+                                :disabled="$server->isLogDrainEnabled()" />
                         </div>
-                    </div>
-                    <div class="flex justify-end gap-4 pt-6">
-                        <x-forms.button type="submit">
-                            Save
-                        </x-forms.button>
-                    </div>
-                </form>
-
-                <h3>Axiom</h3>
-                <div class="w-32">
-                    <x-forms.checkbox instantSave='instantSave("axiom")' id="server.settings.is_logdrain_axiom_enabled"
-                        label="Enabled" />
-                </div>
-                <form wire:submit='submit("axiom")' class="flex flex-col">
-                    <div class="flex flex-col gap-4">
-                        <div class="flex flex-col w-full gap-2 xl:flex-row">
-                            @if ($server->isLogDrainEnabled())
-                                <x-forms.input disabled type="password" required
-                                    id="server.settings.logdrain_axiom_api_key" label="API Key" />
-                                <x-forms.input disabled required id="server.settings.logdrain_axiom_dataset_name"
-                                    label="Dataset Name" />
-                            @else
-                                <x-forms.input type="password" required id="server.settings.logdrain_axiom_api_key"
-                                    label="API Key" />
-                                <x-forms.input required id="server.settings.logdrain_axiom_dataset_name"
-                                    label="Dataset Name" />
-                            @endif
+                    </x-application.settings-section>
+                    <x-application.settings-section id="server-axiom-drain-section" title="Axiom"
+                        helper="Send logs to an Axiom dataset using its ingest API.">
+                        <div class="mb-4 max-w-sm">
+                            <x-forms.listbox canGate="update" :canResource="$server" id="isLogDrainAxiomEnabled" label="Status"
+                                onChange="instantSave" :options="[
+                                    ['value' => false, 'label' => 'Disabled'],
+                                    ['value' => true, 'label' => 'Enabled'],
+                                ]"
+                                :disabled="$isLogDrainNewRelicEnabled || $isLogDrainCustomEnabled || $isLogDrainCloudwatchEnabled || !auth()->user()->can('update', $server)" />
                         </div>
-                    </div>
-                    <div class="flex justify-end gap-4 pt-6">
-                        <x-forms.button type="submit">
-                            Save
-                        </x-forms.button>
-                    </div>
+                        <div class="grid gap-4 lg:grid-cols-3">
+                            <x-forms.input canGate="update" :canResource="$server" type="password" :required="$isLogDrainAxiomEnabled"
+                                id="logDrainAxiomApiKey" label="API key"
+                                :disabled="$server->isLogDrainEnabled()" />
+                            <x-forms.input canGate="update" :canResource="$server" :required="$isLogDrainAxiomEnabled"
+                                id="logDrainAxiomDatasetName" label="Dataset name"
+                                :disabled="$server->isLogDrainEnabled()" />
+                            <x-forms.input canGate="update" :canResource="$server" :required="$isLogDrainAxiomEnabled"
+                                id="logDrainAxiomDomain" label="Edge domain"
+                                placeholder="us-east-1.aws.edge.axiom.co"
+                                helper="Base domain of the edge deployment of your Axiom organization.<br><br>US: <code>us-east-1.aws.edge.axiom.co</code><br>EU: <code>eu-central-1.aws.edge.axiom.co</code>"
+                                :disabled="$server->isLogDrainEnabled()" />
+                        </div>
+                    </x-application.settings-section>
+                    <x-application.settings-section id="server-cloudwatch-drain-section" title="Amazon CloudWatch Logs"
+                        helper="Send container logs directly to CloudWatch Logs using the Docker awslogs logging driver.<br><br>AWS credentials are read by the Docker daemon on this server, not by Coolify. Attach an IAM instance role, or configure <code>AWS_ACCESS_KEY_ID</code> and <code>AWS_SECRET_ACCESS_KEY</code> for the Docker service or in <code>/root/.aws/credentials</code>.<br><br>The credentials need <code>logs:CreateLogStream</code> and <code>logs:PutLogEvents</code>, plus <code>logs:CreateLogGroup</code> if the log group does not exist yet.<br><br>Delivery errors do not stop containers; they appear in the Docker daemon logs (<code>journalctl -u docker</code>). Redeploy or restart resources to apply the logging driver.">
+                        <div class="mb-4 max-w-sm">
+                            <x-forms.listbox canGate="update" :canResource="$server" id="isLogDrainCloudwatchEnabled" label="Status"
+                                onChange="instantSave" :options="[
+                                    ['value' => false, 'label' => 'Disabled'],
+                                    ['value' => true, 'label' => 'Enabled'],
+                                ]"
+                                :disabled="$isLogDrainNewRelicEnabled || $isLogDrainAxiomEnabled || $isLogDrainCustomEnabled || !auth()->user()->can('update', $server)" />
+                        </div>
+                        <div class="grid gap-4 lg:grid-cols-3">
+                            <x-forms.input canGate="update" :canResource="$server" :required="$isLogDrainCloudwatchEnabled"
+                                id="logDrainCloudwatchGroup" label="Log group" placeholder="/coolify/production"
+                                :disabled="$server->isLogDrainEnabled()" />
+                            <x-forms.input canGate="update" :canResource="$server"
+                                id="logDrainCloudwatchStreamPrefix" label="Log stream prefix" placeholder="docker/"
+                                helper="Optional. Log streams are named after the container, prefixed with this value (e.g. docker/&lt;container name&gt;)."
+                                :disabled="$server->isLogDrainEnabled()" />
+                            <x-forms.input canGate="update" :canResource="$server" :required="$isLogDrainCloudwatchEnabled"
+                                id="logDrainCloudwatchRegion" label="Region" placeholder="us-east-1"
+                                :disabled="$server->isLogDrainEnabled()" />
+                        </div>
+                    </x-application.settings-section>
+                    <x-application.settings-section id="server-custom-drain-section" title="Custom Fluent Bit"
+                        helper="Provide the full Fluent Bit configuration and an optional parser configuration. The configuration must have an [INPUT] section with Name forward: containers send their logs to this input on port 24224. To use credential or certificate files, copy them to /data/coolify/log-drains/files on the server. Fluent Bit reads them at /files, for example: google_service_credentials /files/gcp.json">
+                        <div class="mb-4 max-w-sm">
+                            <x-forms.listbox canGate="update" :canResource="$server" id="isLogDrainCustomEnabled" label="Status"
+                                onChange="instantSave" :options="[
+                                    ['value' => false, 'label' => 'Disabled'],
+                                    ['value' => true, 'label' => 'Enabled'],
+                                ]"
+                                :disabled="$isLogDrainNewRelicEnabled || $isLogDrainAxiomEnabled || $isLogDrainCloudwatchEnabled || !auth()->user()->can('update', $server)" />
+                        </div>
+                        <div class="grid gap-4 lg:grid-cols-2">
+                            <x-forms.textarea canGate="update" :canResource="$server" rows="8" :required="$isLogDrainCustomEnabled"
+                                id="logDrainCustomConfig" label="Fluent Bit configuration"
+                                :placeholder="implode(PHP_EOL, ['[INPUT]', '    Name forward', '', '[OUTPUT]', '    Name  stdout', '    Match *'])"
+                                :disabled="$server->isLogDrainEnabled()" />
+                            <x-forms.textarea canGate="update" :canResource="$server" rows="8"
+                                id="logDrainCustomConfigParser" label="Parser configuration"
+                                :disabled="$server->isLogDrainEnabled()" />
+                        </div>
+                    </x-application.settings-section>
                 </form>
-                {{-- <h3>Highlight.io</h3>
-            <div class="w-32">
-                <x-forms.checkbox instantSave='instantSave("highlight")'
-                    id="server.settings.is_logdrain_highlight_enabled" label="Enabled" />
-            </div>
-            <form wire:submit='submit("highlight")' class="flex flex-col">
-                <div class="flex flex-col gap-4">
-                    <div class="flex flex-col w-full gap-2 xl:flex-row">
-                        <x-forms.input type="password" required id="server.settings.logdrain_highlight_project_id"
-                            label="Project Id" />
-                    </div>
-                </div>
-                <div class="flex justify-end gap-4 pt-6">
-                    <x-forms.button type="submit">
-                        Save
-                    </x-forms.button>
-                </div>
-            </form> --}}
-                <h3>Custom FluentBit configuration</h3>
-                <div class="w-32">
-                    <x-forms.checkbox instantSave='instantSave("custom")'
-                        id="server.settings.is_logdrain_custom_enabled" label="Enabled" />
-                </div>
-                <form wire:submit='submit("custom")' class="flex flex-col">
-                    <div class="flex flex-col gap-4">
-                        @if ($server->isLogDrainEnabled())
-                            <x-forms.textarea disabled rows="6" required
-                                id="server.settings.logdrain_custom_config" label="Custom FluentBit Configuration" />
-                            <x-forms.textarea disabled id="server.settings.logdrain_custom_config_parser"
-                                label="Custom Parser Configuration" />
-                        @else
-                            <x-forms.textarea rows="6" required id="server.settings.logdrain_custom_config"
-                                label="Custom FluentBit Configuration" />
-                            <x-forms.textarea id="server.settings.logdrain_custom_config_parser"
-                                label="Custom Parser Configuration" />
-                        @endif
-
-                    </div>
-                    <div class="flex justify-end gap-4 pt-6">
-                        <x-forms.button type="submit">
-                            Save
-                        </x-forms.button>
-                    </div>
-                </form>
-
-            </div>
+            @else
+                <x-application.settings-section title="Log drains"
+                    helper="Forward container logs from this server to an external destination.">
+                    <x-empty size="sm" title="Server validation required"
+                        description="Validate this server before configuring log drains."
+                        icon-name="notifications" />
+                </x-application.settings-section>
+            @endif
         </div>
-    @else
-        <div>Server is not validated. Validate first.</div>
-    @endif
+    </div>
 </div>

@@ -1,0 +1,750 @@
+<?php
+
+use App\Models\Application;
+use App\Models\EnvironmentVariable;
+use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
+use App\Services\Access\AccessResolver;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
+
+/**
+ * Count domains in a comma-separated FQDN string (e.g. "https://a.com,https://b.com").
+ */
+function countDomains(?string $fqdn): int
+{
+    if (! filled($fqdn)) {
+        return 0;
+    }
+
+    return collect(explode(',', $fqdn))
+        ->map(fn ($d) => trim($d))
+        ->filter()
+        ->count();
+}
+
+function isValidDomainUrl(string $url): bool
+{
+    $components = parse_url($url);
+
+    if ($components === false) {
+        return false;
+    }
+
+    $scheme = $components['scheme'] ?? '';
+    $host = $components['host'] ?? '';
+
+    if (! in_array(strtolower($scheme), ['http', 'https'], true) || $host === '') {
+        return false;
+    }
+
+    $urlToValidate = $scheme.'://';
+
+    if (isset($components['user'])) {
+        $urlToValidate .= $components['user'];
+
+        if (isset($components['pass'])) {
+            $urlToValidate .= ':'.$components['pass'];
+        }
+
+        $urlToValidate .= '@';
+    }
+
+    $urlToValidate .= str_replace('_', '-', $host);
+
+    if (isset($components['port'])) {
+        $urlToValidate .= ':'.$components['port'];
+    }
+
+    if (isset($components['path'])) {
+        $urlToValidate .= $components['path'];
+    }
+
+    if (isset($components['query'])) {
+        $urlToValidate .= '?'.$components['query'];
+    }
+
+    if (isset($components['fragment'])) {
+        $urlToValidate .= '#'.$components['fragment'];
+    }
+
+    return filter_var($urlToValidate, FILTER_VALIDATE_URL) !== false;
+}
+
+function domainConflictKey(string $domain): string
+{
+    $domain = str($domain)->endsWith('/')
+        ? str($domain)->beforeLast('/')->toString()
+        : $domain;
+
+    $domain = preg_replace('#^https?://#i', '', $domain) ?? $domain;
+
+    // The URL port is the container port. The public address does not include it.
+    return preg_replace('#^([^/:\[]+|\[[^\]]+\]):\d+#', '$1', $domain) ?? $domain;
+}
+
+/**
+ * @return Collection<int, array{domain: string, service_name: ?string}>
+ */
+function applicationDomainEntries(Application $application): Collection
+{
+    $entries = collect(explode(',', (string) $application->fqdn))
+        ->filter(fn ($domain) => $domain !== '')
+        ->map(fn ($domain) => [
+            'domain' => str($domain)->finish('/')->beforeLast('/')->toString(),
+            'service_name' => null,
+        ]);
+
+    if ($application->build_pack !== 'dockercompose' || empty($application->docker_compose_domains)) {
+        return $entries->values();
+    }
+
+    $composeDomains = json_decode($application->docker_compose_domains, true);
+    if (! is_array($composeDomains)) {
+        return $entries->values();
+    }
+
+    foreach ($composeDomains as $serviceName => $domainConfig) {
+        foreach (explode(',', (string) data_get($domainConfig, 'domain')) as $domain) {
+            if ($domain === '') {
+                continue;
+            }
+
+            $entries->push([
+                'domain' => str($domain)->finish('/')->beforeLast('/')->toString(),
+                'service_name' => (string) $serviceName,
+            ]);
+        }
+    }
+
+    return $entries->values();
+}
+
+/**
+ * True when the authenticated user cannot see the resource, so a conflict must not reveal its name.
+ */
+function domainConflictResourceIsHidden(Model $resource): bool
+{
+    return auth()->check() && Gate::denies('view', $resource);
+}
+
+/**
+ * @return array{domain: string, resource_name: string, resource_link: null, resource_uuid: null, resource_type: string, message: string}
+ */
+function hiddenDomainConflict(string $domain, string $type): array
+{
+    return [
+        'domain' => $domain,
+        'resource_name' => 'another resource',
+        'resource_link' => null,
+        'resource_uuid' => null,
+        'resource_type' => $type,
+        'message' => "Domain $domain is already in use by another resource in this team",
+    ];
+}
+
+function checkDomainUsage(ServiceApplication|Application|null $resource = null, ?string $domain = null)
+{
+    $conflicts = [];
+
+    // Get the current team for filtering
+    $currentTeam = null;
+    if ($resource) {
+        $currentTeam = $resource->team();
+    }
+
+    if ($resource) {
+        if ($resource->getMorphClass() === Application::class && $resource->build_pack === 'dockercompose') {
+            $domains = applicationDomainEntries($resource)->pluck('domain');
+        } else {
+            $domains = collect($resource->fqdns);
+        }
+    } elseif ($domain) {
+        $domains = collect([$domain]);
+    } else {
+        return ['conflicts' => [], 'hasConflicts' => false];
+    }
+
+    $domains = $domains->map(function ($domain) {
+        if (str($domain)->endsWith('/')) {
+            $domain = str($domain)->beforeLast('/');
+        }
+
+        return domainConflictKey((string) $domain);
+    });
+
+    // A member limited to some projects must still see conflicts with every resource of the team.
+    [$apps, $serviceApps] = app(AccessResolver::class)->withoutVisibilityScope(function () use ($currentTeam) {
+        $appsQuery = Application::query();
+        $serviceAppsQuery = ServiceApplication::query()->with('service');
+        if ($currentTeam) {
+            $appsQuery->whereHas('environment.project', function ($query) use ($currentTeam) {
+                $query->where('team_id', $currentTeam->id);
+            });
+            $serviceAppsQuery->whereHas('service.environment.project', function ($query) use ($currentTeam) {
+                $query->where('team_id', $currentTeam->id);
+            });
+        }
+
+        return [$appsQuery->get(), $serviceAppsQuery->get()];
+    });
+
+    foreach ($apps as $app) {
+        foreach (applicationDomainEntries($app) as $domainEntry) {
+            $naked_domain = $domainEntry['domain'];
+            if (! $domains->contains(domainConflictKey($naked_domain))) {
+                continue;
+            }
+            if (data_get($resource, 'uuid') && $resource->uuid === $app->uuid) {
+                continue;
+            }
+            if (domainConflictResourceIsHidden($app)) {
+                $conflicts[] = hiddenDomainConflict($naked_domain, 'application');
+
+                continue;
+            }
+            $conflicts[] = [
+                'domain' => $naked_domain,
+                'resource_name' => $app->name,
+                'resource_link' => $app->link(),
+                'resource_type' => 'application',
+                'message' => "Domain $naked_domain is already in use by application '{$app->name}'".($domainEntry['service_name'] ? " (service: {$domainEntry['service_name']})" : ''),
+                ...($domainEntry['service_name'] ? ['service_name' => $domainEntry['service_name']] : []),
+            ];
+        }
+    }
+
+    foreach ($serviceApps as $app) {
+        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        foreach ($list_of_domains as $domain) {
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->value();
+            if (! $domains->contains(domainConflictKey($naked_domain))) {
+                continue;
+            }
+            if (data_get($resource, 'uuid') && $resource->uuid === $app->uuid) {
+                continue;
+            }
+            if (domainConflictResourceIsHidden($app->service)) {
+                $conflicts[] = hiddenDomainConflict($naked_domain, 'service');
+
+                continue;
+            }
+            $conflicts[] = [
+                'domain' => $naked_domain,
+                'resource_name' => $app->service->name,
+                'resource_link' => $app->service->link(),
+                'resource_type' => 'service',
+                'message' => "Domain $naked_domain is already in use by service '{$app->service->name}'",
+            ];
+        }
+    }
+
+    if ($resource) {
+        $settings = instanceSettings();
+        if (data_get($settings, 'fqdn')) {
+            $domain = data_get($settings, 'fqdn');
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->value();
+            if ($domains->contains(domainConflictKey($naked_domain))) {
+                $conflicts[] = [
+                    'domain' => $naked_domain,
+                    'resource_name' => 'Coolify Instance',
+                    'resource_link' => '#',
+                    'resource_type' => 'instance',
+                    'message' => "Domain $naked_domain is already in use by this Coolify instance",
+                ];
+            }
+        }
+    }
+
+    return [
+        'conflicts' => $conflicts,
+        'hasConflicts' => count($conflicts) > 0,
+    ];
+}
+
+function checkIfDomainIsAlreadyUsedViaAPI(Collection|array $domains, ?string $teamId = null, ?string $uuid = null)
+{
+    $conflicts = [];
+
+    if (is_null($teamId)) {
+        return ['error' => 'Team ID is required.'];
+    }
+    if (is_array($domains)) {
+        $domains = collect($domains);
+    }
+
+    $domains = $domains->map(function ($domain) {
+        if (str($domain)->endsWith('/')) {
+            $domain = str($domain)->beforeLast('/');
+        }
+
+        return domainConflictKey((string) $domain);
+    });
+
+    // A token or member limited to some projects must still see conflicts with every resource of the team.
+    [$applications, $serviceApplications] = app(AccessResolver::class)->withoutVisibilityScope(fn () => [
+        Application::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid', 'name', 'id', 'docker_compose_domains', 'build_pack', 'environment_id']),
+        ServiceApplication::ownedByCurrentTeamAPI($teamId)->with('service:id,name,uuid,environment_id')->get(['fqdn', 'uuid', 'id', 'service_id']),
+    ]);
+
+    if ($uuid) {
+        $applications = $applications->filter(fn ($app) => $app->uuid !== $uuid);
+        $serviceApplications = $serviceApplications->filter(fn ($app) => $app->uuid !== $uuid);
+    }
+
+    foreach ($applications as $app) {
+        foreach (applicationDomainEntries($app) as $domainEntry) {
+            $naked_domain = $domainEntry['domain'];
+            if ($domains->contains(domainConflictKey($naked_domain))) {
+                if (domainConflictResourceIsHidden($app)) {
+                    $conflicts[] = hiddenDomainConflict($naked_domain, 'application');
+
+                    continue;
+                }
+                $conflicts[] = [
+                    'domain' => $naked_domain,
+                    'resource_name' => $app->name,
+                    'resource_uuid' => $app->uuid,
+                    'resource_type' => 'application',
+                    'message' => "Domain $naked_domain is already in use by application '{$app->name}'".($domainEntry['service_name'] ? " (service: {$domainEntry['service_name']})" : ''),
+                    ...($domainEntry['service_name'] ? ['service_name' => $domainEntry['service_name']] : []),
+                ];
+            }
+        }
+    }
+
+    foreach ($serviceApplications as $app) {
+        if (str($app->fqdn)->isEmpty()) {
+            continue;
+        }
+        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        foreach ($list_of_domains as $domain) {
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->value();
+            if ($domains->contains(domainConflictKey($naked_domain))) {
+                if ($app->service !== null && domainConflictResourceIsHidden($app->service)) {
+                    $conflicts[] = hiddenDomainConflict($naked_domain, 'service');
+
+                    continue;
+                }
+                $conflicts[] = [
+                    'domain' => $naked_domain,
+                    'resource_name' => $app->service->name ?? 'Unknown Service',
+                    'resource_uuid' => $app->uuid,
+                    'resource_type' => 'service',
+                    'message' => "Domain $naked_domain is already in use by service '{$app->service->name}'",
+                ];
+            }
+        }
+    }
+
+    // Check instance-level domain
+    $settings = instanceSettings();
+    if (data_get($settings, 'fqdn')) {
+        $domain = data_get($settings, 'fqdn');
+        if (str($domain)->endsWith('/')) {
+            $domain = str($domain)->beforeLast('/');
+        }
+        $naked_domain = str($domain)->value();
+        if ($domains->contains(domainConflictKey($naked_domain))) {
+            $conflicts[] = [
+                'domain' => $naked_domain,
+                'resource_name' => 'Coolify Instance',
+                'resource_uuid' => null,
+                'resource_type' => 'instance',
+                'message' => "Domain $naked_domain is already in use by this Coolify instance",
+            ];
+        }
+    }
+
+    return [
+        'conflicts' => $conflicts,
+        'hasConflicts' => count($conflicts) > 0,
+    ];
+}
+
+/**
+ * Normalize a compose service name the way Coolify historically did for env var keys
+ * (hyphens and dots → underscores). Used for comparison and SERVICE_* env names only —
+ * docker_compose_domains keys should use the original compose service name.
+ */
+function normalizeComposeServiceName(string $serviceName): string
+{
+    return str($serviceName)->replace('-', '_')->replace('.', '_')->toString();
+}
+
+/**
+ * Resolve a candidate key (original or legacy-normalized) to the original compose service name.
+ *
+ * @param  iterable<int|string, mixed>  $serviceNames
+ */
+function findComposeServiceName(string $candidate, iterable $serviceNames): ?string
+{
+    $names = collect($serviceNames)->map(fn ($name) => (string) $name)->values();
+
+    if ($names->containsStrict($candidate)) {
+        return $candidate;
+    }
+
+    $normalized = normalizeComposeServiceName($candidate);
+    $matches = $names->filter(
+        fn ($name) => normalizeComposeServiceName($name) === $normalized
+    )->values();
+
+    return $matches->count() === 1 ? $matches->first() : null;
+}
+
+/**
+ * Collapse domain-map keys that only differ by hyphen/dot/underscore into one preferred name.
+ * Prefers a key that still has `-` or `.` over a fully underscore-normalized twin.
+ *
+ * @param  iterable<int|string, mixed>  $domainKeys
+ * @return list<string>
+ */
+function preferredComposeServiceNamesFromDomainKeys(iterable $domainKeys): array
+{
+    $groups = [];
+    foreach ($domainKeys as $key) {
+        $key = (string) $key;
+        $groups[normalizeComposeServiceName($key)][] = $key;
+    }
+
+    $preferred = [];
+    foreach ($groups as $normalized => $keys) {
+        $keys = array_values(array_unique($keys));
+        $withSeparators = array_values(array_filter(
+            $keys,
+            fn (string $key) => $key !== $normalized
+        ));
+        $preferred[] = $withSeparators[0] ?? $keys[0];
+    }
+
+    return $preferred;
+}
+
+/**
+ * Read domain string for a compose service from docker_compose_domains.
+ * Prefers a filled domain on the requested key; falls back to any filled twin
+ * (legacy underscore keys). Blank entries do not shadow filled twins.
+ * Uses collection key access (not dotted data_get) so names like "api.test" work.
+ *
+ * @param  array<string, mixed>|Collection<string, mixed>  $domains
+ */
+function getComposeServiceDomainString(array|Collection $domains, string $serviceName): ?string
+{
+    $domains = collect($domains);
+    $normalized = normalizeComposeServiceName($serviceName);
+    $matches = [];
+
+    foreach ($domains as $key => $entry) {
+        $key = (string) $key;
+        if ($key !== $serviceName
+            && $key !== $normalized
+            && normalizeComposeServiceName($key) !== $normalized) {
+            continue;
+        }
+
+        $matches[] = [
+            'key' => $key,
+            'domain' => composeDomainEntryString($entry),
+            'is_requested' => $key === $serviceName,
+        ];
+    }
+
+    if ($matches === []) {
+        return null;
+    }
+
+    $filled = array_values(array_filter(
+        $matches,
+        fn (array $match) => filled($match['domain'])
+    ));
+
+    if ($filled !== []) {
+        foreach ($filled as $match) {
+            if ($match['is_requested']) {
+                return $match['domain'];
+            }
+        }
+
+        return $filled[0]['domain'];
+    }
+
+    foreach ($matches as $match) {
+        if ($match['is_requested']) {
+            return $match['domain'];
+        }
+    }
+
+    return $matches[0]['domain'];
+}
+
+/**
+ * Determine whether a compose service already has a domain-map entry, including
+ * an explicitly empty entry left when a user removes its generated domain.
+ *
+ * @param  array<string, mixed>|Collection<string, mixed>  $domains
+ */
+function hasComposeServiceDomainEntry(array|Collection $domains, string $serviceName): bool
+{
+    $normalized = normalizeComposeServiceName($serviceName);
+
+    foreach (collect($domains)->keys() as $key) {
+        $key = (string) $key;
+        if ($key === $serviceName || normalizeComposeServiceName($key) === $normalized) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function composeDomainEntryString(mixed $entry): ?string
+{
+    if (is_object($entry)) {
+        $entry = (array) $entry;
+    }
+
+    if (! is_array($entry)) {
+        return is_string($entry) ? $entry : null;
+    }
+
+    $domain = $entry['domain'] ?? null;
+
+    return is_string($domain) ? $domain : null;
+}
+
+/**
+ * Choose which domain string wins when merging twin compose domain keys.
+ * Filled values always beat blanks; when both are filled, prefer the canonical key.
+ */
+function preferComposeDomainValue(
+    mixed $existingDomain,
+    bool $existingIsCanonical,
+    mixed $incomingDomain,
+    bool $incomingIsCanonical,
+): mixed {
+    $existingFilled = filled($existingDomain);
+    $incomingFilled = filled($incomingDomain);
+
+    if ($existingFilled && ! $incomingFilled) {
+        return $existingDomain;
+    }
+
+    if ($incomingFilled && ! $existingFilled) {
+        return $incomingDomain;
+    }
+
+    if ($existingFilled && $incomingFilled) {
+        if ($incomingIsCanonical && ! $existingIsCanonical) {
+            return $incomingDomain;
+        }
+
+        return $existingDomain;
+    }
+
+    // Both blank: keep canonical slot when possible.
+    if ($incomingIsCanonical) {
+        return $incomingDomain;
+    }
+
+    return $existingDomain;
+}
+
+/**
+ * Rekey docker_compose_domains to original compose service names.
+ * Merges legacy underscore/dot twin keys onto the canonical compose name.
+ * Never lets an empty canonical key wipe a filled legacy twin.
+ *
+ * @param  array<string, mixed>|Collection<string, mixed>  $domains
+ * @param  iterable<int|string, mixed>  $serviceNames
+ * @return array<string, mixed>
+ */
+function rekeyComposeDomainsToServiceNames(array|Collection $domains, iterable $serviceNames): array
+{
+    $domains = collect($domains);
+    $serviceNames = collect($serviceNames)->map(fn ($name) => (string) $name)->values();
+    $rekeyed = [];
+    $canonicalDomainSources = [];
+
+    foreach ($domains as $key => $value) {
+        $key = (string) $key;
+        $original = findComposeServiceName($key, $serviceNames) ?? $key;
+        $isCanonical = $key === $original;
+
+        if (is_object($value)) {
+            $value = (array) $value;
+        }
+        if (! is_array($value)) {
+            $value = ['domain' => $value];
+        }
+
+        if (! isset($rekeyed[$original])) {
+            $rekeyed[$original] = $value;
+            $canonicalDomainSources[$original] = $isCanonical;
+
+            continue;
+        }
+
+        $existingDomain = $rekeyed[$original]['domain'] ?? null;
+        $incomingDomain = $value['domain'] ?? null;
+        $rekeyed[$original] = array_merge($rekeyed[$original], $value);
+        $rekeyed[$original]['domain'] = preferComposeDomainValue(
+            $existingDomain,
+            $canonicalDomainSources[$original],
+            $incomingDomain,
+            $isCanonical,
+        );
+        $canonicalDomainSources[$original] = $canonicalDomainSources[$original] || $isCanonical;
+    }
+
+    return $rekeyed;
+}
+
+/**
+ * Resolve a SERVICE_FQDN_ / SERVICE_URL_ env fragment to a ServiceApplication by compose name.
+ * Handles legacy underscore fragments and dotted compose names (api.test vs API_TEST).
+ */
+function findServiceApplicationForEnvName(Service $resource, string $envServiceName): ?ServiceApplication
+{
+    $names = $resource->applications()->pluck('name');
+    $resolved = findComposeServiceName($envServiceName, $names)
+        ?? findComposeServiceName(str($envServiceName)->replace('_', '-')->toString(), $names);
+
+    if ($resolved === null) {
+        return null;
+    }
+
+    return $resource->applications()->where('name', $resolved)->first();
+}
+
+/**
+ * Check if a service copies a SERVICE_FQDN_ / SERVICE_URL_ declaration of the application named in it.
+ * The copy (same name, port and value; URL or FQDN) must not generate a domain or overwrite the variable (#11924).
+ * Declarations with another port or path share the host on purpose (for example Appwrite).
+ *
+ * @param  array<string, mixed>|Collection<string, mixed>  $services  Parsed compose services
+ */
+function isCopiedServiceUrlDeclaration(
+    Service $resource,
+    array|Collection $services,
+    ServiceApplication|ServiceDatabase $current,
+    string $key,
+): bool {
+    $owner = findServiceApplicationForEnvName($resource, parseServiceEnvironmentVariable($key)['service_name']);
+    if (! $owner || $owner->name === $current->name) {
+        return false;
+    }
+
+    // Same declaration sources as serviceParser: environment and build arguments.
+    $declarationsOf = fn (string $serviceName) => convertToKeyValueCollection(
+        collect(data_get($services, [$serviceName, 'environment'], []))
+            ->merge(data_get($services, [$serviceName, 'build', 'args'], []))
+    );
+    $ownerDeclarations = $declarationsOf($owner->name);
+    $currentDeclarations = $declarationsOf($current->name);
+
+    if (! $currentDeclarations->has($key)) {
+        return false;
+    }
+
+    // SERVICE_URL_X_3000 and SERVICE_FQDN_X_3000 write the same variable pair, so either one counts.
+    $twinKey = str_starts_with($key, 'SERVICE_URL_')
+        ? 'SERVICE_FQDN_'.substr($key, strlen('SERVICE_URL_'))
+        : 'SERVICE_URL_'.substr($key, strlen('SERVICE_FQDN_'));
+    $value = (string) $currentDeclarations->get($key);
+
+    return collect([$key, $twinKey])->contains(
+        fn (string $ownerKey) => $ownerDeclarations->has($ownerKey) && (string) $ownerDeclarations->get($ownerKey) === $value
+    );
+}
+
+/**
+ * Put/update a service domain entry under the original compose service name,
+ * removing legacy twin keys that resolve unambiguously to the same name.
+ *
+ * @param  array<string, mixed>|Collection<string, mixed>  $domains
+ * @param  iterable<int|string, mixed>  $serviceNames
+ * @return array<string, mixed>
+ */
+function putComposeServiceDomain(
+    array|Collection $domains,
+    string $serviceName,
+    ?string $domainString,
+    iterable $serviceNames = [],
+): array {
+    $domains = collect($domains)->all();
+    $names = collect($serviceNames)->map(fn ($name) => (string) $name);
+    $storageKey = findComposeServiceName($serviceName, $names) ?? $serviceName;
+
+    $merged = ['domain' => $domainString];
+    foreach (array_keys($domains) as $key) {
+        $key = (string) $key;
+        if ($key !== $storageKey && findComposeServiceName($key, $names) !== $storageKey) {
+            continue;
+        }
+
+        $existing = $domains[$key];
+        if (is_object($existing)) {
+            $existing = (array) $existing;
+        }
+        if (is_array($existing)) {
+            $merged = array_merge($existing, $merged);
+        }
+
+        if ($key !== $storageKey) {
+            unset($domains[$key]);
+        }
+    }
+
+    $domains[$storageKey] = $merged;
+
+    return $domains;
+}
+
+/**
+ * Set the stored SERVICE_URL_ and SERVICE_FQDN_ variables of a compose service from its domain.
+ * Port variables (SERVICE_URL_API_8000) get the same URL or host with their port appended.
+ * A null URL and host clear the variables.
+ */
+function syncComposeServiceUrlVariables(Application $application, string $serviceEnvKey, ?string $url, ?string $host): void
+{
+    if ($url !== null) {
+        foreach (['URL' => $url, 'FQDN' => $host] as $type => $value) {
+            $application->environment_variables()->updateOrCreate([
+                'resourceable_type' => Application::class,
+                'resourceable_id' => $application->id,
+                'key' => "SERVICE_{$type}_{$serviceEnvKey}",
+            ], [
+                'value' => $value,
+                'is_preview' => false,
+            ]);
+        }
+    }
+
+    $pattern = '/^SERVICE_(URL|FQDN)_'.preg_quote($serviceEnvKey, '/').'(?:_(\d+))?$/';
+    $application->environment_variables()
+        ->where(fn ($query) => $query->where('key', 'LIKE', "SERVICE_URL_{$serviceEnvKey}%")
+            ->orWhere('key', 'LIKE', "SERVICE_FQDN_{$serviceEnvKey}%"))
+        ->get()
+        ->each(function (EnvironmentVariable $variable) use ($pattern, $url, $host) {
+            if (! preg_match($pattern, $variable->key, $matches)) {
+                return;
+            }
+            $value = $matches[1] === 'URL' ? $url : $host;
+            if ($value !== null && isset($matches[2])) {
+                $value = "{$value}:{$matches[2]}";
+            }
+            $variable->update(['value' => $value]);
+        });
+}

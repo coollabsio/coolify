@@ -1,22 +1,41 @@
-FROM debian:12-slim
+# Versions
+# https://download.docker.com/linux/static/stable/
+ARG DOCKER_VERSION=29.9.3
+# https://github.com/docker/compose/releases
+ARG DOCKER_COMPOSE_VERSION=5.7.1
+# https://github.com/docker/buildx/releases
+ARG DOCKER_BUILDX_VERSION=0.39.0
+
+
+FROM debian:13-slim
 
 ARG TARGETPLATFORM
-# https://download.docker.com/linux/static/stable/
-ARG DOCKER_VERSION=26.1.2
-# https://github.com/docker/compose/releases
-ARG DOCKER_COMPOSE_VERSION=2.27.0
-# https://github.com/docker/buildx/releases
-ARG DOCKER_BUILDX_VERSION=0.14.0
+ARG DOCKER_VERSION
+ARG DOCKER_COMPOSE_VERSION
+ARG DOCKER_BUILDX_VERSION
 
 USER root
 WORKDIR /root
-ENV PATH "$PATH:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin"
+ENV PATH="/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin:$PATH"
 
 RUN apt update && apt -y install openssh-client openssh-server curl wget git jq jc
 RUN mkdir -p ~/.docker/cli-plugins
-RUN curl -sSL https://github.com/docker/buildx/releases/download/v${DOCKER_BUILDX_VERSION}/buildx-v${DOCKER_BUILDX_VERSION}.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx
-RUN curl -sSL https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
-RUN (curl -sSL https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz | tar -C /usr/bin/ --no-same-owner -xzv --strip-components=1 docker/docker)
+
+# Download architecture-matched Docker CLI, buildx, and compose binaries.
+# This image is published as a multi-arch manifest (amd64 + arm64), so the
+# downloaded binaries must match TARGETPLATFORM or they fail with "exec format error"
+# when the container runs on the other architecture.
+RUN if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then \
+        curl -sSL https://github.com/docker/buildx/releases/download/v${DOCKER_BUILDX_VERSION}/buildx-v${DOCKER_BUILDX_VERSION}.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx && \
+        curl -sSL https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose && \
+        (curl -sSL https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz | tar -C /usr/bin/ --no-same-owner -xzv --strip-components=1 docker/docker); \
+    elif [ "${TARGETPLATFORM}" = "linux/arm64" ]; then \
+        curl -sSL https://github.com/docker/buildx/releases/download/v${DOCKER_BUILDX_VERSION}/buildx-v${DOCKER_BUILDX_VERSION}.linux-arm64 -o ~/.docker/cli-plugins/docker-buildx && \
+        curl -sSL https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-aarch64 -o ~/.docker/cli-plugins/docker-compose && \
+        (curl -sSL https://download.docker.com/linux/static/stable/aarch64/docker-${DOCKER_VERSION}.tgz | tar -C /usr/bin/ --no-same-owner -xzv --strip-components=1 docker/docker); \
+    else \
+        echo "Unsupported TARGETPLATFORM: ${TARGETPLATFORM}" && exit 1; \
+    fi
 RUN chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker /root/.docker/cli-plugins/docker-buildx
 
 

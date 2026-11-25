@@ -2,6 +2,8 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
+use App\Models\Environment;
 use App\Models\Service;
 use App\Models\User;
 
@@ -20,15 +22,15 @@ class ServicePolicy
      */
     public function view(User $user, Service $service): bool
     {
-        return true;
+        return $user->canAccess(AccessLevel::Read, $service);
     }
 
     /**
-     * Determine whether the user can create models.
+     * Determine whether the user can create models, in the environment when one is given.
      */
-    public function create(User $user): bool
+    public function create(User $user, ?Environment $environment = null): bool
     {
-        return true;
+        return app(ResourceCreatePolicy::class)->createAny($user, $environment);
     }
 
     /**
@@ -36,7 +38,7 @@ class ServicePolicy
      */
     public function update(User $user, Service $service): bool
     {
-        return true;
+        return $user->canAccess(AccessLevel::Write, $service);
     }
 
     /**
@@ -44,11 +46,7 @@ class ServicePolicy
      */
     public function delete(User $user, Service $service): bool
     {
-        if ($user->isAdmin()) {
-            return true;
-        }
-
-        return false;
+        return $user->canAccess(AccessLevel::Delete, $service);
     }
 
     /**
@@ -56,7 +54,7 @@ class ServicePolicy
      */
     public function restore(User $user, Service $service): bool
     {
-        return true;
+        return false;
     }
 
     /**
@@ -64,19 +62,46 @@ class ServicePolicy
      */
     public function forceDelete(User $user, Service $service): bool
     {
-        if ($user->isAdmin()) {
-            return true;
-        }
-
         return false;
     }
 
+    /**
+     * Determine whether the user can stop the service.
+     */
     public function stop(User $user, Service $service): bool
     {
-        if ($user->isAdmin()) {
-            return true;
-        }
+        return $user->canAccess(AccessLevel::Deploy, $service);
+    }
 
-        return false;
+    /**
+     * Determine whether the user can read secret values, such as environment variable values.
+     */
+    public function viewSensitive(User $user, Service $service): bool
+    {
+        return $user->canAccess(AccessLevel::ReadSensitive, $service);
+    }
+
+    /**
+     * Determine whether the user can manage environment variables.
+     */
+    public function manageEnvironment(User $user, Service $service): bool
+    {
+        return $user->canAccess(AccessLevel::Write, $service);
+    }
+
+    /**
+     * Determine whether the user can upload a backup archive for a database within this service.
+     */
+    public function uploadBackup(User $user, Service $service): bool
+    {
+        return $user->canAccess(AccessLevel::Write, $service);
+    }
+
+    /**
+     * Determine whether the user can deploy the service.
+     */
+    public function deploy(User $user, Service $service): bool
+    {
+        return $user->canAccess(AccessLevel::Deploy, $service);
     }
 }

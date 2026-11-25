@@ -1,5 +1,7 @@
+# ignore: true
 # documentation: https://posthog.com
 # slogan: The single platform to analyze, test, observe, and deploy new features
+# category: analytics
 # tags: analytics, product, open-source, self-hosted, ab-testing, event-tracking
 # logo: svgs/posthog.svg
 # minversion: 4.0.0-beta.222
@@ -1868,14 +1870,19 @@ services:
       - ALLOW_PLAINTEXT_LISTENER=yes
 
   object_storage:
-    image: minio/minio:RELEASE.2022-06-25T15-50-16Z
+    image: pgsty/silo:RELEASE.2026-10-15T00-00-00Z # Released on 15 October 2026
     environment:
       - MINIO_ROOT_USER=$SERVICE_USER_MINIO
       - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
     entrypoint: sh
-    command: -c 'mkdir -p /data/posthog && minio server --address ":19000" --console-address ":19001" /data'
+    command: -c 'mkdir -p /data/posthog && silo server --address ":9000" --console-address ":9001" /data'
     volumes:
       - object_storage:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
 
   maildev:
     image: maildev/maildev:2.0.5
@@ -1922,7 +1929,7 @@ services:
 
           loop()
     environment:
-      - SERVICE_FQDN_WEB_8000
+      - SERVICE_URL_WEB_8000
       - OPT_OUT_CAPTURING=true
       - DISABLE_SECURE_SSL_REDIRECT=true
       - IS_BEHIND_PROXY=true
@@ -1938,8 +1945,9 @@ services:
       - PGUSER=posthog
       - PGPASSWORD=$SERVICE_PASSWORD_POSTGRES
       - DEPLOYMENT=hobby
-      - SITE_URL=$SERVICE_FQDN_WEB
+      - SITE_URL=$SERVICE_URL_WEB
       - SECRET_KEY=$SERVICE_BASE64_64_SECRETKEY
+      - 'ENCRYPTION_SALT_KEYS=${SERVICE_ENCRYPTION_SALT_KEYS:-00beef0000beef0000beef0000beef00}'
     depends_on:
       - db
       - redis
@@ -1965,8 +1973,9 @@ services:
       - PGUSER=posthog
       - PGPASSWORD=$SERVICE_PASSWORD_POSTGRES
       - DEPLOYMENT=hobby
-      - SITE_URL=$SERVICE_FQDN_WEB
+      - SITE_URL=$SERVICE_URL_WEB
       - SECRET_KEY=$SERVICE_BASE64_64_SECRETKEY
+      - 'ENCRYPTION_SALT_KEYS=${SERVICE_ENCRYPTION_SALT_KEYS:-00beef0000beef0000beef0000beef00}'
     depends_on:
       - db
       - redis
@@ -1996,8 +2005,9 @@ services:
       - CLICKHOUSE_DATABASE=posthog
       - CLICKHOUSE_SECURE=false
       - CLICKHOUSE_VERIFY=false
-      - SITE_URL=$SERVICE_FQDN_WEB
+      - SITE_URL=$SERVICE_URL_WEB
       - SECRET_KEY=$SERVICE_BASE64_64_SECRETKEY
+      - 'ENCRYPTION_SALT_KEYS=${SERVICE_ENCRYPTION_SALT_KEYS:-00beef0000beef0000beef0000beef00}'
     depends_on:
       - db
       - redis
@@ -2024,8 +2034,9 @@ services:
   #     - PGUSER=posthog
   #     - PGPASSWORD=$SERVICE_PASSWORD_POSTGRES
   #     - DEPLOYMENT=hobby
-  #     - SITE_URL=$SERVICE_FQDN_WEB
+  #     - SITE_URL=$SERVICE_URL_WEB
   #     - SECRET_KEY=$SERVICE_BASE64_64_SECRETKEY
+  #     - 'ENCRYPTION_SALT_KEYS=${SERVICE_ENCRYPTION_SALT_KEYS:-00beef0000beef0000beef0000beef00}'
   #   depends_on:
   #     - db
   #     - redis
@@ -2107,8 +2118,9 @@ services:
       - PGUSER=posthog
       - PGPASSWORD=$SERVICE_PASSWORD_POSTGRES
       - DEPLOYMENT=hobby
-      - SITE_URL=$SERVICE_FQDN_WEB
+      - SITE_URL=$SERVICE_URL_WEB
       - SECRET_KEY=$SERVICE_BASE64_64_SECRETKEY
+      - 'ENCRYPTION_SALT_KEYS=${SERVICE_ENCRYPTION_SALT_KEYS:-00beef0000beef0000beef0000beef00}'
       - TEMPORAL_HOST=temporal
     depends_on:
       - db

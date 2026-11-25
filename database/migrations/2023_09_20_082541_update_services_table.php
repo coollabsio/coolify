@@ -16,7 +16,6 @@ return new class extends Migration
             $table->longText('description')->nullable();
             $table->longText('docker_compose_raw');
             $table->longText('docker_compose')->nullable();
-
         });
     }
 

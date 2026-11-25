@@ -10,24 +10,17 @@ class ApiAllowed
 {
     public function handle(Request $request, Closure $next): Response
     {
-        ray()->clearAll();
         if (isCloud()) {
             return $next($request);
         }
-        $settings = \App\Models\InstanceSettings::get();
-        if ($settings->is_api_enabled === false) {
-            return response()->json(['success' => true, 'message' => 'API is disabled.'], 403);
+
+        // MCP write tools run REST routes internally; MCP has its own enable switch.
+        $isMcpRestBridge = $request->attributes->get('mcp_rest_bridge') === true;
+
+        if (! $isMcpRestBridge && instanceSettings()->is_api_enabled === false) {
+            return response()->json(['success' => false, 'message' => 'API is disabled.'], 403);
         }
 
-        if (! isDev()) {
-            if ($settings->allowed_ips) {
-                $allowedIps = explode(',', $settings->allowed_ips);
-                if (! in_array($request->ip(), $allowedIps)) {
-                    return response()->json(['success' => true, 'message' => 'You are not allowed to access the API.'], 403);
-                }
-            }
-        }
-
-        return $next($request);
+        return app(ApiIpAllowed::class)->handle($request, $next);
     }
 }

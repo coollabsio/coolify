@@ -1,18 +1,20 @@
 # documentation: https://appsmith.com
 # slogan: A low-code application platform for building internal tools.
-# tags: lowcode,nocode,no,low,platform
+# category: productivity
+# tags: lowcode, nocode, no, low, platform
 # logo: svgs/appsmith.svg
+# port: 80
 
 services:
   appsmith:
-    image: index.docker.io/appsmith/appsmith-ce:latest
+    image: index.docker.io/appsmith/appsmith-ce:v2.7.0
     environment:
-      - SERVICE_FQDN_APPSMITH
-      - APPSMITH_MAIL_ENABLED=false
-      - APPSMITH_DISABLE_TELEMETRY=true
-      - APPSMITH_DISABLE_INTERCOM=true
-      - APPSMITH_SENTRY_DSN=
-      - APPSMITH_SMART_LOOK_ID=
+      - SERVICE_URL_APPSMITH
+      - APPSMITH_MAIL_ENABLED=${APPSMITH_MAIL_ENABLED:-false}
+      - APPSMITH_DISABLE_TELEMETRY=${APPSMITH_DISABLE_TELEMETRY:-false}
+      - APPSMITH_DISABLE_INTERCOM=${APPSMITH_DISABLE_INTERCOM:-true}
+      - APPSMITH_SENTRY_DSN=${APPSMITH_SENTRY_DSN}
+      - APPSMITH_SMART_LOOK_ID=${APPSMITH_SMART_LOOK_ID}
     volumes:
       - stacks-data:/appsmith-stacks
     healthcheck:

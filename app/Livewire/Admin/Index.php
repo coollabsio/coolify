@@ -2,79 +2,99 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\Team;
 use App\Models\User;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class Index extends Component
 {
-    public $active_subscribers = [];
+    public int $activeSubscribers;
 
-    public $inactive_subscribers = [];
+    public int $inactiveSubscribers;
 
-    public $search = '';
+    public Collection $foundUsers;
 
-    public function submitSearch()
-    {
-        if ($this->search !== '') {
-            $this->inactive_subscribers = User::whereDoesntHave('teams', function ($query) {
-                $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
-            })->where(function ($query) {
-                $query->where('name', 'like', "%{$this->search}%")
-                    ->orWhere('email', 'like', "%{$this->search}%");
-            })->get()->filter(function ($user) {
-                return $user->id !== 0;
-            });
-            $this->active_subscribers = User::whereHas('teams', function ($query) {
-                $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
-            })->where(function ($query) {
-                $query->where('name', 'like', "%{$this->search}%")
-                    ->orWhere('email', 'like', "%{$this->search}%");
-            })->get()->filter(function ($user) {
-                return $user->id !== 0;
-            });
-        } else {
-            $this->getSubscribers();
-        }
-    }
+    public string $search = '';
 
     public function mount()
     {
-        if (! isCloud()) {
-            return redirect()->route('dashboard');
+        if (! isCloud() && ! isDev()) {
+            abort(403);
         }
-        if (auth()->user()->id !== 0) {
-            return redirect()->route('dashboard');
-        }
+        $this->authorizeAdminAccess();
         $this->getSubscribers();
+    }
+
+    public function back()
+    {
+        $this->authorizeAdminAccess();
+        if (session('impersonator_id') === 0) {
+            session()->forget(['impersonator_id', 'impersonating']);
+            $user = User::find(0);
+            $team_to_switch_to = $user->resolveStoredTeam() ?? $user->teams->first();
+            Auth::login($user);
+            refreshSession($team_to_switch_to);
+
+            return redirect()->route('admin.index');
+        }
+    }
+
+    public function submitSearch()
+    {
+        $this->authorizeAdminAccess();
+        if ($this->search !== '') {
+            $this->foundUsers = User::where(function ($query) {
+                $query->where('name', 'like', "%{$this->search}%")
+                    ->orWhere('email', 'like', "%{$this->search}%");
+            })->get();
+        }
     }
 
     public function getSubscribers()
     {
-        $this->inactive_subscribers = User::whereDoesntHave('teams', function ($query) {
-            $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
-        })->get()->filter(function ($user) {
-            return $user->id !== 0;
-        });
-        $this->active_subscribers = User::whereHas('teams', function ($query) {
-            $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
-        })->get()->filter(function ($user) {
-            return $user->id !== 0;
-        });
+        if (Auth::id() !== 0 && session('impersonator_id') !== 0) {
+            return redirect()->route('dashboard');
+        }
+        $this->inactiveSubscribers = Team::whereRelation('subscription', 'stripe_invoice_paid', false)->count();
+        $this->activeSubscribers = Team::whereRelation('subscription', 'stripe_invoice_paid', true)->count();
     }
 
     public function switchUser(int $user_id)
     {
-        if (auth()->user()->id !== 0) {
-            return redirect()->route('dashboard');
-        }
+        $this->authorizeRootOnly();
+        session(['impersonator_id' => Auth::id(), 'impersonating' => true]);
         $user = User::find($user_id);
-        $team_to_switch_to = $user->teams->first();
-        Cache::forget("team:{$user->id}");
-        auth()->login($user);
+        if (! $user) {
+            abort(404);
+        }
+        $team_to_switch_to = $user->resolveStoredTeam() ?? $user->teams->first();
+        auditLog('ui.user.impersonated', [
+            'team_id' => currentTeam()?->id,
+            'resource' => 'user',
+            'user_name' => $user->name,
+            'target_user_id' => $user->id,
+            'target_team_id' => $team_to_switch_to?->id,
+        ]);
+        Auth::login($user);
         refreshSession($team_to_switch_to);
 
-        return redirect(request()->header('Referer'));
+        return redirect()->route('dashboard');
+    }
+
+    private function authorizeAdminAccess(): void
+    {
+        if (! Auth::check() || (Auth::id() !== 0 && session('impersonator_id') !== 0)) {
+            abort(403);
+        }
+    }
+
+    private function authorizeRootOnly(): void
+    {
+        if (! Auth::check() || Auth::id() !== 0) {
+            abort(403);
+        }
     }
 
     public function render()

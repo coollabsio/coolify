@@ -36,8 +36,6 @@ class NotifyDemo extends Command
 
             return;
         }
-
-        ray($channel);
     }
 
     private function showHelp()
@@ -58,12 +56,13 @@ class NotifyDemo extends Command
               php artisan app:demo-notify {channel}
             </p>
             <div class="my-1">
-                <div class="text-yellow-500"> Channels: </div>
+                <div class="text-warning-500"> Channels: </div>
                 <ul class="text-coolify">
                     <li>email</li>
-                    <li>slack</li>
                     <li>discord</li>
                     <li>telegram</li>
+                    <li>slack</li>
+                    <li>pushover</li>
                 </ul>
             </div>
         </div>
@@ -74,6 +73,6 @@ class NotifyDemo extends Command
         <div class="mr-1">
             In which manner you wish a <strong class="text-coolify">coolified</strong> notification?
         </div>
-        HTML, ['email', 'slack', 'discord', 'telegram']);
+        HTML, ['email', 'discord', 'telegram', 'slack', 'pushover']);
     }
 }

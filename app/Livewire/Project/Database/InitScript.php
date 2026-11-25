@@ -2,44 +2,56 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Models\StandalonePostgresql;
 use Exception;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class InitScript extends Component
 {
+    use AuthorizesRequests;
+
+    #[Locked]
+    public StandalonePostgresql $database;
+
+    #[Locked]
     public array $script;
 
+    #[Locked]
     public int $index;
 
-    public ?string $filename;
+    #[Locked]
+    public string $originalFilename;
 
-    public ?string $content;
+    #[Validate(['nullable', 'string'])]
+    public ?string $filename = null;
 
-    protected $rules = [
-        'filename' => 'required|string',
-        'content' => 'required|string',
-    ];
-
-    protected $validationAttributes = [
-        'filename' => 'Filename',
-        'content' => 'Content',
-    ];
+    #[Validate(['nullable', 'string'])]
+    public ?string $content = null;
 
     public function mount()
     {
-        $this->index = data_get($this->script, 'index');
-        $this->filename = data_get($this->script, 'filename');
-        $this->content = data_get($this->script, 'content');
+        try {
+            $this->index = data_get($this->script, 'index');
+            $this->filename = data_get($this->script, 'filename');
+            $this->originalFilename = (string) data_get($this->script, 'filename');
+            $this->content = data_get($this->script, 'content');
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function submit()
     {
-        $this->validate();
         try {
+            $this->authorize('update', $this->database);
+            $this->validate();
             $this->script['index'] = $this->index;
             $this->script['content'] = $this->content;
             $this->script['filename'] = $this->filename;
-            $this->dispatch('save_init_script', $this->script);
+            $this->dispatch('save_init_script', $this->script, $this->originalFilename);
         } catch (Exception $e) {
             return handleError($e, $this);
         }
@@ -47,6 +59,11 @@ class InitScript extends Component
 
     public function delete()
     {
-        $this->dispatch('delete_init_script', $this->script);
+        try {
+            $this->authorize('update', $this->database);
+            $this->dispatch('delete_init_script', $this->script);
+        } catch (Exception $e) {
+            return handleError($e, $this);
+        }
     }
 }

@@ -1,41 +1,44 @@
 <x-layout-simple>
-    <section class="bg-gray-50 dark:bg-base">
-        <div class="flex flex-col items-center justify-center px-6 py-8 mx-auto md:h-screen lg:py-0">
-            <a class="flex items-center text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                Coolify
-            </a>
-            <div class="flex items-center justify-center pb-6 text-center">
-                {{ __('auth.reset_password') }}
-            </div>
-            <div class="w-full bg-white shadow md:mt-0 sm:max-w-md xl:p-0 dark:bg-base ">
-                <div class="p-6 space-y-4 md:space-y-6 sm:p-8">
-                    <form action="/reset-password" method="POST" class="flex flex-col gap-2">
-                        @csrf
-                        <input hidden id="token" name="token" value="{{ request()->route('token') }}">
-                        <input hidden value="{{ request()->query('email') }}" type="email" name="email"
-                            label="{{ __('input.email') }}" />
-                        <div class="flex flex-col gap-2">
-                            <x-forms.input required type="password" id="password" name="password"
-                                label="{{ __('input.password') }}" autofocus />
-                            <x-forms.input required type="password" id="password_confirmation"
-                                name="password_confirmation" label="{{ __('input.password.again') }}" />
-                        </div>
-                        <x-forms.button type="submit">{{ __('auth.reset_password') }}</x-forms.button>
-                    </form>
-                    @if ($errors->any())
-                        <div class="text-xs text-center text-error">
-                            @foreach ($errors->all() as $error)
-                                <p>{{ $error }}</p>
-                            @endforeach
-                        </div>
-                    @endif
-                    @if (session('status'))
-                        <div class="mb-4 font-medium text-green-600">
-                            {{ session('status') }}
-                        </div>
-                    @endif
+    <x-auth.shell title="{{ __('auth.reset_password') }}"
+        description="Choose a strong new password for your Coolify account.">
+        <div class="flex flex-col gap-4">
+            @if (session('status'))
+                <x-auth.alert type="success">{{ session('status') }}</x-auth.alert>
+            @endif
+
+            @if ($errors->any())
+                <x-auth.alert type="error">
+                    <div class="flex flex-col gap-1">
+                        @foreach ($errors->all() as $error)
+                            <p>{{ $error }}</p>
+                        @endforeach
+                    </div>
+                </x-auth.alert>
+            @endif
+
+            <form action="/reset-password" method="POST" class="flex flex-col gap-4">
+                @csrf
+                <input hidden id="token" name="token" value="{{ request()->route('token') }}">
+                <input hidden value="{{ request()->query('email') }}" type="email" name="email" />
+                <x-forms.input required type="password" :copyable="false" id="password" name="password" autocomplete="new-password"
+                    autofocus label="{{ __('input.password') }}" />
+                <x-forms.input required type="password" :copyable="false" id="password_confirmation" name="password_confirmation"
+                    autocomplete="new-password" label="{{ __('input.password.again') }}" />
+
+                <div class="auth-guidance">
+                    <x-reicon name="info-circle" class="mt-0.5 size-4 shrink-0" />
+                    <p>Use at least 8 characters with uppercase, lowercase, number, and symbol.</p>
                 </div>
-            </div>
+
+                <x-forms.button class="w-full justify-center" type="submit" isHighlighted>
+                    {{ __('auth.reset_password') }}
+                </x-forms.button>
+            </form>
         </div>
-    </section>
+
+        <x-slot:footer>
+            <span>Remember your password?</span>
+            <a href="/login" class="auth-text-link">Back to login</a>
+        </x-slot:footer>
+    </x-auth.shell>
 </x-layout-simple>

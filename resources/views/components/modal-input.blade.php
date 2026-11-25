@@ -1,55 +1,96 @@
 @props([
     'title' => 'Are you sure?',
+    'subtitle' => null,
     'buttonTitle' => 'Open Modal',
     'isErrorButton' => false,
+    'isHighlightedButton' => false,
     'disabled' => false,
     'action' => 'delete',
     'content' => null,
     'closeOutside' => true,
+    'isFullWidth' => false,
+    'wireIgnore' => true,
+    // Optional Livewire bool property to entangle open state (survives Livewire re-renders).
+    'wireOpen' => null,
+    // Livewire event sent when the modal closes. A modal inside another modal sets it to false.
+    'closeEvent' => 'modalClosed',
+    'contentClicks' => true,
+    'isLarge' => false,
+    'fixedHeight' => false,
 ])
-<div x-data="{ modalOpen: false }" :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
-    class="relative w-auto h-auto">
+
+<div x-data="{ modalOpen: @if ($wireOpen) $wire.entangle(@js($wireOpen)) @else false @endif }"
+    @if ($closeEvent) x-init="$watch('modalOpen', value => { if (!value) { $wire.dispatch(@js($closeEvent)) } })" @endif
+    :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false"
+    {{ $attributes->class(['relative', $isFullWidth ? 'h-full w-full' : 'h-auto w-auto']) }}
+    @close-modal.window="modalOpen=false" @if ($wireIgnore) wire:ignore @endif>
     @if ($content)
-        <div @click="modalOpen=true">
+        <div @if ($contentClicks) @click="modalOpen=true" @endif @class(['h-full w-full' => $isFullWidth])>
             {{ $content }}
         </div>
     @else
         @if ($disabled)
-            <x-forms.button isError disabled>{{ $buttonTitle }}</x-forms.button>
+            <x-forms.button isError disabled @class(['w-full' => $isFullWidth])>{{ $buttonTitle }}</x-forms.button>
         @elseif ($isErrorButton)
-            <x-forms.button isError @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
+            <x-forms.button isError @click="modalOpen=true" @class(['w-full' => $isFullWidth])>{{ $buttonTitle }}</x-forms.button>
+        @elseif ($isHighlightedButton)
+            <x-forms.button isHighlighted @click="modalOpen=true" @class(['w-full' => $isFullWidth])>{{ $buttonTitle }}</x-forms.button>
         @else
-            <x-forms.button @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
+            <x-forms.button @click="modalOpen=true" @class(['w-full' => $isFullWidth])>{{ $buttonTitle }}</x-forms.button>
         @endif
     @endif
     <template x-teleport="body">
         <div x-show="modalOpen"
-            class="fixed top-0 left-0 lg:px-0 px-4 z-[99] flex items-center justify-center w-screen h-screen" x-cloak>
-            <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
-                x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"
+            x-init="$watch('modalOpen', value => { if(value) { $nextTick(() => { const firstInput = $el.querySelector('input, textarea, select'); firstInput?.focus(); }) } })"
+            class="fixed inset-0 z-99 overflow-hidden">
+            <div x-show="modalOpen" x-transition:enter="transition-opacity ease-out duration-200" x-transition:enter-start="opacity-0"
+                x-transition:enter-end="opacity-100" x-transition:leave="transition-opacity ease-in duration-150"
                 x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-                class="absolute inset-0 w-full h-full bg-black bg-opacity-20 backdrop-blur-sm"></div>
-            <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
-                @if ($closeOutside) @click.outside="modalOpen=false" @endif
-                x-transition:enter="ease-out duration-100"
-                x-transition:enter-start="opacity-0 -translate-y-2 sm:scale-95"
-                x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                x-transition:leave="ease-in duration-100"
-                x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                x-transition:leave-end="opacity-0 -translate-y-2 sm:scale-95"
-                class="relative w-full py-6 border rounded drop-shadow min-w-full lg:min-w-[36rem] max-w-fit bg-white border-neutral-200 dark:bg-base px-6 dark:border-coolgray-300">
-                <div class="flex items-center justify-between pb-3">
-                    <h3 class="text-2xl font-bold">{{ $title }}</h3>
-                    <button @click="modalOpen=false"
-                        class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 rounded-full dark:text-white hover:bg-neutral-100 dark:hover:bg-coolgray-300">
-                        <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                            stroke-width="1.5" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
-                </div>
-                <div class="relative flex items-center justify-center w-auto">
-                    {{ $slot }}
+                class="absolute inset-0 w-full h-full bg-black/50 backdrop-blur-[2px]"></div>
+            <div @if ($closeOutside) @click.self="modalOpen=false" @endif class="relative flex min-h-full items-start justify-center p-2 sm:items-center sm:p-4">
+                <div x-show="modalOpen" x-trap.inert.noscroll="modalOpen"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0 scale-95"
+                    x-transition:enter-end="opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-150"
+                    x-transition:leave-start="opacity-100 scale-100"
+                    x-transition:leave-end="opacity-0 scale-95"
+                    @class([
+                        'application-settings-form application-settings-section relative flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden',
+                        'lg:w-[95vw]! lg:max-w-7xl!' => $isLarge,
+                        'lg:w-auto lg:min-w-2xl lg:max-w-4xl' => ! $isLarge,
+                        'sm:h-[40rem]' => $fixedHeight,
+                    ])
+                    style="box-shadow: 0 0 0 1px var(--coollabs-hairline), var(--shadow-modal)">
+                    <header class="shrink-0 flex-wrap! sm:flex-nowrap!">
+                        <div class="min-w-0 flex-1 py-0.5">
+                            <h3 class="truncate">{{ $title }}</h3>
+                            @if ($subtitle)
+                                <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">{{ $subtitle }}</p>
+                            @endif
+                        </div>
+                        @isset($headerActions)
+                            <div class="order-3 w-full sm:order-none sm:w-auto flex shrink-0 items-center gap-2">
+                                {{ $headerActions }}
+                            </div>
+                        @endisset
+                        <button type="button" @click="modalOpen=false"
+                            class="order-2 sm:order-none flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-neutral-500 outline-0 transition-colors hover:bg-neutral-100 hover:text-black focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg">
+                            <x-reicon name="x" class="size-4" />
+                        </button>
+                    </header>
+                    <div @class([
+                        'application-settings-section-body min-h-0 flex-1 overflow-y-auto',
+                        'mt-2 sm:mt-0' => isset($headerActions),
+                    ])>
+                        {{ $slot }}
+                    </div>
+                    @isset($footer)
+                        <footer
+                            class="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-neutral-200 px-4 py-3 dark:border-white/[0.08]">
+                            {{ $footer }}
+                        </footer>
+                    @endisset
                 </div>
             </div>
         </div>

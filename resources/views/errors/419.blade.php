@@ -1,19 +1,24 @@
 @extends('layouts.base')
-<div class="flex flex-col items-center justify-center h-full">
-    <div>
-        <p class="font-mono font-semibold text-7xl dark:text-warning">419</p>
-        <h1 class="mt-4 font-bold tracking-tight dark:text-white">This page is definitely old, not like you!</h1>
-        <p class="text-base leading-7 text-neutral-300">Sorry, we couldn’t find the page you’re looking
-            for.
-        </p>
-        <div class="flex items-center mt-10 gap-x-6">
-            <a href="/">
-                <x-forms.button>Go back home</x-forms.button>
-            </a>
-            <a target="_blank" class="text-xs" href="{{ config('coolify.contact') }}">Contact
-                support
-                <x-external-link />
-            </a>
-        </div>
-    </div>
-</div>
+
+@section('body')
+    <body class="error-page-body text-black dark:text-inherit">
+        <x-toast />
+        <x-error-page
+            code="419"
+            title="This page is definitely old, not like you!"
+            description="Your session has expired. Please log in again to continue."
+            :show-go-back="false"
+            :show-dashboard="false"
+            primary-href="/login"
+            primary-label="Back to login">
+            <x-forms.collapsible title="Using a reverse proxy or Cloudflare Tunnel?" class="error-proxy-help">
+                <ul>
+                    <li>Set your domain in <strong>Settings &rarr; FQDN</strong> to match the URL you use to access Coolify.</li>
+                    <li>Cloudflare users: disable <strong>Browser Integrity Check</strong> and <strong>Under Attack Mode</strong> for your Coolify domain, as these can interrupt login sessions.</li>
+                    <li>If you can still access Coolify via <code>localhost</code>, log in there first to configure your FQDN.</li>
+                </ul>
+            </x-forms.collapsible>
+        </x-error-page>
+        @livewireScripts
+    </body>
+@endsection

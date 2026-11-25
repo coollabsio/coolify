@@ -1,20 +1,505 @@
 #!/bin/bash
 ## Do not modify this file. You will lose the ability to install and auto-update!
 
+## Environment variables that can be set:
+## ROOT_USERNAME - Predefined root username
+## ROOT_USER_EMAIL - Predefined root user email
+## ROOT_USER_PASSWORD - Predefined root user password
+## DOCKER_ADDRESS_POOL_BASE - Custom Docker address pool base (default: 10.0.0.0/8)
+## DOCKER_ADDRESS_POOL_SIZE - Custom Docker address pool size (default: 24)
+## DOCKER_POOL_FORCE_OVERRIDE - Force override Docker address pool configuration, also when Docker must restart with running containers (default: false)
+## AUTOUPDATE - Set to "false" to disable auto-updates
+## REGISTRY_URL - Custom registry URL for Docker images (default: docker.io)
+
+## Arguments that can be passed:
+## --preview or --nightly - Install the newest version of the preview or nightly channel and switch the instance to that update channel
+
 set -e # Exit immediately if a command exits with a non-zero status
 ## $1 could be empty, so we need to disable this check
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
-
-VERSION="1.3.3"
-DOCKER_VERSION="26.0"
-
 CDN="https://cdn.coollabs.io/coolify"
+CHANNEL="stable"
+case "$1" in
+--preview | --nightly)
+    CHANNEL="${1#--}"
+    CDN="https://cdn.coollabs.io/coolify/$CHANNEL"
+    shift
+    ;;
+esac
+DATE=$(date +"%Y%m%d-%H%M%S")
+
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
+ENV_FILE="/data/coolify/source/.env"
+DOCKER_VERSION="latest"
+# TODO: Ask for a user
+CURRENT_USER=$USER
+
+if [ $EUID != 0 ]; then
+    echo "Please run this script as root or with sudo"
+    exit 1
+fi
+
+# Resource directories hold data whose owner and mode the resource images or a non-root SSH user need.
+# Set their owner and mode only when they are created, never on an upgrade (#11945).
+create_data_directory() {
+    if [ ! -d "$1" ]; then
+        mkdir -p "$1"
+        chown 9999:root "$1"
+        chmod 700 "$1"
+    fi
+}
+
+# Run only after the checks and downloads succeed, so a failed run does not change the data directories (#11973).
+create_coolify_directories() {
+    for COOLIFY_DIRECTORY in /data/coolify/{applications,databases,backups,services,proxy,proxy/dynamic,sentinel}; do
+        create_data_directory "$COOLIFY_DIRECTORY"
+    done
+    mkdir -p /data/coolify/images /data/coolify/ssh/{keys,mux}
+}
+
+# Coolify's own directories, used by the coolify container (UID 9999)
+set_coolify_directory_permissions() {
+    chown -R 9999:root /data/coolify/{source,ssh,images}
+    chmod -R 700 /data/coolify/{source,ssh,images}
+}
+
+# The installation log and the downloaded files go to /data/coolify/source, so only it is created before the checks.
+create_data_directory /data/coolify
+mkdir -p /data/coolify/source
+
+INSTALLATION_LOG_WITH_DATE="/data/coolify/source/installation-${DATE}.log"
+
+# Terminal UI: the terminal only shows the step list, everything else goes to the log file
+TOTAL_STEPS=9
+UI_STEP=0
+UI_STEP_TITLE=""
+UI_STEP_DETAIL=""
+UI_STEP_STARTED=0
+UI_SPINNER_PID=""
+UI_WARNINGS=()
+
+if [ -t 1 ] && [ "${TERM:-dumb}" != "dumb" ]; then
+    UI_TTY=true
+else
+    UI_TTY=false
+fi
+
+if [ "$UI_TTY" = true ] && [ -z "${NO_COLOR:-}" ]; then
+    C_RESET=$'\033[0m'
+    C_BOLD=$'\033[1m'
+    C_DIM=$'\033[2m'
+    C_PURPLE=$'\033[38;5;135m'
+    C_GREEN=$'\033[32m'
+    C_RED=$'\033[31m'
+    C_YELLOW=$'\033[33m'
+else
+    C_RESET="" C_BOLD="" C_DIM="" C_PURPLE="" C_GREEN="" C_RED="" C_YELLOW=""
+fi
+
+UI_WIDTH=$(tput cols 2>/dev/null || true)
+if ! [[ $UI_WIDTH =~ ^[0-9]+$ ]]; then
+    UI_WIDTH=80
+fi
+UI_WIDTH=$((UI_WIDTH > 100 ? 100 : UI_WIDTH < 60 ? 60 : UI_WIDTH))
+
+# Current time in milliseconds
+ui_now() {
+    if [ -n "${EPOCHREALTIME:-}" ]; then
+        local now=${EPOCHREALTIME/[.,]/}
+        echo $((now / 1000))
+    else
+        echo $(($(date +%s) * 1000))
+    fi
+}
+
+ui_duration() {
+    local ms=$1
+    if [ "$ms" -lt 60000 ]; then
+        printf '%d.%ds' $((ms / 1000)) $((ms % 1000 / 100))
+    else
+        printf '%dm %ds' $((ms / 60000)) $((ms % 60000 / 1000))
+    fi
+}
+
+ui_repeat() {
+    local out="" i
+    for ((i = 0; i < $2; i++)); do
+        out+="$1"
+    done
+    printf '%s' "$out"
+}
+
+# Prints the current step line without the trailing status symbol
+ui_render_step() {
+    local right="$1"
+    local title="$UI_STEP_TITLE"
+    local detail="$UI_STEP_DETAIL"
+    local plain_detail="${detail//·/.}"
+    local left=$((7 + ${#title}))
+    local right_width=$((${#right} + 2))
+
+    if [ -n "$detail" ] && [ $((left + 2 + ${#plain_detail} + right_width + 2)) -le "$UI_WIDTH" ]; then
+        left=$((left + 2 + ${#plain_detail}))
+    else
+        detail=""
+    fi
+
+    local pad=$((UI_WIDTH - left - right_width))
+    if [ "$pad" -lt 2 ]; then
+        pad=2
+    fi
+    printf '  %s%-5s%s%s%s%s' "$C_DIM" "${UI_STEP}/${TOTAL_STEPS}" "$C_RESET" "$C_BOLD" "$title" "$C_RESET"
+    if [ -n "$detail" ]; then
+        printf '  %s%s%s' "$C_DIM" "$detail" "$C_RESET"
+    fi
+    printf '%*s%s%s%s ' "$pad" "" "$C_DIM" "$right" "$C_RESET"
+}
+
+ui_bar() {
+    local percent=$1 label=$2
+    local cells=$((UI_WIDTH - 30 > 40 ? 40 : UI_WIDTH - 30))
+    local filled=$((percent * cells / 100))
+    printf '  %s%s%s%s%s  %s%3d%%%s  %s%s%s' \
+        "$C_PURPLE" "$(ui_repeat ■ "$filled")" "$C_DIM" "$(ui_repeat ■ $((cells - filled)))" "$C_RESET" \
+        "$C_BOLD" "$percent" "$C_RESET" "$C_DIM" "$label" "$C_RESET"
+}
+
+# Runs in the background and animates the current step line and the progress bar below it
+ui_spinner() {
+    set +x
+    local frames=(◜ ◠ ◝ ◞ ◡ ◟) i=0 stop=false
+    local line bar
+    trap 'stop=true' TERM
+    line=$(ui_render_step "")
+    bar=$(ui_bar $(((UI_STEP - 1) * 100 / TOTAL_STEPS)) "${UI_STEP_TITLE,,}…")
+    while [ "$stop" = false ]; do
+        printf '\r\033[2K%s%s%s%s\n\033[2K%s\033[1A\r' "$line" "$C_PURPLE" "${frames[i]}" "$C_RESET" "$bar" >&3
+        i=$(((i + 1) % ${#frames[@]}))
+        sleep 0.12
+    done
+}
+
+ui_stop_spinner() {
+    if [ -n "$UI_SPINNER_PID" ]; then
+        kill "$UI_SPINNER_PID" 2>/dev/null || true
+        wait "$UI_SPINNER_PID" 2>/dev/null || true
+        UI_SPINNER_PID=""
+    fi
+}
+
+# Shows a warning below the current step (or right away when no step is running)
+warn() {
+    echo "WARNING: $*"
+    UI_WARNINGS+=("$*")
+}
+
+ui_flush_warnings() {
+    local warning
+    for warning in "${UI_WARNINGS[@]}"; do
+        printf '       %s! %s%s\n' "$C_YELLOW" "$warning" "$C_RESET" >&3
+    done
+    UI_WARNINGS=()
+}
+
+step_start() {
+    UI_STEP=$((UI_STEP + 1))
+    UI_STEP_TITLE="$1"
+    UI_STEP_DETAIL="${2:-}"
+    UI_STEP_STARTED=$(ui_now)
+    log_section "Step ${UI_STEP}/${TOTAL_STEPS}: $1"
+    if [ "$UI_TTY" = true ]; then
+        ui_spinner &
+        UI_SPINNER_PID=$!
+    fi
+}
+
+# Usage: step_done [detail] - optionally replaces the detail text shown next to the step title
+step_done() {
+    if [ -n "${1:-}" ]; then
+        UI_STEP_DETAIL="$1"
+    fi
+    ui_stop_spinner
+    local elapsed
+    elapsed=$(ui_duration $(($(ui_now) - UI_STEP_STARTED)))
+    log "Step ${UI_STEP}/${TOTAL_STEPS} completed in ${elapsed}"
+    if [ "$UI_TTY" = true ]; then
+        printf '\r\033[2K' >&3
+    fi
+    printf '%s%s✓%s\n' "$(ui_render_step "$elapsed")" "$C_GREEN" "$C_RESET" >&3
+    if [ "$UI_TTY" = true ]; then
+        printf '\033[2K' >&3
+    fi
+    ui_flush_warnings
+    UI_STEP_TITLE=""
+}
+
+ui_on_exit() {
+    local code=$?
+    ui_stop_spinner
+    if [ "$code" -ne 0 ]; then
+        if [ "$UI_TTY" = true ]; then
+            printf '\r\033[2K' >&3
+        fi
+        if [ -n "$UI_STEP_TITLE" ]; then
+            printf '%s%s✗%s\n' "$(ui_render_step "$(ui_duration $(($(ui_now) - UI_STEP_STARTED)))")" "$C_RED" "$C_RESET" >&3
+        fi
+        if [ "$UI_TTY" = true ]; then
+            printf '\033[2K' >&3
+        fi
+        ui_flush_warnings
+        printf '\n  %s%sInstallation failed.%s Last lines of the log:\n\n' "$C_BOLD" "$C_RED" "$C_RESET" >&3
+        tail -n 15 "$INSTALLATION_LOG_WITH_DATE" 2>/dev/null | sed 's/^/    /' >&3
+        printf '\n  %sFull log: %s%s\n\n' "$C_DIM" "$INSTALLATION_LOG_WITH_DATE" "$C_RESET" >&3
+    fi
+    if [ "$UI_TTY" = true ]; then
+        printf '\033[?25h' >&3
+    fi
+}
+
+# fd 3 is the terminal, stdout and stderr go to the log file
+exec 3>&1
+exec >>"$INSTALLATION_LOG_WITH_DATE" 2>&1
+trap ui_on_exit EXIT
+
+if [ "$UI_TTY" = true ]; then
+    printf '\033[?25l' >&3
+fi
+printf '\n  %sWelcome to Coolify Installer!%s\n' "$C_BOLD" "$C_RESET" >&3
+printf '  %sThis script will install everything for you. Sit back and relax.%s\n' "$C_DIM" "$C_RESET" >&3
+printf '  %sLog file: %s%s\n\n' "$C_DIM" "$INSTALLATION_LOG_WITH_DATE" "$C_RESET" >&3
+UI_INSTALL_STARTED=$(ui_now)
+
+echo "=========================================="
+echo "   Coolify Installation - ${DATE}"
+echo "=========================================="
+echo "Source code: https://github.com/coollabsio/coolify/blob/v4.x/scripts/install.sh"
+
+# Predefined root user
+ROOT_USERNAME=${ROOT_USERNAME:-}
+ROOT_USER_EMAIL=${ROOT_USER_EMAIL:-}
+ROOT_USER_PASSWORD=${ROOT_USER_PASSWORD:-}
+
+if [ -n "${REGISTRY_URL+x}" ]; then
+    echo "Using registry URL from environment variable: $REGISTRY_URL"
+else
+    if [ -f "$ENV_FILE" ] && grep -q "^REGISTRY_URL=" "$ENV_FILE"; then
+        REGISTRY_URL=$(grep "^REGISTRY_URL=" "$ENV_FILE" | cut -d '=' -f2)
+        echo "Using registry URL from .env: $REGISTRY_URL"
+    else
+        REGISTRY_URL="docker.io"
+        echo "Using default registry URL: $REGISTRY_URL"
+    fi
+fi
+
+# Docker address pool configuration defaults
+DOCKER_ADDRESS_POOL_BASE_DEFAULT="10.0.0.0/8"
+DOCKER_ADDRESS_POOL_SIZE_DEFAULT=24
+
+# Check if environment variables were explicitly provided
+DOCKER_POOL_BASE_PROVIDED=false
+DOCKER_POOL_SIZE_PROVIDED=false
+DOCKER_POOL_FORCE_OVERRIDE=${DOCKER_POOL_FORCE_OVERRIDE:-false}
+
+if [ -n "${DOCKER_ADDRESS_POOL_BASE+x}" ]; then
+    DOCKER_POOL_BASE_PROVIDED=true
+fi
+
+if [ -n "${DOCKER_ADDRESS_POOL_SIZE+x}" ]; then
+    DOCKER_POOL_SIZE_PROVIDED=true
+fi
+
+# OpenRC (Alpine) returns from "service docker start" before the daemon accepts connections
+wait_for_docker_daemon() {
+    for _ in $(seq 1 30); do
+        if docker info >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+restart_docker_service() {
+    # Check if systemctl is available
+    if command -v systemctl >/dev/null 2>&1; then
+        if systemctl restart docker && wait_for_docker_daemon; then
+            echo " - Docker daemon restarted successfully"
+        else
+            echo " - Failed to restart Docker daemon"
+            return 1
+        fi
+    # Check if service command is available
+    elif command -v service >/dev/null 2>&1; then
+        if service docker restart && wait_for_docker_daemon; then
+            echo " - Docker daemon restarted successfully"
+        else
+            echo " - Failed to restart Docker daemon"
+            return 1
+        fi
+    # If neither systemctl nor service is available
+    else
+        echo " - Error: No service management system found"
+        return 1
+    fi
+}
+
+# Function to compare address pools
+compare_address_pools() {
+    local base1="$1"
+    local size1="$2"
+    local base2="$3"
+    local size2="$4"
+
+    # Normalize CIDR notation for comparison
+    local ip1=$(echo "$base1" | cut -d'/' -f1)
+    local prefix1=$(echo "$base1" | cut -d'/' -f2)
+    local ip2=$(echo "$base2" | cut -d'/' -f1)
+    local prefix2=$(echo "$base2" | cut -d'/' -f2)
+
+    # Compare IPs and prefixes
+    if [ "$ip1" = "$ip2" ] && [ "$prefix1" = "$prefix2" ] && [ "$size1" = "$size2" ]; then
+        return 0 # Pools are the same
+    else
+        return 1 # Pools are different
+    fi
+}
+
+# Docker address pool configuration
+DOCKER_ADDRESS_POOL_BASE=${DOCKER_ADDRESS_POOL_BASE:-"$DOCKER_ADDRESS_POOL_BASE_DEFAULT"}
+DOCKER_ADDRESS_POOL_SIZE=${DOCKER_ADDRESS_POOL_SIZE:-$DOCKER_ADDRESS_POOL_SIZE_DEFAULT}
+
+# Load Docker address pool configuration from .env file if it exists and environment variables were not provided
+if [ -f "/data/coolify/source/.env" ] && [ "$DOCKER_POOL_BASE_PROVIDED" = false ] && [ "$DOCKER_POOL_SIZE_PROVIDED" = false ]; then
+    ENV_DOCKER_ADDRESS_POOL_BASE=$(grep -E "^DOCKER_ADDRESS_POOL_BASE=" /data/coolify/source/.env | cut -d '=' -f2 || true)
+    ENV_DOCKER_ADDRESS_POOL_SIZE=$(grep -E "^DOCKER_ADDRESS_POOL_SIZE=" /data/coolify/source/.env | cut -d '=' -f2 || true)
+
+    if [ -n "$ENV_DOCKER_ADDRESS_POOL_BASE" ]; then
+        DOCKER_ADDRESS_POOL_BASE="$ENV_DOCKER_ADDRESS_POOL_BASE"
+    fi
+
+    if [ -n "$ENV_DOCKER_ADDRESS_POOL_SIZE" ]; then
+        DOCKER_ADDRESS_POOL_SIZE="$ENV_DOCKER_ADDRESS_POOL_SIZE"
+    fi
+fi
+
+# Check if daemon.json exists and extract existing address pool configuration
+EXISTING_POOL_CONFIGURED=false
+if [ -f /etc/docker/daemon.json ]; then
+    if jq -e '.["default-address-pools"]' /etc/docker/daemon.json >/dev/null 2>&1; then
+        EXISTING_POOL_BASE=$(jq -r '.["default-address-pools"][0].base' /etc/docker/daemon.json 2>/dev/null || true)
+        EXISTING_POOL_SIZE=$(jq -r '.["default-address-pools"][0].size' /etc/docker/daemon.json 2>/dev/null || true)
+
+        if [ -n "$EXISTING_POOL_BASE" ] && [ -n "$EXISTING_POOL_SIZE" ] && [ "$EXISTING_POOL_BASE" != "null" ] && [ "$EXISTING_POOL_SIZE" != "null" ]; then
+            echo "Found existing Docker network pool: $EXISTING_POOL_BASE/$EXISTING_POOL_SIZE"
+            EXISTING_POOL_CONFIGURED=true
+
+            # Check if environment variables were explicitly provided
+            if [ "$DOCKER_POOL_BASE_PROVIDED" = false ] && [ "$DOCKER_POOL_SIZE_PROVIDED" = false ]; then
+                DOCKER_ADDRESS_POOL_BASE="$EXISTING_POOL_BASE"
+                DOCKER_ADDRESS_POOL_SIZE="$EXISTING_POOL_SIZE"
+            else
+                # Check if force override is enabled
+                if [ "$DOCKER_POOL_FORCE_OVERRIDE" = true ]; then
+                    echo "Force override enabled - network pool will be updated with $DOCKER_ADDRESS_POOL_BASE/$DOCKER_ADDRESS_POOL_SIZE."
+                else
+                    warn "Custom Docker network pool ignored, using the existing $EXISTING_POOL_BASE/$EXISTING_POOL_SIZE. Set DOCKER_POOL_FORCE_OVERRIDE=true to override it (existing networks are not changed)."
+                    DOCKER_ADDRESS_POOL_BASE="$EXISTING_POOL_BASE"
+                    DOCKER_ADDRESS_POOL_SIZE="$EXISTING_POOL_SIZE"
+                    DOCKER_POOL_BASE_PROVIDED=false
+                    DOCKER_POOL_SIZE_PROVIDED=false
+                fi
+            fi
+        fi
+    fi
+fi
+
+# Validate Docker address pool configuration
+if ! [[ $DOCKER_ADDRESS_POOL_BASE =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$ ]]; then
+    warn "Invalid Docker network pool base: $DOCKER_ADDRESS_POOL_BASE"
+    if [ "$EXISTING_POOL_CONFIGURED" = true ]; then
+        echo "Using existing configuration: $EXISTING_POOL_BASE"
+        DOCKER_ADDRESS_POOL_BASE="$EXISTING_POOL_BASE"
+    else
+        echo "Using default configuration: $DOCKER_ADDRESS_POOL_BASE_DEFAULT"
+        DOCKER_ADDRESS_POOL_BASE="$DOCKER_ADDRESS_POOL_BASE_DEFAULT"
+    fi
+fi
+
+if ! [[ $DOCKER_ADDRESS_POOL_SIZE =~ ^[0-9]+$ ]] || [ "$DOCKER_ADDRESS_POOL_SIZE" -lt 16 ] || [ "$DOCKER_ADDRESS_POOL_SIZE" -gt 28 ]; then
+    warn "Invalid Docker network pool size: $DOCKER_ADDRESS_POOL_SIZE (must be 16-28)"
+    if [ "$EXISTING_POOL_CONFIGURED" = true ]; then
+        echo "Using existing configuration: $EXISTING_POOL_SIZE"
+        DOCKER_ADDRESS_POOL_SIZE="$EXISTING_POOL_SIZE"
+    else
+        echo "Using default configuration: $DOCKER_ADDRESS_POOL_SIZE_DEFAULT"
+        DOCKER_ADDRESS_POOL_SIZE=$DOCKER_ADDRESS_POOL_SIZE_DEFAULT
+    fi
+fi
+
+TOTAL_SPACE=$(df -BG / | awk 'NR==2 {print $2}' | sed 's/G//')
+AVAILABLE_SPACE=$(df -BG / | awk 'NR==2 {print $4}' | sed 's/G//')
+REQUIRED_TOTAL_SPACE=30
+REQUIRED_AVAILABLE_SPACE=20
+WARNING_SPACE=false
+
+if [ "$TOTAL_SPACE" -lt "$REQUIRED_TOTAL_SPACE" ]; then
+    WARNING_SPACE=true
+    warn "Insufficient total disk space: ${TOTAL_SPACE}GB (required: ${REQUIRED_TOTAL_SPACE}GB)"
+fi
+
+if [ "$AVAILABLE_SPACE" -lt "$REQUIRED_AVAILABLE_SPACE" ]; then
+    warn "Insufficient available disk space: ${AVAILABLE_SPACE}GB (required: ${REQUIRED_AVAILABLE_SPACE}GB)"
+    WARNING_SPACE=true
+fi
+
+if [ "$WARNING_SPACE" = true ]; then
+    ui_flush_warnings
+    echo "Sleeping for 5 seconds."
+    sleep 5
+fi
+
+# Helper function to log with timestamp
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+# Helper function to log section headers
+log_section() {
+    echo ""
+    echo "============================================================"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+    echo "============================================================"
+}
+
+# Helper function to check if all required packages are installed
+all_packages_installed() {
+    for pkg in curl wget git jq openssl; do
+        if ! command -v "$pkg" >/dev/null 2>&1; then
+            return 1
+        fi
+    done
+    return 0
+}
 
 # Check if the OS is manjaro, if so, change it to arch
 if [ "$OS_TYPE" = "manjaro" ] || [ "$OS_TYPE" = "manjaro-arm" ]; then
     OS_TYPE="arch"
+fi
+
+# Check if the OS is Endeavour OS, if so, change it to arch
+if [ "$OS_TYPE" = "endeavouros" ]; then
+    OS_TYPE="arch"
+fi
+
+# Check if the OS is Cachy OS, if so, change it to arch
+if [ "$OS_TYPE" = "cachyos" ]; then
+    OS_TYPE="arch"
+fi
+
+# Check if the OS is Asahi Linux, if so, change it to fedora
+if [ "$OS_TYPE" = "fedora-asahi-remix" ]; then
+    OS_TYPE="fedora"
 fi
 
 # Check if the OS is popOS, if so, change it to ubuntu
@@ -32,10 +517,29 @@ if [ "$OS_TYPE" = "zorin" ]; then
     OS_TYPE="ubuntu"
 fi
 
+# Arch based distributions (Garuda, Manjaro, EndeavourOS, CachyOS, ...) list arch in ID_LIKE
+is_arch_based() {
+    local id_like
+    id_like=$(. "$1" && echo "${ID_LIKE:-}")
+    case " $id_like " in
+    *" arch "*) return 0 ;;
+    *) return 1 ;;
+    esac
+}
+
+if is_arch_based /etc/os-release; then
+    OS_TYPE="arch"
+fi
+
 if [ "$OS_TYPE" = "arch" ] || [ "$OS_TYPE" = "archarm" ]; then
     OS_VERSION="rolling"
 else
     OS_VERSION=$(grep -w "VERSION_ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
+fi
+
+if [ "$OS_TYPE" = 'amzn' ] && [ "$OS_VERSION" = '2' ]; then
+    echo "Amazon Linux 2 reached its end of life and is not supported. Use Amazon Linux 2023."
+    exit 1
 fi
 
 # Install xargs on Amazon Linux 2023 - lol
@@ -43,19 +547,21 @@ if [ "$OS_TYPE" = 'amzn' ]; then
     dnf install -y findutils >/dev/null
 fi
 
-LATEST_VERSION=$(curl --silent $CDN/versions.json | grep -i version | xargs | awk '{print $2}' | tr -d ',')
-DATE=$(date +"%Y%m%d-%H%M%S")
+# Fetch versions.json once and parse all values from it
+VERSIONS_JSON=$(curl -L --silent https://cdn.coollabs.io/coolify/versions.json)
+CHANNEL_VERSIONS=$(echo "$VERSIONS_JSON" | sed -n "/^    \"$CHANNEL\": {/,/^    }/p")
+LATEST_VERSION=$(echo "$CHANNEL_VERSIONS" | sed -n '/"coolify"/,/}/s/.*"version": *"\([^"]*\)".*/\1/p' | head -n 1)
+LATEST_HELPER_VERSION=$(echo "$CHANNEL_VERSIONS" | sed -n '/"helper"/,/}/s/.*"version": *"\([^"]*\)".*/\1/p' | head -n 1)
 
-if [ $EUID != 0 ]; then
-    echo "Please run as root"
-    exit
+if [ -z "$LATEST_HELPER_VERSION" ]; then
+    LATEST_HELPER_VERSION=latest
 fi
 
 case "$OS_TYPE" in
-arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn) ;;
+arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux | amzn | alpine | postmarketos | tencentos) ;;
 *)
-    echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
-    exit
+    echo "This script only supports Debian, Redhat, Arch Linux, Alpine Linux, or SLES based operating systems for now."
+    exit 1
     ;;
 esac
 
@@ -66,270 +572,681 @@ if [ "$1" != "" ]; then
     LATEST_VERSION="${LATEST_VERSION#v}"
 fi
 
-echo -e "-------------"
-echo -e "Welcome to Coolify v4 beta installer!"
-echo -e "This script will install everything for you."
-echo -e "(Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh )\n"
-echo -e "-------------"
+echo "---------------------------------------------"
+echo "| Operating System  | $OS_TYPE $OS_VERSION"
+echo "| Docker            | $DOCKER_VERSION"
+echo "| Coolify           | $LATEST_VERSION"
+echo "| Helper            | $LATEST_HELPER_VERSION"
+echo "| Docker Pool       | $DOCKER_ADDRESS_POOL_BASE (size $DOCKER_ADDRESS_POOL_SIZE)"
+echo "| Registry URL      | $REGISTRY_URL"
+echo "---------------------------------------------"
 
-echo "OS: $OS_TYPE $OS_VERSION"
-echo "Coolify version: $LATEST_VERSION"
+ui_flush_warnings
+step_start "Installing required packages" "curl wget git jq openssl"
 
-echo -e "-------------"
-echo "Installing required packages..."
+# Track if apt-get update was run to avoid redundant calls later
+APT_UPDATED=false
 
-case "$OS_TYPE" in
-arch)
-    pacman -Sy --noconfirm --needed curl wget git jq >/dev/null || true
-    ;;
-ubuntu | debian | raspbian)
-    apt update -y >/dev/null
-    apt install -y curl wget git jq >/dev/null
-    ;;
-centos | fedora | rhel | ol | rocky | almalinux | amzn)
-    if [ "$OS_TYPE" = "amzn" ]; then
-        dnf install -y wget git jq >/dev/null
-    else
-        if ! command -v dnf >/dev/null; then
-            yum install -y dnf >/dev/null
+if all_packages_installed; then
+    log "All required packages already installed, skipping installation"
+    echo " - All required packages already installed."
+    UI_STEP_DETAIL="already installed"
+else
+    case "$OS_TYPE" in
+    arch)
+        pacman -Sy --noconfirm --needed curl wget git jq openssl >/dev/null || true
+        ;;
+    alpine | postmarketos)
+        sed -i '/^#.*\/community/s/^#//' /etc/apk/repositories
+        apk update >/dev/null
+        apk add curl wget git jq openssl >/dev/null
+        ;;
+    ubuntu | debian | raspbian)
+        apt-get update -y >/dev/null
+        APT_UPDATED=true
+        apt-get install -y curl wget git jq openssl >/dev/null
+        ;;
+    centos | fedora | rhel | ol | rocky | almalinux | amzn | tencentos)
+        if [ "$OS_TYPE" = "amzn" ]; then
+            dnf install -y wget git jq openssl >/dev/null
+        else
+            if ! command -v dnf >/dev/null; then
+                yum install -y dnf >/dev/null
+            fi
+            if ! command -v curl >/dev/null; then
+                dnf install -y curl >/dev/null
+            fi
+            dnf install -y wget git jq openssl >/dev/null
         fi
-        dnf install -y curl wget git jq >/dev/null
-    fi
-    ;;
-sles | opensuse-leap | opensuse-tumbleweed)
-    zypper refresh >/dev/null
-    zypper install -y curl wget git jq >/dev/null
-    ;;
-*)
-    echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
-    exit
-    ;;
-esac
+        ;;
+    sles | opensuse-leap | opensuse-tumbleweed)
+        zypper refresh >/dev/null
+        zypper install -y curl wget git jq openssl >/dev/null
+        ;;
+    *)
+        echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
+        exit 1
+        ;;
+    esac
+    log "Required packages installed successfully"
+fi
+step_done
+
+step_start "Checking OpenSSH server configuration"
 
 # Detect OpenSSH server
 SSH_DETECTED=false
 if [ -x "$(command -v systemctl)" ]; then
     if systemctl status sshd >/dev/null 2>&1; then
-        echo "OpenSSH server is installed."
+        echo " - OpenSSH server is installed."
         SSH_DETECTED=true
-    fi
-    if systemctl status ssh >/dev/null 2>&1; then
-        echo "OpenSSH server is installed."
+    elif systemctl status ssh >/dev/null 2>&1; then
+        echo " - OpenSSH server is installed."
         SSH_DETECTED=true
     fi
 elif [ -x "$(command -v service)" ]; then
     if service sshd status >/dev/null 2>&1; then
-        echo "OpenSSH server is installed."
+        echo " - OpenSSH server is installed."
         SSH_DETECTED=true
-    fi
-    if service ssh status >/dev/null 2>&1; then
-        echo "OpenSSH server is installed."
+    elif service ssh status >/dev/null 2>&1; then
+        echo " - OpenSSH server is installed."
         SSH_DETECTED=true
     fi
 fi
+
 if [ "$SSH_DETECTED" = "false" ]; then
-    echo "###############################################################################"
-    echo "WARNING: Could not detect if OpenSSH server is installed and running - this does not mean that it is not installed, just that we could not detect it."
-    echo -e "Please make sure it is set, otherwise Coolify cannot connect to the host system. \n"
-    echo "###############################################################################"
+    echo " - OpenSSH server not detected. Installing OpenSSH server."
+    case "$OS_TYPE" in
+    arch)
+        pacman -Sy --noconfirm openssh >/dev/null
+        systemctl enable sshd >/dev/null 2>&1
+        systemctl start sshd >/dev/null 2>&1
+        ;;
+    alpine | postmarketos)
+        apk add openssh >/dev/null
+        rc-update add sshd default >/dev/null 2>&1
+        service sshd start >/dev/null 2>&1
+        ;;
+    ubuntu | debian | raspbian)
+        if [ "$APT_UPDATED" = false ]; then
+            apt-get update -y >/dev/null
+            APT_UPDATED=true
+        fi
+        apt-get install -y openssh-server >/dev/null
+        systemctl enable ssh >/dev/null 2>&1
+        systemctl start ssh >/dev/null 2>&1
+        ;;
+    centos | fedora | rhel | ol | rocky | almalinux | amzn | tencentos)
+        if [ "$OS_TYPE" = "amzn" ]; then
+            dnf install -y openssh-server >/dev/null
+        else
+            dnf install -y openssh-server >/dev/null
+        fi
+        systemctl enable sshd >/dev/null 2>&1
+        systemctl start sshd >/dev/null 2>&1
+        ;;
+    sles | opensuse-leap | opensuse-tumbleweed)
+        zypper install -y openssh >/dev/null
+        systemctl enable sshd >/dev/null 2>&1
+        systemctl start sshd >/dev/null 2>&1
+        ;;
+    *)
+        echo "###############################################################################"
+        echo "WARNING: Could not detect and install OpenSSH server - this does not mean that it is not installed or not running, just that we could not detect it."
+        echo -e "Please make sure it is installed and running, otherwise Coolify cannot connect to the host system. \n"
+        echo "###############################################################################"
+        exit 1
+        ;;
+    esac
+    echo " - OpenSSH server installed successfully."
+    SSH_DETECTED=true
 fi
 
 # Detect SSH PermitRootLogin
-SSH_PERMIT_ROOT_LOGIN=false
-SSH_PERMIT_ROOT_LOGIN_CONFIG=$(grep "^PermitRootLogin" /etc/ssh/sshd_config | awk '{print $2}') || SSH_PERMIT_ROOT_LOGIN_CONFIG="N/A (commented out or not found at all)"
-if [ "$SSH_PERMIT_ROOT_LOGIN_CONFIG" = "prohibit-password" ] || [ "$SSH_PERMIT_ROOT_LOGIN_CONFIG" = "yes" ] || [ "$SSH_PERMIT_ROOT_LOGIN_CONFIG" = "without-password" ]; then
-    echo "PermitRootLogin is enabled."
-    SSH_PERMIT_ROOT_LOGIN=true
-fi
-
-if [ "$SSH_PERMIT_ROOT_LOGIN" != "true" ]; then
-    echo "###############################################################################"
-    echo "WARNING: PermitRootLogin is not enabled in /etc/ssh/sshd_config."
-    echo -e "It is set to $SSH_PERMIT_ROOT_LOGIN_CONFIG. Should be prohibit-password, yes or without-password.\n"
-    echo -e "Please make sure it is set, otherwise Coolify cannot connect to the host system. \n"
-    echo "###############################################################################"
+SSH_PERMIT_ROOT_LOGIN=$(sshd -T | grep -i "permitrootlogin" | awk '{print $2}') || true
+if [ "$SSH_PERMIT_ROOT_LOGIN" = "yes" ] || [ "$SSH_PERMIT_ROOT_LOGIN" = "without-password" ] || [ "$SSH_PERMIT_ROOT_LOGIN" = "prohibit-password" ]; then
+    echo " - SSH PermitRootLogin is enabled."
+else
+    warn "SSH PermitRootLogin is disabled. If you have problems with SSH, read https://coolify.io/docs/knowledge-base/server/openssh"
 fi
 
 # Detect if docker is installed via snap
 if [ -x "$(command -v snap)" ]; then
-    if snap list | grep -q docker; then
+    SNAP_DOCKER_INSTALLED=$(snap list docker >/dev/null 2>&1 && echo "true" || echo "false")
+    if [ "$SNAP_DOCKER_INSTALLED" = "true" ]; then
         echo "Docker is installed via snap."
-        echo "Please note that Coolify does not support Docker installed via snap."
-        echo "Please remove Docker with snap (snap remove docker) and reexecute this script."
+        echo "   Please note that Coolify does not support Docker installed via snap."
+        echo "   Please remove Docker with snap (snap remove docker) and reexecute this script."
         exit 1
     fi
 fi
 
+install_docker() {
+    set +e
+    curl -fsSL https://get.docker.com | sh 2>&1 || true
+    if ! [ -x "$(command -v docker)" ]; then
+        echo "Automated Docker installation failed. Trying manual installation."
+        install_docker_manually
+    fi
+    set -e
+}
+
+install_docker_manually() {
+    case "$OS_TYPE" in
+    "ubuntu" | "debian" | "raspbian")
+        if [ "$APT_UPDATED" = false ]; then
+            apt-get update
+            APT_UPDATED=true
+        fi
+        apt-get install -y ca-certificates curl
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/$OS_TYPE/gpg -o /etc/apt/keyrings/docker.asc
+        chmod a+r /etc/apt/keyrings/docker.asc
+
+        # Add the repository to Apt sources
+        echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/$OS_TYPE \
+                  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" |
+            tee /etc/apt/sources.list.d/docker.list
+        apt-get update
+        apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+        ;;
+    *)
+        exit 1
+        ;;
+    esac
+    if ! [ -x "$(command -v docker)" ]; then
+        echo "Docker installation failed."
+        echo "   Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+        exit 1
+    else
+        echo "Docker installed successfully."
+    fi
+}
+
+install_docker_from_rhel_repo() {
+    echo " - Installing Docker from the RHEL repository for Rocky Linux..."
+    rm -f /etc/yum.repos.d/docker-ce.repo /etc/yum.repos.d/docker-ce-staging.repo
+    dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+    dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    systemctl --now enable docker
+}
+
+step_done
+
 if ! [ -x "$(command -v docker)" ]; then
-    # Almalinux
-    if [ "$OS_TYPE" == 'almalinux' ]; then
-        dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
-        dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    step_start "Installing Docker Engine"
+    echo " - Docker is not installed. Installing Docker. It may take a while."
+    case "$OS_TYPE" in
+    "alpine" | "postmarketos")
+        apk add docker docker-cli-compose >/dev/null 2>&1
+        rc-update add docker default >/dev/null 2>&1
+        service docker start >/dev/null 2>&1
         if ! [ -x "$(command -v docker)" ]; then
-            echo "Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+            echo " - Failed to install Docker with apk. Try to install it manually."
+            echo "   Please visit https://wiki.alpinelinux.org/wiki/Docker for more information."
             exit 1
         fi
-        systemctl start docker
-        systemctl enable docker
-    else
-        set +e
+        ;;
+    "arch")
+        pacman -Syu --noconfirm --needed docker docker-compose >/dev/null 2>&1
+        systemctl enable docker.service >/dev/null 2>&1
+        systemctl start docker.service >/dev/null 2>&1
         if ! [ -x "$(command -v docker)" ]; then
-            echo "Docker is not installed. Installing Docker."
-            # Arch Linux
-            if [ "$OS_TYPE" = "arch" ]; then
-                pacman -Sy docker docker-compose --noconfirm
-                systemctl enable docker.service
-                if [ -x "$(command -v docker)" ]; then
-                    echo "Docker installed successfully."
-                else
-                    echo "Failed to install Docker with pacman. Try to install it manually."
-                    echo "Please visit https://wiki.archlinux.org/title/docker for more information."
-                    exit
-                fi
-            else
-                # Amazon Linux 2023
-                if [ "$OS_TYPE" = "amzn" ]; then
-                    dnf install docker -y
-                    DOCKER_CONFIG=${DOCKER_CONFIG:-/usr/local/lib/docker}
-                    mkdir -p $DOCKER_CONFIG/cli-plugins
-                    curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o $DOCKER_CONFIG/cli-plugins/docker-compose
-                    chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
-                    systemctl start docker
-                    systemctl enable docker
-                    if [ -x "$(command -v docker)" ]; then
-                        echo "Docker installed successfully."
-                    else
-                        echo "Failed to install Docker with pacman. Try to install it manually."
-                        echo "Please visit https://wiki.archlinux.org/title/docker for more information."
-                        exit
-                    fi
-                else
-                    # Automated Docker installation
-                    curl https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh
-                    if [ -x "$(command -v docker)" ]; then
-                        echo "Docker installed successfully."
-                    else
-                        echo "Docker installation failed with Rancher script. Trying with official script."
-                        curl https://get.docker.com | sh -s -- --version ${DOCKER_VERSION}
-                        if [ -x "$(command -v docker)" ]; then
-                            echo "Docker installed successfully."
-                        else
-                            echo "Docker installation failed with official script."
-                            echo "Maybe your OS is not supported?"
-                            echo "Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
-                            exit 1
-                        fi
-                    fi
-                fi
-            fi
+            echo " - Failed to install Docker with pacman. Try to install it manually."
+            echo "   Please visit https://wiki.archlinux.org/title/docker for more information."
+            exit 1
         fi
-        set -e
-    fi
+        ;;
+    "amzn")
+        dnf install docker -y >/dev/null 2>&1
+        DOCKER_CONFIG=${DOCKER_CONFIG:-/usr/local/lib/docker}
+        mkdir -p $DOCKER_CONFIG/cli-plugins >/dev/null 2>&1
+        curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o $DOCKER_CONFIG/cli-plugins/docker-compose >/dev/null 2>&1
+        chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose >/dev/null 2>&1
+        systemctl start docker >/dev/null 2>&1
+        systemctl enable docker >/dev/null 2>&1
+        if ! [ -x "$(command -v docker)" ]; then
+            echo " - Failed to install Docker with dnf. Try to install it manually."
+            echo "   Please visit https://www.cyberciti.biz/faq/how-to-install-docker-on-amazon-linux-2/ for more information."
+            exit 1
+        fi
+        ;;
+    "rocky")
+        install_docker_from_rhel_repo
+        if ! [ -x "$(command -v docker)" ]; then
+            echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+            exit 1
+        fi
+        ;;
+    "almalinux" | "tencentos")
+        dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo >/dev/null 2>&1
+        dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin >/dev/null 2>&1
+        systemctl start docker >/dev/null 2>&1
+        systemctl enable docker >/dev/null 2>&1
+        if ! [ -x "$(command -v docker)" ]; then
+            echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+            exit 1
+        fi
+        ;;
+    "ubuntu" | "debian" | "raspbian" | "centos" | "fedora" | "rhel" | "sles")
+        install_docker
+        if ! [ -x "$(command -v docker)" ]; then
+            echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+            exit 1
+        fi
+        ;;
+    *)
+        install_docker
+        if ! [ -x "$(command -v docker)" ]; then
+            echo " - Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+            exit 1
+        fi
+        ;;
+    esac
+    echo " - Docker installed successfully."
+else
+    step_start "Checking Docker Engine"
+    echo " - Docker is installed."
 fi
 
-echo -e "-------------"
-echo -e "Check Docker Configuration..."
-mkdir -p /etc/docker
-# shellcheck disable=SC2015
-test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json /etc/docker/daemon.json.original-"$DATE" || cat >/etc/docker/daemon.json <<EOL
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  }
-}
-EOL
-cat >/etc/docker/daemon.json.coolify <<EOL
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  }
-}
-EOL
-TEMP_FILE=$(mktemp)
-if ! jq -s '.[0] * .[1]' /etc/docker/daemon.json /etc/docker/daemon.json.coolify >"$TEMP_FILE"; then
-    echo "Error merging JSON files"
+# Verify minimum Docker version
+MIN_DOCKER_VERSION=24
+wait_for_docker_daemon || true
+INSTALLED_DOCKER_VERSION=$(docker version --format '{{.Server.Version}}' 2>/dev/null | cut -d. -f1 || true)
+if [ -z "$INSTALLED_DOCKER_VERSION" ]; then
+    warn "Could not determine Docker version. Please ensure Docker $MIN_DOCKER_VERSION+ is installed."
+elif [ "$INSTALLED_DOCKER_VERSION" -lt "$MIN_DOCKER_VERSION" ]; then
+    echo " - ERROR: Docker version $INSTALLED_DOCKER_VERSION is too old. Coolify requires Docker $MIN_DOCKER_VERSION or newer."
+    echo "   Please upgrade Docker: https://docs.docker.com/engine/install/"
     exit 1
+else
+    echo " - Docker version $(docker version --format '{{.Server.Version}}' 2>/dev/null) meets minimum requirement ($MIN_DOCKER_VERSION+)."
 fi
-mv "$TEMP_FILE" /etc/docker/daemon.json
+DOCKER_SERVER_VERSION=$(docker version --format '{{.Server.Version}}' 2>/dev/null || true)
+step_done "${DOCKER_SERVER_VERSION:+v$DOCKER_SERVER_VERSION}"
 
-if [ -s /etc/docker/daemon.json.original-"$DATE" ]; then
-    DIFF=$(diff <(jq --sort-keys . /etc/docker/daemon.json) <(jq --sort-keys . /etc/docker/daemon.json.original-"$DATE"))
-    if [ "$DIFF" != "" ]; then
-        echo "Docker configuration updated, restart docker daemon..."
-        systemctl restart docker
+step_start "Configuring Docker daemon" "log rotation · address pools"
+
+# Changing daemon.json needs a Docker restart, which stops every running container.
+# Coolify sets log rotation and the network pool only when no pool is configured or DOCKER_POOL_FORCE_OVERRIDE=true,
+# keeps all other keys, and does not restart a Docker daemon with running containers unless DOCKER_POOL_FORCE_OVERRIDE=true.
+if [ "$DOCKER_POOL_FORCE_OVERRIDE" = true ] || [ "$EXISTING_POOL_CONFIGURED" = false ]; then
+    mkdir -p /etc/docker
+    CURRENT_DAEMON_CONFIG='{}'
+    if [ -s /etc/docker/daemon.json ] && ! CURRENT_DAEMON_CONFIG=$(jq -S . /etc/docker/daemon.json 2>/dev/null); then
+        CURRENT_DAEMON_CONFIG=""
+    fi
+    if [ -z "$CURRENT_DAEMON_CONFIG" ]; then
+        warn "Docker daemon configuration not changed: /etc/docker/daemon.json is not valid JSON."
     else
-        echo "Docker configuration is up to date."
+        NEW_DAEMON_CONFIG=$(jq -S --arg base "$DOCKER_ADDRESS_POOL_BASE" --argjson size "$DOCKER_ADDRESS_POOL_SIZE" \
+            '. * {"log-driver": "json-file", "log-opts": {"max-size": "10m", "max-file": "3"}, "default-address-pools": [{"base": $base, "size": $size}]}' <<<"$CURRENT_DAEMON_CONFIG")
+        RUNNING_CONTAINERS=$({ docker ps -q 2>/dev/null || true; } | wc -l)
+        if [ "$NEW_DAEMON_CONFIG" = "$CURRENT_DAEMON_CONFIG" ]; then
+            echo " - Configuration is up to date"
+        elif [ "$RUNNING_CONTAINERS" -gt 0 ] && [ "$DOCKER_POOL_FORCE_OVERRIDE" != true ]; then
+            warn "Docker daemon configuration not changed: log rotation and the ${DOCKER_ADDRESS_POOL_BASE} (size ${DOCKER_ADDRESS_POOL_SIZE}) network pool need a Docker restart, which stops ${RUNNING_CONTAINERS} running container(s) and can change the docker0 bridge IP. To apply it, run the installer again with DOCKER_POOL_FORCE_OVERRIDE=true."
+            UI_STEP_DETAIL="skipped · containers running"
+        else
+            if [ -f /etc/docker/daemon.json ]; then
+                cp /etc/docker/daemon.json /etc/docker/daemon.json.original-"$DATE"
+            fi
+            printf '%s\n' "$NEW_DAEMON_CONFIG" >/etc/docker/daemon.json
+            echo " - Network pool configuration: ${DOCKER_ADDRESS_POOL_BASE} (size ${DOCKER_ADDRESS_POOL_SIZE})"
+            echo " - Configuration updated - restarting Docker daemon..."
+            restart_docker_service
+        fi
     fi
 else
-    echo "Docker configuration updated, restart docker daemon..."
-    systemctl restart docker
+    echo " - Using the existing network pool ${DOCKER_ADDRESS_POOL_BASE} (size ${DOCKER_ADDRESS_POOL_SIZE})"
+    echo " - To override it: DOCKER_POOL_FORCE_OVERRIDE=true"
 fi
 
-echo -e "-------------"
+step_done
 
-mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance,metrics,logs}
-mkdir -p /data/coolify/ssh/{keys,mux}
-mkdir -p /data/coolify/proxy/dynamic
+step_start "Downloading required files from CDN"
+log "Downloading configuration files in parallel..."
 
-chown -R 9999:root /data/coolify
-chmod -R 700 /data/coolify
+# Download files in parallel for faster installation
+curl -fsSL -L $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml &
+PID1=$!
+curl -fsSL -L $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml &
+PID2=$!
+curl -fsSL -L $CDN/.env.production -o /data/coolify/source/.env.production &
+PID3=$!
+curl -fsSL -L $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh &
+PID4=$!
+curl -fsSL -L $CDN/upgrade-postgres.sh -o /data/coolify/source/upgrade-postgres.sh &
+PID5=$!
 
-echo "Downloading required files from CDN..."
-curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
-curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
-curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
-curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
+# Wait for all downloads to complete and check for errors
+DOWNLOAD_FAILED=false
+for PID in $PID1 $PID2 $PID3 $PID4 $PID5; do
+    if ! wait $PID; then
+        DOWNLOAD_FAILED=true
+    fi
+done
 
-# Copy .env.example if .env does not exist
-if [ ! -f /data/coolify/source/.env ]; then
-    cp /data/coolify/source/.env.production /data/coolify/source/.env
-    sed -i "s|APP_ID=.*|APP_ID=$(openssl rand -hex 16)|g" /data/coolify/source/.env
-    sed -i "s|APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|g" /data/coolify/source/.env
-    sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
-    sed -i "s|REDIS_PASSWORD=.*|REDIS_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
-    sed -i "s|PUSHER_APP_ID=.*|PUSHER_APP_ID=$(openssl rand -hex 32)|g" /data/coolify/source/.env
-    sed -i "s|PUSHER_APP_KEY=.*|PUSHER_APP_KEY=$(openssl rand -hex 32)|g" /data/coolify/source/.env
-    sed -i "s|PUSHER_APP_SECRET=.*|PUSHER_APP_SECRET=$(openssl rand -hex 32)|g" /data/coolify/source/.env
+if [ "$DOWNLOAD_FAILED" = true ]; then
+    echo " - ERROR: One or more downloads failed. Please check your network connection."
+    exit 1
 fi
 
-# Merge .env and .env.production. New values will be added to .env
-sort -u -t '=' -k 1,1 /data/coolify/source/.env /data/coolify/source/.env.production | sed '/^$/d' >/data/coolify/source/.env.temp && mv /data/coolify/source/.env.temp /data/coolify/source/.env
+chmod +x /data/coolify/source/upgrade.sh /data/coolify/source/upgrade-postgres.sh
+log "All configuration files downloaded successfully"
+step_done
+
+step_start "Setting up environment variables"
+
+if [ -f "$ENV_FILE" ]; then
+    # If .env exists, create backup
+    echo " - Creating backup of existing .env file to .env-$DATE"
+    cp "$ENV_FILE" "$ENV_FILE-$DATE"
+    # Merge .env.production values into .env
+    echo " - Merging .env.production values into .env"
+    awk -F '=' '!seen[$1]++' "$ENV_FILE" "/data/coolify/source/.env.production" > "$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE"
+    echo " - .env file merged successfully"
+else
+    # If no .env exists, copy .env.production to .env
+    echo " - No .env file found, copying .env.production to .env"
+    cp "/data/coolify/source/.env.production" "$ENV_FILE"
+fi
+log "Environment file setup completed"
+
+update_env_var() {
+    local key="$1"
+    local value="$2"
+
+    # If variable "key=" exists but has no value, update the value of the existing line
+    if grep -q "^${key}=$" "$ENV_FILE"; then
+        # awk reads the value from the environment, so characters such as | & \ in it stay literal
+        KEY="$key" VALUE="$value" awk '$0 == ENVIRON["KEY"] "=" { $0 = ENVIRON["KEY"] "=" ENVIRON["VALUE"] } { print }' "$ENV_FILE" >"$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE"
+        echo " - Updated value of ${key} as the current value was empty"
+    # If variable "key=" doesn't exist, append it to the file with value
+    elif ! grep -q "^${key}=" "$ENV_FILE"; then
+        printf '%s=%s\n' "$key" "$value" >>"$ENV_FILE"
+        echo " - Added ${key} and its value as the variable was missing"
+    fi
+}
+
+# Sets the value of a variable, also when it has a value already.
+# Used for values that the user gives explicitly, so that a new run of the installer can correct them.
+set_env_var() {
+    local key="$1"
+    local value="$2"
+
+    if grep -q "^${key}=" "$ENV_FILE"; then
+        # awk reads the value from the environment, so characters such as | & \ in it stay literal
+        KEY="$key" VALUE="$value" awk '!done && index($0, ENVIRON["KEY"] "=") == 1 { $0 = ENVIRON["KEY"] "=" ENVIRON["VALUE"]; done = 1 } { print }' "$ENV_FILE" >"$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE"
+        echo " - Set value of ${key}"
+    else
+        printf '%s=%s\n' "$key" "$value" >>"$ENV_FILE"
+        echo " - Added ${key} and its value as the variable was missing"
+    fi
+}
+
+# Quote a user-supplied value so that Docker Compose and phpdotenv both read it back unchanged
+# (spaces, #, $ and quotes otherwise break parsing or change the value).
+quote_env_value() {
+    local value="$1"
+    case "$value" in
+    *\'*)
+        value=${value//\\/\\\\}
+        value=${value//\"/\\\"}
+        value=${value//\$/\\\$}
+        printf '"%s"' "$value"
+        ;;
+    *)
+        printf "'%s'" "$value"
+        ;;
+    esac
+}
+
+update_env_var "APP_ID" "$(openssl rand -hex 16)"
+update_env_var "APP_KEY" "base64:$(openssl rand -base64 32)"
+# update_env_var "DB_USERNAME" "$(openssl rand -hex 16)" # Causes issues: database "random-user" does not exist
+update_env_var "DB_PASSWORD" "$(openssl rand -base64 32)"
+update_env_var "REDIS_PASSWORD" "$(openssl rand -base64 32)"
+update_env_var "PUSHER_APP_ID" "$(openssl rand -hex 32)"
+update_env_var "PUSHER_APP_KEY" "$(openssl rand -hex 32)"
+update_env_var "PUSHER_APP_SECRET" "$(openssl rand -hex 32)"
+update_env_var "PUSHER_BACKEND_PORT" "6001"
+
+# Add default root user credentials from environment variables (ROOT_USERNAME is optional)
+if [ -n "$ROOT_USER_EMAIL" ] && [ -n "$ROOT_USER_PASSWORD" ]; then
+    echo " - Setting predefined root user credentials from environment"
+    if [ -n "$ROOT_USERNAME" ]; then
+        set_env_var "ROOT_USERNAME" "$(quote_env_value "$ROOT_USERNAME")"
+    fi
+    set_env_var "ROOT_USER_EMAIL" "$(quote_env_value "$ROOT_USER_EMAIL")"
+    set_env_var "ROOT_USER_PASSWORD" "$(quote_env_value "$ROOT_USER_PASSWORD")"
+elif [ -n "$ROOT_USERNAME" ] || [ -n "$ROOT_USER_EMAIL" ] || [ -n "$ROOT_USER_PASSWORD" ]; then
+    warn "Predefined root user skipped: set both ROOT_USER_EMAIL and ROOT_USER_PASSWORD."
+fi
+
+if [ -n "${REGISTRY_URL+x}" ]; then
+    # Only update if REGISTRY_URL was explicitly provided
+    update_env_var "REGISTRY_URL" "$REGISTRY_URL"
+fi
 
 if [ "$AUTOUPDATE" = "false" ]; then
-    if ! grep -q "AUTOUPDATE=" /data/coolify/source/.env; then
-        echo "AUTOUPDATE=false" >>/data/coolify/source/.env
-    else
-        sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" /data/coolify/source/.env
+    update_env_var "AUTOUPDATE" "false"
+fi
+
+if [ "$DOCKER_POOL_BASE_PROVIDED" = true ]; then
+    update_env_var "DOCKER_ADDRESS_POOL_BASE" "$DOCKER_ADDRESS_POOL_BASE"
+else
+    # Add with default value if missing
+    if ! grep -q "^DOCKER_ADDRESS_POOL_BASE=" "$ENV_FILE"; then
+        update_env_var "DOCKER_ADDRESS_POOL_BASE" "$DOCKER_ADDRESS_POOL_BASE"
     fi
 fi
 
-# Generate an ssh key (ed25519) at /data/coolify/ssh/keys/id.root@host.docker.internal
-if [ ! -f /data/coolify/ssh/keys/id.root@host.docker.internal ]; then
-    ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.root@host.docker.internal -q -N "" -C root@coolify
-    chown 9999 /data/coolify/ssh/keys/id.root@host.docker.internal
+if [ "$DOCKER_POOL_SIZE_PROVIDED" = true ]; then
+    update_env_var "DOCKER_ADDRESS_POOL_SIZE" "$DOCKER_ADDRESS_POOL_SIZE"
+else
+    # Add with default value if missing
+    if ! grep -q "^DOCKER_ADDRESS_POOL_SIZE=" "$ENV_FILE"; then
+        update_env_var "DOCKER_ADDRESS_POOL_SIZE" "$DOCKER_ADDRESS_POOL_SIZE"
+    fi
 fi
+log "Environment variables check completed"
+step_done
 
-addSshKey() {
-    cat /data/coolify/ssh/keys/id.root@host.docker.internal.pub >>~/.ssh/authorized_keys
-    chmod 600 ~/.ssh/authorized_keys
-}
-
+step_start "Checking SSH key for localhost access"
+SSH_KEY_DETAIL="existing key"
+create_coolify_directories
 if [ ! -f ~/.ssh/authorized_keys ]; then
     mkdir -p ~/.ssh
     chmod 700 ~/.ssh
     touch ~/.ssh/authorized_keys
-    addSshKey
+    chmod 600 ~/.ssh/authorized_keys
 fi
 
-if ! grep -qw "root@coolify" ~/.ssh/authorized_keys; then
-    addSshKey
+set +e
+IS_COOLIFY_VOLUME_EXISTS=$(docker volume ls | grep coolify-db | wc -l)
+set -e
+
+if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ]; then
+    echo " - Generating SSH key."
+    SSH_KEY_DETAIL="generated new key"
+    test -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal && rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal
+    test -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub && rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
+    ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal -q -N "" -C coolify
+    chown 9999 /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal
+    # Remove only the key from a previous install (comment "coolify", or "root@coolify" before September 2024), not other keys that contain "coolify"
+    sed -i -E "/[[:space:]](root@)?coolify[[:space:]]*$/d" ~/.ssh/authorized_keys
+    cat /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub >>~/.ssh/authorized_keys
+    rm -f /data/coolify/ssh/keys/id.$CURRENT_USER@host.docker.internal.pub
 fi
 
-bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}"
+set_coolify_directory_permissions
+log "SSH key check completed"
+step_done "$SSH_KEY_DETAIL"
 
-echo -e "\nCongratulations! Your Coolify instance is ready to use.\n"
-echo "Please visit http://$(curl -4s https://ifconfig.io):8000 to get started."
+step_start "Pulling images" "coolify · postgres · redis · helper"
+# fd 3 is closed so the detached container restart in upgrade.sh does not hold the terminal open
+if [[ $- == *x* ]]; then
+    bash -x /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-docker.io}" "true" 3>&-
+else
+    bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}" "${LATEST_HELPER_VERSION:-latest}" "${REGISTRY_URL:-docker.io}" "true" 3>&-
+fi
+step_done
+
+step_start "Starting Coolify" "v${LATEST_VERSION}"
+echo " - Waiting for Coolify to be ready..."
+
+# Wait for upgrade.sh background process to complete
+# upgrade.sh writes status to /data/coolify/source/.upgrade-status
+# Status file format: step|message|timestamp
+# Step 6 = "Upgrade complete", file deleted 10 seconds after
+UPGRADE_STATUS_FILE="/data/coolify/source/.upgrade-status"
+MAX_WAIT=180
+WAITED=0
+SEEN_STATUS_FILE=false
+
+while [ $WAITED -lt $MAX_WAIT ]; do
+    if [ -f "$UPGRADE_STATUS_FILE" ]; then
+        SEEN_STATUS_FILE=true
+        STATUS=$(cat "$UPGRADE_STATUS_FILE" 2>/dev/null | cut -d'|' -f1)
+        MESSAGE=$(cat "$UPGRADE_STATUS_FILE" 2>/dev/null | cut -d'|' -f2)
+        if [ "$STATUS" = "6" ]; then
+            log "Upgrade completed: $MESSAGE"
+            echo " - Upgrade complete!"
+            break
+        elif [ "$STATUS" = "error" ]; then
+            echo " - ERROR: Upgrade failed: $MESSAGE"
+            echo " - Please check the upgrade logs: /data/coolify/source/upgrade-*.log"
+            exit 1
+        else
+            if [ $((WAITED % 10)) -eq 0 ]; then
+                echo " - Upgrade in progress: $MESSAGE (${WAITED}s)"
+            fi
+        fi
+    else
+        # Status file doesn't exist
+        if [ "$SEEN_STATUS_FILE" = true ]; then
+            # We saw the file before, now it's gone = upgrade completed and cleaned up
+            log "Upgrade status file cleaned up - upgrade complete"
+            echo " - Upgrade complete!"
+            break
+        fi
+        # Haven't seen status file yet - either very early or upgrade.sh hasn't started
+        if [ $((WAITED % 10)) -eq 0 ] && [ $WAITED -gt 0 ]; then
+            echo " - Waiting for upgrade process to start... (${WAITED}s)"
+        fi
+    fi
+    sleep 2
+    WAITED=$((WAITED + 2))
+done
+
+if [ $WAITED -ge $MAX_WAIT ]; then
+    if [ "$SEEN_STATUS_FILE" = false ]; then
+        # Never saw status file - fallback to old behavior (wait 20s + health check)
+        log "Status file not found, using fallback wait"
+        echo " - Status file not found, waiting 20 seconds..."
+        sleep 20
+    else
+        echo " - ERROR: Upgrade timed out after ${MAX_WAIT}s"
+        echo " - Please check the upgrade logs: /data/coolify/source/upgrade-*.log"
+        exit 1
+    fi
+fi
+
+# Final health verification - wait for container to be healthy
+echo " - Verifying Coolify is healthy..."
+HEALTH_WAIT=60
+HEALTH_WAITED=0
+while [ $HEALTH_WAITED -lt $HEALTH_WAIT ]; do
+    HEALTH=$(docker inspect --format='{{.State.Health.Status}}' coolify 2>/dev/null || echo "unknown")
+    if [ "$HEALTH" = "healthy" ]; then
+        log "Coolify container is healthy"
+        echo " - Coolify is ready!"
+        break
+    fi
+    sleep 2
+    HEALTH_WAITED=$((HEALTH_WAITED + 2))
+done
+
+if [ "$HEALTH" != "healthy" ]; then
+    echo " - ERROR: Coolify container is not healthy after ${HEALTH_WAIT}s. Status: $HEALTH"
+    echo " - Please check: docker logs coolify"
+    exit 1
+fi
+
+# The seeder skips a root user that exists already. If it cannot create one (for example, the password
+# is too weak), it prints the reasons, which otherwise are only in the logs of the coolify container.
+ROOT_USER_ERRORS=""
+if [ -n "$ROOT_USER_EMAIL" ] && [ -n "$ROOT_USER_PASSWORD" ]; then
+    ROOT_USER_SEEDER_OUTPUT=$(docker exec coolify php artisan db:seed --class=RootUserSeeder --force 2>&1 || true)
+    echo "$ROOT_USER_SEEDER_OUTPUT"
+    if ! printf '%s\n' "$ROOT_USER_SEEDER_OUTPUT" | grep -qE "Root user created successfully|Root user already exists"; then
+        ROOT_USER_ERRORS=$(printf '%s\n' "$ROOT_USER_SEEDER_OUTPUT" | sed -n 's/^[[:space:]]*→[[:space:]]*//p')
+        [ -n "$ROOT_USER_ERRORS" ] || ROOT_USER_ERRORS=$(printf '%s\n' "$ROOT_USER_SEEDER_OUTPUT" | sed -n 's/^[[:space:]]*ERROR[[:space:]]*//p')
+        [ -n "$ROOT_USER_ERRORS" ] || ROOT_USER_ERRORS="Unknown reason. Check: docker logs coolify"
+    fi
+fi
+step_done
+
+if [ "$CHANNEL" != "stable" ]; then
+    docker exec coolify php artisan app:update-channel "$CHANNEL" || warn "Could not switch the instance to the $CHANNEL update channel, switch it on the update page"
+    ui_flush_warnings
+fi
+
+if [ "$UI_TTY" = true ]; then
+    printf '%s\n' "$(ui_bar 100 "done")" >&3
+fi
+
+# Fetch public IPs in parallel for faster completion
+IPV4_TMP=$(mktemp)
+IPV6_TMP=$(mktemp)
+curl -4s --max-time 5 https://ifconfig.io > "$IPV4_TMP" 2>/dev/null &
+IPV4_PID=$!
+curl -6s --max-time 5 https://ifconfig.io > "$IPV6_TMP" 2>/dev/null &
+IPV6_PID=$!
+wait $IPV4_PID 2>/dev/null || true
+wait $IPV6_PID 2>/dev/null || true
+IPV4_PUBLIC_IP=$(cat "$IPV4_TMP" 2>/dev/null || true)
+IPV6_PUBLIC_IP=$(cat "$IPV6_TMP" 2>/dev/null || true)
+rm -f "$IPV4_TMP" "$IPV6_TMP"
+
+set +e
+DEFAULT_PRIVATE_IP=$(ip route get 1 | sed -n 's/^.*src \([0-9.]*\) .*$/\1/p')
+PRIVATE_IPS=$(hostname -I 2>/dev/null || ip -o addr show scope global | awk '{print $4}' | cut -d/ -f1)
+set -e
+
+printf '\n  %s%sCoolify is ready!%s  %sInstalled in %s%s\n\n' "$C_BOLD" "$C_PURPLE" "$C_RESET" "$C_DIM" "$(ui_duration $(($(ui_now) - UI_INSTALL_STARTED)))" "$C_RESET" >&3
+if [ -n "$IPV4_PUBLIC_IP" ]; then
+    printf '  Public IPv4   %shttp://%s:8000%s\n' "$C_BOLD" "$IPV4_PUBLIC_IP" "$C_RESET" >&3
+fi
+if [ -n "$IPV6_PUBLIC_IP" ]; then
+    printf '  Public IPv6   %shttp://[%s]:8000%s\n' "$C_BOLD" "$IPV6_PUBLIC_IP" "$C_RESET" >&3
+fi
+
+PRIVATE_IP_LABEL="Private IP  "
+for IP in $PRIVATE_IPS; do
+    if [ "$IP" != "$DEFAULT_PRIVATE_IP" ]; then
+        printf '  %s  %shttp://%s:8000%s\n' "$PRIVATE_IP_LABEL" "$C_DIM" "$IP" "$C_RESET" >&3
+        PRIVATE_IP_LABEL="            "
+    fi
+done
+
+if [ -n "$ROOT_USER_ERRORS" ]; then
+    printf '\n  %s! The predefined root user was not created:%s\n' "$C_YELLOW" "$C_RESET" >&3
+    while IFS= read -r ROOT_USER_ERROR; do
+        printf '    %s- %s%s\n' "$C_YELLOW" "$ROOT_USER_ERROR" "$C_RESET" >&3
+    done <<<"$ROOT_USER_ERRORS"
+    printf '  %sRun the installer again with corrected ROOT_USER_* values. Registration in the browser stays closed while they are set.%s\n' "$C_YELLOW" "$C_RESET" >&3
+    printf '  %sRequirements: https://coolify.io/docs/start-with-self-hosted#_1-root-user%s\n' "$C_YELLOW" "$C_RESET" >&3
+fi
+if [ "$IS_COOLIFY_VOLUME_EXISTS" -eq 0 ] && { [ -z "$ROOT_USER_EMAIL" ] || [ -z "$ROOT_USER_PASSWORD" ]; }; then
+    printf '\n  %s! Create the root account within 10 minutes. If the time ends, run %sdocker restart coolify%s%s and try again.%s\n' "$C_YELLOW" "$C_BOLD" "$C_RESET" "$C_YELLOW" "$C_RESET" >&3
+fi
+printf '\n  %s! Back up %s/data/coolify/source/.env%s%s to a safe place outside this server (e.g. a password manager).%s\n' "$C_YELLOW" "$C_BOLD" "$C_RESET" "$C_YELLOW" "$C_RESET" >&3
+printf '  %sLog file: %s%s\n\n' "$C_DIM" "$INSTALLATION_LOG_WITH_DATE" "$C_RESET" >&3
+
+log_section "Installation Complete"
+log "Coolify installation completed successfully"
+log "Version: ${LATEST_VERSION}"
+log "Log file: ${INSTALLATION_LOG_WITH_DATE}"

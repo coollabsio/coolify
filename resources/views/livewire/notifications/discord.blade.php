@@ -1,42 +1,41 @@
 <div>
     <x-slot:title>
-        Notifications | Coolify
+        Discord Notifications | Coolify
     </x-slot>
-    <x-notification.navbar />
-    <form wire:submit='submit' class="flex flex-col gap-4">
-        <div class="flex items-center gap-2">
-            <h2>Discord</h2>
-            <x-forms.button type="submit">
-                Save
-            </x-forms.button>
-            @if ($team->discord_enabled)
-                <x-forms.button class="normal-case dark:text-white btn btn-xs no-animation btn-primary"
-                    wire:click="sendTestNotification">
-                    Send Test Notifications
-                </x-forms.button>
-            @endif
-        </div>
-        <div class="w-32">
-            <x-forms.checkbox instantSave id="team.discord_enabled" label="Enabled" />
-        </div>
-        <x-forms.input type="password"
-            helper="Generate a webhook in Discord.<br>Example: https://discord.com/api/webhooks/...." required
-            id="team.discord_webhook_url" label="Webhook" />
-    </form>
-    @if (data_get($team, 'discord_enabled'))
-        <h2 class="mt-4">Subscribe to events</h2>
-        <div class="w-64">
-            @if (isDev())
-                <x-forms.checkbox instantSave="saveModel" id="team.discord_notifications_test" label="Test" />
-            @endif
-            <x-forms.checkbox instantSave="saveModel" id="team.discord_notifications_status_changes"
-                label="Container Status Changes" />
-            <x-forms.checkbox instantSave="saveModel" id="team.discord_notifications_deployments"
-                label="Application Deployments" />
-            <x-forms.checkbox instantSave="saveModel" id="team.discord_notifications_database_backups"
-                label="Backup Status" />
-            <x-forms.checkbox instantSave="saveModel" id="team.discord_notifications_scheduled_tasks"
-                label="Scheduled Tasks Status" />
-        </div>
-    @endif
+
+    <x-notification.settings-layout>
+    <div class="application-settings-form flex flex-col gap-6">
+        <form wire:submit="submit">
+            <x-unsaved-bar action="submit" />
+            <x-application.settings-section title="Discord"
+                description="Send team notifications to a Discord channel through an incoming webhook.">
+                <x-slot:actions>
+                    <x-notification.channel-actions :enabled="$discordEnabled" enabledProperty="discordEnabled"
+                        toggleMethod="instantSaveDiscordEnabled" :canUpdate="auth()->user()->can('update', $settings)"
+                        :canResource="$settings" />
+                </x-slot:actions>
+
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.listbox canGate="update" :canResource="$settings" id="discordPingEnabled" label="Critical event mention"
+                        helper="Mention @here when a critical event occurs."
+                        onChange="instantSaveDiscordPingEnabled"
+                        :disabled="!auth()->user()->can('update', $settings)" :options="[
+                            ['value' => true, 'label' => 'Mention @here'],
+                            ['value' => false, 'label' => 'Do not mention'],
+                        ]" />
+                    <div class="lg:col-span-2">
+                        @can('update', $settings)
+                            <x-forms.input type="password" :required="$discordEnabled" id="discordWebhookUrl" label="Webhook URL"
+                                helper="Create an incoming webhook in your Discord server settings." />
+                        @else
+                            <x-forms.input disabled label="Webhook URL" value="Hidden (only admins can view)" />
+                        @endcan
+                    </div>
+                </div>
+            </x-application.settings-section>
+        </form>
+
+        <x-notification.event-grid :settings="$settings" channel="discord" />
+    </div>
+    </x-notification.settings-layout>
 </div>

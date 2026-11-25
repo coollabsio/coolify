@@ -1,0 +1,13 @@
+{
+  "scripts": {
+    "setup": "cp $JEAN_ROOT_PATH/.env .",
+    "teardown": "./scripts/dev teardown",
+    "run": "./scripts/dev run"
+  },
+  "ports": [
+    {
+      "port": 8000,
+      "label": "Coolify UI"
+    }
+  ]
+}

@@ -2,140 +2,164 @@
 
 namespace App\Livewire\Team;
 
-use App\Models\Team;
+use App\Enums\Role;
 use App\Models\User;
 use Livewire\Component;
+use Livewire\WithPagination;
 
 class AdminView extends Component
 {
-    public $users;
+    use WithPagination;
 
-    public ?string $search = '';
+    public string $search = '';
 
-    public bool $lots_of_users = false;
+    public string $teamFilter = 'all';
 
-    private $number_of_users_to_show = 20;
+    public string $sort = 'name_asc';
+
+    public int $perPage = 10;
 
     public function mount()
     {
         if (! isInstanceAdmin()) {
             return redirect()->route('dashboard');
         }
-        $this->getUsers();
     }
 
-    public function submitSearch()
+    public function updatedSearch(): void
     {
-        if ($this->search !== '') {
-            $this->users = User::where(function ($query) {
-                $query->where('name', 'like', "%{$this->search}%")
-                    ->orWhere('email', 'like', "%{$this->search}%");
-            })->get()->filter(function ($user) {
-                return $user->id !== auth()->id();
-            });
-        } else {
-            $this->getUsers();
+        if (! isInstanceAdmin()) {
+            return;
         }
+
+        $this->resetPage();
     }
 
-    public function getUsers()
+    public function updatedTeamFilter(): void
     {
-        $users = User::where('id', '!=', auth()->id())->get();
-        if ($users->count() > $this->number_of_users_to_show) {
-            $this->lots_of_users = true;
-            $this->users = $users->take($this->number_of_users_to_show);
-        } else {
-            $this->lots_of_users = false;
-            $this->users = $users;
-        }
+        $this->resetPage();
     }
 
-    private function finalizeDeletion(User $user, Team $team)
+    public function updatedSort(): void
     {
-        $servers = $team->servers;
-        foreach ($servers as $server) {
-            $resources = $server->definedResources();
-            foreach ($resources as $resource) {
-                ray('Deleting resource: '.$resource->name);
-                $resource->forceDelete();
-            }
-            ray('Deleting server: '.$server->name);
-            $server->forceDelete();
-        }
-
-        $projects = $team->projects;
-        foreach ($projects as $project) {
-            ray('Deleting project: '.$project->name);
-            $project->forceDelete();
-        }
-        $team->members()->detach($user->id);
-        ray('Deleting team: '.$team->name);
-        $team->delete();
+        $this->resetPage();
     }
 
-    public function delete($id)
+    public function updatedPerPage(): void
     {
+        $this->perPage = max(1, min(100, $this->perPage));
+
+        $this->resetPage();
+    }
+
+    public function submitSearch(): void
+    {
+        if (! isInstanceAdmin()) {
+            return;
+        }
+
+        $this->resetPage();
+    }
+
+    public function delete($id, $password, $selectedActions = [])
+    {
+        if (! isInstanceAdmin()) {
+            return redirect()->route('dashboard');
+        }
+
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
+        }
+
         if (! auth()->user()->isInstanceAdmin()) {
             return $this->dispatch('error', 'You are not authorized to delete users');
         }
+
         $user = User::find($id);
-        $teams = $user->teams;
-        foreach ($teams as $team) {
-            ray($team->name);
-            $user_alone_in_team = $team->members->count() === 1;
-            if ($team->id === 0) {
-                if ($user_alone_in_team) {
-                    ray('user is alone in the root team, do nothing');
-
-                    return $this->dispatch('error', 'User is alone in the root team, cannot delete');
-                }
-            }
-            if ($user_alone_in_team) {
-                ray('user is alone in the team');
-                $this->finalizeDeletion($user, $team);
-
-                continue;
-            }
-            ray('user is not alone in the team');
-            if ($user->isOwner()) {
-                $found_other_owner_or_admin = $team->members->filter(function ($member) {
-                    return $member->pivot->role === 'owner' || $member->pivot->role === 'admin';
-                })->where('id', '!=', $user->id)->first();
-
-                if ($found_other_owner_or_admin) {
-                    ray('found other owner or admin');
-                    $team->members()->detach($user->id);
-
-                    continue;
-                } else {
-                    $found_other_member_who_is_not_owner = $team->members->filter(function ($member) {
-                        return $member->pivot->role === 'member';
-                    })->first();
-                    if ($found_other_member_who_is_not_owner) {
-                        ray('found other member who is not owner');
-                        $found_other_member_who_is_not_owner->pivot->role = 'owner';
-                        $found_other_member_who_is_not_owner->pivot->save();
-                        $team->members()->detach($user->id);
-                    } else {
-                        // This should never happen as if the user is the only member in the team, the team should be deleted already.
-                        ray('found no other member who is not owner');
-                        $this->finalizeDeletion($user, $team);
-                    }
-
-                    continue;
-                }
-            } else {
-                ray('user is not owner');
-                $team->members()->detach($user->id);
-            }
+        if (! $user) {
+            return $this->dispatch('error', 'User not found');
         }
-        ray('Deleting user: '.$user->name);
-        $user->delete();
-        $this->getUsers();
+
+        if ($error = $this->deletionError(auth()->user(), $user)) {
+            return $this->dispatch('error', $error);
+        }
+
+        try {
+            $user->delete();
+            auditLog('ui.user.deleted', [
+                'team_id' => currentTeam()?->id,
+                'resource' => 'user',
+                'deleted_user_id' => $user->id,
+            ]);
+            $this->resetPage();
+
+            return true;
+        } catch (\Exception $e) {
+            return $this->dispatch('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Instance admins may delete other users, but never the root user, their
+     * own account (use the profile instead), or a user whose role in the root
+     * team is higher than their own.
+     */
+    private function deletionError(User $actor, User $target): ?string
+    {
+        if ($target->id === 0) {
+            return 'The root user cannot be deleted.';
+        }
+
+        if ($target->id === $actor->id) {
+            return 'Delete your own account from your profile.';
+        }
+
+        $actorRole = $this->rootTeamRole($actor);
+        $targetRole = $this->rootTeamRole($target);
+
+        if (! $actorRole || ($targetRole && $targetRole->gt($actorRole))) {
+            return 'You cannot delete a user with a higher role in the root team.';
+        }
+
+        return null;
+    }
+
+    private function rootTeamRole(User $user): ?Role
+    {
+        $role = $user->teams()->where('teams.id', 0)->first()?->pivot?->role;
+
+        return $role ? Role::tryFrom($role) : null;
     }
 
     public function render()
     {
-        return view('livewire.team.admin-view');
+        abort_unless(isInstanceAdmin(), 403);
+
+        $search = trim($this->search);
+        $teamId = currentTeam()->id;
+        $users = User::query()
+            ->where('id', '!=', auth()->id())
+            ->when($search !== '', function ($query) use ($search): void {
+                $query->where(function ($query) use ($search): void {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            })
+            ->when($this->teamFilter === 'current', function ($query) use ($teamId): void {
+                $query->whereHas('teams', fn ($teamQuery) => $teamQuery->where('teams.id', $teamId));
+            })
+            ->when($this->teamFilter === 'outside', function ($query) use ($teamId): void {
+                $query->whereDoesntHave('teams', fn ($teamQuery) => $teamQuery->where('teams.id', $teamId));
+            })
+            ->when($this->sort === 'name_desc', fn ($query) => $query->orderByDesc('name'))
+            ->when($this->sort === 'email_asc', fn ($query) => $query->orderBy('email'))
+            ->when($this->sort === 'email_desc', fn ($query) => $query->orderByDesc('email'))
+            ->when($this->sort === 'name_asc', fn ($query) => $query->orderBy('name'))
+            ->orderBy('id')
+            ->paginate($this->perPage);
+
+        return view('livewire.team.admin-view', [
+            'users' => $users,
+        ]);
     }
 }

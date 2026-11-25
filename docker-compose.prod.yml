@@ -1,6 +1,15 @@
 services:
+  # Placeholder for "soketi" overrides in docker-compose.custom.yml from versions before 4.4.
+  # Realtime runs inside the coolify container now. Without this entry, such an override is an
+  # incomplete service and every upgrade fails. Zero replicas means it never starts, and
+  # "docker compose up" removes the old coolify-realtime container (an inactive profile keeps it).
+  # It uses the coolify image, so install and upgrade do not pull another image.
+  soketi:
+    image: "${REGISTRY_URL:-docker.io}/coollabsio/coolify:${LATEST_IMAGE:-latest}"
+    deploy:
+      replicas: 0
   coolify:
-    image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-latest}"
+    image: "${REGISTRY_URL:-docker.io}/coollabsio/coolify:${LATEST_IMAGE:-latest}"
     volumes:
       - type: bind
         source: /data/coolify/source/.env
@@ -11,72 +20,36 @@ services:
       - /data/coolify/databases:/var/www/html/storage/app/databases
       - /data/coolify/services:/var/www/html/storage/app/services
       - /data/coolify/backups:/var/www/html/storage/app/backups
-      - /data/coolify/webhooks-during-maintenance:/var/www/html/storage/app/webhooks-during-maintenance
+      - /data/coolify/images:/var/www/html/storage/app/images
     environment:
-      - PHP_MEMORY_LIMIT
-      - APP_ID
-      - APP_ENV=production
-      - APP_DEBUG
-      - APP_NAME
-      - APP_KEY
-      - APP_URL
-      - DB_CONNECTION
-      - DB_HOST
-      - DB_PORT
-      - DB_DATABASE
-      - DB_USERNAME
-      - DB_PASSWORD
-      - QUEUE_CONNECTION
-      - REDIS_HOST
-      - REDIS_PASSWORD
-      - HORIZON_BALANCE
-      - HORIZON_MAX_PROCESSES
-      - HORIZON_BALANCE_MAX_SHIFT
-      - HORIZON_BALANCE_COOLDOWN
-      - SSL_MODE=off
-      - PHP_PM_CONTROL=dynamic
-      - PHP_PM_START_SERVERS=1
-      - PHP_PM_MIN_SPARE_SERVERS=1
-      - PHP_PM_MAX_SPARE_SERVERS=10
-      - PUSHER_HOST
-      - PUSHER_BACKEND_HOST
-      - PUSHER_PORT
-      - PUSHER_BACKEND_PORT
-      - PUSHER_SCHEME
-      - PUSHER_APP_ID
-      - PUSHER_APP_KEY
-      - PUSHER_APP_SECRET
-      - AUTOUPDATE
-      - SELF_HOSTED
-      - SSH_MUX_PERSIST_TIME
-      - FEEDBACK_DISCORD_WEBHOOK
-      - WAITLIST
-      - SUBSCRIPTION_PROVIDER
-      - STRIPE_API_KEY
-      - STRIPE_WEBHOOK_SECRET
-      - STRIPE_PRICE_ID_BASIC_MONTHLY
-      - STRIPE_PRICE_ID_BASIC_YEARLY
-      - STRIPE_PRICE_ID_PRO_MONTHLY
-      - STRIPE_PRICE_ID_PRO_YEARLY
-      - STRIPE_PRICE_ID_ULTIMATE_MONTHLY
-      - STRIPE_PRICE_ID_ULTIMATE_YEARLY
-      - STRIPE_PRICE_ID_DYNAMIC_MONTHLY
-      - STRIPE_PRICE_ID_DYNAMIC_YEARLY
-      - STRIPE_PRICE_ID_BASIC_MONTHLY_OLD
-      - STRIPE_PRICE_ID_BASIC_YEARLY_OLD
-      - STRIPE_PRICE_ID_PRO_MONTHLY_OLD
-      - STRIPE_PRICE_ID_PRO_YEARLY_OLD
-      - STRIPE_PRICE_ID_ULTIMATE_MONTHLY_OLD
-      - STRIPE_PRICE_ID_ULTIMATE_YEARLY_OLD
-      - STRIPE_EXCLUDED_PLANS
+      - APP_ENV=${APP_ENV:-production}
+      - PHP_MEMORY_LIMIT=${PHP_MEMORY_LIMIT:-256M}
+      - PHP_FPM_PM_CONTROL=${PHP_FPM_PM_CONTROL:-dynamic}
+      - PHP_FPM_PM_START_SERVERS=${PHP_FPM_PM_START_SERVERS:-1}
+      - PHP_FPM_PM_MIN_SPARE_SERVERS=${PHP_FPM_PM_MIN_SPARE_SERVERS:-1}
+      - PHP_FPM_PM_MAX_SPARE_SERVERS=${PHP_FPM_PM_MAX_SPARE_SERVERS:-10}
+      - PUSHER_BACKEND_PORT=${PUSHER_BACKEND_PORT:-6001}
+    env_file:
+      - /data/coolify/source/.env
     ports:
-      - "${APP_PORT:-8000}:80"
+      - "${APP_PORT:-8000}:8080"
+      - "${REVERB_PORT:-${SOKETI_PORT:-6001}}:6001"
+      - "6002:6002"
     expose:
       - "${APP_PORT:-8000}"
+      - "6001"
+      - "6002"
+    networks:
+      coolify:
+        # Realtime ran in the coolify-realtime container before 4.4; keep the name for existing proxy upstreams.
+        aliases:
+          - coolify-realtime
     healthcheck:
-      test: curl --fail http://127.0.0.1:80/api/health || exit 1
-      interval: 5s
-      retries: 10
+      test: curl --fail http://127.0.0.1:8080/api/health && curl --fail http://127.0.0.1:${PUSHER_BACKEND_PORT:-6001}/up || exit 1
+      # Each check is a PHP request plus a docker exec; every 5 seconds this cost about 0.4 CPU seconds per minute.
+      interval: 10s
+      retries: 12
+      start_period: 1m
       timeout: 2s
     depends_on:
       postgres:
@@ -87,17 +60,11 @@ services:
     volumes:
       - coolify-db:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: "${DB_USERNAME:-coolify}"
+      POSTGRES_USER: "${DB_USERNAME}"
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
       POSTGRES_DB: "${DB_DATABASE:-coolify}"
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${DB_USERNAME:-coolify}",
-          "-d",
-          "${DB_DATABASE:-coolify}"
-        ]
+      test: [ "CMD", "pg_isready", "-U", "${DB_USERNAME}", "-d", "${DB_DATABASE:-coolify}" ]
       interval: 5s
       retries: 10
       timeout: 2s
@@ -108,20 +75,7 @@ services:
     volumes:
       - coolify-redis:/data
     healthcheck:
-      test: redis-cli ping
-      interval: 5s
-      retries: 10
-      timeout: 2s
-  soketi:
-    ports:
-      - "${SOKETI_PORT:-6001}:6001"
-    environment:
-      SOKETI_DEBUG: "${SOKETI_DEBUG:-false}"
-      SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID}"
-      SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY}"
-      SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET}"
-    healthcheck:
-      test: wget -qO- http://127.0.0.1:6001/ready || exit 1
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "--no-auth-warning", "-e", "ping" ]
       interval: 5s
       retries: 10
       timeout: 2s
@@ -130,3 +84,7 @@ volumes:
     name: coolify-db
   coolify-redis:
     name: coolify-redis
+
+networks:
+  coolify:
+    external: true

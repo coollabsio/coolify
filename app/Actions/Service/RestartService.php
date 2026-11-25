@@ -4,15 +4,23 @@ namespace App\Actions\Service;
 
 use App\Models\Service;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Lorisleiva\Actions\Decorators\JobDecorator;
 
 class RestartService
 {
     use AsAction;
 
-    public function handle(Service $service)
+    public function configureJob(JobDecorator $job): void
     {
-        StopService::run($service);
+        $job->onQueue(deployment_queue());
+    }
 
-        return StartService::run($service);
+    public function handle(Service $service, bool $pullLatestImages)
+    {
+        return StartService::run(
+            service: $service,
+            pullLatestImages: $pullLatestImages,
+            stopBeforeStart: true,
+        );
     }
 }

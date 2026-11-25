@@ -2,52 +2,85 @@
     <x-slot:title>
         Proxy Dynamic Configuration | Coolify
     </x-slot>
-    <x-server.navbar :server="$server" :parameters="$parameters" />
-    <div class="flex gap-2">
-        <x-server.sidebar :server="$server" :parameters="$parameters" />
-        <div class="w-full">
+
+    <livewire:server.navbar :server="$server" />
+
+    <div
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+        <x-server.sidebar :server="$server" activeMenu="proxy" activeSubMenu="dynamic-confs" />
+
+        <div class="application-settings-form flex w-full flex-col gap-6">
             @if ($server->isFunctional())
-                <div class="flex gap-2">
-                    <div>
-                        <div class="flex gap-2">
-                            <h2>Dynamic Configurations</h2>
-                            <x-forms.button wire:click='loadDynamicConfigurations'>Reload</x-forms.button>
+                <div class="flex flex-wrap items-center justify-end gap-3 px-1">
+                    <div class="flex items-center gap-2">
+                        <x-forms.button wire:click="loadDynamicConfigurations">
+                            <x-reicon name="refresh" class="size-3.5" />
+                            Reload
+                        </x-forms.button>
+                        @can('update', $server)
                             <x-modal-input buttonTitle="+ Add" title="New Dynamic Configuration">
-                                <livewire:server.proxy.new-dynamic-configuration />
+                                <livewire:server.proxy.new-dynamic-configuration :server_id="$server->id" />
                             </x-modal-input>
-                        </div>
-                        <div class='pb-4'>You can add dynamic proxy configurations here.</div>
+                        @endcan
                     </div>
                 </div>
-                <div wire:loading wire:target="loadDynamicConfigurations">
-                    <x-loading text="Loading dynamic configurations..." />
-                </div>
-                <div x-init="$wire.loadDynamicConfigurations" class="flex flex-col gap-4">
+
+                <div x-init="$wire.initLoadDynamicConfigurations" class="contents">
+                    <x-skeleton.settings-sections wire:loading.flex wire:target="initLoadDynamicConfigurations"
+                        label="Loading dynamic configurations" />
+                    {{-- Add and delete reload the list through an event, which Livewire sends as __dispatch. --}}
+                    <x-loading wire:loading.flex wire:target="loadDynamicConfigurations, __dispatch" compact
+                        text="Reloading dynamic configurations..." class="justify-start! px-1" />
+
                     @if ($contents?->isNotEmpty())
                         @foreach ($contents as $fileName => $value)
-                            <div class="flex flex-col gap-2 py-2">
-                                @if (str_replace('|', '.', $fileName) === 'coolify.yaml' ||
-                                        str_replace('|', '.', $fileName) === 'Caddyfile' ||
-                                        str_replace('|', '.', $fileName) === 'coolify.caddy' ||
-                                        str_replace('|', '.', $fileName) === 'default_redirect_404.caddy')
-                                    <div>
-                                        <h3 class="dark:text-white">File: {{ str_replace('|', '.', $fileName) }}</h3>
-                                    </div>
-                                    <x-forms.textarea disabled name="proxy_settings"
-                                        wire:model="contents.{{ $fileName }}" rows="5" />
-                                @else
-                                    <livewire:server.proxy.dynamic-configuration-navbar :server_id="$server->id"
-                                        :fileName="$fileName" :value="$value" :newFile="false"
-                                        wire:key="{{ $fileName }}-{{ $loop->index }}" />
+                            @php
+                                $displayName = str_replace('|', '.', $fileName);
+                                $isManagedConfiguration = in_array($displayName, [
+                                    'coolify.yaml',
+                                    'Caddyfile',
+                                    'coolify.caddy',
+                                    'default_redirect_503.yaml',
+                                    'default_redirect_503.caddy',
+                                ]);
+                            @endphp
+                            <x-application.settings-section :title="$displayName"
+                                wire:key="proxy-dynamic-configuration-{{ $fileName }}">
+                                <x-slot:actions>
+                                    @if ($isManagedConfiguration)
+                                        <x-status-badge status="Managed" type="neutral" />
+                                    @else
+                                        <livewire:server.proxy.dynamic-configuration-navbar
+                                            :server_id="$server->id" :server="$server" :fileName="$fileName"
+                                            :value="$value ?? ''" :newFile="false"
+                                            wire:key="proxy-navbar-{{ $fileName }}" />
+                                    @endif
+                                </x-slot:actions>
+                                @can('update', $server)
                                     <x-forms.textarea disabled wire:model="contents.{{ $fileName }}"
-                                        rows="10" />
-                                @endif
-                            </div>
+                                        rows="8" />
+                                @else
+                                    <p class="text-xs text-neutral-500 dark:text-fg-dim">
+                                        You do not have permission to view the contents of this configuration.
+                                    </p>
+                                @endcan
+                            </x-application.settings-section>
                         @endforeach
                     @else
-                        <div wire:loading.remove> No dynamic configurations found.</div>
+                        <x-application.settings-section wire:loading.remove title="Dynamic configurations">
+                            <x-empty size="sm" title="No dynamic configurations"
+                                description="Add a configuration file to extend the proxy at runtime."
+                                icon-name="file-content" />
+                        </x-application.settings-section>
                     @endif
                 </div>
+            @else
+                <x-application.settings-section title="Dynamic configurations"
+                    helper="Manage additional runtime proxy configuration.">
+                    <x-empty size="sm" title="Server validation required"
+                        description="Validate this server before loading proxy configuration."
+                        icon-name="file-content" />
+                </x-application.settings-section>
             @endif
         </div>
     </div>

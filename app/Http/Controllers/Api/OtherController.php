@@ -3,16 +3,27 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use OpenApi\Attributes as OA;
+use Throwable;
 
 class OtherController extends Controller
 {
+    public function post_required(): JsonResponse
+    {
+        return response()
+            ->json(['message' => 'This endpoint has changed to a POST request.'], 405)
+            ->header('Allow', 'POST');
+    }
+
     #[OA\Get(
         summary: 'Version',
         description: 'Get Coolify version.',
         path: '/version',
+        operationId: 'version',
         security: [
             ['bearerAuth' => []],
         ],
@@ -20,8 +31,9 @@ class OtherController extends Controller
             new OA\Response(
                 response: 200,
                 description: 'Returns the version of the application',
-                content: new OA\JsonContent(
-                    type: 'string',
+                content: new OA\MediaType(
+                    mediaType: 'text/html',
+                    schema: new OA\Schema(type: 'string'),
                     example: 'v4.0.0',
                 )),
             new OA\Response(
@@ -36,64 +48,14 @@ class OtherController extends Controller
     )]
     public function version(Request $request)
     {
-        return response(config('version'));
+        return response(config('constants.coolify.version'));
     }
 
-    #[OA\Get(
-        summary: 'Enable API',
-        description: 'Enable API (only with root permissions).',
-        path: '/enable',
-        security: [
-            ['bearerAuth' => []],
-        ],
-        responses: [
-            new OA\Response(
-                response: 200,
-                description: 'Enable API.',
-                content: new OA\JsonContent(
-                    type: 'object',
-                    properties: [
-                        new OA\Property(property: 'message', type: 'string', example: 'API enabled.'),
-                    ]
-                )),
-            new OA\Response(
-                response: 403,
-                description: 'You are not allowed to enable the API.',
-                content: new OA\JsonContent(
-                    type: 'object',
-                    properties: [
-                        new OA\Property(property: 'message', type: 'string', example: 'You are not allowed to enable the API.'),
-                    ]
-                )),
-            new OA\Response(
-                response: 401,
-                ref: '#/components/responses/401',
-            ),
-            new OA\Response(
-                response: 400,
-                ref: '#/components/responses/400',
-            ),
-        ]
-    )]
-    public function enable_api(Request $request)
-    {
-        $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
-            return invalidTokenResponse();
-        }
-        if ($teamId !== '0') {
-            return response()->json(['message' => 'You are not allowed to enable the API.'], 403);
-        }
-        $settings = \App\Models\InstanceSettings::get();
-        $settings->update(['is_api_enabled' => true]);
-
-        return response()->json(['message' => 'API enabled.'], 200);
-    }
-
-    #[OA\Get(
+    #[OA\Post(
         summary: 'Disable API',
         description: 'Disable API (only with root permissions).',
         path: '/disable',
+        operationId: 'disable-api',
         security: [
             ['bearerAuth' => []],
         ],
@@ -132,39 +94,45 @@ class OtherController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        if ($teamId !== '0') {
+        if ($teamId !== '0' || ! $request->user()?->can('update', instanceSettings())) {
+            auditLog('api.instance.disable_denied', ['team_id' => $teamId], 'warning');
+
             return response()->json(['message' => 'You are not allowed to disable the API.'], 403);
         }
-        $settings = \App\Models\InstanceSettings::get();
+        $settings = instanceSettings();
         $settings->update(['is_api_enabled' => false]);
+
+        auditLog('api.instance.disabled', ['team_id' => $teamId]);
 
         return response()->json(['message' => 'API disabled.'], 200);
     }
 
-    public function feedback(Request $request)
-    {
-        $content = $request->input('content');
-        $webhook_url = config('coolify.feedback_discord_webhook');
-        if ($webhook_url) {
-            Http::post($webhook_url, [
-                'content' => $content,
-            ]);
-        }
-
-        return response()->json(['message' => 'Feedback sent.'], 200);
-    }
-
-    #[OA\Get(
-        summary: 'Healthcheck',
-        description: 'Healthcheck endpoint.',
-        path: '/healthcheck',
+    #[OA\Post(
+        summary: 'Enable MCP Server',
+        description: 'Enable the MCP server endpoint at /mcp (only with root permissions).',
+        path: '/mcp/enable',
+        operationId: 'enable-mcp',
+        security: [
+            ['bearerAuth' => []],
+        ],
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'Healthcheck endpoint.',
+                description: 'MCP server enabled.',
                 content: new OA\JsonContent(
-                    type: 'string',
-                    example: 'OK',
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'MCP server enabled.'),
+                    ]
+                )),
+            new OA\Response(
+                response: 403,
+                description: 'You are not allowed to enable the MCP server.',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'You are not allowed to enable the MCP server.'),
+                    ]
                 )),
             new OA\Response(
                 response: 401,
@@ -176,8 +144,161 @@ class OtherController extends Controller
             ),
         ]
     )]
+    public function enable_mcp(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        if ($teamId !== '0' || ! $request->user()?->can('update', instanceSettings())) {
+            auditLog('api.mcp.enable_denied', ['team_id' => $teamId], 'warning');
+
+            return response()->json(['message' => 'You are not allowed to enable the MCP server.'], 403);
+        }
+        $settings = instanceSettings();
+        $settings->update(['is_mcp_server_enabled' => true]);
+
+        auditLog('api.mcp.enabled', ['team_id' => $teamId]);
+
+        return response()->json(['message' => 'MCP server enabled.'], 200);
+    }
+
+    #[OA\Post(
+        summary: 'Disable MCP Server',
+        description: 'Disable the MCP server endpoint at /mcp (only with root permissions).',
+        path: '/mcp/disable',
+        operationId: 'disable-mcp',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'MCP server disabled.',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'MCP server disabled.'),
+                    ]
+                )),
+            new OA\Response(
+                response: 403,
+                description: 'You are not allowed to disable the MCP server.',
+                content: new OA\JsonContent(
+                    type: 'object',
+                    properties: [
+                        new OA\Property(property: 'message', type: 'string', example: 'You are not allowed to disable the MCP server.'),
+                    ]
+                )),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+        ]
+    )]
+    public function disable_mcp(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        if ($teamId !== '0' || ! $request->user()?->can('update', instanceSettings())) {
+            auditLog('api.mcp.disable_denied', ['team_id' => $teamId], 'warning');
+
+            return response()->json(['message' => 'You are not allowed to disable the MCP server.'], 403);
+        }
+        $settings = instanceSettings();
+        $settings->update(['is_mcp_server_enabled' => false]);
+
+        auditLog('api.mcp.disabled', ['team_id' => $teamId]);
+
+        return response()->json(['message' => 'MCP server disabled.'], 200);
+    }
+
+    public function feedback(Request $request)
+    {
+        $data = $request->validate([
+            'content' => ['required', 'string', 'min:10', 'max:2000'],
+        ]);
+
+        $webhook_url = config('constants.webhooks.feedback_discord_webhook');
+        if ($webhook_url) {
+            try {
+                $response = Http::timeout(5)->post($webhook_url, [
+                    'content' => $data['content'],
+                    'allowed_mentions' => ['parse' => []],
+                ]);
+            } catch (ConnectionException) {
+                $response = null;
+            }
+            if (! $response?->successful()) {
+                return response()->json(['message' => 'Feedback could not be delivered.'], 502);
+            }
+        }
+
+        return response()->json(['message' => 'Feedback sent.'], 200);
+    }
+
+    #[OA\Get(
+        summary: 'Healthcheck',
+        description: 'Healthcheck endpoint.',
+        path: '/health',
+        operationId: 'healthcheck',
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Healthcheck endpoint.',
+                content: new OA\MediaType(
+                    mediaType: 'text/html',
+                    schema: new OA\Schema(type: 'string'),
+                    example: 'OK',
+                )),
+            new OA\Response(
+                response: 401,
+                ref: '#/components/responses/401',
+            ),
+            new OA\Response(
+                response: 400,
+                ref: '#/components/responses/400',
+            ),
+            new OA\Response(
+                response: 503,
+                description: 'Database migrations are not finished yet.',
+            ),
+        ]
+    )]
     public function healthcheck(Request $request)
     {
-        return 'OK';
+        if ($this->hasPendingMigrations()) {
+            return response('Database migrations are running.', 503);
+        }
+
+        return response('OK');
+    }
+
+    /**
+     * The web server starts before the migrations finish, so the upgrade page must not reload before they do.
+     */
+    private function hasPendingMigrations(): bool
+    {
+        if (! config('constants.migration.is_migration_enabled')) {
+            return false;
+        }
+
+        try {
+            $migrator = app('migrator');
+            if (! $migrator->repositoryExists()) {
+                return true;
+            }
+            $files = $migrator->getMigrationFiles(array_merge($migrator->paths(), [database_path('migrations')]));
+
+            return array_diff(array_keys($files), $migrator->getRepository()->getRan()) !== [];
+        } catch (Throwable) {
+            return false;
+        }
     }
 }

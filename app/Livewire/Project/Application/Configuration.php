@@ -3,41 +3,73 @@
 namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
-use App\Models\Server;
 use Livewire\Component;
 
 class Configuration extends Component
 {
+    public $currentRoute;
+
     public Application $application;
+
+    public $project;
+
+    public $environment;
 
     public $servers;
 
-    protected $listeners = ['buildPackUpdated' => '$refresh'];
+    protected $listeners = [
+        'buildPackUpdated' => '$refresh',
+        'refresh' => '$refresh',
+    ];
 
     public function mount()
     {
-        $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
-        if (! $project) {
-            return redirect()->route('dashboard');
-        }
-        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
-        if (! $environment) {
-            return redirect()->route('dashboard');
-        }
-        $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
-        if (! $application) {
-            return redirect()->route('dashboard');
-        }
+        $this->syncCurrentRoute();
+
+        $project = currentTeam()
+            ->projects()
+            ->select('id', 'uuid', 'name', 'team_id')
+            ->where('uuid', request()->route('project_uuid'))
+            ->firstOrFail();
+        $environment = $project->environments()
+            ->select('id', 'uuid', 'name', 'project_id')
+            ->where('uuid', request()->route('environment_uuid'))
+            ->firstOrFail();
+        $application = $environment->applications()
+            ->with(['destination.server', 'environment.project'])
+            ->where('uuid', request()->route('application_uuid'))
+            ->firstOrFail();
+
+        // Parent page already resolved these; keep them on the model for nested components.
+        $application->setRelation('environment', $environment);
+        $environment->setRelation('project', $project);
+
+        $this->project = $project;
+        $this->environment = $environment;
         $this->application = $application;
-        $mainServer = $this->application->destination->server;
-        $servers = Server::ownedByCurrentTeam()->get();
-        $this->servers = $servers->filter(function ($server) use ($mainServer) {
-            return $server->id != $mainServer->id;
-        });
+
+        if ($this->application->build_pack === 'dockercompose' && $this->currentRoute === 'project.application.healthcheck') {
+            return redirect()->route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]);
+        }
+    }
+
+    /**
+     * Keep sidebar active state in sync on full-page navigations.
+     * Ignore Livewire update requests so poll/refresh does not clear it.
+     */
+    protected function syncCurrentRoute(): void
+    {
+        $routeName = request()->route()?->getName();
+
+        if (is_string($routeName) && str_starts_with($routeName, 'project.application.')) {
+            $this->currentRoute = $routeName;
+        }
     }
 
     public function render()
     {
+        $this->syncCurrentRoute();
+
         return view('livewire.project.application.configuration');
     }
 }

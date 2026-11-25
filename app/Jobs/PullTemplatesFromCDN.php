@@ -8,33 +8,48 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class PullTemplatesFromCDN implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $timeout = 10;
+    public $timeout = 60;
 
-    public function __construct() {}
+    public function __construct()
+    {
+        $this->onQueue('high');
+    }
 
     public function handle(): void
     {
         try {
-            if (! isDev()) {
-                ray('PullTemplatesAndVersions service-templates');
-                $response = Http::retry(3, 1000)->get(config('constants.services.official'));
-                if ($response->successful()) {
-                    $services = $response->json();
-                    File::put(base_path('templates/service-templates.json'), json_encode($services));
-                } else {
-                    send_internal_notification('PullTemplatesAndVersions failed with: '.$response->status().' '.$response->body());
+            $url = service_templates_cdn_url();
+            if ($url === null) {
+                return;
+            }
+            $response = Http::retry(3, 1000, throw: false)
+                ->timeout(60)
+                ->connectTimeout(10)
+                ->get($url);
+            if ($response->successful()) {
+                // Shared cache so Cloud HTTP nodes see the same bundle Horizon pulled.
+                if (! store_service_templates_bundle($response->body())) {
+                    Log::error('PullTemplatesFromCDN received an invalid bundle', [
+                        'body' => str($response->body())->limit(500)->toString(),
+                    ]);
                 }
+            } else {
+                Log::error('PullTemplatesFromCDN failed', [
+                    'status' => $response->status(),
+                    'body' => str($response->body())->limit(500)->toString(),
+                ]);
             }
         } catch (\Throwable $e) {
-            send_internal_notification('PullTemplatesAndVersions failed with: '.$e->getMessage());
-            ray($e->getMessage());
+            Log::error('PullTemplatesFromCDN exception', [
+                'message' => $e->getMessage(),
+            ]);
         }
     }
 }

@@ -1,0 +1,100 @@
+<?php
+
+use App\Models\PrivateKey;
+use App\Models\Server;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\File\Exception\FileNotFoundException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+function backupDownloadServer(): Server
+{
+    $server = new Server;
+    $server->forceFill([
+        'ip' => '192.0.2.10',
+        'port' => 2222,
+        'user' => 'root',
+        'team_id' => 5,
+    ]);
+
+    $privateKey = Mockery::mock(PrivateKey::class)->makePartial();
+    $privateKey->forceFill(['team_id' => 5]);
+    $privateKey->shouldReceive('getKeyLocation')->andReturn('/tmp/private-key');
+    $server->setRelation('privateKey', $privateKey);
+
+    return $server;
+}
+
+it('throws when the backup file does not exist on the server', function () {
+    $disk = Mockery::mock();
+    $disk->shouldReceive('exists')
+        ->once()
+        ->with('/backups/archive.tar.gz')
+        ->andReturnFalse();
+
+    Storage::shouldReceive('build')
+        ->once()
+        ->with([
+            'driver' => 'sftp',
+            'host' => '192.0.2.10',
+            'port' => 2222,
+            'username' => 'root',
+            'privateKey' => '/tmp/private-key',
+            'root' => '/',
+        ])
+        ->andReturn($disk);
+
+    streamBackupFromServer(backupDownloadServer(), '/backups/archive.tar.gz', 'application/gzip');
+})->throws(FileNotFoundException::class);
+
+it('refuses a private key from another team', function () {
+    $server = backupDownloadServer();
+    $server->privateKey->forceFill(['team_id' => 6]);
+
+    Storage::shouldReceive('build')->never();
+
+    streamBackupFromServer($server, '/backups/archive.tar.gz', 'application/gzip');
+})->throws(RuntimeException::class);
+
+it('streams a backup file with the requested content type', function () {
+    $stream = fopen('php://memory', 'r+');
+    fwrite($stream, 'backup contents');
+    rewind($stream);
+
+    $disk = Mockery::mock();
+    $disk->shouldReceive('exists')->once()->andReturnTrue();
+    $disk->shouldReceive('readStream')
+        ->once()
+        ->with('/backups/archive.tar.gz')
+        ->andReturn($stream);
+    Storage::shouldReceive('build')->once()->andReturn($disk);
+
+    $response = streamBackupFromServer(backupDownloadServer(), '/backups/archive.tar.gz', 'application/gzip');
+
+    expect($response)->toBeInstanceOf(StreamedResponse::class)
+        ->and($response->headers->get('content-type'))->toBe('application/gzip')
+        ->and($response->headers->get('content-disposition'))->toBe('attachment; filename="archive.tar.gz"');
+
+    ob_start();
+    ob_start();
+    $response->sendContent();
+    $contents = ob_get_clean();
+
+    expect($contents)->toBe('backup contents');
+});
+
+it('brackets an IPv6 server address for the sftp host', function (string $ip) {
+    $server = backupDownloadServer();
+    $server->forceFill(['ip' => $ip]);
+
+    $disk = Mockery::mock();
+    $disk->shouldReceive('exists')->once()->andReturnFalse();
+    Storage::shouldReceive('build')
+        ->once()
+        ->withArgs(fn (array $config): bool => $config['host'] === '[2a01:4f8::1]')
+        ->andReturn($disk);
+
+    streamBackupFromServer($server, '/backups/archive.tar.gz', 'application/gzip');
+})->with([
+    'raw' => '2a01:4f8::1',
+    'bracketed' => '[2a01:4f8::1]',
+])->throws(FileNotFoundException::class);

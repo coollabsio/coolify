@@ -1,0 +1,898 @@
+<?php
+
+use App\Models\Server;
+use Symfony\Component\Process\Process;
+
+beforeEach(function () {
+    // Create a mock server with non-root user
+    $this->server = Mockery::mock(Server::class)->makePartial();
+    $this->server->shouldReceive('getAttribute')->with('user')->andReturn('ubuntu');
+    $this->server->shouldReceive('setAttribute')->andReturnSelf();
+    $this->server->user = 'ubuntu';
+});
+
+afterEach(function () {
+    Mockery::close();
+});
+
+test('wraps complex Docker install command with pipes in bash -c', function () {
+    $commands = collect([
+        'curl https://releases.rancher.com/install-docker/27.3.sh | sh || curl https://get.docker.com | sh',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe("sudo bash -c 'curl https://releases.rancher.com/install-docker/27.3.sh | sh || curl https://get.docker.com | sh'");
+});
+
+test('preserves command substitutions inside database and volume backup scripts', function () {
+    $script = 'compressor=$(if command -v pigz; then printf pigz; else printf gzip; fi); exec $compressor';
+    $command = 'docker exec database pg_dumpall | docker run --rm -i helper sh -c '.escapeshellarg($script);
+    $volumeCommand = 'docker run --rm helper sh -c '.escapeshellarg($script).' > /data/coolify/backups/volume.tar.gz';
+
+    $result = parseCommandsByLineForSudo(collect([$command, $volumeCommand]), $this->server);
+
+    expect($result[0])
+        ->toStartWith("sudo bash -c '")
+        ->toContain('compressor=$(if command -v pigz; then')
+        ->not->toContain('$(sudo if')
+        ->not->toContain('| sudo docker run')
+        ->and($result[1])
+        ->toStartWith("sudo bash -c '")
+        ->toContain('compressor=$(if command -v pigz; then')
+        ->not->toContain('$(sudo if');
+});
+
+test('keeps safe file-storage path expansion in non-root commands', function () {
+    $argument = filesystemVolumeShellArgument('${DATA_PATH:-/srv/app/config.yml}');
+    $commands = collect([
+        "test -f {$argument} && echo OK || echo NOK",
+        'mkdir -p -- "$(dirname -- '.$argument.')"',
+        "echo 'e30=' | base64 -d | tee -- {$argument}",
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toContain('"${DATA_PATH:-/srv/app/config.yml}"')
+        ->and($result[1])->toContain('$(sudo dirname -- "${DATA_PATH:-/srv/app/config.yml}")')
+        ->and($result[2])->toContain('"${DATA_PATH:-/srv/app/config.yml}"');
+});
+
+test('rejects unsupported nested Compose defaults before non-root file commands', function () {
+    expect(fn () => filesystemVolumeShellArgument('${DATA:-${HOME}/config.yml}'))
+        ->toThrow(Exception::class);
+});
+
+test('preserves quoted backup container and file arguments for a non-root server', function () {
+    $container = escapeshellarg('db-name-uuid');
+    $path = escapeshellarg('/backups/db-name.dump');
+    $command = "docker exec {$container} pg_dump --username 'postgres' 'app' > {$path}";
+
+    $result = parseCommandsByLineForSudo(collect([$command]), $this->server);
+
+    expect($result)->toBe(['sudo '.$command]);
+});
+
+test('does not add sudo to && and || inside a docker exec sh -c script', function () {
+    $command = "docker exec postgres sh -c '/tmp/restore.sh && rm -f /tmp/restore.sql || exit 1'";
+
+    $result = parseCommandsByLineForSudo(collect([$command]), $this->server);
+
+    expect($result[0])->toBe("sudo bash -c 'docker exec postgres sh -c '\\''/tmp/restore.sh && rm -f /tmp/restore.sql || exit 1'\\'''");
+});
+
+test('wraps complex Docker install command with multiple fallbacks', function () {
+    $commands = collect([
+        'curl --max-time 300 https://releases.rancher.com/install-docker/27.3.sh | sh || curl https://get.docker.com | sh -s -- --version 27.3',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe("sudo bash -c 'curl --max-time 300 https://releases.rancher.com/install-docker/27.3.sh | sh || curl https://get.docker.com | sh -s -- --version 27.3'");
+});
+
+test('wraps command with pipe to bash in bash -c', function () {
+    $commands = collect([
+        'curl https://example.com/script.sh | bash',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe("sudo bash -c 'curl https://example.com/script.sh | bash'");
+});
+
+test('wraps complex command with pipes and && operators', function () {
+    $commands = collect([
+        'curl https://example.com | sh && echo "done"',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe("sudo bash -c 'curl https://example.com | sh && echo \"done\"'");
+});
+
+test('escapes single quotes in complex piped commands', function () {
+    $commands = collect([
+        "curl https://example.com | sh -c 'echo \"test\"'",
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe("sudo bash -c 'curl https://example.com | sh -c '\\''echo \"test\"'\\'''");
+});
+
+test('handles simple command without pipes or operators', function () {
+    $commands = collect([
+        'apt-get update',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo apt-get update');
+});
+
+test('handles command with double ampersand operator but no pipes', function () {
+    $commands = collect([
+        'mkdir -p /foo && chown ubuntu /foo',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo mkdir -p /foo && sudo chown ubuntu /foo');
+});
+
+test('handles command with double pipe operator but no pipes', function () {
+    $commands = collect([
+        'command -v docker || echo "not found"',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    // 'command' is exempted from sudo, but echo gets sudo after ||
+    expect($result[0])->toBe('command -v docker || sudo echo "not found"');
+});
+
+test('handles command with simple pipe but no operators', function () {
+    $commands = collect([
+        'cat file | grep pattern',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo cat file | sudo grep pattern');
+});
+
+test('handles command with subshell $(...)', function () {
+    $commands = collect([
+        'echo $(whoami)',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    // 'echo' is exempted from sudo at the start
+    expect($result[0])->toBe('echo $(sudo whoami)');
+});
+
+test('skips sudo for cd commands', function () {
+    $commands = collect([
+        'cd /var/www',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('cd /var/www');
+});
+
+test('skips sudo for echo commands', function () {
+    $commands = collect([
+        'echo "test"',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('echo "test"');
+});
+
+test('skips sudo for command commands', function () {
+    $commands = collect([
+        'command -v docker',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('command -v docker');
+});
+
+test('skips sudo for true commands', function () {
+    $commands = collect([
+        'true',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('true');
+});
+
+test('handles if statements by adding sudo to condition', function () {
+    $commands = collect([
+        'if command -v docker',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('if sudo command -v docker');
+});
+
+test('preserves shell negation before sudo', function (string $command, string $expected) {
+    expect(parseCommandsByLineForSudo(collect([$command]), $this->server))->toBe([$expected]);
+})->with([
+    'negated condition' => ['if ! docker inspect coolify-proxy; then', 'if ! sudo docker inspect coolify-proxy; then'],
+    'indented condition' => ["\tif  !  docker inspect coolify-proxy; then", "\tif  !  sudo docker inspect coolify-proxy; then"],
+    'negated pipeline' => [
+        '    if ! docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
+        '    if ! sudo docker ps -a --format "{{.Names}}" | sudo grep -q "^coolify-proxy$"; then',
+    ],
+    'standalone negation' => ['! docker inspect coolify-proxy', '! sudo docker inspect coolify-proxy'],
+    'repeated negation' => ['if ! ! docker inspect coolify-proxy; then', 'if ! ! sudo docker inspect coolify-proxy; then'],
+    'literal exclamation argument' => ['echo "! docker"', 'echo "! docker"'],
+]);
+
+test('proxy removal loop exits only once the container is absent', function (string $containers, string $expected) {
+    $commands = collect([
+        'for i in {1..15}; do',
+        '    if ! docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
+        '        echo "Container removed successfully."',
+        '        break',
+        '    fi',
+        '    echo "Waiting for container to be removed... ($i/15)"',
+        'done',
+    ]);
+    $script = <<<'BASH'
+sudo() { "$@"; }
+docker() { printf '%s\n' "$CONTAINERS"; }
+BASH;
+    $script .= "\n".implode("\n", parseCommandsByLineForSudo($commands, $this->server));
+    $process = new Process(['bash', '-c', $script], env: ['CONTAINERS' => $containers]);
+    $process->run();
+
+    expect($process->isSuccessful())->toBeTrue()
+        ->and($process->getErrorOutput())->toBe('')
+        ->and($process->getOutput())->toBe($expected);
+})->with([
+    'removed' => ['', "Container removed successfully.\n"],
+    'other containers remain' => ['another-container', "Container removed successfully.\n"],
+    'still present' => ['coolify-proxy', implode('', array_map(
+        fn (int $attempt): string => "Waiting for container to be removed... ($attempt/15)\n",
+        range(1, 15),
+    ))],
+]);
+
+test('skips sudo for fi statements', function () {
+    $commands = collect([
+        'fi',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('fi');
+});
+
+test('adds ownership changes for Coolify data paths', function () {
+    $commands = collect([
+        'mkdir -p /data/coolify/logs',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo mkdir -p /data/coolify/logs && sudo find /data/coolify/logs -user root -exec chown -h ubuntu:ubuntu {} + && sudo chmod o-rwx /data/coolify/logs');
+});
+
+test('adds ownership changes for Coolify tmp paths', function () {
+    $commands = collect([
+        'mkdir -p /tmp/coolify/cache',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo mkdir -p /tmp/coolify/cache && sudo find /tmp/coolify/cache -user root -exec chown -h ubuntu:ubuntu {} + && sudo chmod o-rwx /tmp/coolify/cache');
+});
+
+test('ownership changes work where root may not use sudo', function (string $parser) {
+    $directory = sys_get_temp_dir().'/coolify-sudo-'.bin2hex(random_bytes(4));
+    mkdir($directory);
+    // Like Alpine: root is not in the sudoers file, so a nested sudo fails.
+    file_put_contents("{$directory}/sudo", "#!/bin/sh\nif [ -n \"\$IN_SUDO\" ]; then echo 'root is not in the sudoers file' >&2; exit 1; fi\nexport IN_SUDO=1\nexec \"\$@\"\n");
+    foreach (['chown', 'chmod'] as $tool) {
+        file_put_contents("{$directory}/{$tool}", "#!/bin/sh\necho \"{$tool} \$*\" >> \"\$LOG\"\n");
+    }
+    array_map(fn (string $tool) => chmod("{$directory}/{$tool}", 0755), ['sudo', 'chown', 'chmod']);
+    $path = '/tmp/coolify/sudo-test-'.bin2hex(random_bytes(4));
+
+    $command = $parser === 'command list'
+        ? parseCommandsByLineForSudo(collect(["mkdir -p {$path}"]), $this->server)[0]
+        : parseLineForSudo("mkdir -p {$path}", $this->server);
+    $process = new Process(['/bin/sh', '-c', $command], env: ['PATH' => "{$directory}:".getenv('PATH'), 'LOG' => "{$directory}/log"]);
+    $process->run();
+
+    expect($command)->not->toMatch('/sudo\s+sudo/')
+        ->and($process->getErrorOutput())->toBe('')
+        ->and($process->isSuccessful())->toBeTrue()
+        ->and(is_dir($path))->toBeTrue()
+        ->and(file_get_contents("{$directory}/log"))->toContain("chmod o-rwx {$path}\n");
+
+    (new Process(['rm', '-rf', $directory, $path]))->run();
+})->with(['command list', 'deployment line']);
+
+test('ownership changes keep container-owned files and file modes', function (string $parser) {
+    if (posix_geteuid() !== 0 || posix_getpwnam('daemon') === false) {
+        $this->markTestSkipped('Needs root and a daemon user to change file owners.');
+    }
+    $directory = sys_get_temp_dir().'/coolify-sudo-'.bin2hex(random_bytes(4));
+    mkdir($directory);
+    file_put_contents("{$directory}/sudo", "#!/bin/sh\nexec \"\$@\"\n");
+    chmod("{$directory}/sudo", 0755);
+    $path = '/tmp/coolify/ownership-test-'.bin2hex(random_bytes(4));
+    // A file mount that Coolify wrote with sudo, and a database folder that belongs to the container user.
+    mkdir("{$path}/pgdata", 0700, true);
+    file_put_contents("{$path}/index.html", 'mounted');
+    chmod("{$path}/index.html", 0644);
+    file_put_contents("{$path}/pgdata/PG_VERSION", '17');
+    chmod("{$path}/pgdata/PG_VERSION", 0600);
+    chown("{$path}/pgdata", 999);
+    chown("{$path}/pgdata/PG_VERSION", 999);
+
+    $server = Mockery::mock(Server::class)->makePartial();
+    $server->shouldReceive('getAttribute')->with('user')->andReturn('daemon');
+    $server->shouldReceive('setAttribute')->andReturnSelf();
+    $command = $parser === 'command list'
+        ? parseCommandsByLineForSudo(collect(["mkdir -p {$path}"]), $server)[0]
+        : parseLineForSudo("mkdir -p {$path}", $server);
+    $process = new Process(['/bin/sh', '-c', $command], env: ['PATH' => "{$directory}:".getenv('PATH')]);
+    $process->run();
+    clearstatcache();
+
+    expect($process->getErrorOutput())->toBe('')
+        ->and(fileowner($path))->toBe(1)
+        ->and(fileperms($path) & 0007)->toBe(0)
+        ->and(fileowner("{$path}/index.html"))->toBe(1)
+        ->and(fileperms("{$path}/index.html") & 0777)->toBe(0644)
+        ->and(fileowner("{$path}/pgdata"))->toBe(999)
+        ->and(fileowner("{$path}/pgdata/PG_VERSION"))->toBe(999)
+        ->and(fileperms("{$path}/pgdata/PG_VERSION") & 0777)->toBe(0600);
+
+    (new Process(['rm', '-rf', $directory, $path]))->run();
+})->with(['command list', 'deployment line']);
+
+test('ownership changes apply only to the mkdir path when more commands follow', function (string $parser, string $separator) {
+    $directory = sys_get_temp_dir().'/coolify-sudo-'.bin2hex(random_bytes(4));
+    mkdir($directory);
+    file_put_contents("{$directory}/sudo", "#!/bin/sh\nexec \"\$@\"\n");
+    foreach (['chown', 'chmod'] as $tool) {
+        file_put_contents("{$directory}/{$tool}", "#!/bin/sh\necho \"{$tool} \$*\" >> \"\$LOG\"\n");
+    }
+    array_map(fn (string $tool) => chmod("{$directory}/{$tool}", 0755), ['sudo', 'chown', 'chmod']);
+    $path = '/tmp/coolify/sudo-test-'.bin2hex(random_bytes(4));
+    $line = "mkdir -p {$path}/dynamic{$separator} ls -1 {$path}/dynamic | head -n 1000";
+
+    $command = $parser === 'command list'
+        ? parseCommandsByLineForSudo(collect([$line]), $this->server)[0]
+        : parseLineForSudo($line, $this->server);
+    $process = new Process(['bash', '-c', $command], env: ['PATH' => "{$directory}:".getenv('PATH'), 'LOG' => "{$directory}/log"]);
+    $process->run();
+
+    expect($command)->toContain("find {$path}/dynamic -user root -exec chown -h ubuntu:ubuntu {} + && ")
+        ->and($command)->toContain("chmod o-rwx {$path}/dynamic{$separator} ")
+        ->and($command)->toEndWith('head -n 1000'.($parser === 'command list' ? "'" : ''))
+        ->and($process->getErrorOutput())->toBe('')
+        ->and($process->isSuccessful())->toBeTrue()
+        ->and(is_dir("{$path}/dynamic"))->toBeTrue()
+        ->and(file_get_contents("{$directory}/log"))->toEndWith("chmod o-rwx {$path}/dynamic\n");
+
+    (new Process(['rm', '-rf', $directory, $path]))->run();
+})->with(['command list', 'deployment line'])->with(['and' => ' &&', 'semicolon' => ';']);
+
+test('does not add ownership changes when mkdir is followed by other operators', function () {
+    $result = parseCommandsByLineForSudo(collect([
+        'mkdir -p /data/coolify/proxy > /dev/null 2>&1 || true',
+    ]), $this->server);
+
+    expect($result[0])->toBe('sudo mkdir -p /data/coolify/proxy > /dev/null 2>&1 || sudo true');
+});
+
+test('does not add ownership changes for system paths', function () {
+    $commands = collect([
+        'mkdir -p /var/log',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo mkdir -p /var/log');
+});
+
+test('handles multiple commands in sequence', function () {
+    $commands = collect([
+        'apt-get update',
+        'apt-get install -y docker',
+        'curl https://get.docker.com | sh',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result)->toHaveCount(3);
+    expect($result[0])->toBe('sudo apt-get update');
+    expect($result[1])->toBe('sudo apt-get install -y docker');
+    expect($result[2])->toBe("sudo bash -c 'curl https://get.docker.com | sh'");
+});
+
+test('handles empty command list', function () {
+    $commands = collect([]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result)->toBeArray();
+    expect($result)->toHaveCount(0);
+});
+
+test('handles real-world Docker installation command from InstallDocker action', function () {
+    $version = '27.3';
+    $commands = collect([
+        "curl --max-time 300 --retry 3 https://releases.rancher.com/install-docker/{$version}.sh | sh || curl --max-time 300 --retry 3 https://get.docker.com | sh -s -- --version {$version}",
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toStartWith("sudo bash -c '");
+    expect($result[0])->toEndWith("'");
+    expect($result[0])->toContain('curl --max-time 300');
+    expect($result[0])->toContain('| sh');
+    expect($result[0])->toContain('||');
+    expect($result[0])->not->toContain('| sudo sh');
+});
+
+test('preserves command structure in wrapped bash -c', function () {
+    $commands = collect([
+        'curl https://example.com | sh || curl https://backup.com | sh',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    // The command should be wrapped without breaking the pipe and fallback structure
+    expect($result[0])->toBe("sudo bash -c 'curl https://example.com | sh || curl https://backup.com | sh'");
+
+    // Verify it doesn't contain broken patterns like "| sudo sh"
+    expect($result[0])->not->toContain('| sudo sh');
+    expect($result[0])->not->toContain('|| sudo curl');
+});
+
+test('handles command with mixed operators and subshells', function () {
+    $commands = collect([
+        'docker ps || echo $(date)',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    // docker commands now correctly get sudo prefix (word boundary fix for 'do' keyword)
+    // The || operator adds sudo to what follows, and subshell adds sudo inside $()
+    expect($result[0])->toBe('sudo docker ps || sudo echo $(sudo date)');
+});
+
+test('handles whitespace-only commands gracefully', function () {
+    $commands = collect([
+        '   ',
+        '',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result)->toHaveCount(2);
+});
+
+test('detects pipe to sh with additional arguments', function () {
+    $commands = collect([
+        'curl https://example.com | sh -s -- --arg1 --arg2',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe("sudo bash -c 'curl https://example.com | sh -s -- --arg1 --arg2'");
+});
+
+test('handles command chains with both && and || operators with pipes', function () {
+    $commands = collect([
+        'curl https://first.com | sh && echo "success" || curl https://backup.com | sh',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toStartWith("sudo bash -c '");
+    expect($result[0])->toEndWith("'");
+    expect($result[0])->not->toContain('| sudo');
+});
+
+test('skips sudo for bash control structure keywords - for loop', function () {
+    $commands = collect([
+        '    for i in {1..10}; do',
+        '        echo $i',
+        '    done',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    // Control structure keywords should not have sudo prefix
+    expect($result[0])->toBe('    for i in {1..10}; do');
+    expect($result[1])->toBe('        echo $i');
+    expect($result[2])->toBe('    done');
+});
+
+test('skips sudo for bash control structure keywords - while loop', function () {
+    $commands = collect([
+        'while true; do',
+        '    echo "running"',
+        'done',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('while true; do');
+    expect($result[1])->toBe('    echo "running"');
+    expect($result[2])->toBe('done');
+});
+
+test('skips sudo for bash control structure keywords - case statement', function () {
+    $commands = collect([
+        'case $1 in',
+        '    start)',
+        '        systemctl start service',
+        '        ;;',
+        'esac',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('case $1 in');
+    // Note: '    start)' gets sudo because 'start)' doesn't match any excluded keyword
+    // The sudo is added at the start of the line, before indentation
+    expect($result[1])->toBe('sudo     start)');
+    expect($result[2])->toBe('sudo         systemctl start service');
+    expect($result[3])->toBe('sudo         ;;');
+    expect($result[4])->toBe('esac');
+});
+
+test('skips sudo for bash control structure keywords - if then else', function () {
+    $commands = collect([
+        'if [ -f /tmp/file ]; then',
+        '    cat /tmp/file',
+        'else',
+        '    touch /tmp/file',
+        'fi',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('if sudo [ -f /tmp/file ]; then');
+    // Note: sudo is added at the start of line (before indentation) for non-excluded commands
+    expect($result[1])->toBe('sudo     cat /tmp/file');
+    expect($result[2])->toBe('else');
+    expect($result[3])->toBe('sudo     touch /tmp/file');
+    expect($result[4])->toBe('fi');
+});
+
+test('skips sudo for bash control structure keywords - elif', function () {
+    $commands = collect([
+        'if [ $x -eq 1 ]; then',
+        '    echo "one"',
+        'elif [ $x -eq 2 ]; then',
+        '    echo "two"',
+        'else',
+        '    echo "other"',
+        'fi',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('if sudo [ $x -eq 1 ]; then');
+    expect($result[1])->toBe('    echo "one"');
+    expect($result[2])->toBe('elif [ $x -eq 2 ]; then');
+    expect($result[3])->toBe('    echo "two"');
+    expect($result[4])->toBe('else');
+    expect($result[5])->toBe('    echo "other"');
+    expect($result[6])->toBe('fi');
+});
+
+test('handles real-world proxy startup with for loop from StartProxy action', function () {
+    // This is the exact command structure that was causing the bug in issue #7346
+    $commands = collect([
+        'if docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
+        "    echo 'Stopping and removing existing coolify-proxy.'",
+        '    docker stop coolify-proxy 2>/dev/null || true',
+        '    docker rm -f coolify-proxy 2>/dev/null || true',
+        '    # Wait for container to be fully removed',
+        '    for i in {1..10}; do',
+        '        if ! docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
+        '            break',
+        '        fi',
+        '        echo "Waiting for coolify-proxy to be removed... ($i/10)"',
+        '        sleep 1',
+        '    done',
+        "    echo 'Successfully stopped and removed existing coolify-proxy.'",
+        'fi',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    // Verify the for loop line doesn't have sudo prefix
+    expect($result[5])->toBe('    for i in {1..10}; do');
+    expect($result[5])->not->toContain('sudo for');
+
+    // Verify the done line doesn't have sudo prefix
+    expect($result[11])->toBe('    done');
+    expect($result[11])->not->toContain('sudo done');
+
+    // Verify break doesn't have sudo prefix
+    expect($result[7])->toBe('            break');
+    expect($result[7])->not->toContain('sudo break');
+
+    // Verify comment doesn't have sudo prefix
+    expect($result[4])->toBe('    # Wait for container to be fully removed');
+    expect($result[4])->not->toContain('sudo #');
+
+    // Verify other control structures remain correct
+    expect($result[0])->toStartWith('if sudo docker ps');
+    expect($result[6])->toBe('        if ! sudo docker ps -a --format "{{.Names}}" | sudo grep -q "^coolify-proxy$"; then');
+    expect($result[8])->toBe('        fi');
+    expect($result[13])->toBe('fi');
+});
+
+test('skips sudo for break and continue keywords', function () {
+    $commands = collect([
+        'for i in {1..5}; do',
+        '    if [ $i -eq 3 ]; then',
+        '        break',
+        '    fi',
+        '    if [ $i -eq 2 ]; then',
+        '        continue',
+        '    fi',
+        'done',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[2])->toBe('        break');
+    expect($result[2])->not->toContain('sudo');
+    expect($result[5])->toBe('        continue');
+    expect($result[5])->not->toContain('sudo');
+});
+
+test('skips sudo for comment lines starting with #', function () {
+    $commands = collect([
+        '# This is a comment',
+        '    # Indented comment',
+        'apt-get update',
+        '# Another comment',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('# This is a comment');
+    expect($result[0])->not->toContain('sudo');
+    expect($result[1])->toBe('    # Indented comment');
+    expect($result[1])->not->toContain('sudo');
+    expect($result[2])->toBe('sudo apt-get update');
+    expect($result[3])->toBe('# Another comment');
+    expect($result[3])->not->toContain('sudo');
+});
+
+test('skips sudo for until loop keywords', function () {
+    $commands = collect([
+        'until [ -f /tmp/ready ]; do',
+        '    echo "Waiting..."',
+        '    sleep 1',
+        'done',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('until [ -f /tmp/ready ]; do');
+    expect($result[0])->not->toContain('sudo until');
+    expect($result[1])->toBe('    echo "Waiting..."');
+    // Note: sudo is added at the start of line (before indentation) for non-excluded commands
+    expect($result[2])->toBe('sudo     sleep 1');
+    expect($result[3])->toBe('done');
+});
+
+test('skips sudo for select loop keywords', function () {
+    $commands = collect([
+        'select opt in "Option1" "Option2"; do',
+        '    echo $opt',
+        '    break',
+        'done',
+    ]);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('select opt in "Option1" "Option2"; do');
+    expect($result[0])->not->toContain('sudo select');
+    expect($result[2])->toBe('    break');
+});
+
+// Tests for word boundary matching - ensuring commands are not confused with bash keywords
+
+test('adds sudo for ifconfig command (not confused with if keyword)', function () {
+    $commands = collect(['ifconfig eth0']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo ifconfig eth0');
+    expect($result[0])->not->toContain('if sudo');
+});
+
+test('adds sudo for ifup command (not confused with if keyword)', function () {
+    $commands = collect(['ifup eth0']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo ifup eth0');
+});
+
+test('adds sudo for ifdown command (not confused with if keyword)', function () {
+    $commands = collect(['ifdown eth0']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo ifdown eth0');
+});
+
+test('adds sudo for find command (not confused with fi keyword)', function () {
+    $commands = collect(['find /var -name "*.log"']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo find /var -name "*.log"');
+});
+
+test('adds sudo for file command (not confused with fi keyword)', function () {
+    $commands = collect(['file /tmp/test']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo file /tmp/test');
+});
+
+test('adds sudo for finger command (not confused with fi keyword)', function () {
+    $commands = collect(['finger user']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo finger user');
+});
+
+test('adds sudo for docker command (not confused with do keyword)', function () {
+    $commands = collect(['docker ps']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo docker ps');
+});
+
+test('adds sudo for fortune command (not confused with for keyword)', function () {
+    $commands = collect(['fortune']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo fortune');
+});
+
+test('adds sudo for formail command (not confused with for keyword)', function () {
+    $commands = collect(['formail -s procmail']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('sudo formail -s procmail');
+});
+
+test('if keyword with word boundary gets sudo inserted correctly', function () {
+    $commands = collect(['if [ -f /tmp/test ]; then']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('if sudo [ -f /tmp/test ]; then');
+});
+
+test('fi keyword with word boundary is not given sudo', function () {
+    $commands = collect(['fi']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('fi');
+});
+
+test('for keyword with word boundary is not given sudo', function () {
+    $commands = collect(['for i in 1 2 3; do']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('for i in 1 2 3; do');
+});
+
+test('do keyword with word boundary is not given sudo', function () {
+    $commands = collect(['do']);
+
+    $result = parseCommandsByLineForSudo($commands, $this->server);
+
+    expect($result[0])->toBe('do');
+});
+
+test('keeps a single sudo sh -c script unchanged in both parsers', function () {
+    // A redirect inside the script is opened by root. Inner sudo fails where root is not in sudoers (Alpine).
+    $line = 'sh -c '.escapeshellarg("docker exec 'db' pg_dump 'app' > '/data/coolify/backups/app.dmp' && echo it's done | cat");
+
+    expect(parseCommandsByLineForSudo(collect([$line]), $this->server)[0])->toBe("sudo {$line}")
+        ->and(parseLineForSudo($line, $this->server))->toBe("sudo {$line}");
+});
+
+test('still wraps a sh -c call that is not the whole line', function () {
+    $line = "docker exec db pg_dumpall | docker run --rm -i helper sh -c 'gzip' > /data/coolify/backups/all.gz";
+
+    expect(parseCommandsByLineForSudo(collect([$line]), $this->server)[0])->toStartWith("sudo bash -c '");
+});
+
+test('parseLineForSudo adds sudo to each pipe stage without doubling it', function () {
+    expect(parseLineForSudo("echo 'ZW52' | base64 -d | tee /data/coolify/applications/app/.env > /dev/null", $this->server))
+        ->toBe("sudo echo 'ZW52' | sudo base64 -d | sudo tee /data/coolify/applications/app/.env > /dev/null")
+        ->and(parseLineForSudo('docker ps | sudo grep app', $this->server))
+        ->toBe('sudo docker ps | sudo grep app');
+});
+
+test('parseLineForSudo keeps pipes inside quoted strings unchanged', function (string $line, string $expected) {
+    expect(parseLineForSudo($line, $this->server))->toBe($expected);
+})->with([
+    'single-quoted go template' => [
+        "docker inspect --format '{{a | b}}' coolify-proxy | grep x",
+        "sudo docker inspect --format '{{a | b}}' coolify-proxy | sudo grep x",
+    ],
+    'double-quoted sh -c script' => [
+        'sh -c "x | y"',
+        'sudo sh -c "x | y"',
+    ],
+    'escaped double quote inside double quotes' => [
+        'echo "a \" | b" | tee /tmp/coolify/file',
+        'sudo echo "a \" | b" | sudo tee /tmp/coolify/file',
+    ],
+    'single quote inside double quotes' => [
+        "echo \"it's | here\" | tee /tmp/coolify/file",
+        "sudo echo \"it's | here\" | sudo tee /tmp/coolify/file",
+    ],
+]);
+
+test('parseCommandsByLineForSudo keeps pipes inside quoted strings unchanged', function () {
+    $result = parseCommandsByLineForSudo(collect([
+        "docker ps --format '{{.Names}} | {{.Image}}' | grep app",
+    ]), $this->server);
+
+    expect($result[0])->toBe("sudo docker ps --format '{{.Names}} | {{.Image}}' | sudo grep app");
+});
+
+test('railpack builder helper command gets sudo only outside the helper script', function () {
+    $command = railpackBuilderHelperCommand('$HOME/.docker/buildx', 'coolify-helper:1.0.0', 'docker buildx prune --builder coolify-railpack -af');
+
+    $parsed = parseCommandsByLineForSudo(collect([$command]), $this->server)[0];
+
+    // The SSH user's shell must expand $HOME, so the line must not be wrapped in `sudo bash -c`.
+    expect($parsed)->toBe(
+        'sudo docker run --rm -v $HOME/.docker/buildx:/root/.docker/buildx -v /var/run/docker.sock:/var/run/docker.sock coolify-helper:1.0.0'
+        ." bash -c 'exec 9>/root/.docker/buildx/coolify-railpack.lock; if flock -s 9; then :; else exit $?; fi; docker buildx prune --builder coolify-railpack -af; status=$?;"
+        .' if flock -n -x 9; then DOCKER_CONFIG=/root/.docker docker buildx stop coolify-railpack >/dev/null 2>&1; fi;'
+        ." exit \$status' 2>/dev/null || sudo true"
+    );
+});
+
+test('railpack builder prune script gets no sudo inside the helper script', function () {
+    $command = railpackBuilderHelperCommand('$HOME/.docker/buildx', 'coolify-helper:1.0.0', railpackBuilderPruneScript());
+
+    $parsed = parseCommandsByLineForSudo(collect([$command]), $this->server)[0];
+
+    expect($parsed)
+        ->toStartWith('sudo docker run --rm ')
+        ->toContain(railpackBuilderPruneScript().'; status=$?;')
+        ->toEndWith("exit \$status' 2>/dev/null || sudo true");
+});

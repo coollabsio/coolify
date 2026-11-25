@@ -12,8 +12,6 @@ class RunCommand
 
     public function handle(Server $server, $command)
     {
-        $activity = remote_process(command: [$command], server: $server, ignore_errors: true, type: ActivityTypes::COMMAND->value);
-
-        return $activity;
+        return remote_process(command: [$command], server: $server, ignore_errors: true, type: ActivityTypes::COMMAND->value);
     }
 }

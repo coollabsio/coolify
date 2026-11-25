@@ -1,86 +1,460 @@
-<div>
+<div class="application-settings-form w-full">
     <x-slot:title>
-        Tag | Coolify
+        Tags | Coolify
     </x-slot>
-    <div class="flex items-start gap-2">
-        <div>
-            <h1>Tags</h1>
+
+    <header @class([
+        'mb-5 flex items-start justify-between gap-4',
+        'lg:hidden' => isset($tag),
+    ])>
+        <div class="min-w-0">
+            <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">Tags</h1>
+            <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
+                @if ($tags->isEmpty())
+                    Group applications and services for bulk deploys
+                @elseif (isset($tag))
+                    Manage webhook deploys and resources for this tag
+                @else
+                    {{ $tags->count() }} {{ Str::plural('tag', $tags->count()) }} for bulk deploys and grouping
+                @endif
+            </p>
         </div>
-    </div>
-    <div class="flex flex-col gap-2 pb-6 ">
-        <div>Available tags</div>
-        <div class="flex flex-wrap gap-2 ">
-            @forelse ($tags as $oneTag)
-                <a :class="{{ $tag->id == $oneTag->id }} && 'bg-coollabs hover:bg-coollabs-100'" class="w-64 box"
-                    href="{{ route('tags.show', ['tag_name' => $oneTag->name]) }}">{{ $oneTag->name }}</a>
-            @empty
-                <div>No tags yet defined yet. Go to a resource and add a tag there.</div>
-            @endforelse
-        </div>
-    </div>
-    <div>
-        <h3 class="py-4">Details</h3>
-        <div class="flex items-end gap-2 ">
-            <div class="w-[500px]">
-                <x-forms.input readonly label="Deploy Webhook URL" id="webhook" />
+        @unless (isset($tag))
+            <div class="flex shrink-0 items-center gap-2">
+                @can('create', App\Models\Tag::class)
+                    <x-modal-input title="New tag">
+                        <x-slot:content>
+                            <button type="button" class="button button-highlighted whitespace-nowrap">
+                                <x-reicon name="plus" class="size-3.5" />
+                                New tag
+                            </button>
+                        </x-slot:content>
+                        @include('livewire.tags.partials.new-tag-form')
+                    </x-modal-input>
+                @endcan
             </div>
-            <x-modal-confirmation isHighlighted buttonTitle="Redeploy All" action="redeploy_all">
-                All resources will be redeployed.
-            </x-modal-confirmation>
-        </div>
-        <div class="grid grid-cols-1 gap-2 pt-4 lg:grid-cols-2 xl:grid-cols-3">
-            @foreach ($applications as $application)
-                <a href="{{ $application->link() }}" class="box group">
-                    <div class="flex flex-col">
-                        <div class="box-title">{{ $application->project()->name }}/{{ $application->environment->name }}
-                        </div>
-                        <div class="box-description">{{ $application->name }}</div>
-                        <div class="box-description">{{ $application->description }}</div>
+        @endunless
+    </header>
+
+    @if ($tags->isEmpty())
+        <x-empty title="No tags yet"
+            description="Create a tag, then connect it to resources to group related deployments."
+            icon-name="tags" />
+    @elseif (! isset($tag))
+        <div x-data="tagsIndex()" class="w-full">
+            <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="relative w-full sm:max-w-sm">
+                    <x-reicon name="search"
+                        class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                    <input x-model.debounce.150ms="search" x-on:input="page = 1" type="search"
+                        placeholder="Search tags"
+                        class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint">
+                    <button x-cloak x-show="search" x-on:click="search = ''; page = 1" type="button"
+                        class="absolute top-1/2 right-2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                        aria-label="Clear search">
+                        <span class="text-sm leading-none">×</span>
+                    </button>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <div :class="viewMode === 'grid' ? '' : 'min-[641px]:hidden'">
+                        <x-table.dropdown panel-class="w-52!">
+                            <x-slot:trigger>
+                                <button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
+                                <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none"
+                                    aria-hidden="true">
+                                    <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3"
+                                        stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+                                        stroke-linejoin="round" />
+                                </svg>
+                                Sort
+                                </button>
+                            </x-slot:trigger>
+                                <template x-for="option in sortOptions" :key="option.value">
+                                    <button type="button"
+                                        class="listbox-option"
+                                        x-on:click="sortBy = option.value; close(); page = 1">
+                                        <span class="flex-1" x-text="option.label"></span>
+                                        <svg x-show="sortBy === option.value" class="size-3.5 text-black dark:text-fg"
+                                            viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                            <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor"
+                                                stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                    </button>
+                                </template>
+                        </x-table.dropdown>
                     </div>
-                </a>
-            @endforeach
-            @foreach ($services as $service)
-                <a href="{{ $service->link() }}" class="flex flex-col box group">
-                    <div class="flex flex-col">
-                        <div class="box-title">{{ $service->project()->name }}/{{ $service->environment->name }}
-                        </div>
-                        <div class="box-description">{{ $service->name }}</div>
-                        <div class="box-description">{{ $service->description }}</div>
-                    </div>
-                </a>
-            @endforeach
-        </div>
-        <div class="flex items-center gap-2">
-            <h3 class="py-4">Deployments</h3>
-            @if (count($deployments_per_tag_per_server) > 0)
-                <x-loading />
-            @endif
-        </div>
-        <div wire:poll.1000ms="get_deployments" class="grid grid-cols-1">
-            @forelse ($deployments_per_tag_per_server as $server_name => $deployments)
-                <h4 class="py-4">{{ $server_name }}</h4>
-                <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
-                    @foreach ($deployments as $deployment)
-                        <a href="{{ data_get($deployment, 'deployment_url') }}" @class([
-                            'gap-2 cursor-pointer box group border-l-2 border-dotted',
-                            'dark:border-coolgray-300' => data_get($deployment, 'status') === 'queued',
-                            'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
-                        ])>
-                            <div class="flex flex-col mx-6">
-                                <div class="font-bold dark:text-white">
-                                    {{ data_get($deployment, 'application_name') }}
+
+                    <x-canvas-view-toggle :list-url="route('tags.show')"
+                        :canvas-url="route('tags.canvas')" />
+                </div>
+            </div>
+
+            <div x-cloak x-show="viewMode === 'grid'">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <template x-for="tag in paginatedTags" :key="tag.id">
+                        <article
+                            class="group relative flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
+                            <a :href="tag.href" {{ wireNavigate() }} class="absolute inset-0 rounded-xl"
+                                :aria-label="`Open ${tag.name}`"></a>
+
+                            <div class="flex items-start gap-3">
+                                <div
+                                    class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                                    <x-reicon name="tags" class="size-4" />
                                 </div>
-                                <div class="description">
-                                    {{ str(data_get($deployment, 'status'))->headline() }}
+                                <div class="min-w-0 flex-1">
+                                    <h2 class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg"
+                                        x-text="tag.name"></h2>
+                                    <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                        Team tag
+                                    </p>
                                 </div>
                             </div>
-                            <div class="flex-1"></div>
-                        </a>
-                    @endforeach
+
+                            <div class="mt-auto flex items-center pt-4">
+                                <span class="text-[11px] text-neutral-500 dark:text-fg-dim"
+                                    x-text="`${tag.resourceCount} ${tag.resourceCount === 1 ? 'resource' : 'resources'}`"></span>
+                            </div>
+                        </article>
+                    </template>
                 </div>
-            @empty
-                <div>No deployments running.</div>
-            @endforelse
+                <x-client-pagination total="filteredTags.length" x-show="filteredTags.length > 0" class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]"
+                    summary="`${rangeStart}-${rangeEnd} of ${filteredTags.length}`" page-size-model="pageSize"
+                    storage-key="coolify.page-size.tags" :options="[12, 24, 48, 96]" />
+            </div>
+
+            <div x-show="viewMode === 'table'"
+                class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
+                <div
+                    class="tags-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
+                    <x-table.sort-header label="Tag" asc="name-asc" desc="name-desc" then="page = 1" />
+                    <x-table.sort-header label="Resources" asc="resources-asc" desc="resources-desc" first="desc" then="page = 1" />
+                    <x-table.sort-header label="Applications" asc="applications-asc" desc="applications-desc" first="desc"
+                        then="page = 1" />
+                    <x-table.sort-header label="Services" asc="services-asc" desc="services-desc" first="desc" then="page = 1"
+                        class="tag-services" />
+                </div>
+
+                <template x-for="tag in paginatedTags" :key="tag.id">
+                    <a :href="tag.href" {{ wireNavigate() }}
+                        class="tags-table-grid group min-h-14 items-center border-b border-neutral-200 px-4 py-2.5 transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]"
+                        :aria-label="`Open ${tag.name}`">
+                        <div class="flex min-w-0 items-center gap-3">
+                            <div
+                                class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                                <x-reicon name="tags" class="size-4" />
+                            </div>
+                            <span class="truncate text-[13px] font-semibold text-black dark:text-fg"
+                                x-text="tag.name"></span>
+                        </div>
+
+                        <div class="text-[12px] text-neutral-600 dark:text-fg-dim" x-text="tag.resourceCount"></div>
+                        <div class="text-[12px] text-neutral-600 dark:text-fg-dim" x-text="tag.applicationsCount"></div>
+                        <div class="tag-services text-[12px] text-neutral-600 dark:text-fg-dim"
+                            x-text="tag.servicesCount"></div>
+                    </a>
+                </template>
+                <x-client-pagination total="filteredTags.length" x-show="filteredTags.length > 0"
+                    summary="`${rangeStart}-${rangeEnd} of ${filteredTags.length}`" page-size-model="pageSize"
+                    storage-key="coolify.page-size.tags" :options="[12, 24, 48, 96]" />
+            </div>
+
+            <div x-show="filteredTags.length === 0"
+                class="flex min-h-52 flex-col items-center justify-center rounded-xl border border-neutral-200 bg-white px-6 text-center dark:border-white/[0.08] dark:bg-white/[0.05]">
+                <x-reicon name="search" class="mb-3 size-6 text-neutral-300 dark:text-fg-faint" />
+                <p class="text-[13px] font-medium">No matching tags</p>
+                <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">
+                    Try a different search.
+                </p>
+            </div>
         </div>
-    </div>
+
+        <script>
+            function tagsIndex() {
+                return {
+                    search: '',
+                    sortBy: 'name-asc',
+                    sortOpen: false,
+                    viewMode: @js($this->listView('tags', 'grid')),
+                    page: 1,
+                    pageSize: 12,
+                    tags: @js($tagsJs),
+                    sortOptions: [{
+                            value: 'name-asc',
+                            label: 'Name A–Z'
+                        },
+                        {
+                            value: 'name-desc',
+                            label: 'Name Z–A'
+                        },
+                        {
+                            value: 'resources-desc',
+                            label: 'Most resources'
+                        },
+                    ],
+                    get filteredTags() {
+                        const query = this.search.trim().toLowerCase();
+                        const tags = this.tags.filter((tag) => {
+                            return !query || tag.name.toLowerCase().includes(query);
+                        });
+
+                        const [column, direction] = this.sortBy.split('-');
+                        const sortValues = {
+                            name: (tag) => tag.name,
+                            resources: (tag) => Number(tag.resourceCount),
+                            applications: (tag) => Number(tag.applicationsCount),
+                            services: (tag) => Number(tag.servicesCount),
+                        };
+                        const sortValue = sortValues[column] || sortValues.name;
+                        const order = direction === 'desc' ? -1 : 1;
+                        const compare = (first, second) => typeof first === 'number' ?
+                            first - second :
+                            first.localeCompare(second);
+
+                        return tags.sort((first, second) =>
+                            order * compare(sortValue(first), sortValue(second)) ||
+                            first.name.localeCompare(second.name));
+                    },
+                    get totalPages() {
+                        return Math.max(1, Math.ceil(this.filteredTags.length / this.pageSize));
+                    },
+                    get paginatedTags() {
+                        if (this.page > this.totalPages) {
+                            this.page = this.totalPages;
+                        }
+
+                        const start = (this.page - 1) * this.pageSize;
+                        return this.filteredTags.slice(start, start + this.pageSize);
+                    },
+                    get rangeStart() {
+                        return this.filteredTags.length === 0 ? 0 : ((this.page - 1) * this.pageSize) + 1;
+                    },
+                    get rangeEnd() {
+                        return Math.min(this.page * this.pageSize, this.filteredTags.length);
+                    },
+                    setViewMode(mode) {
+                        this.viewMode = mode;
+                        this.page = 1;
+                        this.$wire.saveListView('tags', mode);
+                    },
+                    previousPage() {
+                        this.page = Math.max(1, this.page - 1);
+                    },
+                    nextPage() {
+                        this.page = Math.min(this.totalPages, this.page + 1);
+                    },
+                };
+            }
+        </script>
+    @else
+        @php
+            $resourceCount = ($applications?->count() ?? 0) + ($services?->count() ?? 0);
+        @endphp
+
+        <div class="flex flex-col gap-6">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div
+                    class="rounded-xl border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.05]">
+                    <p class="text-[11px] font-medium text-neutral-500 dark:text-fg-faint">Resources</p>
+                    <p class="mt-1 text-[20px] font-semibold tracking-tight text-black dark:text-fg">
+                        {{ $resourceCount }}
+                    </p>
+                    <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-dim">
+                        Applications & services
+                    </p>
+                </div>
+                <div
+                    class="rounded-xl border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.05]">
+                    <p class="text-[11px] font-medium text-neutral-500 dark:text-fg-faint">Applications</p>
+                    <p class="mt-1 text-[20px] font-semibold tracking-tight text-black dark:text-fg">
+                        {{ $applications?->count() ?? 0 }}
+                    </p>
+                    <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-dim">
+                        Using this tag
+                    </p>
+                </div>
+                <div
+                    class="rounded-xl border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.05]">
+                    <p class="text-[11px] font-medium text-neutral-500 dark:text-fg-faint">Active deployments</p>
+                    <p class="mt-1 text-[20px] font-semibold tracking-tight text-black dark:text-fg">
+                        {{ collect($deploymentsPerTagPerServer ?? [])->flatten(1)->count() }}
+                    </p>
+                    <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-dim">
+                        Queued or running
+                    </p>
+                </div>
+            </div>
+
+            <x-application.settings-section :title="$tag->name"
+                description="Use this webhook to deploy every resource with this tag.">
+                <x-slot:actions>
+                    {{-- Two ways to connect: a list in a modal, or the canvas (wide screens only). --}}
+                    <x-modal-input title="Connect to resources" subtitle="Add this tag to resources, or remove it."
+                        wireOpen="connectResourcesOpen" :wireIgnore="false" :contentClicks="false">
+                        <x-slot:content>
+                            <button type="button" class="button whitespace-nowrap" wire:click="openConnectResources">
+                                <x-reicon name="link" class="size-3.5" />
+                                Connect to resources
+                            </button>
+                        </x-slot:content>
+                        @forelse ($connectableResources as $context => $resources)
+                            <div wire:key="connect-group-{{ $context }}" class="mb-4 last:mb-0">
+                                <p class="mb-1.5 truncate text-[11px] font-medium text-neutral-500 dark:text-fg-faint">{{ $context }}</p>
+                                <div class="flex flex-col gap-1">
+                                    @foreach ($resources as $resource)
+                                        <label wire:key="connect-resource-{{ $resource['uuid'] }}" @class([
+                                            'flex items-center gap-2.5 rounded-md border border-neutral-200 px-3 py-2 text-[13px] dark:border-white/[0.08]',
+                                            'cursor-pointer' => $resource['can_update'],
+                                            'opacity-60' => ! $resource['can_update'],
+                                        ])>
+                                            <input type="checkbox" @checked($resource['tagged']) @disabled(! $resource['can_update'])
+                                                wire:click="toggleResource(@js($resource['uuid']))" wire:loading.attr="disabled"
+                                                class="size-4 shrink-0 rounded-sm border-neutral-300 text-accent focus:ring-accent dark:border-white/20 dark:bg-transparent" />
+                                            <span class="min-w-0 truncate">{{ $resource['name'] }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @empty
+                            <div wire:loading.remove wire:target="openConnectResources">
+                                <x-empty title="No resources yet" description="Create a resource in a project first." icon-name="tags" size="sm" />
+                            </div>
+                        @endforelse
+                    </x-modal-input>
+                    <a href="{{ app(App\Services\TagCanvas::class)->connectLink($tag) }}"
+                        class="button hidden whitespace-nowrap md:inline-flex"
+                        title="Add this tag to resources on the canvas, and see which resources have it">
+                        <x-reicon name="deploy-canvas" class="size-3.5" />
+                        Connect in canvas
+                    </a>
+                    @can('delete', $tag)
+                        <x-modal-confirmation title="Delete this tag?" isErrorButton buttonTitle="Delete"
+                            submitAction="deleteTag" :actions="[
+                                'The tag will be removed from every resource.',
+                                'The deploy webhook of this tag will stop working.',
+                            ]"
+                            confirmationText="{{ $tag->name }}"
+                            confirmationLabel="Please confirm the execution of the actions by entering the Tag Name below"
+                            shortConfirmationLabel="Tag Name" :confirmWithPassword="false"
+                            step2ButtonText="Delete tag" />
+                    @endcan
+                    <x-modal-confirmation title="Redeploy all resources with this tag?"
+                        buttonTitle="Redeploy all" submitAction="redeployAll" :actions="[
+                            'All resources with this tag will be redeployed.',
+                            'During redeploy resources will be temporarily unavailable.',
+                        ]"
+                        confirmationText="{{ $tag->name }}"
+                        confirmationLabel="Please confirm the execution of the actions by entering the Tag Name below"
+                        shortConfirmationLabel="Tag Name" :confirmWithPassword="false"
+                        step2ButtonText="Redeploy All" />
+                </x-slot:actions>
+
+                <x-forms.input readonly label="Deploy webhook URL" id="webhook" />
+            </x-application.settings-section>
+
+            <x-application.settings-section title="Resources"
+                description="{{ $resourceCount }} {{ Str::plural('resource', $resourceCount) }} use this tag.">
+                @if ($resourceCount === 0)
+                    <x-empty title="No resources use this tag"
+                        description="Connect this tag to resources to see them here."
+                        icon-name="tags" size="sm" />
+                @else
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        @foreach ($applications ?? [] as $application)
+                            <a {{ wireNavigate() }} href="{{ $application->link() }}"
+                                class="group flex min-h-24 flex-col rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 transition-colors hover:border-neutral-300 hover:no-underline dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
+                                <div class="flex items-start gap-2.5">
+                                    <div
+                                        class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-neutral-200 bg-white text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                                        <x-resource-logo :resource="$application" icon-class="size-3.5" />
+                                    </div>
+                                    <div class="min-w-0">
+                                        <h3
+                                            class="truncate text-[12px]! leading-4! font-semibold! text-black dark:text-fg">
+                                            {{ $application->name }}
+                                        </h3>
+                                        <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                            {{ $application->project()->name }}/{{ $application->environment->name }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <p class="mt-auto truncate pt-3 text-[11px] text-neutral-500 dark:text-fg-dim">
+                                    {{ $application->description ?: 'Application' }}
+                                </p>
+                            </a>
+                        @endforeach
+
+                        @foreach ($services ?? [] as $service)
+                            <a {{ wireNavigate() }} href="{{ $service->link() }}"
+                                class="group flex min-h-24 flex-col rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 transition-colors hover:border-neutral-300 hover:no-underline dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
+                                <div class="flex items-start gap-2.5">
+                                    <div
+                                        class="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md border border-neutral-200 bg-white text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                                        <x-resource-logo :resource="$service" icon-class="size-3.5" />
+                                    </div>
+                                    <div class="min-w-0">
+                                        <h3
+                                            class="truncate text-[12px]! leading-4! font-semibold! text-black dark:text-fg">
+                                            {{ $service->name }}
+                                        </h3>
+                                        <p class="mt-0.5 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                            {{ $service->project()->name }}/{{ $service->environment->name }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <p class="mt-auto truncate pt-3 text-[11px] text-neutral-500 dark:text-fg-dim">
+                                    {{ $service->description ?: 'Service' }}
+                                </p>
+                            </a>
+                        @endforeach
+                    </div>
+                @endif
+            </x-application.settings-section>
+
+            <x-application.settings-section title="Active deployments"
+                description="Queued and running deployments for applications using this tag." flush>
+                <x-slot:actions>
+                    @if (count($deploymentsPerTagPerServer ?? []) > 0)
+                        <x-loading />
+                    @endif
+                </x-slot:actions>
+
+                <div wire:poll="getDeployments" class="overflow-x-auto transition-opacity" wire:loading.class="opacity-50 pointer-events-none"
+                    wire:target="setDeploymentSort">
+                    @if (count($deploymentsPerTagPerServer ?? []) === 0)
+                        <div class="p-3">
+                            <x-empty title="No active deployments"
+                                description="Deployments will appear here while they are queued or running."
+                                icon-name="play-circle" size="sm" />
+                        </div>
+                    @else
+                        <div
+                            class="grid min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.55fr)_7rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
+                            <x-table.sort-header label="Resource" asc="resource-asc" desc="resource-desc"
+                                action="setDeploymentSort" :current="$deploymentSort" />
+                            <x-table.sort-header label="Server" asc="server-asc" desc="server-desc"
+                                action="setDeploymentSort" :current="$deploymentSort" />
+                            <x-table.sort-header label="Status" asc="status-asc" desc="status-desc"
+                                action="setDeploymentSort" :current="$deploymentSort" />
+                        </div>
+
+                        @foreach ($activeDeployments as $deployment)
+                            <a {{ wireNavigate() }} href="{{ data_get($deployment, 'deployment_url') }}"
+                                class="grid min-h-13 min-w-[620px] grid-cols-[minmax(0,1fr)_minmax(10rem,.55fr)_7rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                                <div class="truncate font-medium text-black dark:text-fg">
+                                    {{ data_get($deployment, 'application_name') }}
+                                </div>
+                                <div class="truncate text-neutral-500 dark:text-fg-dim">{{ data_get($deployment, 'server_name') }}</div>
+                                <div>
+                                    <x-status-badge :status="str(data_get($deployment, 'status'))->headline()"
+                                        :type="data_get($deployment, 'status') === 'in_progress' ? 'warning' : 'neutral'" />
+                                </div>
+                            </a>
+                        @endforeach
+                    @endif
+                </div>
+            </x-application.settings-section>
+        </div>
+    @endif
 </div>

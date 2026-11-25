@@ -1,0 +1,20 @@
+# documentation: https://docs.organizr.app/
+# slogan: Homelab Services Organizer
+# category: productivity
+# tags: tool
+# logo: svgs/organizr.png
+# port: 80
+
+services:
+  organizr:
+    image: organizr/organizr:latest
+    environment:
+      - SERVICE_URL_ORGANIZR_80
+      - branch=${branch:-v2-master}
+    volumes:
+      - organizr-data:/config
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:80 || exit 1"]
+      interval: 10s
+      timeout: 1s
+      retries: 3

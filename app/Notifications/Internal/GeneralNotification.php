@@ -2,8 +2,9 @@
 
 namespace App\Notifications\Internal;
 
-use App\Notifications\Channels\DiscordChannel;
-use App\Notifications\Channels\TelegramChannel;
+use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\PushoverMessage;
+use App\Notifications\Dto\SlackMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -14,33 +15,57 @@ class GeneralNotification extends Notification implements ShouldQueue
 
     public $tries = 1;
 
-    public function __construct(public string $message) {}
+    public function __construct(public string $message, public bool $success = true)
+    {
+        $this->onQueue('high');
+    }
 
     public function via(object $notifiable): array
     {
-        $channels = [];
-        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-        $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
-
-        if ($isDiscordEnabled) {
-            $channels[] = DiscordChannel::class;
-        }
-        if ($isTelegramEnabled) {
-            $channels[] = TelegramChannel::class;
-        }
-
-        return $channels;
+        return $notifiable->getEnabledChannels('general');
     }
 
-    public function toDiscord(): string
+    public function toDiscord(): DiscordMessage
     {
-        return $this->message;
+        return new DiscordMessage(
+            title: $this->success ? 'Coolify: General Notification' : 'Coolify: Action required',
+            description: $this->message,
+            color: $this->success ? DiscordMessage::infoColor() : DiscordMessage::errorColor(),
+        );
     }
 
     public function toTelegram(): array
     {
         return [
             'message' => $this->message,
+        ];
+    }
+
+    public function toPushover(): PushoverMessage
+    {
+        return new PushoverMessage(
+            title: $this->success ? 'General Notification' : 'Action required',
+            level: $this->success ? 'info' : 'error',
+            message: $this->message,
+        );
+    }
+
+    public function toSlack(): SlackMessage
+    {
+        return new SlackMessage(
+            title: $this->success ? 'Coolify: General Notification' : 'Coolify: Action required',
+            description: $this->message,
+            color: $this->success ? SlackMessage::infoColor() : SlackMessage::errorColor(),
+        );
+    }
+
+    public function toWebhook(): array
+    {
+        return [
+            'success' => $this->success,
+            'message' => $this->message,
+            'event' => 'general',
+            'url' => base_url(),
         ];
     }
 }

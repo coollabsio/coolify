@@ -2,15 +2,40 @@
 
 namespace App\Livewire\Project\Application\Deployment;
 
+use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
-use Illuminate\Support\Collection;
+use App\Models\ApplicationDeploymentQueue;
+use App\Traits\ListensToTeamChannel;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Index extends Component
 {
-    public Application $application;
+    use ListensToTeamChannel;
 
-    public ?Collection $deployments;
+    /**
+     * The history list never loads logs or configuration payloads.
+     */
+    public const HISTORY_COLUMNS = [
+        'id',
+        'application_id',
+        'deployment_uuid',
+        'pull_request_id',
+        'status',
+        'commit',
+        'commit_message',
+        'is_webhook',
+        'is_api',
+        'is_mcp',
+        'rollback',
+        'server_id',
+        'server_name',
+        'created_at',
+        'updated_at',
+        'finished_at',
+    ];
+
+    public Application $application;
 
     public int $deployments_count = 0;
 
@@ -18,96 +43,334 @@ class Index extends Component
 
     public int $skip = 0;
 
-    public int $default_take = 40;
+    public int $defaultTake = 10;
 
-    public bool $show_next = false;
+    public function updatedDefaultTake(): void
+    {
+        $this->defaultTake = max(1, min(100, $this->defaultTake));
 
-    public bool $show_prev = false;
+        $this->skip = 0;
+    }
+
+    public bool $showPrev = false;
+
+    public int $currentPage = 1;
 
     public ?string $pull_request_id = null;
 
+    public array $pullRequestOptions = [];
+
+    public string $search = '';
+
+    public array $deploymentFilters = [];
+
+    public string $deploymentSort = 'newest';
+
+    public array $statusFilterOptions = [];
+
+    public array $sourceFilterOptions = [];
+
+    public array $serverFilterOptions = [];
+
+    public bool $embedded = false;
+
+    public ?string $selectedDeploymentUuid = null;
+
     protected $queryString = ['pull_request_id'];
 
-    public function mount()
+    public function getListeners()
     {
-        $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        return $this->teamChannelListeners([
+            'ServiceChecked' => '$refresh',
+        ]);
+    }
+
+    #[On('deploymentSelected')]
+    public function setSelectedDeployment(string $deploymentUuid): void
+    {
+        $this->selectedDeploymentUuid = $deploymentUuid;
+    }
+
+    public function mount(string $project_uuid, string $environment_uuid, string $application_uuid)
+    {
+        $project = currentTeam()->load(['projects'])->projects->where('uuid', $project_uuid)->first();
         if (! $project) {
             return redirect()->route('dashboard');
         }
-        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
+        $environment = $project->load(['environments'])->environments->where('uuid', $environment_uuid)->first();
         if (! $environment) {
-            return redirect()->route('dashboard');
+            abort(404);
         }
-        $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
+        $environment->load(['applications']);
+        $application = $environment->applications->where('uuid', $application_uuid)->first();
         if (! $application) {
             return redirect()->route('dashboard');
         }
-        ['deployments' => $deployments, 'count' => $count] = $application->deployments(0, 40);
-        $this->application = $application;
-        $this->deployments = $deployments;
-        $this->deployments_count = $count;
-        $this->current_url = url()->current();
-        $this->show_pull_request_only();
-        $this->show_more();
-    }
-
-    private function show_pull_request_only()
-    {
-        if ($this->pull_request_id) {
-            $this->deployments = $this->deployments->where('pull_request_id', $this->pull_request_id);
-        }
-    }
-
-    private function show_more()
-    {
-        if ($this->deployments->count() !== 0) {
-            $this->show_next = true;
-            if ($this->deployments->count() < $this->default_take) {
-                $this->show_next = false;
+        // Validate pull request ID from URL parameters
+        if ($this->pull_request_id !== null && $this->pull_request_id !== '') {
+            if (! is_numeric($this->pull_request_id) || (float) $this->pull_request_id <= 0 || (float) $this->pull_request_id != (int) $this->pull_request_id) {
+                $this->pull_request_id = null;
+                $this->dispatch('error', 'Invalid Pull Request ID in URL. Filter cleared.');
+            } else {
+                // Ensure it's stored as a string representation of a positive integer
+                $this->pull_request_id = (string) (int) $this->pull_request_id;
             }
+        }
 
+        $this->application = $application;
+        if ($this->embedded) {
+            $this->defaultTake = 3;
+        }
+        $this->loadPullRequestOptions();
+        $this->loadDeploymentFilterOptions();
+        $this->current_url = route('project.application.deployment.index', [
+            'project_uuid' => $project->uuid,
+            'environment_uuid' => $environment->uuid,
+            'application_uuid' => $application->uuid,
+        ]);
+        $this->updateCurrentPage();
+    }
+
+    /**
+     * Polling target. The list is loaded again on every render.
+     */
+    public function reloadDeployments(): void {}
+
+    public function previousPage(): void
+    {
+        $this->skip = max(0, $this->skip - $this->defaultTake);
+        $this->showPrev = $this->skip > 0;
+        $this->updateCurrentPage();
+    }
+
+    public function nextPage(): void
+    {
+        $this->goToPage($this->currentPage + 1);
+    }
+
+    public function goToPage(int $page): void
+    {
+        $lastPage = max(1, (int) ceil($this->deployments_count / $this->defaultTake));
+        $page = max(1, min($page, $lastPage));
+        $this->skip = ($page - 1) * $this->defaultTake;
+        $this->showPrev = $page > 1;
+        $this->updateCurrentPage();
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->resetPagination();
+    }
+
+    public function toggleDeploymentFilter(string $filter): void
+    {
+        $validFilters = collect($this->statusFilterOptions)
+            ->concat($this->sourceFilterOptions)
+            ->concat($this->serverFilterOptions)
+            ->pluck('value')
+            ->values();
+
+        if (! $validFilters->contains($filter)) {
             return;
         }
-    }
 
-    public function reload_deployments()
-    {
-        $this->load_deployments();
-    }
-
-    public function previous_page(?int $take = null)
-    {
-        if ($take) {
-            $this->skip = $this->skip - $take;
+        if (in_array($filter, $this->deploymentFilters, true)) {
+            $this->deploymentFilters = array_values(array_diff($this->deploymentFilters, [$filter]));
+        } else {
+            $this->deploymentFilters[] = $filter;
         }
-        $this->skip = $this->skip - $this->default_take;
-        if ($this->skip < 0) {
-            $this->show_prev = false;
-            $this->skip = 0;
-        }
-        $this->load_deployments();
+
+        $this->pull_request_id = null;
+        $this->resetPagination();
     }
 
-    public function next_page(?int $take = null)
+    public function setPullRequestFilter(string $pullRequestId): void
     {
-        if ($take) {
-            $this->skip = $this->skip + $take;
+        $validPullRequestIds = collect($this->pullRequestOptions)->pluck('value');
+
+        if (! $validPullRequestIds->contains($pullRequestId)) {
+            return;
         }
-        $this->show_prev = true;
-        $this->load_deployments();
+
+        $this->pull_request_id = $pullRequestId === '' ? null : $pullRequestId;
+        $this->deploymentFilters = [];
+        $this->resetPagination();
     }
 
-    public function load_deployments()
+    public function setDeploymentSort(string $sort): void
     {
-        ['deployments' => $deployments, 'count' => $count] = $this->application->deployments($this->skip, $this->default_take);
-        $this->deployments = $deployments;
-        $this->deployments_count = $count;
-        $this->show_pull_request_only();
-        $this->show_more();
+        if (! in_array($sort, ['newest', 'oldest'], true)) {
+            return;
+        }
+
+        $this->deploymentSort = $sort;
+        $this->resetPagination();
     }
 
+    public function updatedPullRequestId($value)
+    {
+        // Sanitize and validate the pull request ID
+        if ($value !== null && $value !== '') {
+            // Check if it's numeric and positive
+            if (! is_numeric($value) || (float) $value <= 0 || (float) $value != (int) $value) {
+                $this->pull_request_id = null;
+                $this->dispatch('error', 'Invalid Pull Request ID. Please enter a valid positive number.');
+
+                return;
+            }
+            // Ensure it's stored as a string representation of a positive integer
+            $this->pull_request_id = (string) (int) $value;
+        } else {
+            $this->pull_request_id = null;
+        }
+
+        $this->deploymentFilters = [];
+        $this->resetPagination();
+    }
+
+    public function clearFilter()
+    {
+        $this->pull_request_id = null;
+        $this->deploymentFilters = [];
+        $this->resetPagination();
+    }
+
+    private function updateCurrentPage()
+    {
+        $this->currentPage = intval($this->skip / $this->defaultTake) + 1;
+    }
+
+    private function loadPullRequestOptions(): void
+    {
+        $pullRequestIds = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->application->id)
+            ->where('pull_request_id', '>', 0)
+            ->distinct()
+            ->pluck('pull_request_id')
+            ->merge($this->application->previews()->pluck('pull_request_id'))
+            ->map(fn ($pullRequestId) => (string) $pullRequestId)
+            ->unique()
+            ->sortByDesc(fn (string $pullRequestId) => (int) $pullRequestId)
+            ->values();
+
+        if ($this->pull_request_id && ! $pullRequestIds->contains($this->pull_request_id)) {
+            $pullRequestIds->prepend($this->pull_request_id);
+        }
+
+        $this->pullRequestOptions = collect([
+            ['value' => '', 'label' => 'All deployments'],
+        ])
+            ->concat($pullRequestIds->map(fn ($pullRequestId) => [
+                'value' => $pullRequestId,
+                'label' => "Pull request #{$pullRequestId}",
+            ]))
+            ->all();
+    }
+
+    private function loadDeploymentFilterOptions(): void
+    {
+        $statuses = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->application->id)
+            ->distinct()
+            ->pluck('status');
+
+        $statusLabels = [
+            ApplicationDeploymentStatus::FINISHED->value => 'Success',
+            ApplicationDeploymentStatus::FAILED->value => 'Failed',
+            ApplicationDeploymentStatus::IN_PROGRESS->value => 'In progress',
+            ApplicationDeploymentStatus::QUEUED->value => 'Queued',
+            ApplicationDeploymentStatus::CANCELLED_BY_USER->value => 'Cancelled',
+            ApplicationDeploymentStatus::SKIPPED->value => 'Skipped',
+        ];
+
+        $this->statusFilterOptions = collect($statusLabels)
+            ->filter(fn (string $label, string $status) => $statuses->contains($status))
+            ->map(fn (string $label, string $status) => [
+                'value' => "status:{$status}",
+                'label' => $label,
+            ])
+            ->values()
+            ->all();
+
+        $sourceKeys = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->application->id)
+            ->selectRaw("
+                CASE
+                    WHEN pull_request_id > 0 THEN 'pull-request'
+                    WHEN is_webhook THEN 'webhook'
+                    WHEN rollback THEN 'rollback'
+                    WHEN is_mcp THEN 'mcp'
+                    WHEN is_api THEN 'api'
+                    ELSE 'manual'
+                END AS source_key
+            ")
+            ->distinct()
+            ->pluck('source_key');
+
+        $sourceLabels = [
+            'manual' => 'Manual',
+            'pull-request' => 'Pull requests',
+            'webhook' => 'Webhooks',
+            'api' => 'API',
+            'mcp' => 'MCP',
+            'rollback' => 'Rollbacks',
+        ];
+
+        $this->sourceFilterOptions = collect($sourceLabels)
+            ->filter(fn (string $label, string $source) => $sourceKeys->contains($source))
+            ->map(fn (string $label, string $source) => [
+                'value' => "source:{$source}",
+                'label' => $label,
+            ])
+            ->values()
+            ->all();
+
+        $servers = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->application->id)
+            ->whereNotNull('server_id')
+            ->select(['server_id', 'server_name'])
+            ->distinct()
+            ->orderBy('server_name')
+            ->get()
+            ->unique('server_id');
+
+        $this->serverFilterOptions = $servers
+            ->map(function (ApplicationDeploymentQueue $deployment): array {
+                $serverId = (int) $deployment->server_id;
+
+                return [
+                    'value' => "server:{$serverId}",
+                    'label' => $deployment->server_name ?: "Server #{$serverId}",
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function resetPagination(): void
+    {
+        $this->skip = 0;
+        $this->showPrev = false;
+        $this->updateCurrentPage();
+    }
+
+    /**
+     * The list is not a public property: Livewire would restore it with SELECT * on every request.
+     */
     public function render()
     {
-        return view('livewire.project.application.deployment.index');
+        ['deployments' => $deployments, 'count' => $this->deployments_count] = $this->application->deployments(
+            skip: $this->skip,
+            take: $this->defaultTake,
+            pullRequestId: $this->pull_request_id,
+            search: $this->search,
+            filters: $this->deploymentFilters,
+            sort: $this->deploymentSort,
+            columns: self::HISTORY_COLUMNS,
+        );
+
+        return view('livewire.project.application.deployment.index', [
+            'deployments' => $deployments,
+        ]);
     }
 }

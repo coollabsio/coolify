@@ -1,0 +1,419 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Actions\Stripe\CancelSubscription;
+use App\Actions\Stripe\FindOpenStripeSubscriptions;
+use App\Actions\Stripe\UpdateSubscriptionQuantity;
+use App\Models\Subscription;
+use App\Models\Team;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Str;
+use Stripe\StripeClient;
+
+class StripeProcessJob implements ShouldBeEncrypted, ShouldQueue
+{
+    use Queueable;
+
+    public $type;
+
+    public $webhook;
+
+    public $tries = 3;
+
+    public function __construct(public $event)
+    {
+        $this->onQueue(webhooks_queue());
+    }
+
+    public function handle(): void
+    {
+        try {
+            $excludedPlans = config('subscription.stripe_excluded_plans');
+
+            $type = data_get($this->event, 'type');
+            $this->type = $type;
+            $data = data_get($this->event, 'data.object');
+            switch ($type) {
+                case 'radar.early_fraud_warning.created':
+                    $stripe = app(StripeClient::class);
+                    $id = data_get($data, 'id');
+                    $charge = data_get($data, 'charge');
+                    if ($charge) {
+                        $stripe->refunds->create(['charge' => $charge]);
+                    }
+                    $pi = data_get($data, 'payment_intent');
+                    $piData = $stripe->paymentIntents->retrieve($pi, []);
+                    $customerId = data_get($piData, 'customer');
+                    // Cancel every subscription of the email, also those of its other Stripe customers.
+                    $email = $customerId ? $stripe->customers->retrieve($customerId)->email : null;
+                    $subscriptionIds = app(FindOpenStripeSubscriptions::class)->handle([$email], [$customerId])->keys()
+                        ->merge(Subscription::where('stripe_customer_id', $customerId)->whereNotNull('stripe_subscription_id')->pluck('stripe_subscription_id'))
+                        ->unique();
+                    if ($subscriptionIds->isNotEmpty()) {
+                        $failedIds = $subscriptionIds->reject(fn (string $subscriptionId): bool => CancelSubscription::cancelById($subscriptionId));
+                        if ($failedIds->isNotEmpty()) {
+                            send_internal_notification("Early fraud warning: refunded, but could not cancel subscriptions {$failedIds->implode(', ')}. Charge: {$charge}, id: {$id}, pi: {$pi}");
+                            throw new \RuntimeException("Early fraud warning: could not cancel subscriptions {$failedIds->implode(', ')}.");
+                        }
+                        send_internal_notification("Early fraud warning created Refunded, subscriptions canceled: {$subscriptionIds->implode(', ')}. Email: {$email}, Charge: {$charge}, id: {$id}, pi: {$pi}");
+                    } else {
+                        send_internal_notification("Early fraud warning: subscription not found. Charge: {$charge}, id: {$id}, pi: {$pi}");
+                        throw new \RuntimeException("Early fraud warning: subscription not found. Charge: {$charge}, id: {$id}, pi: {$pi}");
+                    }
+                    break;
+                case 'checkout.session.completed':
+                    $clientReferenceId = data_get($data, 'client_reference_id');
+                    if (is_null($clientReferenceId)) {
+                        // send_internal_notification('Checkout session completed without client reference id.');
+                        break;
+                    }
+                    $userId = Str::before($clientReferenceId, ':');
+                    $teamId = Str::after($clientReferenceId, ':');
+                    $subscriptionId = data_get($data, 'subscription');
+                    $customerId = data_get($data, 'customer');
+                    $team = Team::find($teamId);
+                    $found = $team->members->where('id', $userId)->first();
+                    if (! $found->isAdmin()) {
+                        // send_internal_notification("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}, subscriptionid: {$subscriptionId}.");
+                        throw new \RuntimeException("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}, subscriptionid: {$subscriptionId}.");
+                    }
+                    $subscription = Subscription::updateOrCreate(
+                        ['team_id' => $teamId],
+                        [
+                            'stripe_subscription_id' => $subscriptionId,
+                            'stripe_customer_id' => $customerId,
+                            'stripe_invoice_paid' => true,
+                            'stripe_past_due' => false,
+                        ]
+                    );
+                    logger()->info('Stripe subscription checkout completed.', [
+                        'team_id' => $team->id,
+                        'stripe_customer_id' => $customerId,
+                        'stripe_checkout_session_id' => data_get($data, 'id'),
+                        'stripe_subscription_id' => $subscription->stripe_subscription_id,
+                    ]);
+                    break;
+                case 'checkout.session.expired':
+                    $clientReferenceId = data_get($data, 'client_reference_id');
+                    if (! isCloud() || data_get($data, 'mode') !== 'subscription' || ! is_string($clientReferenceId)) {
+                        break;
+                    }
+                    $userId = Str::before($clientReferenceId, ':');
+                    $teamId = Str::after($clientReferenceId, ':');
+                    $team = Team::find($teamId);
+                    $user = $team?->members->where('id', $userId)->first();
+                    if (! $user?->isAdmin()) {
+                        break;
+                    }
+                    // Atomic claim: one reminder per team per 7 days, also when Stripe delivers several expired sessions at once.
+                    $claimed = Subscription::query()
+                        ->where('team_id', $team->id)
+                        ->where('stripe_invoice_paid', false)
+                        ->where(fn ($query) => $query->whereNull('stripe_checkout_reminder_sent_at')
+                            ->orWhere('stripe_checkout_reminder_sent_at', '<', now()->subDays(7)))
+                        ->update(['stripe_checkout_reminder_sent_at' => now()]);
+                    if ($claimed === 0) {
+                        break;
+                    }
+                    $recoveryUrl = data_get($data, 'after_expiration.recovery.url');
+                    SubscriptionCheckoutReminderJob::dispatch(
+                        $user,
+                        is_string($recoveryUrl) && $recoveryUrl !== '' ? $recoveryUrl : route('subscription.index'),
+                    );
+                    logger()->info('Stripe subscription checkout reminder queued.', [
+                        'team_id' => $team->id,
+                        'stripe_checkout_session_id' => data_get($data, 'id'),
+                    ]);
+                    break;
+                case 'invoice.paid':
+                    $customerId = data_get($data, 'customer');
+                    $invoiceAmount = data_get($data, 'amount_paid', 0);
+                    $subscriptionId = data_get($data, 'subscription');
+                    $planId = data_get($data, 'lines.data.0.plan.id');
+                    if (Str::contains($excludedPlans, $planId)) {
+                        // send_internal_notification('Subscription excluded.');
+                        break;
+                    }
+                    $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                    if (! $subscription) {
+                        break;
+                    }
+
+                    if ($subscription->stripe_subscription_id) {
+                        try {
+                            $stripe = app(StripeClient::class);
+                            $stripeSubscription = $stripe->subscriptions->retrieve(
+                                $subscription->stripe_subscription_id
+                            );
+
+                            switch ($stripeSubscription->status) {
+                                case 'active':
+                                    $subscription->update([
+                                        'stripe_invoice_paid' => true,
+                                        'stripe_past_due' => false,
+                                    ]);
+                                    break;
+
+                                case 'past_due':
+                                    $subscription->update([
+                                        'stripe_invoice_paid' => true,
+                                        'stripe_past_due' => true,
+                                    ]);
+                                    break;
+
+                                case 'canceled':
+                                case 'incomplete_expired':
+                                case 'unpaid':
+                                    send_internal_notification(
+                                        "Invoice paid for {$stripeSubscription->status} subscription. ".
+                                        "Customer: {$customerId}, Amount: \${$invoiceAmount}"
+                                    );
+                                    break;
+
+                                default:
+                                    VerifyStripeSubscriptionStatusJob::dispatch($subscription)
+                                        ->delay(now()->addSeconds(20));
+                                    break;
+                            }
+                        } catch (\Exception $e) {
+                            VerifyStripeSubscriptionStatusJob::dispatch($subscription)
+                                ->delay(now()->addSeconds(20));
+
+                            send_internal_notification(
+                                'Failed to verify subscription status in invoice.paid: '.$e->getMessage()
+                            );
+                        }
+                    } else {
+                        VerifyStripeSubscriptionStatusJob::dispatch($subscription)
+                            ->delay(now()->addSeconds(20));
+                    }
+                    break;
+                case 'invoice.payment_failed':
+                    $customerId = data_get($data, 'customer');
+                    $invoiceId = data_get($data, 'id');
+                    $paymentIntentId = data_get($data, 'payment_intent');
+
+                    $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                    if (! $subscription) {
+                        // send_internal_notification('invoice.payment_failed failed but no subscription found in Coolify for customer: '.$customerId);
+                        break;
+                    }
+                    $team = data_get($subscription, 'team');
+                    if (! $team) {
+                        // send_internal_notification('invoice.payment_failed failed but no team found in Coolify for customer: '.$customerId);
+                        throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");
+                    }
+
+                    // Verify payment status with Stripe API before sending failure notification
+                    if ($paymentIntentId) {
+                        try {
+                            $stripe = app(StripeClient::class);
+                            $paymentIntent = $stripe->paymentIntents->retrieve($paymentIntentId);
+
+                            if (in_array($paymentIntent->status, ['processing', 'succeeded', 'requires_action', 'requires_confirmation'])) {
+                                break;
+                            }
+
+                            if (! $subscription->stripe_invoice_paid && $subscription->created_at->diffInMinutes(now()) < 5) {
+                                SubscriptionInvoiceFailedJob::dispatch($team)->delay(now()->addSeconds(60));
+                                break;
+                            }
+                        } catch (\Exception $e) {
+                        }
+                    }
+
+                    if (! $subscription->stripe_invoice_paid) {
+                        SubscriptionInvoiceFailedJob::dispatch($team);
+                        // send_internal_notification('Invoice payment failed: '.$customerId);
+                    }
+                    break;
+                case 'payment_intent.payment_failed':
+                    $customerId = data_get($data, 'customer');
+                    $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                    if (! $subscription) {
+                        // send_internal_notification('payment_intent.payment_failed, no subscription found in Coolify for customer: '.$customerId);
+                        break;
+                    }
+                    if ($subscription->stripe_invoice_paid) {
+                        // send_internal_notification('payment_intent.payment_failed but invoice is active for customer: '.$customerId);
+
+                        return;
+                    }
+                    // send_internal_notification('Subscription payment failed for customer: '.$customerId);
+                    break;
+                case 'customer.subscription.created':
+                    $customerId = data_get($data, 'customer');
+                    $subscriptionId = data_get($data, 'id');
+                    $teamId = data_get($data, 'metadata.team_id');
+                    $userId = data_get($data, 'metadata.user_id');
+                    if (! $teamId || ! $userId) {
+                        $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                        if ($subscription) {
+                            throw new \RuntimeException("Subscription already exists for customer: {$customerId}");
+                        }
+                        throw new \RuntimeException('No team id or user id found');
+                    }
+                    $team = Team::find($teamId);
+                    $found = $team->members->where('id', $userId)->first();
+                    if (! $found->isAdmin()) {
+                        // send_internal_notification("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}.");
+                        throw new \RuntimeException("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}.");
+                    }
+                    $subscription = Subscription::firstOrCreate(
+                        ['team_id' => $teamId],
+                        [
+                            'stripe_subscription_id' => $subscriptionId,
+                            'stripe_customer_id' => $customerId,
+                            'stripe_invoice_paid' => false,
+                        ]
+                    );
+                    if (! $subscription->stripe_subscription_id && $subscription->stripe_customer_id === $customerId) {
+                        $subscription->update(['stripe_subscription_id' => $subscriptionId]);
+                    } elseif ($subscription->stripe_customer_id !== $customerId) {
+                        throw new \RuntimeException("Stripe customer ID mismatch for team {$teamId}: stored {$subscription->stripe_customer_id}, event {$customerId}.");
+                    }
+                    break;
+                case 'customer.subscription.updated':
+                    $teamId = data_get($data, 'metadata.team_id');
+                    $userId = data_get($data, 'metadata.user_id');
+                    $customerId = data_get($data, 'customer');
+                    $status = data_get($data, 'status');
+                    $subscriptionId = data_get($data, 'items.data.0.subscription') ?? data_get($data, 'id');
+                    $planId = data_get($data, 'items.data.0.plan.id') ?? data_get($data, 'plan.id');
+                    if (Str::contains($excludedPlans, $planId)) {
+                        // send_internal_notification('Subscription excluded.');
+                        break;
+                    }
+                    $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                    if (! $subscription) {
+                        if ($status === 'incomplete_expired') {
+                            throw new \RuntimeException('Subscription incomplete expired');
+                        }
+                        if (! $teamId) {
+                            throw new \RuntimeException('No subscription and team id found');
+                        }
+                        $subscription = Subscription::firstOrCreate(
+                            ['team_id' => $teamId],
+                            [
+                                'stripe_subscription_id' => $subscriptionId,
+                                'stripe_customer_id' => $customerId,
+                                'stripe_invoice_paid' => false,
+                            ]
+                        );
+                    }
+                    $cancelAtPeriodEnd = data_get($data, 'cancel_at_period_end');
+                    $feedback = data_get($data, 'cancellation_details.feedback');
+                    $comment = data_get($data, 'cancellation_details.comment');
+                    $lookup_key = data_get($data, 'items.data.0.price.lookup_key');
+                    if (str($lookup_key)->contains('dynamic')) {
+                        $quantity = max(
+                            UpdateSubscriptionQuantity::MIN_SERVER_LIMIT,
+                            min((int) data_get($data, 'items.data.0.quantity', 2), UpdateSubscriptionQuantity::MAX_SERVER_LIMIT)
+                        );
+                        $team = data_get($subscription, 'team');
+                        if ($team) {
+                            $team->update([
+                                'custom_server_limit' => $quantity,
+                            ]);
+                            ServerLimitCheckJob::dispatch($team);
+                        }
+                    }
+                    $subscription->update([
+                        'stripe_feedback' => $feedback,
+                        'stripe_comment' => $comment,
+                        'stripe_plan_id' => $planId,
+                        'stripe_cancel_at_period_end' => $cancelAtPeriodEnd,
+                    ]);
+                    if (! $subscription->stripe_subscription_id && $subscription->stripe_invoice_paid) {
+                        VerifyStripeSubscriptionStatusJob::dispatch($subscription);
+                    }
+                    if ($status === 'paused' || $status === 'incomplete_expired') {
+                        if ($subscription->stripe_subscription_id === $subscriptionId) {
+                            $subscription->update([
+                                'stripe_invoice_paid' => false,
+                            ]);
+                        }
+                    }
+                    if ($status === 'past_due') {
+                        if ($subscription->stripe_subscription_id === $subscriptionId) {
+                            $subscription->update([
+                                'stripe_past_due' => true,
+                            ]);
+                            // send_internal_notification('Past Due: '.$customerId.'Subscription ID: '.$subscriptionId);
+                        }
+                    }
+                    if ($status === 'unpaid') {
+                        if ($subscription->stripe_subscription_id === $subscriptionId) {
+                            $subscription->update([
+                                'stripe_invoice_paid' => false,
+                            ]);
+                            // send_internal_notification('Unpaid: '.$customerId.'Subscription ID: '.$subscriptionId);
+                        }
+                        $team = data_get($subscription, 'team');
+                        if ($team) {
+                            $team->subscriptionEnded($subscription);
+                        } else {
+                            // send_internal_notification('Subscription unpaid but no team found in Coolify for customer: '.$customerId);
+                            throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");
+                        }
+                    }
+                    if ($status === 'active') {
+                        if ($subscription->stripe_subscription_id === $subscriptionId) {
+                            $subscription->update([
+                                'stripe_past_due' => false,
+                                'stripe_invoice_paid' => true,
+                            ]);
+                        }
+                    }
+                    if ($feedback) {
+                        $reason = "Cancellation feedback for {$customerId}: '".$feedback."'";
+                        if ($comment) {
+                            $reason .= ' with comment: \''.$comment."'";
+                        }
+                    }
+
+                    break;
+                case 'customer.subscription.deleted':
+                    $customerId = data_get($data, 'customer');
+                    $subscriptionId = data_get($data, 'id');
+                    $subscription = Subscription::where('stripe_customer_id', $customerId)->where('stripe_subscription_id', $subscriptionId)->first();
+                    if (! $subscription) {
+                        $this->verifyUnlinkedPaidSubscription($customerId);
+                        break;
+                    }
+                    $team = data_get($subscription, 'team');
+                    if (! $team) {
+                        throw new \RuntimeException("No team found in Coolify for customer: {$customerId}");
+                    }
+                    $team->subscriptionEnded($subscription);
+                    break;
+                default:
+                    throw new \RuntimeException("Unhandled event type: {$type}");
+            }
+        } catch (\Exception $e) {
+            send_internal_notification('StripeProcessJob error: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * A paid row without a Stripe subscription ID matches no webhook by ID. Verify it against Stripe.
+     */
+    private function verifyUnlinkedPaidSubscription(?string $customerId): void
+    {
+        if (! $customerId) {
+            return;
+        }
+
+        $subscription = Subscription::where('stripe_customer_id', $customerId)
+            ->whereNull('stripe_subscription_id')
+            ->where('stripe_invoice_paid', true)
+            ->first();
+
+        if ($subscription) {
+            VerifyStripeSubscriptionStatusJob::dispatch($subscription);
+        }
+    }
+}

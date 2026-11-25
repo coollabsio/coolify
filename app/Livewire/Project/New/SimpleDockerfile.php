@@ -5,13 +5,13 @@ namespace App\Livewire\Project\New;
 use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\Project;
-use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class SimpleDockerfile extends Component
 {
+    use AuthorizesRequests;
+
     public string $dockerfile = '';
 
     public array $parameters;
@@ -35,25 +35,23 @@ CMD ["nginx", "-g", "daemon off;"]
         $this->validate([
             'dockerfile' => 'required',
         ]);
-        $destination_uuid = $this->query['destination'];
-        $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+        $destination_uuid = $this->query['destination'] ?? null;
+        $destination = find_resource_destination_for_current_team($destination_uuid);
         if (! $destination) {
-            $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
-        }
-        if (! $destination) {
-            throw new \Exception('Destination not found. What?!');
+            throw new \Exception('Destination not found.');
         }
         $destination_class = $destination->getMorphClass();
 
-        $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-        $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
+        $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
+        $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
+        $this->authorize('create', [Application::class, $environment]);
 
         $port = get_port_from_dockerfile($this->dockerfile);
         if (! $port) {
             $port = 80;
         }
-        $application = Application::create([
-            'name' => 'dockerfile-'.new Cuid2(7),
+        $application = new Application([
+            'name' => 'dockerfile-'.new_public_id(),
             'repository_project_id' => 0,
             'git_repository' => 'coollabsio/coolify',
             'git_branch' => 'main',
@@ -67,18 +65,19 @@ CMD ["nginx", "-g", "daemon off;"]
             'source_id' => 0,
             'source_type' => GithubApp::class,
         ]);
+        $application->save();
 
-        $fqdn = generateFqdn($destination->server, $application->uuid);
+        $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
         $application->update([
             'name' => 'dockerfile-'.$application->uuid,
             'fqdn' => $fqdn,
         ]);
 
-        $application->parseHealthcheckFromDockerfile(dockerfile: collect(str($this->dockerfile)->trim()->explode("\n")), isInit: true);
+        $application->parseHealthcheckFromDockerfile(dockerfile: $this->dockerfile, isInit: true);
 
         return redirect()->route('project.application.configuration', [
             'application_uuid' => $application->uuid,
-            'environment_name' => $environment->name,
+            'environment_uuid' => $environment->uuid,
             'project_uuid' => $project->uuid,
         ]);
     }

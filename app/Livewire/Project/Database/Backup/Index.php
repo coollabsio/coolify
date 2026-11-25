@@ -14,32 +14,35 @@ class Index extends Component
         if (! $project) {
             return redirect()->route('dashboard');
         }
-        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
+        $environment = $project->load(['environments'])->environments->where('uuid', request()->route('environment_uuid'))->first();
         if (! $environment) {
-            return redirect()->route('dashboard');
+            abort(404);
         }
+        $environment->load(['applications']);
         $database = $environment->databases()->where('uuid', request()->route('database_uuid'))->first();
         if (! $database) {
             return redirect()->route('dashboard');
         }
-        // No backups
-        if (
-            $database->getMorphClass() === 'App\Models\StandaloneRedis' ||
-            $database->getMorphClass() === 'App\Models\StandaloneKeydb' ||
-            $database->getMorphClass() === 'App\Models\StandaloneDragonfly' ||
-            $database->getMorphClass() === 'App\Models\StandaloneClickhouse'
-        ) {
+        if (! $database->isBackupSolutionAvailable()) {
             return redirect()->route('project.database.configuration', [
                 'project_uuid' => $project->uuid,
-                'environment_name' => $environment->name,
+                'environment_uuid' => $environment->uuid,
                 'database_uuid' => $database->uuid,
             ]);
         }
-        $this->database = $database;
+        $this->database = $database->load([
+            'scheduledBackups' => fn ($query) => $query->withCount('executions'),
+        ]);
     }
 
     public function render()
     {
-        return view('livewire.project.database.backup.index');
+        $schedules = $this->database->scheduledBackups()->withCount('executions')->get();
+
+        return view('livewire.project.database.backup.index', [
+            'scheduleCount' => $schedules->count(),
+            'enabledScheduleCount' => $schedules->where('enabled', true)->count(),
+            'executionCount' => $schedules->sum('executions_count'),
+        ]);
     }
 }

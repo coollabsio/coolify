@@ -5,12 +5,11 @@ namespace App\Actions\Fortify;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Contracts\ResetsUserPasswords;
 
 class ResetUserPassword implements ResetsUserPasswords
 {
-    use PasswordValidationRules;
-
     /**
      * Validate and reset the user's forgotten password.
      *
@@ -19,11 +18,14 @@ class ResetUserPassword implements ResetsUserPasswords
     public function reset(User $user, array $input): void
     {
         Validator::make($input, [
-            'password' => $this->passwordRules(),
+            'password' => ['required', Password::defaults(), 'confirmed'],
         ])->validate();
 
-        $user->forceFill([
+        // The reset link went to the mailbox, so its owner now holds the password.
+        $user->fill([
             'password' => Hash::make($input['password']),
-        ])->save();
+            'force_password_reset' => false,
+        ])->forceFill(['created_by_invitation' => false])->save();
+        $user->deleteAllSessions();
     }
 }

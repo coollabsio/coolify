@@ -2,8 +2,14 @@
 
 namespace App\Actions\Server;
 
-use App\Models\InstanceSettings;
+use App\Exceptions\UpgradeAlreadyRunningException;
+use App\Jobs\DatabaseBackupJob;
 use App\Models\Server;
+use App\Models\StandalonePostgresql;
+use App\Services\AutoUpdateNotifier;
+use App\Services\CoolifyUpgradeStatus;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Sleep;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class UpdateCoolify
@@ -16,49 +22,179 @@ class UpdateCoolify
 
     public ?string $currentVersion = null;
 
+    public ?string $upgradeScriptUrl = null;
+
     public function handle($manual_update = false)
     {
-        try {
-            $settings = InstanceSettings::get();
-            ray('Running InstanceAutoUpdateJob');
-            $this->server = Server::find(0);
-            if (! $this->server) {
-                return;
-            }
-            CleanupDocker::dispatch($this->server, false)->onQueue('high');
-            $this->latestVersion = get_latest_version_of_coolify();
-            $this->currentVersion = config('version');
-            if (! $manual_update) {
-                if (! $settings->is_auto_update_enabled) {
-                    return;
-                }
-                if ($this->latestVersion === $this->currentVersion) {
-                    return;
-                }
-                if (version_compare($this->latestVersion, $this->currentVersion, '<')) {
-                    return;
-                }
-            }
-            $this->update();
-        } catch (\Throwable $e) {
-            throw $e;
-        }
-    }
-
-    private function update()
-    {
         if (isDev()) {
-            ray('Running in dev mode');
-            remote_process([
-                'sleep 10',
-            ], $this->server);
+            $this->backupDatabase();
+            Sleep::for(10)->seconds();
 
             return;
         }
-        remote_process([
-            'curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh',
-            "bash /data/coolify/source/upgrade.sh $this->latestVersion",
-        ], $this->server);
+        $settings = instanceSettings();
+        $this->server = Server::find(0);
+        if (! $this->server) {
+            return;
+        }
 
+        if ($settings->update_channel === 'custom') {
+            if ($manual_update && filled($settings->update_custom_tag)) {
+                $this->latestVersion = $settings->update_custom_tag;
+                $this->backupDatabase();
+                $this->ensureNoUpgradeIsRunning();
+                $this->update(registryUrl: 'ghcr.io');
+            }
+
+            return;
+        }
+
+        // Fetch fresh version from CDN instead of using cache
+        try {
+            // A manual update runs in the web request, so it does not wait for a retry; it falls back to the cache.
+            $latest = fetch_latest_versions(tries: $manual_update ? 1 : 3);
+
+            if ($latest !== null) {
+                $this->latestVersion = data_get($latest, 'versions.coolify.version');
+                $this->upgradeScriptUrl = $latest['upgrade_script_url'];
+            } else {
+                // Fallback to cache if CDN unavailable
+                $cacheVersion = get_latest_version_of_coolify();
+
+                // Validate cache version against current running version
+                if ($cacheVersion && version_compare($cacheVersion, config('constants.coolify.version'), '<')) {
+                    Log::error('Failed to fetch fresh version from CDN and cache is corrupted/outdated', [
+                        'cached_version' => $cacheVersion,
+                        'current_version' => config('constants.coolify.version'),
+                    ]);
+                    throw new \Exception(
+                        'Cannot determine latest version: CDN unavailable and cache version '.
+                        "({$cacheVersion}) is older than running version (".config('constants.coolify.version').')'
+                    );
+                }
+
+                $this->latestVersion = $cacheVersion;
+                $this->upgradeScriptUrl = data_get(get_versions_data(), 'upgrade_script_url');
+                Log::warning('Failed to fetch fresh version from CDN (unsuccessful response), using validated cache', [
+                    'version' => $cacheVersion,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            $cacheVersion = get_latest_version_of_coolify();
+
+            // Validate cache version against current running version
+            if ($cacheVersion && version_compare($cacheVersion, config('constants.coolify.version'), '<')) {
+                Log::error('Failed to fetch fresh version from CDN and cache is corrupted/outdated', [
+                    'error' => $e->getMessage(),
+                    'cached_version' => $cacheVersion,
+                    'current_version' => config('constants.coolify.version'),
+                ]);
+                throw new \Exception(
+                    'Cannot determine latest version: CDN unavailable and cache version '.
+                    "({$cacheVersion}) is older than running version (".config('constants.coolify.version').')'
+                );
+            }
+
+            $this->latestVersion = $cacheVersion;
+            $this->upgradeScriptUrl = data_get(get_versions_data(), 'upgrade_script_url');
+            Log::warning('Failed to fetch fresh version from CDN, using validated cache', [
+                'error' => $e->getMessage(),
+                'version' => $cacheVersion,
+            ]);
+        }
+
+        $this->currentVersion = config('constants.coolify.version');
+        if (! $manual_update) {
+            if (! $settings->is_auto_update_enabled) {
+                return;
+            }
+            if ($this->latestVersion === $this->currentVersion) {
+                return;
+            }
+            if (version_compare($this->latestVersion, $this->currentVersion, '<')) {
+                return;
+            }
+        }
+
+        // ALWAYS check for downgrades (even for manual updates)
+        if (version_compare($this->latestVersion, $this->currentVersion, '<')) {
+            Log::error('Downgrade prevented', [
+                'target_version' => $this->latestVersion,
+                'current_version' => $this->currentVersion,
+                'manual_update' => $manual_update,
+            ]);
+            throw new \Exception(
+                "Cannot downgrade from {$this->currentVersion} to {$this->latestVersion}. ".
+                'If you need to downgrade, please do so manually via Docker commands.'
+            );
+        }
+
+        $this->backupDatabase();
+        // Check the lock before the attempt is saved, so a running upgrade keeps its own saved attempt.
+        $this->ensureNoUpgradeIsRunning();
+        if (! $manual_update) {
+            AutoUpdateNotifier::saveAttempt((string) $this->latestVersion);
+        }
+        $this->update();
+        if (! $manual_update) {
+            AutoUpdateNotifier::started((string) $this->currentVersion, (string) $this->latestVersion);
+        }
+        $settings->new_version_available = false;
+        $settings->save();
+    }
+
+    private function backupDatabase(): void
+    {
+        $backup = StandalonePostgresql::find(0)?->scheduledBackups()->first();
+        if (! $backup?->enabled || ! instanceSettings()->is_backup_before_update_enabled) {
+            return;
+        }
+
+        // Runs inline so the update waits for the result. dispatchSync() would go through the job's
+        // WithoutOverlapping middleware, which silently drops the run while the scheduled backup is running.
+        $job = new DatabaseBackupJob($backup);
+        $job->beforeUpdate = true;
+        $job->handle();
+        if ($job->backup_log?->status !== 'success') {
+            $reason = $job->backup_log?->message;
+            throw new \Exception('The database backup failed, so the update was not started.'.($reason ? " Error: {$reason}" : '').' You can turn off "Backup before update" in Settings > Backup to update without a backup.');
+        }
+    }
+
+    private function update(?string $registryUrl = null)
+    {
+        $latestHelperImageVersion = getHelperVersion();
+        $upgradeScriptUrl = $this->upgradeScriptUrl ?? config('constants.coolify.upgrade_script_url');
+        $registryUrl ??= coolifyRegistryUrl();
+
+        remote_process([
+            "curl -fsSL {$upgradeScriptUrl} -o /data/coolify/source/upgrade.sh",
+            'bash /data/coolify/source/upgrade.sh '.
+                escapeshellarg($this->latestVersion).' '.
+                escapeshellarg($latestHelperImageVersion).' '.
+                escapeshellarg($registryUrl),
+        ], $this->server);
+    }
+
+    private function ensureNoUpgradeIsRunning(): void
+    {
+        $status = $this->readUpgradeStatus();
+
+        if (CoolifyUpgradeStatus::isRunning((string) $status)) {
+            Log::warning('Upgrade skipped because another upgrade is running', [
+                'target_version' => $this->latestVersion,
+                'status' => $status,
+            ]);
+            throw new UpgradeAlreadyRunningException;
+        }
+    }
+
+    protected function readUpgradeStatus(): ?string
+    {
+        return instant_remote_process(
+            ['cat '.CoolifyUpgradeStatus::FILE.' 2>/dev/null || true'],
+            $this->server,
+            false
+        );
     }
 }

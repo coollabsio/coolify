@@ -1,19 +1,33 @@
 <?php
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Enums\ProxyTypes;
+use App\Jobs\DatabaseBackupJob;
+use App\Jobs\ScheduledTaskJob;
 use App\Jobs\ServerFilesFromServerJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
+use App\Models\GiteaApp;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
+use App\Models\Project;
+use App\Models\S3Storage;
+use App\Models\ScheduledDatabaseBackupExecution;
+use App\Models\ScheduledTaskExecution;
+use App\Models\ScheduledVolumeBackup;
+use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
@@ -21,40 +35,50 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
+use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
-use App\Notifications\Channels\DiscordChannel;
-use App\Notifications\Channels\EmailChannel;
-use App\Notifications\Channels\TelegramChannel;
-use App\Notifications\Internal\GeneralNotification;
+use App\Services\Dns\CloudflareDnsProvider;
+use App\Services\Dns\DnsRecord;
+use App\Services\Dns\DnsResolver;
+use App\Services\Dns\ServerDnsAddresses;
+use App\Services\Security\SensitiveDataRedactor;
+use App\Support\DnsRecordHints;
+use Carbon\CarbonImmutable;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Mail\Message;
-use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Process\Pool;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
+use Laravel\Horizon\Contracts\JobRepository;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
 use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Signer\Hmac\Sha256;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Token\Builder;
+use Livewire\Component;
+use Nubs\RandomNameGenerator\All;
+use Nubs\RandomNameGenerator\Alliteration;
 use phpseclib3\Crypt\EC;
 use phpseclib3\Crypt\RSA;
 use Poliander\Cron\CronExpression;
-use PurplePixie\PhpDns\DNSQuery;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
-use Visus\Cuid2\Cuid2;
 
 function base_configuration_dir(): string
 {
@@ -85,8 +109,474 @@ function metrics_dir(): string
     return base_configuration_dir().'/metrics';
 }
 
+function sanitize_string(?string $input = null): ?string
+{
+    if (is_null($input)) {
+        return null;
+    }
+    // Remove any HTML/PHP tags
+    $sanitized = strip_tags($input);
+
+    // Convert special characters to HTML entities
+    $sanitized = htmlspecialchars($sanitized, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+    // Remove any control characters
+    $sanitized = preg_replace('/[\x00-\x1F\x7F]/u', '', $sanitized);
+
+    // Trim whitespace
+    $sanitized = trim($sanitized);
+
+    return $sanitized;
+}
+
+function new_public_id(int $length = 24): string
+{
+    $length = max(1, $length);
+
+    return Str::lower(Str::random($length));
+}
+
+/**
+ * The name of a clone: the source name without the "-clone-<id>" suffixes of earlier clones, then a new suffix.
+ * Without this, each clone of a clone adds a suffix, and the name soon becomes longer than the 255 characters of the column.
+ */
+function clone_resource_name(string $name, string $uuid): string
+{
+    $suffix = '-clone-'.$uuid;
+    $baseName = preg_replace('/(-clone-[a-z0-9]{7,})+$/i', '', $name);
+
+    return Str::limit($baseName, 255 - strlen($suffix), '').$suffix;
+}
+
+/**
+ * Validate that a path or identifier is safe for use in shell commands.
+ *
+ * This function prevents command injection by rejecting strings that contain
+ * shell metacharacters or command substitution patterns.
+ *
+ * @param  string  $input  The path or identifier to validate
+ * @param  string  $context  Descriptive name for error messages (e.g., 'volume source', 'service name')
+ * @return string The validated input (unchanged if valid)
+ *
+ * @throws Exception If dangerous characters are detected
+ */
+function validateShellSafePath(string $input, string $context = 'path'): string
+{
+    // List of dangerous shell metacharacters that enable command injection
+    $dangerousChars = [
+        '`' => 'backtick (command substitution)',
+        '$(' => 'command substitution',
+        '${' => 'variable substitution with potential command injection',
+        '|' => 'pipe operator',
+        '&' => 'background/AND operator',
+        ';' => 'command separator',
+        "\n" => 'newline (command separator)',
+        "\r" => 'carriage return',
+        "\t" => 'tab (token separator)',
+        '>' => 'output redirection',
+        '<' => 'input redirection',
+    ];
+
+    // Check for dangerous characters
+    foreach ($dangerousChars as $char => $description) {
+        if (str_contains($input, $char)) {
+            throw new Exception(
+                "Invalid {$context}: contains forbidden character '{$char}' ({$description}). ".
+                'Shell metacharacters are not allowed for security reasons.'
+            );
+        }
+    }
+
+    return $input;
+}
+
+/**
+ * Build the remote mkdir command for a raw Compose bind volume source.
+ *
+ * Keep volume paths as single arguments when creating bind directories.
+ *
+ * Compose environment interpolations are left to Docker Compose. They are
+ * not expanded by the destination server shell.
+ *
+ * @throws Exception If the source is invalid
+ */
+function rawComposeBindMkdirCommand(string $source): ?string
+{
+    if (preg_match('/[\x00-\x1F\x7F]/', $source)) {
+        throw new Exception('Invalid volume source: contains a control character.');
+    }
+
+    $source = trim($source);
+    if ($source === '') {
+        throw new Exception('Invalid volume source: path is empty.');
+    }
+
+    $isSimpleEnvVar = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/', $source) === 1;
+    $isEnvVarWithPath = preg_match('/^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}(?:\/[\w.\-]+)*\/?$/', $source) === 1;
+    if ($isSimpleEnvVar || $isEnvVarWithPath) {
+        return null;
+    }
+
+    if (preg_match('/^\$\{([a-zA-Z_][a-zA-Z0-9_]*):-(.*)\}$/', $source, $matches) === 1) {
+        validateShellSafePath($matches[2], 'volume source');
+
+        return null;
+    }
+
+    validateShellSafePath($source, 'volume source');
+
+    return 'mkdir -p -- '.escapeshellarg($source).' > /dev/null 2>&1 || true';
+}
+
+/**
+ * Validate that a filename is safe for use as a plain file name (no path components).
+ *
+ * Prevents unsafe parent directory paths by rejecting directory separators, parent directory
+ * sequences, and null bytes, in addition to all shell metacharacters blocked by
+ * validateShellSafePath(). Intended for user-supplied filenames such as PostgreSQL
+ * init script names that are later written to a specific directory on the host.
+ *
+ * @param  string  $input  The filename to validate
+ * @param  string  $context  Descriptive name for error messages (e.g., 'init script filename')
+ * @return string The validated input (unchanged if valid)
+ *
+ * @throws Exception If dangerous characters or parent directory sequences are detected
+ */
+function validateFilenameSafe(string $input, string $context = 'filename'): string
+{
+    // First apply shell-metachar checks
+    validateShellSafePath($input, $context);
+
+    // Reject NUL bytes (can be used to truncate path strings in some contexts)
+    if (str_contains($input, "\0")) {
+        throw new Exception(
+            "Invalid {$context}: contains null byte. ".
+            'Null bytes are not allowed in filenames for security reasons.'
+        );
+    }
+
+    // Reject directory separators — filename must be a single path component
+    if (str_contains($input, '/') || str_contains($input, '\\')) {
+        throw new Exception(
+            "Invalid {$context}: directory separators ('/' or '\\') are not allowed. ".
+            'Provide a plain filename without path components.'
+        );
+    }
+
+    // Reject parent directory sequences (catches encoded or unusual forms)
+    if (str_contains($input, '..')) {
+        throw new Exception(
+            "Invalid {$context}: parent directory sequence ('..') is not allowed."
+        );
+    }
+
+    // Reject shell globbing / expansion metacharacters and whitespace that would
+    // split the filename into additional shell arguments if ever interpolated
+    // unquoted (defence in depth on top of escapeshellarg() at call sites).
+    $shellExpansionChars = [
+        ' ' => 'whitespace',
+        '*' => 'glob wildcard',
+        '?' => 'glob wildcard',
+        '[' => 'glob character class',
+        ']' => 'glob character class',
+        '~' => 'tilde expansion',
+        '"' => 'double quote',
+        "'" => 'single quote',
+    ];
+
+    foreach ($shellExpansionChars as $char => $description) {
+        if (str_contains($input, $char)) {
+            throw new Exception(
+                "Invalid {$context}: contains forbidden character '{$char}' ({$description})."
+            );
+        }
+    }
+
+    return $input;
+}
+
+/**
+ * Validate and normalize a user supplied file mount path.
+ *
+ * File mount paths are container paths supplied by tenants. They may look like
+ * absolute paths (for example /etc/nginx/nginx.conf), but are later joined to a
+ * Coolify-managed configuration directory on the host. Therefore shell safety is
+ * not enough: every path segment must also be unable to traverse out of that
+ * managed directory.
+ *
+ * @throws Exception
+ */
+function validateFileMountPath(string $input, string $context = 'file mount path'): string
+{
+    validateShellSafePath($input, $context);
+
+    if (str_contains($input, "\0")) {
+        throw new Exception(
+            "Invalid {$context}: contains null byte. ".
+            'Null bytes are not allowed in file mount paths for security reasons.'
+        );
+    }
+
+    if (str_contains($input, '\\')) {
+        throw new Exception(
+            "Invalid {$context}: backslash directory separators are not allowed."
+        );
+    }
+
+    $path = str($input)->trim()->start('/')->replaceMatches('#/+#', '/')->value();
+
+    foreach (explode('/', trim($path, '/')) as $segment) {
+        if ($segment === '' || ($segment !== '.' && $segment !== '..')) {
+            continue;
+        }
+
+        throw new Exception(
+            "Invalid {$context}: relative path segments ('.' or '..') are not allowed."
+        );
+    }
+
+    return $path;
+}
+
+/**
+ * Validate a host file path used as a bind-only source.
+ *
+ * Unlike managed file mounts, this path is not re-based under the Coolify
+ * configuration directory and must never be written by Coolify. It still needs
+ * to be shell-safe because other storage code may pass paths through remote
+ * shell commands.
+ *
+ * @throws Exception
+ */
+function validateHostFileMountPath(string $input, string $context = 'host file path'): string
+{
+    validateShellSafePath($input, $context);
+
+    if (str_contains($input, "\0")) {
+        throw new Exception("Invalid {$context}: contains null byte.");
+    }
+
+    if (str_contains($input, '\\')) {
+        throw new Exception("Invalid {$context}: backslash directory separators are not allowed.");
+    }
+
+    $path = str($input)->trim()->replaceMatches('#/+#', '/')->value();
+
+    if ($path === '' || ! str_starts_with($path, '/')) {
+        throw new Exception("Invalid {$context}: must be an absolute path.");
+    }
+
+    if ($path === '/' || str_ends_with($path, '/')) {
+        throw new Exception("Invalid {$context}: must point to a file, not a directory.");
+    }
+
+    foreach (explode('/', trim($path, '/')) as $segment) {
+        if ($segment === '' || ($segment !== '.' && $segment !== '..')) {
+            continue;
+        }
+
+        throw new Exception("Invalid {$context}: relative path segments ('.' or '..') are not allowed.");
+    }
+
+    return normalizeUnixPath($path);
+}
+
+/**
+ * Resolve a tenant file mount path under a Coolify-managed base directory.
+ *
+ * This performs lexical normalization only; the target file does not need to
+ * exist yet. The normalized result must remain inside the given base directory.
+ *
+ * @throws Exception
+ */
+function confineFileMountPath(string $baseDirectory, string $path, string $context = 'file mount path'): string
+{
+    $baseDirectory = normalizeUnixPath($baseDirectory);
+    $mountPath = validateFileMountPath($path, $context);
+    $resolvedPath = normalizeUnixPath($baseDirectory.'/'.$mountPath);
+
+    if ($resolvedPath !== $baseDirectory && ! str_starts_with($resolvedPath, $baseDirectory.'/')) {
+        throw new Exception(
+            "Invalid {$context}: resolved path must stay inside the resource configuration directory."
+        );
+    }
+
+    return $resolvedPath;
+}
+
+/**
+ * Normalize an existing host path and assert it remains inside a base directory.
+ *
+ * Dot-relative paths are resolved against the base directory for legacy
+ * LocalFileVolume rows. Absolute paths must already point inside the base.
+ *
+ * @throws Exception
+ */
+function confinePathToBase(string $baseDirectory, string $path, string $context = 'path'): string
+{
+    $baseDirectory = normalizeUnixPath($baseDirectory);
+    $path = trim($path);
+
+    if (str_starts_with($path, '.')) {
+        $path = $baseDirectory.'/'.str($path)->after('.')->value();
+    } elseif (! str_starts_with($path, '/')) {
+        $path = $baseDirectory.'/'.$path;
+    }
+
+    $resolvedPath = normalizeUnixPath($path);
+
+    if ($resolvedPath !== $baseDirectory && ! str_starts_with($resolvedPath, $baseDirectory.'/')) {
+        throw new Exception(
+            "Invalid {$context}: resolved path must stay inside the resource configuration directory."
+        );
+    }
+
+    return $resolvedPath;
+}
+
+/**
+ * Normalize a Unix path lexically without consulting the remote filesystem.
+ *
+ * @throws Exception
+ */
+function normalizeUnixPath(string $path): string
+{
+    validateShellSafePath($path, 'path');
+
+    if (str_contains($path, "\0")) {
+        throw new Exception('Invalid path: contains null byte.');
+    }
+
+    if (str_contains($path, '\\')) {
+        throw new Exception('Invalid path: backslash directory separators are not allowed.');
+    }
+
+    $isAbsolute = str_starts_with($path, '/');
+    $segments = [];
+
+    foreach (explode('/', $path) as $segment) {
+        if ($segment === '' || $segment === '.') {
+            continue;
+        }
+
+        if ($segment === '..') {
+            if ($segments === [] || end($segments) === '..') {
+                if ($isAbsolute) {
+                    throw new Exception('Invalid path: resolved path escapes the base directory.');
+                }
+                $segments[] = $segment;
+
+                continue;
+            }
+
+            array_pop($segments);
+
+            continue;
+        }
+
+        $segments[] = $segment;
+    }
+
+    $normalized = implode('/', $segments);
+
+    if ($isAbsolute) {
+        return $normalized === '' ? '/' : '/'.$normalized;
+    }
+
+    return $normalized === '' ? '.' : $normalized;
+}
+
+/**
+ * Validate that a databases_to_backup input string is safe from command injection.
+ *
+ * Supports all database formats:
+ * - PostgreSQL/MySQL/MariaDB: "db1,db2,db3"
+ * - MongoDB: "db1:col1,col2|db2:col3,col4"
+ *
+ * Validates each database name AND collection name individually against shell metacharacters.
+ *
+ * @param  string  $input  The databases_to_backup string
+ * @return string The validated input
+ *
+ * @throws Exception If any component contains dangerous characters
+ */
+function validateDatabasesBackupInput(string $input): string
+{
+    // Split by pipe (MongoDB multi-db separator)
+    $databaseEntries = explode('|', $input);
+
+    foreach ($databaseEntries as $entry) {
+        $entry = trim($entry);
+        if ($entry === '' || $entry === 'all' || $entry === '*') {
+            continue;
+        }
+
+        if (str_contains($entry, ':')) {
+            // MongoDB format: dbname:collection1,collection2
+            $databaseName = str($entry)->before(':')->value();
+            $collections = str($entry)->after(':')->explode(',');
+
+            validateShellSafePath($databaseName, 'database name');
+
+            foreach ($collections as $collection) {
+                $collection = trim($collection);
+                if ($collection !== '') {
+                    validateShellSafePath($collection, 'collection name');
+                }
+            }
+        } else {
+            // Simple format: just a database name (may contain commas for non-Mongo)
+            $databases = explode(',', $entry);
+            foreach ($databases as $db) {
+                $db = trim($db);
+                if ($db !== '' && $db !== 'all' && $db !== '*') {
+                    validateShellSafePath($db, 'database name');
+                }
+            }
+        }
+    }
+
+    return $input;
+}
+
+/**
+ * Validate that a string is a safe git ref (commit SHA, branch name, tag, or HEAD).
+ *
+ * Prevents command injection by enforcing an allowlist of characters valid for git refs.
+ * Valid: hex SHAs, HEAD, branch/tag names (alphanumeric, dots, hyphens, underscores, slashes).
+ *
+ * @param  string  $input  The git ref to validate
+ * @param  string  $context  Descriptive name for error messages
+ * @return string The validated input (trimmed)
+ *
+ * @throws Exception If the input contains disallowed characters
+ */
+function validateGitRef(string $input, string $context = 'git ref'): string
+{
+    $input = trim($input);
+
+    if ($input === '' || $input === 'HEAD') {
+        return $input;
+    }
+
+    // Must not start with a hyphen (git flag injection)
+    if (str_starts_with($input, '-')) {
+        throw new Exception("Invalid {$context}: must not start with a hyphen.");
+    }
+
+    // Allow only alphanumeric characters, dots, hyphens, underscores, and slashes
+    if (! preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._\-\/]*$/', $input)) {
+        throw new Exception("Invalid {$context}: contains disallowed characters. Only alphanumeric characters, dots, hyphens, underscores, and slashes are allowed.");
+    }
+
+    return $input;
+}
+
 function generate_readme_file(string $name, string $updated_at): string
 {
+    $name = sanitize_string($name);
+    $updated_at = sanitize_string($updated_at);
+
     return "Resource name: $name\nLatest Deployment Date: $updated_at";
 }
 
@@ -97,12 +587,39 @@ function isInstanceAdmin()
 
 function currentTeam()
 {
-    return auth()?->user()?->currentTeam() ?? null;
+    return Auth::user()?->currentTeam() ?? null;
+}
+
+function find_destination_for_current_team(?string $uuid): StandaloneDocker|SwarmDocker|null
+{
+    if (blank($uuid) || ! currentTeam()) {
+        return null;
+    }
+
+    return StandaloneDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first()
+        ?? SwarmDocker::ownedByCurrentTeam()->where('uuid', $uuid)->first();
+}
+
+function find_resource_destination_for_current_team(?string $uuid): StandaloneDocker|SwarmDocker|null
+{
+    $destination = find_destination_for_current_team($uuid);
+
+    if (! $destination?->server?->canHostResources()) {
+        return null;
+    }
+
+    Gate::authorize('placeResource', $destination->server);
+
+    return $destination;
 }
 
 function showBoarding(): bool
 {
-    if (auth()->user()?->isMember()) {
+    if (isDev()) {
+        return false;
+    }
+
+    if (Auth::user()?->isMember()) {
         return false;
     }
 
@@ -111,21 +628,56 @@ function showBoarding(): bool
 function refreshSession(?Team $team = null): void
 {
     if (! $team) {
-        if (auth()->user()?->currentTeam()) {
-            $team = Team::find(auth()->user()->currentTeam()->id);
-        } else {
-            $team = User::find(auth()->user()->id)->teams->first();
+        $currentTeam = Auth::user()->currentTeam();
+        if ($currentTeam) {
+            // currentTeam() can resolve a stale (just-deleted) team from the
+            // session/cache, so Team::find() may still return null here.
+            $team = Team::find($currentTeam->id);
+        }
+        if (! $team) {
+            // Fall back to the user's resolvable team (stored choice, or their
+            // sole team). Returns null for a multi-team user with no valid stored
+            // choice, so an arbitrary first team is never silently persisted —
+            // the user is sent to the selection screen instead.
+            $team = User::query()->find(Auth::id())?->resolveStoredTeam();
         }
     }
-    Cache::forget('team:'.auth()->user()->id);
-    Cache::remember('team:'.auth()->user()->id, 3600, function () use ($team) {
+
+    // Clear old cache key format for backwards compatibility
+    Cache::forget('team:'.Auth::id());
+
+    if (! $team) {
+        // The user has no team left (e.g. just deleted their current team and
+        // belongs to no other): clear the stale session reference instead of
+        // dereferencing null, and drop the persisted choice so it is not
+        // restored on next login.
+        session()->forget('currentTeam');
+        $user = Auth::user();
+        if ($user && ! is_null($user->current_team_id)) {
+            $user->forceFill(['current_team_id' => null])->saveQuietly();
+        }
+
+        return;
+    }
+
+    // Use new cache key format that includes team ID
+    Cache::forget('user:'.Auth::id().':team:'.$team->id);
+    Cache::remember('user:'.Auth::id().':team:'.$team->id, 3600, function () use ($team) {
         return $team;
     });
     session(['currentTeam' => $team]);
+
+    // Persist the active team so it can be restored after logout/login — but
+    // never while an admin is impersonating, so viewing another user's account
+    // does not overwrite that user's real last-active team.
+    $user = Auth::user();
+    if ($user && ! session('impersonating') && $user->current_team_id !== $team->id) {
+        $user->current_team_id = $team->id;
+        $user->saveQuietly();
+    }
 }
-function handleError(?Throwable $error = null, ?Livewire\Component $livewire = null, ?string $customErrorMessage = null)
+function handleError(?Throwable $error = null, ?Component $livewire = null, ?string $customErrorMessage = null)
 {
-    ray($error);
     if ($error instanceof TooManyRequestsException) {
         if (isset($livewire)) {
             return $livewire->dispatch('error', "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.");
@@ -139,6 +691,10 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
         }
 
         return 'Duplicate entry found. Please use a different name.';
+    }
+
+    if ($error instanceof ModelNotFoundException) {
+        abort(404);
     }
 
     if ($error instanceof Throwable) {
@@ -162,31 +718,16 @@ function get_route_parameters(): array
 
 function get_latest_sentinel_version(): string
 {
-    try {
-        $response = Http::get('https://cdn.coollabs.io/sentinel/versions.json');
-        $versions = $response->json();
-
-        return data_get($versions, 'sentinel.version');
-    } catch (\Throwable $e) {
-        //throw $e;
-        ray($e->getMessage());
-
-        return '0.0.0';
-    }
+    // Read the local versions.json, which CheckForUpdatesJob refreshes every hour. Do not ask the CDN for each server.
+    return data_get(get_versions_data(), 'sentinel.version') ?? '0.0.0';
 }
 function get_latest_version_of_coolify(): string
 {
     try {
-        $versions = File::get(base_path('versions.json'));
-        $versions = json_decode($versions, true);
+        $versions = get_versions_data();
 
-        return data_get($versions, 'coolify.v4.version');
-        // $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
-        // $versions = $response->json();
-        // return data_get($versions, 'coolify.v4.version');
-    } catch (\Throwable $e) {
-        //throw $e;
-        ray($e->getMessage());
+        return data_get($versions, 'coolify.version', '0.0.0');
+    } catch (Throwable $e) {
 
         return '0.0.0';
     }
@@ -194,21 +735,24 @@ function get_latest_version_of_coolify(): string
 
 function generate_random_name(?string $cuid = null): string
 {
-    $generator = new \Nubs\RandomNameGenerator\All(
+    $generator = new All(
         [
-            new \Nubs\RandomNameGenerator\Alliteration,
+            new Alliteration,
         ]
     );
     if (is_null($cuid)) {
-        $cuid = new Cuid2(7);
+        $cuid = new_public_id();
     }
 
     return Str::kebab("{$generator->getName()}-$cuid");
 }
-function generateSSHKey(string $type = 'rsa')
+/**
+ * RSA keys get 4096 bits: GitHub rejects new RSA SSH keys smaller than 3072 bits, and phpseclib makes 2048-bit keys by default.
+ */
+function generateSSHKey(string $type = 'ed25519')
 {
     if ($type === 'rsa') {
-        $key = RSA::createKey();
+        $key = RSA::createKey(4096);
 
         return [
             'private' => $key->toString('PKCS1'),
@@ -236,47 +780,39 @@ function formatPrivateKey(string $privateKey)
 function generate_application_name(string $git_repository, string $git_branch, ?string $cuid = null): string
 {
     if (is_null($cuid)) {
-        $cuid = new Cuid2(7);
+        $cuid = new_public_id();
     }
 
-    return Str::kebab("$git_repository:$git_branch-$cuid");
+    $repo_name = str_contains($git_repository, '/') ? last(explode('/', $git_repository)) : $git_repository;
+
+    $name = Str::kebab("$repo_name:$git_branch-$cuid");
+
+    // Strip characters not allowed by NAME_PATTERN
+    $name = preg_replace('/[^\p{L}\p{M}\p{N}\s\-_.@\/&()#,:+]+/u', '', $name);
+
+    if (empty($name) || mb_strlen($name) < 3) {
+        return generate_random_name($cuid);
+    }
+
+    return $name;
 }
 
-function is_transactional_emails_active(): bool
+/**
+ * Sort branches by priority: main first, master second, then alphabetically.
+ *
+ * @param  Collection  $branches  Collection of branch objects with 'name' key
+ */
+function sortBranchesByPriority(Collection $branches): Collection
 {
-    return isEmailEnabled(\App\Models\InstanceSettings::get());
-}
+    return $branches->sortBy(function ($branch) {
+        $name = data_get($branch, 'name');
 
-function set_transanctional_email_settings(?InstanceSettings $settings = null): ?string
-{
-    if (! $settings) {
-        $settings = \App\Models\InstanceSettings::get();
-    }
-    config()->set('mail.from.address', data_get($settings, 'smtp_from_address'));
-    config()->set('mail.from.name', data_get($settings, 'smtp_from_name'));
-    if (data_get($settings, 'resend_enabled')) {
-        config()->set('mail.default', 'resend');
-        config()->set('resend.api_key', data_get($settings, 'resend_api_key'));
-
-        return 'resend';
-    }
-    if (data_get($settings, 'smtp_enabled')) {
-        config()->set('mail.default', 'smtp');
-        config()->set('mail.mailers.smtp', [
-            'transport' => 'smtp',
-            'host' => data_get($settings, 'smtp_host'),
-            'port' => data_get($settings, 'smtp_port'),
-            'encryption' => data_get($settings, 'smtp_encryption'),
-            'username' => data_get($settings, 'smtp_username'),
-            'password' => data_get($settings, 'smtp_password'),
-            'timeout' => data_get($settings, 'smtp_timeout'),
-            'local_domain' => null,
-        ]);
-
-        return 'smtp';
-    }
-
-    return null;
+        return match ($name) {
+            'main' => '0_main',
+            'master' => '1_master',
+            default => '2_'.$name,
+        };
+    })->values();
 }
 
 function base_ip(): string
@@ -284,7 +820,7 @@ function base_ip(): string
     if (isDev()) {
         return 'localhost';
     }
-    $settings = \App\Models\InstanceSettings::get();
+    $settings = instanceSettings();
     if ($settings->public_ipv4) {
         return "$settings->public_ipv4";
     }
@@ -294,25 +830,152 @@ function base_ip(): string
 
     return 'localhost';
 }
-function getFqdnWithoutPort(string $fqdn)
+/**
+ * Parse a domain URL into scheme/host/path pieces used by COOLIFY_* and SERVICE_* env builders.
+ * Omits a bare "/" path so port re-append stays valid ("http://host:80" not "http://host/:80").
+ *
+ * @return array{scheme: string, host: string, path: string}|null
+ */
+function parseDomainUrlParts(string $fqdn): ?array
 {
     try {
         $url = Url::fromString($fqdn);
         $host = $url->getHost();
-        $scheme = $url->getScheme();
-        $path = $url->getPath();
+        if ($host === '') {
+            return null;
+        }
 
-        return "$scheme://$host$path";
-    } catch (\Throwable $e) {
-        return $fqdn;
+        $path = $url->getPath();
+        if ($path === '' || $path === '/') {
+            $path = '';
+        }
+
+        return [
+            'scheme' => $url->getScheme(),
+            'host' => $host,
+            'path' => $path,
+        ];
+    } catch (Throwable) {
+        return null;
     }
 }
+
+/**
+ * Absolute URL without port (and without a bare trailing slash).
+ * Used for COOLIFY_URL / SERVICE_URL base values.
+ */
+function getFqdnWithoutPort(string $fqdn): string
+{
+    $parts = parseDomainUrlParts($fqdn);
+    if ($parts === null || $parts['scheme'] === '') {
+        // Spatie accepts bare hostnames (empty scheme). Do not invent "://host".
+        return $fqdn;
+    }
+
+    return $parts['scheme'].'://'.$parts['host'].$parts['path'];
+}
+
+/**
+ * Host (+ optional path) without scheme or port.
+ * Used for COOLIFY_FQDN / SERVICE_FQDN base values.
+ */
+function getHostWithoutPort(string $fqdn): string
+{
+    $parts = parseDomainUrlParts($fqdn);
+    if ($parts === null) {
+        return $fqdn;
+    }
+
+    return $parts['host'].$parts['path'];
+}
+
+/**
+ * First entry from a comma-separated FQDN list (service apps may store multiple).
+ */
+function firstDomainFromList(?string $fqdns): string
+{
+    return trim((string) str($fqdns ?? '')->explode(',')->first());
+}
+function profile_avatar_url(User $user): string
+{
+    if ($user->avatar_storage_type === 's3') {
+        $url = s3_image_url($user->avatar_s3_storage_id, $user->avatar_path, $user->updated_at->timestamp);
+        if ($url) {
+            return $url;
+        }
+    }
+
+    if (auth()->check() && $user->id !== auth()->id()) {
+        return route('team.member.avatar', ['user_id' => $user->id, 'v' => $user->updated_at->timestamp]);
+    }
+
+    return route('profile.avatar', ['v' => $user->updated_at->timestamp]);
+}
+
+function project_icon_url(Project $project): string
+{
+    if ($project->icon_storage_type === 's3') {
+        $url = s3_image_url($project->icon_s3_storage_id, $project->icon_path, $project->updated_at->timestamp);
+        if ($url) {
+            return $url;
+        }
+    }
+
+    return route('project.icon', [
+        'project_uuid' => $project->uuid,
+        'v' => $project->updated_at->timestamp,
+    ]);
+}
+
+function team_avatar_url(Team $team): string
+{
+    if ($team->avatar_storage_type === 's3') {
+        $url = s3_image_url($team->avatar_s3_storage_id, $team->avatar_path, $team->updated_at->timestamp);
+        if ($url) {
+            return $url;
+        }
+    }
+
+    return route('team.avatar', [
+        'team_id' => $team->id,
+        'v' => $team->updated_at->timestamp,
+    ]);
+}
+
+function s3_image_url(?int $storageId, ?string $path, int $version): ?string
+{
+    if (! $storageId || blank($path)) {
+        return null;
+    }
+
+    // S3-compatible endpoints (e.g. Cloudflare R2) require authenticated requests for
+    // every object, including plain GETs, so an unauthenticated direct link only works
+    // when a public CDN has been configured in front of the bucket. Without one, callers
+    // must fall back to the app's own authenticated proxy route.
+    $cdnUrl = instanceSettings()->image_cdn_url;
+    if (blank($cdnUrl)) {
+        return null;
+    }
+
+    $storage = S3Storage::query()
+        ->whereKey($storageId)
+        ->whereTeamId(0)
+        ->where('is_usable', true)
+        ->first();
+
+    if (! $storage) {
+        return null;
+    }
+
+    return rtrim($cdnUrl, '/').'/'.ltrim($path, '/').'?v='.$version;
+}
+
 /**
  * If fqdn is set, return it, otherwise return public ip.
  */
 function base_url(bool $withPort = true): string
 {
-    $settings = \App\Models\InstanceSettings::get();
+    $settings = instanceSettings();
     if ($settings->fqdn) {
         return $settings->fqdn;
     }
@@ -333,31 +996,171 @@ function base_url(bool $withPort = true): string
     }
     if ($settings->public_ipv6) {
         if ($withPort) {
-            return "http://$settings->public_ipv6:$port";
+            return "http://[$settings->public_ipv6]:$port";
         }
 
-        return "http://$settings->public_ipv6";
+        return "http://[$settings->public_ipv6]";
     }
 
-    return url('/');
+    return config('app.url');
 }
 
 function isSubscribed()
 {
-    return isSubscriptionActive() || auth()->user()->isInstanceAdmin();
+    return isSubscriptionActive();
+}
+
+function isProduction(): bool
+{
+    return ! isDev();
 }
 function isDev(): bool
 {
     return config('app.env') === 'local';
 }
 
-function isCloud(): bool
+/**
+ * Path that the Docker daemon of $server must use as a bind mount source for $path, a path that Coolify
+ * writes through SSH (below base_configuration_dir()).
+ *
+ * Only the development `testing-host` server needs a different path (Server::sharesDevHostDocker()):
+ * it writes to Docker named volumes, but it starts containers on the host Docker daemon. The returned
+ * paths match its mounts in docker-compose.dev*.yml:
+ * - /data/coolify/backups/... -> /var/lib/docker/volumes/<DEV_COOLIFY_BACKUPS_VOLUME>/_data/...
+ * - /data/coolify/...         -> /var/lib/docker/volumes/<DEV_COOLIFY_DATA_VOLUME>/_data/...
+ *
+ * For all other servers (production, dev KVM VMs, remote servers) the function returns $path unchanged.
+ */
+function devHostDockerPath(?Server $server, string $path): string
 {
-    return ! config('coolify.self_hosted');
+    if (! $server?->sharesDevHostDocker()) {
+        return $path;
+    }
+
+    $mounts = [
+        backup_dir() => devDockerVolumeDataPath('constants.coolify.dev_backups_volume', 'coolify_dev_backups_data'),
+        base_configuration_dir() => devDockerVolumeDataPath('constants.coolify.dev_data_volume', 'coolify_dev_coolify_data'),
+    ];
+    foreach ($mounts as $containerPath => $hostPath) {
+        if ($path === $containerPath || str_starts_with($path, $containerPath.'/')) {
+            return $hostPath.substr($path, strlen($containerPath));
+        }
+    }
+
+    return $path;
 }
 
+/**
+ * Host path of a development Docker volume. An invalid volume name falls back to the legacy name.
+ */
+function devDockerVolumeDataPath(string $configKey, string $fallbackVolume): string
+{
+    $volume = (string) config($configKey);
+    if (preg_match('/^[A-Za-z0-9][A-Za-z0-9_.-]*$/', $volume) !== 1) {
+        $volume = $fallbackVolume;
+    }
+
+    return "/var/lib/docker/volumes/{$volume}/_data";
+}
+
+function isCloud(): bool
+{
+    return ! config('constants.coolify.self_hosted');
+}
+
+/**
+ * Resolve the queue used for application deployments and for database, service and proxy
+ * starts and restarts.
+ *
+ * On cloud these jobs run on a dedicated `deployments` queue so they can be drained by an
+ * isolated Horizon worker pool; self-hosted keeps them on the shared `high` queue. Routing
+ * is decided by `isCloud()` (config-based) rather than `HORIZON_QUEUES`, so the dispatching
+ * process needs no special env — only the worker must be configured to drain `deployments`.
+ *
+ * On cloud, config/horizon.php provisions a dedicated `deployments` pool in production
+ * (see docs/cloud-horizon-workers.md).
+ */
+function deployment_queue(): string
+{
+    return isCloud() ? 'deployments' : 'high';
+}
+
+/**
+ * Resolve the queue used for scheduled jobs — the scheduler dispatcher, scheduled tasks and
+ * scheduled database backups, whether triggered automatically or manually.
+ *
+ * On cloud these jobs run on a dedicated `crons` queue so they can be drained by an isolated
+ * Horizon worker pool; self-hosted keeps them on the shared `high` queue. Routing is decided
+ * by `isCloud()` (config-based), so the dispatching process needs no special env — only the
+ * worker must be configured to drain `crons`.
+ *
+ * On cloud, config/horizon.php provisions a dedicated `crons` pool in production
+ * (see docs/cloud-horizon-workers.md).
+ */
+function crons_queue(): string
+{
+    return isCloud() ? 'crons' : 'high';
+}
+
+/**
+ * Resolve the queue used for slow server maintenance — scheduled, manual and stop-triggered
+ * Docker cleanups, and weekly server patch checks.
+ *
+ * On cloud these jobs run on a dedicated `maintenance` queue so a small, bounded Horizon pool
+ * drains them and slow remote prunes cannot occupy the `high` workers; self-hosted keeps them
+ * on the shared `high` queue, so a custom `HORIZON_QUEUES` does not need a new queue name. Routing is decided by `isCloud()` (config-based), so the dispatching
+ * process needs no special env — only the worker must be configured to drain `maintenance`.
+ *
+ * On cloud, config/horizon.php provisions a dedicated `maintenance` pool in production
+ * (see docs/cloud-horizon-workers.md).
+ */
+function maintenance_queue(): string
+{
+    return isCloud() ? 'maintenance' : 'high';
+}
+
+/**
+ * Resolve the queue used for incoming webhook processing — GitHub pull request webhooks,
+ * Stripe events, and the server limit checks that follow subscription changes.
+ *
+ * On cloud these jobs run on a dedicated `webhooks` queue so a busy `high` queue cannot delay
+ * them; self-hosted keeps them on the shared `high` queue, so a custom `HORIZON_QUEUES` does
+ * not need a new queue name. Routing is decided by `isCloud()` (config-based), so the
+ * dispatching process needs no special env — only the worker must be configured to drain `webhooks`.
+ *
+ * On cloud, config/horizon.php provisions a dedicated `webhooks` pool in production
+ * (see docs/cloud-horizon-workers.md).
+ */
+function webhooks_queue(): string
+{
+    return isCloud() ? 'webhooks' : 'high';
+}
+
+/**
+ * Resolve the queue for PushServerUpdateJob, which processes Sentinel pushes.
+ *
+ * On cloud these jobs run on a dedicated `sentinel` queue, so a burst of pushes from many
+ * servers cannot use the workers of the other queues. Self-hosted returns null, so the jobs
+ * stay on the default queue of the connection, as before.
+ */
+function sentinel_queue(): ?string
+{
+    return isCloud() ? 'sentinel' : null;
+}
+
+function translate_cron_expression($expression_to_validate): string
+{
+    if (isset(VALID_CRON_STRINGS[$expression_to_validate])) {
+        return VALID_CRON_STRINGS[$expression_to_validate];
+    }
+
+    return $expression_to_validate;
+}
 function validate_cron_expression($expression_to_validate): bool
 {
+    if (empty($expression_to_validate)) {
+        return false;
+    }
     $isValid = false;
     $expression = new CronExpression($expression_to_validate);
     $isValid = $expression->isValid();
@@ -368,80 +1171,42 @@ function validate_cron_expression($expression_to_validate): bool
 
     return $isValid;
 }
-function send_internal_notification(string $message): void
+
+/**
+ * Determine if a cron schedule should run now, with deduplication.
+ *
+ * Uses getPreviousRunDate() + last-dispatch tracking to be resilient to queue delays.
+ * Even if the job runs minutes late, it still catches the missed cron window.
+ * Without a dedupKey, falls back to a simple isDue() check.
+ */
+function shouldRunCronNow(string $frequency, string $timezone, ?string $dedupKey = null, ?Carbon $executionTime = null): bool
 {
-    try {
-        $team = Team::find(0);
-        $team?->notify(new GeneralNotification($message));
-    } catch (\Throwable $e) {
-        ray($e->getMessage());
-    }
-}
-function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null): void
-{
-    $settings = \App\Models\InstanceSettings::get();
-    $type = set_transanctional_email_settings($settings);
-    if (! $type) {
-        throw new Exception('No email settings found.');
-    }
-    if ($cc) {
-        Mail::send(
-            [],
-            [],
-            fn (Message $message) => $message
-                ->to($email)
-                ->replyTo($email)
-                ->cc($cc)
-                ->subject($mail->subject)
-                ->html((string) $mail->render())
-        );
-    } else {
-        Mail::send(
-            [],
-            [],
-            fn (Message $message) => $message
-                ->to($email)
-                ->subject($mail->subject)
-                ->html((string) $mail->render())
-        );
-    }
-}
-function isTestEmailEnabled($notifiable)
-{
-    if (data_get($notifiable, 'use_instance_email_settings') && isInstanceAdmin()) {
-        return true;
-    } elseif (data_get($notifiable, 'smtp_enabled') || data_get($notifiable, 'resend_enabled') && auth()->user()->isAdminFromSession()) {
-        return true;
+    $cron = new Cron\CronExpression($frequency);
+    $executionTime = ($executionTime ?? Carbon::now())->copy()->setTimezone($timezone);
+
+    if ($dedupKey === null) {
+        return $cron->isDue($executionTime);
     }
 
-    return false;
-}
-function isEmailEnabled($notifiable)
-{
-    return data_get($notifiable, 'smtp_enabled') || data_get($notifiable, 'resend_enabled') || data_get($notifiable, 'use_instance_email_settings');
-}
-function setNotificationChannels($notifiable, $event)
-{
-    $channels = [];
-    $isEmailEnabled = isEmailEnabled($notifiable);
-    $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-    $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
-    $isSubscribedToEmailEvent = data_get($notifiable, "smtp_notifications_$event");
-    $isSubscribedToDiscordEvent = data_get($notifiable, "discord_notifications_$event");
-    $isSubscribedToTelegramEvent = data_get($notifiable, "telegram_notifications_$event");
+    $previousDue = Carbon::instance($cron->getPreviousRunDate($executionTime, allowCurrentDate: true));
+    $lastDispatched = Cache::get($dedupKey);
 
-    if ($isDiscordEnabled && $isSubscribedToDiscordEvent) {
-        $channels[] = DiscordChannel::class;
-    }
-    if ($isEmailEnabled && $isSubscribedToEmailEvent) {
-        $channels[] = EmailChannel::class;
-    }
-    if ($isTelegramEnabled && $isSubscribedToTelegramEvent) {
-        $channels[] = TelegramChannel::class;
-    }
+    $shouldFire = $lastDispatched === null
+        ? $cron->isDue($executionTime)
+        : $previousDue->gt(Carbon::parse($lastDispatched));
 
-    return $channels;
+    // Always write: seeds on first miss, refreshes on dispatch.
+    // 30-day static TTL covers all intervals; orphan keys self-clean.
+    Cache::put($dedupKey, ($shouldFire ? $executionTime : $previousDue)->toIso8601String(), 2592000);
+
+    return $shouldFire;
 }
+
+function validate_timezone(string $timezone): bool
+{
+    return in_array($timezone, timezone_identifiers_list());
+}
+
 function parseEnvFormatToArray($env_file_contents)
 {
     $env_array = [];
@@ -453,17 +1218,402 @@ function parseEnvFormatToArray($env_file_contents)
         $equals_pos = strpos($line, '=');
         if ($equals_pos !== false) {
             $key = substr($line, 0, $equals_pos);
-            $value = substr($line, $equals_pos + 1);
-            if (substr($value, 0, 1) === '"' && substr($value, -1) === '"') {
-                $value = substr($value, 1, -1);
-            } elseif (substr($value, 0, 1) === "'" && substr($value, -1) === "'") {
-                $value = substr($value, 1, -1);
+            $value_and_comment = substr($line, $equals_pos + 1);
+            $comment = null;
+            $remainder = '';
+
+            // Check if value starts with quotes
+            $firstChar = $value_and_comment[0] ?? '';
+            $isDoubleQuoted = $firstChar === '"';
+            $isSingleQuoted = $firstChar === "'";
+
+            if ($isDoubleQuoted) {
+                // Find the closing double quote
+                $closingPos = strpos($value_and_comment, '"', 1);
+                if ($closingPos !== false) {
+                    // Extract quoted value and remove quotes
+                    $value = substr($value_and_comment, 1, $closingPos - 1);
+                    // Everything after closing quote (including comments)
+                    $remainder = substr($value_and_comment, $closingPos + 1);
+                } else {
+                    // No closing quote - treat as unquoted
+                    $value = substr($value_and_comment, 1);
+                }
+            } elseif ($isSingleQuoted) {
+                // Find the closing single quote
+                $closingPos = strpos($value_and_comment, "'", 1);
+                if ($closingPos !== false) {
+                    // Extract quoted value and remove quotes
+                    $value = substr($value_and_comment, 1, $closingPos - 1);
+                    // Everything after closing quote (including comments)
+                    $remainder = substr($value_and_comment, $closingPos + 1);
+                } else {
+                    // No closing quote - treat as unquoted
+                    $value = substr($value_and_comment, 1);
+                }
+            } else {
+                // Unquoted value - strip inline comments
+                // Only treat # as comment if preceded by whitespace
+                if (preg_match('/\s+#/', $value_and_comment, $matches, PREG_OFFSET_CAPTURE)) {
+                    // Found whitespace followed by #, extract comment
+                    $remainder = substr($value_and_comment, $matches[0][1]);
+                    $value = substr($value_and_comment, 0, $matches[0][1]);
+                } else {
+                    $value = $value_and_comment;
+                }
+                // Like a .env file, an unquoted value loses its edge whitespace. Quotes keep it.
+                $value = trim($value);
             }
-            $env_array[$key] = $value;
+
+            // Extract comment from remainder (if any)
+            if ($remainder !== '') {
+                // Look for # in remainder
+                $hashPos = strpos($remainder, '#');
+                if ($hashPos !== false) {
+                    // Extract everything after the # and trim
+                    $comment = substr($remainder, $hashPos + 1);
+                    $comment = trim($comment);
+                    // Set to null if empty after trimming
+                    if ($comment === '') {
+                        $comment = null;
+                    }
+                }
+            }
+
+            $env_array[$key] = [
+                'value' => $value,
+                'comment' => $comment,
+            ];
         }
     }
 
     return $env_array;
+}
+
+/**
+ * Format a value for a KEY=VALUE line of the developer view, so that parseEnvFormatToArray()
+ * reads it back unchanged. Returns null when the format cannot hold the value: it has a line
+ * break, or it needs quotes and has both quote types.
+ */
+function formatEnvValueForDevView(?string $value): ?string
+{
+    $value ??= '';
+    if (str_contains($value, "\n")) {
+        return null;
+    }
+
+    $needsQuotes = str_starts_with($value, '"') || str_starts_with($value, "'") || preg_match('/\s#/', $value) === 1 || $value !== trim($value);
+    if (! $needsQuotes) {
+        return $value;
+    }
+    if (! str_contains($value, "'")) {
+        return "'{$value}'";
+    }
+    if (! str_contains($value, '"')) {
+        return "\"{$value}\"";
+    }
+
+    return null;
+}
+
+/**
+ * Format a variable for the developer view: its KEY=value line, with a "# coolify:" directive
+ * line above it when a flag is not its default. A variable that the view cannot edit gets a
+ * placeholder line and no directive.
+ */
+function formatEnvVariableForDevView(EnvironmentVariable|SharedEnvironmentVariable $variable, bool $canViewValue): string
+{
+    if (! $canViewValue) {
+        return "{$variable->key}=(Hidden, only admins can view)";
+    }
+    if ($variable->is_shown_once) {
+        return "{$variable->key}=(Locked Secret, delete and add again to change)";
+    }
+    if ($variable->is_multiline) {
+        return "{$variable->key}=(Multiline environment variable, edit in normal view)";
+    }
+    $value = formatEnvValueForDevView($variable->value);
+    if ($value === null) {
+        return "{$variable->key}=(Value cannot be shown in this view, edit in normal view)";
+    }
+
+    $flags = [];
+    foreach ($variable::DEV_VIEW_FLAG_DEFAULTS as $flag => $default) {
+        if ((bool) $variable->{"is_{$flag}"} !== $default) {
+            $flags[] = $default ? "{$flag}=false" : $flag;
+        }
+    }
+    $line = "{$variable->key}={$value}";
+
+    return $flags === [] ? $line : '# coolify: '.implode(' ', $flags)."\n".$line;
+}
+
+/**
+ * Parse developer view text. Returns the result of parseEnvFormatToArray() with a 'settings'
+ * entry per key: the flags of the "# coolify:" line directly above the key line, as model
+ * attributes (for example ['is_literal' => true]). A key without a directive gets empty
+ * settings, so its current flags stay.
+ *
+ * @param  array<string, bool>  $flagDefaults  the allowed flags and their defaults
+ * @return array<string, array{value: string, comment: ?string, settings: array<string, bool>}>
+ *
+ * @throws InvalidArgumentException when a directive is not directly above a KEY=value line, or has an unknown flag or value
+ */
+function parseEnvDevView(?string $contents, array $flagDefaults): array
+{
+    $contents ??= '';
+    $settingsByKey = [];
+    $directive = null;
+    $directiveLine = 0;
+
+    foreach (explode("\n", $contents) as $index => $line) {
+        $isKeyLine = $line !== '' && ! str_starts_with($line, '#') && str_contains($line, '=');
+        if ($directive !== null && ! $isKeyLine) {
+            throw new InvalidArgumentException("Line {$directiveLine}: a \"# coolify:\" line must be directly above a KEY=value line.");
+        }
+
+        if ($isKeyLine) {
+            $settingsByKey[substr($line, 0, strpos($line, '='))] = $directive ?? [];
+            $directive = null;
+        } elseif (str_starts_with($line, '# coolify:')) {
+            $directiveLine = $index + 1;
+            $flags = preg_split('/\s+/', trim(substr($line, strlen('# coolify:'))), -1, PREG_SPLIT_NO_EMPTY);
+            if ($flags === []) {
+                throw new InvalidArgumentException("Line {$directiveLine}: the \"# coolify:\" line has no flags.");
+            }
+
+            $directive = [];
+            foreach ($flags as $flag) {
+                [$name, $value] = array_pad(explode('=', $flag, 2), 2, 'true');
+                if (! array_key_exists($name, $flagDefaults)) {
+                    throw new InvalidArgumentException("Line {$directiveLine}: unknown flag \"{$name}\". Allowed flags: ".implode(', ', array_keys($flagDefaults)).'.');
+                }
+                if ($value !== 'true' && $value !== 'false') {
+                    throw new InvalidArgumentException("Line {$directiveLine}: the value of \"{$name}\" must be true or false.");
+                }
+                $directive["is_{$name}"] = $value === 'true';
+            }
+        }
+    }
+    if ($directive !== null) {
+        throw new InvalidArgumentException("Line {$directiveLine}: a \"# coolify:\" line must be directly above a KEY=value line.");
+    }
+
+    $variables = parseEnvFormatToArray($contents);
+    foreach ($variables as $key => $data) {
+        $variables[$key]['settings'] = $settingsByKey[$key] ?? [];
+    }
+
+    return $variables;
+}
+
+/**
+ * Extract inline comments from environment variables in raw docker-compose YAML.
+ *
+ * Parses raw docker-compose YAML to extract inline comments from environment sections.
+ * Standard YAML parsers discard comments, so this pre-processes the raw text.
+ *
+ * Handles both formats:
+ * - Map format: `KEY: "value"  # comment` or `KEY: value  # comment`
+ * - Array format: `- KEY=value  # comment`
+ *
+ * @param  string  $rawYaml  The raw docker-compose.yml content
+ * @return array Map of environment variable keys to their inline comments
+ */
+function extractYamlEnvironmentComments(string $rawYaml): array
+{
+    $comments = [];
+    $lines = explode("\n", $rawYaml);
+    $inEnvironmentBlock = false;
+    $environmentIndent = 0;
+
+    foreach ($lines as $line) {
+        // Skip empty lines
+        if (trim($line) === '') {
+            continue;
+        }
+
+        // Calculate current line's indentation (number of leading spaces)
+        $currentIndent = strlen($line) - strlen(ltrim($line));
+
+        // Check if this line starts an environment block
+        if (preg_match('/^(\s*)environment\s*:\s*$/', $line, $matches)) {
+            $inEnvironmentBlock = true;
+            $environmentIndent = strlen($matches[1]);
+
+            continue;
+        }
+
+        // Check if this line starts an environment block with inline content (rare but possible)
+        if (preg_match('/^(\s*)environment\s*:\s*\{/', $line)) {
+            // Inline object format - not supported for comment extraction
+            continue;
+        }
+
+        // If we're in an environment block, check if we've exited it
+        if ($inEnvironmentBlock) {
+            // If we hit a line with same or less indentation that's not empty, we've left the block
+            // Unless it's a continuation of the environment block
+            $trimmedLine = ltrim($line);
+
+            // Check if this is a new top-level key (same indent as 'environment:' or less)
+            if ($currentIndent <= $environmentIndent && ! str_starts_with($trimmedLine, '-') && ! str_starts_with($trimmedLine, '#')) {
+                // Check if it looks like a YAML key (contains : not inside quotes)
+                if (preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*\s*:/', $trimmedLine)) {
+                    $inEnvironmentBlock = false;
+
+                    continue;
+                }
+            }
+
+            // Skip comment-only lines
+            if (str_starts_with($trimmedLine, '#')) {
+                continue;
+            }
+
+            // Try to extract environment variable and comment from this line
+            $extracted = extractEnvVarCommentFromYamlLine($trimmedLine);
+            if ($extracted !== null && $extracted['comment'] !== null) {
+                $comments[$extracted['key']] = $extracted['comment'];
+            }
+        }
+    }
+
+    return $comments;
+}
+
+/**
+ * Extract environment variable key and inline comment from a single YAML line.
+ *
+ * @param  string  $line  A trimmed line from the environment section
+ * @return array|null Array with 'key' and 'comment', or null if not an env var line
+ */
+function extractEnvVarCommentFromYamlLine(string $line): ?array
+{
+    $key = null;
+    $comment = null;
+
+    // Handle array format: `- KEY=value  # comment` or `- KEY  # comment`
+    if (str_starts_with($line, '-')) {
+        $content = ltrim(substr($line, 1));
+
+        // Check for KEY=value format
+        if (preg_match('/^([A-Za-z_][A-Za-z0-9_]*)/', $content, $keyMatch)) {
+            $key = $keyMatch[1];
+            // Find comment - need to handle quoted values
+            $comment = extractCommentAfterValue($content);
+        }
+    }
+    // Handle map format: `KEY: "value"  # comment` or `KEY: value  # comment`
+    elseif (preg_match('/^([A-Za-z_][A-Za-z0-9_]*)\s*:/', $line, $keyMatch)) {
+        $key = $keyMatch[1];
+        // Get everything after the key and colon
+        $afterKey = substr($line, strlen($keyMatch[0]));
+        $comment = extractCommentAfterValue($afterKey);
+    }
+
+    if ($key === null) {
+        return null;
+    }
+
+    return [
+        'key' => $key,
+        'comment' => $comment,
+    ];
+}
+
+/**
+ * Extract inline comment from a value portion of a YAML line.
+ *
+ * Handles quoted values (where # inside quotes is not a comment).
+ *
+ * @param  string  $valueAndComment  The value portion (may include comment)
+ * @return string|null The comment text, or null if no comment
+ */
+function extractCommentAfterValue(string $valueAndComment): ?string
+{
+    $valueAndComment = ltrim($valueAndComment);
+
+    if ($valueAndComment === '') {
+        return null;
+    }
+
+    $firstChar = $valueAndComment[0] ?? '';
+
+    // Handle case where value is empty and line starts directly with comment
+    // e.g., `KEY:  # comment` becomes `# comment` after ltrim
+    if ($firstChar === '#') {
+        $comment = trim(substr($valueAndComment, 1));
+
+        return $comment !== '' ? $comment : null;
+    }
+
+    // Handle double-quoted value
+    if ($firstChar === '"') {
+        // Find closing quote (handle escaped quotes)
+        $pos = 1;
+        $len = strlen($valueAndComment);
+        while ($pos < $len) {
+            if ($valueAndComment[$pos] === '\\' && $pos + 1 < $len) {
+                $pos += 2; // Skip escaped character
+
+                continue;
+            }
+            if ($valueAndComment[$pos] === '"') {
+                // Found closing quote
+                $remainder = substr($valueAndComment, $pos + 1);
+
+                return extractCommentFromRemainder($remainder);
+            }
+            $pos++;
+        }
+
+        // No closing quote found
+        return null;
+    }
+
+    // Handle single-quoted value
+    if ($firstChar === "'") {
+        // Find closing quote (single quotes don't have escapes in YAML)
+        $closingPos = strpos($valueAndComment, "'", 1);
+        if ($closingPos !== false) {
+            $remainder = substr($valueAndComment, $closingPos + 1);
+
+            return extractCommentFromRemainder($remainder);
+        }
+
+        // No closing quote found
+        return null;
+    }
+
+    // Unquoted value - find # that's preceded by whitespace
+    // Be careful not to match # at the start of a value like color codes
+    if (preg_match('/\s+#\s*(.*)$/', $valueAndComment, $matches)) {
+        $comment = trim($matches[1]);
+
+        return $comment !== '' ? $comment : null;
+    }
+
+    return null;
+}
+
+/**
+ * Extract comment from the remainder of a line after a quoted value.
+ *
+ * @param  string  $remainder  Text after the closing quote
+ * @return string|null The comment text, or null if no comment
+ */
+function extractCommentFromRemainder(string $remainder): ?string
+{
+    // Look for # in remainder
+    $hashPos = strpos($remainder, '#');
+    if ($hashPos !== false) {
+        $comment = trim(substr($remainder, $hashPos + 1));
+
+        return $comment !== '' ? $comment : null;
+    }
+
+    return null;
 }
 
 function data_get_str($data, $key, $default = null): Stringable
@@ -473,7 +1623,7 @@ function data_get_str($data, $key, $default = null): Stringable
     return str($str);
 }
 
-function generateFqdn(Server $server, string $random)
+function generateUrl(Server $server, string $random, bool $forceHttps = false): string
 {
     $wildcard = data_get($server, 'settings.wildcard_domain');
     if (is_null($wildcard) || $wildcard === '') {
@@ -483,45 +1633,192 @@ function generateFqdn(Server $server, string $random)
     $host = $url->getHost();
     $path = $url->getPath() === '/' ? '' : $url->getPath();
     $scheme = $url->getScheme();
-    $finalFqdn = "$scheme://{$random}.$host$path";
+    if ($forceHttps) {
+        $scheme = 'https';
+    }
 
-    return $finalFqdn;
+    return "$scheme://{$random}.$host$path";
+}
+function generateFqdn(Server $server, string $random, bool $forceHttps = false, int $parserVersion = 5): string
+{
+
+    $wildcard = data_get($server, 'settings.wildcard_domain');
+    if (is_null($wildcard) || $wildcard === '') {
+        $wildcard = sslip($server);
+    }
+    $url = Url::fromString($wildcard);
+    $host = $url->getHost();
+    $path = $url->getPath() === '/' ? '' : $url->getPath();
+    $scheme = $url->getScheme();
+    if ($forceHttps) {
+        $scheme = 'https';
+    }
+
+    if ($parserVersion >= 5 && version_compare(config('constants.coolify.version'), '4.0.0-beta.420.7', '>=')) {
+        return "{$random}.$host$path";
+    }
+
+    return "$scheme://{$random}.$host$path";
 }
 function sslip(Server $server)
 {
     if (isDev() && $server->id === 0) {
         return 'http://127.0.0.1.sslip.io';
     }
-    if ($server->ip === 'host.docker.internal') {
-        $baseIp = base_ip();
+    $ip = $server->ip === 'host.docker.internal' ? base_ip() : $server->ip;
 
-        return "http://$baseIp.sslip.io";
+    return 'http://'.sslipHostLabel(resolveHostToIp($ip)).'.sslip.io';
+}
+
+/**
+ * Resolve a hostname to its IPv4 (or else IPv6) address. sslip.io only answers for names that
+ * contain an IP address. Returns the input unchanged if it is already an IP or does not resolve.
+ */
+function resolveHostToIp(string $host): string
+{
+    if (filter_var(normalizeIpAddress($host), FILTER_VALIDATE_IP) !== false) {
+        return $host;
+    }
+    $ipv4 = gethostbyname($host);
+    if (filter_var($ipv4, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+        return $ipv4;
+    }
+    $ipv6 = data_get(@dns_get_record($host, DNS_AAAA), '0.ipv6');
+
+    return is_string($ipv6) && $ipv6 !== '' ? $ipv6 : $host;
+}
+
+function service_templates_cache_key(): string
+{
+    return config('constants.services.cache_key', 'coolify:service-templates-bundle').':'.service_templates_cdn_url();
+}
+
+function service_templates_path(): string
+{
+    return base_path('templates/'.config('constants.services.file_name'));
+}
+
+function service_templates_cdn_url(): ?string
+{
+    $version = config('constants.coolify.version');
+    $url = config('constants.services.official');
+
+    return match (true) {
+        isDev() => null,
+        preg_match('/^\d+\.\d+\.\d+$/', $version) === 1 => $url,
+        preg_match('/^\d+\.\d+\.\d+-(beta|rc)\.\d+$/', $version) === 1 => dirname($url).'/preview/'.basename($url),
+        preg_match('/^\d+\.\d+\.\d+-(alpha\.\d+|(alpha|beta|rc)\.\d+\.\d{8}\.\d+)$/', $version) === 1 => dirname($url).'/nightly/'.basename($url),
+        default => null,
+    };
+}
+
+/**
+ * Persist the CDN service-templates bundle to local disk and shared cache.
+ *
+ * The shared cache entry is what multi-node Cloud relies on: Horizon (or any
+ * single node) pulls once; every HTTP node reads the same Redis payload.
+ */
+function store_service_templates_bundle(string $json, ?string $fetchedAt = null): bool
+{
+    // A 200 response can still be an empty body or an error page; keep the current templates then.
+    $templates = json_decode($json, true);
+    if (! is_array($templates) || $templates === [] || array_is_list($templates)) {
+        return false;
     }
 
-    return "http://{$server->ip}.sslip.io";
+    $fetchedAt ??= now()->toIso8601String();
+    $path = service_templates_path();
+
+    $written = File::put($path, $json) !== false;
+
+    Cache::forever(service_templates_cache_key(), [
+        'fetched_at' => $fetchedAt,
+        'json' => $json,
+    ]);
+
+    return $written;
+}
+
+function get_service_templates_fetched_at(): ?CarbonImmutable
+{
+    $bundle = Cache::get(service_templates_cache_key());
+    if (is_array($bundle) && filled(data_get($bundle, 'fetched_at'))) {
+        try {
+            return CarbonImmutable::parse((string) data_get($bundle, 'fetched_at'));
+        } catch (Throwable) {
+            // fall through to local file mtime
+        }
+    }
+
+    $path = service_templates_path();
+    if (File::exists($path)) {
+        $mtime = filemtime($path);
+        if ($mtime !== false) {
+            return CarbonImmutable::createFromTimestamp($mtime);
+        }
+    }
+
+    return null;
 }
 
 function get_service_templates(bool $force = false): Collection
 {
-    if ($force) {
+    if ($force && service_templates_cdn_url()) {
         try {
-            $response = Http::retry(3, 50)->get(config('constants.services.official'));
+            $response = Http::retry(3, 1000, throw: false)
+                ->timeout(60)
+                ->connectTimeout(10)
+                ->get(service_templates_cdn_url());
             if ($response->failed()) {
                 return collect([]);
             }
-            $services = $response->json();
+            if (! store_service_templates_bundle($response->body())) {
+                return get_service_templates();
+            }
 
-            return collect($services);
-        } catch (\Throwable $e) {
-            $services = File::get(base_path('templates/service-templates.json'));
-
-            return collect(json_decode($services))->sortKeys();
+            return collect(json_decode($response->body()))->sortKeys();
+        } catch (Throwable) {
+            return get_service_templates();
         }
-    } else {
-        $services = File::get(base_path('templates/service-templates.json'));
-
-        return collect(json_decode($services))->sortKeys();
     }
+
+    $bundle = Cache::get(service_templates_cache_key());
+    if (is_array($bundle) && is_string(data_get($bundle, 'json')) && data_get($bundle, 'json') !== '') {
+        $fetchedAt = (string) data_get($bundle, 'fetched_at', '0');
+
+        return Cache::remember("service-templates:shared:{$fetchedAt}", now()->addDay(), function () use ($bundle) {
+            return collect(json_decode((string) data_get($bundle, 'json')))->sortKeys();
+        });
+    }
+
+    $path = service_templates_path();
+    if (! File::exists($path)) {
+        return collect([]);
+    }
+
+    $mtime = filemtime($path) ?: 0;
+
+    return Cache::remember("service-templates:{$mtime}", now()->addDay(), function () use ($path) {
+        return collect(json_decode(File::get($path)))->sortKeys();
+    });
+}
+
+/**
+ * The template key for a service type. A renamed template keeps its old key as an alias, so API callers
+ * and services stored with the old key still find the template. A key that the templates contain is
+ * returned as is.
+ */
+function resolve_service_template_key(?string $type, ?Collection $templates = null): ?string
+{
+    $aliases = [
+        'denoKV' => 'deno-kv',
+    ];
+    if (blank($type) || ! isset($aliases[$type])) {
+        return $type;
+    }
+    $templates ??= get_service_templates();
+
+    return $templates->has($type) ? $type : $aliases[$type];
 }
 
 function getResourceByUuid(string $uuid, ?int $teamId = null)
@@ -530,52 +1827,45 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
         return null;
     }
     $resource = queryResourcesByUuid($uuid);
-    if (! is_null($resource) && $resource->environment->project->team_id === $teamId) {
+    if (is_null($resource)) {
+        return null;
+    }
+
+    // ServiceDatabase has a different relationship path: service->environment->project->team_id
+    if ($resource instanceof ServiceDatabase) {
+        if ($resource->service?->environment?->project?->team_id === $teamId) {
+            return $resource;
+        }
+
+        return null;
+    }
+
+    // Standard resources: environment->project->team_id
+    if ($resource->environment->project->team_id === $teamId) {
         return $resource;
     }
 
     return null;
 }
+/**
+ * Finds a standalone database of the team for the API and MCP. The instance database (coolify-db) is never returned.
+ */
 function queryDatabaseByUuidWithinTeam(string $uuid, string $teamId)
 {
-    $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
-    if ($postgresql && $postgresql->team()->id == $teamId) {
-        return $postgresql->unsetRelation('environment')->unsetRelation('destination');
-    }
-    $redis = StandaloneRedis::whereUuid($uuid)->first();
-    if ($redis && $redis->team()->id == $teamId) {
-        return $redis->unsetRelation('environment');
-    }
-    $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
-    if ($mongodb && $mongodb->team()->id == $teamId) {
-        return $mongodb->unsetRelation('environment');
-    }
-    $mysql = StandaloneMysql::whereUuid($uuid)->first();
-    if ($mysql && $mysql->team()->id == $teamId) {
-        return $mysql->unsetRelation('environment');
-    }
-    $mariadb = StandaloneMariadb::whereUuid($uuid)->first();
-    if ($mariadb && $mariadb->team()->id == $teamId) {
-        return $mariadb->unsetRelation('environment');
-    }
-    $keydb = StandaloneKeydb::whereUuid($uuid)->first();
-    if ($keydb && $keydb->team()->id == $teamId) {
-        return $keydb->unsetRelation('environment');
-    }
-    $dragonfly = StandaloneDragonfly::whereUuid($uuid)->first();
-    if ($dragonfly && $dragonfly->team()->id == $teamId) {
-        return $dragonfly->unsetRelation('environment');
-    }
-    $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
-    if ($clickhouse && $clickhouse->team()->id == $teamId) {
-        return $clickhouse->unsetRelation('environment');
+    foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
+        $database = $modelClass::whereUuid($uuid)->first();
+        if ($database instanceof StandalonePostgresql && $database->isInstanceDatabase()) {
+            return null;
+        }
+        if ($database && $database->team()?->id == $teamId) {
+            return $database->unsetRelation('environment');
+        }
     }
 
     return null;
 }
 function queryResourcesByUuid(string $uuid)
 {
-    $resource = null;
     $application = Application::whereUuid($uuid)->first();
     if ($application) {
         return $application;
@@ -584,49 +1874,28 @@ function queryResourcesByUuid(string $uuid)
     if ($service) {
         return $service;
     }
-    $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
-    if ($postgresql) {
-        return $postgresql;
-    }
-    $redis = StandaloneRedis::whereUuid($uuid)->first();
-    if ($redis) {
-        return $redis;
-    }
-    $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
-    if ($mongodb) {
-        return $mongodb;
-    }
-    $mysql = StandaloneMysql::whereUuid($uuid)->first();
-    if ($mysql) {
-        return $mysql;
-    }
-    $mariadb = StandaloneMariadb::whereUuid($uuid)->first();
-    if ($mariadb) {
-        return $mariadb;
-    }
-    $keydb = StandaloneKeydb::whereUuid($uuid)->first();
-    if ($keydb) {
-        return $keydb;
-    }
-    $dragonfly = StandaloneDragonfly::whereUuid($uuid)->first();
-    if ($dragonfly) {
-        return $dragonfly;
-    }
-    $clickhouse = StandaloneClickhouse::whereUuid($uuid)->first();
-    if ($clickhouse) {
-        return $clickhouse;
+    foreach (STANDALONE_DATABASE_MODELS as $modelClass) {
+        $database = $modelClass::whereUuid($uuid)->first();
+        if ($database) {
+            return $database;
+        }
     }
 
-    return $resource;
+    // Check for ServiceDatabase by its own UUID
+    $serviceDatabase = ServiceDatabase::whereUuid($uuid)->first();
+    if ($serviceDatabase) {
+        return $serviceDatabase;
+    }
+
+    return null;
 }
-function generatTagDeployWebhook($tag_name)
+function generateTagDeployWebhook($tag_name)
 {
     $baseUrl = base_url();
     $api = Url::fromString($baseUrl).'/api/v1';
     $endpoint = "/deploy?tag=$tag_name";
-    $url = $api.$endpoint;
 
-    return $url;
+    return $api.$endpoint;
 }
 function generateDeployWebhook($resource)
 {
@@ -634,20 +1903,18 @@ function generateDeployWebhook($resource)
     $api = Url::fromString($baseUrl).'/api/v1';
     $endpoint = '/deploy';
     $uuid = data_get($resource, 'uuid');
-    $url = $api.$endpoint."?uuid=$uuid&force=false";
 
-    return $url;
+    return $api.$endpoint."?uuid=$uuid&force=false";
 }
 function generateGitManualWebhook($resource, $type)
 {
     if ($resource->source_id !== 0 && ! is_null($resource->source_id)) {
         return null;
     }
-    if ($resource->getMorphClass() === 'App\Models\Application') {
+    if ($resource->getMorphClass() === Application::class) {
         $baseUrl = base_url();
-        $api = Url::fromString($baseUrl)."/webhooks/source/$type/events/manual";
 
-        return $api;
+        return Url::fromString($baseUrl)."/webhooks/source/$type/events/manual";
     }
 
     return null;
@@ -657,24 +1924,46 @@ function removeAnsiColors($text)
     return preg_replace('/\e[[][A-Za-z0-9];?[0-9]*m?/', '', $text);
 }
 
-function getTopLevelNetworks(Service|Application $resource)
+/**
+ * Redact log text before it leaves Coolify (copy, download, API, MCP).
+ *
+ * @param  array{known?: array<int, string>, locked?: array<int, string>}  $secrets  Resource values to hide, usually from EnvironmentVariable::logRedactionSecretsFor().
+ */
+function sanitizeLogsForExport(string $text, array $secrets = []): string
 {
-    if ($resource->getMorphClass() === 'App\Models\Service') {
+    return app(SensitiveDataRedactor::class)->redactText($text, $secrets['known'] ?? [], $secrets['locked'] ?? []);
+}
+
+function getTopLevelNetworks(Service|Application $resource): Collection
+{
+    if ($resource->getMorphClass() === Service::class) {
         if ($resource->docker_compose_raw) {
             try {
-                $yaml = Yaml::parse($resource->docker_compose_raw);
-            } catch (\Exception $e) {
-                throw new \Exception($e->getMessage());
+                $yaml = parseDockerComposeYaml($resource->docker_compose_raw);
+            } catch (Exception $e) {
+                // If the docker-compose.yml file is not valid, we will return the network name as the key
+                $topLevelNetworks = collect([
+                    $resource->uuid => [
+                        'name' => $resource->uuid,
+                        'external' => true,
+                    ],
+                ]);
+
+                return $topLevelNetworks->keys();
             }
             $services = data_get($yaml, 'services');
             $topLevelNetworks = collect(data_get($yaml, 'networks', []));
             $definedNetwork = collect([$resource->uuid]);
             $services = collect($services)->map(function ($service, $_) use ($topLevelNetworks, $definedNetwork) {
                 $serviceNetworks = collect(data_get($service, 'networks', []));
-                $hasHostNetworkMode = data_get($service, 'network_mode') === 'host' ? true : false;
+                $networkMode = data_get($service, 'network_mode');
 
-                // Only add 'networks' key if 'network_mode' is not 'host'
-                if (! $hasHostNetworkMode) {
+                $hasValidNetworkMode =
+                    $networkMode === 'host' ||
+                    (is_string($networkMode) && (str_starts_with($networkMode, 'service:') || str_starts_with($networkMode, 'container:')));
+
+                // Only add 'networks' key if 'network_mode' is not 'host' or does not start with 'service:' or 'container:'
+                if (! $hasValidNetworkMode) {
                     // Collect/create/update networks
                     if ($serviceNetworks->count() > 0) {
                         foreach ($serviceNetworks as $networkName => $networkDetails) {
@@ -689,7 +1978,9 @@ function getTopLevelNetworks(Service|Application $resource)
                                 return $value == $networkName || $key == $networkName;
                             });
                             if (! $networkExists) {
-                                $topLevelNetworks->put($networkDetails, null);
+                                if (is_string($networkDetails) || is_int($networkDetails)) {
+                                    $topLevelNetworks->put($networkDetails, null);
+                                }
                             }
                         }
                     }
@@ -712,13 +2003,20 @@ function getTopLevelNetworks(Service|Application $resource)
 
             return $topLevelNetworks->keys();
         }
-    } elseif ($resource->getMorphClass() === 'App\Models\Application') {
+    } elseif ($resource->getMorphClass() === Application::class) {
         try {
-            $yaml = Yaml::parse($resource->docker_compose_raw);
-        } catch (\Exception $e) {
-            throw new \Exception($e->getMessage());
+            $yaml = parseDockerComposeYaml($resource->docker_compose_raw);
+        } catch (Exception $e) {
+            // If the docker-compose.yml file is not valid, we will return the network name as the key
+            $topLevelNetworks = collect([
+                $resource->uuid => [
+                    'name' => $resource->uuid,
+                    'external' => true,
+                ],
+            ]);
+
+            return $topLevelNetworks->keys();
         }
-        $server = $resource->destination->server;
         $topLevelNetworks = collect(data_get($yaml, 'networks', []));
         $services = data_get($yaml, 'services');
         $definedNetwork = collect([$resource->uuid]);
@@ -739,7 +2037,9 @@ function getTopLevelNetworks(Service|Application $resource)
                         return $value == $networkName || $key == $networkName;
                     });
                     if (! $networkExists) {
-                        $topLevelNetworks->put($networkDetails, null);
+                        if (is_string($networkDetails) || is_int($networkDetails)) {
+                            $topLevelNetworks->put($networkDetails, null);
+                        }
                     }
                 }
             }
@@ -760,18 +2060,1021 @@ function getTopLevelNetworks(Service|Application $resource)
 
         return $topLevelNetworks->keys();
     }
+
+    return collect();
+}
+function sourceIsLocal(Stringable $source)
+{
+    if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~') || $source->startsWith('..') || $source->startsWith('~/') || $source->startsWith('../')) {
+        return true;
+    }
+
+    return false;
 }
 
+/**
+ * The host path of a local Compose bind source, relative to the resource directory $replacedWith.
+ *
+ * Sources with a `..` segment are resolved like Docker Compose resolves them, without touching the
+ * filesystem. Other sources keep the result of legacyReplaceLocalSource().
+ *
+ * @throws Exception If the source resolves above `/` or the resolved path is not shell-safe
+ */
+function replaceLocalSource(Stringable $source, Stringable $replacedWith): Stringable
+{
+    $path = $source->value();
+    if (! in_array('..', explode('/', $path), true)) {
+        return legacyReplaceLocalSource($source, $replacedWith);
+    }
+
+    if (str_starts_with($path, '~')) {
+        $path = $replacedWith->value().substr($path, 1);
+    } elseif (! str_starts_with($path, '/')) {
+        $path = $replacedWith->value().'/'.$path;
+    }
+
+    $segments = [];
+    foreach (explode('/', $path) as $segment) {
+        if ($segment === '' || $segment === '.') {
+            continue;
+        }
+        if ($segment === '..') {
+            if ($segments === []) {
+                throw new Exception("Volume source {$source} resolves to a path above /. Remove some ../ segments.");
+            }
+            array_pop($segments);
+
+            continue;
+        }
+        $segments[] = $segment;
+    }
+
+    $resolved = '/'.implode('/', $segments);
+    validateShellSafePath($resolved, 'volume source');
+
+    return str($resolved);
+}
+
+/**
+ * The host path that Coolify used for a local Compose bind source before it resolved `..` segments.
+ * A leading `../` became `{directory}./`. Resources that still store that path keep it.
+ */
+function legacyReplaceLocalSource(Stringable $source, Stringable $replacedWith): Stringable
+{
+    if ($source->startsWith('.')) {
+        $source = $source->replaceFirst('.', $replacedWith->value());
+    }
+    if ($source->startsWith('~')) {
+        $source = $source->replaceFirst('~', $replacedWith->value());
+    }
+    if ($source->startsWith('..')) {
+        $source = $source->replaceFirst('..', $replacedWith->value());
+    }
+    if ($source->endsWith('/') && $source->value() !== '/') {
+        $source = $source->replaceLast('/', '');
+    }
+
+    return $source;
+}
+
+/**
+ * The host path of a local Compose bind source. A mount whose storage row already has the legacy path
+ * (also with a preview suffix) keeps it, because its data is there.
+ *
+ * @throws Exception If a new source resolves above `/` or is not shell-safe
+ */
+function resolveComposeBindSource(Stringable $source, Stringable $directory, ?string $existingFsPath = null): Stringable
+{
+    $legacySource = legacyReplaceLocalSource($source, $directory);
+    if ($existingFsPath !== null && preg_match('/^'.preg_quote($legacySource->value(), '/').'(-pr-\d+)?$/', $existingFsPath) === 1) {
+        return $legacySource;
+    }
+
+    return replaceLocalSource($source, $directory);
+}
+
+function convertToArray($collection)
+{
+    if ($collection instanceof Collection) {
+        return $collection->map(function ($item) {
+            return convertToArray($item);
+        })->toArray();
+    } elseif ($collection instanceof Stringable) {
+        return (string) $collection;
+    } elseif (is_array($collection)) {
+        return array_map(function ($item) {
+            return convertToArray($item);
+        }, $collection);
+    }
+
+    return $collection;
+}
+
+function parseCommandFromMagicEnvVariable(Str|string $key): Stringable
+{
+    $value = str($key);
+    $count = substr_count($value->value(), '_');
+    $command = null;
+    if ($count === 2) {
+        if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
+            // SERVICE_FQDN_UMAMI
+            $command = $value->after('SERVICE_')->beforeLast('_');
+        } else {
+            // SERVICE_BASE64_UMAMI
+            $command = $value->after('SERVICE_')->beforeLast('_');
+        }
+    }
+    if ($count === 3) {
+        if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
+            // SERVICE_FQDN_UMAMI_1000
+            $command = $value->after('SERVICE_')->before('_');
+        } else {
+            // SERVICE_BASE64_64_UMAMI
+            $command = $value->after('SERVICE_')->beforeLast('_');
+        }
+    }
+
+    return str($command);
+}
+function parseEnvVariable(Str|string $value)
+{
+    $value = str($value);
+    $count = substr_count($value->value(), '_');
+    $command = null;
+    $forService = null;
+    $generatedValue = null;
+    $port = null;
+    if ($value->startsWith('SERVICE')) {
+        if ($count === 2) {
+            if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
+                // SERVICE_FQDN_UMAMI
+                $command = $value->after('SERVICE_')->beforeLast('_');
+                $forService = $value->afterLast('_');
+            } else {
+                // SERVICE_BASE64_UMAMI
+                $command = $value->after('SERVICE_')->beforeLast('_');
+            }
+        }
+        if ($count === 3) {
+            if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
+                // SERVICE_FQDN_UMAMI_1000
+                $command = $value->after('SERVICE_')->before('_');
+                $forService = $value->after('SERVICE_')->after('_')->before('_');
+                $port = $value->afterLast('_');
+                if (filter_var($port, FILTER_VALIDATE_INT) === false) {
+                    $port = null;
+                }
+            } else {
+                // SERVICE_BASE64_64_UMAMI
+                $command = $value->after('SERVICE_')->beforeLast('_');
+            }
+        }
+    }
+
+    return [
+        'command' => $command,
+        'forService' => $forService,
+        'generatedValue' => $generatedValue,
+        'port' => $port,
+    ];
+}
+function generateEnvValue(string $command, Service|Application|null $service = null)
+{
+    switch ($command) {
+        case 'PASSWORD':
+            $generatedValue = Str::password(symbols: false);
+            break;
+        case 'PASSWORD_64':
+            $generatedValue = Str::password(length: 64, symbols: false);
+            break;
+        case 'PASSWORDWITHSYMBOLS':
+            $generatedValue = Str::password(symbols: true);
+            break;
+        case 'PASSWORDWITHSYMBOLS_64':
+            $generatedValue = Str::password(length: 64, symbols: true);
+            break;
+            // This is not base64, it's just a random string
+        case 'BASE64_64':
+            $generatedValue = Str::random(64);
+            break;
+        case 'BASE64_128':
+            $generatedValue = Str::random(128);
+            break;
+        case 'BASE64':
+        case 'BASE64_32':
+            $generatedValue = Str::random(32);
+            break;
+            // This is base64,
+        case 'REALBASE64_64':
+            $generatedValue = base64_encode(random_bytes(64));
+            break;
+        case 'REALBASE64_128':
+            $generatedValue = base64_encode(random_bytes(128));
+            break;
+        case 'REALBASE64':
+        case 'REALBASE64_32':
+            $generatedValue = base64_encode(random_bytes(32));
+            break;
+        case 'HEX_32':
+            $generatedValue = bin2hex(random_bytes(16));
+            break;
+        case 'HEX_64':
+            $generatedValue = bin2hex(random_bytes(32));
+            break;
+        case 'HEX_128':
+            $generatedValue = bin2hex(random_bytes(64));
+            break;
+        case 'USER':
+            $generatedValue = Str::random(16);
+            break;
+        case 'LOWERCASEUSER':
+            $generatedValue = Str::lower(Str::random(16));
+            break;
+        case 'SUPABASEANON':
+            $signingKey = $service->environment_variables()->where('key', 'SERVICE_PASSWORD_JWT')->first();
+            if (is_null($signingKey)) {
+                return;
+            } else {
+                $signingKey = $signingKey->value;
+            }
+            $key = InMemory::plainText($signingKey);
+            $algorithm = new Sha256;
+            $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
+            $now = CarbonImmutable::now();
+            $now = $now->setTime($now->format('H'), $now->format('i'));
+            $token = $tokenBuilder
+                ->issuedBy('supabase')
+                ->issuedAt($now)
+                ->expiresAt($now->modify('+100 year'))
+                ->withClaim('role', 'anon')
+                ->getToken($algorithm, $key);
+            $generatedValue = $token->toString();
+            break;
+        case 'SUPABASESERVICE':
+            $signingKey = $service->environment_variables()->where('key', 'SERVICE_PASSWORD_JWT')->first();
+            if (is_null($signingKey)) {
+                return;
+            } else {
+                $signingKey = $signingKey->value;
+            }
+            $key = InMemory::plainText($signingKey);
+            $algorithm = new Sha256;
+            $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
+            $now = CarbonImmutable::now();
+            $now = $now->setTime($now->format('H'), $now->format('i'));
+            $token = $tokenBuilder
+                ->issuedBy('supabase')
+                ->issuedAt($now)
+                ->expiresAt($now->modify('+100 year'))
+                ->withClaim('role', 'service_role')
+                ->getToken($algorithm, $key);
+            $generatedValue = $token->toString();
+            break;
+        default:
+            // $generatedValue = Str::random(16);
+            $generatedValue = null;
+            break;
+    }
+
+    return $generatedValue;
+}
+
+function getRealtime()
+{
+    $envDefined = config('constants.pusher.port');
+    if (empty($envDefined)) {
+        $url = Url::fromString(Request::getSchemeAndHttpHost());
+        $port = $url->getPort();
+        if ($port) {
+            return '6001';
+        } else {
+            return null;
+        }
+    } else {
+        return $envDefined;
+    }
+}
+
+/**
+ * Resolve a server IP or hostname to an IP address for DNS comparison/display.
+ *
+ * When a server uses a hostname (e.g. coolify-testing-host) instead of a literal
+ * IP, A-record validation and UI copy need the actual IP the user should point DNS to.
+ *
+ * Successful hostname resolutions are cached briefly so Livewire mounts/domain state
+ * loads do not re-query DNS on every request.
+ *
+ * @return array{ip: ?string, configured: ?string, resolved_from_hostname: bool}
+ */
+function resolveServerIpAddress(?string $ipOrHost): array
+{
+    $configured = filled($ipOrHost) ? trim((string) $ipOrHost) : null;
+
+    if ($configured === null || $configured === '') {
+        return [
+            'ip' => null,
+            'configured' => null,
+            'resolved_from_hostname' => false,
+        ];
+    }
+
+    // Strip IPv6 brackets if present: [2001:db8::1]
+    $candidate = str($configured)->trim('[]')->toString();
+
+    if (filter_var($candidate, FILTER_VALIDATE_IP) !== false) {
+        return [
+            'ip' => $candidate,
+            'configured' => $configured,
+            'resolved_from_hostname' => false,
+        ];
+    }
+
+    $cacheKey = 'server-ip-resolve:'.mb_strtolower($candidate);
+    $cachedIp = Cache::get($cacheKey);
+
+    if (is_string($cachedIp) && filter_var($cachedIp, FILTER_VALIDATE_IP) !== false) {
+        return [
+            'ip' => $cachedIp,
+            'configured' => $configured,
+            'resolved_from_hostname' => true,
+        ];
+    }
+
+    $resolvedIp = null;
+
+    try {
+        $aRecords = @dns_get_record($candidate, DNS_A);
+        if (is_array($aRecords)) {
+            foreach ($aRecords as $record) {
+                $ip = $record['ip'] ?? null;
+                if (is_string($ip) && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+                    $resolvedIp = $ip;
+                    break;
+                }
+            }
+        }
+    } catch (Throwable) {
+    }
+
+    if ($resolvedIp === null) {
+        try {
+            $aaaaRecords = @dns_get_record($candidate, DNS_AAAA);
+            if (is_array($aaaaRecords)) {
+                foreach ($aaaaRecords as $record) {
+                    $ip = $record['ipv6'] ?? null;
+                    if (is_string($ip) && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+                        $resolvedIp = $ip;
+                        break;
+                    }
+                }
+            }
+        } catch (Throwable) {
+        }
+    }
+
+    if ($resolvedIp === null) {
+        $resolved = @gethostbyname($candidate);
+        if (is_string($resolved) && $resolved !== $candidate && filter_var($resolved, FILTER_VALIDATE_IP) !== false) {
+            $resolvedIp = $resolved;
+        }
+    }
+
+    if ($resolvedIp !== null) {
+        Cache::put($cacheKey, $resolvedIp, now()->addSeconds(60));
+    }
+
+    return [
+        'ip' => $resolvedIp,
+        'configured' => $configured,
+        'resolved_from_hostname' => $resolvedIp !== null,
+    ];
+}
+
+/**
+ * Preferred server address for DNS validation: the public IPs of the server (instance settings for localhost),
+ * otherwise the server IP/hostname resolved to a real IP when possible.
+ */
+function serverDnsTargetIp(Server $server): ?string
+{
+    return ServerDnsAddresses::forServer($server)->address;
+}
+
+/**
+ * DNS record type users should create for a server address: A (IPv4) or AAAA (IPv6).
+ */
+function dnsRecordTypeForIp(?string $ipOrHost): string
+{
+    if (! is_string($ipOrHost) || trim($ipOrHost) === '') {
+        return 'A';
+    }
+
+    // Accept labels like "2001:db8::1 (hostname)" or bracketed IPv6.
+    $candidate = trim($ipOrHost);
+    if (preg_match('/^(\S+)/', $candidate, $matches) === 1) {
+        $candidate = $matches[1];
+    }
+    $candidate = str($candidate)->trim('[]')->toString();
+
+    if (filter_var($candidate, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+        return 'AAAA';
+    }
+
+    return 'A';
+}
+
+/**
+ * Bare address for DNS guidance (first token of a label, brackets stripped).
+ */
+function dnsGuidanceTargetAddress(?string $ipOrLabel): ?string
+{
+    if (! is_string($ipOrLabel) || trim($ipOrLabel) === '') {
+        return null;
+    }
+
+    $candidate = trim($ipOrLabel);
+    if (preg_match('/^(\S+)/', $candidate, $matches) === 1) {
+        $candidate = $matches[1];
+    }
+    $candidate = str($candidate)->trim('[]')->toString();
+
+    return $candidate !== '' ? $candidate : null;
+}
+
+/**
+ * User-facing guidance when a hostname does not resolve to the server.
+ * Format: "Required DNS record type A pointing to 1.2.3.4"
+ * or "Required DNS record type AAAA pointing to 2001:db8::1".
+ *
+ * @param  ?string  $targetLabel  Display target (IP, or "IP (hostname)") used as fallback.
+ * @param  ?string  $ipForRecordType  Preferred IP for type + display (defaults to $targetLabel).
+ */
+function dnsMismatchGuidanceMessage(?string $targetLabel, ?string $ipForRecordType = null): string
+{
+    $address = dnsGuidanceTargetAddress($ipForRecordType)
+        ?? dnsGuidanceTargetAddress($targetLabel);
+
+    if ($address === null) {
+        return 'DNS validation failed. Check your DNS records.';
+    }
+
+    $recordType = dnsRecordTypeForIp($address);
+
+    return "Required DNS record type {$recordType} pointing to {$address}";
+}
+
+function validateDNSEntry(string $fqdn, Server $server)
+{
+    $url = Url::fromString($fqdn);
+    $host = $url->getHost();
+    if (str($host)->contains('sslip.io')) {
+        return true;
+    }
+    $settings = instanceSettings();
+    $is_dns_validation_enabled = data_get($settings, 'is_dns_validation_enabled');
+    if (! $is_dns_validation_enabled) {
+        return true;
+    }
+    $dns_servers = data_get($settings, 'custom_dns_servers');
+    $dns_servers = str($dns_servers)->explode(',');
+    $ip = serverDnsTargetIp($server);
+    $found_matching_ip = false;
+    $type = dnsRecordTypeForIp($ip) === 'AAAA' ? DnsResolver::TYPE_AAAA : DnsResolver::TYPE_A;
+    foreach ($dns_servers as $dns_server) {
+        try {
+            $results = queryDnsServer($dns_server, $host, $type);
+            if ($results !== false) {
+                foreach ($results as $result) {
+                    if ($result->getType() == $type) {
+                        if ($ip && DnsRecordHints::sameAddress($result->getData(), $ip)) {
+                            $found_matching_ip = true;
+                            break 2;
+                        }
+                        if (isCloudflareIp($result->getData())) {
+                            $found_matching_ip = ! app(CloudflareDnsProvider::class)->sendsHostnameToAnotherServer($server, $host, $ip);
+                            break 2;
+                        }
+                    }
+                }
+            }
+        } catch (Exception) {
+        }
+    }
+
+    return $found_matching_ip;
+}
+
+function createDnsQuery(string $dnsServer, int $timeout = 5, bool $udp = true): DnsResolver
+{
+    return app()->make(DnsResolver::class, [
+        'server' => formatHostForUrl($dnsServer),
+        'port' => 53,
+        'timeout' => $timeout,
+        'udp' => $udp,
+    ]);
+}
+
+/**
+ * Query one DNS server for one record type. When the UDP answer is truncated (TC bit),
+ * retry over TCP: resolvers such as 1.1.1.1 can truncate even small answers, and the
+ * records would otherwise be silently dropped.
+ *
+ * @return iterable<int, DnsRecord>|false
+ */
+function queryDnsServer(string $dnsServer, string $host, string $type, int $timeout = 5): iterable|false
+{
+    $query = createDnsQuery($dnsServer, $timeout);
+    $records = $query->query($host, $type);
+
+    if ($records === false && str_contains($query->getLasterror(), 'too big for UDP')) {
+        $query = createDnsQuery($dnsServer, $timeout, udp: false);
+        $records = $query->query($host, $type);
+    }
+
+    if ($records === false || $query->hasError()) {
+        return false;
+    }
+
+    return $records;
+}
+
+function isCloudflareIp(string $ip): bool
+{
+    // https://www.cloudflare.com/ips/
+    $cloudflareIps = [
+        '173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22',
+        '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20',
+        '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13', '104.24.0.0/14',
+        '172.64.0.0/13', '131.0.72.0/22', '2400:cb00::/32', '2606:4700::/32',
+        '2803:f800::/32', '2405:b500::/32', '2405:8100::/32', '2a06:98c0::/29',
+        '2c0f:f248::/32',
+    ];
+
+    return ipMatch($ip, $cloudflareIps);
+}
+
+/**
+ * The one stored form of an IP address: no spaces, no brackets, and IPv6 in its short lower-case
+ * form (2A01:04F8::0001 becomes 2a01:4f8::1). IPv4 addresses and hostnames stay as they are.
+ */
+function normalizeIpAddress(string $value): string
+{
+    $value = trim($value);
+    $withoutBrackets = trim($value, '[]');
+    if (filter_var($withoutBrackets, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false) {
+        return inet_ntop(inet_pton($withoutBrackets));
+    }
+
+    return $value;
+}
+
+/**
+ * The host for a URL or a "host:port" value: an IPv6 address gets brackets ([2a01:4f8::1]), so
+ * that its colons are not read as the port. Other hosts stay as they are.
+ */
+function formatHostForUrl(string $host): string
+{
+    $normalized = normalizeIpAddress($host);
+
+    return filter_var($normalized, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false ? "[{$normalized}]" : $normalized;
+}
+
+/**
+ * Hetzner gives an IPv6 network (2a01:4f8:c016:bd23::/64), not an address. The server uses the
+ * first address of the network (2a01:4f8:c016:bd23::1).
+ */
+function hetznerServerIpv6(?string $network): ?string
+{
+    if (blank($network)) {
+        return null;
+    }
+    $address = str($network)->before('/')->value();
+    if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === false) {
+        return null;
+    }
+    if (str_contains($network, '/')) {
+        $address = inet_ntop(inet_pton($address) | inet_pton('::1'));
+    }
+
+    return normalizeIpAddress($address);
+}
+
+/**
+ * The sslip.io label for an IP address. IPv6 colons become dashes, and a "0" is added where the
+ * address starts or ends with "::", because a DNS label cannot start or end with a dash.
+ */
+function sslipHostLabel(string $ip): string
+{
+    $ip = normalizeIpAddress($ip);
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) === false) {
+        return $ip;
+    }
+    if (str_starts_with($ip, '::')) {
+        $ip = '0'.$ip;
+    }
+    if (str_ends_with($ip, '::')) {
+        $ip .= '0';
+    }
+
+    return str_replace(':', '-', $ip);
+}
+
+function ipMatch($ip, $cidrs, &$match = null)
+{
+    foreach ((array) $cidrs as $cidr) {
+        [$subnet, $prefixLength] = explode('/', $cidr);
+        $packedIp = inet_pton($ip);
+        $packedSubnet = inet_pton($subnet);
+
+        if ($packedIp === false || $packedSubnet === false || strlen($packedIp) !== strlen($packedSubnet)) {
+            continue;
+        }
+
+        $addressBits = strlen($packedIp) * 8;
+        $prefixLength = (int) $prefixLength;
+        if ($prefixLength < 0 || $prefixLength > $addressBits) {
+            continue;
+        }
+
+        $fullBytes = intdiv($prefixLength, 8);
+        $remainingBits = $prefixLength % 8;
+        $matches = substr($packedIp, 0, $fullBytes) === substr($packedSubnet, 0, $fullBytes);
+
+        if ($matches && $remainingBits > 0) {
+            $mask = (0xFF << (8 - $remainingBits)) & 0xFF;
+            $matches = (ord($packedIp[$fullBytes]) & $mask) === (ord($packedSubnet[$fullBytes]) & $mask);
+        }
+
+        if ($matches) {
+            $match = $cidr;
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function checkIPAgainstAllowlist($ip, $allowlist)
+{
+    if (empty($allowlist)) {
+        return false;
+    }
+
+    foreach ((array) $allowlist as $allowed) {
+        $allowed = trim($allowed);
+
+        if (empty($allowed)) {
+            continue;
+        }
+
+        // Check if it's a CIDR notation
+        if (str_contains($allowed, '/')) {
+            [$subnet, $mask] = explode('/', $allowed);
+
+            // Special case: 0.0.0.0 with any subnet means allow all
+            if ($subnet === '0.0.0.0') {
+                return true;
+            }
+
+            $mask = (int) $mask;
+            $isIpv6Subnet = filter_var($subnet, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+            $maxMask = $isIpv6Subnet ? 128 : 32;
+
+            // Validate mask for address family
+            if ($mask < 0 || $mask > $maxMask) {
+                continue;
+            }
+
+            if ($isIpv6Subnet) {
+                // IPv6 CIDR matching using binary string comparison
+                $ipBin = inet_pton($ip);
+                $subnetBin = inet_pton($subnet);
+
+                if ($ipBin === false || $subnetBin === false) {
+                    continue;
+                }
+
+                // Build a 128-bit mask from $mask prefix bits
+                $maskBin = str_repeat("\xff", (int) ($mask / 8));
+                $remainder = $mask % 8;
+                if ($remainder > 0) {
+                    $maskBin .= chr(0xFF & (0xFF << (8 - $remainder)));
+                }
+                $maskBin = str_pad($maskBin, 16, "\x00");
+
+                if (($ipBin & $maskBin) === ($subnetBin & $maskBin)) {
+                    return true;
+                }
+            } else {
+                // IPv4 CIDR matching
+                $ip_long = ip2long($ip);
+                $subnet_long = ip2long($subnet);
+
+                if ($ip_long === false || $subnet_long === false) {
+                    continue;
+                }
+
+                $mask_long = ~((1 << (32 - $mask)) - 1);
+
+                if (($ip_long & $mask_long) == ($subnet_long & $mask_long)) {
+                    return true;
+                }
+            }
+        } else {
+            // Special case: 0.0.0.0 means allow all
+            if ($allowed === '0.0.0.0') {
+                return true;
+            }
+
+            // Direct IP comparison; IPv6 can be written in more than one form
+            if (normalizeIpAddress((string) $ip) === normalizeIpAddress((string) $allowed)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+function deduplicateAllowlist(array $entries): array
+{
+    if (count($entries) <= 1) {
+        return array_values($entries);
+    }
+
+    // Normalize each entry into [original, ip, mask]
+    $parsed = [];
+    foreach ($entries as $entry) {
+        $entry = trim($entry);
+        if (empty($entry)) {
+            continue;
+        }
+
+        if ($entry === '0.0.0.0') {
+            // Special case: bare 0.0.0.0 means "allow all" — treat as /0
+            $parsed[] = ['original' => $entry, 'ip' => '0.0.0.0', 'mask' => 0];
+        } elseif (str_contains($entry, '/')) {
+            [$ip, $mask] = explode('/', $entry);
+            $parsed[] = ['original' => $entry, 'ip' => $ip, 'mask' => (int) $mask];
+        } else {
+            $ip = $entry;
+            $isIpv6 = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+            $parsed[] = ['original' => $entry, 'ip' => $ip, 'mask' => $isIpv6 ? 128 : 32];
+        }
+    }
+
+    $count = count($parsed);
+    $redundant = array_fill(0, $count, false);
+
+    for ($i = 0; $i < $count; $i++) {
+        if ($redundant[$i]) {
+            continue;
+        }
+
+        for ($j = 0; $j < $count; $j++) {
+            if ($i === $j || $redundant[$j]) {
+                continue;
+            }
+
+            // Entry $j is redundant if its mask is narrower/equal (>=) than $i's mask
+            // AND $j's network IP falls within $i's CIDR range
+            if ($parsed[$j]['mask'] >= $parsed[$i]['mask']) {
+                $cidr = $parsed[$i]['ip'].'/'.$parsed[$i]['mask'];
+                if (checkIPAgainstAllowlist($parsed[$j]['ip'], [$cidr])) {
+                    $redundant[$j] = true;
+                }
+            }
+        }
+    }
+
+    $result = [];
+    for ($i = 0; $i < $count; $i++) {
+        if (! $redundant[$i]) {
+            $result[] = $parsed[$i]['original'];
+        }
+    }
+
+    return $result;
+}
+
+/**
+ * Detect the instance public IPs with ifconfig.io. Only empty settings are filled, so an address saved in Settings is kept.
+ */
+function get_public_ips(): void
+{
+    try {
+        $settings = InstanceSettings::get();
+        $columns = array_values(array_filter(['public_ipv4', 'public_ipv6'], fn (string $column) => blank($settings->$column)));
+        if ($columns === []) {
+            return;
+        }
+
+        $detected = detect_public_ips($columns);
+        if ($detected !== []) {
+            $settings->update($detected);
+        }
+    } catch (Throwable $e) {
+        echo "Error: {$e->getMessage()}\n";
+    }
+}
+
+/**
+ * Look up the public IPs of this host with ifconfig.io, without saving them.
+ *
+ * @param  list<'public_ipv4'|'public_ipv6'>  $columns
+ * @return array<'public_ipv4'|'public_ipv6', string> valid addresses only
+ */
+function detect_public_ips(array $columns = ['public_ipv4', 'public_ipv6']): array
+{
+    $versions = array_intersect_key(['public_ipv4' => 4, 'public_ipv6' => 6], array_flip($columns));
+
+    // Start the lookups together, but wait for each one alone, so a timeout of one family does not discard the other.
+    $processes = [];
+    foreach ($versions as $column => $version) {
+        $processes[$column] = Process::path(__DIR__)->start("curl -{$version}s --max-time 10 https://ifconfig.io");
+    }
+
+    $detected = [];
+    foreach ($processes as $column => $process) {
+        try {
+            $ip = trim($process->wait()->output());
+        } catch (Throwable) {
+            continue;
+        }
+        $version = $versions[$column];
+        if (filter_var($ip, FILTER_VALIDATE_IP, $version === 4 ? FILTER_FLAG_IPV4 : FILTER_FLAG_IPV6) !== false) {
+            $detected[$column] = $ip;
+        }
+    }
+
+    return $detected;
+}
+
+function isAnyDeploymentInprogress(bool $showAll = false)
+{
+    $runningJobs = ApplicationDeploymentQueue::where('horizon_job_worker', gethostname())->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)->get();
+
+    $horizonJobIds = [];
+    $deploymentDetails = [];
+
+    foreach ($runningJobs as $runningJob) {
+        if ($runningJob->isHorizonJobActive()) {
+            $horizonJobIds[] = $runningJob->horizon_job_id;
+
+            if ($showAll) {
+                $application = Application::find($runningJob->application_id);
+                $teamMembers = [];
+                $deploymentUrl = '';
+
+                if ($application) {
+                    $team = $application->team();
+                    if ($team) {
+                        $teamMembers = $team->members()->pluck('email')->toArray();
+                    }
+
+                    if ($runningJob->deployment_url) {
+                        $deploymentUrl = base_url().$runningJob->deployment_url;
+                    }
+                }
+
+                $deploymentDetails[] = [
+                    'application_name' => $runningJob->application_name ?? 'Unknown',
+                    'server_name' => $runningJob->server_name ?? 'Unknown',
+                    'deployment_url' => $deploymentUrl,
+                    'team_members' => $teamMembers,
+                    'created_at' => $runningJob->created_at->format('Y-m-d H:i:s'),
+                    'horizon_job_id' => $runningJob->horizon_job_id,
+                ];
+            }
+        }
+    }
+
+    $scheduledJobCount = runningScheduledJobCount();
+
+    if (count($horizonJobIds) === 0 && $scheduledJobCount === 0) {
+        echo "No active deployments or scheduled jobs in progress.\n";
+        exit(0);
+    }
+
+    echo formatRunningDeploymentsOutput(count($horizonJobIds), $deploymentDetails, $showAll, $scheduledJobCount);
+
+    exit(1);
+}
+
+/**
+ * Counts scheduled task, database backup, and volume backup runs that are still running on this host.
+ * A run that started longer ago than its job timeout is stale: the worker has stopped it.
+ */
+function runningScheduledJobCount(): int
+{
+    $startedWithin = fn (Model $execution, int $timeoutSeconds): bool => $execution->created_at?->gt(now()->subSeconds($timeoutSeconds)) ?? false;
+
+    $tasks = ScheduledTaskExecution::with('scheduledTask')->onThisHost()->where('status', 'running')->get()
+        ->filter(fn (ScheduledTaskExecution $execution) => $startedWithin($execution, ($execution->scheduledTask?->timeout ?? 300) + ScheduledTaskJob::WORKER_TIMEOUT_MARGIN_SECONDS));
+
+    $databaseBackups = ScheduledDatabaseBackupExecution::with('scheduledDatabaseBackup')->onThisHost()->where('status', 'running')->get()
+        ->filter(fn (ScheduledDatabaseBackupExecution $execution) => $startedWithin($execution, ($execution->scheduledDatabaseBackup?->timeout ?? 3600) + DatabaseBackupJob::WORKER_TIMEOUT_MARGIN_SECONDS));
+
+    $volumeBackups = ScheduledVolumeBackupExecution::with('scheduledVolumeBackup')->onThisHost()->where('status', 'running')->get()
+        ->filter(fn (ScheduledVolumeBackupExecution $execution) => $startedWithin($execution, $execution->scheduledVolumeBackup?->timeout ?? ScheduledVolumeBackup::DEFAULT_TIMEOUT));
+
+    return $tasks->count() + $databaseBackups->count() + $volumeBackups->count();
+}
+
+function formatRunningDeploymentsOutput(int $activeDeploymentCount, array $deploymentDetails = [], bool $showAll = false, int $scheduledJobCount = 0): string
+{
+    $output = "\n=== Running Deployments ===\n";
+    $output .= 'Total active deployments: '.$activeDeploymentCount."\n";
+    $output .= 'Total running scheduled jobs: '.$scheduledJobCount."\n";
+
+    if (! $showAll) {
+        return $output;
+    }
+
+    $output .= "\n";
+
+    foreach ($deploymentDetails as $index => $deployment) {
+        $output .= 'Deployment #'.($index + 1).":\n";
+        $output .= '  Application: '.$deployment['application_name']."\n";
+        $output .= '  Server: '.$deployment['server_name']."\n";
+        $output .= '  Started: '.$deployment['created_at']."\n";
+        if ($deployment['deployment_url']) {
+            $output .= '  URL: '.$deployment['deployment_url']."\n";
+        }
+        if (! empty($deployment['team_members'])) {
+            $output .= '  Team members: '.implode(', ', $deployment['team_members'])."\n";
+        } else {
+            $output .= "  Team members: No team members found\n";
+        }
+        $output .= '  Horizon Job ID: '.$deployment['horizon_job_id']."\n\n";
+    }
+
+    return $output;
+}
+
+function isBase64Encoded($strValue)
+{
+    return base64_encode(base64_decode($strValue, true)) === $strValue;
+}
+
+function decodeBase64EncodedLabels(string $value): ?string
+{
+    if (! isBase64Encoded($value)) {
+        return null;
+    }
+
+    $decoded = base64_decode($value, true);
+    if ($decoded === false) {
+        return null;
+    }
+    $labels = $decoded;
+
+    while ($decoded !== '' && isBase64Encoded($decoded)) {
+        $next = base64_decode($decoded, true);
+        if ($next === false) {
+            break;
+        }
+        $decoded = $next;
+        if (mb_detect_encoding($decoded, 'UTF-8', true) !== false) {
+            $lines = preg_split('/\r\n|\n|\r/', $decoded);
+            if ($lines === false) {
+                break;
+            }
+            $containsOnlyLabels = collect($lines)
+                ->filter(fn (string $line) => $line !== '')
+                ->every(fn (string $line) => str_contains($line, '=') && ! str_starts_with($line, '='));
+
+            if ($containsOnlyLabels) {
+                $labels = $decoded;
+            }
+        }
+    }
+
+    return mb_detect_encoding($labels, 'UTF-8', true) === false ? null : $labels;
+}
+function customApiValidator(Collection|array $item, array $rules, array $messages = [])
+{
+    if (is_array($item)) {
+        $item = collect($item);
+    }
+
+    return Validator::make($item->toArray(), $rules, array_merge([
+        'required' => 'This field is required.',
+    ], $messages));
+}
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, ?int $preview_id = null)
 {
-    if ($resource->getMorphClass() === 'App\Models\Service') {
+    $resource->resetComposeVolumeWarnings();
+    if ($resource->getMorphClass() === Service::class) {
         if ($resource->docker_compose_raw) {
+            // Extract inline comments from raw YAML before Symfony parser discards them
+            $envComments = extractYamlEnvironmentComments($resource->docker_compose_raw);
+
             try {
-                $yaml = Yaml::parse($resource->docker_compose_raw);
-            } catch (\Exception $e) {
-                throw new \Exception($e->getMessage());
+                $yaml = parseDockerComposeYaml($resource->docker_compose_raw);
+            } catch (Exception $e) {
+                throw new RuntimeException($e->getMessage());
             }
-            $allServices = get_service_templates();
             $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
             $topLevelNetworks = collect(data_get($yaml, 'networks', []));
             $topLevelConfigs = collect(data_get($yaml, 'configs', []));
@@ -797,34 +3100,28 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
                 $topLevelVolumes = collect($tempTopLevelVolumes);
             }
-            $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $allServices) {
-                // Workarounds for beta users.
-                if ($serviceName === 'registry') {
-                    $tempServiceName = 'docker-registry';
-                } else {
-                    $tempServiceName = $serviceName;
-                }
-                if (str(data_get($service, 'image'))->contains('glitchtip')) {
-                    $tempServiceName = 'glitchtip';
-                }
-                if ($serviceName === 'supabase-kong') {
-                    $tempServiceName = 'supabase';
-                }
-                $serviceDefinition = data_get($allServices, $tempServiceName);
-                $predefinedPort = data_get($serviceDefinition, 'port');
-                if ($serviceName === 'plausible') {
-                    $predefinedPort = '8000';
-                }
-                // End of workarounds for beta users.
+            $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $envComments) {
+                $predefinedPort = $resource->getRequiredPort();
                 $serviceVolumes = collect(data_get($service, 'volumes', []));
                 $servicePorts = collect(data_get($service, 'ports', []));
                 $serviceNetworks = collect(data_get($service, 'networks', []));
                 $serviceVariables = collect(data_get($service, 'environment', []));
                 $serviceLabels = collect(data_get($service, 'labels', []));
-                $hasHostNetworkMode = data_get($service, 'network_mode') === 'host' ? true : false;
+                $networkMode = data_get($service, 'network_mode');
+
+                $hasValidNetworkMode =
+                    $networkMode === 'host' ||
+                    (is_string($networkMode) && (str_starts_with($networkMode, 'service:') || str_starts_with($networkMode, 'container:')));
+
                 if ($serviceLabels->count() > 0) {
                     $removedLabels = collect([]);
                     $serviceLabels = $serviceLabels->filter(function ($serviceLabel, $serviceLabelName) use ($removedLabels) {
+                        // Handle array values from YAML (e.g., "traefik.enable: true" becomes an array)
+                        if (is_array($serviceLabel)) {
+                            $removedLabels->put($serviceLabelName, $serviceLabel);
+
+                            return false;
+                        }
                         if (! str($serviceLabel)->contains('=')) {
                             $removedLabels->put($serviceLabelName, $serviceLabel);
 
@@ -834,60 +3131,81 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         return $serviceLabel;
                     });
                     foreach ($removedLabels as $removedLabelName => $removedLabel) {
+                        // Convert array values to strings
+                        if (is_array($removedLabel)) {
+                            $removedLabel = (string) collect($removedLabel)->first();
+                        }
                         $serviceLabels->push("$removedLabelName=$removedLabel");
                     }
                 }
-
                 $containerName = "$serviceName-{$resource->uuid}";
 
                 // Decide if the service is a database
-                $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
                 $image = data_get_str($service, 'image');
-                data_set($service, 'is_database', $isDatabase);
 
-                // Create new serviceApplication or serviceDatabase
-                if ($isDatabase) {
-                    if ($isNew) {
-                        $savedService = ServiceDatabase::create([
-                            'name' => $serviceName,
-                            'image' => $image,
-                            'service_id' => $resource->id,
-                        ]);
-                    } else {
-                        $savedService = ServiceDatabase::where([
-                            'name' => $serviceName,
-                            'service_id' => $resource->id,
-                        ])->first();
-                    }
+                // Check for manually migrated services first (respects user's conversion choice)
+                $migratedApp = ServiceApplication::where('name', $serviceName)
+                    ->where('service_id', $resource->id)
+                    ->where('is_migrated', true)
+                    ->first();
+                $migratedDb = ServiceDatabase::where('name', $serviceName)
+                    ->where('service_id', $resource->id)
+                    ->where('is_migrated', true)
+                    ->first();
+
+                if ($migratedApp || $migratedDb) {
+                    // Use the migrated service type, ignoring image detection
+                    $isDatabase = (bool) $migratedDb;
+                    $savedService = $migratedApp ?: $migratedDb;
                 } else {
-                    if ($isNew) {
-                        $savedService = ServiceApplication::create([
-                            'name' => $serviceName,
-                            'image' => $image,
-                            'service_id' => $resource->id,
-                        ]);
-                    } else {
-                        $savedService = ServiceApplication::where([
-                            'name' => $serviceName,
-                            'service_id' => $resource->id,
-                        ])->first();
-                    }
-                }
-                if (is_null($savedService)) {
+                    // Use image detection for non-migrated services
+                    $isDatabase = isDatabaseImage($image, $service);
+
+                    // Create new serviceApplication or serviceDatabase
                     if ($isDatabase) {
-                        $savedService = ServiceDatabase::create([
-                            'name' => $serviceName,
-                            'image' => $image,
-                            'service_id' => $resource->id,
-                        ]);
+                        if ($isNew) {
+                            $savedService = ServiceDatabase::create([
+                                'name' => $serviceName,
+                                'image' => $image,
+                                'service_id' => $resource->id,
+                            ]);
+                        } else {
+                            $savedService = ServiceDatabase::where([
+                                'name' => $serviceName,
+                                'service_id' => $resource->id,
+                            ])->first();
+                            if (is_null($savedService)) {
+                                $savedService = ServiceDatabase::create([
+                                    'name' => $serviceName,
+                                    'image' => $image,
+                                    'service_id' => $resource->id,
+                                ]);
+                            }
+                        }
                     } else {
-                        $savedService = ServiceApplication::create([
-                            'name' => $serviceName,
-                            'image' => $image,
-                            'service_id' => $resource->id,
-                        ]);
+                        if ($isNew) {
+                            $savedService = ServiceApplication::create([
+                                'name' => $serviceName,
+                                'image' => $image,
+                                'service_id' => $resource->id,
+                            ]);
+                        } else {
+                            $savedService = ServiceApplication::where([
+                                'name' => $serviceName,
+                                'service_id' => $resource->id,
+                            ])->first();
+                            if (is_null($savedService)) {
+                                $savedService = ServiceApplication::create([
+                                    'name' => $serviceName,
+                                    'image' => $image,
+                                    'service_id' => $resource->id,
+                                ]);
+                            }
+                        }
                     }
                 }
+
+                data_set($service, 'is_database', $isDatabase);
 
                 // Check if image changed
                 if ($savedService->image !== $image) {
@@ -908,7 +3226,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             return $value == $networkName || $key == $networkName;
                         });
                         if (! $networkExists) {
-                            $topLevelNetworks->put($networkDetails, null);
+                            if (is_string($networkDetails) || is_int($networkDetails)) {
+                                $topLevelNetworks->put($networkDetails, null);
+                            }
                         }
                     }
                 }
@@ -931,7 +3251,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $savedService->ports = $collectedPorts->implode(',');
                 $savedService->save();
 
-                if (! $hasHostNetworkMode) {
+                if (! $hasValidNetworkMode) {
                     // Add Coolify specific networks
                     $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
                         return $value == $definedNetwork;
@@ -966,7 +3286,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
                 // Collect/create/update volumes
                 if ($serviceVolumes->count() > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($savedService, $topLevelVolumes) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $savedService, $topLevelVolumes) {
                         $type = null;
                         $source = null;
                         $target = null;
@@ -988,6 +3308,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $target = data_get_str($volume, 'target');
                             $content = data_get($volume, 'content');
                             $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
+                            validateComposeContentVolumeSource($volume);
                             $foundConfig = $savedService->fileStorages()->whereMountPath($target)->first();
                             if ($foundConfig) {
                                 $contentNotNull = data_get($foundConfig, 'content');
@@ -998,7 +3319,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             }
                             if (is_null($isDirectory) && is_null($content)) {
                                 // if isDirectory is not set & content is also not set, we assume it is a directory
-                                ray('setting isDirectory to true');
                                 $isDirectory = true;
                             }
                         }
@@ -1009,6 +3329,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             if ($source->value() === '/tmp' || $source->value() === '/tmp/') {
                                 return $volume;
                             }
+
                             LocalFileVolume::updateOrCreate(
                                 [
                                     'mount_path' => $target,
@@ -1025,12 +3346,18 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 ]
                             );
                         } elseif ($type->value() === 'volume') {
+                            $legacyName = "{$savedService->service->uuid}_".Str::slug($source, '-');
+                            if (useComposeExternalVolumeAsWritten($resource, $savedService, $topLevelVolumes, $source->value(), $legacyName)) {
+                                // The external volume gets no row, so Coolify never removes it.
+                                return $volume;
+                            }
                             if ($topLevelVolumes->has($source->value())) {
                                 $v = $topLevelVolumes->get($source->value());
                                 if (data_get($v, 'driver_opts.type') === 'cifs') {
                                     return $volume;
                                 }
                             }
+                            $declaration = $topLevelVolumes->get($source->value());
                             $slugWithoutUuid = Str::slug($source, '-');
                             $name = "{$savedService->service->uuid}_{$slugWithoutUuid}";
                             if (is_string($volume)) {
@@ -1041,10 +3368,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             } elseif (is_array($volume)) {
                                 data_set($volume, 'source', $name);
                             }
-                            $topLevelVolumes->put($name, [
-                                'name' => $name,
-                            ]);
-                            LocalPersistentVolume::updateOrCreate(
+                            $persistentVolume = LocalPersistentVolume::updateOrCreate(
                                 [
                                     'mount_path' => $target,
                                     'resource_id' => $savedService->id,
@@ -1057,6 +3381,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     'resource_type' => get_class($savedService),
                                 ]
                             );
+                            $topLevelVolumes->put($name, composeRenamedVolumeDeclarationFor($declaration, $name, $persistentVolume));
                         }
                         dispatch(new ServerFilesFromServerJob($savedService));
 
@@ -1065,6 +3390,23 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     data_set($service, 'volumes', $serviceVolumes->toArray());
                 }
 
+                // convert - SESSION_SECRET: 123 to - SESSION_SECRET=123
+                $convertedServiceVariables = collect([]);
+                foreach ($serviceVariables as $variableName => $variable) {
+                    if (is_numeric($variableName)) {
+                        if (is_array($variable)) {
+                            $key = str(collect($variable)->keys()->first());
+                            $value = str(collect($variable)->values()->first());
+                            $variable = "$key=$value";
+                            $convertedServiceVariables->put($variableName, $variable);
+                        } elseif (is_string($variable)) {
+                            $convertedServiceVariables->put($variableName, $variable);
+                        }
+                    } elseif (is_string($variableName)) {
+                        $convertedServiceVariables->put($variableName, $variable);
+                    }
+                }
+                $serviceVariables = $convertedServiceVariables;
                 // Get variables from the service
                 foreach ($serviceVariables as $variableName => $variable) {
                     if (is_numeric($variableName)) {
@@ -1092,6 +3434,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $key = str($variableName);
                         $value = str($variable);
                     }
+                    // Preserve original key for comment lookup before $key might be reassigned
+                    $originalKey = $key->value();
                     if ($key->startsWith('SERVICE_FQDN')) {
                         if ($isNew || $savedService->fqdn === null) {
                             $name = $key->after('SERVICE_FQDN_')->beforeLast('_')->lower();
@@ -1139,12 +3483,14 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 }
                                 $savedService->save();
                             }
-                            EnvironmentVariable::create([
-                                'key' => $key,
-                                'value' => $fqdn,
-                                'is_build_time' => false,
-                                'service_id' => $resource->id,
+                            EnvironmentVariable::firstOrCreate([
+                                'key' => $key->value(),
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                                 'is_preview' => false,
+                            ], [
+                                'value' => $fqdn,
+                                'comment' => $envComments[$originalKey] ?? null,
                             ]);
                         }
                         // Caddy needs exact port in some cases.
@@ -1155,12 +3501,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             }
                             $env = EnvironmentVariable::where([
                                 'key' => $key,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                             ])->first();
                             if ($env) {
                                 $env_url = Url::fromString($savedService->fqdn);
                                 $env_port = $env_url->getPort();
-                                if ($env_port !== $predefinedPort) {
+                                if ((int) $env_port !== (int) $predefinedPort) {
                                     $env_url = $env_url->withPort($predefinedPort);
                                     $savedService->fqdn = $env_url->__toString();
                                     $savedService->save();
@@ -1178,14 +3525,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     if ($value?->startsWith('$')) {
                         $foundEnv = EnvironmentVariable::where([
                             'key' => $key,
-                            'service_id' => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ])->first();
-                        $value = str(replaceVariables($value));
+                        $value = replaceVariables($value);
                         $key = $value;
                         if ($value->startsWith('SERVICE_')) {
                             $foundEnv = EnvironmentVariable::where([
                                 'key' => $key,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                             ])->first();
                             ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
                             if (! is_null($command)) {
@@ -1218,9 +3567,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         EnvironmentVariable::create([
                                             'key' => $key,
                                             'value' => $fqdn,
-                                            'is_build_time' => false,
-                                            'service_id' => $resource->id,
+                                            'resourceable_type' => get_class($resource),
+                                            'resourceable_id' => $resource->id,
                                             'is_preview' => false,
+                                            'comment' => $envComments[$originalKey] ?? null,
                                         ]);
                                     }
                                     if (! $isDatabase) {
@@ -1236,12 +3586,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                             }
                                             $env = EnvironmentVariable::where([
                                                 'key' => $key,
-                                                'service_id' => $resource->id,
+                                                'resourceable_type' => get_class($resource),
+                                                'resourceable_id' => $resource->id,
                                             ])->first();
                                             if ($env) {
                                                 $env_url = Url::fromString($env->value);
                                                 $env_port = $env_url->getPort();
-                                                if ($env_port !== $predefinedPort) {
+                                                if ((int) $env_port !== (int) $predefinedPort) {
                                                     $env_url = $env_url->withPort($predefinedPort);
                                                     $savedService->fqdn = $env_url->__toString();
                                                     $savedService->save();
@@ -1255,9 +3606,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         EnvironmentVariable::create([
                                             'key' => $key,
                                             'value' => $generatedValue,
-                                            'is_build_time' => false,
-                                            'service_id' => $resource->id,
+                                            'resourceable_type' => get_class($resource),
+                                            'resourceable_id' => $resource->id,
                                             'is_preview' => false,
+                                            'comment' => $envComments[$originalKey] ?? null,
                                         ]);
                                     }
                                 }
@@ -1281,19 +3633,22 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             }
                             $foundEnv = EnvironmentVariable::where([
                                 'key' => $key,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                             ])->first();
                             if ($foundEnv) {
                                 $defaultValue = data_get($foundEnv, 'value');
                             }
                             EnvironmentVariable::updateOrCreate([
                                 'key' => $key,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                             ], [
                                 'value' => $defaultValue,
-                                'is_build_time' => false,
-                                'service_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                                 'is_preview' => false,
+                                'comment' => $envComments[$originalKey] ?? null,
                             ]);
                         }
                     }
@@ -1304,42 +3659,116 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 } else {
                     $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
                 }
-                $defaultLabels = defaultLabels($resource->id, $containerName, type: 'service', subType: $isDatabase ? 'database' : 'application', subId: $savedService->id);
+                $noindexDomains = $savedService instanceof ServiceApplication
+                    ? $savedService->noindexDomains()
+                    : collect([]);
+                $defaultLabels = defaultLabels(
+                    uuid: $resource->uuid,
+                    name: $containerName,
+                    projectName: $resource->project()->name,
+                    resourceName: $resource->name,
+                    type: 'service',
+                    subType: $isDatabase ? 'database' : 'application',
+                    subUuid: $savedService->uuid,
+                    subName: $savedService->name,
+                    environment: $resource->environment->name,
+                );
                 $serviceLabels = $serviceLabels->merge($defaultLabels);
                 if (! $isDatabase && $fqdns->count() > 0) {
                     if ($fqdns) {
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
-                            uuid: $resource->uuid,
-                            domains: $fqdns,
-                            is_force_https_enabled: true,
-                            serviceLabels: $serviceLabels,
-                            is_gzip_enabled: $savedService->isGzipEnabled(),
-                            is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
-                            service_name: $serviceName,
-                            image: data_get($service, 'image')
-                        ));
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
-                            network: $resource->destination->network,
-                            uuid: $resource->uuid,
-                            domains: $fqdns,
-                            is_force_https_enabled: true,
-                            serviceLabels: $serviceLabels,
-                            is_gzip_enabled: $savedService->isGzipEnabled(),
-                            is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
-                            service_name: $serviceName,
-                            image: data_get($service, 'image')
-                        ));
+                        $shouldGenerateLabelsExactly = $resource->server->settings->generate_exact_labels;
+                        $redirectDirection = in_array(data_get($savedService, 'redirect'), ['www', 'non-www', 'both'], true)
+                            ? data_get($savedService, 'redirect')
+                            : 'both';
+                        $domainPortOverrides = $savedService instanceof ServiceApplication
+                            ? ($savedService->domain_port_overrides ?? [])
+                            : [];
+                        $onlyPort = $savedService instanceof ServiceApplication
+                            ? $savedService->getRequiredPort()
+                            : $predefinedPort;
+                        if ($shouldGenerateLabelsExactly) {
+                            switch ($resource->server->proxyType()) {
+                                case ProxyTypes::TRAEFIK->value:
+                                    $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
+                                        uuid: $resource->uuid,
+                                        domains: $fqdns,
+                                        is_force_https_enabled: $savedService->isForceHttpsEnabled(),
+                                        is_permanent_redirect_enabled: $savedService->isPermanentRedirectEnabled(),
+                                        serviceLabels: $serviceLabels,
+                                        is_gzip_enabled: $savedService->isGzipEnabled(),
+                                        is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
+                                        service_name: $serviceName,
+                                        image: data_get($service, 'image'),
+                                        onlyPort: $onlyPort,
+                                        noindex_domains: $noindexDomains,
+                                        redirect_direction: $redirectDirection,
+                                        domainPortOverrides: $domainPortOverrides,
+                                        certificate_resolver: $resource->server->traefikCertificateResolver(data_get($savedService, 'traefik_certificate_resolver')),
+                                    ));
+                                    break;
+                                case ProxyTypes::CADDY->value:
+                                    $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
+                                        network: $resource->destination->network,
+                                        uuid: $resource->uuid,
+                                        domains: $fqdns,
+                                        is_force_https_enabled: $savedService->isForceHttpsEnabled(),
+                                        is_permanent_redirect_enabled: $savedService->isPermanentRedirectEnabled(),
+                                        serviceLabels: $serviceLabels,
+                                        is_gzip_enabled: $savedService->isGzipEnabled(),
+                                        is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
+                                        service_name: $serviceName,
+                                        image: data_get($service, 'image'),
+                                        onlyPort: $onlyPort,
+                                        predefinedPort: $onlyPort,
+                                        noindex_domains: $noindexDomains,
+                                        redirect_direction: $redirectDirection,
+                                        domainPortOverrides: $domainPortOverrides,
+                                        is_traffic_analytics_enabled: $resource->server?->isTrafficAnalyticsEnabled() ?? false,
+                                        supports_log_append: $resource->server?->caddySupportsLogAppend() ?? false,
+                                    ));
+                                    break;
+                            }
+                        } else {
+                            $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
+                                uuid: $resource->uuid,
+                                domains: $fqdns,
+                                is_force_https_enabled: $savedService->isForceHttpsEnabled(),
+                                is_permanent_redirect_enabled: $savedService->isPermanentRedirectEnabled(),
+                                serviceLabels: $serviceLabels,
+                                is_gzip_enabled: $savedService->isGzipEnabled(),
+                                is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
+                                service_name: $serviceName,
+                                image: data_get($service, 'image'),
+                                onlyPort: $onlyPort,
+                                noindex_domains: $noindexDomains,
+                                redirect_direction: $redirectDirection,
+                                domainPortOverrides: $domainPortOverrides,
+                                certificate_resolver: $resource->server->traefikCertificateResolver(data_get($savedService, 'traefik_certificate_resolver')),
+                            ));
+                            $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
+                                network: $resource->destination->network,
+                                uuid: $resource->uuid,
+                                domains: $fqdns,
+                                is_force_https_enabled: $savedService->isForceHttpsEnabled(),
+                                is_permanent_redirect_enabled: $savedService->isPermanentRedirectEnabled(),
+                                serviceLabels: $serviceLabels,
+                                is_gzip_enabled: $savedService->isGzipEnabled(),
+                                is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
+                                service_name: $serviceName,
+                                image: data_get($service, 'image'),
+                                onlyPort: $onlyPort,
+                                predefinedPort: $onlyPort,
+                                noindex_domains: $noindexDomains,
+                                redirect_direction: $redirectDirection,
+                                domainPortOverrides: $domainPortOverrides,
+                                is_traffic_analytics_enabled: $resource->server?->isTrafficAnalyticsEnabled() ?? false,
+                                supports_log_append: $resource->server?->caddySupportsLogAppend() ?? false,
+                            ));
+                        }
                     }
                 }
                 if ($resource->server->isLogDrainEnabled() && $savedService->isLogDrainEnabled()) {
-                    data_set($service, 'logging', [
-                        'driver' => 'fluentd',
-                        'options' => [
-                            'fluentd-address' => 'tcp://127.0.0.1:24224',
-                            'fluentd-async' => 'true',
-                            'fluentd-sub-second-precision' => 'true',
-                        ],
-                    ]);
+                    data_set($service, 'logging', generate_log_drain_configuration($resource->server));
                 }
                 if ($serviceLabels->count() > 0) {
                     if ($resource->is_container_label_escape_enabled) {
@@ -1365,7 +3794,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 updateCompose($savedService);
 
                 return $service;
-
             });
 
             $envs_from_coolify = $resource->environment_variables()->get();
@@ -1387,7 +3815,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $parsedServiceVariables->put($key, $value);
                     }
                 }
+                $parsedServiceVariables->put('COOLIFY_RESOURCE_UUID', "{$resource->uuid}");
                 $parsedServiceVariables->put('COOLIFY_CONTAINER_NAME', "$serviceName-{$resource->uuid}");
+
+                coolifyDefaultEnvironmentVariables($resource, $parsedServiceVariables->keys())
+                    ->each(fn ($value, $key) => $parsedServiceVariables->put($key, escapeDollarSign($value)));
+
                 $parsedServiceVariables = $parsedServiceVariables->map(function ($value, $key) use ($envs_from_coolify) {
                     if (! str($value)->startsWith('$')) {
                         $found_env = $envs_from_coolify->where('key', $key)->first();
@@ -1410,9 +3843,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 'configs' => $topLevelConfigs->toArray(),
                 'secrets' => $topLevelSecrets->toArray(),
             ];
+            $originalYaml = $yaml;
             $yaml = data_forget($yaml, 'services.*.volumes.*.content');
-            $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
+            if ($yaml !== $originalYaml) {
+                $resource->docker_compose_raw = removeComposeVolumeFieldsPreservingComments($resource->docker_compose_raw, $yaml, ['content']);
+            }
             $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
+
             $resource->save();
             $resource->saveComposeConfigs();
 
@@ -1420,18 +3857,18 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         } else {
             return collect([]);
         }
-    } elseif ($resource->getMorphClass() === 'App\Models\Application') {
-        $isSameDockerComposeFile = false;
-        if ($resource->dockerComposePrLocation() === $resource->dockerComposeLocation()) {
-            $isSameDockerComposeFile = true;
-        }
+    } elseif ($resource->getMorphClass() === Application::class) {
         try {
-            $yaml = Yaml::parse($resource->docker_compose_raw);
-        } catch (\Exception $e) {
+            $yaml = parseDockerComposeYaml($resource->docker_compose_raw);
+        } catch (Exception) {
             return;
         }
         $server = $resource->destination->server;
         $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
+        // Legacy Compose applications (parser versions 1 and 2) never stored their volumes, so Coolify
+        // cannot tell which external volume already holds data. They keep the old volume names, and
+        // warnLegacyApplicationComposeExternalVolume() tells the user about it.
+        $declaredTopLevelVolumes = collect($topLevelVolumes->all());
         if ($pull_request_id !== 0) {
             $topLevelVolumes = collect([]);
         }
@@ -1464,7 +3901,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
         }
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $declaredTopLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id, $preview_id) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -1476,6 +3913,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             if ($serviceLabels->count() > 0) {
                 $removedLabels = collect([]);
                 $serviceLabels = $serviceLabels->filter(function ($serviceLabel, $serviceLabelName) use ($removedLabels) {
+                    // Handle array values from YAML (e.g., "traefik.enable: true" becomes an array)
+                    if (is_array($serviceLabel)) {
+                        $removedLabels->put($serviceLabelName, $serviceLabel);
+
+                        return false;
+                    }
                     if (! str($serviceLabel)->contains('=')) {
                         $removedLabels->put($serviceLabelName, $serviceLabel);
 
@@ -1485,6 +3928,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     return $serviceLabel;
                 });
                 foreach ($removedLabels as $removedLabelName => $removedLabel) {
+                    // Convert array values to strings
+                    if (is_array($removedLabel)) {
+                        $removedLabel = (string) collect($removedLabel)->first();
+                    }
                     $serviceLabels->push("$removedLabelName=$removedLabel");
                 }
             }
@@ -1493,7 +3940,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $containerName = "$serviceName-$baseName";
             if ($resource->compose_parsing_version === '1') {
                 if (count($serviceVolumes) > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $declaredTopLevelVolumes, $pull_request_id) {
                         if (is_string($volume)) {
                             $volume = str($volume);
                             if ($volume->contains(':') && ! $volume->startsWith('/')) {
@@ -1508,12 +3955,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $name = $name->replaceFirst('~', $dir);
                                     }
                                     if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
+                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
                                 } else {
+                                    warnLegacyApplicationComposeExternalVolume($resource, $declaredTopLevelVolumes, $name->value(), $pull_request_id);
                                     if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
+                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                         $volume = str("$name:$mount");
                                         if ($topLevelVolumes->has($name)) {
                                             $v = $topLevelVolumes->get($name);
@@ -1526,9 +3974,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($name, [
-                                                'name' => $name,
-                                            ]);
+                                            $topLevelVolumes->put($name, legacyApplicationRenamedVolumeDeclaration($name));
                                         }
                                     } else {
                                         if ($topLevelVolumes->has($name->value())) {
@@ -1541,9 +3987,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($name->value(), [
-                                                'name' => $name->value(),
-                                            ]);
+                                            $topLevelVolumes->put($name->value(), legacyApplicationRenamedVolumeDeclaration($name->value()));
                                         }
                                     }
                                 }
@@ -1552,7 +3996,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     $name = $volume->before(':');
                                     $mount = $volume->after(':');
                                     if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
+                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
                                 }
@@ -1571,7 +4015,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $source = str($source)->replaceFirst('~', $dir);
                                     }
                                     if ($pull_request_id !== 0) {
-                                        $source = $source."-pr-$pull_request_id";
+                                        $source = addPreviewDeploymentSuffix($source, $pull_request_id);
                                     }
                                     if ($read_only) {
                                         data_set($volume, 'source', $source.':'.$target.':ro');
@@ -1579,8 +4023,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         data_set($volume, 'source', $source.':'.$target);
                                     }
                                 } else {
+                                    warnLegacyApplicationComposeExternalVolume($resource, $declaredTopLevelVolumes, (string) $source, $pull_request_id);
                                     if ($pull_request_id !== 0) {
-                                        $source = $source."-pr-$pull_request_id";
+                                        $source = addPreviewDeploymentSuffix($source, $pull_request_id);
                                     }
                                     if ($read_only) {
                                         data_set($volume, 'source', $source.':'.$target.':ro');
@@ -1599,9 +4044,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($source, [
-                                                'name' => $source,
-                                            ]);
+                                            $topLevelVolumes->put($source, legacyApplicationRenamedVolumeDeclaration($source));
                                         }
                                     }
                                 }
@@ -1617,7 +4060,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
             } elseif ($resource->compose_parsing_version === '2') {
                 if (count($serviceVolumes) > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $declaredTopLevelVolumes, $pull_request_id) {
                         if (is_string($volume)) {
                             $volume = str($volume);
                             if ($volume->contains(':') && ! $volume->startsWith('/')) {
@@ -1632,13 +4075,14 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $name = $name->replaceFirst('~', $dir);
                                     }
                                     if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
+                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
                                 } else {
+                                    warnLegacyApplicationComposeExternalVolume($resource, $declaredTopLevelVolumes, $name->value(), $pull_request_id);
                                     if ($pull_request_id !== 0) {
                                         $uuid = $resource->uuid;
-                                        $name = $uuid."-$name-pr-$pull_request_id";
+                                        $name = $uuid.'-'.addPreviewDeploymentSuffix($name, $pull_request_id);
                                         $volume = str("$name:$mount");
                                         if ($topLevelVolumes->has($name)) {
                                             $v = $topLevelVolumes->get($name);
@@ -1651,9 +4095,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($name, [
-                                                'name' => $name,
-                                            ]);
+                                            $topLevelVolumes->put($name, legacyApplicationRenamedVolumeDeclaration($name));
                                         }
                                     } else {
                                         $uuid = $resource->uuid;
@@ -1669,9 +4111,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($name->value(), [
-                                                'name' => $name->value(),
-                                            ]);
+                                            $topLevelVolumes->put($name->value(), legacyApplicationRenamedVolumeDeclaration($name->value()));
                                         }
                                     }
                                 }
@@ -1680,7 +4120,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     $name = $volume->before(':');
                                     $mount = $volume->after(':');
                                     if ($pull_request_id !== 0) {
-                                        $name = $name."-pr-$pull_request_id";
+                                        $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                                     }
                                     $volume = str("$name:$mount");
                                 }
@@ -1705,10 +4145,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         data_set($volume, 'source', $source.':'.$target);
                                     }
                                 } else {
+                                    warnLegacyApplicationComposeExternalVolume($resource, $declaredTopLevelVolumes, (string) $source, $pull_request_id);
                                     if ($pull_request_id === 0) {
                                         $source = $uuid."-$source";
                                     } else {
-                                        $source = $uuid."-$source-pr-$pull_request_id";
+                                        $source = $uuid.'-'.addPreviewDeploymentSuffix($source, $pull_request_id);
                                     }
                                     if ($read_only) {
                                         data_set($volume, 'source', $source.':'.$target.':ro');
@@ -1727,9 +4168,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                                 }
                                             }
                                         } else {
-                                            $topLevelVolumes->put($source, [
-                                                'name' => $source,
-                                            ]);
+                                            $topLevelVolumes->put($source, legacyApplicationRenamedVolumeDeclaration($source));
                                         }
                                     }
                                 }
@@ -1748,13 +4187,14 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
             if ($pull_request_id !== 0 && count($serviceDependencies) > 0) {
                 $serviceDependencies = $serviceDependencies->map(function ($dependency) use ($pull_request_id) {
-                    return $dependency."-pr-$pull_request_id";
+                    return addPreviewDeploymentSuffix($dependency, $pull_request_id);
                 });
                 data_set($service, 'depends_on', $serviceDependencies->toArray());
             }
 
             // Decide if the service is a database
-            $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
+            $image = data_get_str($service, 'image');
+            $isDatabase = isDatabaseImage($image, $service);
             data_set($service, 'is_database', $isDatabase);
 
             // Collect/create/update networks
@@ -1771,7 +4211,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         return $value == $networkName || $key == $networkName;
                     });
                     if (! $networkExists) {
-                        $topLevelNetworks->put($networkDetails, null);
+                        if (is_string($networkDetails) || is_int($networkDetails)) {
+                            $topLevelNetworks->put($networkDetails, null);
+                        }
                     }
                 }
             }
@@ -1789,9 +4231,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $collectedPorts->push("$target:$published/$protocol");
                     }
                 }
-            }
-            if ($collectedPorts->count() > 0) {
-                // ray($collectedPorts->implode(','));
             }
             $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
                 return $value == $definedNetwork;
@@ -1903,15 +4342,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 if ($value?->startsWith('$')) {
                     $foundEnv = EnvironmentVariable::where([
                         'key' => $key,
-                        'application_id' => $resource->id,
+                        'resourceable_type' => get_class($resource),
+                        'resourceable_id' => $resource->id,
                         'is_preview' => false,
                     ])->first();
-                    $value = str(replaceVariables($value));
+                    $value = replaceVariables($value);
                     $key = $value;
                     if ($value->startsWith('SERVICE_')) {
                         $foundEnv = EnvironmentVariable::where([
                             'key' => $key,
-                            'application_id' => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                         ])->first();
                         ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
                         if (! is_null($command)) {
@@ -1933,8 +4374,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     EnvironmentVariable::create([
                                         'key' => $key,
                                         'value' => $fqdn,
-                                        'is_build_time' => false,
-                                        'application_id' => $resource->id,
+                                        'resourceable_type' => get_class($resource),
+                                        'resourceable_id' => $resource->id,
                                         'is_preview' => false,
                                     ]);
                                 }
@@ -1944,8 +4385,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     EnvironmentVariable::create([
                                         'key' => $key,
                                         'value' => $generatedValue,
-                                        'is_build_time' => false,
-                                        'application_id' => $resource->id,
+                                        'resourceable_type' => get_class($resource),
+                                        'resourceable_id' => $resource->id,
                                         'is_preview' => false,
                                     ]);
                                 }
@@ -1970,26 +4411,26 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         }
                         $foundEnv = EnvironmentVariable::where([
                             'key' => $key,
-                            'application_id' => $resource->id,
+                            'resourceable_type' => get_class($resource),
+                            'resourceable_id' => $resource->id,
                             'is_preview' => false,
                         ])->first();
                         if ($foundEnv) {
                             $defaultValue = data_get($foundEnv, 'value');
                         }
-                        $isBuildTime = data_get($foundEnv, 'is_build_time', false);
                         if ($foundEnv) {
                             $foundEnv->update([
                                 'key' => $key,
-                                'application_id' => $resource->id,
-                                'is_build_time' => $isBuildTime,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                                 'value' => $defaultValue,
                             ]);
                         } else {
                             EnvironmentVariable::create([
                                 'key' => $key,
                                 'value' => $defaultValue,
-                                'is_build_time' => $isBuildTime,
-                                'application_id' => $resource->id,
+                                'resourceable_type' => get_class($resource),
+                                'resourceable_id' => $resource->id,
                                 'is_preview' => false,
                             ]);
                         }
@@ -2000,75 +4441,160 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             if ($resource->serviceType()) {
                 $fqdns = generateServiceSpecificFqdns($resource);
             } else {
-                $domains = collect(json_decode($resource->docker_compose_domains)) ?? [];
+                $domains = json_decode($resource->docker_compose_domains ?: '[]', true) ?: [];
                 if ($domains) {
-                    $fqdns = data_get($domains, "$serviceName.domain");
+                    // Dual-read: original compose name or legacy underscore key.
+                    $fqdns = getComposeServiceDomainString($domains, (string) $serviceName);
                     if ($fqdns) {
                         $fqdns = str($fqdns)->explode(',');
                         if ($pull_request_id !== 0) {
                             $preview = $resource->previews()->find($preview_id);
-                            $docker_compose_domains = collect(json_decode(data_get($preview, 'docker_compose_domains')));
-                            if ($docker_compose_domains->count() > 0) {
-                                $found_fqdn = data_get($docker_compose_domains, "$serviceName.domain");
+                            if (! $preview) {
+                                try {
+                                    $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pull_request_id);
+                                } catch (ModelNotFoundException) {
+                                    throw new RuntimeException('Preview not found.');
+                                }
+                            }
+                            $docker_compose_domains = json_decode(data_get($preview, 'docker_compose_domains') ?: '[]', true) ?: [];
+                            if (count($docker_compose_domains) > 0) {
+                                $found_fqdn = getComposeServiceDomainString($docker_compose_domains, (string) $serviceName);
                                 if ($found_fqdn) {
-                                    $fqdns = collect($found_fqdn);
+                                    $fqdns = str($found_fqdn)->explode(',')->map(fn ($fqdn) => trim($fqdn))->filter();
                                 } else {
                                     $fqdns = collect([]);
                                 }
                             } else {
-                                $fqdns = $fqdns->map(function ($fqdn) use ($pull_request_id, $resource) {
-                                    $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pull_request_id);
-                                    $url = Url::fromString($fqdn);
-                                    $template = $resource->preview_url_template;
-                                    $host = $url->getHost();
-                                    $schema = $url->getScheme();
-                                    $random = new Cuid2(7);
-                                    $preview_fqdn = str_replace('{{random}}', $random, $template);
-                                    $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
-                                    $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);
-                                    $preview_fqdn = "$schema://$preview_fqdn";
-                                    $preview->fqdn = $preview_fqdn;
-                                    $preview->save();
-
-                                    return $preview_fqdn;
-                                });
+                                $generatedDomains = $fqdns->map(
+                                    fn ($fqdn) => $preview->generatedPreviewDomain((string) $fqdn)
+                                );
+                                $fqdns = $generatedDomains->pluck('url');
+                                $preview->fqdn = $fqdns->implode(',');
+                                $generatedOverrides = $generatedDomains
+                                    ->filter(fn (array $generated): bool => filled($generated['port']))
+                                    ->mapWithKeys(fn (array $generated): array => [$generated['url'] => $generated['port']])
+                                    ->all();
+                                $preview->domain_port_overrides = array_replace(
+                                    $preview->domain_port_overrides ?? [],
+                                    $generatedOverrides,
+                                );
+                                $preview->save();
                             }
                         }
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
-                            uuid: $resource->uuid,
-                            domains: $fqdns,
-                            serviceLabels: $serviceLabels,
-                            generate_unique_uuid: $resource->build_pack === 'dockercompose',
-                            image: data_get($service, 'image'),
-                            is_force_https_enabled: $resource->isForceHttpsEnabled(),
-                            is_gzip_enabled: $resource->isGzipEnabled(),
-                            is_stripprefix_enabled: $resource->isStripprefixEnabled(),
-                        ));
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
-                            network: $resource->destination->network,
-                            uuid: $resource->uuid,
-                            domains: $fqdns,
-                            serviceLabels: $serviceLabels,
-                            image: data_get($service, 'image'),
-                            is_force_https_enabled: $resource->isForceHttpsEnabled(),
-                            is_gzip_enabled: $resource->isGzipEnabled(),
-                            is_stripprefix_enabled: $resource->isStripprefixEnabled(),
-                        ));
+                        $noindexDomains = $pull_request_id !== 0 ? $fqdns : $resource->noindexDomains();
+                        $shouldGenerateLabelsExactly = $server->settings->generate_exact_labels;
+                        $composeRedirect = data_get($domains, [$serviceName, 'redirect']);
+                        $redirectDirection = in_array($composeRedirect, ['www', 'non-www', 'both'], true)
+                            ? $composeRedirect
+                            : 'both';
+                        $domainPortOverrides = $pull_request_id === 0
+                            ? ($resource->domain_port_overrides ?? [])
+                            : ($preview?->domain_port_overrides ?? []);
+                        $onlyPort = firstDockerComposeServicePort($service);
+                        if ($shouldGenerateLabelsExactly) {
+                            switch ($server->proxyType()) {
+                                case ProxyTypes::TRAEFIK->value:
+                                    $serviceLabels = $serviceLabels->merge(
+                                        fqdnLabelsForTraefik(
+                                            uuid: $resource->uuid,
+                                            domains: $fqdns,
+                                            serviceLabels: $serviceLabels,
+                                            generate_unique_uuid: $resource->build_pack === 'dockercompose',
+                                            image: data_get($service, 'image'),
+                                            is_force_https_enabled: $resource->isForceHttpsEnabled(),
+                                            is_permanent_redirect_enabled: $resource->isPermanentRedirectEnabled(),
+                                            is_gzip_enabled: $resource->isGzipEnabled(),
+                                            is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                            onlyPort: $onlyPort,
+                                            noindex_domains: $noindexDomains,
+                                            redirect_direction: $redirectDirection,
+                                            domainPortOverrides: $domainPortOverrides,
+                                            certificate_resolver: $server->traefikCertificateResolver(data_get($resource, 'settings.traefik_certificate_resolver')),
+                                        )
+                                    );
+                                    break;
+                                case ProxyTypes::CADDY->value:
+                                    $serviceLabels = $serviceLabels->merge(
+                                        fqdnLabelsForCaddy(
+                                            network: $resource->destination->network,
+                                            uuid: $resource->uuid,
+                                            domains: $fqdns,
+                                            serviceLabels: $serviceLabels,
+                                            image: data_get($service, 'image'),
+                                            service_name: $serviceName,
+                                            is_force_https_enabled: $resource->isForceHttpsEnabled(),
+                                            is_permanent_redirect_enabled: $resource->isPermanentRedirectEnabled(),
+                                            is_gzip_enabled: $resource->isGzipEnabled(),
+                                            is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                            onlyPort: $onlyPort,
+                                            noindex_domains: $noindexDomains,
+                                            redirect_direction: $redirectDirection,
+                                            domainPortOverrides: $domainPortOverrides,
+                                            is_traffic_analytics_enabled: $server?->isTrafficAnalyticsEnabled() ?? false,
+                                            supports_log_append: $server?->caddySupportsLogAppend() ?? false,
+                                        )
+                                    );
+                                    break;
+                            }
+                        } else {
+                            $serviceLabels = $serviceLabels->merge(
+                                fqdnLabelsForTraefik(
+                                    uuid: $resource->uuid,
+                                    domains: $fqdns,
+                                    serviceLabels: $serviceLabels,
+                                    generate_unique_uuid: $resource->build_pack === 'dockercompose',
+                                    image: data_get($service, 'image'),
+                                    is_force_https_enabled: $resource->isForceHttpsEnabled(),
+                                    is_permanent_redirect_enabled: $resource->isPermanentRedirectEnabled(),
+                                    is_gzip_enabled: $resource->isGzipEnabled(),
+                                    is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                    onlyPort: $onlyPort,
+                                    noindex_domains: $noindexDomains,
+                                    redirect_direction: $redirectDirection,
+                                    domainPortOverrides: $domainPortOverrides,
+                                    certificate_resolver: $server->traefikCertificateResolver(data_get($resource, 'settings.traefik_certificate_resolver')),
+                                )
+                            );
+                            $serviceLabels = $serviceLabels->merge(
+                                fqdnLabelsForCaddy(
+                                    network: $resource->destination->network,
+                                    uuid: $resource->uuid,
+                                    domains: $fqdns,
+                                    serviceLabels: $serviceLabels,
+                                    image: data_get($service, 'image'),
+                                    service_name: $serviceName,
+                                    is_force_https_enabled: $resource->isForceHttpsEnabled(),
+                                    is_permanent_redirect_enabled: $resource->isPermanentRedirectEnabled(),
+                                    is_gzip_enabled: $resource->isGzipEnabled(),
+                                    is_stripprefix_enabled: $resource->isStripprefixEnabled(),
+                                    onlyPort: $onlyPort,
+                                    noindex_domains: $noindexDomains,
+                                    redirect_direction: $redirectDirection,
+                                    domainPortOverrides: $domainPortOverrides,
+                                    is_traffic_analytics_enabled: $server?->isTrafficAnalyticsEnabled() ?? false,
+                                    supports_log_append: $server?->caddySupportsLogAppend() ?? false,
+                                )
+                            );
+                        }
                     }
                 }
             }
-            $defaultLabels = defaultLabels($resource->id, $containerName, $pull_request_id, type: 'application');
+
+            $defaultLabels = defaultLabels(
+                uuid: $resource->uuid,
+                name: $containerName,
+                projectName: $resource->project()->name,
+                resourceName: $resource->name,
+                environment: $resource->environment->name,
+                pull_request_id: $pull_request_id,
+                type: 'application'
+            );
             $serviceLabels = $serviceLabels->merge($defaultLabels);
 
-            if ($server->isLogDrainEnabled() && $resource->isLogDrainEnabled()) {
-                data_set($service, 'logging', [
-                    'driver' => 'fluentd',
-                    'options' => [
-                        'fluentd-address' => 'tcp://127.0.0.1:24224',
-                        'fluentd-async' => 'true',
-                        'fluentd-sub-second-precision' => 'true',
-                    ],
-                ]);
+            if ($server->isLogDrainEnabled()) {
+                if ($resource instanceof Application && $resource->isLogDrainEnabled()) {
+                    data_set($service, 'logging', generate_log_drain_configuration($server));
+                }
             }
             if ($serviceLabels->count() > 0) {
                 if ($resource->settings->is_container_label_escape_enabled) {
@@ -2085,12 +4611,15 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             data_set($service, 'container_name', $containerName);
             data_forget($service, 'volumes.*.content');
             data_forget($service, 'volumes.*.isDirectory');
+            data_forget($service, 'volumes.*.is_directory');
+            data_forget($service, 'exclude_from_hc');
+            data_set($service, 'environment', $serviceVariables->toArray());
 
             return $service;
         });
         if ($pull_request_id !== 0) {
             $services->each(function ($service, $serviceName) use ($pull_request_id, $services) {
-                $services[$serviceName."-pr-$pull_request_id"] = $service;
+                $services[addPreviewDeploymentSuffix($serviceName, $pull_request_id)] = $service;
                 data_forget($services, $serviceName);
             });
         }
@@ -2101,498 +4630,2006 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             'configs' => $topLevelConfigs->toArray(),
             'secrets' => $topLevelSecrets->toArray(),
         ];
-        if ($isSameDockerComposeFile) {
-            $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
-            $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
-        } else {
-            $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
-            $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
-        }
+        $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
+        data_forget($resource, 'environment_variables');
+        data_forget($resource, 'environment_variables_preview');
         $resource->save();
 
         return collect($finalServices);
     }
 }
 
-function parseEnvVariable(Str|string $value)
+function generate_fluentd_configuration(): array
 {
-    $value = str($value);
-    $count = substr_count($value->value(), '_');
-    $command = null;
-    $forService = null;
-    $generatedValue = null;
-    $port = null;
-    if ($value->startsWith('SERVICE')) {
-        if ($count === 2) {
-            if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
-                // SERVICE_FQDN_UMAMI
-                $command = $value->after('SERVICE_')->beforeLast('_');
-                $forService = $value->afterLast('_');
-            } else {
-                // SERVICE_BASE64_UMAMI
-                $command = $value->after('SERVICE_')->beforeLast('_');
+    return [
+        'driver' => 'fluentd',
+        'options' => [
+            'fluentd-address' => 'tcp://127.0.0.1:24224',
+            'fluentd-async' => 'true',
+            'fluentd-sub-second-precision' => 'true',
+            // The env vars exist only when the resource includes the Coolify default variables.
+            'env' => 'COOLIFY_APP_NAME,COOLIFY_PROJECT_NAME,COOLIFY_SERVER_IP,COOLIFY_ENVIRONMENT_NAME',
+            // Every Coolify container has these labels. Docker skips a label that a container does not have.
+            'labels' => 'coolify.projectName,coolify.environmentName,coolify.resourceName,coolify.serviceName',
+        ],
+    ];
+}
+
+function generate_log_drain_configuration(Server $server): array
+{
+    if ($server->isFluentBitLogDrainEnabled()) {
+        return generate_fluentd_configuration();
+    }
+
+    $settings = $server->settings;
+    $options = [
+        'awslogs-region' => $settings->logdrain_cloudwatch_region,
+        'awslogs-group' => $settings->logdrain_cloudwatch_group,
+        'awslogs-create-group' => 'true',
+        // Like fluentd-async: a CloudWatch outage or missing credentials must not block or fail the container.
+        'mode' => 'non-blocking',
+        // The stream is named after the container; awslogs-stream is never set because it would override this tag.
+        'tag' => ($settings->logdrain_cloudwatch_stream_prefix ?? '').'{{.Name}}',
+    ];
+
+    return [
+        'driver' => 'awslogs',
+        'options' => collect($options)
+            ->reject(fn ($value) => blank($value))
+            ->all(),
+    ];
+}
+
+function isAssociativeArray($array)
+{
+    if ($array instanceof Collection) {
+        $array = $array->toArray();
+    }
+
+    if (! is_array($array)) {
+        throw new InvalidArgumentException('Input must be an array or a Collection.');
+    }
+
+    if ($array === []) {
+        return false;
+    }
+
+    return array_keys($array) !== range(0, count($array) - 1);
+}
+
+/**
+ * The variables that tell a container where it runs. Values are raw: each caller escapes them
+ * for its output (compose file, .env file, or build arguments). Keys in $definedKeys are
+ * skipped, so a variable that the user defines wins. Pass $server when the container runs on
+ * another server than the main destination (an application on an additional server).
+ *
+ * @param  iterable<int, string>  $definedKeys
+ * @return Collection<string, string>
+ */
+function coolifyDefaultEnvironmentVariables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|Application|Service $resource, iterable $definedKeys = [], ?Server $server = null): Collection
+{
+    // A model created in this request has no column default loaded yet (null), which means on.
+    $isEnabled = $resource instanceof Application
+        ? $resource->settings?->include_coolify_default_variables
+        : $resource->include_coolify_default_variables;
+    if ($isEnabled === false) {
+        return collect();
+    }
+
+    $server ??= $resource instanceof Service ? $resource->server : $resource->destination?->server;
+
+    return collect([
+        'COOLIFY_APP_NAME' => $resource->name,
+        'COOLIFY_PROJECT_NAME' => $resource->project()?->name,
+        'COOLIFY_ENVIRONMENT_NAME' => $resource->environment?->name,
+        'COOLIFY_SERVER_IP' => $server?->ip,
+    ])->whereNotNull()->map(fn ($value) => (string) $value)->except(collect($definedKeys)->all());
+}
+
+function convertToKeyValueCollection($environment)
+{
+    $convertedServiceVariables = collect([]);
+    if (isAssociativeArray($environment)) {
+        // Example: $environment = ['FOO' => 'bar', 'BAZ' => 'qux'];
+        if ($environment instanceof Collection) {
+            $changedEnvironment = collect([]);
+            $environment->each(function ($value, $key) use ($changedEnvironment) {
+                if (is_numeric($key)) {
+                    $parts = explode('=', $value, 2);
+                    if (count($parts) === 2) {
+                        $key = $parts[0];
+                        $realValue = $parts[1] ?? '';
+                        $changedEnvironment->put($key, $realValue);
+                    } elseif (is_string($value) && $value !== '') {
+                        // A bare name (for example a list-style build arg) is the same as `NAME:` without a value.
+                        $changedEnvironment->put($value, $changedEnvironment->get($value));
+                    }
+                } else {
+                    $changedEnvironment->put($key, $value);
+                }
+            });
+
+            return $changedEnvironment;
+        }
+        $convertedServiceVariables = $environment;
+    } else {
+        // Example: $environment = ['FOO=bar', 'BAZ=qux'];
+        foreach ($environment as $value) {
+            if (is_string($value)) {
+                $parts = explode('=', $value, 2);
+                $key = $parts[0];
+                $realValue = $parts[1] ?? '';
+                if ($key) {
+                    $convertedServiceVariables->put($key, $realValue);
+                }
             }
         }
-        if ($count === 3) {
-            if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
-                // SERVICE_FQDN_UMAMI_1000
-                $command = $value->after('SERVICE_')->before('_');
-                $forService = $value->after('SERVICE_')->after('_')->before('_');
-                $port = $value->afterLast('_');
-                if (filter_var($port, FILTER_VALIDATE_INT) === false) {
-                    $port = null;
-                }
-            } else {
-                // SERVICE_BASE64_64_UMAMI
-                $command = $value->after('SERVICE_')->beforeLast('_');
+    }
+
+    return $convertedServiceVariables;
+}
+function instanceSettings()
+{
+    return InstanceSettings::get();
+}
+
+function wireNavigate(): string
+{
+    try {
+        $settings = instanceSettings();
+
+        // Return wire:navigate for SPA navigation with prefetching, or empty string if disabled
+        return ($settings->is_wire_navigate_enabled ?? true) ? 'wire:navigate' : '';
+    } catch (Exception $e) {
+        return 'wire:navigate';
+    }
+}
+
+/**
+ * Registers a resource menu that the main sidebar and the mobile drawer show in place of their main menu
+ * (see components/navbar.blade.php). The menu teleports itself into #main-nav-context-{depth}.
+ * Back on a menu shows the menu one depth lower, and Back at depth 0 shows the main menu.
+ * The main menu then shows a row (labelled with $name) that opens the deepest resource menu again.
+ */
+function registerMainNavContext(int $depth, string $label, string $backTitle, ?string $name = null): void
+{
+    $levels = request()->attributes->get('mainNavContext', []);
+    $levels[$depth] = ['label' => $label, 'backTitle' => $backTitle, 'name' => $name];
+    ksort($levels);
+
+    request()->attributes->set('mainNavContext', $levels);
+}
+
+/**
+ * Flattens a grouped settings sidebar into the items that the command palette
+ * shows for the current page: every page, its child pages, and its in-page sections.
+ *
+ * @param  iterable<string, iterable<array{label: string, route: string, navigate?: bool, visible?: bool, children?: array<int, array{label: string, route: string, navigate?: bool, visible?: bool}>}>>  $groupedItems
+ * @param  array<string, string>  $routeParameters
+ * @param  array<string, array<int, array{id: string, label: string}>>  $pageSections  In-page sections keyed by page route
+ * @return array<int, array{label: string, breadcrumb: string, search_text: string, href: string, navigate: bool}>
+ */
+function settingsSearchItems(iterable $groupedItems, array $routeParameters, array $pageSections = []): array
+{
+    $spaNavigation = wireNavigate() !== '';
+    $items = [];
+    $add = function (string $label, string $breadcrumb, string $href, bool $navigate) use (&$items, $spaNavigation): void {
+        $items[] = [
+            'label' => $label,
+            'breadcrumb' => $breadcrumb,
+            'search_text' => $label.' '.$breadcrumb,
+            'href' => $href,
+            'navigate' => $navigate && $spaNavigation,
+        ];
+    };
+
+    foreach ($groupedItems as $groupLabel => $groupItems) {
+        foreach ($groupItems as $item) {
+            if ($item['disabled'] ?? false) {
+                continue;
             }
+
+            $href = route($item['route'], $routeParameters);
+            $add($item['label'], $groupLabel, $href, $item['navigate'] ?? true);
+
+            foreach ($item['children'] ?? [] as $child) {
+                if ($child['visible'] ?? true) {
+                    $add($child['label'], $groupLabel.' · '.$item['label'], route($child['route'], $routeParameters), $child['navigate'] ?? true);
+                }
+            }
+
+            foreach ($pageSections[$item['route']] ?? [] as $section) {
+                $add($section['label'], $groupLabel.' · '.$item['label'], $href.'#'.$section['id'], true);
+            }
+        }
+    }
+
+    return $items;
+}
+
+/**
+ * Redirect to a named route with SPA navigation support.
+ * Automatically uses wire:navigate when is_wire_navigate_enabled is true.
+ */
+function redirectRoute(Component $component, string $name, array $parameters = []): mixed
+{
+    $navigate = true;
+
+    try {
+        $navigate = instanceSettings()->is_wire_navigate_enabled ?? true;
+    } catch (Exception $e) {
+        $navigate = true;
+    }
+
+    return $component->redirectRoute($name, $parameters, navigate: $navigate);
+}
+
+function coolifyRegistryUrl(): string
+{
+    try {
+        return instanceSettings()->docker_registry_url ?: 'docker.io';
+    } catch (Throwable) {
+        return config('constants.coolify.registry_url', 'docker.io');
+    }
+}
+
+function coolifyHelperImage(): string
+{
+    $configuredHelperImage = config('constants.coolify.helper_image');
+    $configuredDefaultHelperImage = config('constants.coolify.registry_url', 'docker.io').'/coollabsio/coolify-helper';
+
+    if ($configuredHelperImage !== $configuredDefaultHelperImage) {
+        return $configuredHelperImage;
+    }
+
+    return coolifyRegistryUrl().'/coollabsio/coolify-helper';
+}
+
+function getHelperVersion(): string
+{
+    $configuredHelperVersion = config('constants.coolify.helper_version');
+
+    if (isDev()) {
+        $devHelperVersion = InstanceSettings::query()->whereKey(0)->value('dev_helper_version');
+
+        if (! empty($devHelperVersion)) {
+            return $devHelperVersion;
+        }
+    }
+
+    $fetchedHelperVersion = InstanceSettings::query()->whereKey(0)->value('helper_version');
+
+    if (! empty($fetchedHelperVersion) && version_compare($fetchedHelperVersion, $configuredHelperVersion, '>')) {
+        return $fetchedHelperVersion;
+    }
+
+    return $configuredHelperVersion;
+}
+
+function loggy($message = null, array $context = [])
+{
+    if (! isDev()) {
+        return;
+    }
+    if (is_null($message)) {
+        return app('log');
+    }
+
+    return app('log')->debug($message, $context);
+}
+/**
+ * Warn when any domain uses HTTPS with an sslip hostname.
+ *
+ * Empty/null domain lists are valid (domains removed) and produce no warning.
+ */
+function sslipDomainWarning(?string $domains): bool
+{
+    if (blank($domains)) {
+        return false;
+    }
+
+    $domains = str($domains)->trim()->explode(',');
+    $showSslipHttpsWarning = false;
+    $domains->each(function ($domain) use (&$showSslipHttpsWarning) {
+        if (str($domain)->contains('https') && str($domain)->contains('sslip')) {
+            $showSslipHttpsWarning = true;
+        }
+    });
+
+    return $showSslipHttpsWarning;
+}
+
+function isEmailRateLimited(string $limiterKey, int $decaySeconds = 3600, ?callable $callbackOnSuccess = null): bool
+{
+    if (isDev()) {
+        $decaySeconds = 120;
+    }
+    $rateLimited = false;
+    $executed = RateLimiter::attempt(
+        $limiterKey,
+        $maxAttempts = 0,
+        function () use (&$rateLimited, &$limiterKey, $callbackOnSuccess) {
+            isDev() && loggy('Rate limit not reached for '.$limiterKey);
+            $rateLimited = false;
+
+            if ($callbackOnSuccess) {
+                $callbackOnSuccess();
+            }
+        },
+        $decaySeconds,
+    );
+    if (! $executed) {
+        isDev() && loggy('Rate limit reached for '.$limiterKey.'. Rate limiter will be disabled for '.$decaySeconds.' seconds.');
+        $rateLimited = true;
+    }
+
+    return $rateLimited;
+}
+
+function defaultNginxConfiguration(string $type = 'static'): string
+{
+    if ($type === 'spa') {
+        return <<<'NGINX'
+server {
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Handle 404 errors
+    error_page 404 /404.html;
+    location = /404.html {
+        root /usr/share/nginx/html;
+        internal;
+    }
+
+    # Handle server errors (50x)
+    error_page 500 502 503 504 /50x.html;
+    location = /50x.html {
+        root /usr/share/nginx/html;
+        internal;
+    }
+}
+NGINX;
+    } else {
+        return <<<'NGINX'
+server {
+    location / {
+        root /usr/share/nginx/html;
+        index index.html index.htm;
+        try_files $uri $uri.html $uri/index.html $uri/index.htm $uri/ =404;
+    }
+
+    # Handle 404 errors
+    error_page 404 /404.html;
+    location = /404.html {
+        root /usr/share/nginx/html;
+        internal;
+    }
+
+    # Handle server errors (50x)
+    error_page 500 502 503 504 /50x.html;
+    location = /50x.html {
+        root /usr/share/nginx/html;
+        internal;
+    }
+}
+NGINX;
+    }
+}
+
+/**
+ * Parse an scp-style SSH Git URL (`user@host:path` or `user@host:port/path`).
+ *
+ * @return array{user: string, host: string, port: ?string, path: string}|null
+ */
+function parseScpStyleGitUrl(?string $gitRepository): ?array
+{
+    if (! is_string($gitRepository) || $gitRepository === '') {
+        return null;
+    }
+
+    if (preg_match('/^(?<user>[A-Za-z0-9._-]+)@(?<host>\[[0-9A-Fa-f:.]+\]|[^:\[\]]+):(?:(?<port>\d+)\/)?(?<path>.+)$/', $gitRepository, $matches) !== 1) {
+        return null;
+    }
+
+    $host = trim($matches['host']);
+    $path = ltrim($matches['path'], '/');
+
+    if ($host === '' || $path === '') {
+        return null;
+    }
+
+    return [
+        'user' => $matches['user'],
+        'host' => $host,
+        'port' => ($matches['port'] ?? '') === '' ? null : $matches['port'],
+        'path' => $path,
+    ];
+}
+
+function sshGitUrlToHttps(?string $gitRepository): ?string
+{
+    if (is_string($gitRepository) && str_starts_with($gitRepository, 'ssh://')) {
+        $host = parse_url($gitRepository, PHP_URL_HOST);
+        $path = ltrim((string) parse_url($gitRepository, PHP_URL_PATH), '/');
+
+        return filled($host) && $path !== '' ? "https://{$host}/{$path}" : null;
+    }
+
+    $parts = parseScpStyleGitUrl($gitRepository);
+
+    if ($parts === null) {
+        return null;
+    }
+
+    return 'https://'.$parts['host'].'/'.$parts['path'];
+}
+
+function gitRepositorySlug(?string $gitRepository): string
+{
+    if (! is_string($gitRepository) || $gitRepository === '') {
+        return '';
+    }
+
+    if (($httpsRepository = sshGitUrlToHttps($gitRepository)) !== null) {
+        $gitRepository = (string) parse_url($httpsRepository, PHP_URL_PATH);
+    } elseif (str($gitRepository)->startsWith('http') || str($gitRepository)->contains('github.com')) {
+        $gitRepository = str($gitRepository)->replace('https://', '')->replace('http://', '')->replace('github.com/', '');
+    }
+
+    return str($gitRepository)->trim('/')->replaceEnd('.git', '')->toString();
+}
+
+function convertGitUrl(string $gitRepository, string $deploymentType, GithubApp|GitlabApp|GiteaApp|null $source = null): array
+{
+    $repository = $gitRepository;
+    $providerInfo = [
+        'host' => null,
+        'user' => 'git',
+        'port' => 22,
+        'repository' => $gitRepository,
+    ];
+    $sshMatches = [];
+
+    // Let's try and parse the string to detect if it's a valid SSH string or not
+    preg_match('/((.*?)\:\/\/)?(.*@.*:.*)/', $gitRepository, $sshMatches);
+
+    if ($deploymentType === 'deploy_key' && empty($sshMatches) && $source) {
+        // If this happens, the user may have provided an HTTP URL when they needed an SSH one
+        // Let's try and fix that for known Git providers
+        switch ($source->getMorphClass()) {
+            case GithubApp::class:
+            case GitlabApp::class:
+            case GiteaApp::class:
+                $providerInfo['host'] = Url::fromString($source->html_url)->getHost();
+                $providerInfo['port'] = $source->custom_port;
+                $providerInfo['user'] = $source->custom_user;
+                break;
+        }
+        if (! empty($providerInfo['host'])) {
+            // Until we do not support more providers with App (like GithubApp), this will be always true, port will be 22
+            if ($providerInfo['port'] === 22) {
+                $repository = "{$providerInfo['user']}@{$providerInfo['host']}:{$providerInfo['repository']}";
+            } else {
+                $repository = "ssh://{$providerInfo['user']}@{$providerInfo['host']}:{$providerInfo['port']}/{$providerInfo['repository']}";
+            }
+        }
+    }
+
+    $normalizedRepository = $repository;
+
+    if (str($normalizedRepository)->contains('://')) {
+        $parsedRepository = parse_url($normalizedRepository);
+
+        if ($parsedRepository !== false && array_key_exists('port', $parsedRepository)) {
+            $providerInfo['port'] = (string) $parsedRepository['port'];
+        }
+    } else {
+        $scp = parseScpStyleGitUrl($normalizedRepository);
+
+        if ($scp !== null && $scp['port'] !== null) {
+            $providerInfo['port'] = $scp['port'];
+            $repository = "{$scp['user']}@{$scp['host']}:{$scp['path']}";
         }
     }
 
     return [
-        'command' => $command,
-        'forService' => $forService,
-        'generatedValue' => $generatedValue,
-        'port' => $port,
+        'repository' => $repository,
+        'port' => $providerInfo['port'],
     ];
 }
-function generateEnvValue(string $command, ?Service $service = null)
+
+function getJobStatus(?string $jobId = null)
 {
-    switch ($command) {
-        case 'PASSWORD':
-            $generatedValue = Str::password(symbols: false);
-            break;
-        case 'PASSWORD_64':
-            $generatedValue = Str::password(length: 64, symbols: false);
-            break;
-            // This is not base64, it's just a random string
-        case 'BASE64_64':
-            $generatedValue = Str::random(64);
-            break;
-        case 'BASE64_128':
-            $generatedValue = Str::random(128);
-            break;
-        case 'BASE64':
-        case 'BASE64_32':
-            $generatedValue = Str::random(32);
-            break;
-            // This is base64,
-        case 'REALBASE64_64':
-            $generatedValue = base64_encode(Str::random(64));
-            break;
-        case 'REALBASE64_128':
-            $generatedValue = base64_encode(Str::random(128));
-            break;
-        case 'REALBASE64':
-        case 'REALBASE64_32':
-            $generatedValue = base64_encode(Str::random(32));
-            break;
-        case 'USER':
-            $generatedValue = Str::random(16);
-            break;
-        case 'SUPABASEANON':
-            $signingKey = $service->environment_variables()->where('key', 'SERVICE_PASSWORD_JWT')->first();
-            if (is_null($signingKey)) {
-                return;
-            } else {
-                $signingKey = $signingKey->value;
-            }
-            $key = InMemory::plainText($signingKey);
-            $algorithm = new Sha256;
-            $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
-            $now = new DateTimeImmutable;
-            $now = $now->setTime($now->format('H'), $now->format('i'));
-            $token = $tokenBuilder
-                ->issuedBy('supabase')
-                ->issuedAt($now)
-                ->expiresAt($now->modify('+100 year'))
-                ->withClaim('role', 'anon')
-                ->getToken($algorithm, $key);
-            $generatedValue = $token->toString();
-            break;
-        case 'SUPABASESERVICE':
-            $signingKey = $service->environment_variables()->where('key', 'SERVICE_PASSWORD_JWT')->first();
-            if (is_null($signingKey)) {
-                return;
-            } else {
-                $signingKey = $signingKey->value;
-            }
-            $key = InMemory::plainText($signingKey);
-            $algorithm = new Sha256;
-            $tokenBuilder = (new Builder(new JoseEncoder, ChainedFormatter::default()));
-            $now = new DateTimeImmutable;
-            $now = $now->setTime($now->format('H'), $now->format('i'));
-            $token = $tokenBuilder
-                ->issuedBy('supabase')
-                ->issuedAt($now)
-                ->expiresAt($now->modify('+100 year'))
-                ->withClaim('role', 'service_role')
-                ->getToken($algorithm, $key);
-            $generatedValue = $token->toString();
-            break;
-        default:
-            $generatedValue = Str::random(16);
-            break;
+    if (blank($jobId)) {
+        return 'unknown';
+    }
+    $jobFound = app(JobRepository::class)->getJobs([$jobId]);
+    if ($jobFound->isEmpty()) {
+        return 'unknown';
     }
 
-    return $generatedValue;
+    return $jobFound->first()->status;
 }
 
-function getRealtime()
+/**
+ * Find the HEALTHCHECK instruction that applies to the image built from the Dockerfile.
+ *
+ * Docker builds the target stage, or the last stage when no target is set. A stage keeps the
+ * HEALTHCHECK of an earlier stage that it starts FROM, and the last HEALTHCHECK of a stage wins.
+ * Returns null when no HEALTHCHECK applies or when it is HEALTHCHECK NONE.
+ */
+function dockerfileHealthcheckInstruction(?string $dockerfile, ?string $target = null): ?string
 {
-    $envDefined = env('PUSHER_PORT');
-    if (empty($envDefined)) {
-        $url = Url::fromString(Request::getSchemeAndHttpHost());
-        $port = $url->getPort();
-        if ($port) {
-            return '6001';
+    $dockerfile = (string) $dockerfile;
+    // The "# escape=`" parser directive (Windows Dockerfiles) is valid only in the comment lines at the top of the file.
+    $escape = preg_match('/\A(?:[ \t]*#[ \t]*[a-z]+[ \t]*=[^\r\n]*\R)*?[ \t]*#[ \t]*escape[ \t]*=[ \t]*([\\\\`])[ \t]*$/im', $dockerfile, $directive)
+        ? $directive[1]
+        : '\\';
+    $instructions = [];
+    $current = '';
+    foreach (preg_split('/\R/', $dockerfile) as $line) {
+        $line = trim($line);
+        if ($line === '' || str_starts_with($line, '#')) {
+            continue;
+        }
+        $continues = str_ends_with($line, $escape);
+        $current = trim($current.' '.($continues ? substr($line, 0, -1) : $line));
+        if (! $continues) {
+            $instructions[] = $current;
+            $current = '';
+        }
+    }
+    if ($current !== '') {
+        $instructions[] = $current;
+    }
+
+    /** @var array<int, array{name: ?string, parent: string, healthcheck: ?string}> $stages */
+    $stages = [];
+    foreach ($instructions as $instruction) {
+        if (preg_match('/^FROM\s+(?:--\S+\s+)*(\S+)(?:\s+AS\s+(\S+))?/i', $instruction, $matches)) {
+            $stages[] = [
+                'name' => isset($matches[2]) ? strtolower($matches[2]) : null,
+                'parent' => strtolower($matches[1]),
+                'healthcheck' => null,
+            ];
+        } elseif ($stages !== [] && preg_match('/^HEALTHCHECK(\s|$)/i', $instruction)) {
+            $stages[array_key_last($stages)]['healthcheck'] = $instruction;
+        }
+    }
+    if ($stages === []) {
+        return null;
+    }
+
+    $target = filled($target) ? strtolower(trim($target)) : null;
+    $index = $target === null ? array_key_last($stages) : null;
+    foreach ($stages as $i => $stage) {
+        if ($target !== null && $stage['name'] === $target) {
+            $index = $i;
+        }
+    }
+
+    while ($index !== null) {
+        $stage = $stages[$index];
+        if ($stage['healthcheck'] !== null) {
+            return preg_match('/^HEALTHCHECK(?:\s+--\S+)*\s+NONE$/i', $stage['healthcheck']) ? null : $stage['healthcheck'];
+        }
+        $parentIndex = null;
+        foreach ($stages as $i => $candidate) {
+            if ($i < $index && $candidate['name'] === $stage['parent']) {
+                $parentIndex = $i;
+            }
+        }
+        $index = $parentIndex;
+    }
+
+    return null;
+}
+
+/**
+ * Read the options of a HEALTHCHECK instruction like Docker does: only the --name=value flags before CMD count.
+ * An option is null when it is missing or not valid. Docker uses its default for a zero interval, timeout, or retries
+ * (30s, 30s, 3), so those are returned instead of 0.
+ *
+ * @return array{interval: ?int, timeout: ?int, start_period: ?int, retries: ?int}
+ */
+function dockerfileHealthcheckOptions(string $instruction): array
+{
+    preg_match('/^HEALTHCHECK((?:\s+--[a-z-]+=(?:"[^"]*"|\'[^\']*\'|\S+))*)/i', $instruction, $flagsPart);
+    preg_match_all('/--([a-z-]+)=("[^"]*"|\'[^\']*\'|\S+)/i', $flagsPart[1] ?? '', $flags, PREG_SET_ORDER);
+    $values = [];
+    foreach ($flags as [, $name, $value]) {
+        $values[$name] = preg_replace('/^(["\'])(.*)\1$/', '$2', $value);
+    }
+
+    $interval = parseDockerfileInterval($values['interval'] ?? '');
+    $timeout = parseDockerfileInterval($values['timeout'] ?? '');
+    $retries = preg_match('/^\+?\d{1,9}$/', $values['retries'] ?? '') ? (int) $values['retries'] : null;
+
+    return [
+        'interval' => $interval === 0 ? 30 : $interval,
+        'timeout' => $timeout === 0 ? 30 : $timeout,
+        'start_period' => parseDockerfileInterval($values['start-period'] ?? ''),
+        'retries' => $retries === 0 ? 3 : $retries,
+    ];
+}
+
+/**
+ * Convert a Dockerfile HEALTHCHECK duration (Go duration syntax, for example "1m30s" or "1.5m") to whole seconds.
+ * A value without a unit is read as seconds. A positive value below one second becomes 1, so it does not read as zero.
+ * Returns null when the value is not a valid duration or does not fit the integer column.
+ */
+function parseDockerfileInterval(string $duration): ?int
+{
+    if (str_starts_with($duration, '+')) {
+        $duration = substr($duration, 1);
+    }
+    if (preg_match('/^\d+$/', $duration)) {
+        return (int) $duration <= 2147483647 ? (int) $duration : null;
+    }
+
+    $unitSeconds = ['ns' => 1e-9, 'us' => 1e-6, 'µs' => 1e-6, 'μs' => 1e-6, 'ms' => 1e-3, 's' => 1, 'm' => 60, 'h' => 3600];
+    preg_match_all('/(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|μs|ms|s|m|h)/u', $duration, $parts, PREG_SET_ORDER);
+    if ($parts === [] || implode('', array_column($parts, 0)) !== $duration) {
+        return null;
+    }
+
+    $seconds = 0.0;
+    foreach ($parts as [, $value, $unit]) {
+        $seconds += (float) $value * $unitSeconds[$unit];
+    }
+    if ($seconds > 0 && $seconds < 1) {
+        return 1;
+    }
+
+    // Round away float noise (0.3m = 17.999...s), then drop the fraction: the columns store whole seconds.
+    $seconds = floor(round($seconds, 6));
+
+    return $seconds <= 2147483647 ? (int) $seconds : null;
+}
+
+function addPreviewDeploymentSuffix(string $name, int $pull_request_id = 0): string
+{
+    return ($pull_request_id === 0) ? $name : $name.'-pr-'.$pull_request_id;
+}
+
+function generateDockerComposeServiceName(mixed $services, int $pullRequestId = 0): Collection
+{
+    $collection = collect([]);
+    foreach ($services as $serviceName => $_) {
+        $collection->put('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper(), addPreviewDeploymentSuffix($serviceName, $pullRequestId));
+    }
+
+    return $collection;
+}
+
+function formatBytes(?int $bytes, int $precision = 2): string
+{
+    if ($bytes === null || $bytes === 0) {
+        return '0 B';
+    }
+
+    // Handle negative numbers
+    if ($bytes < 0) {
+        return '0 B';
+    }
+
+    $units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+    $base = 1024;
+    $exponent = floor(log($bytes) / log($base));
+    $exponent = min($exponent, count($units) - 1);
+
+    $value = $bytes / pow($base, $exponent);
+
+    return round($value, $precision).' '.$units[$exponent];
+}
+
+/**
+ * Compact human-readable count (e.g. 26_360 -> "26.36K", 1_200_000 -> "1.2M").
+ * Trailing zeros are trimmed so round values read cleanly ("1K", not "1.00K").
+ * Used for the dense metric columns in the traffic-analytics lists.
+ */
+function compactNumber(?int $n): string
+{
+    $n = (int) $n;
+
+    if ($n < 1000) {
+        return (string) $n;
+    }
+
+    [$divisor, $suffix] = match (true) {
+        $n >= 1_000_000_000 => [1_000_000_000, 'B'],
+        $n >= 1_000_000 => [1_000_000, 'M'],
+        default => [1000, 'K'],
+    };
+
+    return rtrim(rtrim(number_format($n / $divisor, 2, '.', ''), '0'), '.').$suffix;
+}
+
+/**
+ * Compact response time for the traffic-analytics latency figures
+ * (e.g. 85.4 -> "85.4 ms", 2_450 -> "2.5 s", 312_000 -> "5.2 min").
+ */
+function formatLatency(float|int|null $ms): string
+{
+    $ms = (float) $ms;
+
+    return match (true) {
+        $ms >= 60_000 => number_format($ms / 60_000, 1).' min',
+        $ms >= 1000 => number_format($ms / 1000, 1).' s',
+        default => number_format($ms, 1).' ms',
+    };
+}
+
+/**
+ * Validates that a file path is safely within the /tmp/ directory.
+ * Protects against unsafe parent directory paths by resolving the real path
+ * and verifying it stays within /tmp/.
+ *
+ * Note: On macOS, /tmp is often a symlink to /private/tmp, which is handled.
+ */
+function isSafeTmpPath(?string $path): bool
+{
+    if (blank($path)) {
+        return false;
+    }
+
+    // URL decode to catch encoded traversal attempts
+    $decodedPath = urldecode($path);
+
+    // Minimum length check - /tmp/x is 6 chars
+    if (strlen($decodedPath) < 6) {
+        return false;
+    }
+
+    // Must start with /tmp/
+    if (! str($decodedPath)->startsWith('/tmp/')) {
+        return false;
+    }
+
+    // Quick check for obvious traversal attempts
+    if (str($decodedPath)->contains('..')) {
+        return false;
+    }
+
+    // Check for null bytes (directory traversal technique)
+    if (str($decodedPath)->contains("\0")) {
+        return false;
+    }
+
+    // Remove any trailing slashes for consistent validation
+    $normalizedPath = rtrim($decodedPath, '/');
+
+    // Normalize the path by removing redundant separators and resolving . and ..
+    // We'll do this manually since realpath() requires the path to exist
+    $parts = explode('/', $normalizedPath);
+    $resolvedParts = [];
+
+    foreach ($parts as $part) {
+        if ($part === '' || $part === '.') {
+            // Skip empty parts (from //) and current directory references
+            continue;
+        } elseif ($part === '..') {
+            // Parent directory - this should have been caught earlier but double-check
+            return false;
         } else {
+            $resolvedParts[] = $part;
+        }
+    }
+
+    $resolvedPath = '/'.implode('/', $resolvedParts);
+
+    // Final check: resolved path must start with /tmp/
+    // And must have at least one component after /tmp/
+    if (! str($resolvedPath)->startsWith('/tmp/') || $resolvedPath === '/tmp') {
+        return false;
+    }
+
+    // Resolve the canonical /tmp path (handles symlinks like /tmp -> /private/tmp on macOS)
+    $canonicalTmpPath = realpath('/tmp');
+    if ($canonicalTmpPath === false) {
+        // If /tmp doesn't exist, something is very wrong, but allow non-existing paths
+        $canonicalTmpPath = '/tmp';
+    }
+
+    // Calculate dirname once to avoid redundant calls
+    $dirPath = dirname($resolvedPath);
+
+    // If the directory exists, resolve it via realpath to catch symlink attacks
+    if (is_dir($dirPath)) {
+        // For existing paths, resolve to absolute path to catch symlinks
+        $realDir = realpath($dirPath);
+        if ($realDir === false) {
+            return false;
+        }
+
+        // Check if the real directory is within /tmp (or its canonical path)
+        if (! str($realDir)->startsWith('/tmp') && ! str($realDir)->startsWith($canonicalTmpPath)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Transform colon-delimited status format to human-readable parentheses format.
+ *
+ * Handles Docker container status formats with optional health check status and exclusion modifiers.
+ *
+ * Examples:
+ * - running:healthy → Running (healthy)
+ * - running:unhealthy:excluded → Running (unhealthy, excluded)
+ * - exited:excluded → Exited (excluded)
+ * - Proxy:running → Proxy:running (preserved as-is for headline formatting)
+ * - running → Running
+ *
+ * @param  string  $status  The status string to format
+ * @return string The formatted status string
+ */
+function formatContainerStatus(string $status): string
+{
+    // Preserve Proxy statuses as-is (they follow different format)
+    if (str($status)->startsWith('Proxy')) {
+        return str($status)->headline()->value();
+    }
+
+    // Check for :excluded suffix
+    $isExcluded = str($status)->endsWith(':excluded');
+    $parts = explode(':', $status);
+
+    if ($isExcluded) {
+        if (count($parts) === 3) {
+            // Has health status: running:unhealthy:excluded → Running (unhealthy, excluded)
+            return str($parts[0])->headline().' ('.$parts[1].', excluded)';
+        } else {
+            // No health status: exited:excluded → Exited (excluded)
+            return str($parts[0])->headline().' (excluded)';
+        }
+    } elseif (count($parts) >= 2) {
+        // Regular colon format: running:healthy → Running (healthy)
+        return str($parts[0])->headline().' ('.$parts[1].')';
+    } else {
+        // Simple status: running → Running
+        return str($status)->headline()->value();
+    }
+}
+
+/**
+ * Check if the password step of a destructive action should be skipped.
+ * Returns true if:
+ * - Two-step confirmation is globally disabled
+ * - User has a linked OAuth identity (they only use the dialog's typed confirmation)
+ * - User has no password (no way to confirm)
+ * - User confirmed their password recently (`auth.password_confirmed_at`
+ *   within `auth.password_timeout`)
+ *
+ * Used by modal-confirmation.blade.php to determine if password step should be shown,
+ * and by verifyPasswordConfirmation() to enforce the same rule on the server.
+ *
+ * @return bool True if password confirmation should be skipped
+ */
+function shouldSkipPasswordConfirmation(): bool
+{
+    // Skip if two-step confirmation is globally disabled
+    if (data_get(InstanceSettings::get(), 'disable_two_step_confirmation')) {
+        return true;
+    }
+
+    if (! Auth::user()?->requiresPasswordConfirmation()) {
+        return true;
+    }
+
+    return hasRecentPasswordConfirmation();
+}
+
+/**
+ * Whether the session holds a password confirmation within `auth.password_timeout`.
+ */
+function hasRecentPasswordConfirmation(): bool
+{
+    $confirmedAt = session('auth.password_confirmed_at');
+    if (! is_numeric($confirmedAt)) {
+        return false;
+    }
+
+    return (time() - (int) $confirmedAt) < (int) config('auth.password_timeout', 10800);
+}
+
+/**
+ * Verify password for two-step confirmation.
+ * Skips verification in the cases listed in shouldSkipPasswordConfirmation().
+ *
+ * @param  mixed  $password  The password to verify (may be array if skipped by frontend)
+ * @param  Component|null  $component  Optional Livewire component to add errors to
+ * @return bool True if verification passed (or skipped), false if password is incorrect
+ */
+function verifyPasswordConfirmation(mixed $password, ?Component $component = null): bool
+{
+    // Skip if password confirmation should be skipped
+    if (shouldSkipPasswordConfirmation()) {
+        return true;
+    }
+
+    // Verify the password
+    if (! is_string($password) || ! Hash::check($password, Auth::user()->password)) {
+        $component?->addError('password', 'The provided password is incorrect.');
+
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Extract hard-coded environment variables from docker-compose YAML.
+ *
+ * @param  string  $dockerComposeRaw  Raw YAML content
+ * @return Collection Collection of arrays with: key, value, comment, service_name
+ */
+function extractHardcodedEnvironmentVariables(string $dockerComposeRaw): Collection
+{
+    if (blank($dockerComposeRaw)) {
+        return collect([]);
+    }
+
+    try {
+        $yaml = parseDockerComposeYaml($dockerComposeRaw);
+    } catch (Exception $e) {
+        // Malformed YAML - return empty collection
+        return collect([]);
+    }
+
+    $services = data_get($yaml, 'services', []);
+    if (empty($services)) {
+        return collect([]);
+    }
+
+    // Extract inline comments from raw YAML
+    $envComments = extractYamlEnvironmentComments($dockerComposeRaw);
+
+    $hardcodedVars = collect([]);
+
+    foreach ($services as $serviceName => $service) {
+        $environment = collect(data_get($service, 'environment', []));
+
+        if ($environment->isEmpty()) {
+            continue;
+        }
+
+        $passthroughKeys = extractDockerComposePassthroughKeys($environment);
+
+        // Convert environment variables to key-value format
+        $environment = convertToKeyValueCollection($environment);
+
+        foreach ($environment as $key => $value) {
+            $hardcodedVars->push([
+                'key' => $key,
+                'value' => $value,
+                'comment' => $envComments[$key] ?? null,
+                'service_name' => $serviceName,
+                'is_passthrough' => $passthroughKeys->contains($key),
+            ]);
+        }
+    }
+
+    return $hardcodedVars;
+}
+
+/** @return Collection<int, string> */
+function extractDockerComposePassthroughKeys(mixed $environment): Collection
+{
+    return collect($environment)
+        ->map(function (mixed $value, mixed $key): ?string {
+            if (is_numeric($key)) {
+                return is_string($value) && ! str_contains($value, '=') ? $value : null;
+            }
+
+            return $value === null ? (string) $key : null;
+        })
+        ->filter()
+        ->unique()
+        ->values();
+}
+
+/** @return Collection<int, string> */
+function extractDockerComposeEnvironmentVariableReferences(mixed $value): Collection
+{
+    if (! is_string($value) || ! str_contains($value, '$')) {
+        return collect();
+    }
+
+    preg_match_all('/(?<!\$)\$\{([A-Za-z_][A-Za-z0-9_]*)/', $value, $bracedMatches);
+    preg_match_all('/(?<!\$)\$(?!\{)([A-Za-z_][A-Za-z0-9_]*)/', $value, $bareMatches);
+
+    return collect([...$bracedMatches[1], ...$bareMatches[1]])
+        ->unique()
+        ->values();
+}
+
+/** @return array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
+function dockerComposeEnvironmentVariableInfo(?string $dockerCompose, string $key): ?array
+{
+    if (blank($dockerCompose)) {
+        return null;
+    }
+
+    $services = [];
+    $default = null;
+    $operator = null;
+    $required = false;
+
+    foreach (extractHardcodedEnvironmentVariables($dockerCompose) as $assignment) {
+        $value = $assignment['value'] ?? null;
+        $isPassthrough = ($assignment['is_passthrough'] ?? false) && $assignment['key'] === $key;
+        if (! $isPassthrough && ! extractDockerComposeEnvironmentVariableReferences($value)->contains($key)) {
+            continue;
+        }
+
+        if (filled($assignment['service_name'] ?? null)) {
+            $services[] = $assignment['service_name'];
+        }
+
+        if (is_string($value)) {
+            $offset = 0;
+            while (($referenceStart = strpos($value, '${', $offset)) !== false) {
+                if ($referenceStart > 0 && $value[$referenceStart - 1] === '$') {
+                    $offset = $referenceStart + 2;
+
+                    continue;
+                }
+
+                $balancedReference = extractBalancedBraceContent(substr($value, $referenceStart));
+                if ($balancedReference === null) {
+                    break;
+                }
+
+                $splitReference = splitOnOperatorOutsideNested($balancedReference['content']);
+                if ($splitReference !== null && $splitReference['variable'] === $key) {
+                    $matchedOperator = $splitReference['operator'];
+                    $operator ??= $matchedOperator;
+                    if (str_contains($matchedOperator, '-')) {
+                        $default ??= $splitReference['default'];
+                    }
+                    $required = $required || str_contains($matchedOperator, '?');
+                }
+
+                $offset = $referenceStart + 2;
+            }
+        }
+    }
+
+    if ($services === []) {
+        return null;
+    }
+
+    return [
+        'services' => array_values(array_unique($services)),
+        'default' => $default,
+        'operator' => $operator,
+        'required' => $required,
+    ];
+}
+
+/**
+ * Docker Compose gives a bare $VAR or ${VAR} reference no default, and the service parser does not store
+ * defaults. So `/$POSTGRES_DB` next to `${POSTGRES_DB:-umami}` in another service resolves to an empty value.
+ * For new variables, store the default when the Compose file has a bare reference and exactly one default.
+ *
+ * @param  Collection<int, string>  $existingKeys
+ */
+function fillDockerComposeDefaultsForBareReferences(Service $resource, Collection $existingKeys): void
+{
+    $dockerCompose = $resource->docker_compose_raw;
+    if (blank($dockerCompose)) {
+        return;
+    }
+
+    $resource->environment_variables()
+        ->whereNull('value')
+        ->whereNotIn('key', $existingKeys)
+        ->get()
+        ->each(function (EnvironmentVariable $environmentVariable) use ($dockerCompose): void {
+            $default = dockerComposeBareReferenceDefault($dockerCompose, $environmentVariable->key);
+            // A nested default (`${A:-${B}}`) must stay with Compose: stored, it would be escaped to a literal.
+            if (filled($default) && ! str_contains($default, '$')) {
+                $environmentVariable->update(['value' => $default]);
+            }
+        });
+}
+
+/** The single default of a variable that the Compose file also references without a default, otherwise null. */
+function dockerComposeBareReferenceDefault(string $dockerCompose, string $key): ?string
+{
+    $quotedKey = preg_quote($key, '/');
+    if (preg_match('/(?<!\$)\$(?:'.$quotedKey.'(?![A-Za-z0-9_])|\{'.$quotedKey.'\})/', $dockerCompose) !== 1) {
+        return null;
+    }
+
+    $defaults = [];
+    $offset = 0;
+    while (($referenceStart = strpos($dockerCompose, '${'.$key, $offset)) !== false) {
+        $offset = $referenceStart + 2;
+        if ($referenceStart > 0 && $dockerCompose[$referenceStart - 1] === '$') {
+            continue;
+        }
+
+        $reference = extractBalancedBraceContent(substr($dockerCompose, $referenceStart));
+        $split = $reference === null ? null : splitOnOperatorOutsideNested($reference['content']);
+        if ($split === null || $split['variable'] !== $key) {
+            continue;
+        }
+        if (str_contains($split['operator'], '?')) {
             return null;
         }
-    } else {
-        return $envDefined;
+        $defaults[$split['default']] = true;
     }
+
+    return count($defaults) === 1 ? (string) array_key_first($defaults) : null;
 }
 
-function validate_dns_entry(string $fqdn, Server $server)
+function dockerComposeEnvironmentVariableIsRequired(?string $dockerCompose, string $key): bool
 {
-    // https://www.cloudflare.com/ips-v4/#
-    $cloudflare_ips = collect(['173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13', '172.64.0.0/13', '131.0.72.0/22']);
+    if (blank($dockerCompose)) {
+        return false;
+    }
 
-    $url = Url::fromString($fqdn);
-    $host = $url->getHost();
-    if (str($host)->contains('sslip.io')) {
+    $key = preg_quote($key, '/');
+
+    return preg_match('/(?<!\$)\$\{'.$key.'(?::\?|\?)/', $dockerCompose) === 1;
+}
+
+function dockerComposeEnvironmentVariableShouldBeUnset(?string $dockerCompose, string $key, ?string $value): bool
+{
+    if ($value !== null || blank($dockerCompose)) {
+        return false;
+    }
+
+    $assignments = extractHardcodedEnvironmentVariables($dockerCompose);
+    if ($assignments->contains(fn (array $assignment): bool => $assignment['key'] === $key && $assignment['is_passthrough'])) {
         return true;
     }
-    $settings = \App\Models\InstanceSettings::get();
-    $is_dns_validation_enabled = data_get($settings, 'is_dns_validation_enabled');
-    if (! $is_dns_validation_enabled) {
-        return true;
+
+    return extractDockerComposeEnvironmentVariableReferences($dockerCompose)->contains($key);
+}
+
+/**
+ * Variables whose stored value the Compose parser before v4.5.0 wrote straight into the `environment:`
+ * list, so their containers got the value without the old .env escaping: references with a default or
+ * under another name (`FOO=${FOO:-}`, `BAR=${FOO}`, `BAR=$FOO`) and references in such a default.
+ * A plain `FOO=${FOO}` reference kept reading the escaped .env value.
+ *
+ * @return Collection<int, string>
+ */
+function dockerComposeVariablesWithStoredValueBeforeExactEscaping(?string $dockerCompose): Collection
+{
+    static $cache = [];
+    if (blank($dockerCompose)) {
+        return collect();
     }
-    $dns_servers = data_get($settings, 'custom_dns_servers');
-    $dns_servers = str($dns_servers)->explode(',');
-    if ($server->id === 0) {
-        $ip = data_get($settings, 'public_ipv4', data_get($settings, 'public_ipv6', $server->ip));
-    } else {
-        $ip = $server->ip;
+
+    $cacheKey = hash('xxh128', $dockerCompose);
+    if (isset($cache[$cacheKey])) {
+        return $cache[$cacheKey];
     }
-    $found_matching_ip = false;
-    $type = \PurplePixie\PhpDns\DNSTypes::NAME_A;
-    foreach ($dns_servers as $dns_server) {
-        try {
-            ray("Checking $host on $dns_server");
-            $query = new DNSQuery($dns_server);
-            $results = $query->query($host, $type);
-            if ($results === false || $query->hasError()) {
-                ray('Error: '.$query->getLasterror());
+
+    $keys = collect();
+    foreach (extractHardcodedEnvironmentVariables($dockerCompose) as $assignment) {
+        $value = $assignment['value'] ?? null;
+        if (! is_string($value) || ! str_starts_with($value, '$') || replaceVariables($value)->value() === (string) $assignment['key']) {
+            continue;
+        }
+
+        $reference = extractBalancedBraceContent($value, 0);
+        if ($reference === null) {
+            if (preg_match('/\A\$([A-Za-z_][A-Za-z0-9_]*)\z/', $value, $match) === 1) {
+                $keys->push($match[1]);
+            }
+
+            continue;
+        }
+
+        $split = splitOnOperatorOutsideNested($reference['content']);
+        $keys->push($split === null ? $reference['content'] : $split['variable']);
+        if ($split !== null) {
+            $keys = $keys->concat(extractDockerComposeEnvironmentVariableReferences($split['default']));
+        }
+    }
+
+    $cache = [$cacheKey => $keys->reject(fn (string $key): bool => str_starts_with($key, 'SERVICE_'))->unique()->values()];
+
+    return $cache[$cacheKey];
+}
+
+/** @param Collection<int, EnvironmentVariable> $environmentVariables */
+function preserveLegacyDockerComposeNullAssignments(Collection $environment, Collection $environmentVariables): Collection
+{
+    foreach ($environmentVariables as $environmentVariable) {
+        if (! $environmentVariable->preservesLegacyComposeNull() || ! $environment->has($environmentVariable->key)) {
+            continue;
+        }
+
+        $key = $environmentVariable->key;
+        $value = $environment->get($key);
+        if ($value === null || $value === '$'.$key) {
+            $environment->put($key, '');
+
+            continue;
+        }
+        if (! is_string($value) || ! str_starts_with($value, '${')) {
+            continue;
+        }
+        $reference = extractBalancedBraceContent($value);
+        if ($reference === null || $reference['end'] !== strlen($value) - 1) {
+            continue;
+        }
+        $split = splitOnOperatorOutsideNested($reference['content']);
+        if (($split['variable'] ?? $reference['content']) === $key) {
+            $environment->put($key, '');
+        }
+    }
+
+    return $environment;
+}
+
+function syncDockerComposeEnvironmentVariableRequiredState(Application|Service $resource): void
+{
+    $dockerCompose = $resource->docker_compose_raw ?? $resource->docker_compose;
+
+    $environmentVariables = $resource->environment_variables()->get();
+    if ($resource instanceof Application) {
+        $environmentVariables = $environmentVariables->concat($resource->environment_variables_preview()->get());
+    }
+
+    $environmentVariables->each(function (EnvironmentVariable $environmentVariable) use ($dockerCompose): void {
+        $isRequired = ! $environmentVariable->preservesLegacyComposeNull()
+            && dockerComposeEnvironmentVariableIsRequired($dockerCompose, $environmentVariable->key);
+        if ((bool) $environmentVariable->is_required !== $isRequired) {
+            $environmentVariable->update(['is_required' => $isRequired]);
+        }
+    });
+}
+
+/**
+ * Downsample metrics using the Largest-Triangle-Three-Buckets (LTTB) algorithm.
+ * This preserves the visual shape of the data better than simple averaging.
+ *
+ * @param  array  $data  Array of [timestamp, value] pairs
+ * @param  int  $threshold  Target number of points
+ * @return array Downsampled data
+ */
+function downsampleLTTB(array $data, int $threshold): array
+{
+    $dataLength = count($data);
+
+    // Return unchanged if threshold >= data length, or if threshold <= 2
+    // (threshold <= 2 would cause division by zero in bucket calculation)
+    if ($threshold >= $dataLength || $threshold <= 2) {
+        return $data;
+    }
+
+    $sampled = [];
+    $sampled[] = $data[0]; // Always keep first point
+
+    $bucketSize = ($dataLength - 2) / ($threshold - 2);
+
+    $a = 0; // Index of previous selected point
+
+    for ($i = 0; $i < $threshold - 2; $i++) {
+        // Calculate bucket range
+        $bucketStart = (int) floor(($i + 1) * $bucketSize) + 1;
+        $bucketEnd = (int) floor(($i + 2) * $bucketSize) + 1;
+        $bucketEnd = min($bucketEnd, $dataLength - 1);
+
+        // Calculate average point for next bucket (used as reference)
+        $nextBucketStart = (int) floor(($i + 2) * $bucketSize) + 1;
+        $nextBucketEnd = (int) floor(($i + 3) * $bucketSize) + 1;
+        $nextBucketEnd = min($nextBucketEnd, $dataLength - 1);
+
+        $avgX = 0;
+        $avgY = 0;
+        $nextBucketCount = $nextBucketEnd - $nextBucketStart + 1;
+
+        if ($nextBucketCount > 0) {
+            for ($j = $nextBucketStart; $j <= $nextBucketEnd; $j++) {
+                $avgX += $data[$j][0];
+                $avgY += $data[$j][1];
+            }
+            $avgX /= $nextBucketCount;
+            $avgY /= $nextBucketCount;
+        }
+
+        // Find point in current bucket with largest triangle area
+        $maxArea = -1;
+        $maxAreaIndex = $bucketStart;
+
+        $pointAX = $data[$a][0];
+        $pointAY = $data[$a][1];
+
+        for ($j = $bucketStart; $j <= $bucketEnd; $j++) {
+            // Triangle area calculation
+            $area = abs(
+                ($pointAX - $avgX) * ($data[$j][1] - $pointAY) -
+                ($pointAX - $data[$j][0]) * ($avgY - $pointAY)
+            ) * 0.5;
+
+            if ($area > $maxArea) {
+                $maxArea = $area;
+                $maxAreaIndex = $j;
+            }
+        }
+
+        $sampled[] = $data[$maxAreaIndex];
+        $a = $maxAreaIndex;
+    }
+
+    $sampled[] = $data[$dataLength - 1]; // Always keep last point
+
+    return $sampled;
+}
+
+/**
+ * Convert Sentinel container memory samples from bytes to megabytes.
+ *
+ * Sentinel stores container `used` memory in bytes. Application and database
+ * metric charts label the series as megabytes, so the values must be converted
+ * before they are sent to the frontend.
+ *
+ * @param  array<int, array{0: int|float, 1: int|float}>  $metrics
+ * @return array<int, array{0: int, 1: float}>
+ */
+function convertContainerMemoryBytesToMegabytes(array $metrics): array
+{
+    return array_map(static function (array $point): array {
+        return [(int) $point[0], round(((float) $point[1]) / 1024 / 1024, 2)];
+    }, $metrics);
+}
+
+/**
+ * Resolve shared environment variable patterns like {{environment.VAR}}, {{project.VAR}}, {{team.VAR}}, {{server.VAR}}.
+ *
+ * This is the canonical implementation used by both EnvironmentVariable::realValue and the compose parsers
+ * to ensure shared variable references are replaced with their actual values.
+ */
+function resolveSharedEnvironmentVariables(?string $value, $resource): ?string
+{
+    if (is_null($value) || $value === '' || is_null($resource)) {
+        return $value;
+    }
+    $value = trim($value);
+    preg_match_all(SHARED_VARIABLE_REFERENCE_PATTERN, $value, $references, PREG_SET_ORDER);
+    foreach ($references as [$reference, $type, $variable]) {
+        if (! in_array($type, SHARED_VARIABLE_TYPES, true)) {
+            continue;
+        }
+        $id = null;
+        if ($type === 'environment') {
+            $id = $resource->environment->id;
+        } elseif ($type === 'project') {
+            $id = $resource->environment->project->id;
+        } elseif ($type === 'team') {
+            $id = $resource->team()->id;
+        } elseif ($type === 'server') {
+            $id = data_get($resource, 'destination.server_id');
+        }
+        if (is_null($id)) {
+            continue;
+        }
+        $found = SharedEnvironmentVariable::where('type', $type)
+            ->where('key', $variable)
+            ->where('team_id', $resource->team()->id)
+            ->where("{$type}_id", $id)
+            ->first();
+        if ($found) {
+            $value = str_replace($reference, $found->value, $value);
+        }
+    }
+
+    return $value;
+}
+
+/**
+ * Replace locked values in the generated compose file of a resource, for display only.
+ *
+ * The compose parsers write resolved values into `docker_compose`: environment variables, database
+ * overrides, and shared variable references. Deployments need those values, so only the displayed
+ * copy is redacted. Covered: the resource's locked variables (also variables that reference a locked
+ * shared variable) and locked team, project, environment, and server variables that the raw compose references.
+ * Values shorter than 4 characters are not replaced, because they would match unrelated text.
+ * A parsed compose (array or collection) gets the same replacement in every string value.
+ *
+ * @template T of string|array|Collection|null
+ *
+ * @param  T  $compose
+ * @return T
+ */
+function redactLockedValuesInGeneratedCompose(string|array|Collection|null $compose, Application|Service $resource): string|array|Collection|null
+{
+    if (blank($compose)) {
+        return $compose;
+    }
+
+    $values = EnvironmentVariable::logRedactionSecretsFor($resource, includePreview: true, resolveRemoteSecrets: false)['locked'];
+
+    preg_match_all(SHARED_VARIABLE_REFERENCE_PATTERN, (string) $resource->docker_compose_raw, $matches, PREG_SET_ORDER);
+    $references = collect($matches)->filter(fn (array $match): bool => in_array($match[1], SHARED_VARIABLE_TYPES, true));
+    $teamId = $resource->team()?->id;
+    if ($references->isNotEmpty() && $teamId !== null) {
+        $scopeIds = [
+            'team' => $teamId,
+            'project' => $resource->environment?->project_id,
+            'environment' => $resource->environment_id,
+            'server' => data_get($resource, 'destination.server_id'),
+        ];
+        $values = SharedEnvironmentVariable::query()
+            ->where('team_id', $teamId)
+            ->where('is_shown_once', true)
+            ->whereIn('key', $references->pluck(2)->unique()->values())
+            ->get()
+            ->filter(fn (SharedEnvironmentVariable $shared): bool => $references->contains(fn (array $match): bool => $match[1] === $shared->type && $match[2] === $shared->key)
+                && $scopeIds[$shared->type] !== null
+                && (int) $shared->{"{$shared->type}_id"} === (int) $scopeIds[$shared->type])
+            ->pluck('value')
+            ->merge($values)
+            ->all();
+    }
+
+    $variants = collect($values)
+        ->filter(fn (mixed $value): bool => is_string($value))
+        ->flatMap(fn (string $value): array => [
+            $value,
+            escapeDollarSign($value),
+            str_replace("'", "''", $value),
+            substr((string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), 1, -1),
+        ])
+        ->filter(fn (string $value): bool => mb_strlen($value) >= 4)
+        ->unique()
+        ->mapWithKeys(fn (string $value): array => [$value => '<locked>']);
+
+    if ($variants->isEmpty()) {
+        return $compose;
+    }
+
+    // strtr() replaces the longest match first and does not search the replaced text again.
+    $redact = function (mixed $value) use (&$redact, $variants): mixed {
+        return match (true) {
+            is_string($value) => strtr($value, $variants->all()),
+            is_array($value) => array_map($redact, $value),
+            $value instanceof Collection => $value->map($redact),
+            default => $value,
+        };
+    };
+
+    return $redact($compose);
+}
+
+/**
+ * Convert an ISO 3166-1 alpha-2 country code into its regional-indicator flag emoji.
+ *
+ * The input is case-insensitive (e.g. "us" and "US" both yield the United States flag).
+ * For null, empty, or otherwise invalid input (not exactly two ASCII letters) a neutral
+ * globe emoji is returned to represent an "Unknown" origin.
+ */
+function countryFlagEmoji(?string $a2): string
+{
+    $unknown = '🌐';
+
+    if (! is_string($a2)) {
+        return $unknown;
+    }
+
+    $code = strtoupper(trim($a2));
+
+    if (preg_match('/^[A-Z]{2}$/', $code) !== 1) {
+        return $unknown;
+    }
+
+    $flag = '';
+    foreach (str_split($code) as $letter) {
+        $flag .= mb_chr(0x1F1E6 + (ord($letter) - ord('A')), 'UTF-8');
+    }
+
+    return $flag;
+}
+
+/**
+ * Resolve an ISO 3166-1 alpha-2 code to a flag image URL (flagcdn.com).
+ *
+ * Emoji flags do not render on most Linux/Windows browsers, so the analytics
+ * views render an <img> instead. Returns null for null/invalid codes so callers
+ * can fall back to a globe icon.
+ */
+function countryFlagUrl(?string $a2, string $size = '24x18'): ?string
+{
+    if (! is_string($a2)) {
+        return null;
+    }
+
+    $code = strtolower(trim($a2));
+
+    if (preg_match('/^[a-z]{2}$/', $code) !== 1) {
+        return null;
+    }
+
+    return "https://flagcdn.com/{$size}/{$code}.png";
+}
+
+/**
+ * Extract the bare host from a referer value (full URL or bare host), dropping
+ * a leading "www.". Returns null when there is no usable host (e.g. direct hits).
+ */
+function refererHost(?string $referer): ?string
+{
+    if (! is_string($referer) || trim($referer) === '') {
+        return null;
+    }
+
+    $referer = trim($referer);
+    $withScheme = str_contains($referer, '://') ? $referer : 'http://'.$referer;
+    $host = parse_url($withScheme, PHP_URL_HOST) ?: null;
+
+    if (! $host) {
+        return null;
+    }
+
+    $host = strtolower($host);
+
+    return str_starts_with($host, 'www.') ? substr($host, 4) : $host;
+}
+
+/**
+ * Group referrer breakdown rows by hostname and sum their metrics.
+ *
+ * @param  array<int, array{value?: string, requests?: int, bytesOut?: int}>  $rows
+ * @return array<int, array{value: string, requests: int, bytesOut: int}>
+ */
+function groupRefererBreakdownRows(array $rows): array
+{
+    $grouped = [];
+
+    foreach ($rows as $row) {
+        $value = (string) ($row['value'] ?? '');
+        $host = $value === '__other__' ? $value : (refererHost($value) ?? $value);
+
+        $grouped[$host] ??= ['value' => $host, 'requests' => 0, 'bytesOut' => 0];
+        $grouped[$host]['requests'] += (int) ($row['requests'] ?? 0);
+        $grouped[$host]['bytesOut'] += (int) ($row['bytesOut'] ?? 0);
+    }
+
+    $rows = array_values($grouped);
+    usort($rows, fn (array $left, array $right): int => $right['requests'] <=> $left['requests']);
+
+    return $rows;
+}
+
+/**
+ * Favicon URL for a host, served by DuckDuckGo's icon proxy. Used to decorate
+ * referrer rows in analytics.
+ *
+ * Note: rendering these icons makes the operator's browser request each favicon
+ * from icons.duckduckgo.com, which discloses the referrer hostnames of the
+ * operator's own traffic to that third party. Same applies to countryFlagUrl()
+ * (flagcdn.com). No API key is required.
+ */
+function refererFaviconUrl(string $host): string
+{
+    return 'https://icons.duckduckgo.com/ip3/'.rawurlencode($host).'.ico';
+}
+
+/**
+ * Map Sentinel's lowercase woothee device category to a friendly, capitalized
+ * label (e.g. "pc" -> "Desktop", "smartphone" -> "Mobile").
+ */
+function deviceLabel(?string $device): string
+{
+    $value = strtolower(trim((string) $device));
+
+    return match ($value) {
+        '' => 'Unknown',
+        'pc' => 'Desktop',
+        'smartphone' => 'Mobile',
+        'mobilephone' => 'Mobile',
+        'appliance' => 'Appliance',
+        'crawler' => 'Bot',
+        default => Str::title($value),
+    };
+}
+
+/**
+ * Whether a raw User-Agent comes from container tooling (Docker CLI and Engine,
+ * BuildKit, containerd, Podman, Skopeo) instead of a person or a bot. The
+ * analytics views hide these rows behind a toggle: image pulls and builds are
+ * normal, but the raw strings look like an attack or a leak of internal data.
+ */
+function isContainerToolingUserAgent(?string $userAgent): bool
+{
+    return preg_match('#^(docker|docker-client|buildkit|containerd|podman|skopeo|cri-o)/#i', trim((string) $userAgent)) === 1;
+}
+
+/**
+ * Prepare aggregated `city` breakdown rows (`CC|subdivision|City`, from
+ * TrafficAnalyticsAggregator::breakdowns(), not raw Sentinel rows) for display,
+ * largest first. `name` and `detail` are the two parts of `label` ("Berlin" and
+ * "BE, Germany"). `CC||` (sent by older Sentinel builds) is an unknown city of
+ * that country. `__other__` and malformed values are merged into one "Other"
+ * row, which stays last. Returns [] when no row has a real city.
+ *
+ * @param  iterable<int, array{value?: string, requests?: int, bytesOut?: int, lat?: float, lon?: float}>  $rows
+ * @return array<int, array{key: string, country: string, label: string, name: string, detail: string, requests: int, bytesOut: int, lat: ?float, lon: ?float}>
+ */
+function trafficCityRows(iterable $rows): array
+{
+    $out = [];
+    $hasCity = false;
+
+    foreach ($rows as $row) {
+        $requests = (int) data_get($row, 'requests', 0);
+        if ($requests <= 0) {
+            continue;
+        }
+
+        $value = (string) data_get($row, 'value', '');
+        $parts = explode('|', $value, 3);
+        $parts[0] = strtoupper($parts[0]);
+        $isCityKey = count($parts) === 3 && preg_match('/^[A-Z]{2}$/', $parts[0]) === 1;
+
+        $key = '__other__';
+        $country = '';
+        $label = 'Other';
+        $name = 'Other';
+        $detail = '';
+        $lat = null;
+        $lon = null;
+
+        if ($isCityKey) {
+            [$country, $subdivision, $city] = array_map('trim', $parts);
+            $key = $value;
+
+            if ($city === '') {
+                $label = 'Unknown, '.$country;
+                $name = 'Unknown';
+                $detail = countryName($country);
             } else {
-                foreach ($results as $result) {
-                    if ($result->getType() == $type) {
-                        if (ip_match($result->getData(), $cloudflare_ips->toArray(), $match)) {
-                            ray("Found match in Cloudflare IPs: $match");
-                            $found_matching_ip = true;
-                            break;
-                        }
-                        if ($result->getData() === $ip) {
-                            ray($host.' has IP address '.$result->getData());
-                            ray($result->getString());
-                            $found_matching_ip = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        } catch (\Exception $e) {
-        }
-    }
-    ray("Found match: $found_matching_ip");
+                $hasCity = true;
+                $region = preg_match('/^[A-Z]{2,3}$/', $subdivision) === 1 ? $subdivision.', ' : '';
+                $label = $city.', '.$region.$country;
+                $name = $city;
+                $detail = $region.countryName($country);
 
-    return $found_matching_ip;
-}
-
-function ip_match($ip, $cidrs, &$match = null)
-{
-    foreach ((array) $cidrs as $cidr) {
-        [$subnet, $mask] = explode('/', $cidr);
-        if (((ip2long($ip) & ($mask = ~((1 << (32 - $mask)) - 1))) == (ip2long($subnet) & $mask))) {
-            $match = $cidr;
-
-            return true;
-        }
-    }
-
-    return false;
-}
-function checkIfDomainIsAlreadyUsed(Collection|array $domains, ?string $teamId = null, ?string $uuid = null)
-{
-    if (is_null($teamId)) {
-        return response()->json(['error' => 'Team ID is required.'], 400);
-    }
-    if (is_array($domains)) {
-        $domains = collect($domains);
-    }
-
-    $domains = $domains->map(function ($domain) {
-        if (str($domain)->endsWith('/')) {
-            $domain = str($domain)->beforeLast('/');
-        }
-
-        return str($domain);
-    });
-    $applications = Application::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid']);
-    $serviceApplications = ServiceApplication::ownedByCurrentTeamAPI($teamId)->get(['fqdn', 'uuid']);
-    if ($uuid) {
-        $applications = $applications->filter(fn ($app) => $app->uuid !== $uuid);
-        $serviceApplications = $serviceApplications->filter(fn ($app) => $app->uuid !== $uuid);
-    }
-    $domainFound = false;
-    foreach ($applications as $app) {
-        if (is_null($app->fqdn)) {
-            continue;
-        }
-        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
-        foreach ($list_of_domains as $domain) {
-            if (str($domain)->endsWith('/')) {
-                $domain = str($domain)->beforeLast('/');
-            }
-            $naked_domain = str($domain)->value();
-            if ($domains->contains($naked_domain)) {
-                $domainFound = true;
-                break;
-            }
-        }
-    }
-    if ($domainFound) {
-        return true;
-    }
-    foreach ($serviceApplications as $app) {
-        if (str($app->fqdn)->isEmpty()) {
-            continue;
-        }
-        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
-        foreach ($list_of_domains as $domain) {
-            if (str($domain)->endsWith('/')) {
-                $domain = str($domain)->beforeLast('/');
-            }
-            $naked_domain = str($domain)->value();
-            if ($domains->contains($naked_domain)) {
-                $domainFound = true;
-                break;
-            }
-        }
-    }
-    if ($domainFound) {
-        return true;
-    }
-    $settings = \App\Models\InstanceSettings::get();
-    if (data_get($settings, 'fqdn')) {
-        $domain = data_get($settings, 'fqdn');
-        if (str($domain)->endsWith('/')) {
-            $domain = str($domain)->beforeLast('/');
-        }
-        $naked_domain = str($domain)->value();
-        if ($domains->contains($naked_domain)) {
-            return true;
-        }
-    }
-}
-function check_domain_usage(ServiceApplication|Application|null $resource = null, ?string $domain = null)
-{
-    if ($resource) {
-        if ($resource->getMorphClass() === 'App\Models\Application' && $resource->build_pack === 'dockercompose') {
-            $domains = data_get(json_decode($resource->docker_compose_domains, true), '*.domain');
-            $domains = collect($domains);
-        } else {
-            $domains = collect($resource->fqdns);
-        }
-    } elseif ($domain) {
-        $domains = collect($domain);
-    } else {
-        throw new \RuntimeException('No resource or FQDN provided.');
-    }
-    $domains = $domains->map(function ($domain) {
-        if (str($domain)->endsWith('/')) {
-            $domain = str($domain)->beforeLast('/');
-        }
-
-        return str($domain);
-    });
-    $apps = Application::all();
-    foreach ($apps as $app) {
-        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
-        foreach ($list_of_domains as $domain) {
-            if (str($domain)->endsWith('/')) {
-                $domain = str($domain)->beforeLast('/');
-            }
-            $naked_domain = str($domain)->value();
-            if ($domains->contains($naked_domain)) {
-                if (data_get($resource, 'uuid')) {
-                    if ($resource->uuid !== $app->uuid) {
-                        throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
-                    }
-                } elseif ($domain) {
-                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
+                $rawLat = data_get($row, 'lat');
+                $rawLon = data_get($row, 'lon');
+                if (is_numeric($rawLat) && is_numeric($rawLon)) {
+                    $lat = (float) $rawLat;
+                    $lon = (float) $rawLon;
                 }
             }
         }
+
+        $out[$key] ??= ['key' => $key, 'country' => $country, 'label' => $label, 'name' => $name, 'detail' => $detail, 'requests' => 0, 'bytesOut' => 0, 'lat' => $lat, 'lon' => $lon];
+        $out[$key]['requests'] += $requests;
+        $out[$key]['bytesOut'] += (int) data_get($row, 'bytesOut', 0);
     }
-    $apps = ServiceApplication::all();
-    foreach ($apps as $app) {
-        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
-        foreach ($list_of_domains as $domain) {
-            if (str($domain)->endsWith('/')) {
-                $domain = str($domain)->beforeLast('/');
-            }
-            $naked_domain = str($domain)->value();
-            if ($domains->contains($naked_domain)) {
-                if (data_get($resource, 'uuid')) {
-                    if ($resource->uuid !== $app->uuid) {
-                        throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
-                    }
-                } elseif ($domain) {
-                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource called: <br><br>{$app->name}.");
-                }
-            }
-        }
+
+    if (! $hasCity) {
+        return [];
     }
-    if ($resource) {
-        $settings = \App\Models\InstanceSettings::get();
-        if (data_get($settings, 'fqdn')) {
-            $domain = data_get($settings, 'fqdn');
-            if (str($domain)->endsWith('/')) {
-                $domain = str($domain)->beforeLast('/');
-            }
-            $naked_domain = str($domain)->value();
-            if ($domains->contains($naked_domain)) {
-                throw new \RuntimeException("Domain $naked_domain is already in use by this Coolify instance.");
-            }
-        }
-    }
+
+    $other = $out['__other__'] ?? null;
+    unset($out['__other__']);
+    $out = array_values($out);
+    usort($out, fn (array $a, array $b): int => $b['requests'] <=> $a['requests']);
+
+    return $other === null ? $out : [...$out, $other];
 }
 
-function parseCommandsByLineForSudo(Collection $commands, Server $server): array
+/**
+ * Marker data for the analytics globe, one set for each view of the Locations
+ * card: a marker per country with a valid ISO-A2 code, and a marker per city
+ * that has coordinates.
+ *
+ * @param  iterable<int, mixed>  $countryRows
+ * @param  iterable<int, mixed>  $cityRows
+ * @return array{countries: array<int, array{code: string, requests: int}>, cities: array<int, array{lat: float, lon: float, requests: int}>}
+ */
+function trafficGeoMarkers(iterable $countryRows, iterable $cityRows): array
 {
-    $commands = $commands->map(function ($line) {
-        if (! str($line)->startsWith('cd') && ! str($line)->startsWith('command') && ! str($line)->startsWith('echo') && ! str($line)->startsWith('true')) {
-            return "sudo $line";
+    $countries = [];
+    foreach ($countryRows as $row) {
+        $code = strtoupper((string) data_get($row, 'value', ''));
+        $requests = (int) data_get($row, 'requests', 0);
+        if ($requests > 0 && preg_match('/^[A-Z]{2}$/', $code) === 1) {
+            $countries[] = ['code' => $code, 'requests' => $requests];
         }
-
-        return $line;
-    });
-    $commands = $commands->map(function ($line) use ($server) {
-        if (Str::startsWith($line, 'sudo mkdir -p')) {
-            return "$line && sudo chown -R $server->user:$server->user ".Str::after($line, 'sudo mkdir -p').' && sudo chmod -R o-rwx '.Str::after($line, 'sudo mkdir -p');
-        }
-
-        return $line;
-    });
-    $commands = $commands->map(function ($line) {
-        $line = str($line);
-        if (str($line)->contains('$(')) {
-            $line = $line->replace('$(', '$(sudo ');
-        }
-        if (str($line)->contains('||')) {
-            $line = $line->replace('||', '|| sudo');
-        }
-        if (str($line)->contains('&&')) {
-            $line = $line->replace('&&', '&& sudo');
-        }
-        if (str($line)->contains(' | ')) {
-            $line = $line->replace(' | ', ' | sudo ');
-        }
-
-        return $line->value();
-    });
-
-    return $commands->toArray();
-}
-function parseLineForSudo(string $command, Server $server): string
-{
-    if (! str($command)->startSwith('cd') && ! str($command)->startSwith('command')) {
-        $command = "sudo $command";
-    }
-    if (Str::startsWith($command, 'sudo mkdir -p')) {
-        $command = "$command && sudo chown -R $server->user:$server->user ".Str::after($command, 'sudo mkdir -p').' && sudo chmod -R o-rwx '.Str::after($command, 'sudo mkdir -p');
-    }
-    if (str($command)->contains('$(') || str($command)->contains('`')) {
-        $command = str($command)->replace('$(', '$(sudo ')->replace('`', '`sudo ')->value();
-    }
-    if (str($command)->contains('||')) {
-        $command = str($command)->replace('||', '|| sudo ')->value();
-    }
-    if (str($command)->contains('&&')) {
-        $command = str($command)->replace('&&', '&& sudo ')->value();
     }
 
-    return $command;
+    $cities = [];
+    foreach ($cityRows as $row) {
+        $requests = (int) data_get($row, 'requests', 0);
+        $lat = data_get($row, 'lat');
+        $lon = data_get($row, 'lon');
+        if ($requests > 0 && is_numeric($lat) && is_numeric($lon)) {
+            $cities[] = ['lat' => (float) $lat, 'lon' => (float) $lon, 'requests' => $requests];
+        }
+    }
+
+    return ['countries' => $countries, 'cities' => $cities];
 }
 
-function get_public_ips()
+/**
+ * Resolve an ISO 3166-1 alpha-2 country code to its English country name.
+ *
+ * Uses a bundled ISO 3166-1 lookup so the result is deterministic and does not
+ * depend on the intl extension being installed. Returns "Unknown" for null,
+ * empty, invalid, or unassigned codes.
+ */
+function countryName(?string $a2): string
 {
-    try {
-        echo "Refreshing public ips!\n";
-        $settings = \App\Models\InstanceSettings::get();
-        [$first, $second] = Process::concurrently(function (Pool $pool) {
-            $pool->path(__DIR__)->command('curl -4s https://ifconfig.io');
-            $pool->path(__DIR__)->command('curl -6s https://ifconfig.io');
-        });
-        $ipv4 = $first->output();
-        if ($ipv4) {
-            $ipv4 = trim($ipv4);
-            $validate_ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP);
-            if ($validate_ipv4 == false) {
-                echo "Invalid ipv4: $ipv4\n";
+    $unknown = 'Unknown';
 
-                return;
-            }
-            $settings->update(['public_ipv4' => $ipv4]);
-        }
-        $ipv6 = $second->output();
-        if ($ipv6) {
-            $ipv6 = trim($ipv6);
-            $validate_ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP);
-            if ($validate_ipv6 == false) {
-                echo "Invalid ipv6: $ipv6\n";
-
-                return;
-            }
-            $settings->update(['public_ipv6' => $ipv6]);
-        }
-    } catch (\Throwable $e) {
-        echo "Error: {$e->getMessage()}\n";
-    }
-}
-
-function isAnyDeploymentInprogress()
-{
-    // Only use it in the deployment script
-    $count = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS, ApplicationDeploymentStatus::QUEUED])->count();
-    if ($count > 0) {
-        echo "There are $count deployments in progress. Exiting...\n";
-        exit(1);
-    }
-    echo "No deployments in progress.\n";
-    exit(0);
-}
-
-function generateSentinelToken()
-{
-    $token = Str::random(64);
-
-    return $token;
-}
-
-function isBase64Encoded($strValue)
-{
-    return base64_encode(base64_decode($strValue, true)) === $strValue;
-}
-function customApiValidator(Collection|array $item, array $rules)
-{
-    if (is_array($item)) {
-        $item = collect($item);
+    if (! is_string($a2)) {
+        return $unknown;
     }
 
-    return Validator::make($item->toArray(), $rules, [
-        'required' => 'This field is required.',
-    ]);
+    $code = strtoupper(trim($a2));
+
+    if (preg_match('/^[A-Z]{2}$/', $code) !== 1) {
+        return $unknown;
+    }
+
+    static $names = [
+        'AD' => 'Andorra',
+        'AE' => 'United Arab Emirates',
+        'AF' => 'Afghanistan',
+        'AG' => 'Antigua & Barbuda',
+        'AI' => 'Anguilla',
+        'AL' => 'Albania',
+        'AM' => 'Armenia',
+        'AO' => 'Angola',
+        'AQ' => 'Antarctica',
+        'AR' => 'Argentina',
+        'AS' => 'American Samoa',
+        'AT' => 'Austria',
+        'AU' => 'Australia',
+        'AW' => 'Aruba',
+        'AX' => 'Åland Islands',
+        'AZ' => 'Azerbaijan',
+        'BA' => 'Bosnia & Herzegovina',
+        'BB' => 'Barbados',
+        'BD' => 'Bangladesh',
+        'BE' => 'Belgium',
+        'BF' => 'Burkina Faso',
+        'BG' => 'Bulgaria',
+        'BH' => 'Bahrain',
+        'BI' => 'Burundi',
+        'BJ' => 'Benin',
+        'BL' => 'St. Barthélemy',
+        'BM' => 'Bermuda',
+        'BN' => 'Brunei',
+        'BO' => 'Bolivia',
+        'BQ' => 'Caribbean Netherlands',
+        'BR' => 'Brazil',
+        'BS' => 'Bahamas',
+        'BT' => 'Bhutan',
+        'BV' => 'Bouvet Island',
+        'BW' => 'Botswana',
+        'BY' => 'Belarus',
+        'BZ' => 'Belize',
+        'CA' => 'Canada',
+        'CC' => 'Cocos (Keeling) Islands',
+        'CD' => 'Congo - Kinshasa',
+        'CF' => 'Central African Republic',
+        'CG' => 'Congo - Brazzaville',
+        'CH' => 'Switzerland',
+        'CI' => 'Côte d’Ivoire',
+        'CK' => 'Cook Islands',
+        'CL' => 'Chile',
+        'CM' => 'Cameroon',
+        'CN' => 'China',
+        'CO' => 'Colombia',
+        'CR' => 'Costa Rica',
+        'CU' => 'Cuba',
+        'CV' => 'Cape Verde',
+        'CW' => 'Curaçao',
+        'CX' => 'Christmas Island',
+        'CY' => 'Cyprus',
+        'CZ' => 'Czechia',
+        'DE' => 'Germany',
+        'DJ' => 'Djibouti',
+        'DK' => 'Denmark',
+        'DM' => 'Dominica',
+        'DO' => 'Dominican Republic',
+        'DZ' => 'Algeria',
+        'EC' => 'Ecuador',
+        'EE' => 'Estonia',
+        'EG' => 'Egypt',
+        'EH' => 'Western Sahara',
+        'ER' => 'Eritrea',
+        'ES' => 'Spain',
+        'ET' => 'Ethiopia',
+        'FI' => 'Finland',
+        'FJ' => 'Fiji',
+        'FK' => 'Falkland Islands',
+        'FM' => 'Micronesia',
+        'FO' => 'Faroe Islands',
+        'FR' => 'France',
+        'GA' => 'Gabon',
+        'GB' => 'United Kingdom',
+        'GD' => 'Grenada',
+        'GE' => 'Georgia',
+        'GF' => 'French Guiana',
+        'GG' => 'Guernsey',
+        'GH' => 'Ghana',
+        'GI' => 'Gibraltar',
+        'GL' => 'Greenland',
+        'GM' => 'Gambia',
+        'GN' => 'Guinea',
+        'GP' => 'Guadeloupe',
+        'GQ' => 'Equatorial Guinea',
+        'GR' => 'Greece',
+        'GS' => 'South Georgia & South Sandwich Islands',
+        'GT' => 'Guatemala',
+        'GU' => 'Guam',
+        'GW' => 'Guinea-Bissau',
+        'GY' => 'Guyana',
+        'HK' => 'Hong Kong SAR China',
+        'HM' => 'Heard & McDonald Islands',
+        'HN' => 'Honduras',
+        'HR' => 'Croatia',
+        'HT' => 'Haiti',
+        'HU' => 'Hungary',
+        'ID' => 'Indonesia',
+        'IE' => 'Ireland',
+        'IL' => 'Israel',
+        'IM' => 'Isle of Man',
+        'IN' => 'India',
+        'IO' => 'British Indian Ocean Territory',
+        'IQ' => 'Iraq',
+        'IR' => 'Iran',
+        'IS' => 'Iceland',
+        'IT' => 'Italy',
+        'JE' => 'Jersey',
+        'JM' => 'Jamaica',
+        'JO' => 'Jordan',
+        'JP' => 'Japan',
+        'KE' => 'Kenya',
+        'KG' => 'Kyrgyzstan',
+        'KH' => 'Cambodia',
+        'KI' => 'Kiribati',
+        'KM' => 'Comoros',
+        'KN' => 'St. Kitts & Nevis',
+        'KP' => 'North Korea',
+        'KR' => 'South Korea',
+        'KW' => 'Kuwait',
+        'KY' => 'Cayman Islands',
+        'KZ' => 'Kazakhstan',
+        'LA' => 'Laos',
+        'LB' => 'Lebanon',
+        'LC' => 'St. Lucia',
+        'LI' => 'Liechtenstein',
+        'LK' => 'Sri Lanka',
+        'LR' => 'Liberia',
+        'LS' => 'Lesotho',
+        'LT' => 'Lithuania',
+        'LU' => 'Luxembourg',
+        'LV' => 'Latvia',
+        'LY' => 'Libya',
+        'MA' => 'Morocco',
+        'MC' => 'Monaco',
+        'MD' => 'Moldova',
+        'ME' => 'Montenegro',
+        'MF' => 'St. Martin',
+        'MG' => 'Madagascar',
+        'MH' => 'Marshall Islands',
+        'MK' => 'North Macedonia',
+        'ML' => 'Mali',
+        'MM' => 'Myanmar (Burma)',
+        'MN' => 'Mongolia',
+        'MO' => 'Macao SAR China',
+        'MP' => 'Northern Mariana Islands',
+        'MQ' => 'Martinique',
+        'MR' => 'Mauritania',
+        'MS' => 'Montserrat',
+        'MT' => 'Malta',
+        'MU' => 'Mauritius',
+        'MV' => 'Maldives',
+        'MW' => 'Malawi',
+        'MX' => 'Mexico',
+        'MY' => 'Malaysia',
+        'MZ' => 'Mozambique',
+        'NA' => 'Namibia',
+        'NC' => 'New Caledonia',
+        'NE' => 'Niger',
+        'NF' => 'Norfolk Island',
+        'NG' => 'Nigeria',
+        'NI' => 'Nicaragua',
+        'NL' => 'Netherlands',
+        'NO' => 'Norway',
+        'NP' => 'Nepal',
+        'NR' => 'Nauru',
+        'NU' => 'Niue',
+        'NZ' => 'New Zealand',
+        'OM' => 'Oman',
+        'PA' => 'Panama',
+        'PE' => 'Peru',
+        'PF' => 'French Polynesia',
+        'PG' => 'Papua New Guinea',
+        'PH' => 'Philippines',
+        'PK' => 'Pakistan',
+        'PL' => 'Poland',
+        'PM' => 'St. Pierre & Miquelon',
+        'PN' => 'Pitcairn Islands',
+        'PR' => 'Puerto Rico',
+        'PS' => 'Palestinian Territories',
+        'PT' => 'Portugal',
+        'PW' => 'Palau',
+        'PY' => 'Paraguay',
+        'QA' => 'Qatar',
+        'RE' => 'Réunion',
+        'RO' => 'Romania',
+        'RS' => 'Serbia',
+        'RU' => 'Russia',
+        'RW' => 'Rwanda',
+        'SA' => 'Saudi Arabia',
+        'SB' => 'Solomon Islands',
+        'SC' => 'Seychelles',
+        'SD' => 'Sudan',
+        'SE' => 'Sweden',
+        'SG' => 'Singapore',
+        'SH' => 'St. Helena',
+        'SI' => 'Slovenia',
+        'SJ' => 'Svalbard & Jan Mayen',
+        'SK' => 'Slovakia',
+        'SL' => 'Sierra Leone',
+        'SM' => 'San Marino',
+        'SN' => 'Senegal',
+        'SO' => 'Somalia',
+        'SR' => 'Suriname',
+        'SS' => 'South Sudan',
+        'ST' => 'São Tomé & Príncipe',
+        'SV' => 'El Salvador',
+        'SX' => 'Sint Maarten',
+        'SY' => 'Syria',
+        'SZ' => 'Eswatini',
+        'TC' => 'Turks & Caicos Islands',
+        'TD' => 'Chad',
+        'TF' => 'French Southern Territories',
+        'TG' => 'Togo',
+        'TH' => 'Thailand',
+        'TJ' => 'Tajikistan',
+        'TK' => 'Tokelau',
+        'TL' => 'Timor-Leste',
+        'TM' => 'Turkmenistan',
+        'TN' => 'Tunisia',
+        'TO' => 'Tonga',
+        'TR' => 'Türkiye',
+        'TT' => 'Trinidad & Tobago',
+        'TV' => 'Tuvalu',
+        'TW' => 'Taiwan',
+        'TZ' => 'Tanzania',
+        'UA' => 'Ukraine',
+        'UG' => 'Uganda',
+        'UM' => 'U.S. Outlying Islands',
+        'US' => 'United States',
+        'UY' => 'Uruguay',
+        'UZ' => 'Uzbekistan',
+        'VA' => 'Vatican City',
+        'VC' => 'St. Vincent & Grenadines',
+        'VE' => 'Venezuela',
+        'VG' => 'British Virgin Islands',
+        'VI' => 'U.S. Virgin Islands',
+        'VN' => 'Vietnam',
+        'VU' => 'Vanuatu',
+        'WF' => 'Wallis & Futuna',
+        'WS' => 'Samoa',
+        'XK' => 'Kosovo',
+        'YE' => 'Yemen',
+        'YT' => 'Mayotte',
+        'ZA' => 'South Africa',
+        'ZM' => 'Zambia',
+        'ZW' => 'Zimbabwe',
+    ];
+
+    return $names[$code] ?? $unknown;
 }

@@ -8,4 +8,5 @@ enum BuildPackTypes: string
     case STATIC = 'static';
     case DOCKERFILE = 'dockerfile';
     case DOCKERCOMPOSE = 'dockercompose';
+    case RAILPACK = 'railpack';
 }

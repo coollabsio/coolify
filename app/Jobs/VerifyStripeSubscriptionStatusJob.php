@@ -1,0 +1,109 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Models\Subscription;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use Stripe\StripeClient;
+
+class VerifyStripeSubscriptionStatusJob implements ShouldBeEncrypted, ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public int $tries = 3;
+
+    public array $backoff = [10, 30, 60];
+
+    public function __construct(public Subscription $subscription)
+    {
+        $this->onQueue('high');
+    }
+
+    public function handle(): void
+    {
+        // If no subscription ID yet, try to find it via customer
+        if (! $this->subscription->stripe_subscription_id &&
+            $this->subscription->stripe_customer_id) {
+            try {
+                $stripe = app(StripeClient::class);
+                $subscriptions = collect($stripe->subscriptions->all([
+                    'customer' => $this->subscription->stripe_customer_id,
+                    'status' => 'all',
+                    'limit' => 10,
+                ])->data);
+
+                $found = $subscriptions->first(fn ($sub) => in_array($sub->status, ['active', 'past_due'], true))
+                    ?? $subscriptions->first();
+
+                if ($found) {
+                    $this->subscription->update([
+                        'stripe_subscription_id' => $found->id,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                // Continue without subscription ID
+            }
+        }
+
+        if (! $this->subscription->stripe_subscription_id) {
+            return;
+        }
+
+        try {
+            $stripe = app(StripeClient::class);
+            $stripeSubscription = $stripe->subscriptions->retrieve(
+                $this->subscription->stripe_subscription_id
+            );
+
+            switch ($stripeSubscription->status) {
+                case 'active':
+                    $this->subscription->update([
+                        'stripe_invoice_paid' => true,
+                        'stripe_past_due' => false,
+                        'stripe_cancel_at_period_end' => $stripeSubscription->cancel_at_period_end,
+                    ]);
+                    break;
+
+                case 'past_due':
+                    // Keep subscription active but mark as past_due
+                    $this->subscription->update([
+                        'stripe_invoice_paid' => true,
+                        'stripe_past_due' => true,
+                        'stripe_cancel_at_period_end' => $stripeSubscription->cancel_at_period_end,
+                    ]);
+                    break;
+
+                case 'canceled':
+                case 'incomplete_expired':
+                case 'unpaid':
+                    // Ensure subscription is marked as inactive
+                    $this->subscription->update([
+                        'stripe_invoice_paid' => false,
+                        'stripe_past_due' => false,
+                    ]);
+
+                    $team = $this->subscription->team;
+                    if ($team) {
+                        $team->subscriptionEnded($this->subscription);
+                    }
+                    break;
+
+                default:
+                    send_internal_notification(
+                        'Unknown subscription status in VerifyStripeSubscriptionStatusJob: '.$stripeSubscription->status.
+                        ' for customer: '.$this->subscription->stripe_customer_id
+                    );
+                    break;
+            }
+        } catch (\Exception $e) {
+            send_internal_notification(
+                'VerifyStripeSubscriptionStatusJob failed for subscription ID '.$this->subscription->id.': '.$e->getMessage()
+            );
+        }
+    }
+}

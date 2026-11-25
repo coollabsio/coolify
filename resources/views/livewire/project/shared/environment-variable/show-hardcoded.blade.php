@@ -1,0 +1,75 @@
+<div class="env-table-item"
+    x-show="typeof envFilter === 'undefined' || envFilter === 'all' || envFilter === '{{ $isPreview ? 'preview' : 'production' }}'">
+    <div class="data-table-row env-table-grid {{ $showEnvironmentType ? '' : 'env-table-grid-no-type' }}">
+        <div class="flex min-w-0 items-center gap-2">
+            <button type="button" data-env-name-trigger
+                class="env-key-label min-w-0 truncate text-left font-mono text-[13px] text-black dark:text-fg"
+                title="{{ $key }}"
+                @click="$el.closest('.data-table-row').querySelector('[data-env-settings-trigger]').click()">
+                {{ $key }}
+            </button>
+            @if (filled($comment))
+                <x-helper :helper="e($comment)" />
+            @endif
+            @if ($serviceName)
+                <span class="table-badge shrink-0">{{ $serviceName }}</span>
+            @endif
+            <span class="table-badge shrink-0">{{ $composeType === 'derived' ? 'Derived in Compose' : 'Defined in Compose' }}</span>
+        </div>
+        <span class="env-managed-desktop data-table-cell-check">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                stroke="currentColor" class="size-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+            </svg>
+        </span>
+        @if ($showEnvironmentType)
+            <div class="env-type-desktop text-[13px] text-neutral-500 dark:text-fg-dim">{{ $isPreview ? 'Preview' : 'Production' }}</div>
+        @endif
+        <span class="data-table-cell-dash">-</span>
+        <span class="data-table-cell-dash">-</span>
+        <span class="data-table-cell-dash">-</span>
+        <span class="data-table-cell-dash">-</span>
+        <div class="flex items-center justify-end gap-0.5 justify-self-end">
+            @unless ($isValueHidden)
+                <x-copy-button resolve="$wire.copyValue()" label="Copy value" />
+            @endunless
+            <x-modal-input title="Environment variable details" :closeOutside="false">
+                <x-slot:content>
+                    <button type="button" data-env-settings-trigger class="icon-button shrink-0"
+                        title="View environment variable" aria-label="View environment variable">
+                        <x-reicon name="settings" class="size-3.5" />
+                    </button>
+                </x-slot:content>
+                <div class="flex w-full flex-col gap-4">
+                    <x-forms.input label="Name" :value="$key" readonly />
+                    @if ($isValueHidden)
+                        <div class="w-full">
+                            <label class="mb-1 flex items-center gap-1 text-sm font-medium">Value</label>
+                            <input disabled type="text" value="Hidden (only admins can view)"
+                                class="input w-full italic !text-neutral-500 dark:!text-neutral-500" />
+                        </div>
+                    @else
+                        <x-forms.input label="Value" :value="$value ?? ''" readonly />
+                    @endif
+                    @if (filled($comment))
+                        <x-forms.input label="Comment" :value="$comment" readonly />
+                    @endif
+                    <x-callout type="info" :title="$composeType === 'derived' ? 'Derived in Compose' : 'Defined in Compose'">
+                        @if ($composeType === 'derived')
+                            This value is derived from
+                            @foreach ($references as $reference)
+                                <button type="button" data-compose-reference
+                                    class="font-mono underline underline-offset-2"
+                                    @click="$dispatch('focus-compose-environment-variable', { key: @js($reference) }); modalOpen = false">
+                                    {{ $reference }}</button>{{ $loop->last ? '' : ',' }}
+                            @endforeach.
+                            Edit those variables or update the Compose file.
+                        @else
+                            This value is defined directly in Docker Compose. Update it in the Compose file.
+                        @endif
+                    </x-callout>
+                </div>
+            </x-modal-input>
+        </div>
+    </div>
+</div>

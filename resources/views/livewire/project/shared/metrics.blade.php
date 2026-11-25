@@ -1,257 +1,379 @@
-<div>
-    <div class="flex items-center gap-2 ">
-        <h2>Metrics</h2>
-    </div>
-    <div class="pb-4">Basic metrics for your container.</div>
+<div class="flex flex-col gap-6"
+    @if (
+        $resource->getMorphClass() !== 'App\Models\Application' ||
+            ($resource->build_pack !== 'dockercompose' &&
+                $resource->destination->server->isMetricsEnabled() &&
+                str($resource->status)->contains('running'))) x-init="$wire.loadData()"
+    @endif>
     @if ($resource->getMorphClass() === 'App\Models\Application' && $resource->build_pack === 'dockercompose')
-        <div class="alert alert-warning">Metrics are not available for Docker Compose applications yet!</div>
-    @elseif(!$resource->destination->server->isSentinelEnabled())
-        <div class="alert alert-warning">Metrics are only available for servers with Sentinel enabled!</div>
-        <div> Go to <a class="underline dark:text-white"
-                href="{{ route('server.show', $resource->destination->server->uuid) }}">Server settings</a> to
-            enable
-            it.</div>
+        <x-application.settings-section id="metrics-overview-section" title="Metrics"
+            helper="Inspect CPU and memory usage for this application.">
+            <x-empty size="sm" title="Metrics unavailable"
+                description="Container metrics are not currently available for Docker Compose applications."
+                icon-name="dashboard" />
+        </x-application.settings-section>
+    @elseif (!$resource->destination->server->isMetricsEnabled())
+        <x-application.settings-section id="metrics-overview-section" title="Metrics"
+            helper="Inspect CPU and memory usage for this application.">
+            <x-slot:actions>
+                <a class="button"
+                    href="{{ route('server.metrics', ['server_uuid' => $resource->destination->server->uuid]) }}"
+                    {{ wireNavigate() }}>
+                    Server metrics
+                    <x-external-link />
+                </a>
+            </x-slot:actions>
+            <x-empty size="sm" title="Metrics are not enabled"
+                description="Enable metrics for this server before collecting application usage data."
+                icon-name="dashboard" />
+        </x-application.settings-section>
+    @elseif (!str($resource->status)->contains('running'))
+        <x-application.settings-section id="metrics-overview-section" title="Metrics"
+            helper="Inspect CPU and memory usage for this application.">
+            <x-slot:actions>
+                <x-status-badge status="Not running" type="neutral" />
+            </x-slot:actions>
+            <x-empty size="sm" title="Container is not running"
+                description="Start the application to begin collecting CPU and memory metrics."
+                icon-name="dashboard" />
+        </x-application.settings-section>
     @else
-        @if (!str($resource->status)->contains('running'))
-            <div class="alert alert-warning">Metrics are only available when this resource is running!</div>
-        @else
-            <x-forms.select label="Interval" wire:change="setInterval" id="interval">
-                <option value="5">5 minutes (live)</option>
-                <option value="10">10 minutes (live)</option>
-                <option value="30">30 minutes</option>
-                <option value="60">1 hour</option>
-                <option value="720">12 hours</option>
-                <option value="10080">1 week</option>
-                <option value="43200">30 days</option>
-            </x-forms.select>
-            <div @if ($poll) wire:poll.5000ms='pollData' @endif x-init="$wire.loadData()"
-                class="pt-5">
-                <h4>CPU (%)</h4>
-                <div wire:ignore id="{!! $chartId !!}-cpu"></div>
+        @if ($this->pollSeconds())
+            <div wire:key="metrics-poll-{{ $this->pollSeconds() }}" wire:poll.{{ $this->pollSeconds() }}s="pollData" class="hidden"></div>
+        @endif
+        <x-application.settings-section id="metrics-overview-section" title="Metrics"
+            helper="Inspect recent CPU and memory usage reported by Sentinel.">
+            <x-slot:actions>
+                <x-live-toggle :active="$live" storageKey="resource-metrics-live" />
+            </x-slot:actions>
+            <div class="max-w-xs">
+                <x-forms.listbox id="interval" label="Time range" onChange="setInterval" :options="[
+                    ['value' => 5, 'label' => 'Last 5 minutes'],
+                    ['value' => 10, 'label' => 'Last 10 minutes'],
+                    ['value' => 30, 'label' => 'Last 30 minutes'],
+                    ['value' => 60, 'label' => 'Last hour'],
+                    ['value' => 720, 'label' => 'Last 12 hours'],
+                    ['value' => 10080, 'label' => 'Last week'],
+                    ['value' => 43200, 'label' => 'Last 30 days'],
+                ]" />
+            </div>
+            <p class="mt-3 text-xs leading-5 text-neutral-500 dark:text-fg-dim">
+                Ranges up to one hour refresh live every five seconds. Longer ranges load once; turn on live refresh to update them every minute.
+            </p>
+        </x-application.settings-section>
 
-                <script>
+        <x-application.settings-section id="cpu-metrics-section" title="CPU usage"
+            helper="CPU usage of the container, as in docker stats. 100% means one CPU core is fully busy, so a container that uses more than one core can go above 100%. The maximum is the number of cores × 100%.">
+            <x-slot:actions>
+                <div wire:ignore id="{!! $chartId !!}-cpu-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+            </x-slot:actions>
+            <div wire:ignore id="{!! $chartId !!}-cpu" class="min-h-[240px] w-full"></div>
+
+            @script
+            <script>
+                (() => {
                     checkTheme();
-                    const optionsServerCpu = {
-                        stroke: {
-                            curve: 'straight',
-                        },
+
+                    const cpuChart = new ApexCharts(document.getElementById('{!! $chartId !!}-cpu'), {
                         chart: {
-                            height: '150px',
-                            id: '{!! $chartId !!}-cpu',
+                            height: 240,
                             type: 'area',
                             toolbar: {
-                                show: true,
-                                tools: {
-                                    download: false,
-                                    selection: false,
-                                    zoom: true,
-                                    zoomin: false,
-                                    zoomout: false,
-                                    pan: false,
-                                    reset: true
-                                },
+                                show: false
+                            },
+                            zoom: {
+                                enabled: false
                             },
                             animations: {
-                                enabled: false,
+                                enabled: true
                             },
-                        },
-                        fill: {
-                            type: 'gradient',
-                        },
-                        dataLabels: {
-                            enabled: false,
-                            offsetY: -10,
-                            style: {
-                                colors: ['#FCD452'],
-                            },
-                            background: {
-                                enabled: false,
-                            }
-                        },
-                        grid: {
-                            show: true,
-                            borderColor: '',
-                        },
-                        colors: [baseColor],
-                        xaxis: {
-                            type: 'datetime',
+                            background: 'transparent',
                         },
                         series: [{
-                            name: "CPU %",
-                            data: []
+                            name: 'CPU',
+                            data: [],
                         }],
-                        noData: {
-                            text: 'Loading...',
-                            style: {
-                                color: textColor,
-                            }
-                        },
-                        tooltip: {
-                            enabled: true,
-                            marker: {
-                                show: false,
-                            }
-                        },
-                        legend: {
-                            show: false
-                        }
-                    }
-                    const serverCpuChart = new ApexCharts(document.getElementById(`{!! $chartId !!}-cpu`), optionsServerCpu);
-                    serverCpuChart.render();
-                    document.addEventListener('livewire:init', () => {
-                        Livewire.on('refreshChartData-{!! $chartId !!}-cpu', (chartData) => {
-                            checkTheme();
-                            serverCpuChart.updateOptions({
-                                series: [{
-                                    data: chartData[0].seriesData,
-                                }],
-                                colors: [baseColor],
-                                xaxis: {
-                                    type: 'datetime',
-                                    labels: {
-                                        show: true,
-                                        style: {
-                                            colors: textColor,
-                                        }
-                                    }
-                                },
-                                yaxis: {
-                                    show: true,
-                                    labels: {
-                                        show: true,
-                                        style: {
-                                            colors: textColor,
-                                        }
-                                    }
-                                },
-                                noData: {
-                                    text: 'Loading...',
-                                    style: {
-                                        color: textColor,
-                                    }
-                                }
-                            });
-                        });
-                    });
-                </script>
-
-                <h3>Memory (MB)</h3>
-                <div wire:ignore id="{!! $chartId !!}-memory"></div>
-
-                <script>
-                    checkTheme();
-                    const optionsServerMemory = {
+                        colors: [cpuColor],
                         stroke: {
-                            curve: 'straight',
-                        },
-                        chart: {
-                            height: '150px',
-                            id: '{!! $chartId !!}-memory',
-                            type: 'area',
-                            toolbar: {
-                                show: true,
-                                tools: {
-                                    download: false,
-                                    selection: false,
-                                    zoom: true,
-                                    zoomin: false,
-                                    zoomout: false,
-                                    pan: false,
-                                    reset: true
-                                },
-                            },
-                            animations: {
-                                enabled: false,
-                            },
+                            curve: 'smooth',
+                            width: 2,
                         },
                         fill: {
                             type: 'gradient',
+                            gradient: {
+                                opacityFrom: 0.28,
+                                opacityTo: 0.02,
+                                stops: [0, 90, 100],
+                            },
                         },
                         dataLabels: {
                             enabled: false,
-                            offsetY: -10,
-                            style: {
-                                colors: ['#FCD452'],
-                            },
-                            background: {
-                                enabled: false,
-                            }
                         },
                         grid: {
-                            show: true,
-                            borderColor: '',
+                            borderColor: 'rgba(128, 128, 128, 0.14)',
+                            strokeDashArray: 4,
                         },
-                        colors: [baseColor],
+                        legend: {
+                            show: false,
+                        },
                         xaxis: {
                             type: 'datetime',
                             labels: {
-                                show: true,
+                                datetimeUTC: false,
                                 style: {
                                     colors: textColor,
-                                }
-                            }
+                                },
+                            },
                         },
-                        series: [{
-                            name: "Memory (MB)",
-                            data: []
-                        }],
+                        yaxis: {
+                            min: 0,
+                            max: max => max > 0 ? max * 1.2 : 1,
+                            forceNiceScale: true,
+                            labels: {
+                                style: {
+                                    colors: textColor,
+                                },
+                                formatter: value => {
+                                    const precision = Math.abs(value) < 1 ? 2 : 1;
+
+                                    return `${Number(value.toFixed(precision))}%`;
+                                },
+                            },
+                        },
                         noData: {
-                            text: 'Loading...',
+                            text: 'Loading CPU metrics…',
                             style: {
                                 color: textColor,
-                            }
+                            },
                         },
                         tooltip: {
-                            enabled: true,
+                            shared: false,
+                            intersect: false,
+                            followCursor: false,
+                            fixed: {
+                                enabled: false,
+                            },
                             marker: {
                                 show: false,
-                            }
+                            },
+                            custom: ({ series, seriesIndex, dataPointIndex, w }) => {
+                                const value = series[seriesIndex][dataPointIndex];
+                                const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
+
+                                return `<div class="apexcharts-tooltip-custom">
+                                    <div class="apexcharts-tooltip-custom-value">CPU: <span class="apexcharts-tooltip-value-bold">${value}%</span></div>
+                                    ${window.chartTooltipTime(timestamp)}
+                                </div>`;
+                            },
+                        },
+                    });
+
+                    cpuChart.render();
+                    window.syncChartTooltips('{!! $chartId !!}', [cpuChart]);
+
+                    Livewire.on('refreshChartData-{!! $chartId !!}-cpu', chartData => {
+                        checkTheme();
+                        cpuChart.updateOptions({
+                            colors: [cpuColor],
+                            series: [{
+                                name: 'CPU',
+                                data: chartData[0].seriesData,
+                            }],
+                            xaxis: {
+                                type: 'datetime',
+                                labels: {
+                                    datetimeUTC: false,
+                                    style: {
+                                        colors: textColor,
+                                    },
+                                },
+                            },
+                            yaxis: {
+                                min: 0,
+                                max: max => max > 0 ? max * 1.2 : 1,
+                                forceNiceScale: true,
+                                labels: {
+                                    style: {
+                                        colors: textColor,
+                                    },
+                                    formatter: value => {
+                                        const precision = Math.abs(value) < 1 ? 2 : 1;
+
+                                        return `${Number(value.toFixed(precision))}%`;
+                                    },
+                                },
+                            },
+                            noData: {
+                                text: 'No CPU metrics available',
+                                style: {
+                                    color: textColor,
+                                },
+                            },
+                        });
+                        renderChartLegend(document.getElementById('{!! $chartId !!}-cpu-legend'), [{
+                            name: 'CPU',
+                            color: cpuColor,
+                            data: chartData[0].seriesData,
+                            formatter: value => `${Number(value.toFixed(Math.abs(value) < 1 ? 2 : 1))}%`,
+                        }]);
+                    });
+                })();
+            </script>
+            @endscript
+        </x-application.settings-section>
+
+        <x-application.settings-section id="memory-metrics-section" title="Memory usage"
+            helper="Memory consumed by the application container, measured in megabytes.">
+            <x-slot:actions>
+                <div wire:ignore id="{!! $chartId !!}-memory-legend" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"></div>
+            </x-slot:actions>
+            <div wire:ignore id="{!! $chartId !!}-memory" class="min-h-[240px] w-full"></div>
+
+            @script
+            <script>
+                (() => {
+                    checkTheme();
+
+                    const formatMemory = value => value >= 1024 ? `${Number((value / 1024).toFixed(1))} GB` : `${Math.round(value)} MB`;
+
+                    const memoryChart = new ApexCharts(document.getElementById('{!! $chartId !!}-memory'), {
+                        chart: {
+                            height: 240,
+                            type: 'area',
+                            toolbar: {
+                                show: false
+                            },
+                            zoom: {
+                                enabled: false
+                            },
+                            animations: {
+                                enabled: true
+                            },
+                            background: 'transparent',
+                        },
+                        series: [{
+                            name: 'Memory',
+                            data: [],
+                        }],
+                        colors: [ramColor],
+                        stroke: {
+                            curve: 'smooth',
+                            width: 2,
+                        },
+                        fill: {
+                            type: 'gradient',
+                            gradient: {
+                                opacityFrom: 0.28,
+                                opacityTo: 0.02,
+                                stops: [0, 90, 100],
+                            },
+                        },
+                        dataLabels: {
+                            enabled: false,
+                        },
+                        grid: {
+                            borderColor: 'rgba(128, 128, 128, 0.14)',
+                            strokeDashArray: 4,
                         },
                         legend: {
-                            show: false
-                        }
-                    }
-                    const serverMemoryChart = new ApexCharts(document.getElementById(`{!! $chartId !!}-memory`),
-                        optionsServerMemory);
-                    serverMemoryChart.render();
-                    document.addEventListener('livewire:init', () => {
-                        Livewire.on('refreshChartData-{!! $chartId !!}-memory', (chartData) => {
-                            checkTheme();
-                            serverMemoryChart.updateOptions({
-                                series: [{
-                                    data: chartData[0].seriesData,
-                                }],
-                                colors: [baseColor],
-                                xaxis: {
-                                    type: 'datetime',
-                                    labels: {
-                                        show: true,
-                                        style: {
-                                            colors: textColor,
-                                        }
-                                    }
+                            show: false,
+                        },
+                        xaxis: {
+                            type: 'datetime',
+                            labels: {
+                                datetimeUTC: false,
+                                style: {
+                                    colors: textColor,
                                 },
-                                yaxis: {
-                                    min: 0,
-                                    show: true,
-                                    labels: {
-                                        show: true,
-                                        style: {
-                                            colors: textColor,
-                                        }
-                                    }
+                            },
+                        },
+                        yaxis: {
+                            min: 0,
+                            max: max => max > 0 ? max * 1.2 : 1,
+                            forceNiceScale: true,
+                            labels: {
+                                style: {
+                                    colors: textColor,
                                 },
-                                noData: {
-                                    text: 'Loading...',
-                                    style: {
-                                        color: textColor,
-                                    }
-                                }
-                            });
-                        });
+                                formatter: formatMemory,
+                            },
+                        },
+                        noData: {
+                            text: 'Loading memory metrics…',
+                            style: {
+                                color: textColor,
+                            },
+                        },
+                        tooltip: {
+                            shared: false,
+                            intersect: false,
+                            followCursor: false,
+                            fixed: {
+                                enabled: false,
+                            },
+                            marker: {
+                                show: false,
+                            },
+                            custom: ({ series, seriesIndex, dataPointIndex, w }) => {
+                                const value = series[seriesIndex][dataPointIndex];
+                                const timestamp = w.globals.seriesX[seriesIndex][dataPointIndex];
+
+                                return `<div class="apexcharts-tooltip-custom">
+                                    <div class="apexcharts-tooltip-custom-value">Memory: <span class="apexcharts-tooltip-value-bold">${value} MB</span></div>
+                                    ${window.chartTooltipTime(timestamp)}
+                                </div>`;
+                            },
+                        },
                     });
-                </script>
-            </div>
-        @endif
+
+                    memoryChart.render();
+                    window.syncChartTooltips('{!! $chartId !!}', [memoryChart]);
+
+                    Livewire.on('refreshChartData-{!! $chartId !!}-memory', chartData => {
+                        checkTheme();
+                        memoryChart.updateOptions({
+                            colors: [ramColor],
+                            series: [{
+                                name: 'Memory',
+                                data: chartData[0].seriesData,
+                            }],
+                            xaxis: {
+                                type: 'datetime',
+                                labels: {
+                                    datetimeUTC: false,
+                                    style: {
+                                        colors: textColor,
+                                    },
+                                },
+                            },
+                            yaxis: {
+                                min: 0,
+                                max: max => max > 0 ? max * 1.2 : 1,
+                                forceNiceScale: true,
+                                labels: {
+                                    style: {
+                                        colors: textColor,
+                                    },
+                                    formatter: formatMemory,
+                                },
+                            },
+                            noData: {
+                                text: 'No memory metrics available',
+                                style: {
+                                    color: textColor,
+                                },
+                            },
+                        });
+                        renderChartLegend(document.getElementById('{!! $chartId !!}-memory-legend'), [{
+                            name: 'Memory',
+                            color: ramColor,
+                            data: chartData[0].seriesData,
+                            formatter: formatMemory,
+                        }]);
+                    });
+                })();
+            </script>
+            @endscript
+        </x-application.settings-section>
     @endif
 </div>

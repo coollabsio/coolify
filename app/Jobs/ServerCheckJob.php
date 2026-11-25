@@ -1,0 +1,123 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Actions\Docker\GetContainersStatus;
+use App\Actions\Proxy\CheckProxy;
+use App\Actions\Proxy\StartProxy;
+use App\Actions\Server\StartLogDrain;
+use App\Models\Server;
+use App\Notifications\Container\ContainerRestarted;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Queue\TimeoutExceededException;
+use Illuminate\Support\Facades\Log;
+
+class ServerCheckJob implements ShouldBeEncrypted, ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public $tries = 1;
+
+    public $timeout = 60;
+
+    public $containers;
+
+    public function middleware(): array
+    {
+        return [(new WithoutOverlapping('server-check-'.$this->server->uuid))->expireAfter(60)->dontRelease()];
+    }
+
+    public function __construct(public Server $server) {}
+
+    public function failed(?\Throwable $exception): void
+    {
+        if ($exception instanceof TimeoutExceededException) {
+            Log::warning('ServerCheckJob timed out', [
+                'server_id' => $this->server->id,
+                'server_name' => $this->server->name,
+            ]);
+            $this->server->increment('unreachable_count');
+
+            // Delete the queue job so it doesn't appear in Horizon's failed list.
+            $this->job?->delete();
+        }
+    }
+
+    public function handle()
+    {
+        try {
+            // ServerConnectionCheckJob owns reachability. Do not probe SSH again here: one failed
+            // probe would mark the server unreachable without UNREACHABLE_THRESHOLD.
+            if ($this->server->isFunctional() === false) {
+                if ($this->server->settings->is_reachable === false) {
+                    $this->server->markResourcesAsExited();
+                }
+
+                return 'Server is not reachable or not ready.';
+            }
+
+            if (! $this->server->isSwarmWorker() && ! $this->server->isBuildServer()) {
+                ['containers' => $this->containers, 'containerReplicates' => $containerReplicates] = $this->server->getContainers();
+                if (is_null($this->containers)) {
+                    return 'No containers found.';
+                }
+                GetContainersStatus::run($this->server, $this->containers, $containerReplicates);
+
+                if ($this->server->isSentinelEnabled()) {
+                    CheckAndStartSentinelJob::dispatch($this->server);
+                }
+
+                if ($this->server->isFluentBitLogDrainEnabled()) {
+                    $this->checkLogDrainContainer();
+                }
+
+                if ($this->server->proxySet() && ! $this->server->proxy->force_stop && ! $this->server->isProxyTransitionInProgress()) {
+                    $this->server->proxyType();
+                    $foundProxyContainer = $this->containers->filter(function ($value, $key) {
+                        if ($this->server->isSwarm()) {
+                            return data_get($value, 'Spec.Name') === 'coolify-proxy_traefik';
+                        } else {
+                            return data_get($value, 'Name') === '/coolify-proxy';
+                        }
+                    })->first();
+                    if (! $foundProxyContainer) {
+                        try {
+                            $shouldStart = CheckProxy::run($this->server);
+                            if ($shouldStart) {
+                                StartProxy::run($this->server, async: false);
+                                $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server, restartedResource: $this->server));
+                            }
+                        } catch (\Throwable $e) {
+                        }
+                    } else {
+                        $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
+                        $this->server->save();
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            return handleError($e);
+        }
+    }
+
+    private function checkLogDrainContainer()
+    {
+        $foundLogDrainContainer = $this->containers->filter(function ($value, $key) {
+            return data_get($value, 'Name') === '/coolify-log-drain';
+        })->first();
+        if ($foundLogDrainContainer) {
+            $status = data_get($foundLogDrainContainer, 'State.Status');
+            if ($status !== 'running' || StartLogDrain::claimOutdatedRefresh($this->server, data_get($foundLogDrainContainer, 'Config.Labels'))) {
+                StartLogDrain::dispatch($this->server);
+            }
+        } else {
+            StartLogDrain::dispatch($this->server);
+        }
+    }
+}

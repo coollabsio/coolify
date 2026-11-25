@@ -1,0 +1,141 @@
+# documentation: https://jitsi.github.io/handbook/docs/devops-guide/devops-guide-docker/
+# slogan: Self-hosted Jitsi Meet — open-source video conferencing platform
+# tags: jitsi,video,conference,webrtc,meeting,self-hosted
+# category: productivity
+# logo: svgs/jitsi.svg
+# port: 8000
+
+services:
+  jitsi-web:
+    image: "ghcr.io/jitsi/web:stable-11509"
+    restart: unless-stopped
+    environment:
+      - SERVICE_URL_JITSI_8000
+      - PUBLIC_URL=$SERVICE_URL_JITSI
+      - ENABLE_AUTH=0
+      - ENABLE_GUESTS=1
+      - ENABLE_LETSENCRYPT=0
+      - ENABLE_HTTP_REDIRECT=0
+      - DISABLE_HTTPS=1
+      - XMPP_DOMAIN=meet.jitsi
+      - XMPP_AUTH_DOMAIN=auth.meet.jitsi
+      - XMPP_GUEST_DOMAIN=guest.meet.jitsi
+      - XMPP_MUC_DOMAIN=conference.meet.jitsi
+      - XMPP_INTERNAL_MUC_DOMAIN=internal.auth.meet.jitsi
+      - XMPP_BOSH_URL_BASE=http://prosody:5280
+      - JVB_BREWERY_MUC=jvbbrewery
+      - JICOFO_COMPONENT_SECRET=${SERVICE_PASSWORD_JICOFO}
+      - JICOFO_AUTH_PASSWORD=${SERVICE_PASSWORD_JICOFO}
+      - JVB_AUTH_PASSWORD=${SERVICE_PASSWORD_JVB}
+      - TZ=${TZ:-UTC}
+    depends_on:
+      - prosody
+      - jicofo
+      - jvb
+    volumes:
+      - jitsi-web:/config
+      - jitsi-web-storage:/storage
+    networks:
+      meet.jitsi:
+        aliases:
+          - meet.jitsi
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+
+  prosody:
+    image: "ghcr.io/jitsi/prosody:stable-11509"
+    restart: unless-stopped
+    environment:
+      - AUTH_TYPE=internal
+      - ENABLE_AUTH=0
+      - ENABLE_GUESTS=1
+      - XMPP_DOMAIN=meet.jitsi
+      - XMPP_AUTH_DOMAIN=auth.meet.jitsi
+      - XMPP_GUEST_DOMAIN=guest.meet.jitsi
+      - XMPP_MUC_DOMAIN=conference.meet.jitsi
+      - XMPP_INTERNAL_MUC_DOMAIN=internal.auth.meet.jitsi
+      - JICOFO_COMPONENT_SECRET=${SERVICE_PASSWORD_JICOFO}
+      - JICOFO_AUTH_PASSWORD=${SERVICE_PASSWORD_JICOFO}
+      - JVB_AUTH_PASSWORD=${SERVICE_PASSWORD_JVB}
+      - PUBLIC_URL=$SERVICE_URL_JITSI
+      - TZ=${TZ:-UTC}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - jitsi-prosody:/config
+      - jitsi-prosody-data:/var/lib/prosody
+    networks:
+      meet.jitsi:
+        aliases:
+          - xmpp.meet.jitsi
+          - auth.meet.jitsi
+          - guest.meet.jitsi
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5280/http-bind"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+
+  jicofo:
+    image: "ghcr.io/jitsi/jicofo:stable-11509"
+    restart: unless-stopped
+    environment:
+      - AUTH_TYPE=internal
+      - ENABLE_AUTH=0
+      - XMPP_DOMAIN=meet.jitsi
+      - XMPP_AUTH_DOMAIN=auth.meet.jitsi
+      - XMPP_INTERNAL_MUC_DOMAIN=internal.auth.meet.jitsi
+      - XMPP_MUC_DOMAIN=conference.meet.jitsi
+      - XMPP_SERVER=prosody
+      - JICOFO_COMPONENT_SECRET=${SERVICE_PASSWORD_JICOFO}
+      - JICOFO_AUTH_PASSWORD=${SERVICE_PASSWORD_JICOFO}
+      - JVB_BREWERY_MUC=jvbbrewery
+      - JICOFO_ENABLE_HEALTH_CHECKS=1
+      - TZ=${TZ:-UTC}
+    depends_on:
+      - prosody
+    volumes:
+      - jitsi-jicofo:/config
+    networks:
+      meet.jitsi:
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/about/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+
+  jvb:
+    image: "ghcr.io/jitsi/jvb:stable-11509"
+    restart: unless-stopped
+    ports:
+      - "10000:10000/udp"
+    environment:
+      - XMPP_SERVER=prosody
+      - XMPP_DOMAIN=meet.jitsi
+      - XMPP_AUTH_DOMAIN=auth.meet.jitsi
+      - XMPP_INTERNAL_MUC_DOMAIN=internal.auth.meet.jitsi
+      - XMPP_MUC_DOMAIN=conference.meet.jitsi
+      - JVB_AUTH_USER=jvb
+      - JVB_AUTH_PASSWORD=${SERVICE_PASSWORD_JVB}
+      - JVB_BREWERY_MUC=jvbbrewery
+      - JVB_PORT=10000
+      - JVB_ADVERTISE_IPS=${JVB_ADVERTISE_IPS:-} #Optional: set your public IP only if STUN auto-detection fails or the server is behind NAT / multiple interfaces
+      - JVB_STUN_SERVERS=${JVB_STUN_SERVERS:-stun.l.google.com:19302}
+      - PUBLIC_URL=$SERVICE_URL_JITSI
+      - TZ=${TZ:-UTC}
+    depends_on:
+      - prosody
+    volumes:
+      - jitsi-jvb:/config
+    networks:
+      meet.jitsi:
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/about/health"]
+      interval: 5s
+      timeout: 10s
+      retries: 15
+
+networks:
+  meet.jitsi:

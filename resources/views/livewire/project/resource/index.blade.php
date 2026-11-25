@@ -1,145 +1,579 @@
 <div>
     <x-slot:title>
-        {{ data_get_str($project, 'name')->limit(10) }} > Resources | Coolify
+        {{ data_get_str($environment, 'name')->limit(10) }} > Resources | Coolify
     </x-slot>
-    <div class="flex flex-col">
-        <div class="flex items-center gap-2">
-            <h1>Resources</h1>
-            @if ($environment->isEmpty())
-                <a class="button"
-                    href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => request()->route('environment_name')]) }}">
-                    Clone
+    <div x-data="resourceIndex()" class="w-full">
+        <header class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0">
+                <div class="flex min-w-0 items-center gap-1.5">
+                    <h1 class="truncate text-[24px]! leading-7! font-semibold! tracking-tight!">{{ $environment->name }}</h1>
+                    @can('update', $project)
+                        <a href="{{ route('project.environment.edit', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
+                            {{ wireNavigate() }}
+                            class="flex size-7 shrink-0 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                            title="Environment settings"
+                            aria-label="Open settings for {{ $environment->name }}">
+                            <x-reicon name="settings" class="size-4" />
+                        </a>
+                    @endcan
+                </div>
+                <p class="mt-1 text-[13px] text-neutral-500 dark:text-fg-dim">
+                    <span x-text="`${resources.length} ${resources.length === 1 ? 'resource' : 'resources'}`"></span>
+                    in <a href="{{ route('project.show', ['project_uuid' => $project->uuid]) }}" {{ wireNavigate() }}
+                        class="font-medium text-neutral-700 underline-offset-2 hover:text-black hover:underline dark:text-fg dark:hover:text-white"
+                        title="Show all environments in {{ $project->name }}">{{ $project->name }}</a>
+                </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 sm:shrink-0">
+                @if ($environment->isEmpty())
+                    {{-- The list toolbar (with its canvas switch) is hidden when there are no resources. --}}
+                    <x-canvas-view-toggle :views="['list' => ['List view', 'unordered-list']]"
+                        :canvas-url="route('project.environment.canvas', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid])" />
+                @endif
+                <a href="{{ route('shared-variables.environment.show', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
+                    {{ wireNavigate() }}
+                    class="button whitespace-nowrap"
+                    title="Shared variables for this environment"
+                    aria-label="Shared variables for {{ $environment->name }}">
+                    <x-reicon name="variables" class="size-3.5" />
+                    Shared variables
                 </a>
-            @else
-                <a href="{{ route('project.resource.create', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
-                    class="button">+
-                    New</a>
-                <a class="button"
-                    href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => request()->route('environment_name')]) }}">
-                    Clone
-                </a>
-            @endif
-            <livewire:project.delete-environment :disabled="!$environment->isEmpty()" :environment_id="$environment->id" />
-        </div>
-        <nav class="flex pt-2 pb-6">
-            <ol class="flex items-center">
-                <li class="inline-flex items-center">
-                    <a class="text-xs truncate lg:text-sm"
-                        href="{{ route('project.show', ['project_uuid' => request()->route('project_uuid')]) }}">
-                        {{ $project->name }}</a>
-                </li>
-                <li>
-                    <div class="flex items-center">
-                        <svg aria-hidden="true" class="w-4 h-4 mx-1 font-bold dark:text-warning" fill="currentColor"
-                            viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                            <path fill-rule="evenodd"
-                                d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                                clip-rule="evenodd"></path>
-                        </svg>
+                @can('createAnyResource', [$environment])
+                    <a href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
+                        {{ wireNavigate() }}
+                        class="button whitespace-nowrap button-highlighted">
+                        <x-reicon name="plus" class="size-3.5" />
+                        New resource
+                    </a>
+                @endcan
+            </div>
+        </header>
 
-                        <livewire:project.resource.environment-select :environments="$project->environments" />
+        @if ($environment->isEmpty())
+            @can('createAnyResource', [$environment])
+                <x-empty title="No resources yet"
+                    description="Add an application, database, or service to this environment."
+                    icon-name="layers">
+                    <x-slot:contents>
+                        <a href="{{ route('project.resource.create', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
+                            {{ wireNavigate() }} class="button">
+                            <x-reicon name="plus" class="size-3.5" />
+                            Add resource
+                        </a>
+                    </x-slot:contents>
+                </x-empty>
+            @else
+                <x-empty title="No resources yet"
+                    description="Add an application, database, or service to this environment."
+                    icon-name="layers" />
+            @endcan
+        @else
+            <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="relative w-full sm:max-w-sm">
+                    <x-reicon name="search"
+                        class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                    <input x-model.debounce.150ms="search" x-on:input="page = 1" type="search"
+                        placeholder="Search resources"
+                        class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint">
+                    <button x-cloak x-show="search" x-on:click="search = ''; page = 1" type="button"
+                        class="absolute top-1/2 right-2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                        aria-label="Clear search">
+                        <span class="text-sm leading-none">×</span>
+                    </button>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2">
+                    <x-table.dropdown panel-class="w-64! overflow-hidden! p-0!" :multiselectable="true">
+                        <x-slot:trigger>
+                            <button type="button" class="button max-w-64"
+                                :class="activeFilterCount > 0 && 'button-highlighted'"
+                                :title="activeFilterCount > 0 ? filterButtonText : 'Filter'"
+                                aria-haspopup="listbox" :aria-expanded="open">
+                            <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="1.7"
+                                    stroke-linecap="round" />
+                            </svg>
+                            <span class="truncate" x-text="activeFilterCount > 0 ? filterButtonText : 'Filter'">Filter</span>
+                            <span x-show="activeFilterCount > 0" x-cloak
+                                class="shrink-0 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-white/[0.07] dark:text-fg-dim"
+                                x-text="activeFilterCount"></span>
+                            </button>
+                        </x-slot:trigger>
+                            <div class="max-h-80 overflow-y-auto p-1">
+                                <template x-for="group in filterGroups" :key="group.key">
+                                    <div x-show="group.options.length > 0">
+                                        <div class="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400 dark:text-fg-faint"
+                                            x-text="group.label"></div>
+                                        <template x-for="option in group.options" :key="`${group.key}-${option.value}`">
+                                            <button type="button" class="listbox-option"
+                                                x-on:click="toggleFilter(group.key, option.value)">
+                                                <span class="min-w-0 flex-1 truncate" x-text="option.label"></span>
+                                                <span
+                                                    class="flex size-4 shrink-0 items-center justify-center rounded-[5px] border"
+                                                    :class="isFilterSelected(group.key, option.value)
+                                                        ? 'border-coollabs bg-coollabs text-white dark:border-brand dark:bg-brand dark:text-white'
+                                                        : 'border-neutral-300 bg-white dark:border-white/[0.14] dark:bg-white/[0.045]'">
+                                                    <svg x-show="isFilterSelected(group.key, option.value)" class="size-3"
+                                                        viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                                        <path d="m2.25 6.15 2.35 2.3 5.15-5" stroke="currentColor"
+                                                            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+                                                    </svg>
+                                                </span>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+                            <div class="border-t border-neutral-200 bg-white p-1 dark:border-white/10 dark:bg-raised">
+                                <button type="button" class="listbox-option justify-center! text-center!"
+                                    x-on:click="clearFilters()">
+                                    Clear filters
+                                </button>
+                            </div>
+                    </x-table.dropdown>
+
+                    <div :class="viewMode === 'grid' ? '' : 'min-[769px]:hidden'">
+                        <x-table.dropdown panel-class="w-48!">
+                            <x-slot:trigger>
+                                <button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
+                                <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                    <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3"
+                                        stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+                                        stroke-linejoin="round" />
+                                </svg>
+                                Sort
+                                </button>
+                            </x-slot:trigger>
+                                <template x-for="option in sortOptions" :key="option.value">
+                                    <button type="button"
+                                        class="listbox-option"
+                                        x-on:click="sortBy = option.value; close(); page = 1">
+                                        <span class="flex-1" x-text="option.label"></span>
+                                        <svg x-show="sortBy === option.value" class="size-3.5 text-black dark:text-fg"
+                                            viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                            <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor"
+                                                stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                    </button>
+                                </template>
+                        </x-table.dropdown>
                     </div>
-                </li>
-            </ol>
-        </nav>
-    </div>
-    @if ($environment->isEmpty())
-        <a href="{{ route('project.resource.create', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }} "
-            class="items-center justify-center box">+ Add New Resource</a>
-    @else
-        <div x-data="searchComponent()">
-            <x-forms.input autofocus placeholder="Search for name, fqdn..." x-model="search" id="null" />
-            <div class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
-                <template x-for="item in allFilteredItems" :key="item.uuid">
-                    <span>
-                        <a class="h-24 box group" :href="item.hrefLink">
-                            <div class="flex flex-col w-full">
-                                <div class="flex gap-2 px-4">
-                                    <div class="pb-2 truncate box-title" x-text="item.name"></div>
-                                    <div class="flex-1"></div>
-                                    <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="bg-success badge badge-absolute"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="bg-error badge badge-absolute"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="bg-warning badge badge-absolute"></div>
-                                    </template>
-                                    <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="bg-warning badge badge-absolute"></div>
+
+                    <x-canvas-view-toggle
+                        :list-url="route('project.resource.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid])"
+                        :canvas-url="route('project.environment.canvas', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid])" />
+                </div>
+            </div>
+
+            <div x-show="viewMode === 'table'"
+                class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
+                <div
+                    class="environment-resource-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
+                    <x-table.sort-header label="Resource" asc="name-asc" desc="name-desc" then="page = 1" />
+                    <x-table.sort-header label="Type" asc="type-asc" desc="type-desc" then="page = 1" class="resource-type" />
+                    <x-table.sort-header label="Status" asc="status-asc" desc="status-desc" then="page = 1" />
+                    <x-table.sort-header label="Domain" asc="domain-asc" desc="domain-desc" then="page = 1" class="resource-domain" />
+                    <x-table.sort-header label="Server" asc="server-asc" desc="server-desc" then="page = 1" class="resource-server" />
+                    <div class="resource-tags">Tags</div>
+                </div>
+
+                <template x-for="item in paginatedResources" :key="item.uuid">
+                    <div
+                        class="environment-resource-grid group relative min-h-14 items-center border-b border-neutral-200 px-4 py-2.5 transition-colors last:border-b-0 hover:bg-neutral-50 dark:border-white/[0.07] dark:hover:bg-white/[0.025]">
+                        <a :href="item.hrefLink"
+                            @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
+                            {{ wireNavigate() }} class="absolute inset-0" :aria-label="`Open ${item.name}`"></a>
+                        <div class="flex min-w-0 items-center gap-3">
+                            <div
+                                class="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                                <span class="contents" x-html="item.logoHtml"></span>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="flex min-w-0 items-center gap-1.5">
+                                    <a :href="item.hrefLink"
+                                        {{ wireNavigate() }}
+                                        class="relative block truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
+                                        x-text="item.name"></a>
+                                    <x-image-scan.marker bind="item.security" class="relative" />
+                                </div>
+                                <p class="truncate text-[11px] text-neutral-500 dark:text-fg-faint"
+                                    x-show="item.description?.trim()"
+                                    x-text="item.description"></p>
+                                <div class="mobile-resource-domain min-w-0">
+                                    <template x-if="item.fqdn">
+                                        <a :href="firstDomain(item.fqdn)" target="_blank" rel="noopener noreferrer"
+                                            class="relative z-10 block truncate text-[11px] text-neutral-500 hover:underline dark:text-fg-dim"
+                                            x-text="displayDomain(item.fqdn)"></a>
                                     </template>
                                 </div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.description"></div>
-                                <div class="max-w-full px-4 truncate box-description" x-text="item.fqdn"></div>
                             </div>
-                        </a>
-                        <div
-                            class="flex flex-wrap gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
-                            <template x-for="tag in item.tags">
-                                <div class="tag" @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
-                            </template>
-                            <div class="add-tag" @click.prevent="goto(item)">Add tag</div>
                         </div>
-                    </span>
-                </template>
-            </div>
-        </div>
-    @endif
 
+                        <div class="resource-type min-w-0">
+                            <button type="button"
+                                class="table-filter-value truncate text-[12px] text-neutral-600 dark:text-fg-dim"
+                                x-on:click="toggleFilter('typeFilters', item.type)"
+                                x-bind:title="`Filter by ${item.typeLabel}`" x-text="item.typeLabel"></button>
+                        </div>
+
+                        <div class="min-w-0">
+                            <x-status-badge dynamic as="button" class="table-filter-value table-filter-badge"
+                                x-on:click="toggleFilter('statusFilters', statusState(item))"
+                                x-bind:title="`${statusTitle(item)} · Filter by ${statusLabel(item)}`">
+                                <span class="size-1.5 shrink-0 rounded-full"
+                                    x-bind:class="statusDotClass(item)"></span>
+                                <span class="truncate" x-text="statusLabel(item)"></span>
+                            </x-status-badge>
+                        </div>
+
+                        <div class="resource-domain min-w-0">
+                            <template x-if="item.fqdn">
+                                <a :href="firstDomain(item.fqdn)" target="_blank"
+                                    class="relative inline-block max-w-full truncate align-middle text-[12px] text-neutral-600 hover:underline dark:text-fg-dim"
+                                    x-text="displayDomain(item.fqdn)"></a>
+                            </template>
+                            <span x-show="!item.fqdn" class="text-[12px] text-neutral-400 dark:text-fg-faint">-</span>
+                        </div>
+
+                        <div class="resource-server min-w-0">
+                            <button type="button"
+                                class="table-filter-value truncate text-[12px] text-neutral-600 dark:text-fg-dim"
+                                x-on:click="toggleFilter('serverFilters', item.destination?.server?.name || 'Unknown')"
+                                x-bind:title="`Filter by ${item.destination?.server?.name || 'Unknown'}`"
+                                x-text="item.destination?.server?.name || 'Unknown'"></button>
+                        </div>
+
+                        <div class="resource-tags flex min-w-0 items-center gap-1 overflow-hidden">
+                            <template x-for="tag in item.tags.slice(0, 2)" :key="tag.id">
+                                <a :href="`/tags/${tag.name}`"
+                                    class="relative max-w-24 truncate rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] text-neutral-500 hover:text-black dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-faint dark:hover:text-fg"
+                                    x-text="tag.name"></a>
+                            </template>
+                            <span x-show="item.tags.length > 2"
+                                class="text-[10px] text-neutral-400 dark:text-fg-faint"
+                                x-text="`+${item.tags.length - 2}`"></span>
+                            <span x-show="item.tags.length === 0"
+                                class="text-[12px] text-neutral-400 dark:text-fg-faint">-</span>
+                        </div>
+                    </div>
+                </template>
+
+                <div x-show="filteredResources.length === 0"
+                    class="flex min-h-52 flex-col items-center justify-center px-6 text-center">
+                    <x-reicon name="search" class="mb-3 size-6 text-neutral-300 dark:text-fg-faint" />
+                    <p class="text-[13px] font-medium">No matching resources</p>
+                    <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">
+                        Try a different search or filter.
+                    </p>
+                </div>
+                <x-client-pagination total="filteredResources.length" x-show="filteredResources.length > 0"
+                    summary="filteredResources.length === 0 ? '0 resources' : `${rangeStart}-${rangeEnd} of ${filteredResources.length}`"
+                    page-size-model="pageSize" storage-key="coolify.page-size.environment-resources" />
+            </div>
+
+            <div x-cloak x-show="viewMode === 'grid'">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <template x-for="item in paginatedResources" :key="item.uuid">
+                        <article
+                            class="group relative flex min-h-28 flex-col rounded-xl border border-neutral-200 bg-white p-3 shadow-sm transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-md dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]">
+                            <a :href="item.hrefLink"
+                                @click="if (item.version === 'v5') { $event.preventDefault(); window.location.assign(item.hrefLink) }"
+                                {{ wireNavigate() }} class="absolute inset-0 rounded-xl"
+                                :aria-label="`Open ${item.name}`"></a>
+
+                            <div class="flex items-start gap-3">
+                                <div
+                                    class="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-fg-dim">
+                                <span class="contents" x-html="item.logoHtml"></span>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex min-w-0 items-center gap-1.5">
+                                        <h2
+                                            class="truncate text-[13px]! leading-4! font-semibold! text-black dark:text-fg"
+                                            x-text="item.name"></h2>
+                                        <x-image-scan.marker bind="item.security" class="relative" />
+                                    </div>
+                                    <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint"
+                                        x-text="item.typeLabel"></p>
+                                </div>
+                                <x-status-badge dynamic x-bind:title="statusTitle(item)">
+                                    <span class="size-1.5 shrink-0 rounded-full"
+                                        x-bind:class="statusDotClass(item)"></span>
+                                    <span class="truncate" x-text="statusLabel(item)"></span>
+                                </x-status-badge>
+                            </div>
+                            <div class="mt-auto flex min-w-0 flex-col gap-0.5 pt-4">
+                                <p class="min-h-4 truncate text-[11px] text-neutral-500 dark:text-fg-faint">
+                                    <span x-show="item.description" x-text="item.description"></span>
+                                </p>
+                                <template x-if="item.fqdn">
+                                    <a :href="firstDomain(item.fqdn)" target="_blank" rel="noopener noreferrer"
+                                        class="relative z-10 max-w-full self-start truncate text-[11px] text-neutral-500 hover:underline dark:text-fg-dim"
+                                        :title="displayDomain(item.fqdn)" x-text="displayDomain(item.fqdn)"></a>
+                                </template>
+                            </div>
+                        </article>
+                    </template>
+                </div>
+
+                <div x-show="filteredResources.length === 0"
+                    class="flex min-h-52 flex-col items-center justify-center rounded-xl border border-neutral-200 bg-white px-6 text-center dark:border-white/[0.08] dark:bg-white/[0.05]">
+                    <x-reicon name="search" class="mb-3 size-6 text-neutral-300 dark:text-fg-faint" />
+                    <p class="text-[13px] font-medium">No matching resources</p>
+                    <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">
+                        Try a different search or filter.
+                    </p>
+                </div>
+                <x-client-pagination total="filteredResources.length" x-show="filteredResources.length > 0"
+                    class="mt-3 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]"
+                    summary="filteredResources.length === 0 ? '0 resources' : `${rangeStart}-${rangeEnd} of ${filteredResources.length}`"
+                    page-size-model="pageSize" storage-key="coolify.page-size.environment-resources" />
+            </div>
+        @endif
+    </div>
 </div>
 
 <script>
-    function sortFn(a, b) {
-        return a.name.localeCompare(b.name)
-    }
-
-    function searchComponent() {
+    function resourceIndex() {
         return {
             search: '',
-            applications: @js($applications),
-            postgresqls: @js($postgresqls),
-            redis: @js($redis),
-            mongodbs: @js($mongodbs),
-            mysqls: @js($mysqls),
-            mariadbs: @js($mariadbs),
-            keydbs: @js($keydbs),
-            dragonflies: @js($dragonflies),
-            clickhouses: @js($clickhouses),
-            services: @js($services),
-            gotoTag(tag) {
-                window.location.href = '/tags/' + tag;
+            typeFilters: [],
+            tagFilters: [],
+            serverFilters: [],
+            statusFilters: [],
+            sortBy: 'name-asc',
+            viewMode: @js($this->listView('environment', 'table')),
+            filterOpen: false,
+            sortOpen: false,
+            page: 1,
+            pageSize: 10,
+            resources: [
+                ...@js($applicationsJs),
+                ...@js($postgresqlsJs),
+                ...@js($redisJs),
+                ...@js($mongodbsJs),
+                ...@js($mysqlsJs),
+                ...@js($mariadbsJs),
+                ...@js($keydbsJs),
+                ...@js($dragonfliesJs),
+                ...@js($clickhousesJs),
+                ...@js($sqlitesJs),
+                ...@js($servicesJs),
+            ],
+            get filterGroups() {
+                return [{
+                        key: 'typeFilters',
+                        label: 'Resource types',
+                        options: this.uniqueOptions(this.resources.map((item) => ({
+                            value: item.type,
+                            label: item.typeLabel,
+                        }))),
+                    },
+                    {
+                        key: 'tagFilters',
+                        label: 'Tags',
+                        options: this.uniqueOptions(this.resources.flatMap((item) =>
+                            (item.tags || []).map((tag) => ({ value: tag.name, label: tag.name }))
+                        )),
+                    },
+                    {
+                        key: 'serverFilters',
+                        label: 'Servers',
+                        options: this.uniqueOptions(this.resources.map((item) => ({
+                            value: item.destination?.server?.name || 'Unknown',
+                            label: item.destination?.server?.name || 'Unknown',
+                        }))),
+                    },
+                    {
+                        key: 'statusFilters',
+                        label: 'Statuses',
+                        options: this.uniqueOptions(this.resources.map((item) => ({
+                            value: this.statusState(item),
+                            label: this.statusLabel(item),
+                        }))),
+                    },
+                ];
             },
-            goto(item) {
-                const hrefLink = item.hrefLink;
-                window.location.href = `${hrefLink}#tags`;
+            get activeFilterCount() {
+                return this.typeFilters.length + this.tagFilters.length + this.serverFilters.length +
+                    this.statusFilters.length;
             },
-            filterAndSort(items) {
-                if (this.search === '') {
-                    return Object.values(items).sort(sortFn);
+            get filterButtonText() {
+                const selectedLabels = this.filterGroups.flatMap((group) => group.options
+                    .filter((option) => this[group.key].includes(option.value))
+                    .map((option) => option.label));
+
+                if (selectedLabels.length === 0) return 'Filter';
+                if (selectedLabels.length === 1) return selectedLabels[0];
+                return `${selectedLabels[0]} +${selectedLabels.length - 1}`;
+            },
+            sortOptions: [{
+                    value: 'name-asc',
+                    label: 'Name A–Z'
+                },
+                {
+                    value: 'name-desc',
+                    label: 'Name Z–A'
+                },
+                {
+                    value: 'type-asc',
+                    label: 'Resource type'
+                },
+                {
+                    value: 'status-asc',
+                    label: 'Status'
+                },
+            ],
+            get filteredResources() {
+                const query = this.search.trim().toLowerCase();
+                const items = this.resources.filter((item) => {
+                    const matchesType = this.typeFilters.length === 0 || this.typeFilters.includes(item.type);
+                    const matchesTags = this.tagFilters.length === 0 || (item.tags || [])
+                        .some((tag) => this.tagFilters.includes(tag.name));
+                    const serverName = item.destination?.server?.name || 'Unknown';
+                    const matchesServer = this.serverFilters.length === 0 || this.serverFilters.includes(serverName);
+                    const matchesStatus = this.statusFilters.length === 0 || this.statusFilters.includes(this.statusState(item));
+                    const searchable = [
+                        item.name,
+                        item.fqdn,
+                        item.description,
+                        item.typeLabel,
+                        item.status,
+                        item.destination?.server?.name,
+                        ...(item.tags || []).map((tag) => tag.name),
+                    ].filter(Boolean).join(' ').toLowerCase();
+
+                    return matchesType && matchesTags && matchesServer && matchesStatus &&
+                        (!query || searchable.includes(query));
+                });
+
+                const [column, direction] = this.sortBy.split('-');
+                const sortValues = {
+                    name: (item) => item.name,
+                    type: (item) => item.typeLabel,
+                    status: (item) => this.statusLabel(item),
+                    domain: (item) => this.displayDomain(item.fqdn) || '',
+                    server: (item) => item.destination?.server?.name || 'Unknown',
+                };
+                const sortValue = sortValues[column] || sortValues.name;
+                const order = direction === 'desc' ? -1 : 1;
+
+                return items.sort((first, second) =>
+                    order * (sortValue(first).localeCompare(sortValue(second)) ||
+                        first.name.localeCompare(second.name)));
+            },
+            uniqueOptions(options) {
+                return [...new Map(options
+                    .filter((option) => option.value)
+                    .map((option) => [option.value, option])).values()]
+                    .sort((first, second) => first.label.localeCompare(second.label));
+            },
+            isFilterSelected(group, value) {
+                return this[group].includes(value);
+            },
+            toggleFilter(group, value) {
+                this[group] = this[group].includes(value)
+                    ? this[group].filter((selected) => selected !== value)
+                    : [...this[group], value];
+                this.page = 1;
+            },
+            clearFilters() {
+                this.typeFilters = [];
+                this.tagFilters = [];
+                this.serverFilters = [];
+                this.statusFilters = [];
+                this.page = 1;
+            },
+            get totalPages() {
+                return Math.max(1, Math.ceil(this.filteredResources.length / this.pageSize));
+            },
+            get paginatedResources() {
+                if (this.page > this.totalPages) {
+                    this.page = this.totalPages;
                 }
-                const searchLower = this.search.toLowerCase();
-                return Object.values(items).filter(item => {
-                    return (item.name?.toLowerCase().includes(searchLower) ||
-                        item.fqdn?.toLowerCase().includes(searchLower) ||
-                        item.description?.toLowerCase().includes(searchLower) ||
-                        item.tags?.some(tag => tag.name.toLowerCase().includes(searchLower)));
-                }).sort(sortFn);
+
+                const start = (this.page - 1) * this.pageSize;
+                return this.filteredResources.slice(start, start + this.pageSize);
             },
-            get allFilteredItems() {
-                return [
-                    this.applications,
-                    this.postgresqls,
-                    this.redis,
-                    this.mongodbs,
-                    this.mysqls,
-                    this.mariadbs,
-                    this.keydbs,
-                    this.dragonflies,
-                    this.clickhouses,
-                    this.services
-                ].flatMap((items) => this.filterAndSort(items))
-            }
+            get rangeStart() {
+                return this.filteredResources.length === 0 ? 0 : ((this.page - 1) * this.pageSize) + 1;
+            },
+            get rangeEnd() {
+                return Math.min(this.page * this.pageSize, this.filteredResources.length);
+            },
+            previousPage() {
+                this.page = Math.max(1, this.page - 1);
+            },
+            nextPage() {
+                this.page = Math.min(this.totalPages, this.page + 1);
+            },
+            setViewMode(mode) {
+                this.viewMode = mode;
+                this.page = 1;
+                this.$wire.saveListView('environment', mode);
+            },
+            statusState(item) {
+                if (item.restartLimitReached) {
+                    return 'restart-limit';
+                }
+
+                return String(item.status || 'unknown').split(':')[0].toLowerCase();
+            },
+            statusLabel(item) {
+                if (item.restartLimitReached) {
+                    return 'Restart limit reached';
+                }
+
+                const state = this.statusState(item);
+                return state.charAt(0).toUpperCase() + state.slice(1);
+            },
+            statusTitle(item) {
+                if (item.restartLimitReached) {
+                    return `${item.restartCount}/${item.maxRestartCount} restarts. Container preserved.`;
+                }
+
+                return this.statusLabel(item);
+            },
+            statusTone(item) {
+                if (item.restartLimitReached) {
+                    return 'warning';
+                }
+
+                const state = this.statusState(item);
+                if (state === 'running') {
+                    return 'success';
+                }
+                if (['starting', 'restarting', 'degraded'].includes(state)) {
+                    return 'warning';
+                }
+                if (['exited', 'stopped', 'failed'].includes(state)) {
+                    return 'error';
+                }
+
+                return 'neutral';
+            },
+            statusDotClass(item) {
+                if (item.restartLimitReached) {
+                    return 'bg-warning';
+                }
+
+                return {
+                    success: 'bg-emerald-500',
+                    warning: 'bg-warning',
+                    error: 'bg-red-500',
+                    neutral: 'bg-neutral-400 dark:bg-neutral-500',
+                } [this.statusTone(item)];
+            },
+            firstDomain(fqdn) {
+                return String(fqdn).split(',')[0].trim();
+            },
+            displayDomain(fqdn) {
+                if (!fqdn) {
+                    return '';
+                }
+
+                return this.firstDomain(fqdn).replace(/^https?:\/\//, '');
+            },
         };
     }
 </script>

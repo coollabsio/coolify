@@ -1,13 +1,15 @@
 # documentation: https://www.dokuwiki.org/
 # slogan: A lightweight and easy-to-use wiki platform for creating and managing documentation and knowledge bases.
+# category: cms
 # tags: wiki, documentation, knowledge, base
 # logo: svgs/dokuwiki.png
+# port: 80
 
 services:
   dokuwiki:
-    image: lscr.io/linuxserver/dokuwiki:latest
+    image: lscr.io/linuxserver/dokuwiki:version-2026-07-14c
     environment:
-      - SERVICE_FQDN_DOKUWIKI
+      - SERVICE_URL_DOKUWIKI
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid

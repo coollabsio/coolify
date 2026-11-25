@@ -1,0 +1,26 @@
+# documentation: https://docs.seerr.dev/getting-started/docker
+# slogan: Seerr (formerly Overseerr) is a request management and media discovery tool for Jellyfin, Plex, and Emby.
+# category: media
+# tags: media,request,plex,jellyfin,emby,sonarr,radarr,seerr
+# logo: svgs/overseerr.svg
+# port: 5055
+
+services:
+  overseerr:
+    image: ghcr.io/seerr-team/seerr:v3.5.2
+    init: true
+    environment:
+      - SERVICE_URL_OVERSEERR_5055
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - TZ=${TZ:-America/Toronto}
+      - PORT=5055
+    volumes:
+      - overseerr-config:/app/config
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget --no-verbose --tries=1 --spider http://localhost:5055/api/v1/settings/public || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s

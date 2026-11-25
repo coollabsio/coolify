@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::table('services', function (Blueprint $table) {
             $table->dropColumn('destination_type');
             $table->dropColumn('destination_id');
-
         });
     }
 

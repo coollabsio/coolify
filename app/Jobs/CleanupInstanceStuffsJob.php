@@ -2,56 +2,113 @@
 
 namespace App\Jobs;
 
+use App\Models\NotificationThrottle;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\TeamInvitation;
-use App\Models\Waitlist;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class CleanupInstanceStuffsJob implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $timeout = 60;
+
+    /**
+     * Releases the unique lock of a killed worker after one run (the timeout), so the next run every one or
+     * two minutes is not blocked until the queue retry_after.
+     */
+    public int $uniqueFor = 60;
+
     public function __construct() {}
 
-    // public function uniqueId(): string
-    // {
-    //     return $this->container_name;
-    // }
+    public function middleware(): array
+    {
+        return [(new WithoutOverlapping('cleanup-instance-stuffs'))->expireAfter(60)->dontRelease()];
+    }
 
     public function handle(): void
     {
         try {
-            // $this->cleanup_waitlist();
+            $this->cleanupInvitationLink();
+            $this->cleanupExpiredEmailChangeRequests();
+            $this->enforceBackupRetention();
+            $this->deleteOrphanedNotificationThrottles();
+            $this->failDeploymentsOfStoppedWorkers();
         } catch (\Throwable $e) {
-            send_internal_notification('CleanupInstanceStuffsJob failed with error: '.$e->getMessage());
-            ray($e->getMessage());
-        }
-        try {
-            $this->cleanup_invitation_link();
-        } catch (\Throwable $e) {
-            send_internal_notification('CleanupInstanceStuffsJob failed with error: '.$e->getMessage());
-            ray($e->getMessage());
+            Log::error('CleanupInstanceStuffsJob failed with error: '.$e->getMessage());
         }
     }
 
-    private function cleanup_waitlist()
-    {
-        $waitlist = Waitlist::whereVerified(false)->where('created_at', '<', now()->subMinutes(config('constants.waitlist.expiration')))->get();
-        foreach ($waitlist as $item) {
-            $item->delete();
-        }
-    }
-
-    private function cleanup_invitation_link()
+    private function cleanupInvitationLink()
     {
         $invitation = TeamInvitation::all();
         foreach ($invitation as $item) {
             $item->isValid();
+        }
+    }
+
+    private function cleanupExpiredEmailChangeRequests()
+    {
+        User::whereNotNull('email_change_code_expires_at')
+            ->where('email_change_code_expires_at', '<', now())
+            ->update([
+                'pending_email' => null,
+                'email_change_code' => null,
+                'email_change_code_expires_at' => null,
+            ]);
+    }
+
+    private function failDeploymentsOfStoppedWorkers(): void
+    {
+        try {
+            fail_deployments_of_stopped_workers();
+        } catch (\Throwable $e) {
+            Log::error('Failed to fail the deployments of stopped workers: '.$e->getMessage());
+        }
+    }
+
+    private function deleteOrphanedNotificationThrottles(): void
+    {
+        if (! Cache::add('notification-throttle-orphan-cleanup', true, 3600)) {
+            return;
+        }
+
+        try {
+            NotificationThrottle::deleteOrphans();
+        } catch (\Throwable $e) {
+            Log::error('Failed to delete orphaned notification throttles: '.$e->getMessage());
+            Cache::forget('notification-throttle-orphan-cleanup');
+        }
+    }
+
+    private function enforceBackupRetention(): void
+    {
+        if (! Cache::add('backup-retention-enforcement', true, 1800)) {
+            return;
+        }
+
+        try {
+            $backups = ScheduledDatabaseBackup::where('enabled', true)->get();
+            foreach ($backups as $backup) {
+                try {
+                    removeOldBackups($backup);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to enforce retention for backup '.$backup->id.': '.$e->getMessage());
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::error('Failed to enforce backup retention: '.$e->getMessage());
+            Cache::forget('backup-retention-enforcement');
         }
     }
 }

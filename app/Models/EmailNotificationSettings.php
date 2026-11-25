@@ -1,0 +1,121 @@
+<?php
+
+namespace App\Models;
+
+use App\Traits\HasSmtpServers;
+use App\Traits\TracksDeliveryFailures;
+use Illuminate\Database\Eloquent\Model;
+
+class EmailNotificationSettings extends Model
+{
+    use HasSmtpServers, TracksDeliveryFailures;
+
+    public $timestamps = false;
+
+    protected $fillable = [
+        'team_id',
+
+        'smtp_enabled',
+        'smtp_from_address',
+        'smtp_from_name',
+        'smtp_recipients',
+        'smtp_host',
+        'smtp_port',
+        'smtp_encryption',
+        'smtp_username',
+        'smtp_password',
+        'smtp_timeout',
+        'smtp_ehlo_domain',
+
+        'resend_enabled',
+        'resend_api_key',
+        'resend_from_address',
+        'resend_from_name',
+
+        'use_instance_email_settings',
+
+        'deployment_success_email_notifications',
+        'deployment_failure_email_notifications',
+        'deployment_commit_details_email_notifications',
+        'status_change_email_notifications',
+        'restart_limit_reached_email_notifications',
+        'backup_success_email_notifications',
+        'backup_failure_email_notifications',
+        'scheduled_task_success_email_notifications',
+        'scheduled_task_failure_email_notifications',
+        'docker_cleanup_success_email_notifications',
+        'docker_cleanup_failure_email_notifications',
+        'server_disk_usage_email_notifications',
+        'server_reachable_email_notifications',
+        'server_unreachable_email_notifications',
+        'server_patch_email_notifications',
+        'traefik_outdated_email_notifications',
+        'image_vulnerabilities_email_notifications',
+    ];
+
+    protected $hidden = [
+        'smtp_from_address',
+        'smtp_from_name',
+        'smtp_recipients',
+        'smtp_host',
+        'smtp_username',
+        'smtp_password',
+        'resend_api_key',
+        'resend_from_address',
+        'resend_from_name',
+    ];
+
+    protected $casts = [
+        'smtp_enabled' => 'boolean',
+        'smtp_from_address' => 'encrypted',
+        'smtp_from_name' => 'encrypted',
+        'smtp_recipients' => 'encrypted',
+        'smtp_host' => 'encrypted',
+        'smtp_port' => 'integer',
+        'smtp_username' => 'encrypted',
+        'smtp_password' => 'encrypted',
+        'smtp_timeout' => 'integer',
+
+        'resend_enabled' => 'boolean',
+        'resend_api_key' => 'encrypted',
+        'resend_from_address' => 'encrypted',
+        'resend_from_name' => 'encrypted',
+
+        'use_instance_email_settings' => 'boolean',
+
+        'deployment_success_email_notifications' => 'boolean',
+        'deployment_failure_email_notifications' => 'boolean',
+        'deployment_commit_details_email_notifications' => 'boolean',
+        'status_change_email_notifications' => 'boolean',
+        'restart_limit_reached_email_notifications' => 'boolean',
+        'backup_success_email_notifications' => 'boolean',
+        'backup_failure_email_notifications' => 'boolean',
+        'scheduled_task_success_email_notifications' => 'boolean',
+        'scheduled_task_failure_email_notifications' => 'boolean',
+        'server_disk_usage_email_notifications' => 'boolean',
+        'server_patch_email_notifications' => 'boolean',
+        'traefik_outdated_email_notifications' => 'boolean',
+        'image_vulnerabilities_email_notifications' => 'boolean',
+    ];
+
+    public function team()
+    {
+        return $this->belongsTo(Team::class);
+    }
+
+    public function isEnabled()
+    {
+        return filled(enabled_email_provider($this)) || $this->use_instance_email_settings;
+    }
+
+    public function notificationChannelName(): string
+    {
+        return 'Email';
+    }
+
+    protected function disableNotificationChannel(): void
+    {
+        $this->smtp_enabled = false;
+        $this->resend_enabled = false;
+    }
+}

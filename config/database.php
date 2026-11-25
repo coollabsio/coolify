@@ -1,6 +1,66 @@
 <?php
 
 use Illuminate\Support\Str;
+use Pdo\Pgsql;
+
+$parseDatabaseHosts = function (mixed $hosts, mixed $fallback = 'coolify-db'): array {
+    $parsedHosts = array_values(array_filter(
+        array_map('trim', explode(',', (string) $hosts)),
+        'strlen',
+    ));
+
+    if ($parsedHosts !== []) {
+        return $parsedHosts;
+    }
+
+    $fallbackHosts = array_values(array_filter(
+        array_map('trim', explode(',', (string) $fallback)),
+        'strlen',
+    ));
+
+    return $fallbackHosts === [] ? ['coolify-db'] : $fallbackHosts;
+};
+
+$pgsql = [
+    'driver' => 'pgsql',
+    'url' => env('DATABASE_URL'),
+    'host' => env('DB_HOST', 'coolify-db'),
+    'port' => env('DB_PORT', '5432'),
+    'database' => env('DB_DATABASE', 'coolify'),
+    'username' => env('DB_USERNAME', 'coolify'),
+    'password' => env('DB_PASSWORD', ''),
+    'charset' => 'utf8',
+    'prefix' => '',
+    'prefix_indexes' => true,
+    'search_path' => 'public',
+    // Laravel writes dates without an offset, so timestampTz columns need a UTC session.
+    'timezone' => 'UTC',
+    'sslmode' => 'prefer',
+    'options' => [
+        (defined('Pdo\Pgsql::ATTR_DISABLE_PREPARES') ? Pgsql::ATTR_DISABLE_PREPARES : PDO::PGSQL_ATTR_DISABLE_PREPARES) => env('DB_DISABLE_PREPARES', false),
+    ],
+];
+
+/*
+ * Opt-in read/write replica split. Activates only when DB_READ_HOST is set.
+ * When unset, the pgsql connection is identical to a single-primary setup.
+ * Hosts may be comma-separated; Laravel random-picks one per connection.
+ */
+if (env('DB_READ_HOST')) {
+    $pgsql['read'] = [
+        'host' => $parseDatabaseHosts(env('DB_READ_HOST'), env('DB_HOST', 'coolify-db')),
+        'port' => env('DB_READ_PORT', env('DB_PORT', '5432')),
+        'username' => env('DB_READ_USERNAME', env('DB_USERNAME', 'coolify')),
+        'password' => env('DB_READ_PASSWORD', env('DB_PASSWORD', '')),
+    ];
+    $pgsql['write'] = [
+        'host' => $parseDatabaseHosts(env('DB_WRITE_HOST'), env('DB_HOST', 'coolify-db')),
+        'port' => env('DB_WRITE_PORT', env('DB_PORT', '5432')),
+        'username' => env('DB_WRITE_USERNAME', env('DB_USERNAME', 'coolify')),
+        'password' => env('DB_WRITE_PASSWORD', env('DB_PASSWORD', '')),
+    ];
+    $pgsql['sticky'] = (bool) env('DB_STICKY', true);
+}
 
 return [
 
@@ -35,62 +95,13 @@ return [
 
     'connections' => [
 
-        'sqlite' => [
+        'pgsql' => $pgsql,
+
+        'testing' => [
             'driver' => 'sqlite',
-            'url' => env('DATABASE_URL'),
-            'database' => env('DB_DATABASE', database_path('database.sqlite')),
+            'database' => ':memory:',
             'prefix' => '',
-            'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-        ],
-
-        'mysql' => [
-            'driver' => 'mysql',
-            'url' => env('DATABASE_URL'),
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '3306'),
-            'database' => env('DB_DATABASE', 'forge'),
-            'username' => env('DB_USERNAME', 'forge'),
-            'password' => env('DB_PASSWORD', ''),
-            'unix_socket' => env('DB_SOCKET', ''),
-            'charset' => 'utf8mb4',
-            'collation' => 'utf8mb4_unicode_ci',
-            'prefix' => '',
-            'prefix_indexes' => true,
-            'strict' => true,
-            'engine' => null,
-            'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
-        ],
-
-        'pgsql' => [
-            'driver' => 'pgsql',
-            'url' => env('DATABASE_URL'),
-            'host' => env('DB_HOST', 'postgres'),
-            'port' => env('DB_PORT', '5432'),
-            'database' => env('DB_DATABASE', 'coolify'),
-            'username' => env('DB_USERNAME', 'coolify'),
-            'password' => env('DB_PASSWORD', ''),
-            'charset' => 'utf8',
-            'prefix' => '',
-            'prefix_indexes' => true,
-            'search_path' => 'public',
-            'sslmode' => 'prefer',
-        ],
-
-        'sqlsrv' => [
-            'driver' => 'sqlsrv',
-            'url' => env('DATABASE_URL'),
-            'host' => env('DB_HOST', 'localhost'),
-            'port' => env('DB_PORT', '1433'),
-            'database' => env('DB_DATABASE', 'forge'),
-            'username' => env('DB_USERNAME', 'forge'),
-            'password' => env('DB_PASSWORD', ''),
-            'charset' => 'utf8',
-            'prefix' => '',
-            'prefix_indexes' => true,
-            // 'encrypt' => env('DB_ENCRYPT', 'yes'),
-            // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
+            'foreign_key_constraints' => true,
         ],
 
     ],

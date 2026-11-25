@@ -1,120 +1,153 @@
-<div>
-    <dialog id="newInitScript" class="modal">
-        <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit='save_new_init_script'>
-            <h3 class="text-lg font-bold">Add Init Script</h3>
-            <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="Filename" required />
-            <x-forms.textarea placeholder="CREATE DATABASE test;" id="new_content" label="Content" required />
-            <x-forms.button onclick="newInitScript.close()" type="submit">
-                Save
-            </x-forms.button>
-        </form>
-        <form method="dialog" class="modal-backdrop">
-            <button>close</button>
-        </form>
-    </dialog>
+<div class="application-settings-form flex flex-col gap-6">
+    <form wire:submit="submit" class="flex flex-col gap-6">
+        <x-unsaved-bar action="submit" />
 
-    <form wire:submit="submit" class="flex flex-col gap-2">
-        <div class="flex items-center gap-2">
-            <h2>General</h2>
-            <x-forms.button type="submit">
-                Save
-            </x-forms.button>
-        </div>
-        <div class="flex flex-wrap gap-2 sm:flex-nowrap">
-            <x-forms.input label="Name" id="database.name" />
-            <x-forms.input label="Description" id="database.description" />
-            <x-forms.input label="Image" id="database.image" required
-                helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/postgres'>https://hub.docker.com/_/postgres</a>" />
-        </div>
-        <div class="pt-2 dark:text-warning">If you change the values in the database, please sync it here, otherwise
-            automations (like backups) won't work.
-        </div>
-        @if ($database->started_at)
-            <div class="flex flex-col gap-2">
-                <x-forms.input label="Username" id="database.postgres_user" placeholder="If empty: postgres"
-                    helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
-                <x-forms.input label="Password" id="database.postgres_password" type="password" required
-                    helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
-                <x-forms.input label="Initial Database" id="database.postgres_db"
-                    placeholder="If empty, it will be the same as Username." readonly
-                    helper="You can only change this in the database." />
+        <x-application.settings-section id="database-details-section" title="Database details"
+            description="Manage the identity, container image, and credentials of this PostgreSQL database.">
+            <x-slot:actions>
+                <x-modal-input title="Resource details" buttonTitle="Details">
+                    <livewire:project.shared.resource-details :resource="$database" />
+                </x-modal-input>
+            </x-slot:actions>
+            <div class="grid gap-4 lg:grid-cols-2">
+                <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
+                <x-forms.input label="Description" id="description" canGate="update" :canResource="$database" />
+                <div class="lg:col-span-2">
+                    <x-forms.input label="Image" id="image" required canGate="update" :canResource="$database"
+                        helper="Use a published PostgreSQL image from Docker Hub." />
+                </div>
             </div>
-        @else
-            <div class="flex flex-col gap-2 pb-2">
-                <x-forms.input label="Username" id="database.postgres_user" placeholder="If empty: postgres" />
-                <x-forms.input label="Password" id="database.postgres_password" type="password" required />
-                <x-forms.input label="Initial Database" id="database.postgres_db"
-                    placeholder="If empty, it will be the same as Username." />
-            </div>
-        @endif
-        <div class="flex gap-2">
-            <x-forms.input label="Initial Database Arguments" id="database.postgres_initdb_args"
-                placeholder="If empty, use default. See in docker docs." />
-            <x-forms.input label="Host Auth Method" id="database.postgres_host_auth_method"
-                placeholder="If empty, use default. See in docker docs." />
-        </div>
-        <div class="flex flex-col gap-2">
-            <h3 class="py-2">Network</h3>
-            <div class="flex items-end gap-2">
-                <x-forms.input placeholder="3000:5432" id="database.ports_mappings" label="Ports Mappings"
-                    helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433" />
-            </div>
+            <x-application.settings-subsection id="credentials-section" title="Credentials" helper="Keep these values aligned with the credentials configured inside PostgreSQL.">
+                @if ($database->started_at)
+                    <x-callout type="warning" title="Keep credentials synchronized">
+                        Changing values here does not update PostgreSQL. Update PostgreSQL first, then synchronize the
+                        values here so backups and other automations continue working.
+                    </x-callout>
+                @endif
+                <div class="{{ $database->started_at ? 'mt-4 ' : '' }}grid gap-4 lg:grid-cols-2">
+                    <x-forms.input label="Username" id="postgresUser" placeholder="If empty: postgres"
+                        canGate="update" :canResource="$database" />
+                    @if ($isPasswordHiddenForMember)
+                        <x-forms.input label="Password" disabled value="Hidden (only admins can view)" />
+                    @else
+                        <x-forms.input label="Password" id="postgresPassword" type="password" required
+                            canGate="update" :canResource="$database" />
+                    @endif
+                    <x-forms.input label="Initial database" id="postgresDb"
+                        placeholder="If empty, it will match the username."
+                        :readonly="(bool) $database->started_at" canGate="update" :canResource="$database"
+                        helper="{{ $database->started_at ? 'You can only change this in the database.' : null }}" />
+                </div>
+            </x-application.settings-subsection>
+            <x-application.settings-subsection id="initialization-section" title="Initialization" helper="Configure the options used when PostgreSQL creates its initial data directory.">
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.input label="Initial database arguments" id="postgresInitdbArgs"
+                        placeholder="Leave empty to use the image default." canGate="update" :canResource="$database"
+                        helper="Used only on the first start, when PostgreSQL creates the data directory. To apply a change later, delete the data volume or edit the files in the database." />
+                    <x-forms.input label="Host authentication method" id="postgresHostAuthMethod"
+                        placeholder="Leave empty to use the image default." canGate="update" :canResource="$database"
+                        helper="Used only on the first start, when PostgreSQL creates the data directory. To apply a change later, delete the data volume or edit the files in the database." />
+                </div>
+            </x-application.settings-subsection>
+        </x-application.settings-section>
 
-            <x-forms.input label="Postgres URL (internal)"
-                helper="If you change the user/password/port, this could be different. This is with the default values."
-                type="password" readonly wire:model="db_url" />
-            @if ($db_url_public)
-                <x-forms.input label="Postgres URL (public)"
-                    helper="If you change the user/password/port, this could be different. This is with the default values."
-                    type="password" readonly wire:model="db_url_public" />
+        <x-application.settings-section id="access-section" title="Access"
+            description="How applications and clients connect to this database, and whether it is reachable from the internet.">
+            <x-slot:actions>
+                @if ($isPublic)
+                    <x-process-dialog closeWithX size="xl">
+                        <x-slot:title>Proxy logs</x-slot:title>
+                        <x-slot:content>
+                            <livewire:project.shared.get-logs :server="$server" :resource="$database"
+                                container="{{ data_get($database, 'uuid') }}-proxy" :collapsible="false" lazy />
+                        </x-slot:content>
+                        <x-forms.button @click="processDialogOpen = true">View logs</x-forms.button>
+                    </x-process-dialog>
+                @endif
+            </x-slot:actions>
+            <x-application.settings-subsection id="connection-section" title="Connection" helper="Use these URLs to connect to the database." first>
+                <livewire:project.database.postgresql.status-info :database="$database" />
+            </x-application.settings-subsection>
+            <x-application.settings-subsection id="public-access-section" title="Public access" helper="Expose this database through the managed TCP proxy." class="relative">
+                <x-table.loading target="instantSave" text="Updating public access..." />
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <div wire:key="public-access-{{ $publicPort ?: 'unset' }}">
+                        <x-forms.listbox id="isPublic" label="Access" live onChange="instantSave" :onChangeArgs="[]"
+                            :disabled="! auth()->user()->can('update', $database)" canGate="update" :canResource="$database" :options="[
+                                ['value' => false, 'label' => 'Private'],
+                                ['value' => true, 'label' => blank($publicPort) ? 'Public through TCP proxy (set public port first)' : 'Public through TCP proxy', 'disabled' => blank($publicPort)],
+                            ]" />
+                    </div>
+                    <x-forms.input type="number" placeholder="5432" disabled="{{ $isPublic }}" id="publicPort"
+                        label="Public port" canGate="update" :canResource="$database" />
+                    <x-forms.input type="number" placeholder="3600" disabled="{{ $isPublic }}" id="publicPortTimeout"
+                        label="Proxy timeout" helper="Timeout in seconds. The default is 3600."
+                        canGate="update" :canResource="$database" />
+                    <x-forms.input placeholder="3000:5432" id="portsMappings" label="Port mappings"
+                        helper="Comma-separated host-to-container mappings, for example 3000:5432."
+                        canGate="update" :canResource="$database" />
+                </div>
+            </x-application.settings-subsection>
+        </x-application.settings-section>
+
+        <x-application.settings-section id="container-section" title="Container"
+            description="Docker options, configuration, and log forwarding for the database container.">
+            @if ($isPasswordHiddenForMember)
+                <x-forms.input label="Custom Docker options" disabled value="Hidden (only admins can view)" />
+            @else
+                <x-forms.input
+                    helper="Add supported docker run options used when the container starts. Unsupported options can interfere with Coolify automation."
+                    placeholder="--cap-add SYS_ADMIN --device=/dev/fuse"
+                    id="customDockerRunOptions" label="Custom Docker options" canGate="update"
+                    :canResource="$database" />
+            @endif
+            <x-application.settings-subsection id="configuration-section" title="Configuration" helper="Override the PostgreSQL configuration used by this container.">
+                @if ($isPasswordHiddenForMember)
+                    <x-forms.input label="Custom PostgreSQL configuration" disabled value="Hidden (only admins can view)" />
+                @else
+                    <x-forms.textarea label="Custom PostgreSQL configuration" rows="10" id="postgresConf"
+                        canGate="update" :canResource="$database" />
+                @endif
+            </x-application.settings-subsection>
+            <x-application.settings-subsection id="log-delivery-section" title="Log delivery" helper="Forward container logs to the drain configured on the server.">
+                <x-forms.listbox canGate="update" :canResource="$database" id="isLogDrainEnabled" label="Log drain" live onChange="instantSaveAdvanced"
+                    :disabled="! auth()->user()->can('update', $database)" :options="[
+                        ['value' => false, 'label' => 'Do not forward logs'],
+                        ['value' => true, 'label' => 'Forward logs to the server drain'],
+                    ]" />
+            </x-application.settings-subsection>
+        </x-application.settings-section>
+    </form>
+
+    <x-application.settings-section id="initialization-scripts-section" title="Initialization scripts"
+        description="Run SQL files in order when PostgreSQL initializes for the first time." flush>
+        <x-slot:actions>
+            @can('update', $database)
+                <x-modal-input buttonTitle="+ Add" title="New initialization script">
+                    <form class="flex w-full flex-col gap-4" wire:submit="save_new_init_script">
+                        <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="Filename" required />
+                        <x-forms.textarea rows="16" placeholder="CREATE DATABASE test;" id="new_content"
+                            label="Content" required />
+                        <div class="flex justify-end border-t border-neutral-200 pt-4 dark:border-white/[0.08]">
+                            <x-forms.button type="submit">Add script</x-forms.button>
+                        </div>
+                    </form>
+                </x-modal-input>
+            @endcan
+        </x-slot:actions>
+        <div class="divide-y divide-neutral-200 dark:divide-border-subtle">
+            @if ($isPasswordHiddenForMember)
+                <x-empty title="Hidden (only admins can view)"
+                    description="Initialization scripts can contain credentials." />
+            @else
+                @forelse($initScripts ?? [] as $script)
+                    <livewire:project.database.init-script :database="$database" :script="$script"
+                        :wire:key="'init-script-'.md5($script['filename'])" />
+                @empty
+                    <x-empty title="No initialization scripts"
+                        description="Add a SQL file to run during the first PostgreSQL initialization." />
+                @endforelse
             @endif
         </div>
-        <div>
-            <h3 class="py-2">Proxy</h3>
-            <div class="flex items-end gap-2">
-                <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
-                    id="database.public_port" label="Public Port" />
-                <x-slide-over fullScreen>
-                    <x-slot:title>Proxy Logs</x-slot:title>
-                    <x-slot:content>
-                        <livewire:project.shared.get-logs :server="$server" :resource="$database"
-                            container="{{ data_get($database, 'uuid') }}-proxy" lazy />
-                    </x-slot:content>
-                    <x-forms.button disabled="{{ !data_get($database, 'is_public') }}" @click="slideOverOpen=true"
-                        class="w-28">Proxy Logs</x-forms.button>
-                </x-slide-over>
-                <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
-            </div>
-        </div>
-        <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10" id="database.postgres_conf" />
-    </form>
-    <h3 class="pt-4">Advanced</h3>
-    <div class="flex flex-col">
-        <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-            instantSave="instantSaveAdvanced" id="database.is_log_drain_enabled" label="Drain Logs" />
-    </div>
-    <div class="pb-16">
-        <div class="flex gap-2 pt-4 pb-2">
-            <h3>Initialization scripts</h3>
-            <x-modal-input buttonTitle="+ Add" title="New Init Script">
-                <form class="flex flex-col w-full gap-2 rounded" wire:submit='save_new_init_script'>
-                    <x-forms.input autofocus placeholder="create_test_db.sql" id="new_filename" label="Filename"
-                        required />
-                    <x-forms.textarea rows="20" placeholder="CREATE DATABASE test;" id="new_content"
-                        label="Content" required />
-                    <x-forms.button type="submit">
-                        Save
-                    </x-forms.button>
-                </form>
-            </x-modal-input>
-        </div>
-        <div class="flex flex-col gap-2">
-            @forelse(data_get($database,'init_scripts', []) as $script)
-                <livewire:project.database.init-script :script="$script" :wire:key="$script['index']" />
-            @empty
-                <div>No initialization scripts found.</div>
-            @endforelse
-        </div>
-    </div>
-
+    </x-application.settings-section>
 </div>

@@ -1,60 +1,228 @@
-<div>
+<div @if ($type !== 'server') wire:init="loadContainers" @endif>
     <x-slot:title>
-        {{ data_get_str($resource, 'name')->limit(10) }} > Commands | Coolify
+        {{ data_get_str($resource, 'name')->limit(10) }} > Terminal | Coolify
     </x-slot>
-    <livewire:project.shared.configuration-checker :resource="$resource" />
+
     @if ($type === 'application')
-        <h1>Execute Command</h1>
-        <livewire:project.application.heading :application="$resource" />
-        <h2 class="pt-4">Command</h2>
-        <div class="pb-2">Run any one-shot command inside a container.</div>
+        <livewire:project.shared.configuration-checker :resource="$resource" />
+        <livewire:project.application.heading :application="$resource" wire:key="application-heading-command" />
     @elseif ($type === 'database')
-        <h1>Execute Command</h1>
         <livewire:project.database.heading :database="$resource" />
-        <h2 class="pt-4">Command</h2>
-        <div class="pb-2">Run any one-shot command inside a container.</div>
     @elseif ($type === 'service')
-        <h2>Execute Command</h2>
+        <livewire:project.service.heading :service="$resource" :parameters="$parameters" title="Terminal" />
+    @else
+        <livewire:server.navbar :server="$servers->first()" />
     @endif
-    <div x-init="$wire.loadContainers">
-        <div class="pt-4" wire:loading wire:target='loadContainers'>
-            Loading containers...
-        </div>
-        <div wire:loading.remove wire:target='loadContainers'>
-            @if (count($containers) > 0)
-                <form class="flex flex-col gap-2 pt-4" wire:submit='runCommand'>
-                    <div class="flex gap-2">
-                        <x-forms.input placeholder="ls -l" autofocus id="command" label="Command" required />
-                        <x-forms.input id="workDir" label="Working directory" />
-                    </div>
-                    <x-forms.select label="Container" id="container" required>
-                        <option disabled selected>Select container</option>
-                        @if (data_get($this->parameters, 'application_uuid'))
-                            @foreach ($containers as $container)
-                                <option value="{{ data_get($container, 'container.Names') }}">
-                                    {{ data_get($container, 'container.Names') }}
-                                </option>
-                            @endforeach
-                        @elseif(data_get($this->parameters, 'service_uuid'))
-                            @foreach ($containers as $container)
-                                <option value="{{ $container }}">
-                                    {{ $container }}
-                                </option>
-                            @endforeach
-                        @else
-                            <option value="{{ $container }}">
-                                {{ $container }}
-                            </option>
-                        @endif
-                    </x-forms.select>
-                    <x-forms.button type="submit">Run</x-forms.button>
-                </form>
+
+    @php
+        $consoleUnavailable = ($type === 'server' && (! $servers->first()->isTerminalEnabled() || ! $servers->first()->isFunctional()))
+            || ($type !== 'server' && $containersLoaded && $containers->isEmpty());
+        $consoleThemes = [
+            ['key' => 'system', 'name' => 'System', 'background' => 'linear-gradient(135deg, #ffffff 0 50%, #121214 50% 100%)', 'accent' => '#8C8E9C'],
+            ['key' => 'shadows-midnight', 'name' => 'Midnight', 'background' => 'linear-gradient(135deg, #2a3b4c, rgba(42, 59, 76, 0.4))', 'accent' => '#6d7a7c'],
+            ['key' => 'shadows-golden-hour', 'name' => 'Golden Hour', 'background' => 'linear-gradient(135deg, #d58a42, rgba(213, 138, 66, 0.4))', 'accent' => '#bf8c3c'],
+            ['key' => 'shadows-cosmic-purple', 'name' => 'Cosmic Purple', 'background' => 'linear-gradient(135deg, #5d3e66, rgba(93, 62, 102, 0.4))', 'accent' => '#A76DBE'],
+            ['key' => 'shadows-neon-glow', 'name' => 'Neon Glow', 'background' => 'linear-gradient(135deg, #f300a6, rgba(243, 0, 166, 0.3))', 'accent' => '#DB425A'],
+            ['key' => 'shadows-icy-mist', 'name' => 'Icy Mist', 'background' => 'linear-gradient(135deg, #d0d8e2, rgba(208, 216, 226, 0.2))', 'accent' => '#93b7c4'],
+            ['key' => 'shadows-tropical-storm', 'name' => 'Tropical Storm', 'background' => 'linear-gradient(135deg, #00b894, #1fa771, #2ecc71, #27ae60)', 'accent' => '#1fa771'],
+            ['key' => 'shadows-golden-nebula', 'name' => 'Golden Nebula', 'background' => 'linear-gradient(135deg, #ffd700, #ff6347, #d4a20e, #ffcc00, #1f3d6f)', 'accent' => '#d4a20e'],
+            ['key' => 'shadows-cosmic-lagoon', 'name' => 'Cosmic Lagoon', 'background' => 'linear-gradient(135deg, #1d2b64, #2f4f96, #00b5b8, #9c27b0, #8e24aa)', 'accent' => '#00b5b8'],
+            ['key' => 'shadows-neon-nebula', 'name' => 'Neon Nebula', 'background' => 'linear-gradient(135deg, #00d9d9, #ff55aa, #1e1e2f, #2f3b57, #ff99ff)', 'accent' => '#ff55aa'],
+            ['key' => 'shadows-transparent', 'name' => 'Blur Black', 'background' => 'rgba(0, 0, 0, 0.7)', 'accent' => '#8C8E9C'],
+        ];
+        $consoleThemeKeys = collect($consoleThemes)->pluck('key')->values();
+        $consoleThemeNames = collect($consoleThemes)->pluck('name', 'key');
+        $consoleThemeAccents = collect($consoleThemes)->pluck('accent', 'key');
+    @endphp
+
+    @if (in_array($type, ['application', 'database', 'service', 'server'], true))
+        <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
+            <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+                @if ($type === 'server')
+                    <x-server.sidebar :server="$resource" activeMenu="terminal" />
+                @elseif ($type === 'application')
+                    <x-application.configuration-sidebar :application="$resource" current-route="project.application.command" />
+                @elseif ($type === 'database')
+                    <x-database.configuration-sidebar :database="$resource" current-route="project.database.command" />
+                @else
+                    <x-service.configuration-sidebar :service="$resource" current-route="project.service.command" />
+                @endif
+                <div class="min-w-0">
+    @endif
+
+    @if ($consoleUnavailable)
+        <section class="mt-8 w-full max-w-none xl:mt-0">
+            @if ($type === 'server')
+                <x-empty size="lg" title="Terminal unavailable"
+                    description="This server is not functional or terminal access is disabled."
+                    icon-name="browser-terminal" />
             @else
-                <div class="pt-4">No containers are not running.</div>
+                <x-empty size="lg" title="Terminal unavailable"
+                    description="No containers are running, or terminal access is disabled on the destination server."
+                    icon-name="browser-terminal" />
             @endif
-        </div>
-    </div>
-    <div class="w-full pt-10 mx-auto">
-        <livewire:activity-monitor header="Command output" />
-    </div>
+        </section>
+    @else
+        <section class="mt-8 mb-0! h-[calc(100dvh-8rem)] min-h-[32rem] w-full max-w-none xl:mt-0"
+            x-on:terminal-theme-selected="setTheme($event.detail.theme)"
+            x-on:terminal-starting.window="syncTheme()"
+            x-on:terminal-mode-updated.window="attachAvailable = $event.detail.attachAvailable; terminalMode = $event.detail.mode; hasShell = $event.detail.hasShell"
+            x-data="{
+                themeKeys: @js($consoleThemeKeys),
+                themeAccents: @js($consoleThemeAccents),
+                consoleTheme: 'system',
+                themeOpen: false,
+                attachAvailable: false,
+                hasShell: true,
+                terminalMode: 'shell',
+                modeOpen: false,
+                containerOpen: false,
+                targetChosen: @js($selected_container !== 'default'),
+                selectedContainer: @entangle('selected_container').live,
+                containerOptions: @entangle('containerOptions'),
+                init() {
+                    const savedTheme = localStorage.getItem('coolify-console-theme');
+                    this.consoleTheme = this.themeKeys.includes(savedTheme) ? savedTheme : 'system';
+                    localStorage.setItem('coolify-console-theme', this.consoleTheme);
+                },
+                setTheme(theme) {
+                    this.consoleTheme = theme;
+                    this.themeOpen = false;
+                    localStorage.setItem('coolify-console-theme', theme);
+                    window.dispatchEvent(new CustomEvent('terminal-theme-change', { detail: { theme } }));
+                },
+                setTerminalMode(mode) {
+                    this.modeOpen = false;
+                    if (this.terminalMode === mode || (mode === 'shell' && !this.hasShell)) {
+                        return;
+                    }
+                    this.terminalMode = mode;
+                    window.dispatchEvent(new CustomEvent('terminal-starting'));
+                    Livewire.dispatch('set-terminal-mode', { mode });
+                },
+                syncTheme() {
+                    const savedTheme = localStorage.getItem('coolify-console-theme');
+                    this.consoleTheme = this.themeKeys.includes(savedTheme) ? savedTheme : 'system';
+                },
+                selectContainer(value) {
+                    window.dispatchEvent(new CustomEvent('terminal-starting'));
+                    this.selectedContainer = value;
+                    this.targetChosen = true;
+                    this.containerOpen = false;
+                },
+                get selectedContainerLabel() {
+                    return this.containerOptions.find((option) => option.value === this.selectedContainer)?.label
+                        ?? 'Choose a container';
+                },
+            }">
+            <div data-terminal-session-canvas
+                class="application-console-shell flex h-full min-h-0 flex-col overflow-hidden rounded-lg"
+                :data-console-theme="consoleTheme"
+                :style="{ '--terminal-scrollbar': themeAccents[consoleTheme] }">
+                <header
+                    class="terminal-session-toolbar flex items-center gap-3 text-white select-none">
+                    @if ($type === 'server')
+                        <div class="terminal-session-target-trigger flex h-8 min-w-0 max-w-sm flex-1 items-center gap-2 rounded-md px-2.5 text-xs font-medium text-white/70"
+                            x-data="{ autoConnected: false }"
+                            @if ($servers->first()->isTerminalEnabled() && $servers->first()->isFunctional())
+                                x-on:terminal-websocket-ready.window="if (!autoConnected) {
+                                    autoConnected = true;
+                                    $nextTick(() => $wire.dispatchSelf('connectToServer'));
+                                }"
+                            @endif>
+                            <x-reicon name="browser-terminal" class="size-3.5 shrink-0 text-white/55" />
+                            <span class="min-w-0 truncate font-semibold text-white/80">
+                                {{ $servers->first()->name }}
+                            </span>
+                        </div>
+                    @else
+                        <div class="flex min-w-0 flex-1 items-center gap-2">
+                            @if ($containers->count() === 1)
+                                <div class="terminal-session-target-trigger flex h-8 min-w-0 max-w-sm items-center gap-2 rounded-md px-2.5 text-xs font-medium text-white/70">
+                                <x-reicon name="browser-terminal" class="size-3.5 shrink-0 text-white/55" />
+                                <span class="min-w-0 truncate font-semibold text-white/80">
+                                    {{ data_get($containers->first(), 'container.Names') }}
+                                    · {{ data_get($containers->first(), 'server.name') }}
+                                </span>
+                                </div>
+                            @else
+                                <div x-cloak x-show="targetChosen" class="relative min-w-0"
+                                    @click.outside="containerOpen = false">
+                                    <button type="button"
+                                        class="terminal-session-target-trigger flex h-8 max-w-[34rem] min-w-48 items-center gap-2 rounded-md px-2.5 text-xs font-medium text-white/70 transition-colors hover:bg-white/[0.08] hover:text-white"
+                                        @click="containerOpen = !containerOpen">
+                                        <span class="min-w-0 flex-1 truncate text-left"
+                                            x-text="selectedContainerLabel"></span>
+                                        <svg class="size-2.5 shrink-0 text-white/35" viewBox="0 0 12 12"
+                                            fill="none" aria-hidden="true">
+                                            <path d="m3.5 4.75 2.5 2.5 2.5-2.5" stroke="currentColor"
+                                                stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                    </button>
+                                    <div x-cloak x-show="containerOpen" x-transition.origin.top.left
+                                        class="terminal-target-picker terminal-target-list absolute top-11 left-0 z-50 max-h-72 w-80 overflow-y-auto rounded-lg border p-1 shadow-[var(--shadow-dropdown)]">
+                                        <template x-for="option in containerOptions" :key="option.value">
+                                            <button type="button"
+                                                class="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-[11px] text-white/65 transition-colors hover:bg-white/[0.07] hover:text-white"
+                                                @click="selectContainer(option.value)">
+                                                <span class="min-w-0 flex-1 truncate" x-text="option.label"></span>
+                                                <svg x-show="option.value === selectedContainer"
+                                                    class="size-3 shrink-0 text-[#fcd452]" viewBox="0 0 12 12"
+                                                    fill="none" aria-hidden="true">
+                                                    <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor"
+                                                        stroke-width="1.4" stroke-linecap="round"
+                                                        stroke-linejoin="round" />
+                                                </svg>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
+                    <div class="ml-auto flex items-center gap-2">
+                        <x-terminal.mode-selector />
+                        <x-terminal.theme-selector :themes="$consoleThemes" :theme-names="$consoleThemeNames"
+                            :theme-accents="$consoleThemeAccents" />
+                    </div>
+                </header>
+
+                <div class="terminal-session-panel flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-6">
+                <div class="application-console-block min-h-0 flex-1">
+                    @if ($type !== 'server' && $containers->count() > 1)
+                        <div x-cloak x-show="!targetChosen" data-terminal-target-picker="launcher"
+                            class="absolute inset-0 z-20 flex items-start justify-start p-6 sm:p-10">
+                            <div class="terminal-target-picker w-full max-w-md rounded-lg border p-2 shadow-[var(--shadow-dropdown)]">
+                                <div class="px-2 pt-1 pb-2">
+                                    <div class="text-sm font-semibold text-white/80">Start a terminal session</div>
+                                    <div class="mt-0.5 text-[11px] text-white/45">
+                                    Choose a container to start a session
+                                    </div>
+                                </div>
+                                <div class="max-h-64 overflow-y-auto">
+                                    <template x-for="option in containerOptions" :key="option.value">
+                                        <button type="button"
+                                            class="flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-[11px] text-white/65 transition-colors hover:bg-white/[0.07] hover:text-white"
+                                            @click="selectContainer(option.value)">
+                                            <x-reicon name="layers" class="size-3.5 shrink-0 text-white/35" />
+                                            <span class="min-w-0 flex-1 truncate" x-text="option.label"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+                    <livewire:project.shared.terminal variant="application"
+                        :auto-start="$type === 'server' || ! $containersLoaded || $containers->count() === 1" />
+                </div>
+                </div>
+            </div>
+        </section>
+    @endif
+    @if (in_array($type, ['application', 'database', 'service', 'server'], true))
+                </div>
+            </div>
+        </section>
+    @endif
 </div>

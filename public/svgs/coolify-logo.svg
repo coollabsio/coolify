@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg version="1.1" viewBox="0 0 2048 2048" width="512" height="512" xmlns="http://www.w3.org/2000/svg">
+<path transform="translate(257,640)" d="m0 0h254l1 1v127h127l1 1v639h895l1 1v127h127l1 1v254l-5 1h-1018l-1-1v-127h-127l-1-1v-127h-127l-1-1v-127h-127l-1-1v-766z" fill="#8550FC"/>
+<path transform="translate(513,384)" d="m0 0h1022l1 1v127h127l1 1v254l-5 1h-1018l-1-1v-127h-127l-1-1v-254z" fill="#8550FC"/>
+<path transform="translate(1537,1536)" d="m0 0h126l1 1v254l-5 1h-1018l-1-1v-126l896-1v-29z" fill="#452E72"/>
+<path transform="translate(1537,512)" d="m0 0h126l1 1v254l-5 1h-1018l-1-1v-126l896-1v-29z" fill="#452E72"/>
+<path transform="translate(513,768)" d="m0 0h126l1 1v638l-7 1-108-1-12-1z" fill="#452E72"/>
+<path transform="translate(478,1408)" d="m0 0h32l1 1v127h-126l-1-1v-126z" fill="#452E72"/>
+</svg>

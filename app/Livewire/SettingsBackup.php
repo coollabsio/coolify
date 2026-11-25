@@ -1,0 +1,153 @@
+<?php
+
+namespace App\Livewire;
+
+use App\Models\InstanceSettings;
+use App\Models\S3Storage;
+use App\Models\ScheduledDatabaseBackup;
+use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\Validate;
+use Livewire\Component;
+
+class SettingsBackup extends Component
+{
+    use AuthorizesRequests;
+
+    public InstanceSettings $settings;
+
+    public Server $server;
+
+    public ?StandalonePostgresql $database = null;
+
+    public ScheduledDatabaseBackup|null|array $backup = [];
+
+    #[Locked]
+    public $s3s;
+
+    #[Validate(['nullable'])]
+    public ?string $description = null;
+
+    public bool $is_backup_before_update_enabled;
+
+    public function mount()
+    {
+        if (! isInstanceAdmin()) {
+            return redirect()->route('dashboard');
+        }
+        $settings = instanceSettings();
+        $this->server = Server::findOrFail(0);
+        // The instance database is always id 0; a team database can also be named coolify-db.
+        $this->database = StandalonePostgresql::find(0);
+        $s3s = S3Storage::whereTeamId(0)->get() ?? [];
+        if ($this->database) {
+            $this->description = $this->database->description;
+
+            if ($this->database->status !== 'running') {
+                $this->database->status = 'running';
+                $this->database->save();
+            }
+            $this->backup = $this->database->scheduledBackups->first();
+            if ($this->backup && ! $this->server->isFunctional()) {
+                $this->backup->enabled = false;
+                $this->backup->save();
+            }
+        }
+        $this->settings = $settings;
+        $this->is_backup_before_update_enabled = $settings->is_backup_before_update_enabled;
+        $this->s3s = $s3s;
+    }
+
+    public function addCoolifyDatabase()
+    {
+        try {
+            $this->authorize('update', $this->settings);
+            $this->database = StandalonePostgresql::find(0);
+            if (! $this->database) {
+                $server = Server::findOrFail(0);
+                $out = instant_remote_process(['docker inspect coolify-db'], $server);
+                $envs = format_docker_envs_to_json($out);
+                $this->database = new StandalonePostgresql;
+                $this->database->forceFill([
+                    'id' => 0,
+                    'name' => 'coolify-db',
+                    'description' => 'Coolify database',
+                    'postgres_user' => $envs['POSTGRES_USER'],
+                    'postgres_password' => $envs['POSTGRES_PASSWORD'],
+                    'postgres_db' => $envs['POSTGRES_DB'],
+                    'status' => 'running',
+                    'destination_type' => StandaloneDocker::class,
+                    'destination_id' => 0,
+                ]);
+                $this->database->save();
+            }
+            $this->backup = $this->database->scheduledBackups()->first()
+                ?? ScheduledDatabaseBackup::create([
+                    'enabled' => true,
+                    'save_s3' => false,
+                    'frequency' => '0 0 * * *',
+                    'database_id' => $this->database->id,
+                    'database_type' => StandalonePostgresql::class,
+                    'team_id' => 0,
+                ]);
+            $this->database->refresh();
+            $this->backup->refresh();
+            if ($this->backup->wasRecentlyCreated) {
+                auditLog('ui.database.backup_schedule_created', [
+                    'team_id' => $this->backup->team_id,
+                    'database_uuid' => $this->database->uuid,
+                    'database_name' => $this->database->name,
+                    'backup_uuid' => $this->backup->uuid,
+                    'frequency' => $this->backup->frequency,
+                    'save_s3' => (bool) $this->backup->save_s3,
+                ]);
+            }
+            $this->s3s = S3Storage::whereTeamId(0)->get();
+
+            $this->description = $this->database->description;
+
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function instantSave()
+    {
+        try {
+            $this->authorize('update', $this->settings);
+            $this->settings->is_backup_before_update_enabled = $this->is_backup_before_update_enabled;
+            $changedFields = auditChangedFields($this->settings);
+            $this->settings->save();
+            if ($changedFields !== []) {
+                auditLog('ui.instance.settings.updated', [
+                    'team_id' => null,
+                    'resource' => 'instance',
+                    'section' => 'backup',
+                    'changed_fields' => $changedFields,
+                ]);
+            }
+            $this->dispatch('success', 'Backup updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function submit()
+    {
+        try {
+            $this->authorize('update', $this->settings);
+            $this->validate();
+
+            // Credentials come from the coolify-db container and are display-only, so only the description is saved.
+            $this->database->update([
+                'description' => $this->description,
+            ]);
+            $this->dispatch('success', 'Backup updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+}

@@ -2,45 +2,181 @@
 
 namespace App\Livewire\Project\Shared;
 
+use App\Actions\Database\FlushDatabase;
 use App\Jobs\DeleteResourceJob;
+use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
+use App\Models\StandaloneSqlite;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Danger extends Component
 {
+    use AuthorizesRequests;
+
     public $resource;
+
+    public $resourceName;
 
     public $projectUuid;
 
-    public $environmentName;
+    public $environmentUuid;
 
     public bool $delete_configurations = true;
 
     public bool $delete_volumes = true;
 
+    public bool $docker_cleanup = true;
+
+    public bool $delete_connected_networks = true;
+
+    public bool $delete_backups = false;
+
     public ?string $modalId = null;
+
+    public string $resourceDomain = '';
+
+    public bool $canDelete = false;
 
     public function mount()
     {
-        $this->modalId = new Cuid2(7);
         $parameters = get_route_parameters();
+        $this->modalId = new_public_id();
         $this->projectUuid = data_get($parameters, 'project_uuid');
-        $this->environmentName = data_get($parameters, 'environment_name');
+        $this->environmentUuid = data_get($parameters, 'environment_uuid');
+
+        if ($this->resource === null) {
+            if (isset($parameters['service_uuid'])) {
+                $this->resource = Service::ownedByCurrentTeam()->where('uuid', $parameters['service_uuid'])->first();
+            } elseif (isset($parameters['stack_service_uuid'])) {
+                $this->resource = ServiceApplication::ownedByCurrentTeam()->where('uuid', $parameters['stack_service_uuid'])->first()
+                    ?? ServiceDatabase::ownedByCurrentTeam()->where('uuid', $parameters['stack_service_uuid'])->first();
+            }
+        }
+
+        if ($this->resource === null) {
+            $this->resourceName = 'Unknown Resource';
+
+            return;
+        }
+
+        if (! method_exists($this->resource, 'type')) {
+            $this->resourceName = 'Unknown Resource';
+
+            return;
+        }
+
+        $this->resourceName = match ($this->resource->type()) {
+            'application' => $this->resource->name ?? 'Application',
+            'standalone-postgresql',
+            'standalone-redis',
+            'standalone-mongodb',
+            'standalone-mysql',
+            'standalone-mariadb',
+            'standalone-keydb',
+            'standalone-dragonfly',
+            'standalone-clickhouse',
+            'standalone-sqlite' => $this->resource->name ?? 'Database',
+            'service' => $this->resource->name ?? 'Service',
+            'service-application' => $this->resource->name ?? 'Service Application',
+            'service-database' => $this->resource->name ?? 'Service Database',
+            default => 'Unknown Resource',
+        };
+
+        // Check if user can delete this resource
+        try {
+            $this->canDelete = auth()->user()->can('delete', $this->resource);
+        } catch (\Exception $e) {
+            $this->canDelete = false;
+        }
     }
 
-    public function delete()
+    public function delete($password, $selectedActions = [])
     {
-        try {
-            // $this->authorize('delete', $this->resource);
-            $this->resource->delete();
-            DeleteResourceJob::dispatch($this->resource, $this->delete_configurations, $this->delete_volumes);
+        if (! verifyPasswordConfirmation($password, $this)) {
+            return 'The provided password is incorrect.';
+        }
 
-            return redirect()->route('project.resource.index', [
+        if (! $this->resource) {
+            return 'Resource not found.';
+        }
+
+        if ($this->resource instanceof StandaloneSqlite && $this->resource->hasConnectedApplications()) {
+            $this->dispatch('error', 'This database volume is mounted by '.$this->resource->connectedApplicationNames()->implode(', ').'. Remove those mounts before deleting the database.');
+
+            return;
+        }
+
+        if (! empty($selectedActions)) {
+            $this->delete_volumes = in_array('delete_volumes', $selectedActions);
+            $this->delete_connected_networks = in_array('delete_connected_networks', $selectedActions);
+            $this->delete_configurations = in_array('delete_configurations', $selectedActions);
+            $this->docker_cleanup = in_array('docker_cleanup', $selectedActions);
+            $this->delete_backups = in_array('delete_backups', $selectedActions);
+        }
+
+        try {
+            $this->authorize('delete', $this->resource);
+            // Soft delete first, so the environment page after the redirect does not list the resource.
+            $this->resource->delete();
+            DeleteResourceJob::dispatch(
+                $this->resource,
+                $this->delete_volumes,
+                $this->delete_connected_networks,
+                $this->delete_configurations,
+                $this->docker_cleanup,
+                deleteBackups: $this->delete_backups,
+            );
+
+            return redirectRoute($this, 'project.resource.index', [
                 'project_uuid' => $this->projectUuid,
-                'environment_name' => $this->environmentName,
+                'environment_uuid' => $this->environmentUuid,
             ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    public function flush($password)
+    {
+        try {
+            $this->authorize('manage', $this->resource);
+
+            if (! verifyPasswordConfirmation($password, $this)) {
+                return 'The provided password is incorrect.';
+            }
+
+            FlushDatabase::run($this->resource);
+            auditLog('ui.database.flushed', [
+                'team_id' => $this->resource->team()?->id,
+                'database_uuid' => $this->resource->uuid,
+                'database_name' => $this->resource->name,
+            ]);
+            $this->dispatch('success', 'Database flushed.');
+
+            return true;
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return false;
+        }
+    }
+
+    public function render()
+    {
+        return view('livewire.project.shared.danger', [
+            'checkboxes' => [
+                ['id' => 'delete_volumes', 'label' => __('resource.delete_volumes')],
+                ['id' => 'delete_connected_networks', 'label' => __('resource.delete_connected_networks')],
+                ['id' => 'delete_configurations', 'label' => __('resource.delete_configurations')],
+                ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],
+                [
+                    'id' => 'delete_backups',
+                    'label' => __('resource.delete_backups'),
+                    'default_warning' => __('resource.keep_backups'),
+                ],
+            ],
+        ]);
     }
 }

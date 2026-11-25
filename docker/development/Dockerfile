@@ -1,0 +1,157 @@
+# Versions
+# https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
+ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v5.1.5
+# https://github.com/cloudflare/cloudflared/releases
+ARG CLOUDFLARED_VERSION=2026.11.1
+# https://www.postgresql.org/support/versioning/
+# Note: We are using version 18 of the postgres client (while still using postgres 15 for the postgres server) as version 15 has been removed from Alpine 3.23+ https://pkgs.alpinelinux.org/packages?name=postgresql*-client&branch=v3.23&repo=&arch=x86_64&origin=&flagged=&maintainer=
+ARG POSTGRES_VERSION=18
+# https://nginx.org/en/linux_packages.html
+ARG NGINX_VERSION=1.31.9-r1
+# https://pecl.php.net/package/uv
+ARG PHP_UV_VERSION=0.3.1
+
+# =================================================================
+# Get MinIO client
+# =================================================================
+FROM ghcr.io/coollabsio/mx:0.2.1 AS minio-client
+
+# =================================================================
+# Final Stage: Production image
+# =================================================================
+FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
+
+ARG USER_ID
+ARG GROUP_ID
+ARG TARGETPLATFORM
+ARG TARGETARCH
+ARG POSTGRES_VERSION
+ARG CLOUDFLARED_VERSION
+ARG NGINX_VERSION
+ARG PHP_UV_VERSION
+
+WORKDIR /var/www/html
+
+USER root
+
+# Install patched Nginx from the official nginx.org Alpine repository
+# nginx.org no longer serves this key for download; it still signs the Alpine packages.
+COPY docker/nginx/nginx_signing.rsa.pub /etc/apk/keys/nginx_signing.rsa.pub
+RUN set -eux; \
+    apk add --no-cache ca-certificates curl; \
+    NGINX_ALPINE_VERSION="$(egrep -o '^[0-9]+\.[0-9]+' /etc/alpine-release)"; \
+    NGINX_REPOSITORY="https://nginx.org/packages/mainline/alpine/v${NGINX_ALPINE_VERSION}/main"; \
+    sed -i 's|http://nginx.org/packages|https://nginx.org/packages|g' /etc/apk/repositories; \
+    grep -qxF "@nginx ${NGINX_REPOSITORY}" /etc/apk/repositories || echo "@nginx ${NGINX_REPOSITORY}" >> /etc/apk/repositories; \
+    apk add --no-cache --upgrade "nginx@nginx=${NGINX_VERSION}"; \
+    rm -f /etc/nginx/nginx.conf /etc/nginx/conf.d/default.conf; \
+    nginx -v
+
+RUN docker-php-serversideup-set-id www-data $USER_ID:$GROUP_ID && \
+    docker-php-serversideup-set-file-permissions --owner $USER_ID:$GROUP_ID --service nginx
+
+# Install PostgreSQL repository and keys
+RUN apk upgrade --no-cache && \
+    apk add --no-cache gnupg && \
+    mkdir -p /usr/share/keyrings && \
+    curl -fSsL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor > /usr/share/keyrings/postgresql.gpg
+
+
+# Install system dependencies
+RUN apk add --no-cache \
+    postgresql${POSTGRES_VERSION}-client \
+    nodejs \
+    npm \
+    make \
+    g++ \
+    python3 \
+    openssh-client \
+    openssl \
+    git \
+    git-lfs \
+    jq \
+    lsof \
+    procps \
+    vim
+
+# Install PHP extensions
+# uv: Reverb uses an ext-uv event loop instead of stream_select(), which fails at 1024 open files (FD_SETSIZE)
+RUN install-php-extensions sockets uv-${PHP_UV_VERSION}
+
+# Configure shell aliases
+RUN echo "alias ll='ls -al'" >> /etc/profile && \
+    echo "alias a='php artisan'" >> /etc/profile && \
+    echo "alias logs='tail -F storage/logs/laravel-\$(date -u +%F).log'" >> /etc/profile
+
+# Install Cloudflared based on architecture
+RUN mkdir -p /usr/local/bin && \
+    if [ "${TARGETPLATFORM}" = "linux/amd64" ]; then \
+        curl -sSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64" -o /usr/local/bin/cloudflared; \
+    elif [ "${TARGETPLATFORM}" = "linux/arm64" ]; then \
+        curl -sSL "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-arm64" -o /usr/local/bin/cloudflared; \
+    fi && \
+    chmod +x /usr/local/bin/cloudflared
+
+# Configure PHP
+COPY docker/development/etc/php/conf.d/zzz-custom-php.ini /usr/local/etc/php/conf.d/zzz-custom-php.ini
+COPY docker/production/etc/php-fpm.d/zzzz-coolify-listen.conf /usr/local/etc/php-fpm.d/zzzz-coolify-listen.conf
+ENV PHP_OPCACHE_ENABLE=0
+
+# Install terminal WebSocket server dependencies
+COPY docker/coolify-terminal/package*.json /terminal/
+RUN npm ci --prefix /terminal && \
+    npm rebuild node-pty --prefix /terminal --update-binary
+COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
+COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
+RUN chown -R www-data:www-data /terminal
+
+# Configure the Nginx site of the base image
+ENV NGINX_CLIENT_MAX_BODY_SIZE=2048M
+ENV NGINX_FASTCGI_BUFFERS="16 16k"
+ENV NGINX_FASTCGI_BUFFER_SIZE=32k
+ENV TRUSTED_PROXY=off
+
+# Configure Nginx and S6 overlay
+COPY docker/development/etc/nginx/conf.d/custom.conf /etc/nginx/conf.d/custom.conf
+COPY docker/production/etc/nginx/server-opts.d/coolify.conf /etc/nginx/server-opts.d/coolify.conf
+# Drop HSTS, which would force HTTPS on every subdomain of the dashboard domain, and the
+# year-long caching of static files, which keeps files without a hash in their name stale after an upgrade
+RUN sed -i '/Strict-Transport-Security/d' /etc/nginx/server-opts.d/security.conf && \
+    rm /etc/nginx/server-opts.d/performance.conf
+COPY --chmod=755 docker/development/etc/s6-overlay/ /etc/s6-overlay/
+
+RUN mkdir -p /etc/nginx/conf.d && \
+    chown -R www-data:www-data /etc/nginx && \
+    chmod -R 755 /etc/nginx
+
+# Install MinIO client
+COPY --from=minio-client /usr/bin/mc /usr/bin/mc
+RUN chmod +x /usr/bin/mc
+
+ARG SERVERSIDEUP_PHP_VERSION
+ARG COOLIFY_VERSION
+ARG CREATED
+ARG GIT_SHA
+
+LABEL org.opencontainers.image.title="Coolify Development" \
+    org.opencontainers.image.description="The development image of Coolify, it runs the checkout that Docker Compose mounts into it." \
+    org.opencontainers.image.version="${COOLIFY_VERSION}" \
+    org.opencontainers.image.created="${CREATED}" \
+    org.opencontainers.image.revision="${GIT_SHA}" \
+    org.opencontainers.image.licenses="Apache-2.0" \
+    org.opencontainers.image.authors="coollabsio" \
+    org.opencontainers.image.vendor="coollabsio" \
+    org.opencontainers.image.url="https://coolify.io" \
+    org.opencontainers.image.source="https://github.com/coollabsio/coolify" \
+    org.opencontainers.image.documentation="https://github.com/coollabsio/coolify/blob/main/CONTRIBUTING.md" \
+    org.opencontainers.image.base.name="docker.io/serversideup/php:${SERVERSIDEUP_PHP_VERSION}" \
+    io.coolify.nginx.version="${NGINX_VERSION}" \
+    io.coolify.cloudflared.version="${CLOUDFLARED_VERSION}" \
+    io.coolify.postgresql-client.version="${POSTGRES_VERSION}" \
+    io.coolify.php-uv.version="${PHP_UV_VERSION}"
+
+# Stay as root for s6 init so bind-mounted workspaces work even when the host
+# tree is root-owned (CI, Jean, rootful Docker). PHP-FPM/nginx still run as
+# www-data via their service configs. Do NOT set USER www-data here — that
+# makes init-setup (composer install) fail with "vendor could not be created".
+USER root

@@ -1,7 +1,6 @@
-<svg class="inline-flex w-3 h-3 ml-1" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
-    focusable="false" viewBox="0 0 24 24">
-    <path d="M0 0h24v24H0V0z" fill="none">
-    </path>
-    <path d="M9 5v2h6.59L4 18.59 5.41 20 17 8.41V15h2V5H9z" fill="currentColor">
-    </path>
+@props(['class' => 'inline-flex w-3 h-3 dark:text-neutral-400 text-black'])
+
+<svg {{ $attributes->merge(['class' => $class]) }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
 </svg>

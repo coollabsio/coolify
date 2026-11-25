@@ -1,0 +1,140 @@
+<?php
+
+use App\Models\InstanceSettings;
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Once;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    InstanceSettings::query()->delete();
+    $settings = new InstanceSettings([
+        'is_mcp_server_enabled' => false,
+        'is_api_enabled' => true,
+    ]);
+    $settings->id = 0;
+    $settings->save();
+
+    $this->team = Team::factory()->create();
+    $this->user = User::factory()->create();
+    $this->team->members()->attach($this->user->id, ['role' => 'owner']);
+    $rootTeam = Team::factory()->create(['id' => 0]);
+    $rootTeam->members()->attach($this->user->id, ['role' => 'owner']);
+    session(['currentTeam' => $this->team]);
+});
+
+function makeRootMcpToken(User $user): string
+{
+    $token = $user->createToken('mcp-root', ['root']);
+    DB::table('personal_access_tokens')
+        ->where('id', $token->accessToken->id)
+        ->update(['team_id' => '0']);
+
+    return $token->plainTextToken;
+}
+
+function makeNonRootMcpToken(User $user, Team $team, array $abilities = ['write']): string
+{
+    $token = $user->createToken('mcp-write', $abilities);
+    DB::table('personal_access_tokens')
+        ->where('id', $token->accessToken->id)
+        ->update(['team_id' => (string) $team->id]);
+
+    return $token->plainTextToken;
+}
+
+test('POST /api/v1/mcp/enable enables MCP server with root token', function () {
+    $token = makeRootMcpToken($this->user);
+
+    $response = test()->withHeaders([
+        'Authorization' => 'Bearer '.$token,
+    ])->postJson('/api/v1/mcp/enable');
+
+    $response->assertOk();
+    $response->assertJson(['message' => 'MCP server enabled.']);
+    expect(InstanceSettings::find(0)->is_mcp_server_enabled)->toBeTrue();
+});
+
+test('POST /api/v1/mcp/disable disables MCP server with root token', function () {
+    InstanceSettings::query()->where('id', 0)->update(['is_mcp_server_enabled' => true, 'is_api_enabled' => false]);
+    $token = makeRootMcpToken($this->user);
+
+    $response = test()->withHeaders([
+        'Authorization' => 'Bearer '.$token,
+    ])->postJson('/api/v1/mcp/disable');
+
+    $response->assertOk();
+    $response->assertJson(['message' => 'MCP server disabled.']);
+    expect(InstanceSettings::find(0)->is_mcp_server_enabled)->toBeFalse();
+});
+
+test('non-root token cannot enable MCP server', function () {
+    $token = makeNonRootMcpToken($this->user, $this->team);
+
+    $response = test()->withHeaders([
+        'Authorization' => 'Bearer '.$token,
+    ])->postJson('/api/v1/mcp/enable');
+
+    $response->assertStatus(403);
+    expect(InstanceSettings::find(0)->is_mcp_server_enabled)->toBeFalse();
+});
+
+test('non-root token cannot disable MCP server', function () {
+    InstanceSettings::query()->where('id', 0)->update(['is_mcp_server_enabled' => true]);
+    $token = makeNonRootMcpToken($this->user, $this->team);
+
+    $response = test()->withHeaders([
+        'Authorization' => 'Bearer '.$token,
+    ])->postJson('/api/v1/mcp/disable');
+
+    $response->assertStatus(403);
+    expect(InstanceSettings::find(0)->is_mcp_server_enabled)->toBeTrue();
+});
+
+test('root token can enable MCP server when the REST API is disabled', function () {
+    InstanceSettings::query()->where('id', 0)->update(['is_api_enabled' => false]);
+    Once::flush();
+    $token = makeRootMcpToken($this->user);
+
+    test()->withHeaders(['Authorization' => 'Bearer '.$token])
+        ->postJson('/api/v1/mcp/enable')
+        ->assertOk();
+
+    expect(InstanceSettings::find(0)->is_mcp_server_enabled)->toBeTrue();
+});
+
+test('MCP switch routes enforce the allowed API IPs', function (string $path) {
+    InstanceSettings::query()->where('id', 0)->update(['is_api_enabled' => false, 'allowed_ips' => '192.0.2.10']);
+    Once::flush();
+    $token = makeRootMcpToken($this->user);
+
+    test()->withHeaders(['Authorization' => 'Bearer '.$token])
+        ->postJson($path)
+        ->assertForbidden()
+        ->assertJson(['message' => 'You are not allowed to access the API.']);
+
+    expect(InstanceSettings::find(0)->is_mcp_server_enabled)->toBeFalse();
+
+    test()->withServerVariables(['REMOTE_ADDR' => '192.0.2.10'])
+        ->withHeaders(['Authorization' => 'Bearer '.$token])
+        ->postJson($path)
+        ->assertOk();
+})->with(['/api/v1/mcp/enable', '/api/v1/mcp/disable']);
+
+test('unauthenticated request to /api/v1/mcp/enable returns 401', function () {
+    $response = test()->postJson('/api/v1/mcp/enable');
+    $response->assertStatus(401);
+});
+
+test('read-only token cannot toggle MCP server (lacks write ability)', function () {
+    $token = makeNonRootMcpToken($this->user, $this->team, ['read']);
+
+    $response = test()->withHeaders([
+        'Authorization' => 'Bearer '.$token,
+    ])->postJson('/api/v1/mcp/enable');
+
+    $response->assertStatus(403);
+});

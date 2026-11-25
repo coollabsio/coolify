@@ -1,0 +1,51 @@
+# documentation: https://www.bugsink.com/docs/
+# slogan: Self-hosted Error Tracking.
+# category: monitoring
+# tags: python, error-tracking, django, postgresql
+# logo: svgs/bugsink.svg
+# port: 8000
+
+services:
+  postgres:
+    image: 'postgres:17-alpine'
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-bugsink}
+    volumes:
+      - bugsink-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  web:
+    image: 'bugsink/bugsink:2'
+    restart: unless-stopped
+    environment:
+      - SECRET_KEY=$SERVICE_PASSWORD_64_BUGSINK
+      - CREATE_SUPERUSER=${BUGSINK_ADMIN_EMAIL:?}:$SERVICE_PASSWORD_BUGSINK
+      - SERVICE_URL_BUGSINK_8000
+      - BASE_URL=$SERVICE_URL_BUGSINK
+      - DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-bugsink}
+      - BEHIND_HTTPS_PROXY=True
+      - SITE_TITLE=${SITE_TITLE:-Bugsink}
+      - TIME_ZONE=${TIME_ZONE:-UTC}
+      - PHONEHOME=${PHONEHOME:-False}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT:-587}
+      - EMAIL_HOST_USER=${EMAIL_HOST_USER}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - EMAIL_USE_TLS=${EMAIL_USE_TLS:-True}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL:-False}
+      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import requests; requests.get(\"http://localhost:8000/health/ready\").raise_for_status()'"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    depends_on:
+      postgres:
+        condition: service_healthy

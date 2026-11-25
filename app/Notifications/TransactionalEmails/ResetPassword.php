@@ -3,6 +3,7 @@
 namespace App\Notifications\TransactionalEmails;
 
 use App\Models\InstanceSettings;
+use Exception;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -16,9 +17,9 @@ class ResetPassword extends Notification
 
     public InstanceSettings $settings;
 
-    public function __construct($token)
+    public function __construct($token, public bool $isTransactionalEmail = true)
     {
-        $this->settings = \App\Models\InstanceSettings::get();
+        $this->settings = instanceSettings();
         $this->token = $token;
     }
 
@@ -35,8 +36,8 @@ class ResetPassword extends Notification
     public function via($notifiable)
     {
         $type = set_transanctional_email_settings();
-        if (! $type) {
-            throw new \Exception('No email settings found.');
+        if (blank($type)) {
+            throw new Exception('No email settings found.');
         }
 
         return ['mail'];
@@ -53,7 +54,10 @@ class ResetPassword extends Notification
 
     protected function buildMailMessage($url)
     {
+        $from = mail_from_identity($this->settings);
         $mail = new MailMessage;
+        $mail->from($from['address'], $from['name']);
+        $mail->withSymfonyMessage(fn ($message) => prevent_mail_from_header_folding($message, $this->settings));
         $mail->subject('Coolify: Reset Password');
         $mail->view('emails.reset-password', ['url' => $url, 'count' => config('auth.passwords.'.config('auth.defaults.passwords').'.expire')]);
 
@@ -66,9 +70,12 @@ class ResetPassword extends Notification
             return call_user_func(static::$createUrlCallback, $notifiable, $this->token);
         }
 
-        return url(route('password.reset', [
+        $path = route('password.reset', [
             'token' => $this->token,
             'email' => $notifiable->getEmailForPasswordReset(),
-        ], false));
+        ], false);
+
+        // Use server-side config (FQDN / public IP) instead of request host
+        return rtrim(base_url(), '/').$path;
     }
 }

@@ -2,34 +2,83 @@
 
 namespace App\Actions\Docker;
 
+use App\Actions\Application\StopApplication;
+use App\Actions\Application\StopApplicationPreview;
 use App\Actions\Database\StartDatabaseProxy;
-use App\Actions\Proxy\CheckProxy;
-use App\Actions\Proxy\StartProxy;
+use App\Actions\Database\StopDatabaseProxy;
+use App\Actions\Service\StopServiceApplication;
 use App\Actions\Shared\ComplexStatusCheck;
+use App\Events\ServiceChecked;
+use App\Jobs\NotifyResourceStoppedJob;
+use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Models\ServiceDatabase;
-use App\Notifications\Container\ContainerRestarted;
-use App\Notifications\Container\ContainerStopped;
+use App\Notifications\Application\RestartLimitReached as ApplicationRestartLimitReached;
+use App\Services\ContainerStatusAggregator;
+use App\Services\RestartCountTracker;
+use App\Support\Actions\UniqueUntilProcessingJobDecorator;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Lorisleiva\Actions\Decorators\UniqueJobDecorator;
 
-class GetContainersStatus
+/**
+ * Queued runs are coalesced per server: while one run waits in the queue, further dispatches are
+ * dropped because the waiting run reads the same container snapshot. The lock is released when a
+ * worker starts the run, so a request made during a run still queues one follow-up.
+ * Synchronous run() calls are not affected.
+ */
+class GetContainersStatus implements ShouldBeUnique
 {
     use AsAction;
 
+    public string $jobQueue = 'high';
+
+    public int $jobTimeout = 120;
+
+    /**
+     * Bounds how long a lost queued run (for example a killed worker) blocks new refreshes.
+     */
+    public int $jobUniqueFor = 60;
+
     public $applications;
+
+    public ?Collection $containers;
+
+    public ?Collection $containerReplicates;
 
     public $server;
 
-    public function handle(Server $server)
+    protected ?Collection $applicationContainerStatuses;
+
+    protected ?Collection $applicationContainerRestartCounts;
+
+    protected ?Collection $previewContainerRestartCounts;
+
+    protected ?Collection $serviceContainerStatuses;
+
+    protected ?Collection $serviceContainerRestartCounts;
+
+    public static function makeUniqueJob(mixed ...$arguments): UniqueJobDecorator
     {
-        // if (isDev()) {
-        //     $server = Server::find(0);
-        // }
+        return new UniqueUntilProcessingJobDecorator(static::class, ...$arguments);
+    }
+
+    public function getJobUniqueId(Server $server): string
+    {
+        return $server->uuid;
+    }
+
+    public function handle(Server $server, ?Collection $containers = null, ?Collection $containerReplicates = null)
+    {
+        $this->containers = $containers;
+        $this->containerReplicates = $containerReplicates;
         $this->server = $server;
         if (! $this->server->isFunctional()) {
-            return 'Server is not ready.';
+            return 'Server is not functional.';
         }
         $this->applications = $this->server->applications();
         $skip_these_applications = collect([]);
@@ -45,343 +94,18 @@ class GetContainersStatus
         $this->applications = $this->applications->filter(function ($value, $key) use ($skip_these_applications) {
             return ! $skip_these_applications->pluck('id')->contains($value->id);
         });
-        $this->old_way();
-        // if ($this->server->isSwarm()) {
-        //     $this->old_way();
-        // } else {
-        //     if (!$this->server->is_metrics_enabled) {
-        //         $this->old_way();
-        //         return;
-        //     }
-        //     $sentinel_found = instant_remote_process(["docker inspect coolify-sentinel"], $this->server, false);
-        //     $sentinel_found = json_decode($sentinel_found, true);
-        //     $status = data_get($sentinel_found, '0.State.Status', 'exited');
-        //     if ($status === 'running') {
-        //         ray('Checking with Sentinel');
-        //         $this->sentinel();
-        //     } else {
-        //         ray('Checking the Old way');
-        //         $this->old_way();
-        //     }
-        // }
-    }
-
-    private function sentinel()
-    {
-        try {
-            $containers = $this->server->getContainers();
-            if ($containers->count() === 0) {
-                return;
-            }
-            $databases = $this->server->databases();
-            $services = $this->server->services()->get();
-            $previews = $this->server->previews();
-            $foundApplications = [];
-            $foundApplicationPreviews = [];
-            $foundDatabases = [];
-            $foundServices = [];
-
-            foreach ($containers as $container) {
-                $labels = Arr::undot(data_get($container, 'labels'));
-                $containerStatus = data_get($container, 'state');
-                $containerHealth = data_get($container, 'health_status', 'unhealthy');
-                $containerStatus = "$containerStatus ($containerHealth)";
-                $applicationId = data_get($labels, 'coolify.applicationId');
-                if ($applicationId) {
-                    $pullRequestId = data_get($labels, 'coolify.pullRequestId');
-                    if ($pullRequestId) {
-                        if (str($applicationId)->contains('-')) {
-                            $applicationId = str($applicationId)->before('-');
-                        }
-                        $preview = ApplicationPreview::where('application_id', $applicationId)->where('pull_request_id', $pullRequestId)->first();
-                        if ($preview) {
-                            $foundApplicationPreviews[] = $preview->id;
-                            $statusFromDb = $preview->status;
-                            if ($statusFromDb !== $containerStatus) {
-                                $preview->update(['status' => $containerStatus]);
-                            }
-                        } else {
-                            //Notify user that this container should not be there.
-                        }
-                    } else {
-                        $application = $this->applications->where('id', $applicationId)->first();
-                        if ($application) {
-                            $foundApplications[] = $application->id;
-                            $statusFromDb = $application->status;
-                            if ($statusFromDb !== $containerStatus) {
-                                $application->update(['status' => $containerStatus]);
-                            }
-                        } else {
-                            //Notify user that this container should not be there.
-                        }
-                    }
-                } else {
-                    $uuid = data_get($labels, 'com.docker.compose.service');
-                    $type = data_get($labels, 'coolify.type');
-                    if ($uuid) {
-                        if ($type === 'service') {
-                            $database_id = data_get($labels, 'coolify.service.subId');
-                            if ($database_id) {
-                                $service_db = ServiceDatabase::where('id', $database_id)->first();
-                                if ($service_db) {
-                                    $uuid = $service_db->service->uuid;
-                                    $isPublic = data_get($service_db, 'is_public');
-                                    if ($isPublic) {
-                                        $foundTcpProxy = $containers->filter(function ($value, $key) use ($uuid) {
-                                            if ($this->server->isSwarm()) {
-                                                // TODO: fix this with sentinel
-                                                return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
-                                            } else {
-                                                return data_get($value, 'name') === "$uuid-proxy";
-                                            }
-                                        })->first();
-                                        if (! $foundTcpProxy) {
-                                            StartDatabaseProxy::run($service_db);
-                                            // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$service_db->service->name}", $this->server));
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            $database = $databases->where('uuid', $uuid)->first();
-                            if ($database) {
-                                $isPublic = data_get($database, 'is_public');
-                                $foundDatabases[] = $database->id;
-                                $statusFromDb = $database->status;
-                                if ($statusFromDb !== $containerStatus) {
-                                    $database->update(['status' => $containerStatus]);
-                                }
-                                if ($isPublic) {
-                                    $foundTcpProxy = $containers->filter(function ($value, $key) use ($uuid) {
-                                        if ($this->server->isSwarm()) {
-                                            // TODO: fix this with sentinel
-                                            return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
-                                        } else {
-                                            return data_get($value, 'name') === "$uuid-proxy";
-                                        }
-                                    })->first();
-                                    if (! $foundTcpProxy) {
-                                        StartDatabaseProxy::run($database);
-                                        $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
-                                    }
-                                }
-                            } else {
-                                // Notify user that this container should not be there.
-                            }
-                        }
-                    }
-                    if (data_get($container, 'name') === 'coolify-db') {
-                        $foundDatabases[] = 0;
-                    }
-                }
-                $serviceLabelId = data_get($labels, 'coolify.serviceId');
-                if ($serviceLabelId) {
-                    $subType = data_get($labels, 'coolify.service.subType');
-                    $subId = data_get($labels, 'coolify.service.subId');
-                    $service = $services->where('id', $serviceLabelId)->first();
-                    if (! $service) {
-                        continue;
-                    }
-                    if ($subType === 'application') {
-                        $service = $service->applications()->where('id', $subId)->first();
-                    } else {
-                        $service = $service->databases()->where('id', $subId)->first();
-                    }
-                    if ($service) {
-                        $foundServices[] = "$service->id-$service->name";
-                        $statusFromDb = $service->status;
-                        if ($statusFromDb !== $containerStatus) {
-                            // ray('Updating status: ' . $containerStatus);
-                            $service->update(['status' => $containerStatus]);
-                        }
-                    }
-                }
-            }
-            $exitedServices = collect([]);
-            foreach ($services as $service) {
-                $apps = $service->applications()->get();
-                $dbs = $service->databases()->get();
-                foreach ($apps as $app) {
-                    if (in_array("$app->id-$app->name", $foundServices)) {
-                        continue;
-                    } else {
-                        $exitedServices->push($app);
-                    }
-                }
-                foreach ($dbs as $db) {
-                    if (in_array("$db->id-$db->name", $foundServices)) {
-                        continue;
-                    } else {
-                        $exitedServices->push($db);
-                    }
-                }
-            }
-            $exitedServices = $exitedServices->unique('id');
-            foreach ($exitedServices as $exitedService) {
-                if (str($exitedService->status)->startsWith('exited')) {
-                    continue;
-                }
-                $name = data_get($exitedService, 'name');
-                $fqdn = data_get($exitedService, 'fqdn');
-                if ($name) {
-                    if ($fqdn) {
-                        $containerName = "$name, available at $fqdn";
-                    } else {
-                        $containerName = $name;
-                    }
-                } else {
-                    if ($fqdn) {
-                        $containerName = $fqdn;
-                    } else {
-                        $containerName = null;
-                    }
-                }
-                $projectUuid = data_get($service, 'environment.project.uuid');
-                $serviceUuid = data_get($service, 'uuid');
-                $environmentName = data_get($service, 'environment.name');
-
-                if ($projectUuid && $serviceUuid && $environmentName) {
-                    $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/service/'.$serviceUuid;
-                } else {
-                    $url = null;
-                }
-                // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
-                $exitedService->update(['status' => 'exited']);
-            }
-
-            $notRunningApplications = $this->applications->pluck('id')->diff($foundApplications);
-            foreach ($notRunningApplications as $applicationId) {
-                $application = $this->applications->where('id', $applicationId)->first();
-                if (str($application->status)->startsWith('exited')) {
-                    continue;
-                }
-                $application->update(['status' => 'exited']);
-
-                $name = data_get($application, 'name');
-                $fqdn = data_get($application, 'fqdn');
-
-                $containerName = $name ? "$name ($fqdn)" : $fqdn;
-
-                $projectUuid = data_get($application, 'environment.project.uuid');
-                $applicationUuid = data_get($application, 'uuid');
-                $environment = data_get($application, 'environment.name');
-
-                if ($projectUuid && $applicationUuid && $environment) {
-                    $url = base_url().'/project/'.$projectUuid.'/'.$environment.'/application/'.$applicationUuid;
-                } else {
-                    $url = null;
-                }
-
-                // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
-            }
-            $notRunningApplicationPreviews = $previews->pluck('id')->diff($foundApplicationPreviews);
-            foreach ($notRunningApplicationPreviews as $previewId) {
-                $preview = $previews->where('id', $previewId)->first();
-                if (str($preview->status)->startsWith('exited')) {
-                    continue;
-                }
-                $preview->update(['status' => 'exited']);
-
-                $name = data_get($preview, 'name');
-                $fqdn = data_get($preview, 'fqdn');
-
-                $containerName = $name ? "$name ($fqdn)" : $fqdn;
-
-                $projectUuid = data_get($preview, 'application.environment.project.uuid');
-                $environmentName = data_get($preview, 'application.environment.name');
-                $applicationUuid = data_get($preview, 'application.uuid');
-
-                if ($projectUuid && $applicationUuid && $environmentName) {
-                    $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/application/'.$applicationUuid;
-                } else {
-                    $url = null;
-                }
-
-                // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
-            }
-            $notRunningDatabases = $databases->pluck('id')->diff($foundDatabases);
-            foreach ($notRunningDatabases as $database) {
-                $database = $databases->where('id', $database)->first();
-                if (str($database->status)->startsWith('exited')) {
-                    continue;
-                }
-                $database->update(['status' => 'exited']);
-
-                $name = data_get($database, 'name');
-                $fqdn = data_get($database, 'fqdn');
-
-                $containerName = $name;
-
-                $projectUuid = data_get($database, 'environment.project.uuid');
-                $environmentName = data_get($database, 'environment.name');
-                $databaseUuid = data_get($database, 'uuid');
-
-                if ($projectUuid && $databaseUuid && $environmentName) {
-                    $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/database/'.$databaseUuid;
-                } else {
-                    $url = null;
-                }
-                // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
-            }
-
-            // Check if proxy is running
-            $this->server->proxyType();
-            $foundProxyContainer = $containers->filter(function ($value, $key) {
-                if ($this->server->isSwarm()) {
-                    // TODO: fix this with sentinel
-                    return data_get($value, 'Spec.Name') === 'coolify-proxy_traefik';
-                } else {
-                    return data_get($value, 'name') === 'coolify-proxy';
-                }
-            })->first();
-            if (! $foundProxyContainer) {
-                try {
-                    $shouldStart = CheckProxy::run($this->server);
-                    if ($shouldStart) {
-                        StartProxy::run($this->server, false);
-                        $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
-                    }
-                } catch (\Throwable $e) {
-                    ray($e);
-                }
-            } else {
-                $this->server->proxy->status = data_get($foundProxyContainer, 'state');
-                $this->server->save();
-                $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
-                instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
-            }
-        } catch (\Exception $e) {
-            // send_internal_notification("ContainerStatusJob failed on ({$this->server->id}) with: " . $e->getMessage());
-            ray($e->getMessage());
-
-            return handleError($e);
+        if ($this->containers === null) {
+            ['containers' => $this->containers, 'containerReplicates' => $this->containerReplicates] = $this->server->getContainers();
         }
-    }
 
-    private function old_way()
-    {
-        if ($this->server->isSwarm()) {
-            $containers = instant_remote_process(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this->server, false);
-            $containerReplicates = instant_remote_process(["docker service ls --format '{{json .}}'"], $this->server, false);
-        } else {
-            // Precheck for containers
-            $containers = instant_remote_process(['docker container ls -q'], $this->server, false);
-            if (! $containers) {
-                return;
-            }
-            $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this->server, false);
-            $containerReplicates = null;
-        }
-        if (is_null($containers)) {
+        if (is_null($this->containers)) {
             return;
         }
 
-        $containers = format_docker_command_output_to_json($containers);
-        if ($containerReplicates) {
-            $containerReplicates = format_docker_command_output_to_json($containerReplicates);
-            foreach ($containerReplicates as $containerReplica) {
+        if ($this->containerReplicates) {
+            foreach ($this->containerReplicates as $containerReplica) {
                 $name = data_get($containerReplica, 'Name');
-                $containers = $containers->map(function ($container) use ($name, $containerReplica) {
+                $this->containers = $this->containers->map(function ($container) use ($name, $containerReplica) {
                     if (data_get($container, 'Spec.Name') === $name) {
                         $replicas = data_get($containerReplica, 'Replicas');
                         $running = str($replicas)->explode('/')[0];
@@ -402,49 +126,104 @@ class GetContainersStatus
         $databases = $this->server->databases();
         $services = $this->server->services()->get();
         $previews = $this->server->previews();
+        $upResourceIds = NotifyResourceStoppedJob::upResourceIds(collect($this->applications)
+            ->concat($previews)
+            ->concat($databases)
+            ->concat($services->flatMap(fn ($service) => $service->applications))
+            ->concat($services->flatMap(fn ($service) => $service->databases)));
         $foundApplications = [];
         $foundApplicationPreviews = [];
         $foundDatabases = [];
         $foundServices = [];
 
-        foreach ($containers as $container) {
+        // Owners of preview containers outside this server's applications, in one query.
+        $foreignApplicationIdsByUuid = containerApplicationIdsByUuid(
+            $this->applications,
+            $this->containers
+                ->map(fn ($container) => format_docker_labels_to_json(data_get($container, $this->server->isSwarm() ? 'Spec.Labels' : 'Config.Labels') ?? []))
+                ->filter(fn (Collection $labels) => (bool) $labels->get('coolify.pullRequestId') && isContainerOfType($labels, 'application'))
+        );
+
+        foreach ($this->containers as $container) {
             if ($this->server->isSwarm()) {
                 $labels = data_get($container, 'Spec.Labels');
                 $uuid = data_get($labels, 'coolify.name');
             } else {
                 $labels = data_get($container, 'Config.Labels');
             }
-            $containerStatus = data_get($container, 'State.Status');
-            $containerHealth = data_get($container, 'State.Health.Status', 'unhealthy');
-            $containerStatus = "$containerStatus ($containerHealth)";
-            $labels = Arr::undot(format_docker_labels_to_json($labels));
-            $applicationId = data_get($labels, 'coolify.applicationId');
-            if ($applicationId) {
+            $containerStatus = ContainerStatusAggregator::containerStatus($container);
+            $flatLabels = format_docker_labels_to_json($labels);
+            $labels = Arr::undot($flatLabels);
+            if (filter_var(data_get($labels, 'com.docker.compose.oneoff'), FILTER_VALIDATE_BOOLEAN)) {
+                continue;
+            }
+            // Containers are matched by owner UUID; numeric ids differ between instances.
+            $isApplicationContainer = isContainerOfType($flatLabels, 'application');
+            $isServiceContainer = isContainerOfType($flatLabels, 'service');
+            [$parentService, $serviceSubType, $serviceSubResource] = resolveServiceContainerOwner($services, $flatLabels);
+            if ($isApplicationContainer) {
                 $pullRequestId = data_get($labels, 'coolify.pullRequestId');
                 if ($pullRequestId) {
-                    if (str($applicationId)->contains('-')) {
-                        $applicationId = str($applicationId)->before('-');
-                    }
-                    $preview = ApplicationPreview::where('application_id', $applicationId)->where('pull_request_id', $pullRequestId)->first();
+                    $applicationId = resolveContainerApplicationId($this->applications, $flatLabels, $foreignApplicationIdsByUuid);
+                    $preview = $applicationId
+                        ? ApplicationPreview::where('application_id', $applicationId)->where('pull_request_id', $pullRequestId)->first()
+                        : null;
                     if ($preview) {
                         $foundApplicationPreviews[] = $preview->id;
                         $statusFromDb = $preview->status;
                         if ($statusFromDb !== $containerStatus) {
                             $preview->update(['status' => $containerStatus]);
+                        } else {
+                            $preview->update(['last_online_at' => now()]);
                         }
+                        $key = $applicationId.':'.$pullRequestId;
+                        $this->previewContainerRestartCounts ??= collect();
+                        $this->previewContainerRestartCounts->push([
+                            'key' => $key,
+                            'count' => (int) data_get($container, 'RestartCount', 0),
+                        ]);
                     } else {
-                        //Notify user that this container should not be there.
+                        // Notify user that this container should not be there.
                     }
                 } else {
-                    $application = $this->applications->where('id', $applicationId)->first();
+                    $application = resolveContainerOwner($this->applications, $flatLabels, 'application');
+                    $applicationId = $application?->id;
                     if ($application) {
                         $foundApplications[] = $application->id;
-                        $statusFromDb = $application->status;
-                        if ($statusFromDb !== $containerStatus) {
-                            $application->update(['status' => $containerStatus]);
+                        if ($application->container_present !== true) {
+                            $application->update(['container_present' => true]);
+                        }
+                        // Store container status for aggregation
+                        if (! isset($this->applicationContainerStatuses)) {
+                            $this->applicationContainerStatuses = collect();
+                        }
+                        if (! $this->applicationContainerStatuses->has($applicationId)) {
+                            $this->applicationContainerStatuses->put($applicationId, collect());
+                        }
+                        $containerName = data_get($labels, 'com.docker.compose.service');
+                        // Fallback for Docker Swarm which uses different labels
+                        if (! $containerName && $this->server->isSwarm()) {
+                            $containerName = data_get($labels, 'coolify.serviceName')
+                                ?? data_get($labels, 'coolify.name')
+                                ?? data_get($labels, 'com.docker.stack.namespace');
+                        }
+                        if ($containerName) {
+                            $this->applicationContainerStatuses->get($applicationId)->put($containerName, $containerStatus);
+                        }
+
+                        // Track restart counts for applications
+                        $restartCount = data_get($container, 'RestartCount', 0);
+                        if (! isset($this->applicationContainerRestartCounts)) {
+                            $this->applicationContainerRestartCounts = collect();
+                        }
+                        if (! $this->applicationContainerRestartCounts->has($applicationId)) {
+                            $this->applicationContainerRestartCounts->put($applicationId, collect());
+                        }
+                        if ($containerName) {
+                            $this->applicationContainerRestartCounts->get($applicationId)->put($containerName, $restartCount);
                         }
                     } else {
-                        //Notify user that this container should not be there.
+                        // Notify user that this container should not be there.
                     }
                 }
             } else {
@@ -453,25 +232,35 @@ class GetContainersStatus
 
                 if ($uuid) {
                     if ($type === 'service') {
-                        $database_id = data_get($labels, 'coolify.service.subId');
-                        if ($database_id) {
-                            $service_db = ServiceDatabase::where('id', $database_id)->first();
+                        if ($serviceSubResource instanceof ServiceDatabase) {
+                            $service_db = $serviceSubResource;
                             if ($service_db) {
-                                $uuid = data_get($service_db, 'service.uuid');
-                                if ($uuid) {
-                                    $isPublic = data_get($service_db, 'is_public');
-                                    if ($isPublic) {
-                                        $foundTcpProxy = $containers->filter(function ($value, $key) use ($uuid) {
-                                            if ($this->server->isSwarm()) {
-                                                return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
-                                            } else {
-                                                return data_get($value, 'Name') === "/$uuid-proxy";
-                                            }
-                                        })->first();
-                                        if (! $foundTcpProxy) {
-                                            StartDatabaseProxy::run($service_db);
-                                            // $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$service_db->service->name}", $this->server));
+                                $proxyUuid = $service_db->uuid;
+                                $isPublic = data_get($service_db, 'is_public');
+                                if ($isPublic) {
+                                    $foundTcpProxy = $this->containers->filter(function ($value, $key) use ($proxyUuid) {
+                                        if ($this->server->isSwarm()) {
+                                            return data_get($value, 'Spec.Name') === "coolify-proxy_$proxyUuid";
+                                        } else {
+                                            return data_get($value, 'Name') === "/$proxyUuid-proxy";
                                         }
+                                    })->first();
+                                    if (! $foundTcpProxy) {
+                                        StartDatabaseProxy::run($service_db);
+                                    } elseif (! $this->server->isSwarm() && StartDatabaseProxy::claimOutdatedRefresh($proxyUuid, data_get($foundTcpProxy, 'Config.Labels'))) {
+                                        StartDatabaseProxy::run($service_db);
+                                    }
+                                } else {
+                                    // Clean up orphaned proxy when is_public=false
+                                    $orphanedProxy = $this->containers->filter(function ($value, $key) use ($proxyUuid) {
+                                        if ($this->server->isSwarm()) {
+                                            return data_get($value, 'Spec.Name') === "coolify-proxy_$proxyUuid";
+                                        } else {
+                                            return data_get($value, 'Name') === "/$proxyUuid-proxy";
+                                        }
+                                    })->first();
+                                    if ($orphanedProxy) {
+                                        StopDatabaseProxy::run($service_db);
                                     }
                                 }
                             }
@@ -482,11 +271,27 @@ class GetContainersStatus
                             $isPublic = data_get($database, 'is_public');
                             $foundDatabases[] = $database->id;
                             $statusFromDb = $database->status;
+
+                            // Track restart count for databases (single-container)
+                            $restartCount = data_get($container, 'RestartCount', 0);
                             if ($statusFromDb !== $containerStatus) {
-                                $database->update(['status' => $containerStatus]);
+                                $updateData = ['status' => $containerStatus];
+                            } else {
+                                $updateData = ['last_online_at' => now()];
                             }
+
+                            $database->update($updateData);
+
+                            if ($restartCount > ($database->restart_count ?? 0)) {
+                                $database->update([
+                                    'restart_count' => (int) $restartCount,
+                                    'last_restart_at' => now(),
+                                    'last_restart_type' => 'crash',
+                                ]);
+                            }
+
                             if ($isPublic) {
-                                $foundTcpProxy = $containers->filter(function ($value, $key) use ($uuid) {
+                                $foundTcpProxy = $this->containers->filter(function ($value, $key) use ($uuid) {
                                     if ($this->server->isSwarm()) {
                                         return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
                                     } else {
@@ -495,7 +300,20 @@ class GetContainersStatus
                                 })->first();
                                 if (! $foundTcpProxy) {
                                     StartDatabaseProxy::run($database);
-                                    $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
+                                } elseif (! $this->server->isSwarm() && StartDatabaseProxy::claimOutdatedRefresh($uuid, data_get($foundTcpProxy, 'Config.Labels'))) {
+                                    StartDatabaseProxy::run($database);
+                                }
+                            } else {
+                                // Clean up orphaned proxy when is_public=false
+                                $orphanedProxy = $this->containers->filter(function ($value, $key) use ($uuid) {
+                                    if ($this->server->isSwarm()) {
+                                        return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
+                                    } else {
+                                        return data_get($value, 'Name') === "/$uuid-proxy";
+                                    }
+                                })->first();
+                                if ($orphanedProxy) {
+                                    StopDatabaseProxy::run($database);
                                 }
                             }
                         } else {
@@ -507,26 +325,38 @@ class GetContainersStatus
                     $foundDatabases[] = 0;
                 }
             }
-            $serviceLabelId = data_get($labels, 'coolify.serviceId');
-            if ($serviceLabelId) {
-                $subType = data_get($labels, 'coolify.service.subType');
-                $subId = data_get($labels, 'coolify.service.subId');
-                $service = $services->where('id', $serviceLabelId)->first();
-                if (! $service) {
+            if ($isServiceContainer) {
+                if (! $parentService) {
                     continue;
                 }
-                if ($subType === 'application') {
-                    $service = $service->applications()->where('id', $subId)->first();
-                } else {
-                    $service = $service->databases()->where('id', $subId)->first();
+                $serviceLabelId = $parentService->id;
+                $subType = $serviceSubType;
+                $subId = $serviceSubResource?->id;
+
+                // Store container status for aggregation
+                if (! isset($this->serviceContainerStatuses)) {
+                    $this->serviceContainerStatuses = collect();
                 }
+
+                $key = $serviceLabelId.':'.$subType.':'.$subId;
+                if (! $this->serviceContainerStatuses->has($key)) {
+                    $this->serviceContainerStatuses->put($key, collect());
+                }
+
+                $containerName = data_get($labels, 'com.docker.compose.service');
+                if ($containerName) {
+                    $this->serviceContainerStatuses->get($key)->put($containerName, $containerStatus);
+                    $this->serviceContainerRestartCounts ??= collect();
+                    if (! $this->serviceContainerRestartCounts->has($key)) {
+                        $this->serviceContainerRestartCounts->put($key, collect());
+                    }
+                    $this->serviceContainerRestartCounts->get($key)->put($containerName, (int) data_get($container, 'RestartCount', 0));
+                }
+
+                // Mark service as found
+                $service = $serviceSubResource;
                 if ($service) {
                     $foundServices[] = "$service->id-$service->name";
-                    $statusFromDb = $service->status;
-                    if ($statusFromDb !== $containerStatus) {
-                        // ray('Updating status: ' . $containerStatus);
-                        $service->update(['status' => $containerStatus]);
-                    }
                 }
             }
         }
@@ -549,63 +379,68 @@ class GetContainersStatus
                 }
             }
         }
-        $exitedServices = $exitedServices->unique('id');
+        $exitedServices = $exitedServices->unique('uuid');
         foreach ($exitedServices as $exitedService) {
             if (str($exitedService->status)->startsWith('exited')) {
                 continue;
             }
-            $name = data_get($exitedService, 'name');
-            $fqdn = data_get($exitedService, 'fqdn');
-            if ($name) {
-                if ($fqdn) {
-                    $containerName = "$name, available at $fqdn";
-                } else {
-                    $containerName = $name;
-                }
-            } else {
-                if ($fqdn) {
-                    $containerName = $fqdn;
-                } else {
-                    $containerName = null;
-                }
-            }
-            $projectUuid = data_get($service, 'environment.project.uuid');
-            $serviceUuid = data_get($service, 'uuid');
-            $environmentName = data_get($service, 'environment.name');
 
-            if ($projectUuid && $serviceUuid && $environmentName) {
-                $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/service/'.$serviceUuid;
-            } else {
-                $url = null;
+            // Only protection: If no containers at all, Docker query might have failed
+            if ($this->containers->isEmpty()) {
+                continue;
             }
-            // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
-            $exitedService->update(['status' => 'exited']);
+
+            if ($exitedService instanceof ServiceDatabase) {
+                $exitedService->update(['status' => 'exited']);
+            } elseif (! $exitedService->stoppedAfterRestartLimit()) {
+                $exitedService->update([
+                    'status' => 'exited',
+                    'restart_count' => 0,
+                    'restart_limit_reached' => false,
+                    'last_restart_at' => null,
+                    'last_restart_type' => null,
+                ]);
+            }
         }
 
         $notRunningApplications = $this->applications->pluck('id')->diff($foundApplications);
         foreach ($notRunningApplications as $applicationId) {
             $application = $this->applications->where('id', $applicationId)->first();
-            if (str($application->status)->startsWith('exited')) {
+
+            // Only protection: If no containers at all, Docker query might have failed
+            if ($this->containers->isEmpty()) {
                 continue;
             }
-            $application->update(['status' => 'exited']);
 
-            $name = data_get($application, 'name');
-            $fqdn = data_get($application, 'fqdn');
+            if (str($application->status)->startsWith('exited')) {
+                $application->update([
+                    'container_present' => false,
+                    'restart_limit_reached' => false,
+                ]);
 
-            $containerName = $name ? "$name ($fqdn)" : $fqdn;
-
-            $projectUuid = data_get($application, 'environment.project.uuid');
-            $applicationUuid = data_get($application, 'uuid');
-            $environment = data_get($application, 'environment.name');
-
-            if ($projectUuid && $applicationUuid && $environment) {
-                $url = base_url().'/project/'.$projectUuid.'/'.$environment.'/application/'.$applicationUuid;
-            } else {
-                $url = null;
+                continue;
             }
 
-            // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+            // If container was recently restarting (crash loop), keep it as degraded for a grace period
+            // This prevents false "exited" status during the brief moment between container removal and recreation
+            $recentlyRestarted = $application->restart_count > 0 &&
+                                 $application->last_restart_at &&
+                                 $application->last_restart_at->greaterThan(now()->subSeconds(30));
+
+            if ($recentlyRestarted) {
+                // Keep it as degraded if it was recently in a crash loop
+                $application->update(['status' => 'degraded:unhealthy']);
+            } else {
+                // Reset restart count when application exits completely
+                $application->update([
+                    'status' => 'exited',
+                    'container_present' => false,
+                    'restart_count' => 0,
+                    'last_restart_at' => null,
+                    'last_restart_type' => null,
+                    'restart_limit_reached' => false,
+                ]);
+            }
         }
         $notRunningApplicationPreviews = $previews->pluck('id')->diff($foundApplicationPreviews);
         foreach ($notRunningApplicationPreviews as $previewId) {
@@ -613,24 +448,13 @@ class GetContainersStatus
             if (str($preview->status)->startsWith('exited')) {
                 continue;
             }
-            $preview->update(['status' => 'exited']);
 
-            $name = data_get($preview, 'name');
-            $fqdn = data_get($preview, 'fqdn');
-
-            $containerName = $name ? "$name ($fqdn)" : $fqdn;
-
-            $projectUuid = data_get($preview, 'application.environment.project.uuid');
-            $environmentName = data_get($preview, 'application.environment.name');
-            $applicationUuid = data_get($preview, 'application.uuid');
-
-            if ($projectUuid && $applicationUuid && $environmentName) {
-                $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/application/'.$applicationUuid;
-            } else {
-                $url = null;
+            // Only protection: If no containers at all, Docker query might have failed
+            if ($this->containers->isEmpty()) {
+                continue;
             }
 
-            // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+            $preview->update(['status' => 'exited']);
         }
         $notRunningDatabases = $databases->pluck('id')->diff($foundDatabases);
         foreach ($notRunningDatabases as $database) {
@@ -638,49 +462,183 @@ class GetContainersStatus
             if (str($database->status)->startsWith('exited')) {
                 continue;
             }
-            $database->update(['status' => 'exited']);
 
-            $name = data_get($database, 'name');
-            $fqdn = data_get($database, 'fqdn');
-
-            $containerName = $name;
-
-            $projectUuid = data_get($database, 'environment.project.uuid');
-            $environmentName = data_get($database, 'environment.name');
-            $databaseUuid = data_get($database, 'uuid');
-
-            if ($projectUuid && $databaseUuid && $environmentName) {
-                $url = base_url().'/project/'.$projectUuid.'/'.$environmentName.'/database/'.$databaseUuid;
-            } else {
-                $url = null;
+            // Only protection: If no containers at all, Docker query might have failed
+            if ($this->containers->isEmpty()) {
+                continue;
             }
-            // $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
+
+            // Reset restart tracking when database exits completely
+            $database->update([
+                'status' => 'exited',
+                'restart_count' => 0,
+                'last_restart_at' => null,
+                'last_restart_type' => null,
+            ]);
+
+            // Stop proxy if database was public
+            if ($database->is_public) {
+                StopDatabaseProxy::run($database);
+            }
+
         }
 
-        // Check if proxy is running
-        $this->server->proxyType();
-        $foundProxyContainer = $containers->filter(function ($value, $key) {
-            if ($this->server->isSwarm()) {
-                return data_get($value, 'Spec.Name') === 'coolify-proxy_traefik';
-            } else {
-                return data_get($value, 'Name') === '/coolify-proxy';
-            }
-        })->first();
-        if (! $foundProxyContainer) {
-            try {
-                $shouldStart = CheckProxy::run($this->server);
-                if ($shouldStart) {
-                    StartProxy::run($this->server, false);
-                    $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
+        $this->trackPreviewRestartCounts($previews);
+
+        // Aggregate multi-container application statuses
+        if (isset($this->applicationContainerStatuses) && $this->applicationContainerStatuses->isNotEmpty()) {
+            foreach ($this->applicationContainerStatuses as $applicationId => $containerStatuses) {
+                $application = $this->applications->where('id', $applicationId)->first();
+                if (! $application) {
+                    continue;
                 }
-            } catch (\Throwable $e) {
-                ray($e);
+
+                // Track restart counts first
+                $maxRestartCount = 0;
+                if (isset($this->applicationContainerRestartCounts) && $this->applicationContainerRestartCounts->has($applicationId)) {
+                    $containerRestartCounts = $this->applicationContainerRestartCounts->get($applicationId);
+                    $maxRestartCount = $containerRestartCounts->max() ?? 0;
+                }
+
+                // Wrap all database updates in a transaction to ensure consistency
+                $restartLimitReached = false;
+
+                DB::transaction(function () use ($application, $maxRestartCount, $containerStatuses, &$restartLimitReached) {
+                    $previousRestartCount = $application->restart_count ?? 0;
+                    $restartState = (new RestartCountTracker)->evaluate(
+                        previousRestartCount: $previousRestartCount,
+                        observedRestartCount: $maxRestartCount,
+                        maxRestartCount: $application->max_restart_count ?? 0,
+                    );
+
+                    if ($restartState['restart_count_changed']) {
+                        $hasCrashRestarts = $restartState['restart_count'] > 0;
+                        $application->update([
+                            'restart_count' => $restartState['restart_count'],
+                            'last_restart_at' => $hasCrashRestarts ? now() : null,
+                            'last_restart_type' => $hasCrashRestarts ? 'crash' : null,
+                        ]);
+                    }
+                    $restartLimitReached = $restartState['restart_limit_reached'];
+
+                    // Aggregate status after tracking restart counts
+                    $aggregatedStatus = $this->aggregateApplicationStatus($application, $containerStatuses, $maxRestartCount);
+                    if ($aggregatedStatus) {
+                        $statusFromDb = $application->status;
+                        if ($statusFromDb !== $aggregatedStatus) {
+                            $application->update(['status' => $aggregatedStatus]);
+                        } else {
+                            $application->update(['last_online_at' => now()]);
+                        }
+                    }
+                });
+
+                if ($restartLimitReached) {
+                    $restartLimitClaimed = Application::query()
+                        ->whereKey($application->getKey())
+                        ->where('restart_limit_reached', false)
+                        ->update(['restart_limit_reached' => true]) === 1;
+
+                    // Stop again while a container still runs: an earlier stop can fail or come too late.
+                    $stillRunning = $containerStatuses->contains(fn (string $status): bool => ! str($status)->contains('exited'));
+                    if ($restartLimitClaimed || $stillRunning) {
+                        $application->refresh();
+                        StopApplication::dispatch(
+                            application: $application,
+                            previewDeployments: false,
+                            dockerCleanup: false,
+                            resetRestartCount: false,
+                            removeContainers: false,
+                        );
+                    }
+                    if ($restartLimitClaimed) {
+                        $application->environment->project->team?->notify(new ApplicationRestartLimitReached($application));
+                    }
+                }
             }
-        } else {
-            $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
-            $this->server->save();
-            $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
-            instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
         }
+
+        // Aggregate multi-container service statuses
+        $this->aggregateServiceContainerStatuses($services);
+
+        NotifyResourceStoppedJob::dispatchForStopped($upResourceIds);
+
+        ServiceChecked::dispatch($this->server->team->id);
+    }
+
+    private function aggregateApplicationStatus($application, Collection $containerStatuses, int $maxRestartCount = 0): ?string
+    {
+        return (new ContainerStatusAggregator)->aggregateForCompose($containerStatuses, data_get($application, 'docker_compose_raw'), $maxRestartCount);
+    }
+
+    private function aggregateServiceContainerStatuses($services)
+    {
+        if (! isset($this->serviceContainerStatuses) || $this->serviceContainerStatuses->isEmpty()) {
+            return;
+        }
+
+        foreach ($this->serviceContainerStatuses as $key => $containerStatuses) {
+            // Parse key: serviceId:subType:subId
+            [$serviceId, $subType, $subId] = explode(':', $key);
+
+            $service = $services->where('id', $serviceId)->first();
+            if (! $service) {
+                continue;
+            }
+
+            // Get the service sub-resource (ServiceApplication or ServiceDatabase)
+            $subResource = null;
+            if ($subType === 'application') {
+                $subResource = $service->applications()->where('id', $subId)->first();
+            } elseif ($subType === 'database') {
+                $subResource = $service->databases()->where('id', $subId)->first();
+            }
+
+            if (! $subResource) {
+                continue;
+            }
+
+            $restartCount = isset($this->serviceContainerRestartCounts)
+                ? ($this->serviceContainerRestartCounts->get($key)?->max() ?? 0)
+                : 0;
+            if (! $subResource instanceof ServiceDatabase && $subResource->trackRestartCount($restartCount)) {
+                StopServiceApplication::dispatch($subResource, false, false);
+                $subResource->team()?->notify(new ApplicationRestartLimitReached($subResource));
+
+                continue;
+            }
+
+            $aggregatedStatus = (new ContainerStatusAggregator)->aggregateForCompose($containerStatuses, data_get($service, 'docker_compose_raw'));
+
+            // Update service sub-resource status with aggregated result
+            if ($aggregatedStatus) {
+                $statusFromDb = $subResource->status;
+                if ($statusFromDb !== $aggregatedStatus) {
+                    $subResource->update(['status' => $aggregatedStatus]);
+                } else {
+                    $subResource->update(['last_online_at' => now()]);
+                }
+            }
+        }
+    }
+
+    private function trackPreviewRestartCounts(Collection $previews): void
+    {
+        if (! isset($this->previewContainerRestartCounts)) {
+            return;
+        }
+
+        $this->previewContainerRestartCounts
+            ->groupBy('key')
+            ->each(function (Collection $counts, string $key) use ($previews): void {
+                [$applicationId, $pullRequestId] = explode(':', $key);
+                $preview = $previews->first(fn (ApplicationPreview $preview): bool => (string) $preview->application_id === $applicationId
+                    && (string) $preview->pull_request_id === $pullRequestId
+                );
+                if ($preview?->trackRestartCount((int) $counts->max('count'))) {
+                    StopApplicationPreview::dispatch($preview, false, false);
+                    $preview->application->environment->project->team?->notify(new ApplicationRestartLimitReached($preview));
+                }
+            });
     }
 }

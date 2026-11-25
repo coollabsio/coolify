@@ -1,20 +1,91 @@
 <div>
-    @if ($server->id !== 0)
-        <h2 class="pt-4">Danger Zone</h2>
-        <div class="">Woah. I hope you know what are you doing.</div>
-        <h4 class="pt-4">Delete Server</h4>
-        <div class="pb-4">This will remove this server from Coolify. Beware! There is no coming
-            back!
+    <x-slot:title>
+        {{ data_get_str($server, 'name')->limit(10) }} > Delete Server | Coolify
+    </x-slot>
+
+    <livewire:server.navbar :server="$server" />
+
+    <div
+        class="server-settings-workspace application-settings-workspace mt-4 grid w-full max-w-none min-w-0 gap-8 lg:mt-0 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
+        <x-server.sidebar :server="$server" activeMenu="danger" />
+
+        <div class="application-settings-form w-full">
+            @if (! $server->is_coolify_host)
+                <x-application.settings-section id="server-danger-section" title="Delete server"
+                    helper="Permanently remove this server and its configuration from Coolify."
+                    class="server-danger-section">
+                    <x-danger-zone title="This action cannot be undone">
+                        <p>
+                        The server will be removed from Coolify.
+                        @if ($server->isTransferredAway())
+                            This server was transferred to another Coolify instance. Only the records on this instance
+                            are deleted, also the records of its resources. The server, its containers, and its data
+                            stay as they are.
+                        @elseif ($resourcesToDelete->isNotEmpty())
+                            It currently contains managed resources. Enable force deletion in the confirmation only
+                            if those resources should also be removed.
+                        @endif
+                        </p>
+                        @if (! $server->isTransferredAway() && $resourcesToDelete->isNotEmpty())
+                            <div>
+                                <p>Deleted with "Delete all resources":</p>
+                                <ul class="list-disc pl-5">
+                                    @foreach ($resourcesToDelete as $resource)
+                                        <li>{{ $resource->name }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+                        @if ($detachedApplications->isNotEmpty())
+                            <div>
+                                <p>Removed only from this server (not deleted):</p>
+                                <ul class="list-disc pl-5">
+                                    @foreach ($detachedApplications as $application)
+                                        <li>{{ $application->name }} will keep running on {{ data_get($application, 'destination.server.name') }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+                        @if ($server->hostinger_virtual_machine_id && ! $server->isTransferredAway())
+                            <p>
+                            Hostinger deletes the VPS only at the end of its paid period, and only if you select this in the confirmation dialog.
+                            <a class="underline" href="https://hpanel.hostinger.com/" target="_blank"
+                                rel="noopener noreferrer">Manage the VPS and billing in hPanel.</a>
+                            </p>
+                        @endif
+                        <p>Type the server name in the confirmation dialog to continue.</p>
+                        <x-slot:action>
+                        @php
+                            $deleteActions = $server->isTransferredAway()
+                                ? ['This server and the records of its resources will be permanently deleted from this Coolify instance. Nothing on the server changes.']
+                                : ['This server will be permanently deleted from Coolify.'];
+                            foreach ($detachedApplications as $application) {
+                                $deleteActions[] = "Application {$application->name} will be removed from this server and will keep running on ".data_get($application, 'destination.server.name').'.';
+                            }
+                            $deleteWarningMessage = null;
+                            if ($server->isTransferredAway()) {
+                                $deleteWarningMessage = '<strong>This removes the option to undo the transfer.</strong><br>'
+                                    .'This archive is the copy that "Transfer back" and "Take back" use. '
+                                    .'Delete it only when the transfer works and you do not need to undo it.';
+                            }
+                            if ($server->hostinger_virtual_machine_id && ! $server->isTransferredAway()) {
+                                $deleteWarningMessage = '<strong>Hostinger deletes a VPS only at the end of its paid period.</strong><br>'
+                                    .'If you select to delete the VPS from Hostinger, Coolify turns off its auto-renewal. '
+                                    .'The VPS keeps running until the paid period ends. Then Hostinger deletes it with all its data. '
+                                    .'To delete it now or to request a refund, '
+                                    .'<a class="underline font-semibold" href="https://hpanel.hostinger.com/" target="_blank" rel="noopener noreferrer">cancel the VPS in hPanel</a>.';
+                            }
+                        @endphp
+                        <x-modal-confirmation title="Confirm Server Deletion?" isErrorButton
+                            buttonTitle="Delete server" submitAction="delete"
+                            :actions="$deleteActions" :warningMessage="$deleteWarningMessage"
+                            :checkboxes="$checkboxes" confirmationText="{{ $server->name }}"
+                            confirmationLabel="Please confirm by entering the Server Name below"
+                            shortConfirmationLabel="Server Name" />
+                        </x-slot:action>
+                    </x-danger-zone>
+                </x-application.settings-section>
+            @endif
         </div>
-        @if ($server->definedResources()->count() > 0)
-            <div class="pb-2 text-red-500">You need to delete all resources before deleting this server.</div>
-            <x-modal-confirmation disabled isErrorButton buttonTitle="Delete">
-                This server will be deleted. It is not reversible. <br>Please think again.
-            </x-modal-confirmation>
-        @else
-            <x-modal-confirmation isErrorButton buttonTitle="Delete">
-                This server will be deleted. It is not reversible. <br>Please think again.
-            </x-modal-confirmation>
-        @endif
-    @endif
+    </div>
 </div>

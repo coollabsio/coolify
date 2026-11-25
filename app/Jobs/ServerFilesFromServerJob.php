@@ -7,16 +7,30 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class ServerFilesFromServerJob implements ShouldBeEncrypted, ShouldQueue
+class ServerFilesFromServerJob implements ShouldBeEncrypted, ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public ServiceApplication|ServiceDatabase|Application $resource) {}
+    /**
+     * Only one sync per resource can wait in the queue, also when deployments follow each other quickly.
+     */
+    public int $uniqueFor = 600;
+
+    public function __construct(public ServiceApplication|ServiceDatabase|Application $resource)
+    {
+        $this->onQueue('high');
+    }
+
+    public function uniqueId(): string
+    {
+        return $this->resource::class.':'.$this->resource->id;
+    }
 
     public function handle()
     {

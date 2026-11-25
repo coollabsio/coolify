@@ -13,7 +13,6 @@ return new class extends Migration
     {
         Schema::table('application_settings', function (Blueprint $table) {
             $table->boolean('connect_to_docker_network')->default(false);
-
         });
     }
 

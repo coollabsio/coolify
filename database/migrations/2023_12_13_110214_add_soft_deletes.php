@@ -66,6 +66,5 @@ return new class extends Migration
         Schema::table('service_databases', function (Blueprint $table) {
             $table->dropSoftDeletes();
         });
-
     }
 };

@@ -2,74 +2,120 @@
 
 namespace App\Livewire\Destination;
 
-use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use Illuminate\Support\Collection;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Show extends Component
 {
-    public Server $server;
+    use AuthorizesRequests;
 
-    public Collection|array $networks = [];
+    #[Locked]
+    public $destination;
 
-    private function createNetworkAndAttachToProxy()
+    #[Validate(['string', 'required'])]
+    public string $name;
+
+    #[Locked]
+    public string $network;
+
+    #[Locked]
+    public string $serverIp;
+
+    public function mount(string $destination_uuid)
     {
-        $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
-        instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
-    }
-
-    public function add($name)
-    {
-        if ($this->server->isSwarm()) {
-            $found = $this->server->swarmDockers()->where('network', $name)->first();
-            if ($found) {
-                $this->dispatch('error', 'Network already added to this server.');
-
-                return;
-            } else {
-                SwarmDocker::create([
-                    'name' => $this->server->name.'-'.$name,
-                    'network' => $this->name,
-                    'server_id' => $this->server->id,
-                ]);
+        try {
+            $destination = find_destination_for_current_team($destination_uuid);
+            if (! $destination) {
+                return redirect()->route('destination.index');
             }
-        } else {
-            $found = $this->server->standaloneDockers()->where('network', $name)->first();
-            if ($found) {
-                $this->dispatch('error', 'Network already added to this server.');
+            $this->authorize('view', $destination);
 
-                return;
-            } else {
-                StandaloneDocker::create([
-                    'name' => $this->server->name.'-'.$name,
-                    'network' => $name,
-                    'server_id' => $this->server->id,
-                ]);
-            }
-            $this->createNetworkAndAttachToProxy();
+            $this->destination = $destination;
+            $this->syncData();
+        } catch (AuthorizationException) {
+            abort(403);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 
-    public function scan()
+    private function syncData(bool $toModel = false): void
     {
-        if ($this->server->isSwarm()) {
-            $alreadyAddedNetworks = $this->server->swarmDockers;
+        if ($toModel) {
+            $this->validate();
+            $this->destination->name = $this->name;
+            $changedFields = auditChangedFields($this->destination);
+            $this->destination->save();
+            $this->dispatch('name-changed', uuid: $this->destination->uuid, name: $this->destination->name);
+            if ($changedFields !== []) {
+                auditLog('ui.destination.updated', $this->auditContext([
+                    'changed_fields' => $changedFields,
+                ]));
+            }
         } else {
-            $alreadyAddedNetworks = $this->server->standaloneDockers;
+            $this->name = $this->destination->name;
+            $this->network = $this->destination->network;
+            $this->serverIp = $this->destination->server->ip;
         }
-        $networks = instant_remote_process(['docker network ls --format "{{json .}}"'], $this->server, false);
-        $this->networks = format_docker_command_output_to_json($networks)->filter(function ($network) {
-            return $network['Name'] !== 'bridge' && $network['Name'] !== 'host' && $network['Name'] !== 'none';
-        })->filter(function ($network) use ($alreadyAddedNetworks) {
-            return ! $alreadyAddedNetworks->contains('network', $network['Name']);
-        });
-        if ($this->networks->count() === 0) {
-            $this->dispatch('success', 'No new networks found.');
+    }
 
-            return;
+    public function submit()
+    {
+        try {
+            $this->authorize('update', $this->destination);
+
+            $this->syncData(true);
+            $this->dispatch('success', 'Destination saved.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $this->dispatch('success', 'Scan done.');
+    }
+
+    public function delete()
+    {
+        try {
+            $this->authorize('delete', $this->destination);
+
+            if ($this->destination->getMorphClass() === StandaloneDocker::class) {
+                if ($this->destination->attachedTo()) {
+                    return $this->dispatch('error', 'You must delete all resources before deleting this destination.');
+                }
+                $safeNetwork = escapeshellarg($this->destination->network);
+                instant_remote_process(["docker network disconnect {$safeNetwork} coolify-proxy"], $this->destination->server, throwError: false);
+                instant_remote_process([dockerNetworkRemoveCommand($this->destination->network)], $this->destination->server);
+            }
+            $auditContext = $this->auditContext();
+            $this->destination->delete();
+            auditLog('ui.destination.deleted', $auditContext);
+
+            return redirectRoute($this, 'destination.index');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function auditContext(array $context = []): array
+    {
+        return array_merge([
+            'team_id' => $this->destination->server?->team_id,
+            'destination_uuid' => $this->destination->uuid,
+            'destination_name' => $this->destination->name,
+            'destination_type' => $this->destination instanceof SwarmDocker ? 'swarm' : 'standalone',
+            'server_uuid' => $this->destination->server?->uuid,
+        ], $context);
+    }
+
+    public function render()
+    {
+        return view('livewire.destination.show');
     }
 }

@@ -2,33 +2,90 @@
     <x-slot:title>
         Settings | Coolify
     </x-slot>
-    <x-settings.navbar />
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex flex-col h-full gap-8 pt-1 sm:flex-row">
-        <div class="flex gap-6 overflow-x-scroll sm:gap-2 sm:overflow-x-hidden scrollbar sm:flex-col whitespace-nowrap">
-            <a class="menu-item" :class="activeTab === 'general' && 'menu-item-active'"
-                @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
-            <a class="menu-item" :class="activeTab === 'backup' && 'menu-item-active'"
-                @click.prevent="activeTab = 'backup'; window.location.hash = 'backup'" href="#">Instance Backup</a>
-            <a class="menu-item" :class="activeTab === 'smtp' && 'menu-item-active'"
-                @click.prevent="activeTab = 'smtp'; window.location.hash = 'smtp'" href="#">Transactional
-                Email</a>
-            <a class="menu-item" :class="activeTab === 'auth' && 'menu-item-active'"
-                @click.prevent="activeTab = 'auth'; window.location.hash = 'auth'" href="#">Authentication
-                (OAuth)</a>
-        </div>
-        <div class="w-full">
-            <div x-cloak x-show="activeTab === 'general'" class="h-full">
-                <livewire:settings.configuration :settings="$settings" />
-            </div>
-            <div x-cloak x-show="activeTab === 'backup'" class="h-full">
-                <livewire:settings.backup :settings="$settings" :database="$database" :s3s="$s3s" />
-            </div>
-            <div x-cloak x-show="activeTab === 'smtp'" class="h-full">
-                <livewire:settings.email :settings="$settings" />
-            </div>
-            <div x-cloak x-show="activeTab === 'auth'" class="h-full">
-                <livewire:settings.auth />
-            </div>
-        </div>
-    </div>
+
+    <x-settings.layout>
+        <form wire:submit="submit" class="application-settings-form flex w-full min-w-0 flex-col gap-6">
+            {{-- instance_timezone auto-saves via $wire.set + submit; exclude it so
+                 the bar does not flash while the snapshot catches up. --}}
+            <x-unsaved-bar action="submit"
+                targets="fqdn,instance_name,public_ipv4,public_ipv6,dev_helper_version" />
+            <x-application.settings-section title="General">
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <div @class([
+                        'lg:col-span-2' => !str_starts_with(strtolower($fqdn ?? ''), 'https://'),
+                    ])>
+                        <x-forms.input canGate="update" :canResource="$settings" id="fqdn" label="URL"
+                            helper="Enter the full URL of the instance (for example, https://dashboard.example.com).<br><br><span class='text-coollabs dark:text-brand-light'>Important:</span> Include <b>https://</b> to secure the dashboard with HTTPS.<br><br>Passkeys are tied to this domain. If you change it, users must add their passkeys again."
+                            placeholder="https://coolify.yourdomain.com" />
+                    </div>
+
+                    @if (str_starts_with(strtolower($fqdn ?? ''), 'https://'))
+                        <div>
+                            <x-forms.listbox canGate="update" :canResource="$settings"
+                                id="is_dashboard_force_https_enabled" label="Redirect HTTP to HTTPS"
+                                onChange="submit"
+                                helper="Disable only when Cloudflare Tunnel or another proxy connects to Coolify over HTTP. Keep enabled when Cloudflare uses Full or Full (Strict) SSL."
+                                :options="[
+                                    ['value' => true, 'label' => 'Enabled'],
+                                    ['value' => false, 'label' => 'Disabled'],
+                                ]" />
+                        </div>
+                    @endif
+
+                    <x-forms.input canGate="update" :canResource="$settings" id="instance_name" label="Name"
+                        placeholder="Coolify" helper="Custom name for this Coolify instance." />
+
+                    {{-- Use a searchable listbox so the label row (h-4) and control height match
+                         sibling x-forms.input fields (Name). onChange auto-saves like before. --}}
+                    <x-forms.listbox searchable id="instance_timezone" label="Instance timezone"
+                        helper="Timezone used for update checks and the automatic update schedule."
+                        searchPlaceholder="Search timezones" searchEmptyText="No matching timezone"
+                        onChange="submit" :options="collect($this->timezones)->map(fn ($timezone) => [
+                            'value' => $timezone,
+                            'label' => $timezone,
+                        ])->all()" canGate="update" :canResource="$settings" />
+                </div>
+            </x-application.settings-section>
+
+            <x-application.settings-section title="Network addresses">
+                <x-slot:actions>
+                    <x-forms.button canGate="update" :canResource="$settings" type="button"
+                        wire:click="detectPublicIps">
+                        Detect
+                    </x-forms.button>
+                </x-slot:actions>
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.input canGate="update" :canResource="$settings" id="public_ipv4" type="password"
+                        label="Instance public IPv4"
+                        helper="Coolify detects this address on start only when the field is empty. Set it when the detected address is wrong. Detect looks it up again and saves it."
+                        placeholder="1.2.3.4" autocomplete="new-password" />
+                    <x-forms.input canGate="update" :canResource="$settings" id="public_ipv6" type="password"
+                        label="Instance public IPv6"
+                        helper="Coolify detects this address on start only when the field is empty. Set it when the detected address is wrong. Detect looks it up again and saves it."
+                        placeholder="2001:db8::1" autocomplete="new-password" />
+                </div>
+            </x-application.settings-section>
+
+            @if (isDev())
+                <x-application.settings-section title="Development helper">
+                    <x-forms.input canGate="update" :canResource="$settings" id="dev_helper_version"
+                        label="Version override"
+                        helper="Override the default coolify-helper image version. Leave empty to use {{ config('constants.coolify.helper_version') }}."
+                        placeholder="{{ config('constants.coolify.helper_version') }}" />
+                </x-application.settings-section>
+            @endif
+        </form>
+
+    <x-domain-conflict-modal :conflicts="$domainConflicts" :showModal="$showDomainConflictModal"
+        confirmAction="confirmDomainUsage">
+        <x-slot:consequences>
+            <ul class="mt-2 ml-4 list-disc">
+                <li>The Coolify instance domain will conflict with existing resources.</li>
+                <li>SSL certificates might not work correctly.</li>
+                <li>Routing behavior will be unpredictable.</li>
+                <li>You may not be able to access the Coolify dashboard properly.</li>
+            </ul>
+        </x-slot:consequences>
+    </x-domain-conflict-modal>
+    </x-settings.layout>
 </div>

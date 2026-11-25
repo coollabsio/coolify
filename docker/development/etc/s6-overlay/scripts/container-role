@@ -1,0 +1,26 @@
+#!/bin/sh
+
+coolify_container_role_value() {
+    role="${COOLIFY_CONTAINER_ROLE:-}"
+
+    if [ -z "$role" ]; then
+        role="$(grep -E '^COOLIFY_CONTAINER_ROLE=' .env 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
+    fi
+
+    printf '%s\n' "${role:-all}"
+}
+
+coolify_container_has_role() {
+    wanted_role="$1"
+    roles="$(coolify_container_role_value | tr '[:upper:]' '[:lower:]' | tr ',' ' ')"
+
+    for role in $roles; do
+        case "$role" in
+            all|"$wanted_role")
+                return 0
+                ;;
+        esac
+    done
+
+    return 1
+}

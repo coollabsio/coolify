@@ -3,111 +3,112 @@
 namespace App\Livewire\Destination\New;
 
 use App\Models\Server;
-use App\Models\StandaloneDocker as ModelsStandaloneDocker;
+use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use Illuminate\Support\Collection;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Docker extends Component
 {
+    use AuthorizesRequests;
+
+    #[Locked]
+    public $servers;
+
+    #[Locked]
+    public Server $selectedServer;
+
+    #[Validate(['required', 'string'])]
     public string $name;
 
+    #[Validate(['required', 'string', 'max:255', 'regex:/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/'])]
     public string $network;
 
-    public ?Collection $servers = null;
+    #[Validate(['required', 'string'])]
+    public string $serverId;
 
-    public Server $server;
-
-    public ?int $server_id = null;
-
-    public bool $is_swarm = false;
-
-    protected $rules = [
-        'name' => 'required|string',
-        'network' => 'required|string',
-        'server_id' => 'required|integer',
-        'is_swarm' => 'boolean',
-    ];
-
-    protected $validationAttributes = [
-        'name' => 'name',
-        'network' => 'network',
-        'server_id' => 'server',
-        'is_swarm' => 'swarm',
-    ];
-
-    public function mount()
+    public function mount(?string $server_id = null): void
     {
-        if (is_null($this->servers)) {
-            $this->servers = Server::isReachable()->get();
-        }
-        if (request()->query('server_id')) {
-            $this->server_id = request()->query('server_id');
-        } else {
-            if ($this->servers->count() > 0) {
-                $this->server_id = $this->servers->first()->id;
+        $this->network = new_public_id();
+        $this->servers = Server::isUsable()->get();
+
+        if (filled($server_id)) {
+            $this->selectedServer = Server::ownedByCurrentTeam()->whereKey($server_id)->firstOrFail();
+
+            if (! $this->servers->contains('id', $this->selectedServer->id)) {
+                $this->servers->push($this->selectedServer);
             }
-        }
-        if (request()->query('network_name')) {
-            $this->network = request()->query('network_name');
+
+            $this->serverId = (string) $this->selectedServer->id;
         } else {
-            $this->network = new Cuid2(7);
+            $foundServer = $this->servers->first();
+            if (! $foundServer) {
+                throw new \Exception('Server not found.');
+            }
+            $this->selectedServer = $foundServer;
+            $this->serverId = (string) $this->selectedServer->id;
         }
-        if ($this->servers->count() > 0) {
-            $this->name = str("{$this->servers->first()->name}-{$this->network}")->kebab();
-        }
+        $this->generateName();
     }
 
-    public function generate_name()
+    public function updatedServerId(): void
     {
-        $this->server = Server::find($this->server_id);
-        $this->name = str("{$this->server->name}-{$this->network}")->kebab();
+        $this->selectedServer = $this->servers->find($this->serverId);
+        if (! $this->selectedServer) {
+            throw new \Exception('Server not found.');
+        }
+        $this->generateName();
     }
 
-    public function submit()
+    public function generateName(): void
     {
-        $this->validate();
+        $name = data_get($this->selectedServer, 'name', new_public_id());
+        $this->name = str("{$name}-{$this->network}")->kebab();
+    }
+
+    public function submit(): mixed
+    {
         try {
-            $this->server = Server::find($this->server_id);
-            if ($this->is_swarm) {
-                $found = $this->server->swarmDockers()->where('network', $this->network)->first();
+            $isSwarm = $this->selectedServer->isSwarm();
+            $this->authorize('update', $this->selectedServer);
+            $this->validate();
+            if ($isSwarm) {
+                $found = $this->selectedServer->swarmDockers()->where('network', $this->network)->first();
                 if ($found) {
-                    $this->dispatch('error', 'Network already added to this server.');
-
-                    return;
+                    throw new \Exception('Network already added to this server.');
                 } else {
                     $docker = SwarmDocker::create([
                         'name' => $this->name,
                         'network' => $this->network,
-                        'server_id' => $this->server_id,
+                        'server_id' => $this->selectedServer->id,
                     ]);
                 }
             } else {
-                $found = $this->server->standaloneDockers()->where('network', $this->network)->first();
+                $found = $this->selectedServer->standaloneDockers()->where('network', $this->network)->first();
                 if ($found) {
-                    $this->dispatch('error', 'Network already added to this server.');
-
-                    return;
+                    throw new \Exception('Network already added to this server.');
                 } else {
-                    $docker = ModelsStandaloneDocker::create([
+                    $docker = StandaloneDocker::create([
                         'name' => $this->name,
                         'network' => $this->network,
-                        'server_id' => $this->server_id,
+                        'server_id' => $this->selectedServer->id,
                     ]);
                 }
             }
-            $this->createNetworkAndAttachToProxy();
 
-            return redirect()->route('destination.show', $docker->uuid);
+            auditLog('ui.destination.created', [
+                'team_id' => $this->selectedServer->team_id,
+                'destination_uuid' => $docker->uuid,
+                'destination_name' => $docker->name,
+                'destination_type' => $isSwarm ? 'swarm' : 'standalone',
+                'server_uuid' => $this->selectedServer->uuid,
+            ]);
+
+            return redirectRoute($this, 'destination.show', [$docker->uuid]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-    }
-
-    private function createNetworkAndAttachToProxy()
-    {
-        $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
-        instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
     }
 }

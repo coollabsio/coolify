@@ -1,0 +1,890 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Actions\Shared\DeleteScheduledVolumeBackup;
+use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledTask;
+use App\Models\ScheduledVolumeBackup;
+use App\Models\ScheduledVolumeBackupExecution;
+use App\Models\Server;
+use App\Models\ServerSetting;
+use App\Models\ServiceDatabase;
+use App\Models\Subscription;
+use App\Models\Team;
+use App\Services\ScheduledJobDeliveryService;
+use Cron\CronExpression;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
+
+class ScheduledJobManager implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    private const CHUNK_SIZE = 100;
+
+    /**
+     * Pending volume backup recovery is retried at most once in this interval for each execution.
+     */
+    private const VOLUME_BACKUP_RECOVERY_INTERVAL_MINUTES = 5;
+
+    /**
+     * Bounds the volume backup recovery jobs dispatched in one scheduler run.
+     */
+    private const VOLUME_BACKUP_RECOVERY_MAX_DISPATCHES = 100;
+
+    /**
+     * The schedule types that run as separate dispatchers, with the delivery job types they own.
+     * Each type has its own overlap lock, so a slow type cannot make another type skip a run.
+     */
+    public const TYPES = [
+        'backups' => ['database-backup'],
+        'tasks' => ['scheduled-task'],
+        'volume-backups' => ['volume-backup'],
+        'docker-cleanups' => ['docker-cleanup'],
+    ];
+
+    /**
+     * The time when this job execution started.
+     * Used to ensure all scheduled items are evaluated against the same point in time.
+     */
+    private ?Carbon $executionTime = null;
+
+    private int $dispatchedCount = 0;
+
+    private int $skippedCount = 0;
+
+    /**
+     * One key of TYPES, or null for all types.
+     *
+     * Declared with a default instead of promoted, so jobs queued by older versions without this property still run.
+     */
+    public ?string $type = null;
+
+    /**
+     * @param  string|null  $type  One key of TYPES, or null for all types.
+     */
+    public function __construct(?string $type = null)
+    {
+        if ($type !== null && ! array_key_exists($type, self::TYPES)) {
+            throw new \InvalidArgumentException("Unknown scheduled job type [{$type}].");
+        }
+
+        $this->type = $type;
+        $this->onQueue(crons_queue());
+    }
+
+    /**
+     * Get the middleware the job should pass through.
+     */
+    public function middleware(): array
+    {
+        // Self-healing: clear any stale lock before WithoutOverlapping tries to acquire it.
+        // Stale locks (TTL = -1) can occur during upgrades, Redis restarts, or edge cases.
+        // @see https://github.com/coollabsio/coolify/issues/8327
+        $this->clearStaleLockIfPresent();
+
+        return [
+            (new WithoutOverlapping($this->lockName()))
+                ->expireAfter(90)   // Lock expires after 90s to handle high-load environments with many tasks
+                ->dontRelease(),    // Don't re-queue on lock conflict
+        ];
+    }
+
+    /**
+     * Clear a stale WithoutOverlapping lock if it has no TTL (TTL = -1).
+     *
+     * This provides continuous self-healing since it runs every time the job is dispatched.
+     * Stale locks permanently block all scheduled job executions with no user-visible error.
+     */
+    private function clearStaleLockIfPresent(): void
+    {
+        try {
+            $cachePrefix = config('cache.prefix', '');
+            $lockKey = $cachePrefix.'laravel-queue-overlap:'.self::class.':'.$this->lockName();
+
+            $ttl = Redis::connection('default')->ttl($lockKey);
+
+            if ($ttl === -1) {
+                Redis::connection('default')->del($lockKey);
+                Log::channel('scheduled')->warning('Cleared stale ScheduledJobManager lock', [
+                    'lock_key' => $lockKey,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            // Never let lock cleanup failure prevent the job from running
+            Log::channel('scheduled-errors')->error('Failed to check/clear stale lock', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function lockName(): string
+    {
+        return $this->type === null ? 'scheduled-job-manager' : "scheduled-job-manager:{$this->type}";
+    }
+
+    private function includes(string $type): bool
+    {
+        return $this->type === null || $this->type === $type;
+    }
+
+    public function handle(): void
+    {
+        // Freeze the execution time at the start of the job
+        $this->executionTime = Carbon::now();
+        $this->dispatchedCount = 0;
+        $this->skippedCount = 0;
+
+        $this->logStart();
+        $jobTypes = $this->type === null ? null : self::TYPES[$this->type];
+
+        $deliveries = app(ScheduledJobDeliveryService::class);
+        foreach ([
+            'Failed to recover stale enqueued occurrences' => fn () => $deliveries->recoverStaleEnqueued($jobTypes),
+            'Failed to recover interrupted occurrences' => fn () => $deliveries->failInterruptedClaims($jobTypes),
+            'Failed to publish pending occurrences' => fn () => $deliveries->publishPending($jobTypes),
+        ] as $errorMessage => $recover) {
+            try {
+                $recover();
+            } catch (\Throwable $e) {
+                Log::channel('scheduled-errors')->error($errorMessage, [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        // Process scheduled backups and tasks together so neither type starves the other.
+        try {
+            if ($this->includes('backups') || $this->includes('tasks')) {
+                $this->processScheduledBackupsAndTasks($this->includes('backups'), $this->includes('tasks'));
+            }
+        } catch (\Throwable $e) {
+            Log::channel('scheduled-errors')->error('Failed to process scheduled backups and tasks', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+
+        try {
+            if ($this->includes('volume-backups')) {
+                $this->recoverStoppedVolumeBackupContainers();
+                $this->processScheduledVolumeBackups();
+            }
+        } catch (\Throwable $e) {
+            Log::channel('scheduled-errors')->error('Failed to process scheduled volume backups', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+
+        // Process Docker cleanups - don't let failures stop the job manager
+        try {
+            if ($this->includes('docker-cleanups')) {
+                DockerCleanupJob::failInterruptedExecutions();
+                $this->processDockerCleanups();
+            }
+        } catch (\Throwable $e) {
+            Log::channel('scheduled-errors')->error('Failed to process docker cleanups', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+        }
+
+        Log::channel('scheduled')->info('ScheduledJobManager completed', [
+            'type' => $this->type ?? 'all',
+            'execution_time' => $this->executionTime->toIso8601String(),
+            'duration_ms' => $this->executionTime->diffInMilliseconds(Carbon::now()),
+            'dispatched' => $this->dispatchedCount,
+            'skipped' => $this->skippedCount,
+            'host' => gethostname(),
+            'pid' => getmypid(),
+            'memory_mb' => round(memory_get_usage(true) / 1048576, 1),
+            'memory_peak_mb' => round(memory_get_peak_usage(true) / 1048576, 1),
+            'open_occurrences_over_15_minutes' => rescue(fn () => app(ScheduledJobDeliveryService::class)->staleOpenOccurrenceCounts(), [], report: false),
+        ]);
+
+        // Write heartbeat so the UI can detect when the scheduler has stopped
+        try {
+            Cache::put('scheduled-job-manager:heartbeat', now()->toIso8601String(), 300);
+        } catch (\Throwable) {
+            // Non-critical; don't let heartbeat failure affect the job
+        }
+    }
+
+    /**
+     * Log which worker runs the manager and how late it starts. The manager only catches up
+     * occurrences from the last CATCH_UP_WINDOW_MINUTES, so a larger delay skips them silently.
+     */
+    private function logStart(): void
+    {
+        $lastStartedKey = $this->lockName().':last-started-at';
+        $previousStartedAt = rescue(fn () => Cache::get($lastStartedKey), report: false);
+        rescue(fn () => Cache::put($lastStartedKey, $this->executionTime->toIso8601String(), 86400), report: false);
+        $queuedAt = data_get($this->job?->payload(), 'createdAt');
+
+        $context = [
+            'type' => $this->type ?? 'all',
+            'execution_time' => $this->executionTime->toIso8601String(),
+            'host' => gethostname(),
+            'pid' => getmypid(),
+            'queue_wait_seconds' => $queuedAt ? $this->executionTime->timestamp - (int) $queuedAt : null,
+            'seconds_since_previous_start' => $previousStartedAt ? (int) Carbon::parse($previousStartedAt)->diffInSeconds($this->executionTime) : null,
+            'memory_mb' => round(memory_get_usage(true) / 1048576, 1),
+        ];
+
+        Log::channel('scheduled')->info('ScheduledJobManager started', $context);
+
+        $catchUpWindowSeconds = ScheduledJobDeliveryService::CATCH_UP_WINDOW_MINUTES * 60;
+        if ($context['queue_wait_seconds'] > $catchUpWindowSeconds || $context['seconds_since_previous_start'] > $catchUpWindowSeconds) {
+            Log::channel('scheduled-errors')->warning('ScheduledJobManager started late; occurrences due before the catch-up window were not run', $context);
+        }
+    }
+
+    private function processScheduledBackupsAndTasks(bool $withBackups, bool $withTasks): void
+    {
+        $lastBackupId = null;
+        $lastTaskId = null;
+
+        do {
+            $backups = $withBackups ? $this->scheduledBackupQuery($lastBackupId)->get() : collect();
+            $tasks = $withTasks ? $this->scheduledTaskQuery($lastTaskId)->get() : collect();
+
+            if ($backups->isNotEmpty()) {
+                $lastBackupId = $backups->last()->id;
+            }
+
+            if ($tasks->isNotEmpty()) {
+                $lastTaskId = $tasks->last()->id;
+            }
+
+            $this->processInterleavedDueSchedules(
+                $this->dueScheduledBackups($backups),
+                $this->dueScheduledTasks($tasks),
+            );
+        } while ($backups->isNotEmpty() || $tasks->isNotEmpty());
+    }
+
+    /**
+     * @param  array<int, array{backup: ScheduledDatabaseBackup, server: Server}>  $dueBackups
+     * @param  array<int, array{task: ScheduledTask, server: Server}>  $dueTasks
+     */
+    private function processInterleavedDueSchedules(array $dueBackups, array $dueTasks): void
+    {
+        $maxCount = max(count($dueBackups), count($dueTasks));
+
+        for ($index = 0; $index < $maxCount; $index++) {
+            if (isset($dueBackups[$index])) {
+                $this->processScheduledBackup($dueBackups[$index]['backup'], $dueBackups[$index]['server']);
+            }
+
+            if (isset($dueTasks[$index])) {
+                $this->processScheduledTask($dueTasks[$index]['task'], $dueTasks[$index]['server']);
+            }
+        }
+    }
+
+    /**
+     * Load the server chain of each backup with the chunk. Otherwise $backup->server()
+     * queries the destination, service, server, and settings once for each backup.
+     */
+    private function scheduledBackupQuery(?int $lastBackupId): Builder
+    {
+        return ScheduledDatabaseBackup::with([
+            'team.subscription',
+            'database' => fn (MorphTo $morphTo) => $morphTo->morphWith([
+                ServiceDatabase::class => ['service.destination.server.settings', 'service.destination.server.team.subscription'],
+                ...array_fill_keys(STANDALONE_DATABASE_MODELS, ['destination.server.settings', 'destination.server.team.subscription']),
+            ]),
+        ])
+            ->where('enabled', true)
+            ->when($lastBackupId !== null, fn (Builder $query) => $query->where('id', '>', $lastBackupId))
+            ->orderBy('id')
+            ->limit(self::CHUNK_SIZE);
+    }
+
+    private function scheduledTaskQuery(?int $lastTaskId): Builder
+    {
+        return ScheduledTask::with([
+            'service.destination.server.settings',
+            'service.destination.server.team.subscription',
+            'application.destination.server.settings',
+            'application.destination.server.team.subscription',
+        ])
+            ->where('enabled', true)
+            ->when($lastTaskId !== null, fn (Builder $query) => $query->where('id', '>', $lastTaskId))
+            ->orderBy('id')
+            ->limit(self::CHUNK_SIZE);
+    }
+
+    /**
+     * @param  iterable<ScheduledDatabaseBackup>  $backups
+     * @return array<int, array{backup: ScheduledDatabaseBackup, server: Server}>
+     */
+    private function dueScheduledBackups(iterable $backups): array
+    {
+        $dueBackups = [];
+
+        foreach ($backups as $backup) {
+            try {
+                $server = $backup->server();
+
+                if (blank(data_get($backup, 'database')) || blank($server)) {
+                    $this->processScheduledBackup($backup, $server);
+
+                    continue;
+                }
+
+                if ($this->isDueCandidateBeforeExpensiveChecks($backup->frequency, $server)) {
+                    $dueBackups[] = [
+                        'backup' => $backup,
+                        'server' => $server,
+                    ];
+                }
+            } catch (\Throwable $e) {
+                Log::channel('scheduled-errors')->error('Error prechecking backup', [
+                    'backup_id' => $backup->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $dueBackups;
+    }
+
+    /**
+     * @param  iterable<ScheduledTask>  $tasks
+     * @return array<int, array{task: ScheduledTask, server: Server}>
+     */
+    private function dueScheduledTasks(iterable $tasks): array
+    {
+        $dueTasks = [];
+
+        foreach ($tasks as $task) {
+            try {
+                $server = $task->server();
+
+                if (blank($server) || (! $task->service && ! $task->application)) {
+                    $this->processScheduledTask($task, $server);
+
+                    continue;
+                }
+
+                if ($this->isDueCandidateBeforeExpensiveChecks($task->frequency, $server)) {
+                    $dueTasks[] = [
+                        'task' => $task,
+                        'server' => $server,
+                    ];
+                }
+            } catch (\Throwable $e) {
+                Log::channel('scheduled-errors')->error('Error prechecking task', [
+                    'task_id' => $task->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $dueTasks;
+    }
+
+    private function processScheduledBackup(ScheduledDatabaseBackup $backup, ?Server $precheckedServer = null): void
+    {
+        try {
+            $server = $precheckedServer ?? $backup->server();
+            $skipReason = $this->getBackupSkipReason($backup, $server);
+            if ($skipReason !== null) {
+                if ($server === null || $this->recordSkippedOccurrence($backup->frequency, $server, "scheduled-backup:{$backup->id}")) {
+                    $this->skippedCount++;
+                    $this->logBackupSkip($backup, $skipReason, $server);
+                }
+
+                return;
+            }
+
+            if ($this->dispatchOccurrence(
+                $backup->frequency,
+                $server,
+                "scheduled-backup:{$backup->id}",
+                'database-backup',
+                $backup->id,
+            )) {
+                $this->dispatchedCount++;
+                Log::channel('scheduled')->info('Backup dispatched', [
+                    'backup_id' => $backup->id,
+                    'database_id' => $backup->database_id,
+                    'database_type' => $backup->database_type,
+                    'team_id' => $backup->team_id ?? null,
+                    'server_id' => $server->id,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::channel('scheduled-errors')->error('Error processing backup', [
+                'backup_id' => $backup->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function processScheduledTask(ScheduledTask $task, ?Server $precheckedServer = null): void
+    {
+        try {
+            $server = $precheckedServer ?? $task->server();
+            $criticalSkip = $this->getTaskCriticalSkipReason($task, $server);
+            if ($criticalSkip !== null) {
+                if ($server === null || $this->recordSkippedOccurrence($task->frequency, $server, "scheduled-task:{$task->id}")) {
+                    $this->skippedCount++;
+                    $this->logTaskSkip($task, $criticalSkip, $server);
+                }
+
+                return;
+            }
+
+            $runtimeSkip = $this->getTaskRuntimeSkipReason($task);
+            if ($runtimeSkip !== null) {
+                if ($this->recordSkippedOccurrence($task->frequency, $server, "scheduled-task:{$task->id}")) {
+                    $this->skippedCount++;
+                    $this->logTaskSkip($task, $runtimeSkip, $server);
+                }
+
+                return;
+            }
+
+            if (! $this->dispatchOccurrence(
+                $task->frequency,
+                $server,
+                "scheduled-task:{$task->id}",
+                'scheduled-task',
+                $task->id,
+            )) {
+
+                return;
+            }
+
+            $this->dispatchedCount++;
+            Log::channel('scheduled')->info('Task dispatched', [
+                'task_id' => $task->id,
+                'task_name' => $task->name,
+                'team_id' => $server->team_id,
+                'server_id' => $server->id,
+            ]);
+        } catch (\Throwable $e) {
+            Log::channel('scheduled-errors')->error('Error processing task', [
+                'task_id' => $task->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function processScheduledVolumeBackups(): void
+    {
+        ScheduledVolumeBackup::query()
+            ->with(['backupable', 'team.subscription'])
+            ->where('enabled', true)
+            ->chunkById(self::CHUNK_SIZE, function ($backups): void {
+                foreach ($backups as $backup) {
+                    $this->processScheduledVolumeBackup($backup);
+                }
+            });
+    }
+
+    private function recoverStoppedVolumeBackupContainers(): void
+    {
+        $dispatched = 0;
+
+        ScheduledVolumeBackupExecution::query()
+            ->where(fn (Builder $query) => $query
+                ->where('stop_recovery_pending', true)
+                ->orWhere('s3_cleanup_pending', true))
+            ->where('recovery_needs_attention', false)
+            ->with('scheduledVolumeBackup.backupable.resource')
+            ->chunkById(self::CHUNK_SIZE, function ($executions) use (&$dispatched): bool {
+                foreach ($executions as $execution) {
+                    if ($dispatched >= self::VOLUME_BACKUP_RECOVERY_MAX_DISPATCHES) {
+                        return false;
+                    }
+
+                    if ($execution->stop_recovery_pending && $execution->scheduledVolumeBackup?->server()?->isFunctional() === false) {
+                        continue;
+                    }
+
+                    if (Cache::add(VolumeBackupRecoveryJob::dispatchCacheKey($execution->id), true, now()->addMinutes(self::VOLUME_BACKUP_RECOVERY_INTERVAL_MINUTES))) {
+                        VolumeBackupRecoveryJob::dispatch($execution);
+                        $dispatched++;
+                    }
+                }
+
+                return true;
+            });
+    }
+
+    private function processScheduledVolumeBackup(ScheduledVolumeBackup $backup): void
+    {
+        try {
+            $server = $backup->server();
+
+            if ($backup->executions()->where('stop_recovery_pending', true)->exists()) {
+                $this->skippedCount++;
+                $this->logSkip('volume_backup', 'stopped_container_recovery_pending', [
+                    'backup_id' => $backup->id,
+                    'team_id' => $backup->team_id,
+                ]);
+
+                return;
+            }
+
+            if (! $backup->backupable) {
+                DeleteScheduledVolumeBackup::run($backup, $server);
+                $this->skippedCount++;
+                $this->logSkip('volume_backup', 'resource_deleted', [
+                    'backup_id' => $backup->id,
+                    'team_id' => $backup->team_id,
+                ]);
+
+                return;
+            }
+
+            if (! $server) {
+                $this->skippedCount++;
+                $this->logSkip('volume_backup', 'server_missing', [
+                    'backup_id' => $backup->id,
+                    'team_id' => $backup->team_id,
+                ]);
+
+                return;
+            }
+
+            if (! $this->isDueCandidateBeforeExpensiveChecks($backup->frequency, $server)) {
+                return;
+            }
+
+            if (! $server->isFunctional()) {
+                if ($this->recordSkippedOccurrence($backup->frequency, $server, "scheduled-volume-backup:{$backup->id}")) {
+                    $this->skippedCount++;
+                    $this->logSkip('volume_backup', 'server_not_functional', [
+                        'backup_id' => $backup->id,
+                        'team_id' => $backup->team_id,
+                        ...$this->serverStateContext($server),
+                    ]);
+                }
+
+                return;
+            }
+
+            if (isCloud() && $backup->team_id !== 0 && ! data_get($backup, 'team.subscription.stripe_invoice_paid', false)) {
+                if ($this->recordSkippedOccurrence($backup->frequency, $server, "scheduled-volume-backup:{$backup->id}")) {
+                    $this->skippedCount++;
+                    $this->logSkip('volume_backup', 'subscription_unpaid', [
+                        'backup_id' => $backup->id,
+                        'team_id' => $backup->team_id,
+                        ...$this->serverStateContext($server),
+                    ]);
+                }
+
+                return;
+            }
+
+            if ($this->dispatchOccurrence(
+                $backup->frequency,
+                $server,
+                "scheduled-volume-backup:{$backup->id}",
+                'volume-backup',
+                $backup->id,
+            )) {
+                $this->dispatchedCount++;
+                Log::channel('scheduled')->info('Volume backup dispatched', [
+                    'backup_id' => $backup->id,
+                    'backupable_type' => $backup->backupable_type,
+                    'backupable_id' => $backup->backupable_id,
+                    'team_id' => $backup->team_id,
+                    'server_id' => $server->id,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::channel('scheduled-errors')->error('Error processing volume backup', [
+                'backup_id' => $backup->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function getBackupSkipReason(ScheduledDatabaseBackup $backup, ?Server $server): ?string
+    {
+        if (blank(data_get($backup, 'database'))) {
+            $backup->delete();
+
+            return 'database_deleted';
+        }
+
+        if (blank($server)) {
+            $backup->delete();
+
+            return 'server_deleted';
+        }
+
+        if ($server->isFunctional() === false) {
+            return 'server_not_functional';
+        }
+
+        if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team->id !== 0) {
+            return 'subscription_unpaid';
+        }
+
+        return null;
+    }
+
+    private function getTaskCriticalSkipReason(ScheduledTask $task, ?Server $server): ?string
+    {
+        if (blank($server)) {
+            $task->delete();
+
+            return 'server_deleted';
+        }
+
+        if ($server->isFunctional() === false) {
+            return 'server_not_functional';
+        }
+
+        if (isCloud() && data_get($server->team->subscription, 'stripe_invoice_paid', false) === false && $server->team->id !== 0) {
+            return 'subscription_unpaid';
+        }
+
+        if (! $task->service && ! $task->application) {
+            $task->delete();
+
+            return 'resource_deleted';
+        }
+
+        return null;
+    }
+
+    private function getTaskRuntimeSkipReason(ScheduledTask $task): ?string
+    {
+        if ($task->application && str($task->application->status)->contains('running') === false) {
+            return 'application_not_running';
+        }
+
+        if ($task->service && str($task->service->status)->contains('running') === false) {
+            return 'service_not_running';
+        }
+
+        return null;
+    }
+
+    private function processDockerCleanups(): void
+    {
+        $this->getServersForCleanupQuery()
+            ->chunkById(self::CHUNK_SIZE, function ($servers): void {
+                foreach ($servers as $server) {
+                    $this->processDockerCleanup($server);
+                }
+            });
+    }
+
+    private function processDockerCleanup(Server $server): void
+    {
+        try {
+            $frequency = data_get($server->settings, 'docker_cleanup_frequency', '0 * * * *');
+            if (! $this->isDueCandidateBeforeExpensiveChecks($frequency, $server)) {
+                return;
+            }
+
+            $skipReason = $this->getDockerCleanupSkipReason($server);
+            if ($skipReason !== null) {
+                if ($this->recordSkippedOccurrence($frequency, $server, "docker-cleanup:{$server->id}")) {
+                    $this->skippedCount++;
+                    $this->logSkip('docker_cleanup', $skipReason, [
+                        'server_id' => $server->id,
+                        'server_name' => $server->name,
+                        'team_id' => $server->team_id,
+                    ]);
+                }
+
+                return;
+            }
+
+            if ($this->dispatchOccurrence(
+                $frequency,
+                $server,
+                "docker-cleanup:{$server->id}",
+                'docker-cleanup',
+                $server->id,
+                [
+                    'delete_unused_volumes' => $server->settings->delete_unused_volumes,
+                    'delete_unused_networks' => $server->settings->delete_unused_networks,
+                ],
+            )) {
+                $this->dispatchedCount++;
+                Log::channel('scheduled')->info('Docker cleanup dispatched', [
+                    'server_id' => $server->id,
+                    'server_name' => $server->name,
+                    'team_id' => $server->team_id,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::channel('scheduled-errors')->error('Error processing docker cleanup', [
+                'server_id' => $server->id,
+                'server_name' => $server->name,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function getServersForCleanupQuery(): Builder
+    {
+        $query = Server::with(['settings' => fn (HasOne $query) => $query->withoutPatchCheckResult()])
+            ->whereNotNull('ip')
+            ->where('ip', '!=', '')
+            ->whereNotIn('ip', Server::PLACEHOLDER_IPS);
+
+        if (isCloud()) {
+            $query
+                ->with('team.subscription')
+                ->where(function (Builder $query): void {
+                    $query
+                        ->where('team_id', 0)
+                        ->orWhereRelation('team.subscription', 'stripe_invoice_paid', true);
+                });
+        }
+
+        return $query;
+    }
+
+    private function getDockerCleanupSkipReason(Server $server): ?string
+    {
+        if (! $server->isFunctional()) {
+            return 'server_not_functional';
+        }
+
+        // In cloud, check subscription status (except team 0)
+        if (isCloud() && $server->team_id !== 0) {
+            if (data_get($server->team->subscription, 'stripe_invoice_paid', false) === false) {
+                return 'subscription_unpaid';
+            }
+        }
+
+        return null;
+    }
+
+    private function logSkip(string $type, string $reason, array $context = []): void
+    {
+        Log::channel('scheduled')->info(ucfirst(str_replace('_', ' ', $type)).' skipped', array_merge([
+            'type' => $type,
+            'skip_reason' => $reason,
+            'execution_time' => $this->executionTime?->toIso8601String(),
+        ], $context));
+    }
+
+    private function dispatchOccurrence(
+        string $frequency,
+        Server $server,
+        string $scheduleKey,
+        string $jobType,
+        int $resourceId,
+        array $payload = [],
+    ): bool {
+        return app(ScheduledJobDeliveryService::class)->recordAndPublish(
+            $scheduleKey,
+            $frequency,
+            $this->serverTimezone($server),
+            $jobType,
+            $resourceId,
+            $payload,
+            $this->executionTime,
+        );
+    }
+
+    private function recordSkippedOccurrence(string $frequency, Server $server, string $scheduleKey): bool
+    {
+        return app(ScheduledJobDeliveryService::class)->recordSkipped(
+            $scheduleKey,
+            $frequency,
+            $this->serverTimezone($server),
+            $this->executionTime,
+        );
+    }
+
+    private function isDueCandidateBeforeExpensiveChecks(string $frequency, Server $server): bool
+    {
+        $cron = new CronExpression($this->normalizeFrequency($frequency));
+        $executionTime = ($this->executionTime ?? Carbon::now())->copy()->setTimezone($this->serverTimezone($server));
+        $previousDue = Carbon::instance($cron->getPreviousRunDate($executionTime, allowCurrentDate: true));
+
+        return $previousDue->gte(
+            $executionTime->copy()->subMinutes(ScheduledJobDeliveryService::CATCH_UP_WINDOW_MINUTES)
+        );
+    }
+
+    private function normalizeFrequency(string $frequency): string
+    {
+        return VALID_CRON_STRINGS[$frequency] ?? $frequency;
+    }
+
+    private function serverTimezone(Server $server): string
+    {
+        $timezone = data_get($server->settings, 'server_timezone', config('app.timezone'));
+
+        return validate_timezone($timezone) ? $timezone : config('app.timezone');
+    }
+
+    private function logBackupSkip(ScheduledDatabaseBackup $backup, string $reason, ?Server $server): void
+    {
+        $this->logSkip('backup', $reason, [
+            'backup_id' => $backup->id,
+            'database_id' => $backup->database_id,
+            'database_type' => $backup->database_type,
+            'team_id' => $backup->team_id ?? null,
+            ...$this->serverStateContext($server),
+        ]);
+    }
+
+    private function logTaskSkip(ScheduledTask $task, string $reason, ?Server $server): void
+    {
+        $this->logSkip('task', $reason, [
+            'task_id' => $task->id,
+            'task_name' => $task->name,
+            'team_id' => $server?->team_id,
+            ...$this->serverStateContext($server),
+        ]);
+    }
+
+    /**
+     * Compare the server state that decided the skip with the current database state.
+     * A difference shows that the worker used stale server data.
+     *
+     * @return array<string, mixed>
+     */
+    private function serverStateContext(?Server $server): array
+    {
+        if ($server === null) {
+            return [];
+        }
+
+        $settings = ServerSetting::query()
+            ->where('server_id', $server->id)
+            ->first(['is_reachable', 'is_usable', 'force_disabled']);
+
+        return [
+            'server_id' => $server->id,
+            'server_ip_is_placeholder' => $server->hasPlaceholderIp(),
+            'used_is_reachable' => data_get($server->settings, 'is_reachable'),
+            'used_is_usable' => data_get($server->settings, 'is_usable'),
+            'used_force_disabled' => data_get($server->settings, 'force_disabled'),
+            'used_invoice_paid' => data_get($server->team?->subscription, 'stripe_invoice_paid'),
+            'db_is_reachable' => $settings?->is_reachable,
+            'db_is_usable' => $settings?->is_usable,
+            'db_force_disabled' => $settings?->force_disabled,
+            'db_invoice_paid' => Subscription::query()->where('team_id', $server->team_id)->value('stripe_invoice_paid'),
+        ];
+    }
+}

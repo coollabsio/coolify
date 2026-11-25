@@ -11,21 +11,14 @@ class CheckForcePasswordReset
     /**
      * Handle an incoming request.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
         if (auth()->user()) {
-            if ($request->path() === 'auth/link') {
-                auth()->logout();
-                request()->session()->invalidate();
-                request()->session()->regenerateToken();
-
-                return $next($request);
-            }
             $force_password_reset = auth()->user()->force_password_reset;
             if ($force_password_reset) {
-                if ($request->routeIs('auth.force-password-reset') || $request->path() === 'force-password-reset' || $request->path() === 'livewire/update' || $request->path() === 'logout') {
+                if ($request->routeIs('auth.force-password-reset') || $request->path() === 'force-password-reset' || $request->path() === 'two-factor-challenge' || $request->path() === 'livewire/update' || $request->path() === 'logout') {
                     return $next($request);
                 }
 

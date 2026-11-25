@@ -2,19 +2,101 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
+use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasDatabaseHealthCheck;
+use App\Traits\HasImageScans;
+use App\Traits\HasLogRedactionSetting;
+use App\Traits\HasMetrics;
+use App\Traits\HasSafeStringAttribute;
+use App\Traits\HasSecretManager;
+use App\Traits\HasStars;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandaloneRedis extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasImageScans, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, HasStars, ScopedByAccessGrants, SoftDeletes;
 
-    protected $guarded = [];
+    protected array $auditExclude = ['last_online_at'];
 
-    protected $appends = ['internal_db_url', 'external_db_url', 'database_type'];
+    protected $fillable = [
+        'uuid',
+        'name',
+        'description',
+        'redis_conf',
+        'status',
+        'image',
+        'is_public',
+        'public_port',
+        'ports_mappings',
+        'limits_memory',
+        'limits_memory_swap',
+        'limits_memory_swappiness',
+        'limits_memory_reservation',
+        'limits_cpus',
+        'limits_cpuset',
+        'limits_cpu_shares',
+        'started_at',
+        'restart_count',
+        'last_restart_at',
+        'last_restart_type',
+        'last_online_at',
+        'public_port_timeout',
+        'enable_ssl',
+        'is_log_drain_enabled',
+        'is_include_timestamps',
+        'custom_docker_run_options',
+        'destination_type',
+        'destination_id',
+        'environment_id',
+        'health_check_enabled',
+        'health_check_interval',
+        'health_check_timeout',
+        'health_check_retries',
+        'health_check_start_period',
+    ];
+
+    protected $appends = ['internal_db_url', 'external_db_url', 'database_type', 'server_status'];
+
+    /**
+     * Free-form configuration that can embed credentials. Only users who can
+     * update the database and `read:sensitive` tokens may read it.
+     */
+    public const CONFIGURATION_ATTRIBUTES = [
+        'redis_conf',
+        'custom_docker_run_options',
+    ];
+
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability.
+     */
+    protected $hidden = [
+        'redis_password',
+        ...self::CONFIGURATION_ATTRIBUTES,
+        'internal_db_url',
+        'external_db_url',
+        // Internal start-command state, not part of the API.
+        'legacy_password_quoting',
+    ];
+
+    protected $casts = [
+        'include_coolify_default_variables' => 'boolean',
+        'health_check_enabled' => 'boolean',
+        'health_check_interval' => 'integer',
+        'health_check_timeout' => 'integer',
+        'health_check_retries' => 'integer',
+        'health_check_start_period' => 'integer',
+        'legacy_password_quoting' => 'boolean',
+        'public_port_timeout' => 'integer',
+        'restart_count' => 'integer',
+        'last_restart_at' => 'datetime',
+        'last_restart_type' => 'string',
+    ];
 
     protected static function booted()
     {
@@ -25,7 +107,6 @@ class StandaloneRedis extends BaseModel
                 'host_path' => null,
                 'resource_id' => $database->id,
                 'resource_type' => $database->getMorphClass(),
-                'is_readonly' => true,
             ]);
         });
         static::forceDeleting(function ($database) {
@@ -34,12 +115,46 @@ class StandaloneRedis extends BaseModel
             $database->environment_variables()->delete();
             $database->tags()->detach();
         });
+        static::saving(function ($database) {
+            if ($database->isDirty('status')) {
+                $database->last_online_at = now();
+            }
+        });
+    }
+
+    /**
+     * Get query builder for Redis databases owned by current team.
+     * If you need all databases without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
+    public static function ownedByCurrentTeam()
+    {
+        return StandaloneRedis::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all Redis databases owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return StandaloneRedis::ownedByCurrentTeam()->get();
+        });
+    }
+
+    protected function serverStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->destination?->server?->isFunctional() ?? false;
+            }
+        );
     }
 
     public function isConfigurationChanged(bool $save = false)
     {
         $newConfigHash = $this->image.$this->ports_mappings.$this->redis_conf;
-        $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
+        $newConfigHash .= $this->healthCheckConfigurationHash();
+        $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {
@@ -62,6 +177,11 @@ class StandaloneRedis extends BaseModel
         }
     }
 
+    public function isRunning()
+    {
+        return (bool) str($this->status)->contains('running');
+    }
+
     public function isExited()
     {
         return (bool) str($this->status)->startsWith('exited');
@@ -72,7 +192,7 @@ class StandaloneRedis extends BaseModel
         return database_configuration_dir()."/{$this->uuid}";
     }
 
-    public function delete_configurations()
+    public function deleteConfigurations()
     {
         $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
@@ -81,14 +201,15 @@ class StandaloneRedis extends BaseModel
         }
     }
 
-    public function delete_volumes(Collection $persistentStorages)
+    public function deleteVolumes()
     {
+        $persistentStorages = $this->persistentStorages()->get() ?? collect();
         if ($persistentStorages->count() === 0) {
             return;
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
-            instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+            instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
         }
     }
 
@@ -146,12 +267,17 @@ class StandaloneRedis extends BaseModel
         return data_get($this, 'environment.project.team');
     }
 
+    public function sslCertificates()
+    {
+        return $this->morphMany(SslCertificate::class, 'resource');
+    }
+
     public function link()
     {
         if (data_get($this, 'environment.project.uuid')) {
             return route('project.database.configuration', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_name' => data_get($this, 'environment.name'),
+                'environment_uuid' => data_get($this, 'environment.uuid'),
                 'database_uuid' => data_get($this, 'uuid'),
             ]);
         }
@@ -175,8 +301,8 @@ class StandaloneRedis extends BaseModel
     {
         return Attribute::make(
             get: fn () => is_null($this->ports_mappings)
-                ? []
-                : explode(',', $this->ports_mappings),
+            ? []
+            : explode(',', $this->ports_mappings),
 
         );
     }
@@ -196,7 +322,20 @@ class StandaloneRedis extends BaseModel
     protected function internalDbUrl(): Attribute
     {
         return new Attribute(
-            get: fn () => "redis://:{$this->redis_password}@{$this->uuid}:6379/0",
+            get: function () {
+                $redis_version = $this->getRedisVersion();
+                $username_part = version_compare($redis_version, '6.0', '>=') ? rawurlencode($this->redis_username).':' : '';
+                $encodedPass = rawurlencode($this->connectionPassword());
+                $scheme = $this->enable_ssl ? 'rediss' : 'redis';
+                $port = $this->enable_ssl ? 6380 : 6379;
+                $url = "{$scheme}://{$username_part}{$encodedPass}@{$this->uuid}:{$port}/0";
+
+                if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
+                    $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';
+                }
+
+                return $url;
+            }
         );
     }
 
@@ -205,12 +344,34 @@ class StandaloneRedis extends BaseModel
         return new Attribute(
             get: function () {
                 if ($this->is_public && $this->public_port) {
-                    return "redis://:{$this->redis_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
+                    $serverIp = $this->destination->server->getIp;
+                    if (empty($serverIp)) {
+                        return null;
+                    }
+                    $serverHost = formatHostForUrl($serverIp);
+                    $redis_version = $this->getRedisVersion();
+                    $username_part = version_compare($redis_version, '6.0', '>=') ? rawurlencode($this->redis_username).':' : '';
+                    $encodedPass = rawurlencode($this->connectionPassword());
+                    $scheme = $this->enable_ssl ? 'rediss' : 'redis';
+                    $url = "{$scheme}://{$username_part}{$encodedPass}@{$serverHost}:{$this->public_port}/0";
+
+                    if ($this->enable_ssl && $this->ssl_mode === 'verify-ca') {
+                        $url .= '?cacert=/etc/ssl/certs/coolify-ca.crt';
+                    }
+
+                    return $url;
                 }
 
                 return null;
             }
         );
+    }
+
+    public function getRedisVersion()
+    {
+        $image_parts = explode(':', $this->image);
+
+        return $image_parts[1] ?? '0.0';
     }
 
     public function environment()
@@ -228,14 +389,72 @@ class StandaloneRedis extends BaseModel
         return $this->morphTo();
     }
 
-    public function environment_variables(): HasMany
+    public function runtime_environment_variables()
     {
-        return $this->hasMany(EnvironmentVariable::class);
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
     }
 
-    public function runtime_environment_variables(): HasMany
+    /**
+     * Uses the loaded runtime_environment_variables relation when present, so lists that eager
+     * load it do not run a query per database.
+     */
+    private function runtimeEnvironmentVariable(string $key): ?EnvironmentVariable
     {
-        return $this->hasMany(EnvironmentVariable::class);
+        if ($this->relationLoaded('runtime_environment_variables')) {
+            return $this->runtime_environment_variables->firstWhere('key', $key);
+        }
+
+        return $this->runtime_environment_variables()->where('key', $key)->first();
+    }
+
+    /**
+     * The REDIS_PASSWORD variable whose resolved value sets the server password. Databases created
+     * before this release (legacy_password_quoting) keep their v4.3.23 server password, the stored
+     * value as it is, unless the variable reads a remote secret.
+     */
+    public function serverPasswordEnvironmentVariable(): ?EnvironmentVariable
+    {
+        $environmentVariable = $this->runtimeEnvironmentVariable('REDIS_PASSWORD');
+
+        if (! $environmentVariable) {
+            return null;
+        }
+
+        if ($this->legacy_password_quoting && ! $this->environmentVariableUsesSecretManager($environmentVariable)) {
+            return null;
+        }
+
+        return $environmentVariable;
+    }
+
+    /**
+     * Whether the password variable is locked (shown once) or reads a locked shared variable.
+     * The form, the connection URLs, and the API must then not show the password.
+     */
+    public function isCredentialLocked(): bool
+    {
+        return (bool) $this->runtimeEnvironmentVariable('REDIS_PASSWORD')?->isLockedForLogs();
+    }
+
+    /**
+     * The server password for connection URLs. A remote secret is not fetched here, so the URL
+     * shows its reference instead of a stale or wrong password.
+     */
+    public function connectionPassword(): string
+    {
+        $environmentVariable = $this->serverPasswordEnvironmentVariable();
+
+        if ($environmentVariable) {
+            $password = $this->environmentVariableUsesSecretManager($environmentVariable)
+                ? (string) $environmentVariable->value
+                : (string) $this->resolveSecretManagerEnvironmentVariableValue($environmentVariable);
+
+            if ($password !== '') {
+                return $password;
+            }
+        }
+
+        return (string) $this->redis_password;
     }
 
     public function persistentStorages()
@@ -248,32 +467,40 @@ class StandaloneRedis extends BaseModel
         return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
     }
 
-    public function getMetrics(int $mins = 5)
+    public function isBackupSolutionAvailable()
     {
-        $server = $this->destination->server;
-        $container_name = $this->uuid;
-        if ($server->isMetricsEnabled()) {
-            $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $metrics = instant_remote_process(["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$server->settings->metrics_token}\" http://localhost:8888/api/container/{$container_name}/metrics/history?from=$from'"], $server, false);
-            if (str($metrics)->contains('error')) {
-                $error = json_decode($metrics, true);
-                $error = data_get($error, 'error', 'Something is not okay, are you okay?');
-                if ($error == 'Unauthorized') {
-                    $error = 'Unauthorized, please check your metrics token or restart Sentinel to set a new token.';
+        return false;
+    }
+
+    public function redisPassword(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                $password = $this->runtimeEnvironmentVariable('REDIS_PASSWORD');
+                if (! $password) {
+                    return null;
                 }
-                throw new \Exception($error);
+
+                return $password->value;
+            },
+
+        );
+    }
+
+    public function redisUsername(): Attribute
+    {
+        return new Attribute(
+            get: function () {
+                // Reading must not create the variable: a read during the create or clone of the variables adds a duplicate.
+                $username = $this->runtimeEnvironmentVariable('REDIS_USERNAME')?->value;
+
+                return filled($username) ? $username : 'default';
             }
-            $metrics = str($metrics)->explode("\n")->skip(1)->all();
-            $parsedCollection = collect($metrics)->flatMap(function ($item) {
-                return collect(explode("\n", trim($item)))->map(function ($line) {
-                    [$time, $cpu_usage_percent, $memory_usage, $memory_usage_percent] = explode(',', trim($line));
-                    $cpu_usage_percent = number_format($cpu_usage_percent, 2);
+        );
+    }
 
-                    return [(int) $time, (float) $cpu_usage_percent, (int) $memory_usage];
-                });
-            });
-
-            return $parsedCollection->toArray();
-        }
+    public function environment_variables()
+    {
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
     }
 }

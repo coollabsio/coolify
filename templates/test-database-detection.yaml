@@ -1,0 +1,378 @@
+# Test Compose File for Database Detection Logic
+# This file contains various services to test the isDatabaseImage() function
+# and its contextual analysis capabilities
+# Service names indicate expected detection: "database-*" or "application-*"
+
+version: '3.8'
+
+services:
+  # =============================================================================
+  # ACTUAL DATABASES (should be detected as databases)
+  # =============================================================================
+  
+  # Standard PostgreSQL database
+  database-postgres-main:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=secret123
+      - POSTGRES_DB=maindb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "admin", "-d", "maindb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # MySQL database
+  database-mysql-main:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=testdb
+      - MYSQL_USER=dbuser
+      - MYSQL_PASSWORD=dbpass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # MongoDB database
+  database-mongodb-main:
+    image: mongo:7
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
+      - MONGO_INITDB_DATABASE=testmongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Redis database
+  database-redis-main:
+    image: redis:7-alpine
+    environment:
+      - REDIS_PASSWORD=redispass
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Database with non-standard port
+  database-postgres-custom-port:
+    image: postgres:15
+    environment:
+      - POSTGRES_USER=customuser
+      - POSTGRES_PASSWORD=custompass
+      - POSTGRES_DB=customdb
+    ports:
+      - "5433:5432"  # Non-standard external port
+    volumes:
+      - postgres-custom-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "customuser", "-d", "customdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # MySQL variant with different image
+  database-mariadb:
+    image: mariadb:11
+    environment:
+      - MARIADB_ROOT_PASSWORD=mariaroot
+      - MARIADB_DATABASE=mariadb
+      - MARIADB_USER=mariauser
+      - MARIADB_PASSWORD=mariapass
+    ports:
+      - "3307:3306"
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # =============================================================================
+  # APPLICATIONS WITH DATABASE NAMES (should NOT be detected as databases)
+  # =============================================================================
+
+  # SuperTokens - authentication app with postgresql in name
+  application-supertokens:
+    image: registry.supertokens.io/supertokens/supertokens-postgresql:latest
+    depends_on:
+      database-postgres-main:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_SUPERTOKENS_3567
+      - API_KEYS=test-api-key
+      - POSTGRESQL_CONNECTION_URI=postgresql://admin:secret123@database-postgres-main:5432/maindb
+    ports:
+      - "3567:3567"
+    healthcheck:
+      test: "bash -c 'exec 3<>/dev/tcp/127.0.0.1/3567 && echo -e \"GET /hello HTTP/1.1\\r\\nhost: 127.0.0.1:3567\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && cat <&3 | grep \"Hello\"'"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Metabase - analytics app that uses databases
+  application-metabase:
+    image: metabase/metabase:latest
+    depends_on:
+      database-postgres-main:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_METABASE_3000
+      - MB_DB_TYPE=postgres
+      - MB_DB_HOST=database-postgres-main
+      - MB_DB_PORT=5432
+      - MB_DB_DBNAME=maindb
+      - MB_DB_USER=admin
+      - MB_DB_PASS=secret123
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "-I", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # NocoDB - no-code database interface
+  application-nocodb:
+    image: nocodb/nocodb:latest
+    depends_on:
+      database-postgres-main:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_NOCODB_8080
+      - DATABASE_URL=postgresql://admin:secret123@database-postgres-main:5432/maindb
+      - NC_AUTH_JWT_SECRET=your-secret-key
+    ports:
+      - "8080:8080"
+    volumes:
+      - nocodb-data:/usr/app/data
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:8080/api/v1/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+
+  # PostgREST - REST API for PostgreSQL
+  application-postgrest:
+    image: postgrest/postgrest:latest
+    depends_on:
+      database-postgres-main:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_POSTGREST_3001
+      - PGRST_DB_URI=postgresql://admin:secret123@database-postgres-main:5432/maindb
+      - PGRST_DB_SCHEMA=public
+      - PGRST_DB_ANON_ROLE=web_anon
+    ports:
+      - "3001:3000"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Umami - web analytics with postgresql variant
+  application-umami-postgresql:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    depends_on:
+      database-postgres-main:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_UMAMI_3002
+      - DATABASE_URL=postgres://admin:secret123@database-postgres-main:5432/maindb
+      - DATABASE_TYPE=postgres
+      - APP_SECRET=umami-secret
+    ports:
+      - "3002:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/api/heartbeat"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  # Twenty CRM custom postgres (should be detected as database)
+  database-twenty-postgres:
+    image: twentycrm/twenty-postgres:latest
+    environment:
+      - POSTGRES_USER=twentyuser
+      - POSTGRES_PASSWORD=twentypass
+      - POSTGRES_DB=twenty
+    ports:
+      - "5434:5432"
+    volumes:
+      - twenty-postgres-data:/bitnami/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+
+  # Infisical - secret management with postgres variant
+  application-infisical-postgres:
+    image: infisical/infisical:v0.154.6
+    depends_on:
+      database-postgres-main:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_INFISICAL_8080
+      - SITE_URL=http://localhost:8080
+      - NODE_ENV=production
+      - ENCRYPTION_KEY=infisical-encryption-key
+      - AUTH_SECRET=infisical-auth-secret
+      - DB_CONNECTION_URI=postgres://admin:secret123@database-postgres-main:5432/maindb
+      - REDIS_URL=redis://database-redis-main:6379
+    ports:
+      - "8081:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:8080/api/status || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # EDGE CASES AND TRICKY SCENARIOS
+  # =============================================================================
+
+  # App with database-like name but no context
+  application-fake-postgres-client:
+    image: mycompany/postgres-client:latest
+    environment:
+      - SERVICE_FQDN_POSTGRES_CLIENT_4000
+      - APP_NAME=PostgreSQL Client
+      - API_ENDPOINT=http://api.example.com
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:4000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # App that connects to external database
+  application-webapp-external-db:
+    image: node:18-alpine
+    environment:
+      - SERVICE_FQDN_WEBAPP_8000
+      - DATABASE_URL=postgresql://user:pass@external-db.example.com:5432/appdb
+      - NODE_ENV=production
+      - JWT_SECRET=webapp-secret
+    ports:
+      - "8000:8000"
+    command: ["node", "server.js"]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis-based app (not a database itself)
+  application-redis-commander:
+    image: redis-commander:latest
+    depends_on:
+      database-redis-main:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_REDIS_COMMANDER_8081
+      - REDIS_HOSTS=local:database-redis-main:6379
+      - HTTP_USER=admin
+      - HTTP_PASSWORD=admin
+    ports:
+      - "8082:8081"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:8081/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # MongoDB management interface
+  application-mongo-express:
+    image: mongo-express:latest
+    depends_on:
+      database-mongodb-main:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_MONGO_EXPRESS_8082
+      - ME_CONFIG_MONGODB_SERVER=database-mongodb-main
+      - ME_CONFIG_MONGODB_PORT=27017
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=admin
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=password
+      - ME_CONFIG_BASICAUTH_USERNAME=mongouser
+      - ME_CONFIG_BASICAUTH_PASSWORD=mongopass
+    ports:
+      - "8083:8081"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8081/"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # REGULAR APPLICATIONS (clearly not databases)
+  # =============================================================================
+
+  # Nginx web server
+  application-nginx:
+    image: nginx:alpine
+    environment:
+      - SERVICE_FQDN_NGINX_80
+      - NGINX_HOST=localhost
+      - NGINX_PORT=80
+    ports:
+      - "8084:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Node.js application
+  application-node-app:
+    image: node:18-alpine
+    environment:
+      - SERVICE_FQDN_NODEAPP_3002
+      - NODE_ENV=production
+      - PORT=3000
+    ports:
+      - "3003:3000"
+    command: ["node", "index.js"]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres-data:
+  postgres-custom-data:
+  mysql-data:
+  mariadb-data:
+  mongo-data:
+  redis-data:
+  nocodb-data:
+  twenty-postgres-data: 

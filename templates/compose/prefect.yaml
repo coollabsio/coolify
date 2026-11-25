@@ -1,0 +1,81 @@
+# documentation: https://www.prefect.io/
+# slogan: Prefect is an orchestration and observability platform that empowers developers to build and scale workflows quickly.
+# category: automation
+# tags: workflow, orchestration, data-pipeline, python, automation, data-processing, data-integration, etl
+# logo: svgs/prefect.png
+# port: 4200
+
+services:
+  prefect:
+    image: "prefecthq/prefect:3-latest"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    environment:
+      - SERVICE_URL_PREFECT_4200
+      - PREFECT_API_URL=${SERVICE_URL_PREFECT}/api
+      - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB:-prefect}
+      - PREFECT_API_KEY=${SERVICE_PASSWORD_APIKEY}
+      - PREFECT_EXPERIMENTAL_WARN=${PREFECT_EXPERIMENTAL_WARN:-false}
+      - PREFECT_EXPERIMENTAL_ENABLE_SCHEDULE_CONCURRENCY=${PREFECT_EXPERIMENTAL_ENABLE_SCHEDULE_CONCURRENCY:-false}
+      - PREFECT_RUNNER_SERVER_ENABLE=${PREFECT_RUNNER_SERVER_ENABLE:-false}
+      - PREFECT_DEFAULT_WORK_POOL_NAME=${DEFAULT_POOL_NAME:-default}
+    command:
+      - prefect
+      - server
+      - start
+      - "--host"
+      - 0.0.0.0
+      - "--port"
+      - "4200"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - "-c"
+        - "import requests as r;r.get('http://127.0.0.1:4200/api/health').raise_for_status()"
+      interval: 5s
+      timeout: 5s
+      retries: 3
+  postgresql:
+    image: "postgres:16-alpine"
+    volumes:
+      - "pg-data:/var/lib/postgresql/data"
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-prefect}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 3
+  agent:
+    image: "prefecthq/prefect:3-python3.12"
+    depends_on:
+      prefect:
+        condition: service_healthy
+    entrypoint:
+      - /opt/prefect/entrypoint.sh
+      - prefect
+      - worker
+      - start
+      - --pool=${DEFAULT_POOL_NAME}
+      - --with-healthcheck
+      - --name=${DEFAULT_WORKER_NAME}
+      - --limit=${DEFAULT_POOL_LIMIT}
+    environment:
+      - PREFECT_API_URL=http://prefect:4200/api
+      - PREFECT_API_KEY=${SERVICE_PASSWORD_APIKEY}
+      - DEFAULT_POOL_NAME=${DEFAULT_POOL_NAME:-default}
+      - DEFAULT_POOL_LIMIT=${DEFAULT_POOL_LIMIT:-1}
+      - DEFAULT_WORKER_NAME=${DEFAULT_WORKER_NAME:-worker1}
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pwd
+      interval: 5s
+      timeout: 5s
+      retries: 3

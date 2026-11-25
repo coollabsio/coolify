@@ -1,82 +1,117 @@
-<div>
-    <form wire:submit="submit" class="flex flex-col gap-2">
-        <div class="flex items-center gap-2">
-            <h2>General</h2>
-            <x-forms.button type="submit">
-                Save
-            </x-forms.button>
-        </div>
-        <div class="flex gap-2">
-            <x-forms.input label="Name" id="database.name" />
-            <x-forms.input label="Description" id="database.description" />
-            <x-forms.input label="Image" id="database.image" required
-                helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/mariadb'>https://hub.docker.com/_/mariadb</a>" />
-        </div>
-        <div class="pt-2 dark:text-warning">If you change the values in the database, please sync it here, otherwise
-            automations (like backups) won't work.
-        </div>
-        @if ($database->started_at)
-            <div class="flex flex-col gap-2">
-                <x-forms.input label="Root Password" id="database.mariadb_root_password" type="password" required
-                    helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
-                <x-forms.input label="Normal User" id="database.mariadb_user" required
-                    helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
-                <x-forms.input label="Normal User Password" id="database.mariadb_password" type="password" required
-                    helper="If you change this in the database, please sync it here, otherwise automations (like backups) won't work." />
-                <x-forms.input label="Initial Database" id="database.mariadb_database"
-                    placeholder="If empty, it will be the same as Username." readonly
-                    helper="You can only change this in the database." />
+<div class="application-settings-form">
+    <form wire:submit="submit" class="flex flex-col gap-6">
+        <x-unsaved-bar action="submit" />
+
+        <x-application.settings-section id="database-details-section" title="Database details"
+            description="Manage the identity, container image, and credentials of this MariaDB database.">
+            <x-slot:actions>
+                <x-modal-input title="Resource details" buttonTitle="Details">
+                    <livewire:project.shared.resource-details :resource="$database" />
+                </x-modal-input>
+            </x-slot:actions>
+            <div class="grid gap-4 lg:grid-cols-2">
+                <x-forms.input label="Name" id="name" canGate="update" :canResource="$database" />
+                <x-forms.input label="Description" id="description" canGate="update" :canResource="$database" />
+                <div class="lg:col-span-2">
+                    <x-forms.input label="Image" id="image" required canGate="update" :canResource="$database"
+                        helper="Use a published MariaDB image from Docker Hub." />
+                </div>
             </div>
-        @else
-            <div class="flex flex-col gap-2 pb-2">
-                <x-forms.input label="Root Password" id="database.mariadb_root_password" type="password"
-                    helper="You can only change this in the database." />
-                <x-forms.input label="Normal User" id="database.mariadb_user" required
-                    helper="You can only change this in the database." />
-                <x-forms.input label="Normal User Password" id="database.mariadb_password" type="password" required
-                    helper="You can only change this in the database." />
-                <x-forms.input label="Initial Database" id="database.mariadb_database"
-                    placeholder="If empty, it will be the same as Username."
-                    helper="You can only change this in the database." />
-            </div>
-        @endif
-        <div class="flex flex-col gap-2">
-            <h3 class="py-2">Network</h3>
-            <div class="flex items-end gap-2">
-                <x-forms.input placeholder="3000:5432" id="database.ports_mappings" label="Ports Mappings"
-                    helper="A comma separated list of ports you would like to map to the host system.<br><span class='inline-block font-bold dark:text-warning'>Example</span>3000:5432,3002:5433" />
-            </div>
-            <x-forms.input label="MariaDB URL (internal)"
-                helper="If you change the user/password/port, this could be different. This is with the default values."
-                type="password" readonly wire:model="db_url" />
-            @if ($db_url_public)
-                <x-forms.input label="MariaDB URL (public)"
-                    helper="If you change the user/password/port, this could be different. This is with the default values."
-                    type="password" readonly wire:model="db_url_public" />
+            <x-application.settings-subsection id="credentials-section" title="Credentials" helper="Keep these values aligned with the credentials configured inside MariaDB.">
+                @if ($database->started_at)
+                    <x-callout type="warning" title="Keep credentials synchronized">
+                        Changing values here does not update MariaDB. Update MariaDB first, then synchronize the values here
+                        so backups and other automations continue working.
+                    </x-callout>
+                @endif
+                <div class="{{ $database->started_at ? 'mt-4 ' : '' }}grid gap-4 lg:grid-cols-2">
+                    @if ($isPasswordHiddenForMember)
+                        <x-forms.input label="Root password" disabled value="Hidden (only admins can view)" />
+                    @else
+                        <x-forms.input label="Root password" id="mariadbRootPassword" type="password"
+                            :required="(bool) $database->started_at" canGate="update" :canResource="$database" />
+                    @endif
+                    <x-forms.input label="Normal user" id="mariadbUser" required canGate="update"
+                        :canResource="$database" />
+                    @if ($isPasswordHiddenForMember)
+                        <x-forms.input label="Normal user password" disabled value="Hidden (only admins can view)" />
+                    @else
+                        <x-forms.input label="Normal user password" id="mariadbPassword" type="password" required
+                            canGate="update" :canResource="$database" />
+                    @endif
+                    <x-forms.input label="Initial database" id="mariadbDatabase"
+                        placeholder="If empty, it will match the normal user."
+                        :readonly="(bool) $database->started_at" canGate="update" :canResource="$database"
+                        helper="{{ $database->started_at ? 'You can only change this in the database.' : null }}" />
+                </div>
+            </x-application.settings-subsection>
+        </x-application.settings-section>
+
+        <x-application.settings-section id="access-section" title="Access"
+            description="How applications and clients connect to this database, and whether it is reachable from the internet.">
+            <x-slot:actions>
+                @if ($isPublic)
+                    <x-process-dialog closeWithX size="xl">
+                        <x-slot:title>Proxy logs</x-slot:title>
+                        <x-slot:content>
+                            <livewire:project.shared.get-logs :server="$server" :resource="$database"
+                                container="{{ data_get($database, 'uuid') }}-proxy" :collapsible="false" lazy />
+                        </x-slot:content>
+                        <x-forms.button @click="processDialogOpen = true">View logs</x-forms.button>
+                    </x-process-dialog>
+                @endif
+            </x-slot:actions>
+            <x-application.settings-subsection id="connection-section" title="Connection" helper="Use these URLs to connect to the database." first>
+                <livewire:project.database.mariadb.status-info :database="$database" />
+            </x-application.settings-subsection>
+            <x-application.settings-subsection id="public-access-section" title="Public access" helper="Expose this database through the managed TCP proxy." class="relative">
+                <x-table.loading target="instantSave" text="Updating public access..." />
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <div wire:key="public-access-{{ $publicPort ?: 'unset' }}">
+                        <x-forms.listbox id="isPublic" label="Access" live onChange="instantSave"
+                            :disabled="! auth()->user()->can('update', $database)" canGate="update" :canResource="$database" :options="[
+                                ['value' => false, 'label' => 'Private'],
+                                ['value' => true, 'label' => blank($publicPort) ? 'Public through TCP proxy (set public port first)' : 'Public through TCP proxy', 'disabled' => blank($publicPort)],
+                            ]" />
+                    </div>
+                    <x-forms.input type="number" placeholder="3306" disabled="{{ $isPublic }}" id="publicPort"
+                        label="Public port" canGate="update" :canResource="$database" />
+                    <x-forms.input type="number" placeholder="3600" disabled="{{ $isPublic }}" id="publicPortTimeout"
+                        label="Proxy timeout" helper="Timeout in seconds. The default is 3600."
+                        canGate="update" :canResource="$database" />
+                    <x-forms.input placeholder="3000:3306" id="portsMappings" label="Port mappings"
+                        helper="Comma-separated host-to-container mappings, for example 3000:3306."
+                        canGate="update" :canResource="$database" />
+                </div>
+            </x-application.settings-subsection>
+        </x-application.settings-section>
+
+        <x-application.settings-section id="container-section" title="Container"
+            description="Docker options, configuration, and log forwarding for the database container.">
+            @if ($isPasswordHiddenForMember)
+                <x-forms.input label="Custom Docker options" disabled value="Hidden (only admins can view)" />
+            @else
+                <x-forms.input
+                    helper="Add supported docker run options used when the container starts. Unsupported options can interfere with Coolify automation."
+                    placeholder="--cap-add SYS_ADMIN --device=/dev/fuse"
+                    id="customDockerRunOptions" label="Custom Docker options" canGate="update"
+                    :canResource="$database" />
             @endif
-        </div>
-        <div>
-            <h3 class="py-2">Proxy</h3>
-            <div class="flex items-end gap-2">
-                <x-forms.input placeholder="5432" disabled="{{ data_get($database, 'is_public') }}"
-                    id="database.public_port" label="Public Port" />
-                <x-slide-over fullScreen>
-                    <x-slot:title>Proxy Logs</x-slot:title>
-                    <x-slot:content>
-                        <livewire:project.shared.get-logs :server="$server" :resource="$database"
-                            container="{{ data_get($database, 'uuid') }}-proxy" lazy />
-                    </x-slot:content>
-                    <x-forms.button disabled="{{ !data_get($database, 'is_public') }}" @click="slideOverOpen=true"
-                        class="w-28">Proxy Logs</x-forms.button>
-                </x-slide-over>
-                <x-forms.checkbox instantSave id="database.is_public" label="Make it publicly available" />
-            </div>
-        </div>
-        <x-forms.textarea label="Custom MariaDB Configuration" rows="10" id="database.mariadb_conf" />
-        <h3 class="pt-4">Advanced</h3>
-        <div class="flex flex-col">
-            <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-                instantSave="instantSaveAdvanced" id="database.is_log_drain_enabled" label="Drain Logs" />
-        </div>
+            <x-application.settings-subsection id="configuration-section" title="Configuration" helper="Override the MariaDB configuration used by this container.">
+                @if ($isPasswordHiddenForMember)
+                    <x-forms.input label="Custom MariaDB configuration" disabled value="Hidden (only admins can view)" />
+                @else
+                    <x-forms.textarea label="Custom MariaDB configuration" rows="10" id="mariadbConf"
+                        canGate="update" :canResource="$database" />
+                @endif
+            </x-application.settings-subsection>
+            <x-application.settings-subsection id="log-delivery-section" title="Log delivery" helper="Forward container logs to the drain configured on the server.">
+                <x-forms.listbox canGate="update" :canResource="$database" id="isLogDrainEnabled" label="Log drain" live onChange="instantSaveAdvanced"
+                    :disabled="! auth()->user()->can('update', $database)" :options="[
+                        ['value' => false, 'label' => 'Do not forward logs'],
+                        ['value' => true, 'label' => 'Forward logs to the server drain'],
+                    ]" />
+            </x-application.settings-subsection>
+        </x-application.settings-section>
     </form>
 </div>

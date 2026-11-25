@@ -5,13 +5,12 @@ namespace App\Providers;
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
-use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\OauthSetting;
 use App\Models\User;
-use Illuminate\Cache\RateLimiting\Limit;
+use App\Support\PasskeyRelyingParty;
+use App\Support\RootSetupWindow;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Fortify\Contracts\RegisterResponse;
 use Laravel\Fortify\Fortify;
@@ -28,7 +27,7 @@ class FortifyServiceProvider extends ServiceProvider
             public function toResponse($request)
             {
                 // First user (root) will be redirected to /settings instead of / on registration.
-                if ($request->user()->currentTeam->id === 0) {
+                if ($request->user()->currentTeam()?->id === 0) {
                     return redirect()->route('settings.index');
                 }
 
@@ -44,45 +43,62 @@ class FortifyServiceProvider extends ServiceProvider
     {
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::registerView(function () {
-            $settings = \App\Models\InstanceSettings::get();
-            if (! $settings->is_registration_enabled) {
+            $isFirstUser = User::count() === 0;
+
+            $settings = instanceSettings();
+            if (! $settings->isPasswordRegistrationAllowed()) {
                 return redirect()->route('login');
             }
-            if (config('coolify.waitlist')) {
-                return redirect()->route('waitlist.index');
-            } else {
-                return view('auth.register');
-            }
+
+            return view('auth.register', [
+                'isFirstUser' => $isFirstUser,
+                'isRootUserPredefined' => $isFirstUser && RootSetupWindow::isReservedForPredefinedRootUser(),
+                'isRootSetupWindowPending' => $isFirstUser && RootSetupWindow::isPending(),
+                'isRootSetupWindowClosed' => $isFirstUser && ! RootSetupWindow::isOpen(),
+            ]);
         });
 
         Fortify::loginView(function () {
-            $settings = \App\Models\InstanceSettings::get();
+            $settings = instanceSettings();
             $enabled_oauth_providers = OauthSetting::where('enabled', true)->get();
             $users = User::count();
-            if ($users == 0) {
-                // If there are no users, redirect to registration
+            if ($users == 0 && $settings->isPasswordRegistrationAllowed()) {
+                // If there are no users and password registration is allowed, redirect to registration.
                 return redirect()->route('register');
             }
 
             return view('auth.login', [
-                'is_registration_enabled' => $settings->is_registration_enabled,
+                'is_registration_enabled' => $settings->isPasswordRegistrationAllowed(),
+                'can_register_with_oauth' => $enabled_oauth_providers->contains(
+                    fn (OauthSetting $oauthSetting) => $oauthSetting->couldBeEnabled() && $oauthSetting->allowsUserCreation()
+                ),
                 'enabled_oauth_providers' => $enabled_oauth_providers,
+                'passkeys_available' => PasskeyRelyingParty::isAvailable(),
             ]);
         });
 
         Fortify::authenticateUsing(function (Request $request) {
-            $user = User::where('email', $request->email)->with('teams')->first();
+            $email = strtolower($request->email);
+            $user = User::where('email', $email)->with('teams')->first();
             if (
                 $user &&
                 Hash::check($request->password, $user->password)
             ) {
                 $user->updated_at = now();
                 $user->save();
-                $user->currentTeam = $user->teams->firstWhere('personal_team', true);
-                if (! $user->currentTeam) {
-                    $user->currentTeam = $user->recreate_personal_team();
+
+                // Pending team invitations are not accepted here; the user accepts
+                // them explicitly on the invitation page (team.invitation.show).
+                // Restore the last active team; only fall back when unambiguous.
+                $team = $user->resolveStoredTeam();
+                if (! $team && $user->teams->isEmpty()) {
+                    $team = $user->recreate_personal_team();
                 }
-                session(['currentTeam' => $user->currentTeam]);
+                if ($team) {
+                    session(['currentTeam' => $team]);
+                }
+                // Otherwise (multiple teams, no stored choice) leave the session
+                // team unset so the user is sent to the team-selection screen.
 
                 return $user;
             }
@@ -95,33 +111,17 @@ class FortifyServiceProvider extends ServiceProvider
         });
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
 
-        Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
 
         Fortify::confirmPasswordView(function () {
-            return view('auth.confirm-password');
+            return view('auth.confirm-password', [
+                'can_confirm_with_passkey' => PasskeyRelyingParty::isAvailable()
+                    && auth()->user()->hasPasskeysEnabled(),
+            ]);
         });
 
         Fortify::twoFactorChallengeView(function () {
             return view('auth.two-factor-challenge');
-        });
-
-        RateLimiter::for('force-password-reset', function (Request $request) {
-            return Limit::perMinute(15)->by($request->user()->id);
-        });
-
-        RateLimiter::for('forgot-password', function (Request $request) {
-            return Limit::perMinute(5)->by($request->ip());
-        });
-
-        RateLimiter::for('login', function (Request $request) {
-            $email = (string) $request->email;
-
-            return Limit::perMinute(5)->by($email.$request->ip());
-        });
-
-        RateLimiter::for('two-factor', function (Request $request) {
-            return Limit::perMinute(5)->by($request->session()->get('login.id'));
         });
     }
 }

@@ -3,12 +3,16 @@
 namespace App\Livewire\Project\Shared;
 
 use App\Models\Tag;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 // Refactored ✅
 class Tags extends Component
 {
+    use AuthorizesRequests;
+
     public $resource = null;
 
     #[Validate('required|string|min:2')]
@@ -25,7 +29,7 @@ class Tags extends Component
 
     public function loadTags()
     {
-        $this->tags = Tag::ownedByCurrentTeam()->get();
+        $this->tags = $this->resourceTags()->get();
         $this->filteredTags = $this->tags->filter(function ($tag) {
             return ! $this->resource->tags->contains($tag);
         });
@@ -34,9 +38,11 @@ class Tags extends Component
     public function submit()
     {
         try {
+            $this->authorize('update', $this->resource);
             $this->validate();
             $tags = str($this->newTags)->trim()->explode(' ');
             foreach ($tags as $tag) {
+                $tag = strip_tags($tag);
                 if (strlen($tag) < 2) {
                     $this->dispatch('error', 'Invalid tag.', "Tag <span class='dark:text-warning'>$tag</span> is invalid. Min length is 2.");
 
@@ -47,13 +53,11 @@ class Tags extends Component
 
                     continue;
                 }
-                $found = Tag::ownedByCurrentTeam()->where(['name' => $tag])->exists();
-                if (! $found) {
-                    $found = Tag::create([
+                $found = $this->resourceTags()->where('name', $tag)->first()
+                    ?? Tag::create([
                         'name' => $tag,
-                        'team_id' => currentTeam()->id,
+                        'team_id' => $this->resource->team()->id,
                     ]);
-                }
                 $this->resource->tags()->attach($found->id);
             }
             $this->refresh();
@@ -62,15 +66,17 @@ class Tags extends Component
         }
     }
 
-    public function addTag(string $id, string $name)
+    public function addTag(string $id)
     {
         try {
-            if ($this->resource->tags()->where('id', $id)->exists()) {
-                $this->dispatch('error', 'Duplicate tags.', "Tag <span class='dark:text-warning'>$name</span> already added.");
+            $this->authorize('update', $this->resource);
+            $tag = $this->resourceTags()->findOrFail($id);
+            if ($this->resource->tags()->whereKey($tag->id)->exists()) {
+                $this->dispatch('error', 'Duplicate tags.', 'Tag <span class=\'dark:text-warning\'>'.e($tag->name).'</span> already added.');
 
                 return;
             }
-            $this->resource->tags()->attach($id);
+            $this->resource->tags()->attach($tag->id);
             $this->refresh();
             $this->dispatch('success', 'Tag added.');
         } catch (\Exception $e) {
@@ -81,16 +87,19 @@ class Tags extends Component
     public function deleteTag(string $id)
     {
         try {
+            $this->authorize('update', $this->resource);
+            // The tag stays, also without resources. Delete it on the Tags page.
             $this->resource->tags()->detach($id);
-            $found_more_tags = Tag::ownedByCurrentTeam()->find($id);
-            if ($found_more_tags && $found_more_tags->applications()->count() == 0 && $found_more_tags->services()->count() == 0) {
-                $found_more_tags->delete();
-            }
             $this->refresh();
-            $this->dispatch('success', 'Tag deleted.');
+            $this->dispatch('success', 'Tag removed.');
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
+    }
+
+    private function resourceTags(): Builder
+    {
+        return Tag::query()->where('team_id', $this->resource->team()?->id)->orderBy('name');
     }
 
     public function refresh()

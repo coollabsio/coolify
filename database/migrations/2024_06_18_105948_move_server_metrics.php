@@ -18,7 +18,7 @@ return new class extends Migration
             $table->boolean('is_metrics_enabled')->default(false);
             $table->integer('metrics_refresh_rate_seconds')->default(5);
             $table->integer('metrics_history_days')->default(30);
-            $table->string('metrics_token')->default(generateSentinelToken());
+            $table->string('metrics_token')->nullable();
         });
     }
 

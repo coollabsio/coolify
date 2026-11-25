@@ -4,6 +4,7 @@ namespace App\View\Components\Forms;
 
 use Closure;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\View\Component;
 
 class Button extends Component
@@ -13,12 +14,32 @@ class Button extends Component
      */
     public function __construct(
         public bool $disabled = false,
+        public bool $authDisabled = false,
         public bool $noStyle = false,
         public ?string $modalId = null,
-        public string $defaultClass = 'button'
+        public string $defaultClass = 'button',
+        public bool $showLoadingIndicator = true,
+        public ?string $canGate = null,
+        public mixed $canResource = null,
+        public bool $autoDisable = true,
+        public bool $isHighlighted = false,
+        public bool $isError = false,
+        public ?string $tooltip = null,
     ) {
+        // Handle authorization-based disabling
+        if ($this->canGate && $this->canResource && $this->autoDisable) {
+            $hasPermission = Gate::allows($this->canGate, $this->canResource);
+
+            if (! $hasPermission) {
+                $this->disabled = true;
+                $this->authDisabled = true;
+            }
+        }
+
         if ($this->noStyle) {
             $this->defaultClass = '';
+        } elseif ($this->isError) {
+            $this->defaultClass .= ' button-error';
         }
     }
 

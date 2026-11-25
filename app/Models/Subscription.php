@@ -2,15 +2,73 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Subscription extends Model
 {
-    protected $guarded = [];
+    use HasFactory;
+
+    protected $fillable = [
+        'team_id',
+        'stripe_invoice_paid',
+        'stripe_subscription_id',
+        'stripe_customer_id',
+        'stripe_cancel_at_period_end',
+        'stripe_plan_id',
+        'stripe_feedback',
+        'stripe_comment',
+        'stripe_trial_already_ended',
+        'stripe_past_due',
+        'stripe_refunded_at',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'stripe_refunded_at' => 'datetime',
+            'ended_at' => 'datetime',
+            'stripe_checkout_reminder_sent_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * ended_at marks when the team stopped paying, which starts the data retention period.
+     * A past-due subscription is still in dunning, so it counts as paying.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (Subscription $subscription): void {
+            if ($subscription->isPaying()) {
+                $subscription->ended_at = null;
+            } elseif ($subscription->ended_at === null) {
+                $subscription->ended_at = now();
+            }
+        });
+    }
+
+    public function isPaying(): bool
+    {
+        return (bool) $this->stripe_invoice_paid || (bool) $this->stripe_past_due;
+    }
 
     public function team()
     {
         return $this->belongsTo(Team::class);
+    }
+
+    public function billingInterval(): string
+    {
+        if ($this->stripe_plan_id) {
+            $configKey = collect(config('subscription'))
+                ->search($this->stripe_plan_id);
+
+            if ($configKey && str($configKey)->contains('yearly')) {
+                return 'yearly';
+            }
+        }
+
+        return 'monthly';
     }
 
     public function type()

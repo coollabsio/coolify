@@ -1,0 +1,17 @@
+# documentation: https://github.com/lissy93/web-check
+# slogan: All-in-one OSINT tool for analysing any website
+# category: monitoring
+# tags: osint, website, analysis
+# logo: svgs/web-check.png
+# port: 3000
+
+services:
+  web-check:
+    image: lissy93/web-check:2.4.2
+    environment:
+      - SERVICE_URL_WEBCHECK_3000
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.js"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

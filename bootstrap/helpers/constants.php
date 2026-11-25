@@ -1,7 +1,51 @@
 <?php
 
+use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneKeydb;
+use App\Models\StandaloneMariadb;
+use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
+
 const REDACTED = '<REDACTED>';
-const DATABASE_TYPES = ['postgresql', 'redis', 'mongodb', 'mysql', 'mariadb', 'keydb', 'dragonfly', 'clickhouse'];
+const DATABASE_TYPES = ['postgresql', 'redis', 'mongodb', 'mysql', 'mariadb', 'keydb', 'dragonfly', 'clickhouse', 'sqlite'];
+const STANDALONE_DATABASE_MODELS = [
+    'postgresql' => StandalonePostgresql::class,
+    'redis' => StandaloneRedis::class,
+    'mongodb' => StandaloneMongodb::class,
+    'mysql' => StandaloneMysql::class,
+    'mariadb' => StandaloneMariadb::class,
+    'keydb' => StandaloneKeydb::class,
+    'dragonfly' => StandaloneDragonfly::class,
+    'clickhouse' => StandaloneClickhouse::class,
+    'sqlite' => StandaloneSqlite::class,
+];
+// Custom Docker options that Coolify converts to Compose; other options conflict with settings Coolify manages
+const DOCKER_RUN_OPTION_MAPPING = [
+    '--add-host' => 'extra_hosts',
+    '--cap-add' => 'cap_add',
+    '--cap-drop' => 'cap_drop',
+    '--security-opt' => 'security_opt',
+    '--sysctl' => 'sysctls',
+    '--device' => 'devices',
+    '--init' => 'init',
+    '--ulimit' => 'ulimits',
+    '--privileged' => 'privileged',
+    '--ip' => 'ip',
+    '--ip6' => 'ip6',
+    '--shm-size' => 'shm_size',
+    '--dns' => 'dns',
+    '--gpus' => 'gpus',
+    '--hostname' => 'hostname',
+    '--entrypoint' => 'entrypoint',
+    '--pids-limit' => 'pids_limit',
+    '--read-only' => 'read_only',
+    '--runtime' => 'runtime',
+    '--tmpfs' => 'tmpfs',
+];
 const VALID_CRON_STRINGS = [
     'every_minute' => '* * * * *',
     'hourly' => '0 * * * *',
@@ -9,18 +53,72 @@ const VALID_CRON_STRINGS = [
     'weekly' => '0 0 * * 0',
     'monthly' => '0 0 1 * *',
     'yearly' => '0 0 1 1 *',
+    '@hourly' => '0 * * * *',
+    '@daily' => '0 0 * * *',
+    '@weekly' => '0 0 * * 0',
+    '@monthly' => '0 0 1 * *',
+    '@yearly' => '0 0 1 1 *',
 ];
 const RESTART_MODE = 'unless-stopped';
+const DEFAULT_STOP_GRACE_PERIOD_SECONDS = 30;
+const MIN_STOP_GRACE_PERIOD_SECONDS = 1;
+const MAX_STOP_GRACE_PERIOD_SECONDS = 3600;
+const DEFAULT_ROLLING_UPDATE_DRAIN_SECONDS = 5;
+const MAX_ROLLING_UPDATE_DRAIN_SECONDS = 300;
+/** Local wait for a remote `docker logs` read bounded by remoteCommandWithTimeout(..., 30): 30s + 5s kill-after + SSH setup time. */
+const DOCKER_LOGS_LOCAL_TIMEOUT = 45;
+/**
+ * caddy-docker-proxy reloads Caddy when any proxied container changes (a restart gives it a new IP), and a reload
+ * closes every WebSocket at once unless `reverse_proxy` sets `stream_close_delay` (Caddy 2.7+). A stream to a
+ * stopped or replaced container still ends with that container.
+ */
+const CADDY_STREAM_CLOSE_DELAY = '24h';
+
+/**
+ * Responses that the Traefik compress middleware of Coolify must not compress. Traefik replaces the media
+ * filter of its gzip library with any `excludedcontenttypes` list, so without these types it compresses
+ * video and audio, removes `Accept-Ranges`, and breaks seeking and Safari playback (#5222). Traefik matches
+ * exact media types only (no `video/*`), and v2 has no `includedcontenttypes`. Event streams must not be
+ * buffered. A change of this list needs a new middleware name, because containers that are not redeployed
+ * still declare the old definition and Traefik drops a middleware with conflicting definitions.
+ */
+const TRAEFIK_GZIP_MIDDLEWARE = 'gzip-no-media';
+
+const TRAEFIK_GZIP_EXCLUDED_CONTENT_TYPES = [
+    'text/event-stream',
+    'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-matroska', 'video/x-msvideo',
+    'video/mpeg', 'video/mp2t', 'video/3gpp', 'video/x-m4v', 'video/x-flv',
+    'audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/ogg', 'audio/opus', 'audio/webm', 'audio/wav',
+    'audio/x-wav', 'audio/flac', 'audio/x-m4a',
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
+    'application/pdf', 'application/octet-stream', 'application/zip', 'application/gzip',
+    'application/x-gzip', 'application/zstd', 'application/x-7z-compressed', 'application/x-rar-compressed',
+    'application/x-bzip2', 'application/x-xz', 'application/x-tar',
+];
 
 const DATABASE_DOCKER_IMAGES = [
     'bitnami/mariadb',
     'bitnami/mongodb',
-    'bitnami/mysql',
-    'bitnami/postgresql',
     'bitnami/redis',
+    'bitnamilegacy/mariadb',
+    'bitnamilegacy/mongodb',
+    'bitnamilegacy/redis',
+    'bitnamisecure/mariadb',
+    'bitnamisecure/mongodb',
+    'bitnamisecure/redis',
     'mysql',
+    'bitnami/mysql',
+    'bitnamilegacy/mysql',
+    'bitnamisecure/mysql',
+    'mysql/mysql-server',
     'mariadb',
+    'postgis/postgis',
     'postgres',
+    'bitnami/postgresql',
+    'bitnamilegacy/postgresql',
+    'bitnamisecure/postgresql',
+    'supabase/postgres',
+    'elestio/postgres',
     'mongo',
     'redis',
     'memcached',
@@ -28,19 +126,46 @@ const DATABASE_DOCKER_IMAGES = [
     'neo4j',
     'influxdb',
     'clickhouse/clickhouse-server',
-    'supabase/postgres',
+    'timescaledb/timescaledb',
+    'timescaledb',  // Matches timescale/timescaledb
+    'timescaledb-ha',  // Matches timescale/timescaledb-ha
+    'pgvector/pgvector',
 ];
 const SPECIFIC_SERVICES = [
     'quay.io/minio/minio',
+    'minio/minio',
+    'ghcr.io/coollabsio/minio',
+    'coollabsio/minio',
+    'pgsty/silo',
+    'docker.io/pgsty/silo',
     'svhd/logto',
+    'dxflrs/garage',
 ];
 
 // Based on /etc/os-release
 const SUPPORTED_OS = [
-    'ubuntu debian raspbian',
+    'ubuntu debian raspbian pop',
     'centos fedora rhel ol rocky amzn almalinux',
     'sles opensuse-leap opensuse-tumbleweed',
     'arch',
+    'alpine',
 ];
 
-const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment'];
+const NEEDS_TO_CONNECT_TO_PREDEFINED_NETWORK = [
+    'pgadmin',
+    'databasus',
+    'redis-insight',
+];
+const NEEDS_TO_DISABLE_GZIP = [
+    'beszel' => ['beszel'],
+];
+const NEEDS_TO_DISABLE_STRIPPREFIX = [
+    'appwrite' => ['appwrite', 'appwrite-console', 'appwrite-realtime'],
+    'rybbit' => ['rybbit_backend'],
+];
+const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment', 'server'];
+/**
+ * The only parser of shared variable references ({{team.KEY}}). Every place that reads references uses it,
+ * so that all of them find the same references in a value.
+ */
+const SHARED_VARIABLE_REFERENCE_PATTERN = '/{{\s*(\w+)\.([^}\s]+)\s*}}/';

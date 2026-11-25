@@ -1,0 +1,446 @@
+@utility apexcharts-tooltip {
+    @apply overflow-visible! rounded-none! border-0! bg-transparent! shadow-none! dark:text-white!;
+}
+
+@utility apexcharts-tooltip-title {
+    @apply hidden!;
+}
+
+@utility apexcharts-grid-borders {
+    @apply dark:hidden!;
+}
+
+@utility apexcharts-xaxistooltip {
+    @apply hidden!;
+}
+
+@utility apexcharts-tooltip-custom {
+    @apply bg-white dark:bg-coolgray-100 border border-neutral-200 dark:border-coolgray-300 rounded-lg shadow-dropdown p-3 text-sm;
+    min-width: 160px;
+}
+
+@utility apexcharts-tooltip-custom-value {
+    @apply text-neutral-700 dark:text-neutral-300 mb-1;
+}
+
+@utility apexcharts-tooltip-value-bold {
+    @apply font-bold text-black dark:text-white;
+}
+
+@utility apexcharts-tooltip-custom-title {
+    @apply text-xs text-neutral-500 dark:text-neutral-400 font-medium;
+}
+
+@utility input-sticky {
+    @apply block py-1.5 w-full text-sm text-black rounded-sm border-0 dark:bg-coolgray-100 dark:text-white disabled:bg-neutral-200 disabled:text-neutral-500 dark:disabled:bg-coolgray-100/40 focus-visible:outline-none;
+    box-shadow: inset 4px 0 0 transparent, inset 0 0 0 1px #e5e5e5;
+
+    &:where(.dark, .dark *) {
+        box-shadow: inset 4px 0 0 transparent, inset 0 0 0 1px #242424;
+    }
+
+    &:focus-visible {
+        box-shadow: inset 4px 0 0 #6b16ed, inset 0 0 0 1px #e5e5e5;
+    }
+
+    &:where(.dark, .dark *):focus-visible {
+        box-shadow: inset 4px 0 0 #fcd452, inset 0 0 0 1px #242424;
+    }
+}
+
+@utility input-sticky-active {
+    @apply text-black border-2 border-coollabs dark:border-brand-light dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs dark:focus:border-brand-light;
+}
+
+/* Focus */
+@utility input-focus {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-brand-light focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base;
+}
+
+/*  input, select before */
+@utility input-select {
+    @apply block h-8 px-3 py-1.5 w-full text-sm text-black rounded-md border border-neutral-200 bg-[var(--coollabs-recessed)] dark:text-fg dark:border-white/[0.08] transition-colors disabled:bg-neutral-100 disabled:text-neutral-400 dark:disabled:bg-white/[0.03] dark:disabled:text-fg-faint;
+    box-shadow: none;
+
+    &:where(.dark, .dark *) {
+        box-shadow: none;
+    }
+
+    &:disabled {
+        box-shadow: none;
+    }
+
+    &:where(.dark, .dark *):disabled {
+        box-shadow: none;
+    }
+}
+
+/* Readonly */
+@utility input {
+    @apply dark:read-only:text-neutral-500 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 read-only:text-neutral-500 read-only:bg-neutral-200;
+    @apply input-select;
+    @apply focus-visible:outline-none;
+
+    &:focus-visible {
+        border-color: var(--color-accent);
+        box-shadow: none;
+    }
+
+    &:where(.dark, .dark *):focus-visible {
+        border-color: var(--color-accent);
+        box-shadow: none;
+    }
+
+    &:read-only {
+        box-shadow: none;
+    }
+
+    &:where(.dark, .dark *):read-only {
+        box-shadow: none;
+    }
+}
+
+@utility select {
+    @apply w-full;
+    @apply input-select;
+    @apply focus-visible:outline-none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23000000'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1rem 1rem;
+    padding-right: 2.5rem;
+
+    &:where(.dark, .dark *) {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%23ffffff'%3e%3cpath stroke-linecap='round' stroke-linejoin='round' d='M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9'/%3e%3c/svg%3e");
+    }
+
+    &:focus-visible {
+        border-color: var(--color-accent);
+        box-shadow: none;
+    }
+
+    &:where(.dark, .dark *):focus-visible {
+        border-color: var(--color-accent);
+        box-shadow: none;
+    }
+}
+
+@utility button {
+    @apply inline-flex shrink-0 gap-1.5 justify-center items-center whitespace-nowrap px-2.5 h-8 min-h-8 text-[13px] text-black capitalize rounded-md border outline-0 cursor-pointer font-medium transition-colors bg-white border-neutral-200 hover:bg-neutral-100 dark:bg-white/[0.06] dark:text-fg dark:hover:text-fg dark:hover:bg-white/[0.1] dark:border-white/[0.08] hover:text-black disabled:cursor-not-allowed min-w-fit dark:disabled:text-fg-faint disabled:border-neutral-200 dark:disabled:border-white/[0.06] disabled:hover:bg-transparent disabled:bg-transparent disabled:text-neutral-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent;
+}
+
+@utility button-highlighted {
+    @apply border-coollabs-200 bg-linear-to-b from-coollabs-100 to-coollabs-200 text-accent-foreground! hover:from-coollabs-100 hover:to-coollabs hover:text-accent-foreground!;
+}
+
+@utility control-selected {
+    @apply bg-linear-to-b from-coollabs-100 to-coollabs-200 text-white;
+}
+
+@utility view-toggle {
+    @apply flex h-8 items-center rounded-lg border border-neutral-200 bg-white dark:border-white/[0.08] dark:bg-white/[0.06];
+}
+
+@utility loading-indicator {
+    @apply text-coollabs dark:text-brand-light;
+}
+
+/* Compact icon-only control (gear, chevrons, etc.) */
+@utility icon-button {
+    @apply inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-transparent text-neutral-400 outline-0 transition-colors hover:bg-neutral-100 hover:text-black focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent disabled:pointer-events-none disabled:opacity-35 dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg;
+}
+
+/* Hide static icons while a Livewire loading spinner is shown on the button. */
+.button.is-loading > svg:not(.animate-spin) {
+    display: none;
+}
+
+/* Compact resource tab pill */
+@utility app-tab {
+    @apply inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-[13px] font-medium text-neutral-500 dark:text-fg-dim hover:bg-neutral-100 dark:hover:bg-white/[0.05] hover:text-black dark:hover:text-fg transition-colors;
+}
+
+/* Active resource tab (used with aria-current="page") */
+@utility app-tab-active {
+    @apply bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-brand/15 dark:text-brand-light dark:ring-brand-light/25 dark:hover:bg-brand/20;
+}
+
+@utility auth-tooltip {
+    @apply fixed z-[10000] px-2.5 py-1.5 text-xs font-medium rounded-lg pointer-events-none whitespace-nowrap text-white bg-neutral-900 border border-neutral-700 shadow-dropdown dark:text-fg dark:bg-raised dark:border-white/10;
+}
+
+@utility alert-success {
+    @apply flex gap-2 items-center text-success;
+}
+
+@utility alert-error {
+    @apply flex gap-2 items-center text-error;
+}
+
+@utility tag {
+    @apply px-2 py-1 cursor-pointer box-description dark:bg-coolgray-100 dark:hover:bg-coolgray-300 bg-neutral-100 hover:bg-neutral-200;
+}
+
+@utility add-tag {
+    @apply flex items-center px-2 text-xs cursor-pointer dark:text-neutral-500/20 text-neutral-500 group-hover:text-neutral-700 dark:group-hover:text-white dark:hover:bg-coolgray-300 hover:bg-neutral-200;
+}
+
+@utility user-menu-item {
+    @apply flex items-center gap-2.5 px-3 h-8 w-full text-[13px] font-medium text-neutral-600 dark:text-fg-dim hover:bg-neutral-100 dark:hover:bg-white/[0.06] hover:text-black dark:hover:text-fg transition-colors cursor-pointer;
+}
+
+@utility dropdown-item {
+    @apply flex relative gap-2 justify-start items-center py-1 pr-4 pl-2 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50 focus-visible:bg-neutral-100 dark:focus-visible:bg-coollabs;
+}
+
+@utility dropdown-item-touch {
+    @apply min-h-10 px-3 py-2 text-sm;
+}
+
+@utility dropdown-item-no-padding {
+    @apply flex relative gap-2 justify-start items-center py-1 w-full text-xs transition-colors cursor-pointer select-none dark:text-white hover:bg-neutral-100 dark:hover:bg-coollabs outline-none data-disabled:pointer-events-none data-disabled:opacity-50 focus-visible:bg-neutral-100 dark:focus-visible:bg-coollabs;
+}
+
+@utility badge {
+    @apply inline-block w-3 h-3 text-xs font-bold rounded-full leading-none border border-neutral-200 dark:border-black;
+}
+
+@utility badge-dashboard {
+    @apply absolute top-1 right-1 w-2.5 h-2.5 rounded-full text-xs font-bold leading-none border border-neutral-200 dark:border-black;
+}
+
+@utility badge-success {
+    @apply bg-success;
+}
+
+@utility badge-warning {
+    @apply bg-warning;
+}
+
+@utility badge-error {
+    @apply bg-error;
+}
+
+@utility menu {
+    @apply flex gap-1 items-center;
+}
+
+@utility menu-item {
+    /* Translucent hover (like the active pill) so it darkens against any surface,
+       including the light-mode settings rail's gray fill; on white it matches the
+       old neutral-100. */
+    @apply relative flex gap-2.5 items-center h-8 px-2.5 w-full text-[13px] font-medium rounded-md truncate min-w-0 transition-colors text-nav-text hover:bg-black/[0.04] hover:text-nav-active dark:hover:bg-white/[0.05];
+}
+@utility menu-item-icon {
+    @apply shrink-0 size-[18px] opacity-90;
+}
+
+@utility menu-item-label {
+    @apply min-w-0 flex-1 truncate;
+}
+
+@utility menu-item-active {
+    /* Solid selected pill only — no accent rail / border. */
+    @apply overflow-hidden rounded-md bg-black/[0.05] text-nav-active hover:bg-black/[0.05] dark:bg-white/[0.06] dark:hover:bg-white/[0.06];
+}
+
+/* Subtle Title-Case section header */
+@utility nav-section {
+    @apply px-2.5 pt-1 pb-1 text-[11px] font-medium text-nav-muted select-none;
+}
+
+/* Indented child rows in a collapsible nav group */
+@utility menu-subitem {
+    /* Label owns text ellipsis; keep this row overflow-visible so the focus ring is not clipped. */
+    @apply relative flex gap-2.5 items-center h-8 pl-3 pr-2.5 w-full text-[13px] font-medium rounded-md min-w-0 transition-colors text-nav-text hover:bg-black/[0.04] hover:text-nav-active dark:hover:bg-white/[0.05];
+}
+@utility menu-subitem-active {
+    @apply rounded-md bg-black/[0.05] text-nav-active hover:bg-black/[0.05] dark:bg-white/[0.06] dark:hover:bg-white/[0.06];
+}
+
+@utility sub-menu-wrapper {
+    @apply flex flex-col gap-0.5 w-full md:w-52 shrink-0;
+}
+
+@utility sub-menu-item {
+    @apply relative flex gap-2 items-center h-8 px-2.5 w-full text-[13px] font-medium rounded-none truncate min-w-0 transition-colors text-nav-text hover:bg-neutral-100 dark:hover:bg-white/[0.05] hover:text-nav-active;
+}
+
+@utility sub-menu-item-icon {
+    @apply shrink-0 size-4 dark:hover:text-white;
+}
+
+@utility heading-item-active {
+    @apply text-black rounded-sm dark:bg-coolgray-200 dark:text-brand-light;
+}
+
+@utility icon {
+    @apply w-6 h-6 dark:hover:text-white;
+}
+
+@utility scrollbar {
+    @apply scrollbar-thumb-coollabs-100 scrollbar-track-neutral-200 dark:scrollbar-thumb-coollabs-100 dark:scrollbar-track-coolgray-200 scrollbar-thin;
+}
+
+@utility main {
+    @apply pt-4 pr-10 pl-24 lg:pr-32 lg:pl-44;
+}
+
+@utility custom-modal {
+    @apply flex z-50 flex-col gap-2 px-8 py-4 border dark:bg-coolgray-100 dark:border-coolgray-200;
+}
+
+@utility navbar-main {
+    @apply flex flex-col gap-4 justify-items-start pb-3 border-b border-solid h-fit md:flex-row sm:justify-between dark:border-white/[0.06] border-neutral-200 md:items-center text-neutral-700 dark:text-fg-dim;
+}
+
+@utility loading {
+    @apply w-4 dark:text-brand-light text-coollabs;
+}
+
+@utility kbd-custom {
+    @apply px-2 text-xs rounded-sm border border-dashed border-neutral-700 dark:text-brand-light;
+}
+
+@utility box {
+    @apply relative flex lg:flex-row flex-col p-3 transition-colors cursor-pointer min-h-[4rem] bg-white dark:bg-surface border text-black dark:text-fg hover:text-black border-neutral-200 dark:border-white/[0.06] hover:bg-neutral-50 dark:hover:bg-raised dark:hover:border-white/[0.1] dark:hover:text-fg hover:no-underline rounded-md;
+}
+
+@utility box-boarding {
+    @apply flex lg:flex-row flex-col p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 dark:text-white bg-neutral-50 border border-neutral-200 dark:border-coolgray-300 hover:bg-neutral-100 dark:hover:bg-coollabs-100 dark:hover:text-white hover:text-black hover:no-underline text-black rounded-sm;
+}
+
+@utility box-without-bg {
+    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem] border border-neutral-200 dark:border-coolgray-300 rounded-sm;
+}
+
+@utility box-without-bg-without-border {
+    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem];
+}
+
+@utility coolbox {
+    @apply relative flex items-center transition-all duration-150 bg-white dark:bg-surface p-4 rounded-2xl border border-neutral-200 dark:border-white/[0.06] hover:border-neutral-300 dark:hover:border-white/[0.12] dark:hover:bg-raised hover:shadow-[0_4px_16px_rgba(0,0,0,0.35)] cursor-pointer min-h-[4.5rem];
+}
+
+@utility on-box {
+    @apply rounded-sm hover:bg-neutral-300 dark:hover:bg-coolgray-500/20;
+}
+
+@utility box-title {
+    @apply font-semibold text-black dark:text-white dark:group-hover:text-white;
+}
+
+@utility box-description {
+    @apply text-xs font-medium text-neutral-500 dark:text-fg-faint dark:group-hover:text-fg-dim group-hover:text-black;
+}
+
+@utility description {
+    @apply text-xs font-bold text-neutral-500 dark:group-hover:text-white group-hover:text-black;
+}
+
+@utility bg-coollabs-gradient {
+    @apply from-purple-500 via-pink-500 to-red-500 bg-linear-to-r;
+}
+
+@utility text-helper {
+    @apply inline-block font-semibold text-coollabs dark:text-brand-light;
+}
+
+@utility info-helper {
+    @apply cursor-pointer text-neutral-400 transition-colors hover:text-neutral-600 dark:text-fg-faint dark:hover:text-fg-dim;
+}
+
+@utility info-helper-popup {
+    @apply rounded-lg border border-neutral-200 bg-white text-neutral-600 shadow-dropdown whitespace-normal break-words dark:border-white/10 dark:bg-raised dark:text-fg-dim;
+}
+
+@utility buyme {
+    @apply block px-3 py-2 mt-10 text-sm font-semibold leading-6 text-center text-white rounded-md shadow-xs hover:text-white bg-coolgray-200 hover:bg-coolgray-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coolgray-200 hover:no-underline;
+}
+
+@utility title {
+    @apply hidden pb-0 lg:block lg:pb-8;
+}
+
+@utility subtitle {
+    @apply pt-2 pb-9;
+}
+
+@utility fullscreen {
+    @apply overflow-y-auto fixed top-0 left-0 w-full h-full bg-white z-[9999] dark:bg-coolgray-100 scrollbar;
+}
+
+@utility toast {
+    @apply z-[1];
+}
+
+/* Floating notice / popover surface: elevated fill, hairline ring, and the
+   shared dropdown lift. Toasts, change-pending popovers and the deployments
+   list share this so they match menus/dropdowns instead of the heavier modal. */
+@utility surface-popover {
+    background: var(--coollabs-elevated);
+    box-shadow: 0 0 0 1px var(--coollabs-line), var(--shadow-dropdown);
+}
+
+@utility dz-button {
+    @apply p-4 py-10 my-4 w-full font-bold bg-white border dark:border-coolgray-400 dark:text-white dark:bg-transparent dark:hover:bg-coolgray-400;
+}
+
+@utility xterm {
+    @apply p-2;
+}
+
+/* Log line optimization - uses content-visibility for lazy rendering of off-screen log lines */
+@utility log-line {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 1.5em;
+}
+
+/* Search highlight styling for logs */
+@utility log-highlight {
+    @apply bg-warning/40 dark:bg-warning/30;
+}
+
+/* Log level color classes */
+@utility log-error {
+    @apply bg-red-500/10 dark:bg-red-500/15;
+}
+
+@utility log-warning {
+    @apply bg-yellow-500/10 dark:bg-yellow-500/15;
+}
+
+@utility log-debug {
+    @apply bg-purple-500/10 dark:bg-purple-500/15;
+}
+
+@utility log-info {
+    @apply bg-blue-500/10 dark:bg-blue-500/15;
+}
+
+@media (min-width: 1024px) {
+    /* Collapsed rail keeps every nav icon at its expanded x-position (left-aligned,
+       same 10px inset) so muscle memory holds when the sidebar is toggled; only the
+       label is hidden. Unlayered rule outranks the inline lg:justify-center/lg:px-0
+       utilities on each row. The footer collapse toggle keeps its own centered
+       square via the .sidebar-toggle exclusion. */
+    .sidebar-collapsed .menu-item:not(.sidebar-toggle) {
+        justify-content: flex-start;
+        padding-left: 0.625rem;
+        padding-right: 0.625rem;
+    }
+
+    /* Flat rows show their own fill, so make it a 2rem square (same as the h-8
+       height) with the icon centered, in line with the footer controls. */
+    html[data-nav-items="flat"] .sidebar-collapsed .menu-item:not(.sidebar-toggle) {
+        width: 2rem;
+        margin-left: 0.1875rem;
+        justify-content: center;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    .sidebar-collapsed .sidebar-collapsed-label {
+        display: none;
+    }
+}

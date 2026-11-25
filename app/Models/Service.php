@@ -2,12 +2,25 @@
 
 namespace App\Models;
 
+use App\Exceptions\ComposeRejectedException;
+use App\Services\ContainerStatusAggregator;
+use App\Services\DockerImageParser;
+use App\Support\DomainPortOverrides;
+use App\Support\ResourceStartActivity;
+use App\Traits\Auditable;
+use App\Traits\ClearsGlobalSearchCache;
+use App\Traits\HasComposeVolumeWarnings;
+use App\Traits\HasMaintenancePage;
+use App\Traits\HasSafeStringAttribute;
+use App\Traits\HasSecretManager;
+use App\Traits\HasStars;
+use App\Traits\ScopedByAccessGrants;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use OpenApi\Attributes as OA;
-use Symfony\Component\Yaml\Yaml;
 
 #[OA\Schema(
     description: 'Service model',
@@ -21,9 +34,11 @@ use Symfony\Component\Yaml\Yaml;
         'description' => ['type' => 'string', 'description' => 'The description of the service.'],
         'docker_compose_raw' => ['type' => 'string', 'description' => 'The raw docker-compose.yml file of the service.'],
         'docker_compose' => ['type' => 'string', 'description' => 'The docker-compose.yml file that is parsed and modified by Coolify.'],
+        'destination_type' => ['type' => 'string', 'description' => 'Destination type.'],
         'destination_id' => ['type' => 'integer', 'description' => 'The unique identifier of the destination where the service is running.'],
         'connect_to_docker_network' => ['type' => 'boolean', 'description' => 'The flag to connect the service to the predefined Docker network.'],
         'is_container_label_escape_enabled' => ['type' => 'boolean', 'description' => 'The flag to enable the container label escape.'],
+        'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Hide every environment variable value in logs. When false, only locked values are hidden.'],
         'is_container_label_readonly_enabled' => ['type' => 'boolean', 'description' => 'The flag to enable the container label readonly.'],
         'config_hash' => ['type' => 'string', 'description' => 'The hash of the service configuration.'],
         'service_type' => ['type' => 'string', 'description' => 'The type of the service.'],
@@ -34,16 +49,87 @@ use Symfony\Component\Yaml\Yaml;
 )]
 class Service extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasFactory, HasMaintenancePage, HasSafeStringAttribute, HasSecretManager, HasStars, ScopedByAccessGrants, SoftDeletes;
 
-    protected $guarded = [];
+    private static $parserVersion = '5';
+
+    protected $fillable = [
+        'uuid',
+        'name',
+        'description',
+        'docker_compose_raw',
+        'docker_compose',
+        'connect_to_docker_network',
+        'service_type',
+        'config_hash',
+        'compose_parsing_version',
+        'is_container_label_escape_enabled',
+        'redact_all_env_values_in_logs',
+        'environment_id',
+        'server_id',
+        'destination_id',
+        'destination_type',
+    ];
+
+    protected $appends = ['server_status', 'status'];
+
+    protected $casts = [
+        'include_coolify_default_variables' => 'boolean',
+        'redact_all_env_values_in_logs' => 'boolean',
+    ];
+
+    /**
+     * Compose files that can embed credentials. Only `read:sensitive` or `root` tokens may read them.
+     */
+    public const COMPOSE_ATTRIBUTES = [
+        'docker_compose_raw',
+        'docker_compose',
+    ];
+
+    /**
+     * Sensitive fields hidden by default in serialized output (toArray/toJson).
+     * API controllers should call makeVisible([...]) for callers with the
+     * `read:sensitive` or `root` token ability. Internal compose generators
+     * must makeVisible explicitly before toArray().
+     */
+    protected $hidden = self::COMPOSE_ATTRIBUTES;
+
+    protected function casts(): array
+    {
+        return [
+            'is_maintenance_enabled' => 'boolean',
+        ];
+    }
+
+    protected static function booted()
+    {
+        static::creating(function ($service) {
+            if (blank($service->name)) {
+                $service->name = 'service-'.new_public_id();
+            }
+            $service->compose_parsing_version = self::$parserVersion;
+        });
+        static::saving(function ($service) {
+            if ($service->isDirty('docker_compose_raw')) {
+                EnvironmentVariable::authorizeAddedSharedVariableReferencesIn($service, $service->getOriginal('docker_compose_raw'), $service->docker_compose_raw, 'docker_compose_raw');
+            }
+        });
+    }
 
     public function isConfigurationChanged(bool $save = false)
     {
-        $domains = $this->applications()->get()->pluck('fqdn')->sort()->toArray();
+        $applications = $this->applications()->get();
+        $domains = $applications->pluck('fqdn')->sort()->toArray();
         $domains = implode(',', $domains);
+        $noindexDomains = $applications->pluck('noindex_domains')->flatten()->filter()->sort()->implode(',');
+        $domainPortOverrides = $applications
+            ->mapWithKeys(fn (ServiceApplication $application): array => [
+                $application->id => DomainPortOverrides::sorted($application->domain_port_overrides),
+            ])
+            ->sortKeys()
+            ->all();
 
-        $applicationImages = $this->applications()->get()->pluck('image')->sort();
+        $applicationImages = $applications->pluck('image')->sort();
         $databaseImages = $this->databases()->get()->pluck('image')->sort();
         $images = $applicationImages->merge($databaseImages);
         $images = implode(',', $images->toArray());
@@ -52,8 +138,8 @@ class Service extends BaseModel
         $databaseStorages = $this->databases()->get()->pluck('persistentStorages')->flatten()->sortBy('id');
         $storages = $applicationStorages->merge($databaseStorages)->implode('updated_at');
 
-        $newConfigHash = $images.$domains.$images.$storages;
-        $newConfigHash .= json_encode($this->environment_variables()->get('value')->sort());
+        $newConfigHash = $images.$domains.$images.$storages.$noindexDomains.json_encode($domainPortOverrides);
+        $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {
@@ -76,9 +162,32 @@ class Service extends BaseModel
         }
     }
 
+    protected function serverStatus(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                return $this->server?->isFunctional() ?? false;
+            }
+        );
+    }
+
+    public function isRunning()
+    {
+        return (bool) str($this->status)->contains('running');
+    }
+
     public function isExited()
     {
-        return (bool) str($this->status())->contains('exited');
+        return (bool) str($this->status)->contains('exited');
+    }
+
+    public function isStarting(): bool
+    {
+        try {
+            return ResourceStartActivity::latestRunning($this->uuid) !== null;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     public function type()
@@ -101,83 +210,173 @@ class Service extends BaseModel
         return $this->morphToMany(Tag::class, 'taggable');
     }
 
-    public function delete_configurations()
+    /**
+     * Get query builder for services owned by current team.
+     * If you need all services without further query chaining, use ownedByCurrentTeamCached() instead.
+     */
+    public static function ownedByCurrentTeam()
     {
-        $server = data_get($this, 'server');
+        return Service::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
+    }
+
+    /**
+     * Get all services owned by current team (cached for request duration).
+     */
+    public static function ownedByCurrentTeamCached()
+    {
+        return once(function () {
+            return Service::ownedByCurrentTeam()->get();
+        });
+    }
+
+    public function deleteConfigurations()
+    {
+        $server = data_get($this, 'destination.server');
         $workdir = $this->workdir();
         if (str($workdir)->endsWith($this->uuid)) {
             instant_remote_process(['rm -rf '.$this->workdir()], $server, false);
         }
     }
 
-    public function status()
+    public function deleteConnectedNetworks()
+    {
+        $server = data_get($this, 'destination.server');
+        instant_remote_process(["docker network disconnect {$this->uuid} coolify-proxy"], $server, false);
+        instant_remote_process(["docker network rm {$this->uuid}"], $server, false);
+    }
+
+    /**
+     * Calculate the service's aggregate status from its applications and databases.
+     *
+     * This method aggregates status from Eloquent model relationships (not Docker containers).
+     * It differs from the CalculatesExcludedStatus trait which works with Docker container objects
+     * during container inspection. This accessor runs on-demand for UI display and works with
+     * already-stored status strings from the database.
+     *
+     * Status format: "{status}:{health}" or "{status}:{health}:excluded"
+     * - Status values: running, exited, degraded, starting, paused, restarting
+     * - Health values: healthy, unhealthy, unknown
+     * - :excluded suffix: Indicates all containers are excluded from health monitoring
+     *
+     * @return string The aggregate status in format "status:health" or "status:health:excluded"
+     */
+    public function getStatusAttribute()
+    {
+        if ($this->isStarting()) {
+            return 'starting:unhealthy';
+        }
+
+        return $this->containerStatus();
+    }
+
+    /**
+     * The aggregate status of the stored container statuses, without the running start check.
+     * Callers that check starting services in bulk use it to avoid a query per service.
+     */
+    public function containerStatus(): ?string
     {
         $applications = $this->applications;
         $databases = $this->databases;
 
-        $complexStatus = null;
-        $complexHealth = null;
+        [$complexStatus, $complexHealth, $hasNonExcluded] = $this->aggregateResourceStatuses(
+            $applications,
+            $databases,
+            excludedOnly: false
+        );
 
-        foreach ($applications as $application) {
-            if ($application->exclude_from_status) {
-                continue;
+        // If all services are excluded from status checks, calculate status from excluded containers
+        // but mark it with :excluded to indicate monitoring is disabled
+        if (! $hasNonExcluded && ($complexStatus === null && $complexHealth === null)) {
+            [$excludedStatus, $excludedHealth] = $this->aggregateResourceStatuses(
+                $applications,
+                $databases,
+                excludedOnly: true
+            );
+
+            // Return status with :excluded suffix to indicate monitoring is disabled
+            if ($excludedStatus && $excludedHealth) {
+                return "{$excludedStatus}:{$excludedHealth}:excluded";
             }
-            $status = str($application->status)->before('(')->trim();
-            $health = str($application->status)->between('(', ')')->trim();
-            if ($complexStatus === 'degraded') {
-                continue;
+
+            // If no status was calculated at all (no containers exist), return unknown
+            if ($excludedStatus === null && $excludedHealth === null) {
+                return 'unknown:unknown:excluded';
             }
-            if ($status->startsWith('running')) {
-                if ($complexStatus === 'exited') {
-                    $complexStatus = 'degraded';
-                } else {
-                    $complexStatus = 'running';
-                }
-            } elseif ($status->startsWith('restarting')) {
-                $complexStatus = 'degraded';
-            } elseif ($status->startsWith('exited')) {
-                $complexStatus = 'exited';
-            }
-            if ($health->value() === 'healthy') {
-                if ($complexHealth === 'unhealthy') {
-                    continue;
-                }
-                $complexHealth = 'healthy';
-            } else {
-                $complexHealth = 'unhealthy';
-            }
+
+            return 'exited';
         }
-        foreach ($databases as $database) {
-            if ($database->exclude_from_status) {
-                continue;
-            }
-            $status = str($database->status)->before('(')->trim();
-            $health = str($database->status)->between('(', ')')->trim();
-            if ($complexStatus === 'degraded') {
-                continue;
-            }
-            if ($status->startsWith('running')) {
-                if ($complexStatus === 'exited') {
-                    $complexStatus = 'degraded';
-                } else {
-                    $complexStatus = 'running';
-                }
-            } elseif ($status->startsWith('restarting')) {
-                $complexStatus = 'degraded';
-            } elseif ($status->startsWith('exited')) {
-                $complexStatus = 'exited';
-            }
-            if ($health->value() === 'healthy') {
-                if ($complexHealth === 'unhealthy') {
-                    continue;
-                }
-                $complexHealth = 'healthy';
-            } else {
-                $complexHealth = 'unhealthy';
-            }
+
+        // If health is null/empty, return just the status without trailing colon
+        if ($complexHealth === null || $complexHealth === '') {
+            return $complexStatus;
         }
 
         return "{$complexStatus}:{$complexHealth}";
+    }
+
+    /**
+     * Aggregate status and health from collections of applications and databases.
+     *
+     * This helper method consolidates status aggregation logic using ContainerStatusAggregator.
+     * It processes container status strings stored in the database (not live Docker data).
+     *
+     * @param  \Illuminate\Database\Eloquent\Collection  $applications  Collection of Application models
+     * @param  \Illuminate\Database\Eloquent\Collection  $databases  Collection of Database models
+     * @param  bool  $excludedOnly  If true, only process excluded containers; if false, only process non-excluded
+     * @return array{0: string|null, 1: string|null, 2?: bool} [status, health, hasNonExcluded (only when excludedOnly=false)]
+     */
+    private function aggregateResourceStatuses($applications, $databases, bool $excludedOnly = false): array
+    {
+        $hasNonExcluded = false;
+        $statusStrings = collect();
+
+        // Process both applications and databases using the same logic
+        $resources = $applications->concat($databases);
+
+        foreach ($resources as $resource) {
+            // A part that is not in the compose file has no container, so it does not count.
+            if ($resource->is_removed_from_compose ?? false) {
+                continue;
+            }
+
+            $isExcluded = $resource->exclude_from_status || str($resource->status)->contains(':excluded');
+
+            // Filter based on excludedOnly flag
+            if ($excludedOnly && ! $isExcluded) {
+                continue;
+            }
+            if (! $excludedOnly && $isExcluded) {
+                continue;
+            }
+
+            if (! $excludedOnly) {
+                $hasNonExcluded = true;
+            }
+
+            // Strip :excluded suffix before aggregation (it's in the 3rd part of "status:health:excluded")
+            $status = str($resource->status)->before(':excluded')->toString();
+            $statusStrings->push($status);
+        }
+
+        // If no status strings collected, return nulls
+        if ($statusStrings->isEmpty()) {
+            return $excludedOnly ? [null, null] : [null, null, $hasNonExcluded];
+        }
+
+        // Use ContainerStatusAggregator service for state machine logic
+        $aggregator = new ContainerStatusAggregator;
+        $aggregatedStatus = $aggregator->aggregateFromStrings($statusStrings);
+
+        // Parse the aggregated "status:health" string
+        $parts = explode(':', $aggregatedStatus);
+        $status = $parts[0] ?? null;
+        $health = $parts[1] ?? null;
+
+        if ($excludedOnly) {
+            return [$status, $health];
+        }
+
+        return [$status, $health, $hasNonExcluded];
     }
 
     public function extraFields()
@@ -185,9 +384,234 @@ class Service extends BaseModel
         $fields = collect([]);
         $applications = $this->applications()->get();
         foreach ($applications as $application) {
-            $image = str($application->image)->before(':')->value();
+            $image = str($application->image)->before(':');
+            if ($image->isEmpty()) {
+                continue;
+            }
             switch ($image) {
-                case str($image)?->contains('tolgee'):
+                case $image->contains('drizzle-team/gateway'):
+                    $data = collect([]);
+                    $masterpass = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_DRIZZLE')->first();
+                    $data = $data->merge([
+                        'Master Password' => [
+                            'key' => data_get($masterpass, 'key'),
+                            'value' => data_get($masterpass, 'value'),
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                    ]);
+                    $fields->put('Drizzle', $data->toArray());
+                    break;
+                case $image->contains('castopod'):
+                    $data = collect([]);
+                    $disable_https = $this->environment_variables()->where('key', 'CP_DISABLE_HTTPS')->first();
+                    if ($disable_https) {
+                        $data = $data->merge([
+                            'Disable HTTPS' => [
+                                'key' => 'CP_DISABLE_HTTPS',
+                                'value' => data_get($disable_https, 'value'),
+                                'rules' => 'required',
+                                'customHelper' => 'If you want to use https, set this to 0. Variable name: CP_DISABLE_HTTPS',
+                            ],
+                        ]);
+                    }
+                    $fields->put('Castopod', $data->toArray());
+                    break;
+                case $image->contains('label-studio'):
+                    $data = collect([]);
+                    $username = $this->environment_variables()->where('key', 'LABEL_STUDIO_USERNAME')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_LABELSTUDIO')->first();
+                    if ($username) {
+                        $data = $data->merge([
+                            'Username' => [
+                                'key' => 'LABEL_STUDIO_USERNAME',
+                                'value' => data_get($username, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Label Studio', $data->toArray());
+                    break;
+                case $image->contains('litellm'):
+                    $data = collect([]);
+                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_UI')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_UI')->first();
+                    if ($username) {
+                        $data = $data->merge([
+                            'Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Litellm', $data->toArray());
+                    break;
+                case $image->contains('langfuse'):
+                    $data = collect([]);
+                    $email = $this->environment_variables()->where('key', 'LANGFUSE_INIT_USER_EMAIL')->first();
+                    if ($email) {
+                        $data = $data->merge([
+                            'Admin Email' => [
+                                'key' => data_get($email, 'key'),
+                                'value' => data_get($email, 'value'),
+                                'rules' => 'required|email',
+                            ],
+                        ]);
+                    }
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_LANGFUSE')->first();
+                    if ($password) {
+                        $data = $data->merge([
+                            'Admin Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Langfuse', $data->toArray());
+                    break;
+                case $image->contains('invoiceninja'):
+                    $data = collect([]);
+                    $email = $this->environment_variables()->where('key', 'IN_USER_EMAIL')->first();
+                    $data = $data->merge([
+                        'Email' => [
+                            'key' => data_get($email, 'key'),
+                            'value' => data_get($email, 'value'),
+                            'rules' => 'required|email',
+                        ],
+                    ]);
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_INVOICENINJAUSER')->first();
+                    $data = $data->merge([
+                        'Password' => [
+                            'key' => data_get($password, 'key'),
+                            'value' => data_get($password, 'value'),
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                    ]);
+                    $fields->put('Invoice Ninja', $data->toArray());
+                    break;
+                case $image->contains('argilla'):
+                    $data = collect([]);
+                    $api_key = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_APIKEY')->first();
+                    $data = $data->merge([
+                        'API Key' => [
+                            'key' => data_get($api_key, 'key'),
+                            'value' => data_get($api_key, 'value'),
+                            'isPassword' => true,
+                            'rules' => 'required',
+                        ],
+                    ]);
+                    $data = $data->merge([
+                        'API Key' => [
+                            'key' => data_get($api_key, 'key'),
+                            'value' => data_get($api_key, 'value'),
+                            'isPassword' => true,
+                            'rules' => 'required',
+                        ],
+                    ]);
+                    $username = $this->environment_variables()->where('key', 'ARGILLA_USERNAME')->first();
+                    $data = $data->merge([
+                        'Username' => [
+                            'key' => data_get($username, 'key'),
+                            'value' => data_get($username, 'value'),
+                            'rules' => 'required',
+                        ],
+                    ]);
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ARGILLA')->first();
+                    $data = $data->merge([
+                        'Password' => [
+                            'key' => data_get($password, 'key'),
+                            'value' => data_get($password, 'value'),
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                    ]);
+                    $fields->put('Argilla', $data->toArray());
+                    break;
+                case $image->contains('rabbitmq'):
+                    $data = collect([]);
+                    $host_port = $this->environment_variables()->where('key', 'PORT')->first();
+                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_RABBITMQ')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_RABBITMQ')->first();
+                    if ($host_port) {
+                        $data = $data->merge([
+                            'Host Port Binding' => [
+                                'key' => data_get($host_port, 'key'),
+                                'value' => data_get($host_port, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($username) {
+                        $data = $data->merge([
+                            'Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('RabbitMQ', $data->toArray());
+                    break;
+                case $image->is('registry'):
+                    $data = collect([]);
+                    $registry_user = $this->environment_variables()->where('key', 'SERVICE_USER_REGISTRY')->first();
+                    $registry_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_REGISTRY')->first();
+                    if ($registry_user) {
+                        $data = $data->merge([
+                            'Registry User' => [
+                                'key' => data_get($registry_user, 'key'),
+                                'value' => data_get($registry_user, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($registry_password) {
+                        $data = $data->merge([
+                            'Registry Password' => [
+                                'key' => data_get($registry_password, 'key'),
+                                'value' => data_get($registry_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Docker Registry', $data->toArray());
+                    break;
+                case $image->contains('tolgee'):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_TOLGEE')->first();
                     $data = $data->merge([
@@ -201,7 +625,7 @@ class Service extends BaseModel
                     if ($admin_password) {
                         $data = $data->merge([
                             'Admin Password' => [
-                                'key' => 'SERVICE_PASSWORD_TOLGEE',
+                                'key' => data_get($admin_password, 'key'),
                                 'value' => data_get($admin_password, 'value'),
                                 'rules' => 'required',
                                 'isPassword' => true,
@@ -210,7 +634,7 @@ class Service extends BaseModel
                     }
                     $fields->put('Tolgee', $data->toArray());
                     break;
-                case str($image)?->contains('logto'):
+                case $image->contains('logto'):
                     $data = collect([]);
                     $logto_endpoint = $this->environment_variables()->where('key', 'LOGTO_ENDPOINT')->first();
                     $logto_admin_endpoint = $this->environment_variables()->where('key', 'LOGTO_ADMIN_ENDPOINT')->first();
@@ -234,7 +658,7 @@ class Service extends BaseModel
                     }
                     $fields->put('Logto', $data->toArray());
                     break;
-                case str($image)?->contains('unleash-server'):
+                case $image->contains('unleash-server'):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_UNLEASH')->first();
                     $data = $data->merge([
@@ -248,7 +672,7 @@ class Service extends BaseModel
                     if ($admin_password) {
                         $data = $data->merge([
                             'Admin Password' => [
-                                'key' => 'SERVICE_PASSWORD_UNLEASH',
+                                'key' => data_get($admin_password, 'key'),
                                 'value' => data_get($admin_password, 'value'),
                                 'rules' => 'required',
                                 'isPassword' => true,
@@ -257,7 +681,7 @@ class Service extends BaseModel
                     }
                     $fields->put('Unleash', $data->toArray());
                     break;
-                case str($image)?->contains('grafana'):
+                case $this->isGrafanaServerImage($application->image):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GRAFANA')->first();
                     $data = $data->merge([
@@ -271,7 +695,7 @@ class Service extends BaseModel
                     if ($admin_password) {
                         $data = $data->merge([
                             'Admin Password' => [
-                                'key' => 'GF_SECURITY_ADMIN_PASSWORD',
+                                'key' => data_get($admin_password, 'key'),
                                 'value' => data_get($admin_password, 'value'),
                                 'rules' => 'required',
                                 'isPassword' => true,
@@ -280,7 +704,37 @@ class Service extends BaseModel
                     }
                     $fields->put('Grafana', $data->toArray());
                     break;
-                case str($image)?->contains('directus'):
+                case $image->contains('elasticsearch'):
+                    $data = collect([]);
+                    $elastic_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ELASTICSEARCH')->first();
+                    if ($elastic_password) {
+                        $data = $data->merge([
+                            'Password (default user: elastic)' => [
+                                'key' => data_get($elastic_password, 'key'),
+                                'value' => data_get($elastic_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Elasticsearch', $data->toArray());
+                    break;
+                case $image->contains('opensearch'):
+                    $data = collect([]);
+                    $opensearch_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_OPENSEARCH')->first();
+                    if ($opensearch_password) {
+                        $data = $data->merge([
+                            'Password (default user: admin)' => [
+                                'key' => data_get($opensearch_password, 'key'),
+                                'value' => data_get($opensearch_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('OpenSearch', $data->toArray());
+                    break;
+                case $image->contains('directus'):
                     $data = collect([]);
                     $admin_email = $this->environment_variables()->where('key', 'ADMIN_EMAIL')->first();
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ADMIN')->first();
@@ -306,7 +760,7 @@ class Service extends BaseModel
                     }
                     $fields->put('Directus', $data->toArray());
                     break;
-                case str($image)?->contains('kong'):
+                case $image->contains('kong'):
                     $data = collect([]);
                     $dashboard_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();
                     $dashboard_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ADMIN')->first();
@@ -330,7 +784,7 @@ class Service extends BaseModel
                         ]);
                     }
                     $fields->put('Supabase', $data->toArray());
-                case str($image)?->contains('minio'):
+                case $image->contains(['minio', 'pgsty/silo']):
                     $data = collect([]);
                     $console_url = $this->environment_variables()->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
                     $s3_api_url = $this->environment_variables()->where('key', 'MINIO_SERVER_URL')->first();
@@ -383,7 +837,86 @@ class Service extends BaseModel
 
                     $fields->put('MinIO', $data->toArray());
                     break;
-                case str($image)?->contains('weblate'):
+                case $image->contains('garage'):
+                    $data = collect([]);
+                    $s3_api_url = $this->environment_variables()->where('key', 'GARAGE_S3_API_URL')->first();
+                    $web_url = $this->environment_variables()->where('key', 'GARAGE_WEB_URL')->first();
+                    $admin_url = $this->environment_variables()->where('key', 'GARAGE_ADMIN_URL')->first();
+                    $admin_token = $this->environment_variables()->where('key', 'GARAGE_ADMIN_TOKEN')->first();
+                    if (is_null($admin_token)) {
+                        $admin_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GARAGE')->first();
+                    }
+                    $rpc_secret = $this->environment_variables()->where('key', 'GARAGE_RPC_SECRET')->first();
+                    if (is_null($rpc_secret)) {
+                        $rpc_secret = $this->environment_variables()->where('key', 'SERVICE_HEX_64_RPCSECRET')->first()
+                            ?? $this->environment_variables()->where('key', 'SERVICE_HEX_32_RPCSECRET')->first();
+                    }
+                    $metrics_token = $this->environment_variables()->where('key', 'GARAGE_METRICS_TOKEN')->first();
+                    if (is_null($metrics_token)) {
+                        $metrics_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GARAGEMETRICS')->first();
+                    }
+
+                    if ($s3_api_url) {
+                        $data = $data->merge([
+                            'S3 API URL' => [
+                                'key' => data_get($s3_api_url, 'key'),
+                                'value' => data_get($s3_api_url, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    if ($web_url) {
+                        $data = $data->merge([
+                            'Web URL' => [
+                                'key' => data_get($web_url, 'key'),
+                                'value' => data_get($web_url, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    if ($admin_url) {
+                        $data = $data->merge([
+                            'Admin URL' => [
+                                'key' => data_get($admin_url, 'key'),
+                                'value' => data_get($admin_url, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    if ($admin_token) {
+                        $data = $data->merge([
+                            'Admin Token' => [
+                                'key' => data_get($admin_token, 'key'),
+                                'value' => data_get($admin_token, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($rpc_secret) {
+                        $data = $data->merge([
+                            'RPC Secret' => [
+                                'key' => data_get($rpc_secret, 'key'),
+                                'value' => data_get($rpc_secret, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($metrics_token) {
+                        $data = $data->merge([
+                            'Metrics Token' => [
+                                'key' => data_get($metrics_token, 'key'),
+                                'value' => data_get($metrics_token, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+
+                    $fields->put('Garage', $data->toArray());
+                    break;
+                case $image->contains('weblate'):
                     $data = collect([]);
                     $admin_email = $this->environment_variables()->where('key', 'WEBLATE_ADMIN_EMAIL')->first();
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_WEBLATE')->first();
@@ -409,7 +942,7 @@ class Service extends BaseModel
                     }
                     $fields->put('Weblate', $data->toArray());
                     break;
-                case str($image)?->contains('meilisearch'):
+                case $image->contains('meilisearch'):
                     $data = collect([]);
                     $SERVICE_PASSWORD_MEILISEARCH = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_MEILISEARCH')->first();
                     if ($SERVICE_PASSWORD_MEILISEARCH) {
@@ -423,7 +956,31 @@ class Service extends BaseModel
                     }
                     $fields->put('Meilisearch', $data->toArray());
                     break;
-                case str($image)?->contains('ghost'):
+                case $image->contains('linkding'):
+                    $data = collect([]);
+                    $SERVICE_USER_LINKDING = $this->environment_variables()->where('key', 'SERVICE_USER_LINKDING')->first();
+                    $SERVICE_PASSWORD_LINKDING = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_LINKDING')->first();
+                    if ($SERVICE_USER_LINKDING) {
+                        $data = $data->merge([
+                            'Superuser Name' => [
+                                'key' => data_get($SERVICE_USER_LINKDING, 'key'),
+                                'value' => data_get($SERVICE_USER_LINKDING, 'value'),
+                            ],
+                        ]);
+                    }
+                    if ($SERVICE_PASSWORD_LINKDING) {
+                        $data = $data->merge([
+                            'Superuser Password' => [
+                                'key' => data_get($SERVICE_PASSWORD_LINKDING, 'key'),
+                                'value' => data_get($SERVICE_PASSWORD_LINKDING, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+
+                    $fields->put('Linkding', $data->toArray());
+                    break;
+                case $image->contains('ghost'):
                     $data = collect([]);
                     $MAIL_OPTIONS_AUTH_PASS = $this->environment_variables()->where('key', 'MAIL_OPTIONS_AUTH_PASS')->first();
                     $MAIL_OPTIONS_AUTH_USER = $this->environment_variables()->where('key', 'MAIL_OPTIONS_AUTH_USER')->first();
@@ -483,33 +1040,8 @@ class Service extends BaseModel
 
                     $fields->put('Ghost', $data->toArray());
                     break;
-                default:
-                    $data = collect([]);
-                    $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();
-                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ADMIN')->first();
-                    if ($admin_user) {
-                        $data = $data->merge([
-                            'User' => [
-                                'key' => 'SERVICE_USER_ADMIN',
-                                'value' => data_get($admin_user, 'value', 'admin'),
-                                'readonly' => true,
-                                'rules' => 'required',
-                            ],
-                        ]);
-                    }
-                    if ($admin_password) {
-                        $data = $data->merge([
-                            'Password' => [
-                                'key' => 'SERVICE_PASSWORD_ADMIN',
-                                'value' => data_get($admin_password, 'value'),
-                                'rules' => 'required',
-                                'isPassword' => true,
-                            ],
-                        ]);
-                    }
-                    $fields->put('Admin', $data->toArray());
-                    break;
-                case str($image)?->contains('vaultwarden'):
+
+                case $image->contains('vaultwarden'):
                     $data = collect([]);
 
                     $DATABASE_URL = $this->environment_variables()->where('key', 'DATABASE_URL')->first();
@@ -575,14 +1107,208 @@ class Service extends BaseModel
 
                     $fields->put('Vaultwarden', $data);
                     break;
+                case $image->contains('gitlab/gitlab'):
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GITLAB')->first();
+                    $data = collect([]);
+                    if ($password) {
+                        $data = $data->merge([
+                            'Root Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $data = $data->merge([
+                        'Root User' => [
+                            'key' => 'GITLAB_ROOT_USER',
+                            'value' => 'root',
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                    ]);
+
+                    $fields->put('GitLab', $data->toArray());
+                    break;
+                case $image->contains('code-server'):
+                    $data = collect([]);
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_PASSWORDCODESERVER')->first();
+                    if ($password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $sudoPassword = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_SUDOCODESERVER')->first();
+                    if ($sudoPassword) {
+                        $data = $data->merge([
+                            'Sudo Password' => [
+                                'key' => data_get($sudoPassword, 'key'),
+                                'value' => data_get($sudoPassword, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Code Server', $data->toArray());
+                    break;
+                case $image->contains('elestio/strapi'):
+                    $data = collect([]);
+                    $license = $this->environment_variables()->where('key', 'STRAPI_LICENSE')->first();
+                    if ($license) {
+                        $data = $data->merge([
+                            'License' => [
+                                'key' => data_get($license, 'key'),
+                                'value' => data_get($license, 'value'),
+                            ],
+                        ]);
+                    }
+                    $nodeEnv = $this->environment_variables()->where('key', 'NODE_ENV')->first();
+                    if ($nodeEnv) {
+                        $data = $data->merge([
+                            'Node Environment' => [
+                                'key' => data_get($nodeEnv, 'key'),
+                                'value' => data_get($nodeEnv, 'value'),
+                            ],
+                        ]);
+                    }
+
+                    $fields->put('Strapi', $data->toArray());
+                    break;
+                case $image->contains('marckohlbrugge/sessy'):
+                    $data = collect([]);
+                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_SESSY')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_SESSY')->first();
+                    if ($username) {
+                        $data = $data->merge([
+                            'HTTP Auth Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'HTTP Auth Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Sessy', $data->toArray());
+                    break;
+                case $image->contains('coollabsio/openclaw'):
+                    $data = collect([]);
+                    $username = $this->environment_variables()->where('key', 'SERVICE_USER_OPENCLAW')->first();
+                    $password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_OPENCLAW')->first();
+                    $gateway_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_64_GATEWAYTOKEN')->first();
+                    if ($username) {
+                        $data = $data->merge([
+                            'Username' => [
+                                'key' => data_get($username, 'key'),
+                                'value' => data_get($username, 'value'),
+                                'readonly' => true,
+                            ],
+                        ]);
+                    }
+                    if ($password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => data_get($password, 'key'),
+                                'value' => data_get($password, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($gateway_token) {
+                        $data = $data->merge([
+                            'Gateway Token' => [
+                                'key' => data_get($gateway_token, 'key'),
+                                'value' => data_get($gateway_token, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Openclaw', $data->toArray());
+                    break;
+                case $image->contains('coollabsio/jean-server'):
+                    $data = collect([]);
+                    $settings = [
+                        'Token' => ['key' => 'SERVICE_PASSWORD_64_JEAN', 'rules' => 'required', 'isPassword' => true, 'sortOrder' => 1, 'customHelper' => 'Token required to access Jean Server. Variable name: SERVICE_PASSWORD_64_JEAN'],
+                        'Allowed Origins' => ['key' => 'JEAN_ALLOWED_ORIGINS', 'rules' => 'nullable|string', 'sortOrder' => 2, 'customHelper' => 'Comma-separated additional browser origins. Same-origin access is always allowed. Variable name: JEAN_ALLOWED_ORIGINS'],
+                    ];
+
+                    foreach ($settings as $label => $setting) {
+                        $variable = $this->environment_variables()->where('key', $setting['key'])->first();
+                        if (! $variable) {
+                            continue;
+                        }
+
+                        $data->put($label, [
+                            ...$setting,
+                            'value' => data_get($variable, 'value'),
+                        ]);
+                    }
+
+                    $fields->put('', $data->toArray());
+                    break;
+                default:
+                    $data = collect([]);
+                    $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();
+                    // Chaskiq
+                    $admin_email = $this->environment_variables()->where('key', 'ADMIN_EMAIL')->first();
+
+                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ADMIN')->first();
+                    if ($admin_user) {
+                        $data = $data->merge([
+                            'User' => [
+                                'key' => data_get($admin_user, 'key'),
+                                'value' => data_get($admin_user, 'value', 'admin'),
+                                'readonly' => true,
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($admin_password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => data_get($admin_password, 'key'),
+                                'value' => data_get($admin_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($admin_email) {
+                        $data = $data->merge([
+                            'Email' => [
+                                'key' => data_get($admin_email, 'key'),
+                                'value' => data_get($admin_email, 'value'),
+                                'rules' => 'required|email',
+                            ],
+                        ]);
+                    }
+                    $fields->put('Admin', $data->toArray());
+                    break;
             }
         }
         $databases = $this->databases()->get();
 
         foreach ($databases as $database) {
-            $image = str($database->image)->before(':')->value();
+            $image = str($database->image)->before(':');
+            if ($image->isEmpty()) {
+                continue;
+            }
             switch ($image) {
-                case str($image)->contains('postgres'):
+                case $image->contains('postgres'):
                     $userVariables = ['SERVICE_USER_POSTGRES', 'SERVICE_USER_POSTGRESQL'];
                     $passwordVariables = ['SERVICE_PASSWORD_POSTGRES', 'SERVICE_PASSWORD_POSTGRESQL'];
                     $dbNameVariables = ['POSTGRESQL_DATABASE', 'POSTGRES_DB'];
@@ -620,10 +1346,10 @@ class Service extends BaseModel
                     }
                     $fields->put('PostgreSQL', $data->toArray());
                     break;
-                case str($image)->contains('mysql'):
-                    $userVariables = ['SERVICE_USER_MYSQL', 'SERVICE_USER_WORDPRESS'];
-                    $passwordVariables = ['SERVICE_PASSWORD_MYSQL', 'SERVICE_PASSWORD_WORDPRESS'];
-                    $rootPasswordVariables = ['SERVICE_PASSWORD_MYSQLROOT', 'SERVICE_PASSWORD_ROOT'];
+                case $image->contains('mysql'):
+                    $userVariables = ['SERVICE_USER_MYSQL', 'SERVICE_USER_WORDPRESS', 'MYSQL_USER'];
+                    $passwordVariables = ['SERVICE_PASSWORD_MYSQL', 'SERVICE_PASSWORD_WORDPRESS', 'MYSQL_PASSWORD', 'SERVICE_PASSWORD_64_MYSQL'];
+                    $rootPasswordVariables = ['SERVICE_PASSWORD_MYSQLROOT', 'SERVICE_PASSWORD_ROOT', 'SERVICE_PASSWORD_64_MYSQLROOT'];
                     $dbNameVariables = ['MYSQL_DATABASE'];
                     $mysql_user = $this->environment_variables()->whereIn('key', $userVariables)->first();
                     $mysql_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
@@ -670,11 +1396,12 @@ class Service extends BaseModel
                     }
                     $fields->put('MySQL', $data->toArray());
                     break;
-                case str($image)->contains('mariadb'):
-                    $userVariables = ['SERVICE_USER_MARIADB', 'SERVICE_USER_WORDPRESS', '_APP_DB_USER'];
-                    $passwordVariables = ['SERVICE_PASSWORD_MARIADB', 'SERVICE_PASSWORD_WORDPRESS', '_APP_DB_PASS'];
-                    $rootPasswordVariables = ['SERVICE_PASSWORD_MARIADBROOT', 'SERVICE_PASSWORD_ROOT', '_APP_DB_ROOT_PASS'];
-                    $dbNameVariables = ['SERVICE_DATABASE_MARIADB', 'SERVICE_DATABASE_WORDPRESS', '_APP_DB_SCHEMA'];
+                case $image->contains('mariadb'):
+                    $userVariables = ['SERVICE_USER_MARIADB', 'SERVICE_USER_WORDPRESS', 'SERVICE_USER_MYSQL', 'MYSQL_USER'];
+                    $passwordVariables = ['SERVICE_PASSWORD_MARIADB', 'SERVICE_PASSWORD_WORDPRESS', '_APP_DB_PASS', 'MYSQL_PASSWORD'];
+                    $rootPasswordVariables = ['SERVICE_PASSWORD_MARIADBROOT', 'SERVICE_PASSWORD_ROOT', '_APP_DB_ROOT_PASS', 'MYSQL_ROOT_PASSWORD'];
+                    $dbNameVariables = ['SERVICE_DATABASE_MARIADB', 'SERVICE_DATABASE_WORDPRESS', '_APP_DB_SCHEMA', 'MYSQL_DATABASE'];
+
                     $mariadb_user = $this->environment_variables()->whereIn('key', $userVariables)->first();
                     $mariadb_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
                     $mariadb_root_password = $this->environment_variables()->whereIn('key', $rootPasswordVariables)->first();
@@ -723,8 +1450,51 @@ class Service extends BaseModel
                     break;
             }
         }
+        $fields = collect($fields)->map(function ($extraFields) {
+            if (is_array($extraFields)) {
+                $extraFields = collect($extraFields)->map(function ($field) {
+                    if (filled($field['value']) && str($field['value'])->startsWith('$SERVICE_')) {
+                        $searchValue = str($field['value'])->after('$')->value;
+                        $newValue = $this->environment_variables()->where('key', $searchValue)->first();
+                        if ($newValue?->is_shown_once) {
+                            $field['value'] = null;
+                            $field['isLocked'] = true;
+                        } elseif ($newValue) {
+                            $field['value'] = $newValue->value;
+                        }
+                    }
+
+                    return $field;
+                });
+            }
+
+            return $extraFields;
+        });
 
         return $fields;
+    }
+
+    /**
+     * Determine whether the given image is an actual Grafana server image
+     * (grafana/grafana, grafana/grafana-oss, grafana/grafana-enterprise),
+     * optionally prefixed by a registry host. Other Grafana-published images
+     * such as grafana/loki, grafana/promtail and grafana/tempo are excluded.
+     */
+    private function isGrafanaServerImage(string $image): bool
+    {
+        $parsedImage = (new DockerImageParser)->parse($image);
+        $image = $parsedImage->getImageName();
+
+        // The parser recognizes registry hosts with dots or ports, but not bare localhost.
+        if ($parsedImage->getRegistryUrl() === '' && str_starts_with($image, 'localhost/')) {
+            $image = substr($image, strlen('localhost/'));
+        }
+
+        return in_array($image, [
+            'grafana/grafana',
+            'grafana/grafana-oss',
+            'grafana/grafana-enterprise',
+        ], true);
     }
 
     public function saveExtraFields($fields)
@@ -740,8 +1510,8 @@ class Service extends BaseModel
                 $this->environment_variables()->create([
                     'key' => $key,
                     'value' => $value,
-                    'is_build_time' => false,
-                    'service_id' => $this->id,
+                    'resourceable_id' => $this->id,
+                    'resourceable_type' => $this->getMorphClass(),
                     'is_preview' => false,
                 ]);
             }
@@ -753,22 +1523,8 @@ class Service extends BaseModel
         if (data_get($this, 'environment.project.uuid')) {
             return route('project.service.configuration', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_name' => data_get($this, 'environment.name'),
+                'environment_uuid' => data_get($this, 'environment.uuid'),
                 'service_uuid' => data_get($this, 'uuid'),
-            ]);
-        }
-
-        return null;
-    }
-
-    public function failedTaskLink($task_uuid)
-    {
-        if (data_get($this, 'environment.project.uuid')) {
-            return route('project.service.scheduled-tasks', [
-                'project_uuid' => data_get($this, 'environment.project.uuid'),
-                'environment_name' => data_get($this, 'environment.name'),
-                'service_uuid' => data_get($this, 'uuid'),
-                'task_uuid' => $task_uuid,
             ]);
         }
 
@@ -778,14 +1534,65 @@ class Service extends BaseModel
     public function documentation()
     {
         $services = get_service_templates();
-        $service = data_get($services, str($this->name)->beforeLast('-')->value, []);
+        $service = data_get($services, resolve_service_template_key(str($this->name)->beforeLast('-')->value, $services), []);
 
-        return data_get($service, 'documentation', config('constants.docs.base_url'));
+        return data_get($service, 'documentation', config('constants.urls.docs'));
+    }
+
+    /**
+     * Get the required port for this service from the template definition.
+     */
+    public function getRequiredPort(): ?int
+    {
+        try {
+            $services = get_service_templates();
+            if (blank($this->service_type)) {
+                return null;
+            }
+            $serviceName = resolve_service_template_key($this->service_type, $services);
+            $service = data_get($services, $serviceName, []);
+            $port = data_get($service, 'port');
+
+            return $port ? (int) $port : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Check if this service requires a port to function correctly.
+     */
+    public function requiresPort(): bool
+    {
+        return $this->getRequiredPort() !== null;
     }
 
     public function applications()
     {
         return $this->hasMany(ServiceApplication::class);
+    }
+
+    /**
+     * Domains of every application in the service stack.
+     *
+     * @return Collection<int, array{url: string, force_https: bool}>
+     */
+    public function maintenanceDomains(): Collection
+    {
+        return $this->applications()->get()
+            ->flatMap(fn (ServiceApplication $application) => collect($application->fqdns)
+                ->map(fn ($url) => trim((string) $url))
+                ->filter()
+                ->map(fn (string $url) => ['url' => $url, 'force_https' => $application->isForceHttpsEnabled()]))
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, Server>
+     */
+    public function maintenanceServers(): Collection
+    {
+        return collect([$this->server])->filter()->values();
     }
 
     public function databases()
@@ -841,14 +1648,17 @@ class Service extends BaseModel
         return $this->hasMany(ScheduledTask::class)->orderBy('name', 'asc');
     }
 
-    public function environment_variables(): HasMany
+    /**
+     * Whether logs hide every environment value, or only locked values.
+     */
+    public function redactsAllEnvValuesInLogs(): bool
     {
-        return $this->hasMany(EnvironmentVariable::class)->orderBy('key', 'asc');
+        return $this->redact_all_env_values_in_logs ?? true;
     }
 
-    public function environment_variables_preview(): HasMany
+    public function environment_variables()
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->orderBy('key', 'asc');
+        return $this->morphMany(EnvironmentVariable::class, 'resourceable');
     }
 
     public function workdir()
@@ -856,38 +1666,123 @@ class Service extends BaseModel
         return service_configuration_dir()."/{$this->uuid}";
     }
 
+    /**
+     * Docker Compose must accept the generated file, or the next deployment fails with the old containers still running.
+     * Call it after parse(), in the transaction that saves the Compose file. The check is best effort: it is skipped
+     * when the server is not reachable or the SSH connection fails, so the file can still be edited.
+     *
+     * @throws ComposeRejectedException If `docker compose config` on the server rejects the generated file
+     */
+    public function ensureDockerComposeAccepted(): void
+    {
+        $server = $this->server;
+        if (! $server?->isFunctional()) {
+            return;
+        }
+        try {
+            checkComposeFileOnServer((string) $this->docker_compose, $server, $this->workdir());
+        } catch (\Throwable $e) {
+            // Only an exit code of the remote command is a rejection: 255 is an SSH failure, 124 a timeout.
+            $exitCode = $e->getCode();
+            if (! $e instanceof \RuntimeException || ! is_int($exitCode) || in_array($exitCode, [0, 124, 255], true)) {
+                return;
+            }
+
+            throw new ComposeRejectedException("Docker Compose rejected the file, so Coolify did not save it.\n{$e->getMessage()}", previous: $e);
+        }
+    }
+
     public function saveComposeConfigs()
     {
+        // Guard against null or empty docker_compose
+        if (! $this->docker_compose) {
+            return;
+        }
+
         $workdir = $this->workdir();
-        $commands[] = "mkdir -p $workdir";
-        $commands[] = "cd $workdir";
+        // Absolute paths and tee, no cd or scp: a non-root SSH user cannot enter /data/coolify on the Coolify host.
+        // File content goes over SSH stdin: inline in the command, a compose over ~96 KB exceeds the argument limit.
+        instant_remote_process(["mkdir -p $workdir"], $this->server);
+        instant_remote_write_file($this->server, "$workdir/docker-compose.yml", $this->docker_compose);
+        $environmentFile = "$workdir/".new_public_id().'.env.tmp';
 
-        $json = Yaml::parse($this->docker_compose);
-        $this->docker_compose = Yaml::dump($json, 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
-        $docker_compose_base64 = base64_encode($this->docker_compose);
+        $envs = collect([]);
 
-        $commands[] = "echo $docker_compose_base64 | base64 -d | tee docker-compose.yml > /dev/null";
-        $commands[] = 'rm -f .env || true';
+        // Generate SERVICE_NAME_* environment variables from docker-compose services
+        if ($this->docker_compose) {
+            try {
+                $dockerCompose = parseDockerComposeYaml($this->docker_compose);
+                $services = data_get($dockerCompose, 'services', []);
+                foreach ($services as $serviceName => $_) {
+                    $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
+                }
+            } catch (\Exception $e) {
+            }
+        }
 
         $envs_from_coolify = $this->environment_variables()->get();
-        foreach ($envs_from_coolify as $env) {
-            $commands[] = "echo '{$env->key}={$env->real_value}' >> .env";
+        // So that Docker Compose can resolve ${COOLIFY_RESOURCE_UUID} in the compose file
+        if ($envs_from_coolify->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+            $envs->push("COOLIFY_RESOURCE_UUID={$this->uuid}");
         }
-        if ($envs_from_coolify->count() === 0) {
-            $commands[] = 'touch .env';
+        $sorted = $envs_from_coolify->sortBy(function ($env) {
+            if (str($env->key)->startsWith('SERVICE_')) {
+                return 1;
+            }
+            if (str($env->value)->startsWith('$SERVICE_') || str($env->value)->startsWith('${SERVICE_')) {
+                return 2;
+            }
+
+            return 3;
+        });
+        foreach ($sorted as $env) {
+            if (! $env->preservesLegacyComposeNull() && dockerComposeEnvironmentVariableShouldBeUnset($this->docker_compose_raw ?? $this->docker_compose, $env->key, $env->value)) {
+                continue;
+            }
+            $envs->push($this->composeEnvironmentFileLine($env));
         }
-        instant_remote_process($commands, $this->server);
+        instant_remote_write_file($this->server, $environmentFile, $envs->implode("\n"));
+        instant_remote_process(["mv {$environmentFile} $workdir/.env"], $this->server);
+    }
+
+    /**
+     * Build a KEY="value" line for the service .env file, which Docker Compose reads.
+     * Only plain values allow $VAR interpolation, so $SERVICE_* references keep working.
+     */
+    public function composeEnvironmentFileLine(EnvironmentVariable $environmentVariable): string
+    {
+        return $environmentVariable->key.'='.$this->resolveSecretManagerDotenvValue($environmentVariable);
     }
 
     public function parse(bool $isNew = false): Collection
     {
-        return parseDockerComposeFile($this, $isNew);
+        if ((int) $this->compose_parsing_version >= 3) {
+            return serviceParser($this);
+        } elseif ($this->docker_compose_raw) {
+            return parseDockerComposeFile($this, $isNew);
+        } else {
+            return collect([]);
+        }
     }
 
     public function networks()
     {
-        $networks = getTopLevelNetworks($this);
+        return getTopLevelNetworks($this);
+    }
 
-        return $networks;
+    protected function isDeployable(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): bool => $this->missingRequiredEnvironmentVariables()->isEmpty()
+        );
+    }
+
+    public function missingRequiredEnvironmentVariables(): Collection
+    {
+        return $this->environment_variables()
+            ->where('is_required', true)
+            ->get()
+            ->filter(fn (EnvironmentVariable $environmentVariable): bool => $environmentVariable->is_really_required)
+            ->values();
     }
 }

@@ -2,13 +2,19 @@
 
 namespace App\Actions\Database;
 
+use App\Actions\Shared\EnsureContentFilesOnServer;
+use App\Exceptions\DatabaseStartException;
+use App\Helpers\SslHelper;
+use App\Models\SslCertificate;
 use App\Models\StandaloneMysql;
+use App\Traits\ExecutesDatabaseStartCommands;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class StartMysql
 {
-    use AsAction;
+    use AsAction, ExecutesDatabaseStartCommands;
 
     public StandaloneMysql $database;
 
@@ -16,7 +22,11 @@ class StartMysql
 
     public string $configuration_dir;
 
-    public function handle(StandaloneMysql $database)
+    private ?SslCertificate $ssl_certificate = null;
+
+    private string $resolvedMysqlRootPassword;
+
+    public function handle(StandaloneMysql $database, ?Activity $activity = null)
     {
         $this->database = $database;
 
@@ -24,12 +34,58 @@ class StartMysql
         $this->configuration_dir = database_configuration_dir().'/'.$container_name;
 
         $this->commands = [
-            "echo 'Starting {$database->name}.'",
+            "echo 'Starting database.'",
+            "echo 'Creating directories.'",
             "mkdir -p $this->configuration_dir",
+            "echo 'Directories created successfully.'",
         ];
+
+        if (! $this->database->enable_ssl) {
+            $this->commands[] = "rm -rf $this->configuration_dir/ssl";
+
+            $this->database->sslCertificates()->delete();
+
+            $this->database->fileStorages()
+                ->where('resource_type', $this->database->getMorphClass())
+                ->where('resource_id', $this->database->id)
+                ->get()
+                ->filter(function ($storage) {
+                    return in_array($storage->mount_path, [
+                        '/etc/mysql/certs/server.crt',
+                        '/etc/mysql/certs/server.key',
+                    ]);
+                })
+                ->each(function ($storage) {
+                    $storage->delete();
+                });
+        } else {
+            $this->commands[] = "echo 'Setting up SSL for this database.'";
+            $this->commands[] = "mkdir -p $this->configuration_dir/ssl";
+
+            $server = $this->database->destination->server;
+            $caCert = $server->ensureCaCertificate() ?? throw DatabaseStartException::missingCaCertificate();
+            array_push($this->commands, ...SslHelper::caCertificateFileCommands($caCert->ssl_certificate));
+
+            $this->ssl_certificate = $this->database->sslCertificates()->first();
+
+            if (! $this->ssl_certificate) {
+                $this->commands[] = "echo 'No SSL certificate found, generating new SSL certificate for this database.'";
+                $this->ssl_certificate = SslHelper::generateSslCertificate(
+                    commonName: $this->database->uuid,
+                    resourceType: $this->database->getMorphClass(),
+                    resourceId: $this->database->id,
+                    serverId: $server->id,
+                    caCert: $caCert->ssl_certificate,
+                    caKey: $caCert->ssl_private_key,
+                    configurationDir: $this->configuration_dir,
+                    mountPath: '/etc/mysql/certs',
+                );
+            }
+        }
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $persistent_file_volumes = $this->database->fileStorages()->get();
+        array_push($this->commands, ...EnsureContentFilesOnServer::echoCommands($persistent_file_volumes, $this->database->destination->server));
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
         $this->add_custom_mysql();
@@ -43,16 +99,10 @@ class StartMysql
                     'networks' => [
                         $this->database->destination->network,
                     ],
-                    'labels' => [
-                        'coolify.managed' => 'true',
-                    ],
-                    'healthcheck' => [
-                        'test' => ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', "-p{$this->database->mysql_root_password}"],
-                        'interval' => '5s',
-                        'timeout' => '5s',
-                        'retries' => 10,
-                        'start_period' => '5s',
-                    ],
+                    'labels' => defaultDatabaseLabels($this->database)->toArray(),
+                    'healthcheck' => $this->database->healthCheckConfiguration([
+                        'CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-u', 'root', "-p{$this->resolvedMysqlRootPassword}",
+                    ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
                     'mem_swappiness' => $this->database->limits_memory_swappiness,
@@ -69,52 +119,103 @@ class StartMysql
                 ],
             ],
         ];
+
         if (! is_null($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
+
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
-            $docker_compose['services'][$container_name]['logging'] = [
-                'driver' => 'fluentd',
-                'options' => [
-                    'fluentd-address' => 'tcp://127.0.0.1:24224',
-                    'fluentd-async' => 'true',
-                    'fluentd-sub-second-precision' => 'true',
-                ],
-            ];
+            $docker_compose['services'][$container_name]['logging'] = generate_log_drain_configuration($this->database->destination->server);
         }
+
         if (count($this->database->ports_mappings_array) > 0) {
             $docker_compose['services'][$container_name]['ports'] = $this->database->ports_mappings_array;
         }
+
+        $docker_compose['services'][$container_name]['volumes'] ??= [];
+
         if (count($persistent_storages) > 0) {
-            $docker_compose['services'][$container_name]['volumes'] = $persistent_storages;
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'] ?? [],
+                $persistent_storages
+            );
         }
+
         if (count($persistent_file_volumes) > 0) {
-            $docker_compose['services'][$container_name]['volumes'] = $persistent_file_volumes->map(function ($item) {
-                return "$item->fs_path:$item->mount_path";
-            })->toArray();
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'] ?? [],
+                $persistent_file_volumes->map(function ($item) {
+                    return "$item->fs_path:$item->mount_path";
+                })->toArray()
+            );
         }
+
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (! is_null($this->database->mysql_conf) || ! empty($this->database->mysql_conf)) {
-            $docker_compose['services'][$container_name]['volumes'][] = [
-                'type' => 'bind',
-                'source' => $this->configuration_dir.'/custom-config.cnf',
-                'target' => '/etc/mysql/conf.d/custom-config.cnf',
-                'read_only' => true,
+
+        if ($this->database->enable_ssl) {
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'] ?? [],
+                [
+                    [
+                        'type' => 'bind',
+                        'source' => '/data/coolify/ssl/coolify-ca.crt',
+                        'target' => '/etc/mysql/certs/coolify-ca.crt',
+                        'read_only' => true,
+                    ],
+                ]
+            );
+        }
+
+        if (! is_null($this->database->mysql_conf) && ! empty($this->database->mysql_conf)) {
+            $docker_compose['services'][$container_name]['volumes'] = array_merge(
+                $docker_compose['services'][$container_name]['volumes'] ?? [],
+                [
+                    [
+                        'type' => 'bind',
+                        'source' => $this->configuration_dir.'/custom-config.cnf',
+                        'target' => '/etc/mysql/conf.d/custom-config.cnf',
+                        'read_only' => true,
+                    ],
+                ]
+            );
+        }
+
+        // Add custom docker run options
+        $docker_run_options = convertDockerRunToCompose($this->database->custom_docker_run_options);
+        $docker_compose = generateCustomDockerRunOptionsForDatabases($docker_run_options, $docker_compose, $container_name, $this->database->destination->network);
+
+        if ($this->database->enable_ssl) {
+            $docker_compose['services'][$container_name]['command'] = [
+                'mysqld',
+                '--ssl-cert=/etc/mysql/certs/server.crt',
+                '--ssl-key=/etc/mysql/certs/server.key',
+                '--ssl-ca=/etc/mysql/certs/coolify-ca.crt',
+                '--require-secure-transport=1',
             ];
+        }
+
+        if (! $this->database->isHealthcheckEnabled()) {
+            unset($docker_compose['services'][$container_name]['healthcheck']);
         }
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d | tee $this->configuration_dir/docker-compose.yml > /dev/null";
         $readme = generate_readme_file($this->database->name, now());
-        $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
-        $this->commands[] = "echo 'Pulling {$database->image} image.'";
-        $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
+        $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
+        $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
+        array_push($this->commands, ...$this->pullImageCommands("{$this->configuration_dir}/docker-compose.yml"));
+        if ($this->database->enable_ssl) {
+            $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml run --rm --no-deps --user root --entrypoint chown $container_name mysql:mysql /etc/mysql/certs/server.key /etc/mysql/certs/server.crt < /dev/null";
+        }
+        $this->commands[] = dockerStopCommand(30, $container_name, $this->database->destination->server).' 2>/dev/null || true';
+        $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
+
         $this->commands[] = "echo 'Database started.'";
 
-        return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
+        return $this->executeDatabaseStartCommands($this->commands, $database, $activity);
     }
 
     private function generate_local_persistent_volumes()
@@ -152,24 +253,34 @@ class StartMysql
     private function generate_environment_variables()
     {
         $environment_variables = collect();
+        $this->resolvedMysqlRootPassword = (string) $this->database->mysql_root_password;
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push("$env->key=$env->real_value");
+            $rawValue = (string) $this->database->resolveSecretManagerEnvironmentVariableValue($env);
+            $resolvedValue = (string) $this->database->formatEnvironmentVariableValue($env, $rawValue);
+            // Credentials below are placed directly in the compose file (healthcheck, command).
+            $composeFileValue = $this->database->formatComposeFileValue($env, $rawValue);
+            $environment_variables->push($env->key.'='.$resolvedValue);
+            if ($env->key === 'MYSQL_ROOT_PASSWORD') {
+                $this->resolvedMysqlRootPassword = $composeFileValue;
+            }
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MYSQL_ROOT_PASSWORD'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MYSQL_ROOT_PASSWORD')) {
             $environment_variables->push("MYSQL_ROOT_PASSWORD={$this->database->mysql_root_password}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MYSQL_DATABASE'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MYSQL_DATABASE')) {
             $environment_variables->push("MYSQL_DATABASE={$this->database->mysql_database}");
         }
 
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MYSQL_USER'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MYSQL_USER')) {
             $environment_variables->push("MYSQL_USER={$this->database->mysql_user}");
         }
-        if ($environment_variables->filter(fn ($env) => str($env)->contains('MYSQL_PASSWORD'))->isEmpty()) {
+        if (! $this->hasEnvironmentVariable($environment_variables, 'MYSQL_PASSWORD')) {
             $environment_variables->push("MYSQL_PASSWORD={$this->database->mysql_password}");
         }
+
+        $this->addCoolifyEnvironmentVariables($environment_variables);
 
         return $environment_variables->all();
     }
@@ -183,5 +294,7 @@ class StartMysql
         $content = $this->database->mysql_conf;
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d | tee $this->configuration_dir/{$filename} > /dev/null";
+        // The container user must read the read-only mount; a strict server umask leaves the file unreadable.
+        $this->commands[] = "chmod 644 $this->configuration_dir/{$filename}";
     }
 }

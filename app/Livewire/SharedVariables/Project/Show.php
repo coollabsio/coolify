@@ -2,18 +2,31 @@
 
 namespace App\Livewire\SharedVariables\Project;
 
+use App\Livewire\Concerns\RemembersCanvasView;
 use App\Models\Project;
+use App\Models\SharedEnvironmentVariable;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class Show extends Component
 {
+    use AuthorizesRequests;
+    use RemembersCanvasView;
+
     public Project $project;
 
-    protected $listeners = ['refreshEnvs' => '$refresh', 'saveKey' => 'saveKey'];
+    public string $view = 'normal';
+
+    public ?string $variables = null;
+
+    protected $listeners = ['refreshEnvs' => 'refreshEnvs', 'saveKey' => 'saveKey', 'environmentVariableDeleted' => 'refreshEnvs'];
 
     public function saveKey($data)
     {
         try {
+            $this->authorize('update', $this->project);
+
             $found = $this->project->environment_variables()->where('key', $data['key'])->first();
             if ($found) {
                 throw new \Exception('Variable already exists.');
@@ -23,24 +36,144 @@ class Show extends Component
                 'value' => $data['value'],
                 'is_multiline' => $data['is_multiline'],
                 'is_literal' => $data['is_literal'],
+                'comment' => $data['comment'] ?? null,
                 'type' => 'project',
-                'team_id' => currentTeam()->id,
+                'team_id' => $this->project->team_id,
             ]);
             $this->project->refresh();
+            $this->getDevView();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
 
-    public function mount()
+    public function mount(?string $project_uuid = null)
     {
-        $projectUuid = request()->route('project_uuid');
+        $projectUuid = $project_uuid ?? request()->route('project_uuid');
         $teamId = currentTeam()->id;
         $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
         if (! $project) {
             return redirect()->route('dashboard');
         }
+        $this->authorize('viewSharedVariables', $project);
         $this->project = $project;
+        if ($this->prefersCanvasView('project_variables')) {
+            return $this->redirectRoute('shared-variables.project.canvas', ['project_uuid' => $project->uuid], navigate: true);
+        }
+        $this->getDevView();
+    }
+
+    public function switch()
+    {
+        try {
+            $this->authorize('viewSharedVariables', $this->project);
+            $this->view = $this->view === 'normal' ? 'dev' : 'normal';
+            $this->getDevView();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function getDevView()
+    {
+        $this->variables = $this->formatEnvironmentVariables($this->project->environment_variables->sortBy('key'));
+    }
+
+    private function formatEnvironmentVariables($variables)
+    {
+        return $variables->map(fn ($item) => formatEnvVariableForDevView($item, auth()->user()?->can('viewSensitive', $item) ?? false))->join("\n");
+    }
+
+    public function submit()
+    {
+        // Parse before the save, so that an invalid "# coolify:" line changes nothing and keeps the edited text.
+        try {
+            $this->authorize('update', $this->project);
+            $variables = parseEnvDevView($this->variables, SharedEnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+
+        try {
+            $this->handleBulkSubmit($variables);
+            $this->getDevView();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        } finally {
+            $this->refreshEnvs();
+        }
+    }
+
+    private function handleBulkSubmit(array $variables)
+    {
+        $changesMade = DB::transaction(function () use ($variables) {
+            // Delete removed variables
+            $deletedCount = $this->deleteRemovedVariables($variables);
+
+            // Update or create variables
+            $updatedCount = $this->updateOrCreateVariables($variables);
+
+            return $deletedCount > 0 || $updatedCount > 0;
+        });
+
+        if ($changesMade) {
+            $this->dispatch('success', 'Environment variables updated.');
+        }
+    }
+
+    private function deleteRemovedVariables($variables)
+    {
+        $variablesToDelete = $this->project->environment_variables()->whereNotIn('key', array_keys($variables))->get();
+
+        if ($variablesToDelete->isEmpty()) {
+            return 0;
+        }
+
+        $this->project->environment_variables()->whereNotIn('key', array_keys($variables))->delete();
+
+        return $variablesToDelete->count();
+    }
+
+    private function updateOrCreateVariables($variables)
+    {
+        $count = 0;
+        foreach ($variables as $key => $data) {
+            $value = is_array($data) ? ($data['value'] ?? '') : $data;
+
+            $found = $this->project->environment_variables()->where('key', $key)->first();
+
+            if ($found) {
+                if (! $found->is_shown_once && ! $found->is_multiline && formatEnvValueForDevView($found->value) !== null) {
+                    if ($found->value !== $value) {
+                        $found->value = $value;
+                    }
+                    $found->fill($data['settings']);
+                    if ($found->isDirty()) {
+                        $found->save();
+                        $count++;
+                    }
+                }
+            } else {
+                $this->project->environment_variables()->create([
+                    'key' => $key,
+                    'value' => $value,
+                    'is_multiline' => false,
+                    'is_literal' => false,
+                    ...$data['settings'],
+                    'type' => 'project',
+                    'team_id' => $this->project->team_id,
+                ]);
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    public function refreshEnvs()
+    {
+        $this->project->refresh();
+        $this->getDevView();
     }
 
     public function render()

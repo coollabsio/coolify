@@ -4,7 +4,10 @@ services:
         restart: always
         working_dir: /var/www/html
         extra_hosts:
-            - 'host.docker.internal:host-gateway'
+            - host.docker.internal:host-gateway
+        expose:
+            - "6001"
+            - "6002"
         networks:
             - coolify
         depends_on:
@@ -17,14 +20,8 @@ services:
         networks:
             - coolify
     redis:
-        image: redis:alpine
+        image: redis:7-alpine
         container_name: coolify-redis
-        restart: always
-        networks:
-            - coolify
-    soketi:
-        image: 'quay.io/soketi/soketi:1.6-16-alpine'
-        container_name: coolify-realtime
         restart: always
         networks:
             - coolify
@@ -32,4 +29,4 @@ networks:
     coolify:
         name: coolify
         driver: bridge
-        external: true
+        external: false

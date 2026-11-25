@@ -2,39 +2,102 @@
 
 namespace App\Actions\Service;
 
+use App\Actions\Server\CleanupDocker;
+use App\Enums\ProcessStatus;
+use App\Events\ServiceStatusChanged;
+use App\Jobs\NotifyResourceStoppedJob;
+use App\Models\Server;
 use App\Models\Service;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Spatie\Activitylog\Models\Activity;
 
 class StopService
 {
     use AsAction;
 
-    public function handle(Service $service)
+    public string $jobQueue = 'high';
+
+    public function handle(Service $service, bool $deleteConnectedNetworks = false, bool $dockerCleanup = true)
     {
         try {
-            $server = $service->destination->server;
-            if (! $server->isFunctional()) {
+            // Cancel any in-progress deployment activities so status doesn't stay stuck at "starting"
+            Activity::where('properties->type_uuid', $service->uuid)
+                ->where(function ($q) {
+                    $q->where('properties->status', ProcessStatus::IN_PROGRESS->value)
+                        ->orWhere('properties->status', ProcessStatus::QUEUED->value);
+                })
+                ->each(function ($activity) {
+                    $activity->properties = $activity->properties->put('status', ProcessStatus::CANCELLED->value);
+                    $activity->save();
+                });
+
+            // The server is null once it is deleted (for example "Delete server" with all resources).
+            $server = $service->destination?->server;
+            if (! $server?->isFunctional()) {
                 return 'Server is not functional';
             }
-            ray('Stopping service: '.$service->name);
+
+            $containersToStop = [];
             $applications = $service->applications()->get();
             foreach ($applications as $application) {
-                instant_remote_process(["docker rm -f {$application->name}-{$service->uuid}"], $service->server, false);
-                $application->update(['status' => 'exited']);
+                NotifyResourceStoppedJob::expectStop($application);
+                $containersToStop[] = "{$application->name}-{$service->uuid}";
             }
             $dbs = $service->databases()->get();
             foreach ($dbs as $db) {
-                instant_remote_process(["docker rm -f {$db->name}-{$service->uuid}"], $service->server, false);
-                $db->update(['status' => 'exited']);
+                NotifyResourceStoppedJob::expectStop($db);
+                $containersToStop[] = "{$db->name}-{$service->uuid}";
             }
-            instant_remote_process(["docker network disconnect {$service->uuid} coolify-proxy"], $service->server);
-            instant_remote_process(["docker network rm {$service->uuid}"], $service->server);
+
+            if (! empty($containersToStop)) {
+                $this->stopContainersInParallel($containersToStop, $server);
+            }
+
+            $applications->each(function ($application): void {
+                $application->update(['status' => 'exited']);
+                $application->resetRestartLimit();
+            });
+            $dbs->each(function ($database): void {
+                $database->update(['status' => 'exited']);
+            });
+
+            if ($deleteConnectedNetworks) {
+                $service->deleteConnectedNetworks();
+            }
+            if ($dockerCleanup) {
+                CleanupDocker::dispatchAfterStop($server);
+            }
         } catch (\Exception $e) {
-            echo $e->getMessage();
-            ray($e->getMessage());
-
             return $e->getMessage();
+        } finally {
+            $teamId = $service->environment?->project?->team?->id;
+            if ($teamId !== null) {
+                ServiceStatusChanged::dispatch($teamId);
+            }
         }
+    }
 
+    private function stopContainersInParallel(array $containersToStop, Server $server): void
+    {
+        instant_remote_process(
+            command: self::stopContainersCommands($containersToStop, $server),
+            server: $server,
+            throwError: false
+        );
+    }
+
+    /**
+     * @param  list<string>  $containersToStop
+     * @return list<string>
+     */
+    public static function stopContainersCommands(array $containersToStop, Server $server): array
+    {
+        $timeout = count($containersToStop) > 5 ? 10 : 30;
+        $containerList = implode(' ', array_map('escapeshellarg', $containersToStop));
+
+        return [
+            dockerStopCommand($timeout, $containerList, $server),
+            "docker rm -f $containerList",
+        ];
     }
 }

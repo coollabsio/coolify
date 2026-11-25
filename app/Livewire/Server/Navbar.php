@@ -1,0 +1,330 @@
+<?php
+
+namespace App\Livewire\Server;
+
+use App\Actions\Proxy\CheckProxy;
+use App\Actions\Proxy\StartProxy;
+use App\Actions\Proxy\StopProxy;
+use App\Enums\ProxyTypes;
+use App\Jobs\RestartProxyJob;
+use App\Models\Server;
+use App\Services\ProxyDashboardCacheService;
+use App\Traits\ListensToTeamChannel;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Carbon;
+use Livewire\Component;
+
+class Navbar extends Component
+{
+    use AuthorizesRequests;
+    use ListensToTeamChannel;
+
+    public Server $server;
+
+    public bool $isChecking = false;
+
+    public ?string $currentRoute = null;
+
+    public bool $traefikDashboardAvailable = false;
+
+    public ?string $serverIp = null;
+
+    public ?string $proxyStatus = 'unknown';
+
+    public ?string $lastNotifiedStatus = null;
+
+    public bool $restartInitiated = false;
+
+    public array $serverSwitcherOptions = [];
+
+    public ?bool $sentinelWarningOverride = null;
+
+    public function getListeners()
+    {
+        return [
+            'refreshServerShow' => 'refreshServer',
+            'sentinel-restart-requested' => 'hideSentinelWarning',
+            ...$this->teamChannelListeners([
+                'ProxyStatusChangedUI' => 'showNotification',
+                'SentinelRestarted' => 'refreshSentinelStatus',
+                'SentinelSynchronized' => 'refreshSentinelStatus',
+            ]),
+        ];
+    }
+
+    public function mount(Server $server)
+    {
+        $this->server = $server;
+        $this->currentRoute = request()->route()->getName();
+        $this->serverIp = $this->server->id === 0 ? base_ip() : $this->server->ip;
+        $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
+        $routeParameters = request()->route()?->parameters() ?? [];
+        $routeName = request()->route()?->getName();
+        $this->serverSwitcherOptions = auth()->user()->currentTeam()->servers()
+            ->orderBy('name')
+            ->get()
+            ->map(function (Server $server) use ($routeName, $routeParameters): array {
+                $parameters = [...$routeParameters, 'server_uuid' => $server->uuid];
+
+                try {
+                    $href = $routeName ? route($routeName, $parameters) : route('server.show', $server->uuid);
+                } catch (\Throwable) {
+                    $href = route('server.show', $server->uuid);
+                }
+
+                return [
+                    'uuid' => $server->uuid,
+                    'name' => $server->name,
+                    'href' => $href,
+                    'functional' => $server->isFunctional(),
+                ];
+            })
+            ->values()
+            ->all();
+        $this->loadProxyConfiguration();
+    }
+
+    public function loadProxyConfiguration()
+    {
+        try {
+            if ($this->proxyStatus === 'running') {
+                $this->traefikDashboardAvailable = ProxyDashboardCacheService::isTraefikDashboardAvailableFromCache($this->server);
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function restart()
+    {
+        try {
+            $this->authorize('manageProxy', $this->server);
+
+            // Prevent duplicate restart calls
+            if ($this->restartInitiated) {
+                return;
+            }
+            $this->restartInitiated = true;
+
+            // Always use background job for all servers
+            RestartProxyJob::dispatch($this->server);
+            auditLog('ui.proxy.restarted', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+            ]);
+
+        } catch (\Throwable $e) {
+            $this->restartInitiated = false;
+
+            return handleError($e, $this);
+        }
+    }
+
+    public function checkProxy()
+    {
+        try {
+            $this->authorize('manageProxy', $this->server);
+            CheckProxy::run($this->server, true);
+            $this->dispatch('startProxy')->self();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function startProxy()
+    {
+        try {
+            $this->authorize('manageProxy', $this->server);
+            $activity = StartProxy::run($this->server, force: true);
+            auditLog('ui.proxy.started', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+            ]);
+            $this->dispatch('activityMonitor', $activity->id);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function stop(bool $forceStop = true)
+    {
+        try {
+            $this->authorize('manageProxy', $this->server);
+            StopProxy::dispatch($this->server, $forceStop);
+            auditLog('ui.proxy.stopped', [
+                'team_id' => $this->server->team_id,
+                'server_uuid' => $this->server->uuid,
+                'server_name' => $this->server->name,
+                'force' => $forceStop,
+            ]);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function checkProxyStatus()
+    {
+        if ($this->isChecking) {
+            return;
+        }
+
+        try {
+            $this->authorize('manageProxy', $this->server);
+            $this->isChecking = true;
+            CheckProxy::run($this->server, true);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        } finally {
+            $this->isChecking = false;
+            $this->showNotification();
+        }
+    }
+
+    public function showNotification($event = null)
+    {
+        $previousStatus = $this->proxyStatus;
+        $this->server->refresh();
+        $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
+        $this->dispatchProxyConfigurationState();
+
+        // If event contains activityId, open activity monitor
+        if ($event && isset($event['activityId'])) {
+            $this->dispatch('activityMonitor', $event['activityId']);
+        }
+
+        // Reset restart flag when proxy reaches a stable state
+        if (in_array($this->proxyStatus, ['running', 'exited', 'error'])) {
+            $this->restartInitiated = false;
+        }
+
+        // Skip notification if we already notified about this status (prevents duplicates)
+        if ($this->lastNotifiedStatus === $this->proxyStatus) {
+            return;
+        }
+
+        switch ($this->proxyStatus) {
+            case 'running':
+                $this->loadProxyConfiguration();
+                // Only show "Proxy is running" notification when transitioning from a stopped/error state
+                // Don't show during normal start/restart flows (starting, restarting, stopping)
+                if (in_array($previousStatus, ['exited', 'stopped', 'unknown', null])) {
+                    $this->dispatch('success', 'Proxy is running.');
+                    $this->lastNotifiedStatus = $this->proxyStatus;
+                }
+                break;
+            case 'exited':
+                // Only show "Proxy has exited" notification when transitioning from running state
+                // Don't show during normal stop/restart flows (stopping, restarting)
+                if (in_array($previousStatus, ['running'])) {
+                    $this->dispatch('info', 'Proxy has exited.');
+                    $this->lastNotifiedStatus = $this->proxyStatus;
+                }
+                break;
+            case 'stopping':
+                // $this->dispatch('info', 'Proxy is stopping.');
+                $this->lastNotifiedStatus = $this->proxyStatus;
+                break;
+            case 'starting':
+                // $this->dispatch('info', 'Proxy is starting.');
+                $this->lastNotifiedStatus = $this->proxyStatus;
+                break;
+            case 'restarting':
+                // $this->dispatch('info', 'Proxy is restarting.');
+                $this->lastNotifiedStatus = $this->proxyStatus;
+                break;
+            case 'error':
+                $this->dispatch('error', 'Proxy restart failed. Check logs.');
+                $this->lastNotifiedStatus = $this->proxyStatus;
+                break;
+            case 'unknown':
+                // Don't notify for unknown status - too noisy
+                break;
+            default:
+                // Don't notify for other statuses
+                break;
+        }
+
+    }
+
+    public function refreshServer()
+    {
+        $this->server->refresh();
+        $this->server->load('settings');
+        $this->proxyStatus = $this->server->proxy->status ?? 'unknown';
+        $this->serverSwitcherOptions = collect($this->serverSwitcherOptions)
+            ->map(fn (array $option): array => $option['uuid'] === $this->server->uuid
+                ? [...$option, 'functional' => $this->server->isFunctional()]
+                : $option)
+            ->all();
+        $this->dispatchProxyConfigurationState();
+    }
+
+    private function dispatchProxyConfigurationState(): void
+    {
+        $this->dispatch(
+            'proxy-configuration-state-changed',
+            pending: $this->server->hasPendingProxyConfiguration(),
+            traefikOutdated: $this->server->hasCurrentTraefikOutdatedInfo(),
+            proxyNotRunning: $this->server->proxySet() && ($this->server->proxy->status ?? 'unknown') !== 'running',
+        );
+    }
+
+    public function refreshSentinelStatus($event = null): void
+    {
+        if (isset($event['serverUuid']) && $event['serverUuid'] !== $this->server->uuid) {
+            return;
+        }
+
+        $this->refreshServer();
+        $this->sentinelWarningOverride = null;
+        $sentinelStatus = $this->server->sentinelStatus();
+        $sentinelStatusStartedAt = $this->server->sentinel_waiting_since ?? Carbon::parse($this->server->sentinel_updated_at);
+        $sentinelTimeoutSeconds = $this->server->sentinel_waiting_since !== null
+            ? $this->server->firstSentinelReportTimeoutSeconds()
+            : $this->server->waitBeforeDoingSshCheck();
+        $expiresInMilliseconds = max(
+            0,
+            ($sentinelStatusStartedAt->copy()->addSeconds($sentinelTimeoutSeconds)->timestamp - now()->timestamp) * 1000
+        );
+        $this->dispatch(
+            'sentinel-status-changed',
+            outOfSync: $this->server->isSentinelEnabled() && $sentinelStatus === 'out_of_sync',
+            expiresInMilliseconds: $expiresInMilliseconds,
+        );
+    }
+
+    public function hideSentinelWarning(): void
+    {
+        $this->sentinelWarningOverride = false;
+    }
+
+    public function refreshAgentStatus(): void
+    {
+        $this->refreshSentinelStatus();
+    }
+
+    /**
+     * Check if Traefik has any outdated version info (patch or minor upgrade).
+     * This shows a warning indicator in the navbar.
+     */
+    public function getHasTraefikOutdatedProperty(): bool
+    {
+        if ($this->server->proxyType() !== ProxyTypes::TRAEFIK->value) {
+            return false;
+        }
+
+        return $this->server->hasCurrentTraefikOutdatedInfo();
+    }
+
+    public function getHasPendingProxyConfigurationProperty(): bool
+    {
+        return $this->server->hasPendingProxyConfiguration();
+    }
+
+    public function render()
+    {
+        return view('livewire.server.navbar');
+    }
+}

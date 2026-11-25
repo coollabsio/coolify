@@ -2,14 +2,17 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\CheckHelperImageJob;
 use App\Models\InstanceSettings;
+use App\Models\ScheduledDatabaseBackupExecution;
+use App\Models\ScheduledTaskExecution;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Process;
 
 class Dev extends Command
 {
-    protected $signature = 'dev {--init} {--generate-openapi}';
+    protected $signature = 'dev {--init}';
 
     protected $description = 'Helper commands for development.';
 
@@ -20,43 +23,69 @@ class Dev extends Command
 
             return;
         }
-        if ($this->option('generate-openapi')) {
-            $this->generateOpenApi();
-
-            return;
-        }
-
-    }
-
-    public function generateOpenApi()
-    {
-        // Generate OpenAPI documentation
-        echo "Generating OpenAPI documentation.\n";
-        $process = Process::run(['/var/www/html/vendor/bin/openapi', 'app', '-o', 'openapi.yaml']);
-        $error = $process->errorOutput();
-        $error = preg_replace('/^.*an object literal,.*$/m', '', $error);
-        $error = preg_replace('/^\h*\v+/m', '', $error);
-        echo $error;
-        echo $process->output();
     }
 
     public function init()
     {
         // Generate APP_KEY if not exists
 
-        if (empty(env('APP_KEY'))) {
-            echo "Generating APP_KEY.\n";
+        if (empty(config('app.key'))) {
+            echo "   INFO  Generating APP_KEY.\n";
             Artisan::call('key:generate');
         }
+
+        // Generate STORAGE link if not exists
+        if (! file_exists(public_path('storage'))) {
+            echo "   INFO  Generating storage link.\n";
+            Artisan::call('storage:link');
+        }
+
         // Seed database if it's empty
         $settings = InstanceSettings::find(0);
         if (! $settings) {
-            echo "Initializing instance, seeding database.\n";
+            echo "   INFO  Initializing instance, seeding database.\n";
             Artisan::call('migrate --seed');
         } else {
-            echo "Instance already initialized.\n";
+            echo "   INFO  Instance already initialized.\n";
         }
-        // Set permissions
-        Process::run(['chmod', '-R', 'o+rwx', '.']);
+
+        // Clean up stuck jobs and stale locks on development startup
+        try {
+            echo "   INFO  Cleaning up Redis (stuck jobs and stale locks)...\n";
+            Artisan::call('cleanup:redis', ['--restart' => true, '--clear-locks' => true]);
+            echo "   INFO  Redis cleanup completed.\n";
+        } catch (\Throwable $e) {
+            echo "   ERROR  Redis cleanup failed: {$e->getMessage()}\n";
+        }
+
+        try {
+            $updatedTaskCount = ScheduledTaskExecution::where('status', 'running')->update([
+                'status' => 'failed',
+                'message' => 'Marked as failed during Coolify startup - job was interrupted',
+                'finished_at' => Carbon::now(),
+            ]);
+
+            if ($updatedTaskCount > 0) {
+                echo "   INFO  Marked {$updatedTaskCount} stuck scheduled task executions as failed.\n";
+            }
+        } catch (\Throwable $e) {
+            echo "   ERROR  Could not clean up stuck scheduled task executions: {$e->getMessage()}\n";
+        }
+
+        try {
+            $updatedBackupCount = ScheduledDatabaseBackupExecution::where('status', 'running')->update([
+                'status' => 'failed',
+                'message' => 'Marked as failed during Coolify startup - job was interrupted',
+                'finished_at' => Carbon::now(),
+            ]);
+
+            if ($updatedBackupCount > 0) {
+                echo "   INFO  Marked {$updatedBackupCount} stuck database backup executions as failed.\n";
+            }
+        } catch (\Throwable $e) {
+            echo "   ERROR  Could not clean up stuck database backup executions: {$e->getMessage()}\n";
+        }
+
+        CheckHelperImageJob::dispatch();
     }
 }

@@ -1,0 +1,440 @@
+# documentation: https://signoz.io/docs/introduction/
+# slogan: An observability platform native to OpenTelemetry with logs, traces and metrics.
+# category: monitoring
+# tags: telemetry, server, applications, interface, logs, monitoring, traces, metrics
+# logo: svgs/signoz.svg
+# port: 8080
+
+services:
+  init-clickhouse:
+    image: clickhouse/clickhouse-server:25.12.5-alpine
+    command:
+      - bash
+      - -c
+      - |
+        version="v0.0.1"
+        node_os=$$(uname -s | tr '[:upper:]' '[:lower:]')
+        node_arch=$$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
+        echo "Fetching histogram-binary for $${node_os}/$${node_arch}"
+        cd /tmp
+        wget -O histogram-quantile.tar.gz "https://github.com/SigNoz/signoz/releases/download/histogram-quantile%2F$${version}/histogram-quantile_$${node_os}_$${node_arch}.tar.gz"
+        tar -xvzf histogram-quantile.tar.gz
+        mv histogram-quantile /var/lib/clickhouse/user_scripts/histogramQuantile
+    restart: on-failure
+    exclude_from_hc: true
+    logging:
+      options:
+        max-size: 50m
+        max-file: "3"
+    volumes:
+      - type: volume
+        source: user-scripts
+        target: /var/lib/clickhouse/user_scripts
+
+  zookeeper:
+    image: signoz/zookeeper:3.9.3
+    user: root
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -s -m 2 http://localhost:8080/commands/ruok | grep error | grep null
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      options:
+        max-size: 50m
+        max-file: "3"
+    volumes:
+      - zookeeper:/bitnami/zookeeper
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=${ZOO_ALLOW_ANONYMOUS_LOGIN:-yes}
+      - ZOO_AUTOPURGE_INTERVAL=${ZOO_AUTOPURGE_INTERVAL:-1}
+      - ZOO_ENABLE_PROMETHEUS_METRICS=${ZOO_ENABLE_PROMETHEUS_METRICS:-yes}
+      - ZOO_PROMETHEUS_METRICS_PORT_NUMBER=${ZOO_PROMETHEUS_METRICS_PORT_NUMBER:-9141}
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.12.5-alpine
+    tty: true
+    depends_on:
+      init-clickhouse:
+        condition: service_completed_successfully
+      zookeeper:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O-
+        - 0.0.0.0:8123/ping
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 262144
+        hard: 262144
+    logging:
+      options:
+        max-size: 50m
+        max-file: "3"
+    environment:
+      - CLICKHOUSE_SKIP_USER_SETUP=1
+    volumes:
+      - type: volume
+        source: clickhouse
+        target: /var/lib/clickhouse/
+      - type: volume
+        source: user-scripts
+        target: /var/lib/clickhouse/user_scripts
+        read_only: true
+      - type: bind
+        source: ./clickhouse/custom-function.xml
+        target: /etc/clickhouse-server/custom-function.xml
+        content: |
+          <functions>
+              <function>
+                  <type>executable</type>
+                  <name>histogramQuantile</name>
+                  <return_type>Float64</return_type>
+                  <argument>
+                      <type>Array(Float64)</type>
+                      <name>buckets</name>
+                  </argument>
+                  <argument>
+                      <type>Array(Float64)</type>
+                      <name>counts</name>
+                  </argument>
+                  <argument>
+                      <type>Float64</type>
+                      <name>quantile</name>
+                  </argument>
+                  <format>CSV</format>
+                  <command>./histogramQuantile</command>
+              </function>
+          </functions>
+      - type: bind
+        source: ./clickhouse/cluster.xml
+        target: /etc/clickhouse-server/config.d/cluster.xml
+        content: |
+          <?xml version="1.0"?>
+          <clickhouse>
+              <zookeeper>
+                  <node index="1">
+                      <host>zookeeper</host>
+                      <port>2181</port>
+                  </node>
+              </zookeeper>
+              <remote_servers>
+                  <cluster>
+                      <shard>
+                          <replica>
+                              <host>clickhouse</host>
+                              <port>9000</port>
+                          </replica>
+                      </shard>
+                  </cluster>
+              </remote_servers>
+              <macros>
+                  <shard>01</shard>
+                  <replica>replica01</replica>
+              </macros>
+              <user_scripts_path>/var/lib/clickhouse/user_scripts/</user_scripts_path>
+              <user_defined_executable_functions_config>*function.xml</user_defined_executable_functions_config>
+          </clickhouse>
+      - type: bind
+        source: ./clickhouse/system-logs.xml
+        target: /etc/clickhouse-server/config.d/system-logs.xml
+        content: |
+          <?xml version="1.0"?>
+          <clickhouse>
+              <query_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+                  <flush_interval_milliseconds>30000</flush_interval_milliseconds>
+              </query_log>
+              <query_thread_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+              </query_thread_log>
+              <query_metric_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+              </query_metric_log>
+              <query_views_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+              </query_views_log>
+              <part_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+              </part_log>
+              <metric_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+                  <flush_interval_milliseconds>30000</flush_interval_milliseconds>
+              </metric_log>
+              <asynchronous_metric_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+              </asynchronous_metric_log>
+              <trace_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+                  <flush_interval_milliseconds>30000</flush_interval_milliseconds>
+              </trace_log>
+              <error_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+              </error_log>
+              <processors_profile_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+                  <flush_interval_milliseconds>30000</flush_interval_milliseconds>
+              </processors_profile_log>
+              <text_log>
+                  <ttl>event_date + INTERVAL 1 DAY DELETE</ttl>
+                  <flush_interval_milliseconds>30000</flush_interval_milliseconds>
+              </text_log>
+          </clickhouse>
+
+  signoz:
+    image: signoz/signoz:v0.150.0
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      telemetrystore-migrator:
+        condition: service_completed_successfully
+    logging:
+      options:
+        max-size: 50m
+        max-file: "3"
+    volumes:
+      - type: volume
+        source: sqlite
+        target: /var/lib/signoz/
+    environment:
+      - SERVICE_URL_SIGNOZ_8080
+      - SIGNOZ_TOKENIZER_JWT_SECRET=${SERVICE_REALBASE64_JWTSECRET}
+      - SIGNOZ_SQLSTORE_PROVIDER=sqlite
+      - SIGNOZ_SQLSTORE_SQLITE_PATH=/var/lib/signoz/signoz.db
+      - SIGNOZ_TELEMETRYSTORE_PROVIDER=clickhouse
+      - SIGNOZ_TELEMETRYSTORE_CLICKHOUSE_DSN=tcp://clickhouse:9000
+      - GODEBUG=netdns=go
+      - DEPLOYMENT_TYPE=docker-standalone-amd
+      - SIGNOZ_STATSREPORTER_ENABLED=${SIGNOZ_STATSREPORTER_ENABLED:-true}
+      - SIGNOZ_EMAILING_ENABLED=${SIGNOZ_EMAILING_ENABLED:-false}
+      - SIGNOZ_EMAILING_SMTP_ADDRESS=${SIGNOZ_EMAILING_SMTP_ADDRESS}
+      - SIGNOZ_EMAILING_SMTP_FROM=${SIGNOZ_EMAILING_SMTP_FROM}
+      - SIGNOZ_EMAILING_SMTP_AUTH_USERNAME=${SIGNOZ_EMAILING_SMTP_AUTH_USERNAME}
+      - SIGNOZ_EMAILING_SMTP_AUTH_PASSWORD=${SIGNOZ_EMAILING_SMTP_AUTH_PASSWORD}
+      - SIGNOZ_ALERTMANAGER_PROVIDER=signoz
+      - SIGNOZ_ALERTMANAGER_SIGNOZ_GLOBAL_SMTP__AUTH__PASSWORD=${SIGNOZ_ALERTMANAGER_SIGNOZ_GLOBAL_SMTP__AUTH__PASSWORD}
+      - SIGNOZ_ALERTMANAGER_SIGNOZ_GLOBAL_SMTP__AUTH__USERNAME=${SIGNOZ_ALERTMANAGER_SIGNOZ_GLOBAL_SMTP__AUTH__USERNAME}
+      - SIGNOZ_ALERTMANAGER_SIGNOZ_GLOBAL_SMTP__FROM=${SIGNOZ_ALERTMANAGER_SIGNOZ_GLOBAL_SMTP__FROM}
+      - SIGNOZ_ALERTMANAGER_SIGNOZ_GLOBAL_SMTP__SMARTHOST=${SIGNOZ_ALERTMANAGER_SIGNOZ_GLOBAL_SMTP__SMARTHOST}
+      - DOT_METRICS_ENABLED=true
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --spider
+        - -q
+        - localhost:8080/api/v1/health
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  telemetrystore-migrator:
+    image: signoz/signoz-otel-collector:v0.144.15
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - |
+        /signoz-otel-collector migrate ready --clickhouse-dsn tcp://clickhouse:9000 &&
+        /signoz-otel-collector migrate bootstrap --clickhouse-dsn tcp://clickhouse:9000 &&
+        /signoz-otel-collector migrate sync up --clickhouse-dsn tcp://clickhouse:9000 &&
+        /signoz-otel-collector migrate async up --clickhouse-dsn tcp://clickhouse:9000
+    environment:
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_DSN=tcp://clickhouse:9000
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_CLUSTER=cluster
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_REPLICATION=true
+      - SIGNOZ_OTEL_COLLECTOR_TIMEOUT=10m
+    restart: on-failure
+    exclude_from_hc: true
+    logging:
+      options:
+        max-size: 50m
+        max-file: "3"
+
+  otel-collector:
+    image: signoz/signoz-otel-collector:v0.144.15
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      telemetrystore-migrator:
+        condition: service_completed_successfully
+      signoz:
+        condition: service_healthy
+    logging:
+      options:
+        max-size: 50m
+        max-file: "3"
+    entrypoint:
+      - /bin/sh
+    command:
+      - -c
+      - |
+        set -e
+        cat > /tmp/otel-config.yaml <<'SIGNOZ_CFG'
+        connectors:
+          signozmeter:
+            metrics_flush_interval: 1h
+            dimensions:
+              - name: service.name
+              - name: deployment.environment
+              - name: host.name
+        receivers:
+          otlp:
+            protocols:
+              grpc:
+                endpoint: 0.0.0.0:4317
+              http:
+                endpoint: 0.0.0.0:4318
+                auth:
+                  authenticator: basicauth/server
+        processors:
+          batch:
+            send_batch_size: 50000
+            send_batch_max_size: 55000
+            timeout: 5s
+          batch/meter:
+            send_batch_size: 20000
+            send_batch_max_size: 25000
+            timeout: 5s
+          filter/drop_stale:
+            error_mode: ignore
+            logs:
+              log_record:
+                - time_unix_nano != 0 and time < Now() - Duration("360h")
+                - time_unix_nano == 0 and observed_time_unix_nano != 0 and observed_time < Now() - Duration("360h")
+            metrics:
+              datapoint:
+                - time_unix_nano != 0 and time < Now() - Duration("360h")
+            traces:
+              span:
+                - start_time_unix_nano != 0 and start_time < Now() - Duration("360h")
+          signozllmpricing:
+            attrs:
+              cache_read: gen_ai.usage.cache_read.input_tokens
+              cache_write: gen_ai.usage.cache_creation.input_tokens
+              in: gen_ai.usage.input_tokens
+              model: gen_ai.request.model
+              out: gen_ai.usage.output_tokens
+            default_pricing:
+              rules: []
+            output_attrs:
+              cache_read: signoz.gen_ai.usage.cache_read.input_tokens.cost
+              cache_write: signoz.gen_ai.usage.cache_write.input_tokens.cost
+              in: signoz.gen_ai.usage.input_tokens.cost
+              out: signoz.gen_ai.usage.output_tokens.cost
+              total: signoz.gen_ai.usage.tokens.cost
+          signozlogsnormalizer: {}
+          signozspanmapper:
+            groups: []
+          signozspanmetrics/delta:
+            metrics_exporter: signozclickhousemetrics
+            metrics_flush_interval: 60s
+            latency_histogram_buckets: [100us, 1ms, 2ms, 6ms, 10ms, 50ms, 100ms, 250ms, 500ms, 1000ms, 1400ms, 2000ms, 5s, 10s, 20s, 40s, 60s]
+            dimensions_cache_size: 100000
+            aggregation_temporality: AGGREGATION_TEMPORALITY_DELTA
+            enable_exp_histogram: true
+            dimensions:
+              - name: service.namespace
+                default: default
+              - name: deployment.environment
+                default: default
+              # This is added to ensure the uniqueness of the timeseries
+              # Otherwise, identical timeseries produced by multiple replicas of
+              # collectors result in incorrect APM metrics
+              - name: signoz.collector.id
+              - name: service.version
+        exporters:
+          clickhousetraces:
+            datasource: tcp://clickhouse:9000/signoz_traces
+            low_cardinal_exception_grouping: false
+            use_new_schema: true
+            timeout: 45s
+            sending_queue:
+              enabled: false
+          signozclickhousemetrics:
+            dsn: tcp://clickhouse:9000/signoz_metrics
+            timeout: 45s
+            sending_queue:
+              enabled: false
+          clickhouselogsexporter:
+            dsn: tcp://clickhouse:9000/signoz_logs
+            use_new_schema: true
+            timeout: 45s
+            sending_queue:
+              enabled: false
+          signozclickhousemeter:
+            dsn: tcp://clickhouse:9000/signoz_meter
+            timeout: 45s
+            sending_queue:
+              enabled: false
+          metadataexporter:
+            enabled: true
+            dsn: tcp://clickhouse:9000/signoz_metadata
+            timeout: 45s
+            cache:
+              provider: in_memory
+        extensions:
+          signoz_health_check:
+            endpoint: 0.0.0.0:13133
+          pprof:
+            endpoint: 0.0.0.0:1777
+          basicauth/server:
+            htpasswd:
+              inline: "$${env:OTEL_BASIC_AUTH}\n"
+        service:
+          telemetry:
+            logs:
+              encoding: json
+          extensions:
+            - signoz_health_check
+            - pprof
+            - basicauth/server
+          pipelines:
+            traces:
+              receivers: [otlp]
+              processors: [signozspanmetrics/delta, signozspanmapper, signozllmpricing, filter/drop_stale, batch]
+              exporters: [clickhousetraces, signozmeter, metadataexporter]
+            metrics:
+              receivers: [otlp]
+              processors: [filter/drop_stale, batch]
+              exporters: [signozclickhousemetrics, signozmeter, metadataexporter]
+            logs:
+              receivers: [otlp]
+              processors: [signozlogsnormalizer, filter/drop_stale, batch]
+              exporters: [clickhouselogsexporter, signozmeter, metadataexporter]
+            metrics/meter:
+              receivers: [signozmeter]
+              processors: [batch/meter]
+              exporters: [signozclickhousemeter]
+        SIGNOZ_CFG
+        cat > /tmp/opamp-config.yaml <<'SIGNOZ_OPAMP'
+        server_endpoint: ws://signoz:4320/v1/opamp
+        SIGNOZ_OPAMP
+        /signoz-otel-collector migrate sync check
+        exec /signoz-otel-collector --config=/tmp/otel-config.yaml --manager-config=/tmp/opamp-config.yaml --copy-path=/var/tmp/collector-config.yaml
+    environment:
+      - SERVICE_URL_OTELCOLLECTORHTTP_4318
+      - OTEL_RESOURCE_ATTRIBUTES=host.name=signoz-host,os.type=linux
+      - LOW_CARDINAL_EXCEPTION_GROUPING=false
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_DSN=tcp://clickhouse:9000
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_CLUSTER=cluster
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_REPLICATION=true
+      - SIGNOZ_OTEL_COLLECTOR_TIMEOUT=10m
+      - OTEL_BASIC_AUTH=signoz:${SERVICE_PASSWORD_64_OTELAUTH}
+    healthcheck:
+      test: bash -c "exec 6<> /dev/tcp/localhost/13133"
+      interval: 30s
+      timeout: 5s
+      retries: 3

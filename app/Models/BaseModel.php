@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
-use Visus\Cuid2\Cuid2;
 
 abstract class BaseModel extends Model
 {
@@ -14,8 +14,22 @@ abstract class BaseModel extends Model
         static::creating(function (Model $model) {
             // Generate a UUID if one isn't set
             if (! $model->uuid) {
-                $model->uuid = (string) new Cuid2(7);
+                $model->uuid = new_public_id();
             }
         });
+    }
+
+    public function sanitizedName(): Attribute
+    {
+        return new Attribute(
+            get: fn () => sanitize_string($this->getRawOriginal('name')),
+        );
+    }
+
+    public function image(): Attribute
+    {
+        return new Attribute(
+            get: fn () => sanitize_string($this->getRawOriginal('image')),
+        );
     }
 }

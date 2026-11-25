@@ -1,0 +1,6 @@
+#!/command/execlineb -P
+
+# s6 oneshots are execline pipelines (shebang shell scripts are not run as sh).
+# Delegate to a real shell script for readable setup logic.
+with-contenv
+/etc/s6-overlay/scripts/init-setup.sh

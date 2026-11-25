@@ -1,8 +1,18 @@
 blank_issues_enabled: false
+
 contact_links:
-  - name: 🤔 Community Support (Chat)
+  - name: 🤔 Questions and Community Support
     url: https://coollabs.io/discord
-    about: Reach out to us on Discord.
-  - name: 🙋‍♂️ Feature Requests
-    url: https://github.com/coollabsio/coolify/discussions/categories/feature-requests-ideas
-    about: All feature requests will be discussed here.
+    about: If you have any questions, reach out to us on Discord inside the "#support" channel.
+
+  - name: 💡 Feature Request
+    url: https://github.com/coollabsio/coolify/discussions/categories/feature-requests
+    about: Suggest a new feature for Coolify. Feature code should branch from `next` and target `next`.
+
+  - name: ⚙️ Service Request
+    url: https://github.com/coollabsio/coolify/discussions/categories/service-requests
+    about: Request a new service integration for Coolify. Service code should branch from `next` and target `next`.
+
+  - name: 🔧 Improvements
+    url: https://github.com/coollabsio/coolify/discussions/categories/improvements
+    about: Suggest improvements to existing features. Small fixes should target `main`; larger changes should target `next`.

@@ -13,6 +13,7 @@ class S3StorageSeeder extends Seeder
     public function run(): void
     {
         S3Storage::create([
+            'uuid' => 'minio',
             'name' => 'Local MinIO',
             'description' => 'Local MinIO S3 Storage',
             'key' => 'minioadmin',
@@ -20,6 +21,7 @@ class S3StorageSeeder extends Seeder
             'bucket' => 'local',
             'endpoint' => 'http://coolify-minio:9000',
             'team_id' => 0,
+            'is_usable' => true,
         ]);
     }
 }

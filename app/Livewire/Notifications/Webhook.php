@@ -1,0 +1,236 @@
+<?php
+
+namespace App\Livewire\Notifications;
+
+use App\Livewire\Notifications\Concerns\TogglesNotificationEvents;
+use App\Models\Team;
+use App\Models\WebhookNotificationSettings;
+use App\Notifications\Test;
+use App\Rules\SafeWebhookUrl;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Validate;
+use Livewire\Component;
+
+class Webhook extends Component
+{
+    use AuthorizesRequests, TogglesNotificationEvents;
+
+    public Team $team;
+
+    public WebhookNotificationSettings $settings;
+
+    #[Validate(['boolean'])]
+    public bool $webhookEnabled = false;
+
+    #[Validate(['required_if:webhookEnabled,true', 'nullable', new SafeWebhookUrl])]
+    public ?string $webhookUrl = null;
+
+    #[Validate(['boolean'])]
+    public bool $deploymentSuccessWebhookNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $deploymentFailureWebhookNotifications = true;
+
+    #[Validate(['boolean'])]
+    public bool $statusChangeWebhookNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $restartLimitReachedWebhookNotifications = true;
+
+    #[Validate(['boolean'])]
+    public bool $backupSuccessWebhookNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $backupFailureWebhookNotifications = true;
+
+    #[Validate(['boolean'])]
+    public bool $scheduledTaskSuccessWebhookNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $scheduledTaskFailureWebhookNotifications = true;
+
+    #[Validate(['boolean'])]
+    public bool $dockerCleanupSuccessWebhookNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $dockerCleanupFailureWebhookNotifications = true;
+
+    #[Validate(['boolean'])]
+    public bool $serverDiskUsageWebhookNotifications = true;
+
+    #[Validate(['boolean'])]
+    public bool $serverReachableWebhookNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $serverUnreachableWebhookNotifications = true;
+
+    #[Validate(['boolean'])]
+    public bool $serverPatchWebhookNotifications = false;
+
+    #[Validate(['boolean'])]
+    public bool $traefikOutdatedWebhookNotifications = true;
+
+    #[Validate(['boolean'])]
+    public bool $imageVulnerabilitiesWebhookNotifications = false;
+
+    public function mount()
+    {
+        try {
+            $this->team = auth()->user()->currentTeam();
+            $this->settings = $this->team->webhookNotificationSettings;
+            $this->authorize('view', $this->settings);
+            $this->syncData();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    private function syncData(bool $toModel = false): void
+    {
+        if ($toModel) {
+            $this->validate();
+            $this->settings->webhook_enabled = $this->webhookEnabled;
+            $this->settings->webhook_url = $this->webhookUrl;
+
+            $this->settings->deployment_success_webhook_notifications = $this->deploymentSuccessWebhookNotifications;
+            $this->settings->deployment_failure_webhook_notifications = $this->deploymentFailureWebhookNotifications;
+            $this->settings->status_change_webhook_notifications = $this->statusChangeWebhookNotifications;
+            $this->settings->restart_limit_reached_webhook_notifications = $this->restartLimitReachedWebhookNotifications;
+            $this->settings->backup_success_webhook_notifications = $this->backupSuccessWebhookNotifications;
+            $this->settings->backup_failure_webhook_notifications = $this->backupFailureWebhookNotifications;
+            $this->settings->scheduled_task_success_webhook_notifications = $this->scheduledTaskSuccessWebhookNotifications;
+            $this->settings->scheduled_task_failure_webhook_notifications = $this->scheduledTaskFailureWebhookNotifications;
+            $this->settings->docker_cleanup_success_webhook_notifications = $this->dockerCleanupSuccessWebhookNotifications;
+            $this->settings->docker_cleanup_failure_webhook_notifications = $this->dockerCleanupFailureWebhookNotifications;
+            $this->settings->server_disk_usage_webhook_notifications = $this->serverDiskUsageWebhookNotifications;
+            $this->settings->server_reachable_webhook_notifications = $this->serverReachableWebhookNotifications;
+            $this->settings->server_unreachable_webhook_notifications = $this->serverUnreachableWebhookNotifications;
+            $this->settings->server_patch_webhook_notifications = $this->serverPatchWebhookNotifications;
+            $this->settings->traefik_outdated_webhook_notifications = $this->traefikOutdatedWebhookNotifications;
+            $this->settings->image_vulnerabilities_webhook_notifications = $this->imageVulnerabilitiesWebhookNotifications;
+
+            $changedFields = array_keys($this->settings->getDirty());
+            $this->settings->save();
+            $this->auditNotificationSettings($changedFields);
+            refreshSession();
+        } else {
+            $this->webhookEnabled = $this->settings->webhook_enabled;
+            $this->webhookUrl = auth()->user()->can('update', $this->settings)
+                ? $this->settings->webhook_url
+                : null;
+
+            $this->deploymentSuccessWebhookNotifications = $this->settings->deployment_success_webhook_notifications;
+            $this->deploymentFailureWebhookNotifications = $this->settings->deployment_failure_webhook_notifications;
+            $this->statusChangeWebhookNotifications = $this->settings->status_change_webhook_notifications;
+            $this->restartLimitReachedWebhookNotifications = $this->settings->restart_limit_reached_webhook_notifications;
+            $this->backupSuccessWebhookNotifications = $this->settings->backup_success_webhook_notifications;
+            $this->backupFailureWebhookNotifications = $this->settings->backup_failure_webhook_notifications;
+            $this->scheduledTaskSuccessWebhookNotifications = $this->settings->scheduled_task_success_webhook_notifications;
+            $this->scheduledTaskFailureWebhookNotifications = $this->settings->scheduled_task_failure_webhook_notifications;
+            $this->dockerCleanupSuccessWebhookNotifications = $this->settings->docker_cleanup_success_webhook_notifications;
+            $this->dockerCleanupFailureWebhookNotifications = $this->settings->docker_cleanup_failure_webhook_notifications;
+            $this->serverDiskUsageWebhookNotifications = $this->settings->server_disk_usage_webhook_notifications;
+            $this->serverReachableWebhookNotifications = $this->settings->server_reachable_webhook_notifications;
+            $this->serverUnreachableWebhookNotifications = $this->settings->server_unreachable_webhook_notifications;
+            $this->serverPatchWebhookNotifications = $this->settings->server_patch_webhook_notifications;
+            $this->traefikOutdatedWebhookNotifications = $this->settings->traefik_outdated_webhook_notifications;
+            $this->imageVulnerabilitiesWebhookNotifications = $this->settings->image_vulnerabilities_webhook_notifications;
+        }
+    }
+
+    public function instantSaveWebhookEnabled()
+    {
+        try {
+            $this->validate([
+                'webhookUrl' => 'required',
+            ], [
+                'webhookUrl.required' => 'Webhook URL is required.',
+            ]);
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->webhookEnabled = (bool) $this->settings->refresh()->webhook_enabled;
+
+            return handleError($e, $this);
+        }
+    }
+
+    public function toggleWebhookEnabled()
+    {
+        try {
+            $this->resetErrorBag();
+
+            if ($this->webhookEnabled) {
+                $this->webhookEnabled = false;
+            } else {
+                $this->validate([
+                    'webhookUrl' => 'required',
+                ], [
+                    'webhookUrl.required' => 'Webhook URL is required.',
+                ]);
+                $this->webhookEnabled = true;
+            }
+
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            $this->syncData();
+
+            return handleError($e, $this);
+        }
+    }
+
+    public function instantSave()
+    {
+        try {
+            $this->authorize('update', $this->settings);
+            $this->syncData(true);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function submit()
+    {
+        try {
+            $this->resetErrorBag();
+            $this->authorize('update', $this->settings);
+            $this->syncData(true);
+            $this->saveModel();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function saveModel()
+    {
+        $this->authorize('update', $this->settings);
+
+        $this->syncData(true);
+        refreshSession();
+
+        $this->dispatch('success', 'Settings saved.');
+    }
+
+    public function sendTestNotification()
+    {
+        try {
+            $this->authorize('sendTest', $this->settings);
+
+            $this->team->notify(new Test(channel: 'webhook'));
+            $this->dispatch('success', 'Test notification sent.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function render()
+    {
+        return view('livewire.notifications.webhook');
+    }
+
+    private function auditNotificationSettings(array $changedFields): void
+    {
+        if ($changedFields !== []) {
+            auditLog('ui.notifications.webhook.updated', ['team_id' => $this->team->id, 'changed_fields' => $changedFields]);
+        }
+    }
+}

@@ -4,6 +4,8 @@ namespace Database\Seeders;
 
 use App\Models\OauthSetting;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class OauthSettingSeeder extends Seeder
 {
@@ -12,25 +14,58 @@ class OauthSettingSeeder extends Seeder
      */
     public function run(): void
     {
-        OauthSetting::firstOrCreate([
-            'id' => 0,
-            'provider' => 'azure',
-        ]);
-        OauthSetting::firstOrCreate([
-            'id' => 1,
-            'provider' => 'bitbucket',
-        ]);
-        OauthSetting::firstOrCreate([
-            'id' => 2,
-            'provider' => 'github',
-        ]);
-        OauthSetting::firstOrCreate([
-            'id' => 3,
-            'provider' => 'gitlab',
-        ]);
-        OauthSetting::firstOrCreate([
-            'id' => 4,
-            'provider' => 'google',
-        ]);
+        try {
+            $providers = collect([
+                'azure',
+                'bitbucket',
+                'clerk',
+                'discord',
+                'github',
+                'gitlab',
+                'google',
+                'oidc',
+                'authentik',
+                'infomaniak',
+                'zitadel',
+            ]);
+
+            $isOauthSeeded = OauthSetting::count() > 0;
+
+            // We changed how providers are defined in the database, so we authentik does not exists, we need to recreate all of the auth providers
+            // Before authentik was a provider, providers started with 0 id
+
+            $isOauthAuthentik = OauthSetting::where('provider', 'authentik')->exists();
+            if (! $isOauthSeeded || $isOauthAuthentik) {
+                foreach ($providers as $provider) {
+                    OauthSetting::updateOrCreate([
+                        'provider' => $provider,
+                    ]);
+                }
+
+                return;
+            }
+
+            DB::transaction(function () use ($providers) {
+                $allProviders = OauthSetting::all();
+                $notFoundProviders = $providers->diff($allProviders->pluck('provider'));
+
+                $allProviders->each(function ($provider) {
+                    $provider->delete();
+                });
+                $allProviders->each(function ($provider) {
+                    $newProvider = $provider->replicate();
+                    $newProvider->save();
+                });
+
+                foreach ($notFoundProviders as $provider) {
+                    OauthSetting::create([
+                        'provider' => $provider,
+                    ]);
+                }
+            });
+
+        } catch (\Exception $e) {
+            Log::error('OauthSettingSeeder failed: '.$e->getMessage());
+        }
     }
 }

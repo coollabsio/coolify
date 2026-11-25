@@ -1,0 +1,534 @@
+<?php
+
+use App\Livewire\Security\IntegrationTokenEditor;
+use App\Livewire\Security\IntegrationTokenForm;
+use App\Livewire\Security\IntegrationTokens;
+use App\Models\AuditEvent;
+use App\Models\DnsProviderZone;
+use App\Models\InstanceSettings;
+use App\Models\IntegrationToken;
+use App\Models\Team;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Once;
+use Livewire\Livewire;
+
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    $this->withoutDefer();
+    if (! InstanceSettings::query()->whereKey(0)->exists()) {
+        $settings = new InstanceSettings;
+        $settings->id = 0;
+        $settings->save();
+    }
+    Once::flush();
+
+    $this->team = Team::factory()->create();
+    $this->user = User::factory()->create();
+    $this->team->members()->attach($this->user->id, ['role' => 'owner']);
+
+    session(['currentTeam' => $this->team]);
+    $this->actingAs($this->user);
+});
+
+test('a cloudflare dns token is validated with read only requests before it is saved', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response([
+            'success' => true,
+            'result' => ['status' => 'active'],
+        ]),
+        'https://api.cloudflare.com/client/v4/zones?per_page=1' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'zone-id']],
+        ]),
+        'https://api.cloudflare.com/client/v4/zones/zone-id/dns_records?per_page=1' => Http::response([
+            'success' => true,
+            'result' => [],
+        ]),
+        'https://api.cloudflare.com/client/v4/zones?page=1&per_page=50' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'zone-id', 'name' => 'example.com', 'account' => ['id' => 'account-id', 'name' => 'Production']]],
+            'result_info' => ['total_pages' => 1],
+        ]),
+    ]);
+
+    Livewire::test(IntegrationTokenForm::class, ['modal_mode' => true])
+        ->set('provider', 'cloudflare')
+        ->set('name', 'Production DNS')
+        ->set('token', 'cloudflare-token')
+        ->set('capabilities', ['dns'])
+        ->call('addToken')
+        ->assertHasNoErrors()
+        ->assertDispatched('close-modal');
+
+    $this->assertDatabaseHas('integration_tokens', [
+        'team_id' => $this->team->id,
+        'provider' => 'cloudflare',
+        'name' => 'Production DNS',
+    ]);
+    $this->assertDatabaseHas('audit_events', [
+        'team_id' => $this->team->id,
+        'event' => 'ui.integration_token.created',
+        'resource_name' => 'Production DNS',
+    ]);
+
+    Http::assertSentCount(4);
+    Http::assertSent(fn ($request) => $request->method() === 'GET'
+        && $request->url() === 'https://api.cloudflare.com/client/v4/zones/zone-id/dns_records?per_page=1');
+});
+
+test('automatic dns is enabled by default and can be disabled when saving a cloudflare token', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response(['success' => true, 'result' => ['status' => 'active']]),
+        'https://api.cloudflare.com/client/v4/zones?per_page=1' => Http::response(['success' => true, 'result' => [['id' => 'zone-id']]]),
+        'https://api.cloudflare.com/client/v4/zones/zone-id/dns_records?per_page=1' => Http::response(['success' => true, 'result' => []]),
+        'https://api.cloudflare.com/client/v4/zones?page=1&per_page=50' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'zone-id', 'name' => 'example.com', 'account' => ['id' => 'account-id', 'name' => 'Production']]],
+            'result_info' => ['total_pages' => 1],
+        ]),
+    ]);
+
+    Livewire::test(IntegrationTokenForm::class)
+        ->assertSet('automaticDns', true)
+        ->set('name', 'Manual DNS')
+        ->set('token', 'cloudflare-token')
+        ->set('automaticDns', false)
+        ->call('addToken')
+        ->assertHasNoErrors();
+
+    expect(IntegrationToken::query()->sole()->automaticDnsEnabled())->toBeFalse();
+});
+
+test('cloudflare proxy mode is off by default and can be enabled when adding and editing a token', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response(['success' => true, 'result' => ['status' => 'active']]),
+        'https://api.cloudflare.com/client/v4/zones?per_page=1' => Http::response(['success' => true, 'result' => [['id' => 'zone-id']]]),
+        'https://api.cloudflare.com/client/v4/zones/zone-id/dns_records?per_page=1' => Http::response(['success' => true, 'result' => []]),
+        'https://api.cloudflare.com/client/v4/zones?page=1&per_page=50' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'zone-id', 'name' => 'example.com', 'account' => ['id' => 'account-id', 'name' => 'Production']]],
+            'result_info' => ['total_pages' => 1],
+        ]),
+    ]);
+
+    Livewire::test(IntegrationTokenForm::class)
+        ->assertSet('proxiedDns', false)
+        ->set('name', 'Proxied DNS')
+        ->set('token', 'cloudflare-token')
+        ->set('proxiedDns', true)
+        ->call('addToken')
+        ->assertHasNoErrors();
+
+    $token = IntegrationToken::query()->sole();
+    expect($token->proxiedDnsEnabled())->toBeTrue();
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $token->uuid])
+        ->assertSet('proxiedDns', true)
+        ->set('proxiedDns', false)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    expect($token->refresh()->proxiedDnsEnabled())->toBeFalse();
+});
+
+test('deleting an integration token is audited without storing its value', function () {
+    $token = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'doppler',
+        'name' => 'Production secrets',
+        'token' => 'dp.st.super-secret',
+        'capabilities' => ['secrets'],
+    ]);
+
+    Livewire::test(IntegrationTokens::class)->call('deleteToken', $token->id);
+
+    $auditEvent = AuditEvent::query()->where('event', 'ui.integration_token.deleted')->sole();
+
+    expect($auditEvent->resource_uuid)->toBe($token->uuid)
+        ->and(json_encode($auditEvent->metadata))->not->toContain('dp.st.super-secret');
+});
+
+test('a cloudflare token is not saved when scope validation fails', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response([
+            'success' => true,
+            'result' => ['status' => 'active'],
+        ]),
+        'https://api.cloudflare.com/client/v4/zones?per_page=1' => Http::response([
+            'success' => false,
+            'errors' => [['message' => 'Authentication error']],
+        ], 403),
+    ]);
+
+    Livewire::test(IntegrationTokenForm::class)
+        ->set('name', 'Invalid DNS token')
+        ->set('token', 'cloudflare-token')
+        ->set('capabilities', ['dns'])
+        ->call('addToken')
+        ->assertDispatched('error');
+
+    $this->assertDatabaseCount('integration_tokens', 0);
+});
+
+test('at least one capability is required when adding a cloudflare token', function () {
+    Livewire::test(IntegrationTokenForm::class)
+        ->set('name', 'Account token')
+        ->set('token', 'cloudflare-token')
+        ->set('capabilities', [])
+        ->call('addToken')
+        ->assertHasErrors(['capabilities' => 'required']);
+
+    $this->assertDatabaseCount('integration_tokens', 0);
+    Http::assertNothingSent();
+});
+
+test('integration tokens page lists saved provider and capabilities', function () {
+    IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'cloudflare',
+        'name' => 'Production DNS',
+        'token' => 'secret',
+        'capabilities' => ['dns'],
+    ]);
+
+    Livewire::test(IntegrationTokens::class)
+        ->assertSee('Production DNS')
+        ->assertSee('Cloudflare')
+        ->assertSee('DNS');
+});
+
+test('an integration token can be rotated after validating its capabilities', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response([
+            'success' => true,
+            'result' => ['status' => 'active'],
+        ]),
+        'https://api.cloudflare.com/client/v4/zones?per_page=1' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'zone-id']],
+        ]),
+        'https://api.cloudflare.com/client/v4/zones/zone-id/dns_records?per_page=1' => Http::response([
+            'success' => true,
+            'result' => [],
+        ]),
+        'https://api.cloudflare.com/client/v4/zones?page=1&per_page=50' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'zone-id', 'name' => 'example.com', 'account' => ['id' => 'account-id', 'name' => 'Production']]],
+            'result_info' => ['total_pages' => 1],
+        ]),
+    ]);
+
+    $savedToken = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'cloudflare',
+        'name' => 'Production DNS',
+        'token' => 'original-token',
+        'capabilities' => ['dns'],
+    ]);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('name', 'Rotated DNS')
+        ->set('newToken', 'rotated-token')
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    $savedToken->refresh();
+
+    expect($savedToken->name)->toBe('Rotated DNS')
+        ->and($savedToken->token)->toBe('rotated-token');
+});
+
+test('leaving the token field blank keeps the existing integration token', function () {
+    Http::fake();
+
+    $savedToken = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'cloudflare',
+        'name' => 'Production DNS',
+        'token' => 'original-token',
+        'capabilities' => ['dns'],
+    ]);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('name', 'Renamed DNS')
+        ->set('newToken', '')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $savedToken->refresh();
+
+    expect($savedToken->name)->toBe('Renamed DNS')
+        ->and($savedToken->token)->toBe('original-token');
+
+    Http::assertNothingSent();
+});
+
+test('cloudflare token editor lists the zones managed by that token', function () {
+    $savedToken = IntegrationToken::factory()->for($this->team)->create([
+        'provider' => 'cloudflare',
+        'name' => 'Production DNS',
+        'capabilities' => ['dns'],
+    ]);
+    DnsProviderZone::factory()->for($savedToken)->create([
+        'name' => 'example.com',
+        'account_name' => 'Production Account',
+    ]);
+    DnsProviderZone::factory()->create(['name' => 'other-team.example']);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->assertSee('Domains this token can manage')
+        ->assertSee('example.com')
+        ->assertSee('Production Account')
+        ->assertDontSee('other-team.example');
+});
+
+test('an invalid replacement does not rotate the integration token', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response([
+            'success' => false,
+        ], 403),
+    ]);
+
+    $savedToken = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'cloudflare',
+        'name' => 'Production DNS',
+        'token' => 'original-token',
+        'capabilities' => ['dns'],
+    ]);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('newToken', 'invalid-token')
+        ->call('save')
+        ->assertDispatched('error');
+
+    expect($savedToken->fresh()->token)->toBe('original-token');
+});
+
+function vaultIntegrationToken(Team $team, array $metadata = ['base_url' => 'https://example.com:8200']): IntegrationToken
+{
+    return IntegrationToken::query()->create([
+        'team_id' => $team->id,
+        'provider' => 'vault',
+        'name' => 'Production Vault',
+        'token' => 'hvs.stored-secret',
+        'capabilities' => ['secrets'],
+        'metadata' => $metadata,
+    ]);
+}
+
+test('changing the vault base url without re-entering the token does not send the stored token to the new host', function () {
+    Http::fake();
+    $savedToken = vaultIntegrationToken($this->team);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.base_url', 'https://example.net:8200')
+        ->set('newToken', '')
+        ->call('save')
+        ->assertHasErrors(['newToken'])
+        ->assertNotDispatched('success');
+
+    Http::assertNothingSent();
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'example.net'));
+    expect($savedToken->fresh()->metadata)->toBe(['base_url' => 'https://example.com:8200'])
+        ->and($savedToken->fresh()->token)->toBe('hvs.stored-secret');
+});
+
+test('changing the vault namespace without re-entering the token is rejected', function () {
+    Http::fake();
+    $savedToken = vaultIntegrationToken($this->team, ['base_url' => 'https://example.com:8200', 'namespace' => 'team-a']);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.namespace', 'team-b')
+        ->call('save')
+        ->assertHasErrors(['newToken']);
+
+    Http::assertNothingSent();
+    expect($savedToken->fresh()->metadata)->toBe(['base_url' => 'https://example.com:8200', 'namespace' => 'team-a']);
+});
+
+test('changing the infisical base url or client id without re-entering the client secret is rejected', function (string $field, string $value) {
+    Http::fake();
+    $savedToken = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'infisical',
+        'name' => 'Production Infisical',
+        'token' => 'stored-client-secret',
+        'capabilities' => ['secrets'],
+        'metadata' => ['base_url' => 'https://example.com', 'client_id' => 'client-a'],
+    ]);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set("metadata.{$field}", $value)
+        ->call('save')
+        ->assertHasErrors(['newToken']);
+
+    Http::assertNothingSent();
+    expect($savedToken->fresh()->metadata)->toBe(['base_url' => 'https://example.com', 'client_id' => 'client-a']);
+})->with([
+    'base url' => ['base_url', 'https://example.net'],
+    'client id' => ['client_id', 'client-b'],
+]);
+
+test('an admin changing the vault base url without the token gets a validation error', function () {
+    Http::fake();
+    $admin = User::factory()->create();
+    $this->team->members()->attach($admin->id, ['role' => 'admin']);
+    $this->actingAs($admin);
+    $savedToken = vaultIntegrationToken($this->team);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.base_url', 'https://example.net:8200')
+        ->call('save')
+        ->assertHasErrors(['newToken']);
+
+    Http::assertNothingSent();
+});
+
+test('changing the vault base url with a re-entered token validates against the new host and is audited', function () {
+    Http::fake([
+        'https://example.net:8200/v1/auth/token/lookup-self' => Http::response(['data' => []]),
+    ]);
+    $savedToken = vaultIntegrationToken($this->team);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.base_url', 'https://example.net:8200')
+        ->set('newToken', 'hvs.new-secret')
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://example.net:8200/v1/auth/token/lookup-self'
+        && $request->hasHeader('X-Vault-Token', 'hvs.new-secret'));
+    Http::assertNotSent(fn ($request) => $request->hasHeader('X-Vault-Token', 'hvs.stored-secret'));
+
+    $savedToken->refresh();
+    expect($savedToken->metadata)->toBe(['base_url' => 'https://example.net:8200'])
+        ->and($savedToken->token)->toBe('hvs.new-secret');
+
+    $event = AuditEvent::query()->where('event', 'ui.integration_token.base_url_changed')->first();
+    expect($event)->not->toBeNull()
+        ->and($event->team_id)->toBe($this->team->id);
+    expect(json_encode($event->toArray()))->toContain('example.net')
+        ->not->toContain('hvs.new-secret');
+});
+
+test('saving a vault token with unchanged connection settings and a blank token keeps working', function () {
+    Http::fake();
+    $savedToken = vaultIntegrationToken($this->team, ['base_url' => 'https://example.com:8200', 'namespace' => 'team-a']);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('name', 'Renamed Vault')
+        ->set('newToken', '')
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    Http::assertNothingSent();
+    $savedToken->refresh();
+    expect($savedToken->name)->toBe('Renamed Vault')
+        ->and($savedToken->token)->toBe('hvs.stored-secret')
+        ->and($savedToken->metadata)->toBe(['base_url' => 'https://example.com:8200', 'namespace' => 'team-a']);
+});
+
+test('changing the vault request timeout keeps the stored token and validates with the new timeout', function () {
+    $timeouts = [];
+    Http::fake(function ($request, array $options) use (&$timeouts) {
+        $timeouts[] = $options['timeout'];
+
+        return Http::response(['data' => []]);
+    });
+    $savedToken = vaultIntegrationToken($this->team);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.timeout', '45')
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    $savedToken->refresh();
+    expect($timeouts)->toBe([45])
+        ->and($savedToken->token)->toBe('hvs.stored-secret')
+        ->and(IntegrationToken::requestTimeout($savedToken->metadata))->toBe(45);
+});
+
+test('a request timeout outside 1 to 300 seconds is rejected', function (string $timeout) {
+    Http::fake();
+    $savedToken = vaultIntegrationToken($this->team);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $savedToken->uuid])
+        ->set('metadata.timeout', $timeout)
+        ->call('save')
+        ->assertHasErrors(['metadata.timeout']);
+
+    Http::assertNothingSent();
+})->with(['0', '301', 'abc']);
+
+test('the token list shows its empty state after the editor deletes the last token', function () {
+    $token = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'cloudflare',
+        'name' => 'Production DNS',
+        'token' => 'secret',
+        'capabilities' => ['dns'],
+    ]);
+    $list = Livewire::test(IntegrationTokens::class)->assertDontSee('No integration tokens');
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $token->uuid])
+        ->call('delete')
+        ->assertDispatched('integration-token-deleted', uuid: $token->uuid);
+
+    $list->dispatch('integration-token-deleted', uuid: $token->uuid)
+        ->assertSee('No integration tokens');
+});
+
+test('a cloudflare token is saved when one validation request has a connection failure', function () {
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/user/tokens/verify' => Http::response(['success' => true, 'result' => ['status' => 'active']]),
+        'https://api.cloudflare.com/client/v4/zones?per_page=1' => Http::response(['success' => true, 'result' => [['id' => 'zone-id']]]),
+        'https://api.cloudflare.com/client/v4/zones/zone-id/dns_records?per_page=1' => Http::sequence()
+            ->pushFailedConnection('cURL error 28: Connection timed out after 5001 milliseconds')
+            ->push(['success' => true, 'result' => []]),
+        'https://api.cloudflare.com/client/v4/zones?page=1&per_page=50' => Http::response([
+            'success' => true,
+            'result' => [['id' => 'zone-id', 'name' => 'example.com', 'account' => ['id' => 'account-id', 'name' => 'Production']]],
+            'result_info' => ['total_pages' => 1],
+        ]),
+    ]);
+
+    Livewire::test(IntegrationTokenForm::class)
+        ->set('provider', 'cloudflare')
+        ->set('name', 'Production DNS')
+        ->set('token', 'cloudflare-token')
+        ->set('capabilities', ['dns'])
+        ->call('addToken')
+        ->assertDispatched('success');
+
+    $this->assertDatabaseHas('integration_tokens', ['team_id' => $this->team->id, 'name' => 'Production DNS']);
+});
+
+test('a clear error is shown when the provider api cannot be reached', function () {
+    Http::fake(['*' => Http::failedConnection('cURL error 28: Connection timed out after 10001 milliseconds')]);
+
+    Livewire::test(IntegrationTokenForm::class)
+        ->set('provider', 'cloudflare')
+        ->set('name', 'Production DNS')
+        ->set('token', 'cloudflare-token')
+        ->set('capabilities', ['dns'])
+        ->call('addToken')
+        ->assertDispatched('error', 'Could not connect to the Cloudflare API. Check the network connection of Coolify and try again.');
+
+    $token = IntegrationToken::factory()->create(['team_id' => $this->team->id, 'provider' => 'cloudflare', 'capabilities' => ['dns']]);
+
+    Livewire::test(IntegrationTokenEditor::class, ['integration_token_uuid' => $token->uuid])
+        ->set('newToken', 'new-cloudflare-token')
+        ->call('save')
+        ->assertDispatched('error', 'Could not connect to the Cloudflare API. Check the network connection of Coolify and try again.');
+
+    $this->assertDatabaseMissing('integration_tokens', ['name' => 'Production DNS']);
+    expect($token->refresh()->token)->not->toBe('new-cloudflare-token');
+});

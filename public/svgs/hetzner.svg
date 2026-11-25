@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Hetzner red background -->
+  <rect width="200" height="200" fill="#D50C2D" rx="8"/>
+  <!-- Hetzner "H" logo in white -->
+  <path d="M40 40 H60 V90 H140 V40 H160 V160 H140 V110 H60 V160 H40 Z" fill="white"/>
+</svg>

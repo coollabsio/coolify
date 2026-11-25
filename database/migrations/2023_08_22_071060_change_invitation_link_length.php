@@ -13,7 +13,6 @@ return new class extends Migration
     {
         Schema::table('team_invitations', function (Blueprint $table) {
             $table->text('link')->change();
-
         });
     }
 

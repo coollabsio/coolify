@@ -2,15 +2,19 @@
 
 namespace App\Livewire\Project\Application;
 
+use App\Actions\Application\CleanupCancelledDeployment;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
-use Illuminate\Support\Carbon;
+use App\Traits\AuditsApplicationSettings;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class DeploymentNavbar extends Component
 {
+    use AuditsApplicationSettings, AuthorizesRequests;
+
     public ApplicationDeploymentQueue $application_deployment_queue;
 
     public Application $application;
@@ -23,9 +27,11 @@ class DeploymentNavbar extends Component
 
     public function mount()
     {
-        $this->application = Application::find($this->application_deployment_queue->application_id);
+        $this->application = Application::ownedByCurrentTeam()->find($this->application_deployment_queue->application_id);
         $this->server = $this->application->destination->server;
-        $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
+        $this->is_debug_enabled = ! auth()->user()->can('update', $this->application)
+            ? false
+            : $this->application->settings->is_debug_enabled;
     }
 
     public function deploymentFinished()
@@ -35,56 +41,55 @@ class DeploymentNavbar extends Component
 
     public function show_debug()
     {
-        $this->application->settings->is_debug_enabled = ! $this->application->settings->is_debug_enabled;
-        $this->application->settings->save();
-        $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
-        $this->dispatch('refreshQueue');
+        try {
+            $this->authorize('update', $this->application);
+            $this->application->settings->is_debug_enabled = ! $this->application->settings->is_debug_enabled;
+            $this->saveApplicationSettingsWithAudit($this->application);
+            $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
+            $this->dispatch('refreshQueue');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function force_start()
     {
         try {
-            force_start_deployment($this->application_deployment_queue);
-        } catch (\Throwable $e) {
-            ray($e);
+            $this->authorize('deploy', $this->application);
+            $started = force_start_deployment($this->application_deployment_queue);
+            $this->application_deployment_queue->refresh();
 
+            if (! $started) {
+                $this->dispatch('info', 'This deployment is no longer queued, so it was not started again.');
+            }
+        } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
 
     public function cancel()
     {
-        $kill_command = "docker rm -f {$this->application_deployment_queue->deployment_uuid}";
-        $server_id = $this->application_deployment_queue->server_id ?? $this->application->destination->server_id;
         try {
-            $server = Server::find($server_id);
-            if ($this->application_deployment_queue->logs) {
-                $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
-
-                $new_log_entry = [
-                    'command' => $kill_command,
-                    'output' => 'Deployment cancelled by user.',
-                    'type' => 'stderr',
-                    'order' => count($previous_logs) + 1,
-                    'timestamp' => Carbon::now('UTC'),
-                    'hidden' => false,
-                ];
-                $previous_logs[] = $new_log_entry;
-                $this->application_deployment_queue->update([
-                    'logs' => json_encode($previous_logs, flags: JSON_THROW_ON_ERROR),
-                ]);
-            }
-            instant_remote_process([$kill_command], $server);
+            $this->authorize('deploy', $this->application);
         } catch (\Throwable $e) {
-            ray($e);
+            return handleError($e, $this);
+        }
+        $teamId = $this->application->team()->id;
+        $server_id = $this->application_deployment_queue->server_id ?? $this->application->destination->server_id;
+        $server = Server::where('team_id', $teamId)->find($server_id);
 
+        // First, mark the deployment as cancelled to prevent further processing
+        $this->application_deployment_queue->update([
+            'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+        ]);
+        try {
+            $this->application_deployment_queue->addLogEntry('Deployment cancelled by user.', 'stderr');
+            CleanupCancelledDeployment::run($this->application_deployment_queue, $teamId);
+        } catch (\Throwable $e) {
+            // Still mark as cancelled even if cleanup fails
             return handleError($e, $this);
         } finally {
-            $this->application_deployment_queue->update([
-                'current_process_id' => null,
-                'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
-            ]);
-            next_after_cancel($server);
+            next_after_cancel($server, $this->application);
         }
     }
 }

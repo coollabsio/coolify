@@ -1,0 +1,28 @@
+{
+    "agents": [
+        "cursor",
+        "claude_code",
+        "codex",
+        "opencode"
+    ],
+    "cloud": false,
+    "guidelines": true,
+    "mcp": true,
+    "nightwatch_mcp": false,
+    "packages": [
+        "lorisleiva/laravel-actions"
+    ],
+    "sail": false,
+    "skills": [
+        "infer-conventions",
+        "fortify-development",
+        "laravel-best-practices",
+        "testing-best-practices",
+        "configuring-horizon",
+        "mcp-development",
+        "socialite-development",
+        "livewire-development",
+        "tailwindcss-development",
+        "laravel-actions"
+    ]
+}

@@ -10,16 +10,63 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Stripe\StripeClient;
 
 class SubscriptionInvoiceFailedJob implements ShouldBeEncrypted, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(protected Team $team) {}
+    public function __construct(protected Team $team)
+    {
+        $this->onQueue('high');
+    }
 
     public function handle()
     {
         try {
+            // Double-check subscription status before sending failure notification
+            $subscription = $this->team->subscription;
+            if ($subscription && $subscription->stripe_customer_id) {
+                try {
+                    $stripe = app(StripeClient::class);
+
+                    if ($subscription->stripe_subscription_id) {
+                        $stripeSubscription = $stripe->subscriptions->retrieve($subscription->stripe_subscription_id);
+
+                        if (in_array($stripeSubscription->status, ['active', 'trialing'])) {
+                            if (! $subscription->stripe_invoice_paid) {
+                                $subscription->update([
+                                    'stripe_invoice_paid' => true,
+                                    'stripe_past_due' => false,
+                                ]);
+                            }
+
+                            return;
+                        }
+
+                        // Only an invoice of this subscription proves payment, not one of an older subscription of the customer.
+                        $invoices = $stripe->invoices->all([
+                            'customer' => $subscription->stripe_customer_id,
+                            'subscription' => $subscription->stripe_subscription_id,
+                            'limit' => 3,
+                        ]);
+
+                        foreach ($invoices->data as $invoice) {
+                            if ($invoice->paid && $invoice->created > (time() - 3600)) {
+                                $subscription->update([
+                                    'stripe_invoice_paid' => true,
+                                    'stripe_past_due' => false,
+                                ]);
+
+                                return;
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                }
+            }
+
+            // If we reach here, payment genuinely failed
             $session = getStripeCustomerPortalSession($this->team);
             $mail = new MailMessage;
             $mail->view('emails.subscription-invoice-failed', [
@@ -27,14 +74,12 @@ class SubscriptionInvoiceFailedJob implements ShouldBeEncrypted, ShouldQueue
             ]);
             $mail->subject('Your last payment was failed for Coolify Cloud.');
             $this->team->members()->each(function ($member) use ($mail) {
-                ray($member);
                 if ($member->isAdmin()) {
                     send_user_an_email($mail, $member->email);
                 }
             });
         } catch (\Throwable $e) {
             send_internal_notification('SubscriptionInvoiceFailedJob failed with: '.$e->getMessage());
-            ray($e->getMessage());
             throw $e;
         }
     }

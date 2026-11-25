@@ -1,0 +1,29 @@
+# documentation: https://github.com/go-gitea/gitea
+# category: devtools
+# slogan: Gitea Actions runner for docker
+# tags: gitea,actions,runner,docker
+# logo: svgs/gitea.svg
+
+## Set GITEA_INSTANCE_URL to the URL of your Gitea instance (Gitea 1.26.2 or newer) and
+## GITEA_RUNNER_REGISTRATION_TOKEN to a runner registration token (Gitea: Site Administration > Actions > Runners).
+
+services:
+  runner:
+    image: 'docker.io/gitea/runner:6.0.0'
+    environment:
+      - 'GITEA_INSTANCE_URL=${GITEA_INSTANCE_URL:?}'
+      - 'GITEA_RUNNER_REGISTRATION_TOKEN=${GITEA_RUNNER_REGISTRATION_TOKEN:?}'
+      - 'GITEA_RUNNER_NAME=${GITEA_RUNNER_NAME:-gitea-runner}'
+      - 'GITEA_RUNNER_LABELS=${GITEA_RUNNER_LABELS:-ubuntu-latest:docker://node:22}'
+      - 'GITEA_TOKEN=${GITEA_TOKEN}'
+    working_dir: /data
+    volumes:
+      - 'runner-data:/data'
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "pgrep -f 'gitea-runner daemon' > /dev/null || exit 1"
+      interval: 5s
+      timeout: 10s
+      retries: 15

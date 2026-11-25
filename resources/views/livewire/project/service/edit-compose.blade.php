@@ -1,36 +1,34 @@
-<div x-data="{ raw: true }">
-    <div class="pb-4">Volume names are updated upon save. The service UUID will be added as a prefix to all volumes, to
-        prevent
-        name collision. <br>To see the actual volume names, check the Deployable Compose file, or go to Storage
-        menu.</div>
+<div x-data="{ raw: true, showNormalTextarea: false }"
+    @compose-preview-toggle.window="raw = !raw"
+    @compose-validate.window="$wire.validateCompose().finally(() => $dispatch('compose-validate-finished'))"
+    @compose-save.window="$wire.saveEditedCompose()"
+    class="flex min-h-0 flex-col gap-3">
+    <x-callout type="info" title="Volume names">
+        Volume names are prefixed with the service UUID when you save to prevent collisions.
+    </x-callout>
 
-    <div x-cloak x-show="raw" class="font-mono">
-        <x-forms.textarea allowTab useMonacoEditor monacoEditorLanguage="yaml" rows="20"
-            id="service.docker_compose_raw">
-        </x-forms.textarea>
-    </div>
-    <div x-cloak x-show="raw === false" class="font-mono">
-        <x-forms.textarea rows="20" readonly id="service.docker_compose">
-        </x-forms.textarea>
-    </div>
-    <div class="pt-2 w-72">
-        <x-forms.checkbox label="Escape special characters in labels?"
-            helper="By default, $ (and other chars) is escaped. So if you write $ in the labels, it will be saved as $$.<br><br>If you want to use env variables inside the labels, turn this off."
-            id="service.is_container_label_escape_enabled" instantSave></x-forms.checkbox>
-    </div>
-    <div class="flex justify-end w-full gap-2 pt-4">
-        <div class="flex items-end gap-2">
-            <div x-cloak x-show="raw">
-                <x-forms.button class="w-64" @click.prevent="raw = !raw">Show Deployable Compose</x-forms.button>
+    <div class="compose-editor-container min-h-[24rem] overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-white/[0.10] dark:bg-[#0b0b0c]"
+        style="--editor-height: clamp(24rem, calc(100dvh - 25rem), 48rem)">
+        <div x-cloak x-show="raw" class="font-mono">
+            <div x-cloak x-show="showNormalTextarea">
+                <x-forms.textarea class="min-h-[24rem] font-mono" style="height: var(--editor-height)"
+                    id="dockerComposeRaw" />
             </div>
-            <div x-cloak x-show="raw === false">
-                <x-forms.button class="w-64" @click.prevent="raw = !raw">Show Source
-                    Compose</x-forms.button>
+            <div x-cloak x-show="!showNormalTextarea">
+                <x-forms.textarea allowTab useMonacoEditor monacoEditorLanguage="yaml" id="dockerComposeRaw" />
             </div>
         </div>
-        <div class="flex-1"></div>
-        <x-forms.button class="w-64" wire:click.prevent='saveEditedCompose'>
-            Save
-        </x-forms.button>
+        <div x-cloak x-show="raw === false" class="font-mono">
+            <x-forms.textarea class="min-h-[24rem] font-mono" style="height: var(--editor-height)" readonly
+                id="dockerCompose" />
+        </div>
+    </div>
+
+    <div
+        class="flex flex-col items-stretch gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-1 sm:flex-row sm:flex-wrap sm:items-center dark:border-white/[0.08] dark:bg-white/[0.05]">
+        <x-forms.checkbox label="Escape special characters in labels"
+            helper="By default, $ (and other characters) is escaped. A $ in a label is saved as $$. Turn this off to use environment variables inside labels."
+            id="isContainerLabelEscapeEnabled" instantSave />
+        <x-forms.checkbox label="Use plain-text editor" id="showNormalTextarea" x-model="showNormalTextarea" />
     </div>
 </div>

@@ -2,75 +2,120 @@
 
 namespace App\Actions\Proxy;
 
-use App\Events\ProxyStarted;
+use App\Enums\ProxyTypes;
+use App\Events\ProxyStatusChanged;
+use App\Events\ProxyStatusChangedUI;
 use App\Models\Server;
+use App\Services\ProxyPortParser;
+use Illuminate\Support\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Lorisleiva\Actions\Decorators\JobDecorator;
 use Spatie\Activitylog\Models\Activity;
 
 class StartProxy
 {
     use AsAction;
 
-    public function handle(Server $server, bool $async = true, bool $force = false): string|Activity
+    public function configureJob(JobDecorator $job): void
     {
-        try {
-            $proxyType = $server->proxyType();
-            if ((is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop || $server->isBuildServer()) && $force === false) {
-                return 'OK';
-            }
-            $commands = collect([]);
-            $proxy_path = $server->proxyPath();
-            $configuration = CheckConfiguration::run($server);
-            if (! $configuration) {
-                throw new \Exception('Configuration is not synced');
-            }
-            SaveConfiguration::run($server, $configuration);
-            $docker_compose_yml_base64 = base64_encode($configuration);
-            $server->proxy->last_applied_settings = str($docker_compose_yml_base64)->pipe('md5')->value;
-            $server->save();
-            if ($server->isSwarm()) {
-                $commands = $commands->merge([
-                    "mkdir -p $proxy_path/dynamic",
-                    "cd $proxy_path",
-                    "echo 'Creating required Docker Compose file.'",
-                    "echo 'Starting coolify-proxy.'",
-                    'docker stack deploy -c docker-compose.yml coolify-proxy',
-                    "echo 'Proxy started successfully.'",
-                ]);
-            } else {
-                $caddfile = 'import /dynamic/*.caddy';
-                $commands = $commands->merge([
-                    "mkdir -p $proxy_path/dynamic",
-                    "cd $proxy_path",
-                    "echo '$caddfile' > $proxy_path/dynamic/Caddyfile",
-                    "echo 'Creating required Docker Compose file.'",
-                    "echo 'Pulling docker image.'",
-                    'docker compose pull',
-                    "echo 'Stopping existing coolify-proxy.'",
-                    'docker compose down -v --remove-orphans > /dev/null 2>&1',
-                    "echo 'Starting coolify-proxy.'",
-                    'docker compose up -d --remove-orphans',
-                    "echo 'Proxy started successfully.'",
-                ]);
-                $commands = $commands->merge(connectProxyToNetworks($server));
-            }
+        $job->onQueue(deployment_queue());
+    }
 
-            if ($async) {
-                $activity = remote_process($commands, $server, callEventOnFinish: 'ProxyStarted', callEventData: $server);
-
-                return $activity;
-            } else {
-                instant_remote_process($commands, $server);
-                $server->proxy->set('status', 'running');
-                $server->proxy->set('type', $proxyType);
-                $server->save();
-                ProxyStarted::dispatch($server);
-
-                return 'OK';
-            }
-        } catch (\Throwable $e) {
-            ray($e);
-            throw $e;
+    public function handle(Server $server, bool $async = true, bool $force = false, bool $restarting = false): string|Activity
+    {
+        $proxyType = $server->proxyType();
+        if ((is_null($proxyType) || $proxyType === 'NONE' || $server->proxy->force_stop || $server->isBuildServer()) && $force === false) {
+            return 'OK';
         }
+        $configuration = GetProxyConfiguration::run($server);
+        if (! $configuration) {
+            throw new \Exception('Configuration is not synced');
+        }
+        ProxyPortParser::fromConfiguration($configuration);
+
+        $server->proxy->set('status', 'starting');
+        $server->save();
+        $server->refresh();
+
+        if (! $restarting) {
+            ProxyStatusChangedUI::dispatch($server->team_id);
+        }
+
+        SaveProxyConfiguration::run($server, $configuration);
+        $server->markProxyConfigurationApplied($configuration);
+        $commands = self::startCommands($server);
+
+        if ($async) {
+            $server->markProxyTransitionStarted();
+
+            return remote_process($commands, $server, callEventOnFinish: 'ProxyStatusChanged', callEventData: ProxyStatusChanged::dataFor($server), queue: deployment_queue());
+        } else {
+            instant_remote_process($commands, $server);
+
+            $server->proxy->set('type', $proxyType);
+            $server->save();
+            ProxyStatusChanged::dispatch(ProxyStatusChanged::dataFor($server));
+
+            return 'OK';
+        }
+    }
+
+    /**
+     * Commands that start or restart the proxy. They remove an existing proxy container only after the image pull.
+     */
+    public static function startCommands(Server $server): Collection
+    {
+        $commands = collect([]);
+        $proxy_path = $server->proxyPath();
+        // Absolute paths: a non-root SSH user may not be able to enter the proxy directory (#4255).
+        $compose_file = rtrim($proxy_path, '/').'/docker-compose.yml';
+
+        if ($server->isSwarmManager()) {
+            $commands = $commands->merge([
+                "mkdir -p $proxy_path/dynamic",
+                "echo 'Creating required Docker Compose file.'",
+                "echo 'Starting coolify-proxy.'",
+                "docker stack deploy --detach=true -c $compose_file coolify-proxy",
+                "echo 'Successfully started coolify-proxy.'",
+            ]);
+        } else {
+            // The base Caddyfile also holds the maintenance blocks (see Server::caddyBaseCaddyfile()).
+            $caddyfile = base64_encode($server->caddyBaseCaddyfile());
+            $commands = $commands->merge([
+                "mkdir -p $proxy_path/dynamic",
+                "echo '$caddyfile' | base64 -d | tee $proxy_path/dynamic/Caddyfile > /dev/null",
+                "echo 'Creating required Docker Compose file.'",
+                "echo 'Pulling docker image.'",
+                serverDockerConfigPrefix($server)."docker compose -f $compose_file pull",
+                'if docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
+                "    echo 'Stopping and removing existing coolify-proxy.'",
+                '    '.dockerStopCommand(30, 'coolify-proxy', $server).' 2>/dev/null || true',
+                '    docker rm -f coolify-proxy 2>/dev/null || true',
+                '    # Wait for container to be fully removed',
+                '    for i in {1..10}; do',
+                '        if ! docker ps -a --format "{{.Names}}" | grep -q "^coolify-proxy$"; then',
+                '            break',
+                '        fi',
+                '        echo "Waiting for coolify-proxy to be removed... ($i/10)"',
+                '        sleep 1',
+                '    done',
+                "    echo 'Successfully stopped and removed existing coolify-proxy.'",
+                'fi',
+            ]);
+            if ($server->proxyType() !== ProxyTypes::TRAEFIK->value) {
+                // The sidecar belongs to the Traefik compose project, so --remove-orphans of another proxy keeps it.
+                $commands->push('docker rm -f '.TRAEFIK_LOGROTATE_CONTAINER.' 2>/dev/null || true');
+            }
+            // Ensure required networks exist BEFORE docker compose up (networks are declared as external)
+            $commands = $commands->merge(ensureProxyNetworksExist($server));
+            $commands = $commands->merge([
+                "echo 'Starting coolify-proxy.'",
+                "docker compose -f $compose_file up -d --wait --remove-orphans",
+                "echo 'Successfully started coolify-proxy.'",
+            ]);
+            $commands = $commands->merge(connectProxyToNetworks($server));
+        }
+
+        return $commands;
     }
 }

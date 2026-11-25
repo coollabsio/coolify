@@ -2,8 +2,15 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\Server\DeleteServer;
+use App\Jobs\CleanupHelperContainersJob;
+use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationPreview;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -15,6 +22,8 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
+use App\Models\Team;
 use Illuminate\Console\Command;
 
 class CleanupStuckedResources extends Command
@@ -25,106 +34,183 @@ class CleanupStuckedResources extends Command
 
     public function handle()
     {
-        ray('Running cleanup stucked resources.');
-        echo "Running cleanup stucked resources.\n";
         $this->cleanup_stucked_resources();
     }
 
     private function cleanup_stucked_resources()
     {
-
         try {
-            $applications = Application::withTrashed()->whereNotNull('deleted_at')->get();
+            $teams = Team::query()
+                ->whereDoesntHave('members')
+                ->whereDoesntHave('servers')
+                ->lazyById();
+            foreach ($teams as $team) {
+                $team->delete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stucked teams: {$e->getMessage()}\n";
+        }
+        try {
+            $servers = Server::query()->with('team.subscription')->lazyById()->filter(function ($server) {
+                return $server->isFunctional();
+            });
+            if (isCloud()) {
+                $servers = $servers->filter(function ($server) {
+                    return data_get($server->team?->subscription, 'stripe_invoice_paid', false) === true;
+                });
+            }
+            foreach ($servers as $server) {
+                CleanupHelperContainersJob::dispatch($server);
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stucked helper containers: {$e->getMessage()}\n";
+        }
+        try {
+            // A newer deleted server can still wait for its queued DeleteServer job, which knows whether to remove the containers.
+            // A queued job can wait behind long jobs and then run until the worker timeout (up to about 24 hours).
+            $servers = Server::onlyTrashed()->where('deleted_at', '<', now()->subHours(24))->lazyById();
+            foreach ($servers as $server) {
+                echo "Force deleting stuck server: {$server->name}\n";
+                // Deletes its resources from Coolify first. The containers stay, because the choice made at the delete is not known.
+                DeleteServer::run($server->id, removeResourcesFromServer: false);
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck servers: {$e->getMessage()}\n";
+        }
+        try {
+            $applicationsDeploymentQueue = ApplicationDeploymentQueue::query()
+                ->select(['id', 'application_id'])
+                ->lazyById();
+            foreach ($applicationsDeploymentQueue as $applicationDeploymentQueue) {
+                if (is_null($applicationDeploymentQueue->application)) {
+                    echo "Deleting stuck application deployment queue: {$applicationDeploymentQueue->id}\n";
+                    $applicationDeploymentQueue->delete();
+                }
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck application deployment queue: {$e->getMessage()}\n";
+        }
+        try {
+            $applications = Application::withTrashed()->whereNotNull('deleted_at')->lazyById();
             foreach ($applications as $application) {
                 echo "Deleting stuck application: {$application->name}\n";
-                $application->forceDelete();
+                DeleteResourceJob::dispatch($application);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck application: {$e->getMessage()}\n";
         }
         try {
-            $postgresqls = StandalonePostgresql::withTrashed()->whereNotNull('deleted_at')->get();
+            $applicationsPreviews = ApplicationPreview::query()
+                ->whereDoesntHave('application')
+                ->lazyById();
+            foreach ($applicationsPreviews as $applicationPreview) {
+                echo "Deleting stuck application preview: {$applicationPreview->uuid}\n";
+                DeleteResourceJob::dispatch($applicationPreview);
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck application: {$e->getMessage()}\n";
+        }
+        try {
+            $applicationsPreviews = ApplicationPreview::withTrashed()->whereNotNull('deleted_at')->lazyById();
+            foreach ($applicationsPreviews as $applicationPreview) {
+                echo "Deleting stuck application preview: {$applicationPreview->fqdn}\n";
+                DeleteResourceJob::dispatch($applicationPreview);
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck application: {$e->getMessage()}\n";
+        }
+        try {
+            $postgresqls = StandalonePostgresql::withTrashed()->whereNotNull('deleted_at')->lazyById();
             foreach ($postgresqls as $postgresql) {
                 echo "Deleting stuck postgresql: {$postgresql->name}\n";
-                $postgresql->forceDelete();
+                DeleteResourceJob::dispatch($postgresql);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck postgresql: {$e->getMessage()}\n";
         }
         try {
-            $redis = StandaloneRedis::withTrashed()->whereNotNull('deleted_at')->get();
-            foreach ($redis as $redis) {
+            $rediss = StandaloneRedis::withTrashed()->whereNotNull('deleted_at')->lazyById();
+            foreach ($rediss as $redis) {
                 echo "Deleting stuck redis: {$redis->name}\n";
-                $redis->forceDelete();
+                DeleteResourceJob::dispatch($redis);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck redis: {$e->getMessage()}\n";
         }
         try {
-            $keydbs = StandaloneKeydb::withTrashed()->whereNotNull('deleted_at')->get();
+            $keydbs = StandaloneKeydb::withTrashed()->whereNotNull('deleted_at')->lazyById();
             foreach ($keydbs as $keydb) {
                 echo "Deleting stuck keydb: {$keydb->name}\n";
-                $keydb->forceDelete();
+                DeleteResourceJob::dispatch($keydb);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck keydb: {$e->getMessage()}\n";
         }
         try {
-            $dragonflies = StandaloneDragonfly::withTrashed()->whereNotNull('deleted_at')->get();
+            $dragonflies = StandaloneDragonfly::withTrashed()->whereNotNull('deleted_at')->lazyById();
             foreach ($dragonflies as $dragonfly) {
                 echo "Deleting stuck dragonfly: {$dragonfly->name}\n";
-                $dragonfly->forceDelete();
+                DeleteResourceJob::dispatch($dragonfly);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck dragonfly: {$e->getMessage()}\n";
         }
         try {
-            $clickhouses = StandaloneClickhouse::withTrashed()->whereNotNull('deleted_at')->get();
+            $clickhouses = StandaloneClickhouse::withTrashed()->whereNotNull('deleted_at')->lazyById();
             foreach ($clickhouses as $clickhouse) {
                 echo "Deleting stuck clickhouse: {$clickhouse->name}\n";
-                $clickhouse->forceDelete();
+                DeleteResourceJob::dispatch($clickhouse);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck clickhouse: {$e->getMessage()}\n";
         }
         try {
-            $mongodbs = StandaloneMongodb::withTrashed()->whereNotNull('deleted_at')->get();
+            $mongodbs = StandaloneMongodb::withTrashed()->whereNotNull('deleted_at')->lazyById();
             foreach ($mongodbs as $mongodb) {
                 echo "Deleting stuck mongodb: {$mongodb->name}\n";
-                $mongodb->forceDelete();
+                DeleteResourceJob::dispatch($mongodb);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck mongodb: {$e->getMessage()}\n";
         }
         try {
-            $mysqls = StandaloneMysql::withTrashed()->whereNotNull('deleted_at')->get();
+            $mysqls = StandaloneMysql::withTrashed()->whereNotNull('deleted_at')->lazyById();
             foreach ($mysqls as $mysql) {
                 echo "Deleting stuck mysql: {$mysql->name}\n";
-                $mysql->forceDelete();
+                DeleteResourceJob::dispatch($mysql);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck mysql: {$e->getMessage()}\n";
         }
         try {
-            $mariadbs = StandaloneMariadb::withTrashed()->whereNotNull('deleted_at')->get();
+            $mariadbs = StandaloneMariadb::withTrashed()->whereNotNull('deleted_at')->lazyById();
             foreach ($mariadbs as $mariadb) {
                 echo "Deleting stuck mariadb: {$mariadb->name}\n";
-                $mariadb->forceDelete();
+                DeleteResourceJob::dispatch($mariadb);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck mariadb: {$e->getMessage()}\n";
         }
         try {
-            $services = Service::withTrashed()->whereNotNull('deleted_at')->get();
+            $sqlites = StandaloneSqlite::withTrashed()->whereNotNull('deleted_at')->lazyById();
+            foreach ($sqlites as $sqlite) {
+                echo "Deleting stuck sqlite: {$sqlite->name}\n";
+                DeleteResourceJob::dispatch($sqlite);
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck sqlite: {$e->getMessage()}\n";
+        }
+        try {
+            $services = Service::withTrashed()->whereNotNull('deleted_at')->lazyById();
             foreach ($services as $service) {
                 echo "Deleting stuck service: {$service->name}\n";
-                $service->forceDelete();
+                DeleteResourceJob::dispatch($service);
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck service: {$e->getMessage()}\n";
         }
         try {
-            $serviceApps = ServiceApplication::withTrashed()->whereNotNull('deleted_at')->get();
+            $serviceApps = ServiceApplication::withTrashed()->whereNotNull('deleted_at')->lazyById();
             foreach ($serviceApps as $serviceApp) {
                 echo "Deleting stuck serviceapp: {$serviceApp->name}\n";
                 $serviceApp->forceDelete();
@@ -133,7 +219,7 @@ class CleanupStuckedResources extends Command
             echo "Error in cleaning stuck serviceapp: {$e->getMessage()}\n";
         }
         try {
-            $serviceDbs = ServiceDatabase::withTrashed()->whereNotNull('deleted_at')->get();
+            $serviceDbs = ServiceDatabase::withTrashed()->whereNotNull('deleted_at')->lazyById();
             foreach ($serviceDbs as $serviceDb) {
                 echo "Deleting stuck serviceapp: {$serviceDb->name}\n";
                 $serviceDb->forceDelete();
@@ -142,36 +228,61 @@ class CleanupStuckedResources extends Command
             echo "Error in cleaning stuck serviceapp: {$e->getMessage()}\n";
         }
         try {
-            $scheduled_tasks = ScheduledTask::all();
+            $scheduled_tasks = ScheduledTask::query()
+                ->where(function ($query): void {
+                    $query->where(function ($query): void {
+                        $query->whereNull('application_id')->whereNull('service_id');
+                    })->orWhere(function ($query): void {
+                        $query->whereNotNull('application_id')->whereDoesntHave('application');
+                    })->orWhere(function ($query): void {
+                        $query->whereNotNull('service_id')->whereDoesntHave('service');
+                    });
+                })
+                ->lazyById();
             foreach ($scheduled_tasks as $scheduled_task) {
-                if (! $scheduled_task->service && ! $scheduled_task->application) {
-                    echo "Deleting stuck scheduledtask: {$scheduled_task->name}\n";
-                    $scheduled_task->delete();
-                }
+                echo "Deleting stuck scheduledtask: {$scheduled_task->name}\n";
+                $scheduled_task->delete();
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck scheduledtasks: {$e->getMessage()}\n";
         }
 
+        try {
+            $scheduled_backups = ScheduledDatabaseBackup::query()->lazyById();
+            foreach ($scheduled_backups as $scheduled_backup) {
+                try {
+                    $server = $scheduled_backup->server();
+                    if (! $server) {
+                        echo "Deleting stuck scheduledbackup: {$scheduled_backup->name}\n";
+                        $scheduled_backup->delete();
+                    }
+                } catch (\Throwable $e) {
+                    echo "Error checking server for scheduledbackup {$scheduled_backup->id}: {$e->getMessage()}\n";
+                }
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck scheduledbackups: {$e->getMessage()}\n";
+        }
+
         // Cleanup any resources that are not attached to any environment or destination or server
         try {
-            $applications = Application::all();
+            $applications = Application::query()->lazyById();
             foreach ($applications as $application) {
                 if (! data_get($application, 'environment')) {
                     echo 'Application without environment: '.$application->name.'\n';
-                    $application->forceDelete();
+                    DeleteResourceJob::dispatch($application);
 
                     continue;
                 }
                 if (! $application->destination()) {
                     echo 'Application without destination: '.$application->name.'\n';
-                    $application->forceDelete();
+                    DeleteResourceJob::dispatch($application);
 
                     continue;
                 }
                 if (! data_get($application, 'destination.server')) {
                     echo 'Application without server: '.$application->name.'\n';
-                    $application->forceDelete();
+                    DeleteResourceJob::dispatch($application);
 
                     continue;
                 }
@@ -180,23 +291,23 @@ class CleanupStuckedResources extends Command
             echo "Error in application: {$e->getMessage()}\n";
         }
         try {
-            $postgresqls = StandalonePostgresql::all()->where('id', '!=', 0);
+            $postgresqls = StandalonePostgresql::query()->where('id', '!=', 0)->lazyById();
             foreach ($postgresqls as $postgresql) {
                 if (! data_get($postgresql, 'environment')) {
                     echo 'Postgresql without environment: '.$postgresql->name.'\n';
-                    $postgresql->forceDelete();
+                    DeleteResourceJob::dispatch($postgresql);
 
                     continue;
                 }
                 if (! $postgresql->destination()) {
                     echo 'Postgresql without destination: '.$postgresql->name.'\n';
-                    $postgresql->forceDelete();
+                    DeleteResourceJob::dispatch($postgresql);
 
                     continue;
                 }
                 if (! data_get($postgresql, 'destination.server')) {
                     echo 'Postgresql without server: '.$postgresql->name.'\n';
-                    $postgresql->forceDelete();
+                    DeleteResourceJob::dispatch($postgresql);
 
                     continue;
                 }
@@ -205,23 +316,23 @@ class CleanupStuckedResources extends Command
             echo "Error in postgresql: {$e->getMessage()}\n";
         }
         try {
-            $redis = StandaloneRedis::all();
+            $redis = StandaloneRedis::query()->lazyById();
             foreach ($redis as $redis) {
                 if (! data_get($redis, 'environment')) {
                     echo 'Redis without environment: '.$redis->name.'\n';
-                    $redis->forceDelete();
+                    DeleteResourceJob::dispatch($redis);
 
                     continue;
                 }
                 if (! $redis->destination()) {
                     echo 'Redis without destination: '.$redis->name.'\n';
-                    $redis->forceDelete();
+                    DeleteResourceJob::dispatch($redis);
 
                     continue;
                 }
                 if (! data_get($redis, 'destination.server')) {
                     echo 'Redis without server: '.$redis->name.'\n';
-                    $redis->forceDelete();
+                    DeleteResourceJob::dispatch($redis);
 
                     continue;
                 }
@@ -231,23 +342,23 @@ class CleanupStuckedResources extends Command
         }
 
         try {
-            $mongodbs = StandaloneMongodb::all();
+            $mongodbs = StandaloneMongodb::query()->lazyById();
             foreach ($mongodbs as $mongodb) {
                 if (! data_get($mongodb, 'environment')) {
                     echo 'Mongodb without environment: '.$mongodb->name.'\n';
-                    $mongodb->forceDelete();
+                    DeleteResourceJob::dispatch($mongodb);
 
                     continue;
                 }
                 if (! $mongodb->destination()) {
                     echo 'Mongodb without destination: '.$mongodb->name.'\n';
-                    $mongodb->forceDelete();
+                    DeleteResourceJob::dispatch($mongodb);
 
                     continue;
                 }
                 if (! data_get($mongodb, 'destination.server')) {
                     echo 'Mongodb without server:  '.$mongodb->name.'\n';
-                    $mongodb->forceDelete();
+                    DeleteResourceJob::dispatch($mongodb);
 
                     continue;
                 }
@@ -257,23 +368,23 @@ class CleanupStuckedResources extends Command
         }
 
         try {
-            $mysqls = StandaloneMysql::all();
+            $mysqls = StandaloneMysql::query()->lazyById();
             foreach ($mysqls as $mysql) {
                 if (! data_get($mysql, 'environment')) {
                     echo 'Mysql without environment: '.$mysql->name.'\n';
-                    $mysql->forceDelete();
+                    DeleteResourceJob::dispatch($mysql);
 
                     continue;
                 }
                 if (! $mysql->destination()) {
                     echo 'Mysql without destination: '.$mysql->name.'\n';
-                    $mysql->forceDelete();
+                    DeleteResourceJob::dispatch($mysql);
 
                     continue;
                 }
                 if (! data_get($mysql, 'destination.server')) {
                     echo 'Mysql without server: '.$mysql->name.'\n';
-                    $mysql->forceDelete();
+                    DeleteResourceJob::dispatch($mysql);
 
                     continue;
                 }
@@ -283,23 +394,23 @@ class CleanupStuckedResources extends Command
         }
 
         try {
-            $mariadbs = StandaloneMariadb::all();
+            $mariadbs = StandaloneMariadb::query()->lazyById();
             foreach ($mariadbs as $mariadb) {
                 if (! data_get($mariadb, 'environment')) {
                     echo 'Mariadb without environment: '.$mariadb->name.'\n';
-                    $mariadb->forceDelete();
+                    DeleteResourceJob::dispatch($mariadb);
 
                     continue;
                 }
                 if (! $mariadb->destination()) {
                     echo 'Mariadb without destination: '.$mariadb->name.'\n';
-                    $mariadb->forceDelete();
+                    DeleteResourceJob::dispatch($mariadb);
 
                     continue;
                 }
                 if (! data_get($mariadb, 'destination.server')) {
                     echo 'Mariadb without server: '.$mariadb->name.'\n';
-                    $mariadb->forceDelete();
+                    DeleteResourceJob::dispatch($mariadb);
 
                     continue;
                 }
@@ -309,23 +420,23 @@ class CleanupStuckedResources extends Command
         }
 
         try {
-            $services = Service::all();
+            $services = Service::query()->lazyById();
             foreach ($services as $service) {
                 if (! data_get($service, 'environment')) {
                     echo 'Service without environment: '.$service->name.'\n';
-                    $service->forceDelete();
+                    DeleteResourceJob::dispatch($service);
 
                     continue;
                 }
                 if (! $service->destination()) {
                     echo 'Service without destination: '.$service->name.'\n';
-                    $service->forceDelete();
+                    DeleteResourceJob::dispatch($service);
 
                     continue;
                 }
                 if (! data_get($service, 'server')) {
                     echo 'Service without server: '.$service->name.'\n';
-                    $service->forceDelete();
+                    DeleteResourceJob::dispatch($service);
 
                     continue;
                 }
@@ -334,30 +445,23 @@ class CleanupStuckedResources extends Command
             echo "Error in service: {$e->getMessage()}\n";
         }
         try {
-            $serviceApplications = ServiceApplication::all();
+            $serviceApplications = ServiceApplication::query()->whereDoesntHave('service')->lazyById();
             foreach ($serviceApplications as $service) {
-                if (! data_get($service, 'service')) {
-                    echo 'ServiceApplication without service: '.$service->name.'\n';
-                    $service->forceDelete();
-
-                    continue;
-                }
+                echo 'ServiceApplication without service: '.$service->name.'\n';
+                $service->forceDelete();
             }
         } catch (\Throwable $e) {
             echo "Error in serviceApplications: {$e->getMessage()}\n";
         }
         try {
-            $serviceDatabases = ServiceDatabase::all();
+            $serviceDatabases = ServiceDatabase::query()->whereDoesntHave('service')->lazyById();
             foreach ($serviceDatabases as $service) {
-                if (! data_get($service, 'service')) {
-                    echo 'ServiceDatabase without service: '.$service->name.'\n';
-                    $service->forceDelete();
-
-                    continue;
-                }
+                echo 'ServiceDatabase without service: '.$service->name.'\n';
+                $service->forceDelete();
             }
         } catch (\Throwable $e) {
             echo "Error in ServiceDatabases: {$e->getMessage()}\n";
         }
+
     }
 }

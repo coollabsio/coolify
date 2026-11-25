@@ -2,33 +2,25 @@
 
 namespace App\Events;
 
+use App\Models\Server;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class ProxyStatusChanged implements ShouldBroadcast
+class ProxyStatusChanged
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $teamId;
+    /**
+     * @param  array{server_id: int, team_id: int}|mixed  $data  Build it with dataFor(); the listener ignores any other shape.
+     */
+    public function __construct(public $data) {}
 
-    public function __construct($teamId = null)
+    /**
+     * @return array{server_id: int, team_id: int}
+     */
+    public static function dataFor(Server $server): array
     {
-        if (is_null($teamId)) {
-            $teamId = auth()->user()->currentTeam()->id ?? null;
-        }
-        if (is_null($teamId)) {
-            throw new \Exception('Team id is null');
-        }
-        $this->teamId = $teamId;
-    }
-
-    public function broadcastOn(): array
-    {
-        return [
-            new PrivateChannel("team.{$this->teamId}"),
-        ];
+        return ['server_id' => $server->id, 'team_id' => $server->team_id];
     }
 }

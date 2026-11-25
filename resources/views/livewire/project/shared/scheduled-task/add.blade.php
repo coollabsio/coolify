@@ -1,27 +1,39 @@
-<form class="flex flex-col w-full gap-2 rounded" wire:submit='submit'>
-    <x-forms.input autofocus placeholder="Run cron" id="name" label="Name" />
+<form class="flex w-full flex-col gap-4" wire:submit="submit">
+    <div class="grid gap-4 sm:grid-cols-2">
+        <x-forms.input placeholder="Database cleanup" id="name" label="Name" />
+        <x-forms.input placeholder="0 0 * * * or daily"
+            helper="Use every_minute, hourly, daily, weekly, monthly, yearly, or a cron expression. Runs in the server timezone ({{ $serverTimezone }}). Change it in the server settings."
+            id="frequency" label="Schedule" />
+    </div>
+
     <x-forms.input placeholder="php artisan schedule:run" id="command" label="Command" />
-    <x-forms.input placeholder="0 0 * * * or daily" id="frequency" label="Frequency" />
-    @if ($type === 'application')
-        @if ($containerNames->count() > 1)
-            <x-forms.select id="container" label="Container name">
-                @foreach ($containerNames as $containerName)
-                    <option value="{{ $containerName }}">{{ $containerName }}</option>
-                @endforeach
-            </x-forms.select>
+    <x-forms.checkbox id="useShell" label="Run in a shell"
+        helper="Run the command with <span class='font-mono'>sh -c</span>, so you can use variables, pipes, and redirects. Turn it off for containers without a shell (distroless or scratch images): Coolify then splits the command into arguments and runs it directly." />
+
+    <div class="grid gap-4 sm:grid-cols-2">
+        <x-forms.input type="number" placeholder="300" id="timeout"
+            helper="Maximum execution time from 60 to 36,000 seconds." label="Timeout (seconds)" />
+        @if ($type === 'application' && $containerNames->count() > 1)
+            <x-forms.listbox id="container" label="Container"
+                :options="$containerNames->map(fn ($containerName) => [
+                    'value' => $containerName,
+                    'label' => $containerName,
+                ])->values()->all()" />
+        @elseif ($type === 'service')
+            <x-forms.listbox id="container" label="Container"
+                :options="$containerNames->map(fn ($containerName) => [
+                    'value' => $containerName,
+                    'label' => $containerName,
+                ])->values()->all()" />
         @else
             <x-forms.input placeholder="php" id="container"
-                helper="You can leave it empty if your resource only have one container." label="Container name" />
+                helper="Leave empty when the resource only has one container." label="Container" />
         @endif
-    @elseif ($type === 'service')
-        <x-forms.select id="container" label="Container name">
-            @foreach ($containerNames as $containerName)
-                <option value="{{ $containerName }}">{{ $containerName }}</option>
-            @endforeach
-        </x-forms.select>
-    @endif
+    </div>
 
-    <x-forms.button @click="modalOpen=false" type="submit">
-        Save
-    </x-forms.button>
+    <div class="flex justify-end border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
+        <x-forms.button @click="modalOpen=false" type="submit">
+            Add task
+        </x-forms.button>
+    </div>
 </form>

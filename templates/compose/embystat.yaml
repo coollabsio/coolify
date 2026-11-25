@@ -1,13 +1,15 @@
 # documentation: https://github.com/mregni/EmbyStat
-# slogan: EmnyStat is a web analytics tool, designed to provide insight into website traffic and user behavior.
-# tags: media, server, movies, tv, music
+# slogan: EmbyStat is a web analytics tool, designed to provide insight into website traffic and user behavior.
+# category: analytics
+# tags: analytics, insights, statistics, web, traffic
 # port: 6555
+# outdated: true
 
 services:
   embystat:
-    image: lscr.io/linuxserver/embystat:latest
+    image: lscr.io/linuxserver/embystat:0.2.0
     environment:
-      - SERVICE_FQDN_EMBYSTAT_6555
+      - SERVICE_URL_EMBYSTAT_6555
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid

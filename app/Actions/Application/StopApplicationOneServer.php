@@ -19,21 +19,24 @@ class StopApplicationOneServer
             return 'Server is not functional';
         }
         try {
-            $containers = getCurrentApplicationContainerStatus($server, $application->id, 0);
+            $containers = getCurrentApplicationContainerStatus($server, $application, 0);
+            $timeout = $application->settings->stopGracePeriodSeconds();
+
             if ($containers->count() > 0) {
                 foreach ($containers as $container) {
                     $containerName = data_get($container, 'Names');
                     if ($containerName) {
                         instant_remote_process(
-                            ["docker rm -f {$containerName}"],
+                            [
+                                dockerStopCommand($timeout, escapeshellarg($containerName), $server),
+                                dockerRemoveCommand($containerName),
+                            ],
                             $server
                         );
                     }
                 }
             }
         } catch (\Exception $e) {
-            ray($e->getMessage());
-
             return $e->getMessage();
         }
     }
