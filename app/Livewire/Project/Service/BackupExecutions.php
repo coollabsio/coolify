@@ -91,7 +91,7 @@ class BackupExecutions extends Component
 
     public function downloadExecution(string $executionUuid): void
     {
-        $this->authorize('update', $this->service);
+        $this->authorize('manageBackups', $this->service);
         $row = $this->executionQuery($executionUuid)->first();
         abort_unless($row, 404);
 

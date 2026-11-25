@@ -59,6 +59,7 @@
             'group' => 'Security',
             'visible' => auth()->user()?->can('update', $server),
             'warning' => filled($server->settings->ssh_host_key_pending),
+            'warning_label' => 'SSH host key change pending',
             'children' => [
                 ['label' => 'General', 'route' => 'server.security', 'active' => $activeSubMenu === 'overview', 'icon' => 'settings'],
                 ['label' => 'Patching', 'route' => 'server.security.patches', 'active' => $activeSubMenu === 'patches', 'icon' => 'refresh', 'visible' => $server->isFunctional()],
@@ -162,7 +163,7 @@
             'icon' => 'play-circle',
             'group' => 'Operations',
             'visible' => ! $server->isLocalhost(),
-            'beta' => true,
+            'experimental' => true,
             'disabled' => ! $server->isFunctional(),
         ],
         [
@@ -204,7 +205,7 @@
             'route' => 'server.transfer',
             'active' => $activeMenu === 'transfer',
             'icon' => 'arrow-right',
-            'beta' => true,
+            'experimental' => true,
             'group' => 'Operations',
             'visible' => ! $server->isLocalhost() && auth()->user()?->can('update', $server),
             'disabled' => ! $server->isFunctional(),
@@ -225,6 +226,17 @@
         ->filter(fn (array $item): bool => $item['visible'] ?? true)
         ->values();
     $groupedServerMenuItems = $serverMenuItems->groupBy('group');
+
+    // Pages that the user can star (components/starred-menu). A disabled page cannot be opened, so it is not starrable.
+    $starrableMenuItems = $serverMenuItems->reject(fn (array $item): bool => $item['disabled'] ?? false)
+        ->map(fn (array $item): array => [
+            'key' => $item['route'],
+            'label' => $item['label'],
+            'icon' => $item['icon'],
+            'href' => route($item['route'], $serverRouteParameters),
+            'active' => $item['active'],
+            'navigate' => $item['navigate'] ?? true,
+        ])->values()->all();
 @endphp
 
 @php
@@ -290,6 +302,7 @@
 @endif
     <nav aria-label="Server configuration sections"
         class="grid grid-cols-1 gap-0.5">
+        <x-starred-menu.group menu="server" :items="$starrableMenuItems" />
         @foreach ($groupedServerMenuItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]"
@@ -304,6 +317,7 @@
                         <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                     </span>
                 @else
+                    <div class="starred-menu-row">
                     <a wire:key="{{ $placement }}-server-settings-link-{{ str($menuItem['label'])->slug() }}"
                         @class([
                             'menu-item',
@@ -314,19 +328,18 @@
                         <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                         <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                         @if ($menuItem['tracks_proxy_configuration'] ?? false)
-                            <x-reicon name="alert-triangle" x-cloak
-                                x-show="proxyConfigurationPending || traefikOutdated || proxyNotRunning"
-                                class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                            <x-attention-mark label="Proxy needs attention" x-cloak
+                                x-show="proxyConfigurationPending || traefikOutdated || proxyNotRunning" />
                         @elseif ($menuItem['tracks_sentinel_status'] ?? false)
-                            <x-reicon name="alert-triangle" x-cloak x-show="sentinelOutOfSync"
-                                class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
+                            <x-attention-mark label="Sentinel is out of sync" x-cloak x-show="sentinelOutOfSync" />
                         @elseif ($menuItem['warning'] ?? false)
-                            <x-reicon name="alert-triangle"
-                                class="ml-auto size-3.5 shrink-0 text-orange-500 dark:text-warning" />
-                        @elseif ($menuItem['beta'] ?? false)
-                            <x-beta-badge class="ml-auto shrink-0" />
+                            <x-attention-mark :label="$menuItem['warning_label'] ?? 'Needs attention'" />
+                        @elseif ($menuItem['experimental'] ?? false)
+                            <x-experimental-icon class="ml-auto shrink-0" />
                         @endif
                     </a>
+                    <x-starred-menu.toggle menu="server" :page="$menuItem['route']" :label="$menuItem['label']" />
+                    </div>
                     @if ($menuItem['active'] && isset($menuItem['children']))
                         <div class="col-span-full grid grid-cols-1 gap-0.5 border-l border-neutral-200 pl-2 dark:border-white/[0.08]">
                             @foreach (collect($menuItem['children'])->filter(fn (array $child): bool => $child['visible'] ?? true) as $child)
@@ -336,8 +349,8 @@
                                     href="{{ route($child['route'], $serverRouteParameters) }}">
                                     <x-reicon :name="$child['icon']" class="menu-item-icon" />
                                     <span class="menu-item-label">{{ $child['label'] }}</span>
-                                    @if ($child['beta'] ?? false)
-                                        <x-beta-badge class="ml-auto shrink-0" />
+                                    @if ($child['experimental'] ?? false)
+                                        <x-experimental-icon class="ml-auto shrink-0" />
                                     @endif
                                 </a>
                             @endforeach

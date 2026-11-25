@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Database\StartClickhouse;
+use App\Actions\Database\StartInfluxdb;
 use App\Actions\Database\StartMariadb;
 use App\Actions\Database\StartMongodb;
 use App\Actions\Database\StartMysql;
@@ -154,4 +155,5 @@ it('adds the password default when the user only sets a *_FILE variant', functio
     'mariadb' => [StartMariadb::class, 'create_standalone_mariadb', ['mariadb_root_password' => 'root-secret'], 'MARIADB_ROOT_PASSWORD_FILE', 'MARIADB_ROOT_PASSWORD=root-secret'],
     'mongodb' => [StartMongodb::class, 'create_standalone_mongodb', ['mongo_initdb_root_password' => 'root-secret'], 'MONGO_INITDB_ROOT_PASSWORD_FILE', 'MONGO_INITDB_ROOT_PASSWORD=root-secret'],
     'clickhouse' => [StartClickhouse::class, 'create_standalone_clickhouse', ['clickhouse_admin_password' => 'root-secret'], 'CLICKHOUSE_PASSWORD_FILE', 'CLICKHOUSE_PASSWORD=root-secret'],
+    'influxdb' => [StartInfluxdb::class, 'create_standalone_influxdb', ['influxdb_admin_password' => 'root-secret'], 'DOCKER_INFLUXDB_INIT_PASSWORD_FILE', 'DOCKER_INFLUXDB_INIT_PASSWORD=root-secret'],
 ]);

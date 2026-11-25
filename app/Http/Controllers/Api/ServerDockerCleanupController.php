@@ -308,10 +308,13 @@ class ServerDockerCleanupController extends Controller
         tags: ['Servers'],
         parameters: [
             new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'page', in: 'query', required: false, description: 'Page number.', schema: new OA\Schema(type: 'integer', default: 1, minimum: 1)),
+            new OA\Parameter(name: 'per_page', in: 'query', required: false, description: 'Items per page.', schema: new OA\Schema(type: 'integer', default: 20, minimum: 1, maximum: 100)),
         ],
         responses: [
             new OA\Response(
                 response: 200,
+                headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')],
                 description: 'Recent Docker cleanup executions.',
                 content: new OA\JsonContent(
                     type: 'array',
@@ -331,6 +334,7 @@ class ServerDockerCleanupController extends Controller
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],
     )]
     public function executions(Request $request): JsonResponse
@@ -347,10 +351,9 @@ class ServerDockerCleanupController extends Controller
 
         $this->authorize('view', $server);
 
-        $executions = $server->dockerCleanupExecutions()
-            ->orderBy('created_at', 'desc')
-            ->take(20)
-            ->get()
+        $request->validate(apiPaginationRules());
+        [$executions, $headers] = apiPaginate($server->dockerCleanupExecutions()->orderBy('created_at', 'desc')->orderBy('id', 'desc'), $request, 20, alwaysPaginate: true);
+        $executions = $executions
             ->map(fn ($execution) => [
                 'uuid' => $execution->uuid,
                 'status' => $execution->status,
@@ -361,6 +364,6 @@ class ServerDockerCleanupController extends Controller
             ])
             ->values();
 
-        return response()->json($executions);
+        return response()->json($executions, 200, $headers);
     }
 }

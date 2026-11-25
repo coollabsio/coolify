@@ -7,11 +7,16 @@
             'application_uuid' => $application->uuid,
         ];
 
+        $openRecommendations = \App\Enums\ApplicationRecommendation::openFor($application);
+        $hasRecommendationsSection = $openRecommendations->isNotEmpty()
+            || \App\Enums\ApplicationRecommendation::dismissedFor($application)->isNotEmpty();
+
         $configurationMenuItems = [
             [
                 'label' => 'General',
                 'route' => 'project.application.configuration',
                 'active' => $currentRoute === 'project.application.configuration',
+                'recommendations' => $openRecommendations,
             ],
             [
                 'label' => 'Domains',
@@ -152,7 +157,7 @@
 
         $configurationMenuItems = array_values(array_filter(
             $configurationMenuItems,
-            fn (array $item): bool => $item['visible'] ?? true,
+            fn (array $item): bool => ($item['visible'] ?? true) && $application->hasConfigurationPage($item['route']),
         ));
 
         // Icons follow the main sidebar's reicon set
@@ -205,6 +210,7 @@
         $isComposeApp = $application->build_pack === 'dockercompose';
         $pageSections = [
             'project.application.configuration' => array_values(array_filter([
+                $hasRecommendationsSection ? ['id' => 'recommendations-section', 'label' => 'Recommendations'] : null,
                 ['id' => 'application-details-section', 'label' => 'Application details'],
                 ['id' => 'access-section', 'label' => 'Access'],
                 ['id' => 'build-pipeline-section', 'label' => 'Build & deploy'],
@@ -232,6 +238,16 @@
             ],
         ];
 
+        // Pages that the user can star (components/starred-menu)
+        $starrableMenuItems = collect($configurationMenuItems)->map(fn (array $item): array => [
+            'key' => $item['route'],
+            'label' => $item['label'],
+            'icon' => $menuIcons[$item['label']] ?? 'settings',
+            'href' => route($item['route'], $applicationRouteParameters),
+            'active' => $item['active'],
+            'navigate' => $item['navigate'] ?? true,
+        ])->all();
+
         // Pages and in-page sections that the command palette (⌘K) can search on this page
         $settingsSearchItems = settingsSearchItems($groupedMenuItems, $applicationRouteParameters, $pageSections);
     @endphp
@@ -255,6 +271,7 @@
 @endif
                 <nav aria-label="Configuration sections"
                     class="grid grid-cols-1 gap-0.5">
+                    <x-starred-menu.group menu="application" :items="$starrableMenuItems" />
                     @foreach ($groupedMenuItems as $groupLabel => $groupItems)
                         @unless ($loop->first)
                             <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]"
@@ -263,6 +280,7 @@
                         @foreach ($groupItems as $menuItem)
                             @php $sections = $pageSections[$menuItem['route']] ?? []; @endphp
                             <div wire:key="{{ $placement }}-application-settings-group-{{ str($menuItem['label'])->slug() }}">
+                                <div class="starred-menu-row">
                                 <a wire:key="{{ $placement }}-application-settings-link-{{ str($menuItem['label'])->slug() }}"
                                     @class([
                                         'menu-item',
@@ -274,7 +292,10 @@
                                     <x-reicon :name="$menuIcons[$menuItem['label']] ?? 'settings'" class="menu-item-icon" />
                                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                                     @if ($menuItem['label'] === 'Files')
-                                        <x-beta-badge class="ml-auto shrink-0" />
+                                        <x-experimental-icon class="ml-auto shrink-0" />
+                                    @endif
+                                    @if (filled($menuItem['recommendations'] ?? null))
+                                        <x-attention-mark :label="$menuItem['recommendations']->count().' '.str('recommendation')->plural($menuItem['recommendations']->count())" />
                                     @endif
                                     <x-image-scan.security-dot :status="$menuItem['security'] ?? null" />
                                     @if ($menuItem['badge'] ?? false)
@@ -284,6 +305,8 @@
                                         </span>
                                     @endif
                                 </a>
+                                <x-starred-menu.toggle menu="application" :page="$menuItem['route']" :label="$menuItem['label']" />
+                                </div>
                                 {{-- Sub-sections belong to the current page only; collapse them for
                                      every other item so the sidebar stays short. --}}
                                 @if ($menuItem['active'] && filled($sections))

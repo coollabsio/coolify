@@ -96,7 +96,7 @@ class Create extends Component
 
     public function submit(): void
     {
-        $this->authorize('update', $this->application);
+        $this->authorize('manageBackups', $this->application);
         $this->validate();
 
         $target = $this->selectedTarget();

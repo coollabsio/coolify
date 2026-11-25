@@ -20,6 +20,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -43,7 +44,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct(
-        public Application|ApplicationPreview|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource,
+        public Application|ApplicationPreview|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $resource,
         public bool $deleteVolumes = true,
         public bool $deleteConnectedNetworks = true,
         public bool $deleteConfigurations = true,
@@ -83,6 +84,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
                 case 'standalone-keydb':
                 case 'standalone-dragonfly':
                 case 'standalone-clickhouse':
+                case 'standalone-influxdb':
                 case 'standalone-sqlite':
                     StopDatabase::run($this->resource, dockerCleanup: $this->dockerCleanup, keepAnonymousDataVolume: false);
                     break;
@@ -184,6 +186,7 @@ class DeleteResourceJob implements ShouldBeEncrypted, ShouldQueue
             || $this->resource instanceof StandaloneKeydb
             || $this->resource instanceof StandaloneDragonfly
             || $this->resource instanceof StandaloneClickhouse
+            || $this->resource instanceof StandaloneInfluxdb
             || $this->resource instanceof StandaloneSqlite;
     }
 

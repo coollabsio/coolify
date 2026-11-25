@@ -79,6 +79,13 @@
                     x-bind:disabled="isRoot || {{ $canUseDeployPermissions ? 'false' : 'true' }}" />
             </div>
             <div class="listbox-option p-0!">
+                <x-forms.checkbox id="permission-terminal" label="Terminal" fullWidth
+                    wire:model.live="{{ $form }}.permissions" domValue="terminal"
+                    helper="Run one-shot commands on servers and in application containers. Cannot be combined with other permissions, and always expires after at most 90 days."
+                    :disabled="!$canUseTerminalPermissions"
+                    x-bind:disabled="isRoot || {{ $canUseTerminalPermissions ? 'false' : 'true' }}" />
+            </div>
+            <div class="listbox-option p-0!">
                 <x-forms.checkbox id="permission-read" label="Read" fullWidth
                     wire:model.live="{{ $form }}.permissions" domValue="read"
                     helper="Read non-sensitive resource data."
@@ -126,18 +133,18 @@
 }">
     <div class="mb-2 flex items-center gap-2">
         <h4 class="text-[12px] font-semibold text-black dark:text-fg">Access</h4>
-        <x-helper helper="A limited token sees only the selected projects, environments, and resources, and cannot use team-level endpoints such as servers, keys, or notifications." />
+        <x-helper helper="A limited token sees only the selected projects, environments, and resources. A selected server gives access to the server endpoints of that server (not to create, delete, or transfer it). A limited token cannot use other team-level endpoints such as keys or notifications." />
     </div>
     <div class="grid gap-4 lg:grid-cols-2">
         <x-forms.listbox id="{{ $form }}.scopeMode" label="Resources" :options="[
             ['value' => 'team', 'label' => 'All resources in the team', 'disabled' => !$canUseTeamScope],
-            ['value' => 'selected', 'label' => 'Selected projects, environments, or resources'],
+            ['value' => 'selected', 'label' => 'Selected projects, environments, resources, or servers'],
         ]" />
         <div class="min-w-0">
             <x-forms.listbox id="{{ $form }}.selectedScopes" label="Selected" multiple searchable :portal="! $inModal" countLabel="resource"
                 x-bind:disabled="!isSelectedMode"
-                placeholder="Choose projects, environments, or resources"
-                emptyText="No projects or resources available."
+                placeholder="Choose projects, environments, resources, or servers"
+                emptyText="No projects, resources, or servers available."
                 :options="$this->scopeOptions" x-effect="coverScopes($data)" />
         </div>
     </div>

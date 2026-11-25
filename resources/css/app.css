@@ -2344,6 +2344,16 @@ html[data-theme="custom"]:not(.dark) :is(.application-settings-section, .applica
 }
 
 /*
+ * Checkbox/toggle rows wrap their text in a <label> that shares its baseline with
+ * the control, so it must not inherit the stacked field-label bottom margin —
+ * otherwise the control sits above the row's vertical center.
+ */
+.application-settings-workspace .form-control label,
+.application-settings-form .form-control label {
+    margin-bottom: 0;
+}
+
+/*
  * Labels that sit in a fixed-height control row (with optional helper icon) must not
  * add their own bottom margin — the row wrapper owns spacing so side-by-side inputs align.
  */
@@ -3287,6 +3297,30 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(14rem, 2.5fr) 4.8rem 4rem 4.5rem 4.8rem 4.2rem 4.5rem;
 }
 
+.env-table-grid.env-table-grid-selectable {
+    grid-template-columns: 1.125rem minmax(14rem, 2.5fr) 4.8rem 6rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
+}
+
+.env-table-grid.env-table-grid-no-type.env-table-grid-selectable {
+    grid-template-columns: 1.125rem minmax(14rem, 2.5fr) 4.8rem 4rem 4.5rem 4.8rem 4.2rem 3rem;
+}
+
+.environment-table-scroll .env-table-grid.env-table-grid-selectable {
+    min-width: 55.25rem;
+}
+
+/* Selection checkboxes show when the table is hovered or focused, or a row is selected.
+   Devices without hover always show them. */
+.env-table-grid-selectable > :first-child {
+    transition: opacity 150ms;
+}
+
+@media (hover: hover) {
+    .data-table:not(:hover, :focus-within, .env-table-has-selection) .env-table-grid-selectable > :first-child {
+        opacity: 0;
+    }
+}
+
 @media (max-width: 768px) {
     .environment-table-scroll .env-table-grid {
         min-width: 0;
@@ -3309,6 +3343,18 @@ input[type="search"]::-webkit-search-results-decoration {
     .data-table-row.env-table-grid > :last-child {
         display: flex;
         justify-self: end;
+    }
+
+    .environment-table-scroll .env-table-grid.env-table-grid-selectable {
+        min-width: 0;
+    }
+
+    .data-table-row.env-table-grid.env-table-grid-selectable {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+
+    .data-table-row.env-table-grid.env-table-grid-selectable > :nth-child(2) {
+        display: flex;
     }
 }
 
@@ -3973,6 +4019,11 @@ input[type="search"]::-webkit-search-results-decoration {
 .server-images-table-grid {
     grid-template-columns: minmax(10rem, 1.6fr) minmax(5rem, 0.8fr) 7.5rem 6.5rem 4.5rem minmax(8rem, 1fr) 6.5rem;
     min-width: 55rem;
+}
+
+.proxy-configuration-versions-table-grid {
+    grid-template-columns: 10rem minmax(8rem, 1fr) 5rem 5.5rem minmax(7rem, 1fr) 6.5rem;
+    min-width: 48rem;
 }
 
 .package-updates-table-grid {
@@ -7196,6 +7247,84 @@ html.dark .project-card-stats-dot {
     justify-content: center;
     padding-left: 0;
     padding-right: 0;
+}
+
+/* Starred resource menu pages (components/starred-menu). The star button sits on the right of its row:
+   it shows on hover and on focus, and always for a starred page. */
+.starred-menu-row {
+    position: relative;
+}
+
+.starred-menu-row > .menu-item {
+    padding-right: 2rem;
+}
+
+.starred-menu-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0.375rem;
+    color: var(--color-neutral-400);
+    opacity: 0;
+    transform: translateY(-50%);
+    transition: opacity 0.1s, color 0.1s;
+}
+
+.starred-menu-toggle:hover {
+    color: var(--color-warning-600);
+}
+
+.starred-menu-row:hover > .starred-menu-toggle,
+.starred-menu-toggle:focus-visible,
+.starred-menu-toggle[aria-pressed="true"] {
+    opacity: 1;
+}
+
+.starred-menu-toggle[aria-pressed="true"] {
+    color: var(--color-warning-600);
+}
+
+html.dark .starred-menu-toggle[aria-pressed="true"],
+html.dark .starred-menu-toggle:hover {
+    color: var(--color-warning);
+}
+
+/* Touch screens have no hover: show every star, dimmed. */
+@media (hover: none) {
+    .starred-menu-toggle {
+        opacity: 0.6;
+    }
+}
+
+.starred-menu-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.625rem 0.25rem;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-fg-faint);
+}
+
+.starred-menu-item {
+    cursor: grab;
+}
+
+.starred-menu-item.is-dragging > .menu-item {
+    outline: 1px dashed var(--color-coollabs);
+    outline-offset: -1px;
+}
+
+/* Collapsed desktop sidebar: the starred icons show first, above a divider. */
+.app-sidebar .sidebar-collapsed .nav-context-menu :is(.starred-menu-toggle, .starred-menu-title) {
+    display: none !important;
 }
 
 /* A page menu's own "Back to ..." item: the main sidebar copy has the back row instead (components/main-nav-menu). */

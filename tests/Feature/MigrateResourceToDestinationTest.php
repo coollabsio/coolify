@@ -13,6 +13,7 @@ use App\Models\Application;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\LocalPersistentVolume;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\ServerSetting;
@@ -23,6 +24,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -430,3 +432,53 @@ test('migration api is unavailable outside development mode', function () {
 
     expect($application->fresh()->destination_id)->toBe($this->destination->id);
 });
+
+test('does not copy an existing volume when migrating volumes across servers', function () {
+    Bus::fake();
+    Process::fake(['*' => Process::result(output: "__COOLIFY_VOLUME_PRESENT__\n")]);
+    giveMigrateTestServersPrivateKey($this);
+    StopApplication::shouldRun()->once();
+
+    $application = createMigrateTestApplication($this);
+    LocalPersistentVolume::create([
+        'name' => 'shared-app-data',
+        'mount_path' => '/data',
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+        'is_external' => true,
+    ]);
+
+    $result = MigrateResourceToDestination::run($application, $this->targetDestination, migrateVolumes: true);
+
+    expect($result['async'])->toBeFalse()
+        ->and($result['volume_jobs'])->toBe(0)
+        ->and($application->refresh()->destination_id)->toBe($this->targetDestination->id);
+    Bus::assertNotDispatched(VolumeCloneJob::class);
+});
+
+test('rejects migration to a server that does not have an existing volume of the resource', function () {
+    Bus::fake();
+    Process::fake(['*' => Process::result(output: "__COOLIFY_VOLUME_ABSENT__\n")]);
+    giveMigrateTestServersPrivateKey($this);
+    StopApplication::shouldRun()->never();
+
+    $application = createMigrateTestApplication($this);
+    LocalPersistentVolume::create([
+        'name' => 'shared-app-data',
+        'mount_path' => '/data',
+        'resource_id' => $application->id,
+        'resource_type' => $application->getMorphClass(),
+        'is_external' => true,
+    ]);
+
+    expect(fn () => MigrateResourceToDestination::run($application, $this->targetDestination, migrateVolumes: false))
+        ->toThrow(ValidationException::class, 'does not exist on the target server');
+    expect($application->refresh()->destination_id)->toBe($this->destination->id);
+});
+
+function giveMigrateTestServersPrivateKey($context): void
+{
+    $privateKey = PrivateKey::factory()->create(['team_id' => $context->team->id]);
+    $context->server->update(['private_key_id' => $privateKey->id]);
+    $context->targetServer->update(['private_key_id' => $privateKey->id]);
+}

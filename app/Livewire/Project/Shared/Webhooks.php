@@ -5,6 +5,7 @@ namespace App\Livewire\Project\Shared;
 use App\Models\Application;
 use App\Models\GitlabApp;
 use App\Rules\ManualWebhookSecret;
+use App\Services\ProjectConfig\ManagedResources;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -86,7 +87,7 @@ class Webhooks extends Component
 
     public function canViewSecrets(): bool
     {
-        return auth()->user()->can('update', $this->resource);
+        return ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->resource);
     }
 
     public function submit()

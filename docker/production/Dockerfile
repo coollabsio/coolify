@@ -1,6 +1,7 @@
 # Versions
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
-ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v5.1.5
+ARG BASE_IMAGE=docker.io/serversideup/php:8.4-fpm-nginx-alpine-v5.1.5@sha256:d5fb2815a81adad2d5ca3be575c3fd8da13443e794588532f97ff9bcb2b2cda7
+ARG DISTRO=alpine-3.24
 # https://github.com/cloudflare/cloudflared/releases
 ARG CLOUDFLARED_VERSION=2026.11.1
 # https://www.postgresql.org/support/versioning/
@@ -26,7 +27,7 @@ ARG GIT_SHA
 # =================================================================
 # Stage 1: Composer dependencies
 # =================================================================
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS base
+FROM ${BASE_IMAGE} AS base
 
 USER root
 
@@ -74,7 +75,7 @@ RUN npm run build
 # =================================================================
 # Stage 3: Terminal dependencies (match the production Node.js ABI and libc)
 # =================================================================
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS terminal-dependencies
+FROM ${BASE_IMAGE} AS terminal-dependencies
 
 USER root
 
@@ -95,7 +96,7 @@ COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
 # =================================================================
 # Final Stage: Production image
 # =================================================================
-FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION}
+FROM ${BASE_IMAGE}
 
 ARG USER_ID
 ARG GROUP_ID
@@ -227,28 +228,30 @@ RUN mkdir -p /etc/nginx/conf.d && \
     chown -R www-data:www-data /etc/nginx && \
     chmod -R 755 /etc/nginx
 
-ARG SERVERSIDEUP_PHP_VERSION
-ARG NODE_VERSION
+ARG BASE_IMAGE
+ARG DISTRO
 ARG CREATED
 ARG GIT_SHA
 
 LABEL org.opencontainers.image.title="Coolify" \
     org.opencontainers.image.description="An open-source, self-hostable PaaS alternative to Vercel, Heroku & Netlify that lets you easily deploy static sites, databases, full-stack applications and 360+ one-click services on your own servers." \
     org.opencontainers.image.version="${COOLIFY_VERSION}" \
-    org.opencontainers.image.created="${CREATED}" \
     org.opencontainers.image.revision="${GIT_SHA}" \
+    org.opencontainers.image.created="${CREATED}" \
     org.opencontainers.image.licenses="Apache-2.0" \
-    org.opencontainers.image.authors="coollabsio" \
-    org.opencontainers.image.vendor="coollabsio" \
+    org.opencontainers.image.authors="coolLabs" \
+    org.opencontainers.image.vendor="coolLabs" \
     org.opencontainers.image.url="https://coolify.io" \
-    org.opencontainers.image.source="https://github.com/coollabsio/coolify" \
     org.opencontainers.image.documentation="https://coolify.io/docs" \
-    org.opencontainers.image.base.name="docker.io/serversideup/php:${SERVERSIDEUP_PHP_VERSION}" \
-    io.coolify.nginx.version="${NGINX_VERSION}" \
-    io.coolify.node.version="${NODE_VERSION}" \
-    io.coolify.cloudflared.version="${CLOUDFLARED_VERSION}" \
-    io.coolify.postgresql-client.version="${POSTGRES_VERSION}" \
-    io.coolify.php-uv.version="${PHP_UV_VERSION}"
+    org.opencontainers.image.source="https://github.com/coollabsio/coolify" \
+    org.opencontainers.image.base.name="${BASE_IMAGE%@*}" \
+    org.opencontainers.image.base.digest="${BASE_IMAGE#*@}" \
+    io.coolify.image.version="${COOLIFY_VERSION}" \
+    io.coolify.image.distro="${DISTRO}" \
+    io.coolify.image.variant="runtime" \
+    io.coolify.image.flavor="" \
+    io.coolify.image.shell="busybox" \
+    io.coolify.image.package-manager="apk"
 
 # Switch to non-root user
 USER www-data

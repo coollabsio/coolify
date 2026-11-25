@@ -18,6 +18,7 @@ class RepositoryDetectionResult extends Data
         public array $dockerComposeFiles = [],
         public array $envFiles = [],
         public array $dockerfilePorts = [],
+        public ?string $configFile = null,
     ) {}
 
     public static function none(): self

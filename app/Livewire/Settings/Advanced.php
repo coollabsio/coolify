@@ -7,6 +7,7 @@ use App\Models\S3Storage;
 use App\Rules\ValidDnsServers;
 use App\Rules\ValidIpOrCidr;
 use App\Services\FileDownloadStorageService;
+use App\Services\UploadStorageService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -51,6 +52,9 @@ class Advanced extends Component
     #[Validate('boolean')]
     public bool $is_mcp_server_enabled;
 
+    #[Validate('boolean')]
+    public bool $is_terminal_api_enabled;
+
     public ?string $webhook_allowed_internal_hosts = null;
 
     #[Validate('boolean')]
@@ -65,6 +69,8 @@ class Advanced extends Component
     public array $avatar_storage_options = [];
 
     public string $file_download_storage = 'stream';
+
+    public string $upload_storage = 'local';
 
     public int $server_validation_rate_limit_seconds = 600;
 
@@ -87,6 +93,7 @@ class Advanced extends Component
             'is_passkey_enabled' => 'boolean',
             'is_wire_navigate_enabled' => 'boolean',
             'is_mcp_server_enabled' => 'boolean',
+            'is_terminal_api_enabled' => 'boolean',
             'webhook_allowed_internal_hosts' => 'nullable|string',
             'webhook_allow_localhost' => 'boolean',
             'domain_connect_private_key' => 'nullable|string',
@@ -115,6 +122,7 @@ class Advanced extends Component
         $this->is_sponsorship_popup_enabled = $this->settings->is_sponsorship_popup_enabled;
         $this->is_wire_navigate_enabled = $this->settings->is_wire_navigate_enabled ?? true;
         $this->is_mcp_server_enabled = $this->settings->is_mcp_server_enabled ?? false;
+        $this->is_terminal_api_enabled = $this->settings->is_terminal_api_enabled ?? false;
         $this->webhook_allowed_internal_hosts = collect($this->settings->webhook_allowed_internal_hosts ?? [])->implode(',');
         $this->webhook_allow_localhost = $this->settings->webhook_allow_localhost ?? false;
         // Do not prefill the secret into the form; only update when the admin pastes a new value.
@@ -142,6 +150,9 @@ class Advanced extends Component
         $this->file_download_storage = $this->settings->file_download_s3_storage_id
             ? 's3:'.$this->settings->file_download_s3_storage_id
             : 'stream';
+        $this->upload_storage = $this->settings->upload_s3_storage_id
+            ? 's3:'.$this->settings->upload_s3_storage_id
+            : 'local';
     }
 
     public function submit()
@@ -249,13 +260,18 @@ class Advanced extends Component
             $this->settings->is_passkey_enabled = $this->is_passkey_enabled;
             $this->settings->is_wire_navigate_enabled = $this->is_wire_navigate_enabled;
             $this->settings->is_mcp_server_enabled = $this->is_mcp_server_enabled;
+            $this->settings->is_terminal_api_enabled = $this->is_terminal_api_enabled;
             $this->settings->webhook_allowed_internal_hosts = $webhookAllowedInternalHosts ?? $this->settings->webhook_allowed_internal_hosts ?? [];
             $this->settings->webhook_allow_localhost = $this->webhook_allow_localhost;
             $this->settings->image_cdn_url = filled($this->image_cdn_url) ? rtrim($this->image_cdn_url, '/') : null;
             $this->saveAvatarStorageSetting();
             $this->saveFileDownloadStorageSetting();
+            $bucketProblems = $this->saveUploadStorageSetting();
             $this->saveAndAudit();
             $this->dispatch('success', 'Settings updated!');
+            foreach ($bucketProblems as $problem) {
+                $this->dispatch('warning', $problem);
+            }
         } catch (\Exception $e) {
             return handleError($e, $this);
         }
@@ -326,6 +342,49 @@ class Advanced extends Component
         }
 
         $this->settings->file_download_s3_storage_id = $storage->id;
+    }
+
+    /**
+     * Selecting a storage adds the CORS rule for browser uploads and an auto-delete lifecycle rule to its bucket.
+     * The setting is refused when the bucket is listable by anonymous users, because it holds uploaded files such as database backups.
+     *
+     * @return list<string> Bucket rules that Coolify could not add; the admin must add them.
+     */
+    private function saveUploadStorageSetting(): array
+    {
+        if ($this->upload_storage === 'local') {
+            $this->settings->upload_s3_storage_id = null;
+
+            return [];
+        }
+
+        $storageId = (int) str($this->upload_storage)->after('s3:')->value();
+        if ($storageId === $this->settings->upload_s3_storage_id) {
+            return [];
+        }
+
+        $storage = S3Storage::query()
+            ->s3Only()
+            ->whereTeamId(0)
+            ->where('is_usable', true)
+            ->find($storageId);
+
+        $previous = $this->settings->upload_s3_storage_id ? 's3:'.$this->settings->upload_s3_storage_id : 'local';
+        if (! $storage || $this->upload_storage !== 's3:'.$storage->id) {
+            $this->upload_storage = $previous;
+            throw new \InvalidArgumentException('The selected upload storage is not available.');
+        }
+
+        try {
+            app(FileDownloadStorageService::class)->ensureBucketIsPrivate($storage);
+        } catch (\RuntimeException $e) {
+            $this->upload_storage = $previous;
+            throw $e;
+        }
+
+        $this->settings->upload_s3_storage_id = $storage->id;
+
+        return app(UploadStorageService::class)->prepareBucket($storage);
     }
 
     public function clearDomainConnectPrivateKey(): void

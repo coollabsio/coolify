@@ -218,6 +218,12 @@ class Select extends Component
                 'documentation' => 'https://coolify.io/docs/applications',
                 'logo' => resource_logo_url('docker-image'),
             ],
+            [
+                'id' => 'static-archive',
+                'name' => 'Static Site (Upload)',
+                'description' => 'Deploy a static site from an uploaded .tar, .tar.gz, or .tgz archive, without a Git repository.',
+                'logo' => resource_logo_url('static-archive'),
+            ],
         ];
         $databases = [
             [
@@ -271,6 +277,12 @@ class Select extends Component
                 'name' => 'ClickHouse',
                 'description' => 'A column-oriented database for real-time analytics.',
                 'logo' => resource_logo_url('clickhouse'),
+            ],
+            [
+                'id' => 'influxdb',
+                'name' => 'InfluxDB',
+                'description' => 'A time series database for metrics, events, and real-time analytics.',
+                'logo' => resource_logo_url('influxdb'),
             ],
             [
                 'id' => 'sqlite',
@@ -416,6 +428,7 @@ class Select extends Component
             case 'keydb':
             case 'dragonfly':
             case 'clickhouse':
+            case 'influxdb':
             case 'mongodb':
             case 'sqlite':
                 $this->isDatabase = true;

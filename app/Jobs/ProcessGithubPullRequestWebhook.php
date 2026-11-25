@@ -182,6 +182,7 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
         }
 
         ($found ?? $preview)->recordSameRepository(! $this->isForkPullRequest);
+        ($found ?? $preview)->markForkPullRequest($this->isForkPullRequest, $this->commitSha);
 
         // Queue the deployment
         $deployment_uuid = new_public_id();

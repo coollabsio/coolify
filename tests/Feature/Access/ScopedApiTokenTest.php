@@ -8,6 +8,7 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\PersonalAccessToken;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Scopes\VisibleThroughAccessGrants;
 use App\Models\Server;
@@ -135,7 +136,7 @@ describe('admin token scoped to one project', function () {
     test('cannot use team-level endpoints or create projects', function () {
         scopedTokenTestApi($this->token, 'GET', '/api/v1/servers')
             ->assertForbidden()
-            ->assertExactJson(['message' => 'This API token is limited to selected projects, environments, or resources, so it cannot use this endpoint.']);
+            ->assertExactJson(['message' => 'This API token is limited to selected projects, environments, resources, or servers, so it cannot use this endpoint.']);
         scopedTokenTestApi($this->token, 'GET', '/api/v1/security/keys')->assertForbidden();
         scopedTokenTestApi($this->token, 'GET', '/api/v1/team')->assertForbidden();
         scopedTokenTestApi($this->token, 'POST', '/api/v1/projects', ['name' => 'new'])->assertForbidden();
@@ -203,7 +204,7 @@ describe('server secrets in resource responses', function () {
     beforeEach(function () {
         $this->server->settings->forceFill([
             'sentinel_token' => 'sentinel-token-canary',
-            'logdrain_axiom_api_key' => 'axiom-key-canary',
+            'logdrain_config' => ['axiom' => ['api_key' => 'axiom-key-canary']],
         ])->save();
         $this->server->proxy->last_saved_proxy_configuration = 'proxy-config-canary';
         $this->server->validation_logs = 'validation-logs-canary';
@@ -548,5 +549,133 @@ describe('token form', function () {
         Livewire::test(ApiTokens::class)->call('setPaused', $token->id, true);
 
         expect($token->fresh()->isPaused())->toBeFalse();
+    });
+});
+
+describe('token scoped to servers', function () {
+    beforeEach(function () {
+        $this->otherServer = Server::factory()->create(['team_id' => $this->team->id]);
+    });
+
+    test('a read token lists and shows only its server', function () {
+        $token = scopedTokenTestToken($this->admin, $this->team, ['read'], [['scope' => 'server', 'uuid' => $this->server->uuid]]);
+
+        expect(scopedTokenTestApi($token, 'GET', '/api/v1/servers')->assertOk()->json('*.uuid'))->toBe([$this->server->uuid]);
+        scopedTokenTestApi($token, 'GET', "/api/v1/servers/{$this->server->uuid}")->assertOk();
+        scopedTokenTestApi($token, 'GET', "/api/v1/servers/{$this->otherServer->uuid}")->assertForbidden();
+        scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['description' => 'changed'])->assertForbidden();
+    });
+
+    test('a write token cannot move its server to another SSH endpoint or private key', function () {
+        $token = scopedTokenTestToken($this->admin, $this->team, ['read', 'write'], [['scope' => 'server', 'uuid' => $this->server->uuid]]);
+        $teamToken = scopedTokenTestToken($this->admin, $this->team, ['read', 'write'], null);
+        $this->server->update(['private_key_id' => PrivateKey::factory()->create(['team_id' => $this->team->id])->id]);
+        $otherKey = PrivateKey::factory()->create(['team_id' => $this->team->id, 'private_key' => PrivateKey::generateNewKeyPair()['private_key']]);
+        $before = $this->server->fresh()->only(['ip', 'port', 'private_key_id']);
+
+        scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['ip' => 'other-host.example.com'])->assertForbidden();
+        scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['port' => 2222])->assertForbidden();
+        scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['private_key_uuid' => $otherKey->uuid])->assertForbidden();
+        expect($this->server->fresh()->only(['ip', 'port', 'private_key_id']))->toBe($before);
+
+        scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['ip' => $before['ip'], 'port' => $before['port'], 'name' => 'renamed'])->assertSuccessful();
+        scopedTokenTestApi($teamToken, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['private_key_uuid' => $otherKey->uuid])->assertSuccessful();
+        expect($this->server->fresh()->private_key_id)->toBe($otherKey->id);
+    });
+
+    test('a write token can update its server but not create, delete, or read shared variables or team endpoints', function () {
+        $token = scopedTokenTestToken($this->admin, $this->team, ['read', 'write', 'delete'], [['scope' => 'server', 'uuid' => $this->server->uuid]]);
+
+        scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['description' => 'changed'])->assertSuccessful();
+        expect($this->server->fresh()->description)->toBe('changed');
+
+        scopedTokenTestApi($token, 'DELETE', "/api/v1/servers/{$this->server->uuid}")->assertForbidden();
+        scopedTokenTestApi($token, 'POST', '/api/v1/servers', ['name' => 'new'])->assertForbidden();
+        scopedTokenTestApi($token, 'GET', "/api/v1/servers/{$this->server->uuid}/envs")->assertForbidden();
+        scopedTokenTestApi($token, 'GET', "/api/v1/servers/{$this->server->uuid}/transfer")->assertForbidden();
+        scopedTokenTestApi($token, 'GET', '/api/v1/security/keys')->assertForbidden();
+        expect(scopedTokenTestApi($token, 'GET', '/api/v1/projects')->assertOk()->json())->toBe([])
+            ->and(scopedTokenTestApi($token, 'GET', '/api/v1/applications')->assertOk()->json())->toBe([]);
+    });
+
+    test('the resources of the server are only those that the other scopes cover', function () {
+        $serverOnly = scopedTokenTestToken($this->admin, $this->team, ['read'], [['scope' => 'server', 'uuid' => $this->server->uuid]]);
+        $withProject = scopedTokenTestToken($this->admin, $this->team, ['read'], [
+            ['scope' => 'server', 'uuid' => $this->server->uuid],
+            ['scope' => 'project', 'uuid' => $this->shop->uuid],
+        ]);
+
+        expect(scopedTokenTestApi($serverOnly, 'GET', "/api/v1/servers/{$this->server->uuid}/resources")->assertOk()->json())->toBe([])
+            ->and(scopedTokenTestApi($withProject, 'GET', "/api/v1/servers/{$this->server->uuid}/resources")->assertOk()->json('*.name'))
+            ->toEqualCanonicalizing(['shop-api', 'shop-worker']);
+    });
+
+    test('a project and server write token can place a new application on the server', function () {
+        $payload = [
+            'project_uuid' => $this->shop->uuid,
+            'environment_uuid' => $this->shopProduction->uuid,
+            'server_uuid' => $this->otherServer->uuid,
+            'docker_registry_image_name' => 'nginx',
+            'ports_exposes' => '80',
+        ];
+        $projectOnly = scopedTokenTestToken($this->admin, $this->team, ['read', 'write'], [['scope' => 'project', 'uuid' => $this->shop->uuid]]);
+        $withServer = scopedTokenTestToken($this->admin, $this->team, ['read', 'write'], [
+            ['scope' => 'project', 'uuid' => $this->shop->uuid],
+            ['scope' => 'server', 'uuid' => $this->otherServer->uuid],
+        ]);
+
+        scopedTokenTestApi($projectOnly, 'POST', '/api/v1/applications/dockerimage', $payload)->assertForbidden();
+        scopedTokenTestApi($withServer, 'POST', '/api/v1/applications/dockerimage', $payload)->assertCreated();
+    });
+
+    test('a server grant stored on a member is ignored', function () {
+        $member = scopedTokenTestMember($this->team, [['scope' => 'server', 'uuid' => $this->server->uuid, 'levels' => ['read']]]);
+        $token = scopedTokenTestToken($member, $this->team, ['read'], null);
+
+        scopedTokenTestApi($token, 'GET', "/api/v1/servers/{$this->server->uuid}")->assertForbidden();
+    });
+
+    test('the token form offers servers only to users with access to the whole team', function () {
+        session(['currentTeam' => $this->team]);
+        $this->actingAs($this->admin);
+
+        Livewire::test(ApiTokens::class)
+            ->set('form.description', 'proxy restarts')
+            ->set('form.permissions', ['deploy'])
+            ->set('form.scopeMode', 'selected')
+            ->set('form.selectedScopes', ["server:{$this->server->uuid}"])
+            ->call('addNewToken')
+            ->assertHasNoErrors()
+            ->assertNotDispatched('error');
+        expect(PersonalAccessToken::query()->sole()->scopes)->toBe([['scope' => 'server', 'uuid' => $this->server->uuid]]);
+
+        $member = scopedTokenTestMember($this->team, [['scope' => 'project', 'uuid' => $this->shop->uuid, 'levels' => ['write']]]);
+        $this->actingAs($member);
+        $form = Livewire::test(ApiTokens::class);
+        expect(collect($form->instance()->scopeOptions())->pluck('value')->filter(fn ($value) => str_starts_with($value, 'server:'))->all())->toBe([]);
+        $form->set('form.description', 'crafted')
+            ->set('form.permissions', ['read'])
+            ->set('form.scopeMode', 'selected')
+            ->set('form.selectedScopes', ["server:{$this->server->uuid}"])
+            ->call('addNewToken')
+            ->assertDispatched('error');
+
+        expect(PersonalAccessToken::query()->count())->toBe(1);
+    });
+
+    test('the token form rejects a server of another team', function () {
+        session(['currentTeam' => $this->team]);
+        $this->actingAs($this->admin);
+        $foreignServer = Server::factory()->create(['team_id' => Team::factory()->create()->id]);
+
+        Livewire::test(ApiTokens::class)
+            ->set('form.description', 'foreign')
+            ->set('form.permissions', ['read'])
+            ->set('form.scopeMode', 'selected')
+            ->set('form.selectedScopes', ["server:{$foreignServer->uuid}"])
+            ->call('addNewToken')
+            ->assertDispatched('error');
+
+        expect(PersonalAccessToken::query()->count())->toBe(0);
     });
 });

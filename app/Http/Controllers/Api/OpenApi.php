@@ -43,7 +43,7 @@ use OpenApi\Attributes as OA;
                 new OA\Property(property: 'uuid', type: 'string'),
                 new OA\Property(property: 'name', type: 'string'),
                 new OA\Property(property: 'description', type: 'string', nullable: true),
-                new OA\Property(property: 'database_type', type: 'string', enum: ['standalone-postgresql', 'standalone-redis', 'standalone-mongodb', 'standalone-mysql', 'standalone-mariadb', 'standalone-keydb', 'standalone-dragonfly', 'standalone-clickhouse', 'standalone-sqlite']),
+                new OA\Property(property: 'database_type', type: 'string', enum: ['standalone-postgresql', 'standalone-redis', 'standalone-mongodb', 'standalone-mysql', 'standalone-mariadb', 'standalone-keydb', 'standalone-dragonfly', 'standalone-clickhouse', 'standalone-influxdb', 'standalone-sqlite']),
                 new OA\Property(property: 'image', type: 'string'),
                 new OA\Property(property: 'status', type: 'string', description: 'Container status and health, for example running:healthy or exited:unhealthy.'),
                 new OA\Property(property: 'server_status', type: 'boolean', description: 'True when the server of the database is reachable and usable.'),
@@ -126,6 +126,11 @@ use OpenApi\Attributes as OA;
                 new OA\Property(property: 'clickhouse_admin_user', type: 'string'),
                 new OA\Property(property: 'clickhouse_admin_password', type: 'string', format: 'password'),
                 new OA\Property(property: 'clickhouse_db', type: 'string'),
+                new OA\Property(property: 'influxdb_admin_user', type: 'string'),
+                new OA\Property(property: 'influxdb_admin_password', type: 'string', format: 'password'),
+                new OA\Property(property: 'influxdb_admin_token', type: 'string', format: 'password'),
+                new OA\Property(property: 'influxdb_org', type: 'string'),
+                new OA\Property(property: 'influxdb_bucket', type: 'string'),
                 new OA\Property(property: 'sqlite_databases', type: 'string', description: 'Comma-separated SQLite database file names.'),
                 new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
                 new OA\Property(property: 'updated_at', type: 'string', format: 'date-time'),
@@ -197,11 +202,6 @@ use OpenApi\Attributes as OA;
                     new OA\Property(property: 'image_ref', type: 'string'),
                     new OA\Property(property: 'owner_uuid', type: 'string'),
                 ], type: 'object')),
-                new OA\Property(property: 'pagination', properties: [
-                    new OA\Property(property: 'page', type: 'integer'),
-                    new OA\Property(property: 'per_page', type: 'integer'),
-                    new OA\Property(property: 'total', type: 'integer'),
-                ], type: 'object'),
             ],
             type: 'object',
         ),
@@ -272,6 +272,23 @@ use OpenApi\Attributes as OA;
                 ]
             )),
         new OA\Response(
+            response: 'TerminalRateLimited',
+            description: 'Terminal command rate or concurrency limit exceeded.',
+            headers: [
+                new OA\Header(
+                    header: 'Retry-After',
+                    description: 'Number of seconds to wait before retrying.',
+                    schema: new OA\Schema(type: 'integer', example: 42)
+                ),
+            ],
+            content: new OA\JsonContent(
+                type: 'object',
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: 'Too many terminal command requests. Please retry in 42 seconds.'),
+                    new OA\Property(property: 'retry_after', type: 'integer', description: 'Number of seconds to wait before retrying.', example: 42),
+                ]
+            )),
+        new OA\Response(
             response: 502,
             description: 'The cloud provider API rejected the request.',
             content: new OA\JsonContent(
@@ -284,6 +301,9 @@ use OpenApi\Attributes as OA;
             )),
     ],
 )]
+#[OA\Parameter(parameter: 'Page', name: 'page', in: 'query', required: false, description: 'Page number. With page or per_page, the list is paginated and the X-Total-Count header gives the total.', schema: new OA\Schema(type: 'integer', default: 1, minimum: 1))]
+#[OA\Parameter(parameter: 'PerPage', name: 'per_page', in: 'query', required: false, description: 'Items per page. With page or per_page, the list is paginated and the X-Total-Count header gives the total.', schema: new OA\Schema(type: 'integer', default: 50, minimum: 1, maximum: 100))]
+#[OA\Header(header: 'X-Total-Count', description: 'Total number of items that match the filters, on all pages. Sent when the list is paginated.', schema: new OA\Schema(type: 'integer'))]
 class OpenApi
 {
     // This class is used to generate OpenAPI documentation

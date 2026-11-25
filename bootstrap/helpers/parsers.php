@@ -191,24 +191,31 @@ function composeEnvFileEntryPath(mixed $entry): string
 }
 
 /**
- * Whether a Compose `env_file` entry is Coolify's .env file, which Coolify writes in the project directory.
+ * Whether a Compose `env_file` entry is a file that Coolify writes in the project directory: the .env file
+ * or the env file of a service (see composeServiceEnvironmentFile()).
  */
 function isCoolifyComposeEnvFile(mixed $entry): bool
 {
-    return in_array(composeEnvFileEntryPath($entry), ['.env', './.env'], true);
+    $path = composeEnvFileEntryPath($entry);
+    if (in_array($path, ['.env', './.env'], true)) {
+        return true;
+    }
+
+    return preg_match('#^(\./)?\.coolify\.[A-Za-z0-9._-]+\.env$#', $path) === 1;
 }
 
 /**
- * The `env_file` list of a Compose service with Coolify's .env file at the end. The env files of the
- * user stay in front of it, so Coolify variables override the values in them.
+ * The `env_file` list of a Compose service with the env file of the service at the end. The env files of
+ * the user stay in front of it, so Coolify variables override the values in them. The .env file of
+ * Coolify holds the variables of all services, so it is not in the list.
  *
  * @return list<string|array<string, mixed>>
  */
-function composeEnvFilesWithCoolifyEnv(mixed $envFile): array
+function composeEnvFilesWithServiceEnvironmentFile(mixed $envFile, string $serviceName): array
 {
     return collect(composeEnvFileEntries($envFile))
         ->reject(fn (mixed $entry): bool => isCoolifyComposeEnvFile($entry))
-        ->push('.env')
+        ->push(composeServiceEnvironmentFile($serviceName))
         ->unique()
         ->values()
         ->all();
@@ -242,6 +249,73 @@ function composeEnvFileProjectPath(string $path, string $composeDirectory): ?str
     }
 
     return $segments === [] ? null : implode('/', $segments);
+}
+
+/**
+ * The runtime env file that Coolify adds to env_file: of one Compose service. It holds only the variables
+ * that reach the service. .env keeps all variables, but Compose reads it only for ${VAR} interpolation.
+ */
+function composeServiceEnvironmentFile(string $serviceName): string
+{
+    return '.coolify.'.preg_replace('/[^A-Za-z0-9._-]/', '_', $serviceName).'.env';
+}
+
+/**
+ * The Compose service names that a variable of the resource can be limited to. Empty when the resource
+ * is not a Compose resource or its Compose file does not parse.
+ *
+ * @return list<string>
+ */
+function composeServiceNamesForEnvironmentScope(mixed $resource): array
+{
+    $isCompose = $resource instanceof Service || ($resource instanceof Application && $resource->build_pack === 'dockercompose');
+    if (! $isCompose || blank($resource->docker_compose_raw)) {
+        return [];
+    }
+
+    try {
+        $services = data_get(parseDockerComposeYaml($resource->docker_compose_raw), 'services');
+    } catch (Throwable) {
+        return [];
+    }
+
+    return is_array($services) ? array_map('strval', array_keys($services)) : [];
+}
+
+/**
+ * @param  iterable<EnvironmentVariable>  $environmentVariables
+ * @return array<string, list<string>> The keys that only some Compose services get, with those services.
+ */
+function composeEnvironmentVariableScopes(iterable $environmentVariables): array
+{
+    $scopes = [];
+    foreach ($environmentVariables as $environmentVariable) {
+        if ($environmentVariable->compose_services !== null) {
+            $scopes[$environmentVariable->key] = $environmentVariable->compose_services;
+        }
+    }
+
+    return $scopes;
+}
+
+/**
+ * @param  array<string, list<string>>  $scopes  From composeEnvironmentVariableScopes(). A key without a scope goes to all services.
+ */
+function composeVariableReachesService(string $key, array $scopes, string $serviceName): bool
+{
+    return ! array_key_exists($key, $scopes) || in_array($serviceName, $scopes[$key], true);
+}
+
+/**
+ * @param  Collection<int, string>  $lines  Env file lines in KEY=VALUE format.
+ * @param  array<string, list<string>>  $scopes
+ * @return Collection<int, string>
+ */
+function composeEnvironmentLinesForService(Collection $lines, array $scopes, string $serviceName): Collection
+{
+    return $lines
+        ->filter(fn (string $line): bool => composeVariableReachesService(explode('=', $line, 2)[0], $scopes, $serviceName))
+        ->values();
 }
 
 /**
@@ -2572,9 +2646,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Applications behave consistently with manual .env file usage
-        $payload['env_file'] = composeEnvFilesWithCoolifyEnv(data_get($service, 'env_file'));
+        // The env files of the user, then the env file of this service, which holds the Coolify variables that reach it.
+        $payload['env_file'] = composeEnvFilesWithServiceEnvironmentFile(
+            data_get($service, 'env_file'),
+            $renamesServices ? addPreviewDeploymentSuffix($serviceName, $pullRequestId) : $serviceName,
+        );
 
         // Inject commit-based image tag for services with build directive (for rollback support)
         // Only inject if service has build but no explicit image defined
@@ -3834,9 +3910,8 @@ function serviceParser(Service $resource): Collection
         if ($depends_on->count() > 0) {
             $payload['depends_on'] = $depends_on;
         }
-        // Auto-inject .env file so Coolify environment variables are available inside containers
-        // This makes Services behave consistently with Applications
-        $payload['env_file'] = composeEnvFilesWithCoolifyEnv(data_get($service, 'env_file'));
+        // The env files of the user, then the env file of this service, which holds the Coolify variables that reach it.
+        $payload['env_file'] = composeEnvFilesWithServiceEnvironmentFile(data_get($service, 'env_file'), $serviceName);
 
         $parsedServices->put($serviceName, $payload);
     }

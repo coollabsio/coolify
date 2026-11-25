@@ -8,6 +8,7 @@ use App\Traits\HasSafeStringAttribute;
 use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -88,6 +89,7 @@ class Environment extends BaseModel
             $this->keydbs()->count() == 0 &&
             $this->dragonflies()->count() == 0 &&
             $this->clickhouses()->count() == 0 &&
+            $this->influxdbs()->count() == 0 &&
             $this->mariadbs()->count() == 0 &&
             $this->mongodbs()->count() == 0 &&
             $this->sqlites()->count() == 0 &&
@@ -97,6 +99,11 @@ class Environment extends BaseModel
     public function environment_variables()
     {
         return $this->hasMany(SharedEnvironmentVariable::class)->where('type', 'environment');
+    }
+
+    public function configLink(): HasOne
+    {
+        return $this->hasOne(EnvironmentConfigLink::class);
     }
 
     public function applications()
@@ -144,6 +151,11 @@ class Environment extends BaseModel
         return $this->hasMany(StandaloneClickhouse::class);
     }
 
+    public function influxdbs()
+    {
+        return $this->hasMany(StandaloneInfluxdb::class);
+    }
+
     public function sqlites()
     {
         return $this->hasMany(StandaloneSqlite::class);
@@ -159,9 +171,10 @@ class Environment extends BaseModel
         $keydbs = $this->keydbs;
         $dragonflies = $this->dragonflies;
         $clickhouses = $this->clickhouses;
+        $influxdbs = $this->influxdbs;
         $sqlites = $this->sqlites;
 
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses)->concat($sqlites);
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses)->concat($influxdbs)->concat($sqlites);
     }
 
     public function project()

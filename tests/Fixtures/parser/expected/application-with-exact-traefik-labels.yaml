@@ -179,7 +179,7 @@
           internal: null
           referenceapplication0001: null
         env_file:
-          - .env
+          - .coolify.web.env
         image: 'referenceapplication0001_web:abcdef0123456789abcdef0123456789abcdef01'
       api:
         image: 'node:22-alpine'
@@ -253,7 +253,7 @@
           internal: null
           referenceapplication0001: null
         env_file:
-          - .env
+          - .coolify.api.env
       my-app:
         image: 'httpd:2.4-alpine'
         environment:
@@ -313,7 +313,7 @@
           internal: null
           referenceapplication0001: null
         env_file:
-          - .env
+          - .coolify.my-app.env
       api.v2:
         image: traefik/whoami
         container_name: api.v2-referenceapplication0001-20260102T030405
@@ -361,7 +361,7 @@
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
-          - .env
+          - .coolify.api.v2.env
       admin:
         image: 'nginx:alpine'
         environment:
@@ -421,7 +421,7 @@
           - traefik.http.routers.http-0-referenceapplication0001-admin-2123.service=http-0-referenceapplication0001-admin-2123
           - traefik.http.services.http-0-referenceapplication0001-admin-2123.loadbalancer.server.port=8080
         env_file:
-          - .env
+          - .coolify.admin.env
       blog:
         image: 'ghost:5-alpine'
         environment:
@@ -484,7 +484,7 @@
           internal: null
           referenceapplication0001: null
         env_file:
-          - .env
+          - .coolify.blog.env
       db:
         image: 'postgres:16-alpine'
         environment:
@@ -542,7 +542,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
         env_file:
-          - .env
+          - .coolify.db.env
       cache:
         image: 'redis:7-alpine'
         networks:
@@ -591,7 +591,7 @@
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
-          - .env
+          - .coolify.cache.env
       sidecar:
         image: busybox
         restart: 'no'
@@ -639,7 +639,7 @@
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
-          - .env
+          - .coolify.sidecar.env
       worker:
         image: 'node:22-alpine'
         command:
@@ -695,7 +695,7 @@
           internal: null
           referenceapplication0001: null
         env_file:
-          - .env
+          - .coolify.worker.env
     volumes:
       web-data: {}
       db-data:
@@ -922,7 +922,7 @@
           internal: null
           referenceapplication0001: null
         env_file:
-          - .env
+          - .coolify.web.env
         image: 'referenceapplication0001_web:abcdef0123456789abcdef0123456789abcdef01'
       api:
         image: 'node:22-alpine'
@@ -1008,7 +1008,7 @@
           internal: null
           referenceapplication0001: null
         env_file:
-          - .env
+          - .coolify.api.env
       my-app:
         image: 'httpd:2.4-alpine'
         environment:
@@ -1077,7 +1077,7 @@
           internal: null
           referenceapplication0001: null
         env_file:
-          - .env
+          - .coolify.my-app.env
       api.v2:
         image: traefik/whoami
         container_name: api.v2-referenceapplication0001-20260102T030405
@@ -1141,7 +1141,7 @@
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
-          - .env
+          - .coolify.api.v2.env
       admin:
         image: 'nginx:alpine'
         environment:
@@ -1210,7 +1210,7 @@
           - traefik.http.services.http-0-referenceapplication0001-admin-2123.loadbalancer.server.port=8080
           - traefik.http.services.https-0-referenceapplication0001-admin-2123.loadbalancer.server.port=8080
         env_file:
-          - .env
+          - .coolify.admin.env
       blog:
         image: 'ghost:5-alpine'
         environment:
@@ -1280,7 +1280,7 @@
           internal: null
           referenceapplication0001: null
         env_file:
-          - .env
+          - .coolify.blog.env
       db:
         image: 'postgres:16-alpine'
         environment:
@@ -1340,7 +1340,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
         env_file:
-          - .env
+          - .coolify.db.env
       cache:
         image: 'redis:7-alpine'
         networks:
@@ -1391,7 +1391,7 @@
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
-          - .env
+          - .coolify.cache.env
       sidecar:
         image: busybox
         restart: 'no'
@@ -1441,7 +1441,7 @@
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
-          - .env
+          - .coolify.sidecar.env
       worker:
         image: 'node:22-alpine'
         command:
@@ -1499,7 +1499,7 @@
           internal: null
           referenceapplication0001: null
         env_file:
-          - .env
+          - .coolify.worker.env
     volumes:
       web-data: {}
       db-data:
@@ -1752,7 +1752,7 @@
             aliases:
               - web-pr-7
         env_file:
-          - .env
+          - .coolify.web.env
         image: 'referenceapplication0001_web:pr-7'
       api:
         image: 'node:22-alpine'
@@ -1838,7 +1838,7 @@
             aliases:
               - api-pr-7
         env_file:
-          - .env
+          - .coolify.api.env
       my-app:
         image: 'httpd:2.4-alpine'
         environment:
@@ -1910,7 +1910,7 @@
             aliases:
               - my-app-pr-7
         env_file:
-          - .env
+          - .coolify.my-app.env
       api.v2:
         image: traefik/whoami
         container_name: api.v2-referenceapplication0001-pr-7
@@ -1977,7 +1977,7 @@
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
-          - .env
+          - .coolify.api.v2.env
       admin:
         image: 'nginx:alpine'
         environment:
@@ -2049,7 +2049,7 @@
           - traefik.http.services.http-0-referenceapplication0001-7-admin-2123.loadbalancer.server.port=8080
           - traefik.http.services.https-0-referenceapplication0001-7-admin-2123.loadbalancer.server.port=8080
         env_file:
-          - .env
+          - .coolify.admin.env
       blog:
         image: 'ghost:5-alpine'
         environment:
@@ -2122,7 +2122,7 @@
             aliases:
               - blog-pr-7
         env_file:
-          - .env
+          - .coolify.blog.env
       db:
         image: 'postgres:16-alpine'
         environment:
@@ -2184,7 +2184,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=7
         env_file:
-          - .env
+          - .coolify.db.env
       cache:
         image: 'redis:7-alpine'
         networks:
@@ -2237,7 +2237,7 @@
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
-          - .env
+          - .coolify.cache.env
       sidecar:
         image: busybox
         restart: 'no'
@@ -2287,7 +2287,7 @@
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
-          - .env
+          - .coolify.sidecar.env
       worker:
         image: 'node:22-alpine'
         command:
@@ -2347,7 +2347,7 @@
             aliases:
               - worker-pr-7
         env_file:
-          - .env
+          - .coolify.worker.env
     volumes:
       web-data: {}
       db-data:
@@ -2567,7 +2567,7 @@
             aliases:
               - web-pr-8
         env_file:
-          - .env
+          - .coolify.web.env
         image: 'referenceapplication0001_web:pr-8'
       api:
         image: 'node:22-alpine'
@@ -2622,7 +2622,7 @@
             aliases:
               - api-pr-8
         env_file:
-          - .env
+          - .coolify.api.env
       my-app:
         image: 'httpd:2.4-alpine'
         environment:
@@ -2663,7 +2663,7 @@
             aliases:
               - my-app-pr-8
         env_file:
-          - .env
+          - .coolify.my-app.env
       api.v2:
         image: traefik/whoami
         container_name: api.v2-referenceapplication0001-pr-8
@@ -2703,7 +2703,7 @@
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
-          - .env
+          - .coolify.api.v2.env
       admin:
         image: 'nginx:alpine'
         environment:
@@ -2744,7 +2744,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         env_file:
-          - .env
+          - .coolify.admin.env
       blog:
         image: 'ghost:5-alpine'
         environment:
@@ -2785,7 +2785,7 @@
             aliases:
               - blog-pr-8
         env_file:
-          - .env
+          - .coolify.blog.env
       db:
         image: 'postgres:16-alpine'
         environment:
@@ -2835,7 +2835,7 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         env_file:
-          - .env
+          - .coolify.db.env
       cache:
         image: 'redis:7-alpine'
         networks:
@@ -2876,7 +2876,7 @@
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
-          - .env
+          - .coolify.cache.env
       sidecar:
         image: busybox
         restart: 'no'
@@ -2914,7 +2914,7 @@
           SERVICE_NAME_SIDECAR: sidecar
           SERVICE_NAME_WORKER: worker
         env_file:
-          - .env
+          - .coolify.sidecar.env
       worker:
         image: 'node:22-alpine'
         command:
@@ -2962,7 +2962,7 @@
             aliases:
               - worker-pr-8
         env_file:
-          - .env
+          - .coolify.worker.env
     volumes:
       web-data: {}
       db-data:

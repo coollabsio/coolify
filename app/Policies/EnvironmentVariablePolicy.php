@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\EnvironmentVariable;
 use App\Models\User;
+use App\Services\ProjectConfig\ManagedResources;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -49,6 +50,10 @@ class EnvironmentVariablePolicy
      */
     public function update(User $user, EnvironmentVariable $environmentVariable): bool
     {
+        if (ManagedResources::isManaged($environmentVariable->resourceable) && ($environmentVariable->config_meta['form'] ?? null) !== 'required') {
+            return false;
+        }
+
         return $this->allowsOnResource($user, 'manageEnvironment', $environmentVariable);
     }
 
@@ -57,6 +62,10 @@ class EnvironmentVariablePolicy
      */
     public function delete(User $user, EnvironmentVariable $environmentVariable): bool
     {
+        if (ManagedResources::isManaged($environmentVariable->resourceable)) {
+            return false;
+        }
+
         return $this->allowsOnResource($user, 'manageEnvironment', $environmentVariable);
     }
 

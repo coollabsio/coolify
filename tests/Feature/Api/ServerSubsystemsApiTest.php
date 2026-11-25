@@ -3,6 +3,7 @@
 use App\Actions\Server\StartLogDrain;
 use App\Actions\Server\StartSentinel;
 use App\Actions\Server\StopLogDrain;
+use App\Enums\LogDrainType;
 use App\Jobs\DockerCleanupJob;
 use App\Models\DockerCleanupExecution;
 use App\Models\InstanceSettings;
@@ -153,10 +154,10 @@ describe('Docker cleanup API', function () {
 describe('Log drains API', function () {
     test('GET returns log drain settings and hides secrets without read:sensitive', function () {
         $this->server->settings->update([
-            'is_logdrain_axiom_enabled' => false,
-            'logdrain_axiom_dataset_name' => 'coolify-logs',
-            'logdrain_axiom_api_key' => 'secret-axiom-key',
-            'logdrain_newrelic_license_key' => 'secret-nr-key',
+            'logdrain_config' => [
+                'axiom' => ['dataset_name' => 'coolify-logs', 'api_key' => 'secret-axiom-key'],
+                'newrelic' => ['license_key' => 'secret-nr-key'],
+            ],
         ]);
 
         $readToken = $this->user->createToken('server-subsystems-read', ['read'])->plainTextToken;
@@ -185,9 +186,8 @@ describe('Log drains API', function () {
             ->assertOk()
             ->assertJsonPath('logdrain_axiom_dataset_name', 'api-dataset');
 
-        $settings = $this->server->settings->fresh();
-        expect($settings->logdrain_axiom_dataset_name)->toBe('api-dataset')
-            ->and($settings->logdrain_axiom_api_key)->toBe('axiom-key-123');
+        expect($this->server->settings->fresh()->logDrainConfig(LogDrainType::Axiom))
+            ->toBe(['dataset_name' => 'api-dataset', 'api_key' => 'axiom-key-123']);
     });
 
     test('PATCH sets the Axiom edge domain and rejects a value that is not a hostname', function () {
@@ -207,7 +207,7 @@ describe('Log drains API', function () {
             ->assertUnprocessable()
             ->assertJsonValidationErrors('logdrain_axiom_domain');
 
-        expect($this->server->settings->fresh()->logdrain_axiom_domain)->toBe('eu-central-1.aws.edge.axiom.co');
+        expect($this->server->settings->fresh()->logDrainConfig(LogDrainType::Axiom)['domain'])->toBe('eu-central-1.aws.edge.axiom.co');
     });
 
     test('PATCH saves log drain settings without connecting to a server that is not validated', function () {
@@ -237,13 +237,12 @@ describe('Log drains API', function () {
             ->assertForbidden()
             ->assertJsonPath('message', 'Missing required permissions: deploy');
 
-        $settings = $this->server->settings->fresh();
-        expect($settings->{$field})->toBeNull();
+        expect($this->server->settings->fresh()->logdrain_config)->toBeNull();
     })->with(['logdrain_custom_config', 'logdrain_custom_config_parser']);
 
     test('PATCH lets a write and deploy token enable the custom log drain with its saved config', function () {
         Queue::fake();
-        $this->server->settings->update(['logdrain_custom_config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout"]);
+        $this->server->settings->update(['logdrain_config' => ['custom' => ['config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout"]]]);
         $deployToken = $this->user->createToken('server-subsystems-deploy', ['write', 'deploy'])->plainTextToken;
 
         $this->withHeaders([
@@ -256,7 +255,7 @@ describe('Log drains API', function () {
             ])
             ->assertOk();
 
-        expect($this->server->settings->fresh()->is_logdrain_custom_enabled)->toBeTruthy();
+        expect($this->server->settings->fresh()->logdrain_type)->toBe(LogDrainType::Custom);
     });
 
     test('PATCH changes the custom log drain config with the deploy permission', function () {
@@ -272,7 +271,7 @@ describe('Log drains API', function () {
             ])
             ->assertOk();
 
-        expect($this->server->settings->fresh()->logdrain_custom_config)->toBe("[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout");
+        expect($this->server->settings->fresh()->logDrainConfig(LogDrainType::Custom)['config'])->toBe("[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout");
     });
 
     test('PATCH enables the Amazon CloudWatch Logs drain', function () {
@@ -291,8 +290,8 @@ describe('Log drains API', function () {
             ->assertJsonPath('logdrain_cloudwatch_stream_prefix', 'docker/');
 
         $settings = $this->server->settings->fresh();
-        expect($settings->is_logdrain_cloudwatch_enabled)->toBeTrue()
-            ->and($settings->logdrain_cloudwatch_region)->toBe('us-east-1');
+        expect($settings->logdrain_type)->toBe(LogDrainType::Cloudwatch)
+            ->and($settings->logDrainConfig()['region'])->toBe('us-east-1');
     });
 
     test('PATCH rejects enabling CloudWatch without a log group', function () {
@@ -306,7 +305,7 @@ describe('Log drains API', function () {
             ->assertUnprocessable()
             ->assertJsonValidationErrors('logdrain_cloudwatch_group');
 
-        expect($this->server->settings->fresh()->is_logdrain_cloudwatch_enabled)->toBeFalse();
+        expect($this->server->settings->fresh()->logdrain_type)->toBeNull();
     });
 
     test('PATCH rejects enabling CloudWatch without a region', function () {
@@ -320,7 +319,7 @@ describe('Log drains API', function () {
             ->assertUnprocessable()
             ->assertJsonValidationErrors('logdrain_cloudwatch_region');
 
-        expect($this->server->settings->fresh()->is_logdrain_cloudwatch_enabled)->toBeFalse();
+        expect($this->server->settings->fresh()->logdrain_type)->toBeNull();
     });
 
     test('PATCH rejects CloudWatch values that could break the compose file', function (string $field, mixed $value) {
@@ -343,9 +342,8 @@ describe('Log drains API', function () {
     test('PATCH rejects enabling CloudWatch together with another log drain', function () {
         Queue::fake();
         $this->server->settings->update([
-            'is_logdrain_axiom_enabled' => true,
-            'logdrain_axiom_dataset_name' => 'ds',
-            'logdrain_axiom_api_key' => 'key',
+            'logdrain_type' => LogDrainType::Axiom,
+            'logdrain_config' => ['axiom' => ['dataset_name' => 'ds', 'api_key' => 'key']],
         ]);
 
         $this->withHeaders(serverSubsystemsHeaders())
@@ -433,6 +431,32 @@ describe('Sentinel API', function () {
             ->toHaveCount(1);
     })->with(['anonymized', 'off']);
 
+    test('PATCH turns on Sentinel pull mode and restarts Sentinel', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/sentinel", [
+                'is_sentinel_pull_enabled' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('is_sentinel_pull_enabled', true);
+
+        expect($this->server->settings->fresh()->is_sentinel_pull_enabled)->toBeTrue();
+        expect(Queue::pushed(JobDecorator::class, fn (JobDecorator $job): bool => $job->getAction() instanceof StartSentinel))
+            ->toHaveCount(1);
+    });
+
+    test('PATCH rejects a pull mode that is not a boolean', function () {
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/sentinel", [
+                'is_sentinel_pull_enabled' => 'sometimes',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('is_sentinel_pull_enabled');
+
+        expect($this->server->settings->fresh()->is_sentinel_pull_enabled)->toBeFalse();
+    });
+
     test('PATCH rejects an unknown client IP mode', function () {
         $this->withHeaders(serverSubsystemsHeaders())
             ->patchJson("/api/v1/servers/{$this->server->uuid}/sentinel", [
@@ -443,6 +467,46 @@ describe('Sentinel API', function () {
 
         expect($this->server->settings->fresh()->traffic_ip_mode->value)->toBe('full');
     });
+
+    test('PATCH updates the container log archive settings and restarts Sentinel', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/sentinel", [
+                'is_container_log_archive_enabled' => true,
+                'log_archive_max_file_mb' => 20,
+                'log_archive_max_total_mb' => 2048,
+                'log_archive_retention_days' => 14,
+            ])
+            ->assertOk()
+            ->assertJsonPath('is_container_log_archive_enabled', true)
+            ->assertJsonPath('log_archive_max_file_mb', 20)
+            ->assertJsonPath('log_archive_max_total_mb', 2048)
+            ->assertJsonPath('log_archive_retention_days', 14);
+
+        expect(StartSentinel::sentinelLogArchiveEnvironment($this->server->fresh()))->toBe([
+            'LOG_ARCHIVE_ENABLED' => 'true',
+            'LOG_ARCHIVE_MAX_FILE_MB' => '20',
+            'LOG_ARCHIVE_MAX_TOTAL_MB' => '2048',
+            'LOG_ARCHIVE_RETENTION_DAYS' => '14',
+        ]);
+        expect(Queue::pushed(JobDecorator::class, fn (JobDecorator $job): bool => $job->getAction() instanceof StartSentinel))
+            ->toHaveCount(1);
+    });
+
+    test('PATCH rejects container log archive limits out of range', function (string $field, int $value) {
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/sentinel", [$field => $value])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors($field);
+    })->with([
+        ['log_archive_max_file_mb', 0],
+        ['log_archive_max_file_mb', 1025],
+        ['log_archive_max_total_mb', 0],
+        ['log_archive_max_total_mb', 102401],
+        ['log_archive_retention_days', 0],
+        ['log_archive_retention_days', 366],
+    ]);
 
     test('PATCH rejects disabling mandatory Sentinel', function () {
         $this->withHeaders(serverSubsystemsHeaders())

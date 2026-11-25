@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Exceptions\RemoteSecretException;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
+use App\Services\ProjectConfig\ManagedResources;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
@@ -39,6 +40,7 @@ use PDOException;
         'value' => ['type' => 'string'],
         'real_value' => ['type' => 'string'],
         'comment' => ['type' => 'string', 'nullable' => true],
+        'compose_services' => ['type' => 'array', 'items' => ['type' => 'string'], 'nullable' => true, 'description' => 'Docker Compose services that get this variable. Null means all services.'],
         'version' => ['type' => 'string'],
         'created_at' => ['type' => 'string'],
         'updated_at' => ['type' => 'string'],
@@ -107,9 +109,13 @@ class EnvironmentVariable extends BaseModel
         'is_shared',
         'is_required',
 
+        // Docker Compose services that get the variable; null means all
+        'compose_services',
+
         // Metadata
         'version',
         'order',
+        'config_meta',
     ];
 
     protected $casts = [
@@ -119,10 +125,13 @@ class EnvironmentVariable extends BaseModel
         'is_multiline' => 'boolean',
         'is_literal' => 'boolean',
         'is_preview' => 'boolean',
+        'is_production_value_copy' => 'boolean',
         'is_runtime' => 'boolean',
         'is_buildtime' => 'boolean',
         'uses_legacy_escaping' => 'boolean',
+        'compose_services' => 'array',
         'version' => 'string',
+        'config_meta' => 'array',
         'resourceable_type' => 'string',
         'resourceable_id' => 'integer',
     ];
@@ -141,8 +150,15 @@ class EnvironmentVariable extends BaseModel
         'uses_legacy_escaping',
     ];
 
+    /**
+     * Not stored: false leaves the preview copy of a new production variable of an application empty.
+     * It cannot copy the value when the "New preview variables" setting of the application is "Leave empty".
+     */
+    public ?bool $copyValueToPreview = null;
+
     protected static function booted()
     {
+        static::deleting(fn (ModelsEnvironmentVariable $environmentVariable) => ManagedResources::guardVariable($environmentVariable, deleting: true));
         static::creating(function (ModelsEnvironmentVariable $environment_variable) {
             $environment_variable->version = config('constants.coolify.version');
         });
@@ -159,9 +175,14 @@ class EnvironmentVariable extends BaseModel
                     // A compose preview generates its own magic secrets on the first pull request parse.
                     if ($application && ! ($application->build_pack === 'dockercompose' && $environment_variable->isGeneratedMagicVariable())) {
                         // The preview copy is part of the same change, so it gets no audit rows of its own.
-                        $preview = new ModelsEnvironmentVariable([
+                        $usesProductionValue = $application->settings?->use_production_values_in_previews !== false
+                            && $environment_variable->copyValueToPreview !== false;
+                        // forceFill: is_production_value_copy is not fillable.
+                        $preview = (new ModelsEnvironmentVariable)->forceFill([
                             'key' => $environment_variable->key,
-                            'value' => $environment_variable->value,
+                            // Without production values, the copy only shows which keys the previews need.
+                            'value' => $usesProductionValue ? $environment_variable->value : '',
+                            'is_production_value_copy' => $usesProductionValue && filled($environment_variable->value),
                             'is_multiline' => $environment_variable->is_multiline ?? false,
                             'is_literal' => $environment_variable->is_literal ?? false,
                             'is_runtime' => $environment_variable->is_runtime ?? false,
@@ -169,6 +190,7 @@ class EnvironmentVariable extends BaseModel
                             'is_required' => $environment_variable->is_required ?? false,
                             'is_shown_once' => $environment_variable->is_shown_once ?? false,
                             'comment' => $environment_variable->comment,
+                            'compose_services' => $environment_variable->compose_services,
                             'resourceable_type' => Application::class,
                             'resourceable_id' => $environment_variable->resourceable_id,
                             'is_preview' => true,
@@ -180,6 +202,7 @@ class EnvironmentVariable extends BaseModel
         });
 
         static::saving(function (ModelsEnvironmentVariable $environmentVariable) {
+            ManagedResources::guardVariable($environmentVariable);
             // A lock is permanent: no UI, API, or MCP path can unlock a variable and show its value again.
             if ($environmentVariable->exists && $environmentVariable->getOriginal('is_shown_once')) {
                 $environmentVariable->is_shown_once = true;
@@ -191,6 +214,12 @@ class EnvironmentVariable extends BaseModel
                 ValidationPatterns::rejectNulByteInEnvironmentVariableValue($environmentVariable->value);
             }
             $environmentVariable->authorizeAddedSharedVariableReferences();
+            // A changed preview value is the user's own value, not the copy of production.
+            if ($environmentVariable->exists && $environmentVariable->is_preview && $environmentVariable->isDirty('value')) {
+                $environmentVariable->is_production_value_copy = false;
+            }
+            $composeServices = collect($environmentVariable->compose_services ?? [])->filter(fn (mixed $name): bool => filled($name))->map(fn (mixed $name): string => (string) $name)->unique()->values()->all();
+            $environmentVariable->compose_services = $composeServices === [] ? null : $composeServices;
             $environmentVariable->updateIsShared();
         });
     }
@@ -577,7 +606,7 @@ class EnvironmentVariable extends BaseModel
      *
      * @return array{known: array<int, string>, locked: array<int, string>}
      */
-    public static function logRedactionSecretsFor(Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|null $resource, bool $includePreview = false, bool $resolveRemoteSecrets = true): array
+    public static function logRedactionSecretsFor(Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite|null $resource, bool $includePreview = false, bool $resolveRemoteSecrets = true): array
     {
         if ($resource === null) {
             return ['known' => [], 'locked' => []];
@@ -587,7 +616,7 @@ class EnvironmentVariable extends BaseModel
         $secrets = ['known' => [], 'locked' => []];
         if ($isDatabase) {
             foreach (array_keys($resource->getAttributes()) as $attribute) {
-                if (str_contains($attribute, 'password')) {
+                if (str_contains($attribute, 'password') || str_ends_with($attribute, '_token')) {
                     $value = $resource->getAttribute($attribute);
                     if (is_string($value) && $value !== '') {
                         $secrets['locked'][] = $value;
@@ -661,7 +690,7 @@ class EnvironmentVariable extends BaseModel
      * @param  array<int, string>  $unresolvedKeys
      * @return array<int, string>
      */
-    private static function remoteSecretLogRedactionValuesFor(Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource, self $variable, ?Collection $sharedVariables, ?RemoteSecretException &$failure, array &$unresolvedKeys): array
+    private static function remoteSecretLogRedactionValuesFor(Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $resource, self $variable, ?Collection $sharedVariables, ?RemoteSecretException &$failure, array &$unresolvedKeys): array
     {
         // Cheap check first, so variables without references never query or contact a source.
         $value = $variable->resolveRealValue(escapeLegacyValue: false, sharedVariables: $sharedVariables);

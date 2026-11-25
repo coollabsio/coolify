@@ -9,6 +9,8 @@
 
     $configurationItems = collect([
         ['label' => 'General', 'route' => 'project.service.configuration', 'icon' => 'settings'],
+        ['label' => 'Template', 'route' => 'project.service.template', 'icon' => 'server-update', 'visible' => filled($service->service_type),
+            'attention' => \App\Services\TemplateUpdateChecker::showBadge($service) ? 'Template update available' : null],
         ['label' => 'Domains', 'route' => 'project.service.domains', 'icon' => 'globe'],
         ['label' => 'Environment Variables', 'route' => 'project.service.environment-variables', 'icon' => 'variables', 'hasWarning' => ! $service->isDeployable],
         ['label' => 'Persistent Storage', 'route' => 'project.service.storages', 'icon' => 'storages'],
@@ -36,7 +38,7 @@
         ]);
 
     $menuGroups = [
-        'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage'],
+        'Settings' => ['General', 'Template', 'Domains', 'Environment Variables', 'Persistent Storage'],
         'Observe & troubleshoot' => ['Runtime Logs', 'Terminal', 'Files', 'Analytics', 'Security'],
         'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
         'Operations' => ['Resource Operations', 'Maintenance Mode', 'Tags'],
@@ -49,30 +51,46 @@
             ->filter()
             ->values())
         ->filter(fn ($items) => $items->isNotEmpty());
+
+    // Pages that the user can star (components/starred-menu)
+    $starrableMenuItems = $configurationItems->map(fn (array $item): array => [
+        'key' => $item['route'],
+        'label' => $item['label'],
+        'icon' => $item['icon'],
+        'href' => route($item['route'], $serviceRouteParameters),
+        'active' => $item['active'],
+        'navigate' => $item['navigate'] ?? true,
+    ])->values()->all();
 @endphp
 
 <x-main-nav-menu back-label="Dashboard" :name="$service->name" :nav-only="$navOnly"
     data-settings-search-items="{{ json_encode(settingsSearchItems($groupedItems, $serviceRouteParameters)) }}">
     <nav aria-label="Service settings"
         class="grid grid-cols-1 gap-0.5">
+        <x-starred-menu.group menu="service" :items="$starrableMenuItems" />
         @foreach ($groupedItems as $groupLabel => $groupItems)
             @unless ($loop->first)
                 <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]" aria-hidden="true"></div>
             @endunless
             @foreach ($groupItems as $menuItem)
+                <div class="starred-menu-row">
                 <a @class(['menu-item', 'menu-item-active' => $menuItem['active']])
                     @if ($menuItem['navigate'] ?? true) {{ wireNavigate() }} @endif
                     href="{{ route($menuItem['route'], $serviceRouteParameters) }}">
                     <x-reicon :name="$menuItem['icon']" class="menu-item-icon" />
                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                     @if ($menuItem['label'] === 'Files')
-                        <x-beta-badge class="ml-auto shrink-0" />
+                        <x-experimental-icon class="ml-auto shrink-0" />
                     @endif
                     <x-image-scan.security-dot :status="$menuItem['security'] ?? null" />
-                    @if ($menuItem['hasWarning'] ?? false)
+                    @if ($menuItem['attention'] ?? null)
+                        <x-attention-mark :label="$menuItem['attention']" />
+                    @elseif ($menuItem['hasWarning'] ?? false)
                         <span class="ml-auto size-2 shrink-0 rounded-full bg-error" title="Required environment variables missing"></span>
                     @endif
                 </a>
+                <x-starred-menu.toggle menu="service" :page="$menuItem['route']" :label="$menuItem['label']" />
+                </div>
                 @if ($menuItem['active'] && $menuItem['route'] === 'project.service.storages' && $storageSections->isNotEmpty())
                     <div class="nav-children flex flex-col gap-0.5 py-1"
                         x-data="{ activeSection: '' }">

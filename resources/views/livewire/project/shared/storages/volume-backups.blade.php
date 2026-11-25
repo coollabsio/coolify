@@ -3,7 +3,7 @@
         <div wire:poll.3s="checkDownloads" class="hidden"></div>
     @endif
     @if ($actionsInHeader && $backup)
-        @can('update', $resource)
+        @can('manageBackups', $resource)
             @teleport('#resource-action-hud-slot')
                 <div class="order-first mr-1 hidden items-center gap-1 xl:flex">
                     @if ($enabled)

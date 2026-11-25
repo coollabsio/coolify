@@ -129,3 +129,30 @@ test('a numeric branch name is matched as a string', function () {
 
     expect(bitbucketQueuedCommit($release))->toBe('ddddddd4');
 });
+
+test('a Bitbucket Data Center push of several branches deploys each branch with its own commit', function () {
+    $main = ($this->createBitbucketApplication)('main');
+    $develop = ($this->createBitbucketApplication)('develop');
+    $main->update(['git_repository' => 'https://bitbucket.example.com/scm/test-org/test-repo.git']);
+    $develop->update(['git_repository' => 'https://bitbucket.example.com/scm/test-org/test-repo.git']);
+    $payload = json_encode([
+        'eventKey' => 'repo:refs_changed',
+        'repository' => ['slug' => 'test-repo', 'project' => ['key' => 'test-org']],
+        'changes' => [
+            ['ref' => ['displayId' => 'main', 'type' => 'BRANCH'], 'toHash' => str_repeat('a', 40), 'type' => 'UPDATE'],
+            ['ref' => ['displayId' => 'v1.0', 'type' => 'TAG'], 'toHash' => str_repeat('e', 40), 'type' => 'ADD'],
+            ['ref' => ['displayId' => 'develop', 'type' => 'BRANCH'], 'toHash' => str_repeat('b', 40), 'type' => 'ADD'],
+        ],
+        'commits' => [['message' => 'Update']],
+    ]);
+
+    $this->call('POST', '/webhooks/source/bitbucket/events/manual', [], [], [], [
+        'HTTP_X-Event-Key' => 'repo:refs_changed',
+        'HTTP_X-Hub-Signature' => 'sha256='.hash_hmac('sha256', $payload, 'shared-bitbucket-secret'),
+        'REMOTE_ADDR' => '203.0.113.10',
+        'CONTENT_TYPE' => 'application/json',
+    ], $payload)->assertOk()->assertJsonCount(2);
+
+    expect(bitbucketQueuedCommit($main))->toBe(str_repeat('a', 40))
+        ->and(bitbucketQueuedCommit($develop))->toBe(str_repeat('b', 40));
+});

@@ -33,6 +33,7 @@ class InstallPrerequisites
             $command = $command->merge([
                 "echo 'Installing Prerequisites...'",
                 'command -v curl >/dev/null || dnf install -y curl',
+                'command -v xargs >/dev/null || dnf install -y findutils',
                 'command -v wget >/dev/null || dnf install -y wget',
                 'command -v git >/dev/null || dnf install -y git',
                 'command -v jq >/dev/null || dnf install -y jq',

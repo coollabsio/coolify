@@ -21,6 +21,7 @@ trait HasNotificationSettings
         'hetzner_deletion_failure',
         'api_token_expiring',
         'api_token_failing',
+        'project_config',
     ];
 
     /**

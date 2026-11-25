@@ -14,6 +14,7 @@ use App\Models\Team;
 use App\Notifications\ScheduledJobRecovered;
 use App\Notifications\ScheduledTask\TaskFailed;
 use App\Notifications\ScheduledTask\TaskSuccess;
+use App\Services\HorizonNodeDrainer;
 use App\Services\ScheduledJobDeliveryService;
 use App\Services\Security\SensitiveDataRedactor;
 use Carbon\Carbon;
@@ -325,6 +326,10 @@ class ScheduledTaskJob implements ShouldBeEncrypted, ShouldQueue
     {
         if ($this->occurrenceUuid) {
             app(ScheduledJobDeliveryService::class)->fail($this->occurrenceUuid, $this->job?->uuid() ?? $this->occurrenceUuid);
+        }
+
+        if (HorizonNodeDrainer::wasMoved(HorizonNodeDrainer::SCHEDULED_TASK, $this->task->id)) {
+            return;
         }
 
         $this->team ??= Team::find($this->task->team_id);

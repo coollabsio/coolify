@@ -38,6 +38,8 @@ it('denies missing or ambiguous repository identity', function (mixed $source, m
     'missing target' => [55, null, 55],
     'missing webhook repository' => [55, 55, null],
     'empty identity' => ['', 55, 55],
+    'boolean identity' => [true, true, true],
+    'float identity' => [55.0, 55.0, 55.0],
 ]);
 
 it('denies spoofed target repository metadata', function () {

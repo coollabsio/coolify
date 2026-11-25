@@ -1305,10 +1305,29 @@ test('transfer keeps whether a volume ignores the Compose driver options', funct
     'bundle without the flag' => [null, true],
 ]);
 
+test('transfer keeps whether a volume is an existing Docker volume', function () {
+    LocalPersistentVolume::query()->where('resource_id', $this->application->id)->update(['is_external' => true]);
+    $bundle = $this->exporter->export($this->server);
+    $originalAppUuid = $this->application->uuid;
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    Tag::query()->delete();
+    ScheduledDatabaseBackup::query()->delete();
+    ScheduledTask::query()->delete();
+    $this->privateKey->delete();
+
+    $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: true, adoptMode: true);
+
+    expect(Application::where('uuid', $originalAppUuid)->sole()->persistentStorages()->sole()->is_external)->toBeTrue();
+});
+
 test('transfer keeps the link between an application volume and its sqlite database', function () {
     $sqlite = StandaloneSqlite::create([
         'name' => 'app-sqlite',
-        'image' => 'peakimages/sqlite:3.54.1-v0.2.0',
+        'image' => 'peakimages/sqlite:3.54.1-v0.3.0',
         'environment_id' => $this->environment->id,
         'destination_id' => $this->destination->id,
         'destination_type' => $this->destination->getMorphClass(),
@@ -1422,6 +1441,21 @@ test('transfer keeps the Traefik certificate resolver of applications and servic
         ->and(ServiceApplication::where('uuid', 'svc-app-resolver')->firstOrFail()->traefik_certificate_resolver)->toBe('cloudflare');
 });
 
+test('transfer keeps the build secrets setting and the dismissed recommendations of an application', function () {
+    $this->application->settings->update([
+        'use_build_secrets' => false,
+        'dismissed_recommendations' => ['use-build-secrets'],
+    ]);
+    $bundle = $this->exporter->export($this->server->fresh());
+
+    removeTransferSourceResources($this);
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    $settings = Application::where('uuid', $this->application->uuid)->sole()->settings;
+    expect($settings->use_build_secrets)->toBeFalse()
+        ->and($settings->dismissed_recommendations)->toBe(['use-build-secrets']);
+});
+
 test('transfer keeps the cloud provider instance id of the server', function () {
     $this->server->forceFill(['hetzner_server_id' => 4242, 'vultr_instance_id' => 'vultr-7'])->save();
     $bundle = $this->exporter->export($this->server->fresh());
@@ -1499,10 +1533,10 @@ test('export refuses credentials of another team', function () {
         ->toThrow(RuntimeException::class, 'does not belong to the server team');
 });
 
-test('transfer keeps maintenance mode, the server error page and swarm cluster, environment variable flags, and the Coolify default variables switch', function () {
+test('transfer keeps maintenance mode, the server error page and swarm cluster, environment variable flags and Compose service scope, the Coolify default variables switch, and the production values in previews switch and copies', function () {
     $this->application->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>App down</h1>'])->saveQuietly();
     $this->service->forceFill(['is_maintenance_enabled' => true, 'maintenance_page' => '<h1>Service down</h1>', 'include_coolify_default_variables' => false])->saveQuietly();
-    $this->application->settings->forceFill(['include_coolify_default_variables' => false])->saveQuietly();
+    $this->application->settings->forceFill(['include_coolify_default_variables' => false, 'use_production_values_in_previews' => false])->saveQuietly();
     $this->database->forceFill(['include_coolify_default_variables' => false])->saveQuietly();
     $this->server->forceFill(['proxy_error_page' => '<h1>Proxy error</h1>', 'swarm_cluster' => 7])->saveQuietly();
     EnvironmentVariable::withoutEvents(function () {
@@ -1511,12 +1545,24 @@ test('transfer keeps maintenance mode, the server error page and swarm cluster, 
             'key' => 'COMPOSE_NULL',
             'value' => null,
             'preserve_compose_null' => true,
+            'compose_services' => ['web', 'worker'],
             'version' => '4.0.0-beta.400',
             'resourceable_type' => Application::class,
             'resourceable_id' => $this->application->id,
         ]);
         $env->uuid = new_public_id();
         $env->save();
+        $copy = new EnvironmentVariable;
+        $copy->forceFill([
+            'key' => 'COPIED_SECRET',
+            'value' => 'old-secret',
+            'is_preview' => true,
+            'is_production_value_copy' => true,
+            'resourceable_type' => Application::class,
+            'resourceable_id' => $this->application->id,
+        ]);
+        $copy->uuid = new_public_id();
+        $copy->save();
     });
     $appUuid = $this->application->uuid;
     $serviceUuid = $this->service->uuid;
@@ -1543,9 +1589,12 @@ test('transfer keeps maintenance mode, the server error page and swarm cluster, 
         ->and($server->proxy_error_page)->toBe('<h1>Proxy error</h1>')
         ->and((int) $server->swarm_cluster)->toBe(7)
         ->and($variable->preserve_compose_null)->toBeTrue()
+        ->and($variable->compose_services)->toBe(['web', 'worker'])
         ->and($variable->value)->toBeNull()
         ->and($variable->version)->toBe('4.0.0-beta.400')
+        ->and($application->environment_variables_preview()->where('key', 'COPIED_SECRET')->sole()->is_production_value_copy)->toBeTrue()
         ->and($application->settings->include_coolify_default_variables)->toBeFalse()
+        ->and($application->settings->use_production_values_in_previews)->toBeFalse()
         ->and($service->include_coolify_default_variables)->toBeFalse()
         ->and($databaseClass::where('uuid', $databaseUuid)->sole()->include_coolify_default_variables)->toBeFalse();
 });
@@ -2032,6 +2081,14 @@ test('the checklist asks to move manual webhooks of git applications without a p
         ->toContain('{target_url}/webhooks/source/gitea/events/manual');
 });
 
+test('the checklist asks to link the environment again when only a database or service is managed by coolify.json', function () {
+    $this->service->forceFill(['config_key' => 'cache'])->saveQuietly();
+
+    $checklist = implode("\n", $this->exporter->export($this->server)['post_transfer_checklist']);
+
+    expect($checklist)->toContain('Some resources were managed by coolify.json.');
+});
+
 test('the checklist does not ask about manual webhooks for an application that deploys through a private GitHub App', function () {
     $githubApp = GithubApp::create([
         'name' => 'private-app', 'api_url' => 'https://api.github.com', 'html_url' => 'https://github.com',
@@ -2474,3 +2531,60 @@ test('the image scanner limits move with the server', function () {
         ->and($settings->image_scan_cpus)->toBe(2.0)
         ->and($settings->image_scan_memory_mb)->toBe(4096);
 });
+
+test('transfer keeps the fork pull request approval state of previews and the approval setting', function () {
+    $this->application->settings->forceFill(['is_pr_deployments_public_approval_required' => false])->save();
+
+    $preview = new ApplicationPreview;
+    $preview->forceFill([
+        'application_id' => $this->application->id,
+        'pull_request_id' => 9,
+        'pull_request_html_url' => 'https://github.com/example/app/pull/9',
+        'fqdn' => 'https://pr-9.app.example.com',
+        'is_fork_pull_request' => true,
+        'pending_approval_commit' => 'b2c3d4e5f6',
+        'approved_commit' => 'a1b2c3d4e5',
+        'approved_at' => '2031-02-03 04:05:06',
+    ]);
+    $preview->uuid = 'preview-pr-9';
+    $preview->saveQuietly();
+
+    $bundle = $this->exporter->export($this->server);
+
+    ApplicationPreview::withoutEvents(fn () => ApplicationPreview::withTrashed()->get()->each->forceDelete());
+    DB::table('scheduled_volume_backups')->delete();
+    DB::table('scheduled_database_backups')->delete();
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $this->importer->import($bundle, teamId: $this->team->id, preserveUuids: false, adoptMode: false);
+
+    $application = Application::where('name', 'my-app')->sole();
+    $importedPreview = $application->previews()->sole();
+    expect($application->settings->is_pr_deployments_public_approval_required)->toBeFalse()
+        ->and($importedPreview->is_fork_pull_request)->toBeTrue()
+        ->and($importedPreview->pending_approval_commit)->toBe('b2c3d4e5f6')
+        ->and($importedPreview->approved_commit)->toBe('a1b2c3d4e5')
+        ->and($importedPreview->approved_at->toDateTimeString())->toBe('2031-02-03 04:05:06');
+});
+
+test('an imported server keeps the status for unknown hosts, and a bundle without it gets the legacy status', function (?array $proxy, int $expected) {
+    $bundle = $this->exporter->export($this->server);
+    $bundle['server']['proxy'] = $proxy;
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+
+    $result = $this->importer->import($bundle, teamId: $this->team->id);
+
+    expect(Server::where('uuid', $result['server_uuid'])->first()->proxy->get('unknown_host_status'))->toBe($expected);
+})->with([
+    'no proxy' => [null, Server::LEGACY_UNKNOWN_HOST_STATUS],
+    'empty proxy' => [[], Server::LEGACY_UNKNOWN_HOST_STATUS],
+    'proxy without the status' => [['type' => 'TRAEFIK'], Server::LEGACY_UNKNOWN_HOST_STATUS],
+    'explicit 404' => [['type' => 'TRAEFIK', 'unknown_host_status' => 404], 404],
+    'explicit 503' => [['type' => 'TRAEFIK', 'unknown_host_status' => 503], 503],
+]);

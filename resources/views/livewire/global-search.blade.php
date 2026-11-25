@@ -66,6 +66,10 @@
 
     openPageItem(item) {
         this.closeModal();
+        if (item.action) {
+            item.action();
+            return;
+        }
         if (item.element) {
             if (item.element.id) history.replaceState(null, '', '#' + item.element.id);
             window.scrollToSettingsSection?.(item.element);
@@ -264,7 +268,7 @@
                 'new private github', 'new private gh', 'new private deploy', 'new deploy key',
                 'new dockerfile', 'new docker compose', 'new compose', 'new docker image', 'new image',
                 'new postgresql', 'new postgres', 'new mysql', 'new mariadb',
-                'new redis', 'new valkey', 'new keydb', 'new dragonfly', 'new mongodb', 'new mongo', 'new clickhouse', 'new sqlite'
+                'new redis', 'new valkey', 'new keydb', 'new dragonfly', 'new mongodb', 'new mongo', 'new clickhouse', 'new influxdb', 'new influx', 'new sqlite'
             ];
             if (this.scope === 'global' && exactMatchCommands.includes(trimmed)) {
                 const matchingItem = this.creatableItems.find(item => {
@@ -675,7 +679,7 @@
                         <template x-if="pageResults.length > 0 && !$wire.isSelectingResource">
                         <div class="command-palette-section">
                             <div class="command-palette-group-label">This page</div>
-                            <template x-for="item in pageResults" :key="item.href">
+                            <template x-for="item in pageResults" :key="item.key ?? item.href">
                                 <a :href="item.element ? (item.element.id ? '#' + item.element.id : '#') : item.href" @click.prevent="openPageItem(item)"
                                     class="search-result-item command-palette-item">
                                     <div class="command-palette-item-main">

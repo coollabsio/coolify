@@ -2,6 +2,12 @@
     @teleport('#resource-star-slot-mobile')
         <livewire:star-toggle :resource="$database" :wire:key="'star-mobile-'.$database->getMorphClass().'-'.$database->uuid" />
     @endteleport
+    @teleport('#configuration-warning-hud-slot')
+        <div><x-project-config.hud-chip :resource="$database" /></div>
+    @endteleport
+    @teleport('#configuration-warning-hud-slot-mobile')
+        <div><x-project-config.hud-chip :resource="$database" /></div>
+    @endteleport
     @php
         $databasePageItems = [
             [
@@ -115,9 +121,9 @@
         <div class="hidden w-full items-center xl:flex xl:w-auto">
             <div
                 class="resource-heading-navbar application-heading-actions flex w-auto min-w-0 items-center justify-end gap-1 overflow-visible">
-                <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
+                <div class="resource-heading-actions flex shrink-0 items-center gap-1">
                     @if ($isDeploymentProgress)
-                        <x-deploying-indicator label="Working" class="mr-1" />
+                        <x-deploying-indicator label="Working" size="md" />
                     @endif
                     @if ($database->server_status)
                         @can('manage', $database)

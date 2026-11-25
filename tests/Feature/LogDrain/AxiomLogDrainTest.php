@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Server\StartLogDrain;
+use App\Enums\LogDrainType;
 use App\Livewire\Server\LogDrains;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
@@ -55,10 +56,8 @@ function startAxiomLogDrain(Server $server): array
 
 it('sends logs to the configured Axiom edge deployment', function () {
     $this->server->settings->update([
-        'is_logdrain_axiom_enabled' => true,
-        'logdrain_axiom_dataset_name' => 'dataset',
-        'logdrain_axiom_api_key' => 'key',
-        'logdrain_axiom_domain' => 'eu-central-1.aws.edge.axiom.co',
+        'logdrain_type' => LogDrainType::Axiom,
+        'logdrain_config' => ['axiom' => ['dataset_name' => 'dataset', 'api_key' => 'key', 'domain' => 'eu-central-1.aws.edge.axiom.co']],
     ]);
 
     $files = startAxiomLogDrain($this->server);
@@ -71,67 +70,65 @@ it('sends logs to the configured Axiom edge deployment', function () {
 
 it('uses the US edge deployment when no Axiom domain is set', function () {
     $this->server->settings->update([
-        'is_logdrain_axiom_enabled' => true,
-        'logdrain_axiom_dataset_name' => 'dataset',
-        'logdrain_axiom_api_key' => 'key',
-        'logdrain_axiom_domain' => null,
+        'logdrain_type' => LogDrainType::Axiom,
+        'logdrain_config' => ['axiom' => ['dataset_name' => 'dataset', 'api_key' => 'key']],
     ]);
 
     expect(startAxiomLogDrain($this->server)['env'])->toStartWith("AXIOM_DOMAIN=us-east-1.aws.edge.axiom.co\n");
 });
 
-it('defaults the Axiom domain of new servers to the US edge deployment', function () {
-    expect($this->server->settings->fresh()->logdrain_axiom_domain)->toBe('us-east-1.aws.edge.axiom.co');
+it('shows the US edge deployment as the Axiom domain of new servers', function () {
+    Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
+        ->assertSet('logDrainConfig.axiom.domain', 'us-east-1.aws.edge.axiom.co');
 });
 
 it('enables Axiom with an EU edge domain', function () {
     StartLogDrain::mock()->shouldReceive('handle')->once()->andReturn('ok');
 
     Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
-        ->assertSet('logDrainAxiomDomain', 'us-east-1.aws.edge.axiom.co')
-        ->set('logDrainAxiomApiKey', 'xaat-key')
-        ->set('logDrainAxiomDatasetName', 'dataset')
-        ->set('logDrainAxiomDomain', 'eu-central-1.aws.edge.axiom.co')
+        ->assertSet('logDrainConfig.axiom.domain', 'us-east-1.aws.edge.axiom.co')
+        ->set('logDrainConfig.axiom.api_key', 'xaat-key')
+        ->set('logDrainConfig.axiom.dataset_name', 'dataset')
+        ->set('logDrainConfig.axiom.domain', 'eu-central-1.aws.edge.axiom.co')
         ->call('toggleLogDrain', 'axiom')
         ->assertHasNoErrors()
-        ->assertSet('isLogDrainAxiomEnabled', true);
+        ->assertSet('logDrainType', 'axiom');
 
-    expect($this->server->settings->fresh()->logdrain_axiom_domain)->toBe('eu-central-1.aws.edge.axiom.co');
+    expect($this->server->settings->fresh()->logDrainConfig(LogDrainType::Axiom)['domain'])->toBe('eu-central-1.aws.edge.axiom.co');
 });
 
 it('rejects an Axiom domain that is not a hostname', function (string $domain) {
     StartLogDrain::mock()->shouldNotReceive('handle');
 
     Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
-        ->set('logDrainAxiomApiKey', 'xaat-key')
-        ->set('logDrainAxiomDatasetName', 'dataset')
-        ->set('logDrainAxiomDomain', $domain)
+        ->set('logDrainConfig.axiom.api_key', 'xaat-key')
+        ->set('logDrainConfig.axiom.dataset_name', 'dataset')
+        ->set('logDrainConfig.axiom.domain', $domain)
         ->call('toggleLogDrain', 'axiom')
         ->assertDispatched('error')
-        ->assertHasErrors('logDrainAxiomDomain')
-        ->assertSet('isLogDrainAxiomEnabled', false)
-        ->assertSet('logDrainAxiomDatasetName', 'dataset');
+        ->assertHasErrors('logDrainConfig.axiom.domain')
+        ->assertSet('logDrainType', null)
+        ->assertSet('logDrainConfig.axiom.dataset_name', 'dataset');
 
     $settings = $this->server->settings->fresh();
-    expect($settings->is_logdrain_axiom_enabled)->toBeFalsy()
-        ->and($settings->logdrain_axiom_domain)->toBe('us-east-1.aws.edge.axiom.co');
+    expect($settings->logdrain_type)->toBeNull()
+        ->and($settings->logdrain_config)->toBeNull();
 })->with([
     'env injection' => ["eu-central-1.aws.edge.axiom.co\nAXIOM_API_KEY=x"],
     'url' => ['https://eu-central-1.aws.edge.axiom.co'],
-    'empty' => [''],
 ]);
 
-it('shows a missing API key under its field when Axiom is enabled from the status dropdown', function () {
+it('shows a missing API key under its field when Axiom is enabled', function () {
     StartLogDrain::mock()->shouldNotReceive('handle');
 
     Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
-        ->set('logDrainAxiomDatasetName', 'dataset')
-        ->set('isLogDrainAxiomEnabled', true)
-        ->call('instantSave')
+        ->set('selectedLogDrainType', 'axiom')
+        ->set('logDrainConfig.axiom.dataset_name', 'dataset')
+        ->call('toggleLogDrain')
         ->assertDispatched('error')
-        ->assertHasErrors('logDrainAxiomApiKey')
-        ->assertSet('isLogDrainAxiomEnabled', false)
-        ->assertSet('logDrainAxiomDatasetName', 'dataset');
+        ->assertHasErrors('logDrainConfig.axiom.api_key')
+        ->assertSet('logDrainType', null)
+        ->assertSet('logDrainConfig.axiom.dataset_name', 'dataset');
 
-    expect($this->server->settings->fresh()->is_logdrain_axiom_enabled)->toBeFalsy();
+    expect($this->server->settings->fresh()->logdrain_type)->toBeNull();
 });

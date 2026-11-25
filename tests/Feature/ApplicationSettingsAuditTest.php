@@ -205,7 +205,7 @@ it('audits application setting changes from each settings control', function (Cl
     }, 'docker_images_to_keep'],
     'build secrets' => [function () {
         Livewire::test(All::class, ['resource' => $this->application])
-            ->set('use_build_secrets', true)
+            ->set('use_build_secrets', false)
             ->call('instantSave')
             ->assertHasNoErrors();
     }, 'use_build_secrets'],

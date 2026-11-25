@@ -19,7 +19,7 @@
              `$wire.set('sentinelCustomDockerImage', …)` (and similar) briefly
              flashes this bar on every page open. --}}
         <x-unsaved-bar action="submit"
-            targets="sentinelCustomUrl,sentinelToken" />
+            targets="sentinelCustomUrl,sentinelToken,logArchiveMaxFileMb,logArchiveMaxTotalMb,logArchiveRetentionDays" />
 
         <x-application.settings-section id="server-sentinel-overview-section" title="Sentinel"
             helper="Monitor server and container health while collecting historical metrics.">
@@ -52,7 +52,9 @@
                             <li>Confirm that the Coolify URL and Sentinel token match this configuration.</li>
                         </ul>
 
-                        @if ($server->isLocalhost())
+                        @if ($isSentinelPullEnabled)
+                            <p>Coolify reads Sentinel reports over SSH. Confirm that the SSH connection works and that Sentinel is up to date.</p>
+                        @elseif ($server->isLocalhost())
                             <p>Sync Sentinel to recreate it on the Coolify Docker network.</p>
                         @else
                             <div class="space-y-2">
@@ -112,13 +114,48 @@
                         </x-callout>
                     @endif
                     <div class="grid gap-4 lg:grid-cols-2">
-                        <x-forms.input canGate="update" :canResource="$server" id="sentinelCustomUrl"
-                            required label="Coolify URL"
-                            helper="Public URL used by Sentinel to reach this Coolify instance." />
+                        <x-forms.listbox canGate="update" :canResource="$server" id="isSentinelPullEnabled"
+                            label="Report mode" onChange="instantSave"
+                            helper="Pull: Coolify reads Sentinel data over SSH. Use this when the server cannot reach Coolify (for example, Coolify is on a private network)."
+                            :options="[
+                                ['value' => false, 'label' => 'Push: Sentinel sends reports to Coolify'],
+                                ['value' => true, 'label' => 'Pull: Coolify reads reports over SSH'],
+                            ]" />
+                        @unless ($isSentinelPullEnabled)
+                            <x-forms.input canGate="update" :canResource="$server" id="sentinelCustomUrl"
+                                required label="Coolify URL"
+                                helper="Public URL used by Sentinel to reach this Coolify instance." />
+                        @endunless
                         <x-forms.input canGate="update" :canResource="$server" type="password"
                             id="sentinelToken" label="Sentinel token" required
                             helper="Authentication token used by Sentinel." />
                     </div>
+                </div>
+            </x-application.settings-section>
+
+            <x-application.settings-section id="server-sentinel-container-logs-section" title="Container logs"
+                helper="Sentinel saves the logs of each Coolify container on the server, so you can read them on the Logs page after the container is removed. When you turn this off, the saved logs are deleted. The size and retention limits need Sentinel 1.1.8 or later.">
+                <div class="flex flex-col gap-4">
+                    <div class="max-w-xs">
+                        <x-forms.listbox canGate="update" :canResource="$server" id="isContainerLogArchiveEnabled"
+                            label="Keep logs of removed containers" onChange="instantSave" :options="[
+                                ['value' => true, 'label' => 'Enabled'],
+                                ['value' => false, 'label' => 'Disabled'],
+                            ]" />
+                    </div>
+                    @if ($isContainerLogArchiveEnabled)
+                        <div class="grid gap-4 lg:grid-cols-3">
+                            <x-forms.input canGate="update" :canResource="$server" type="number" min="1" max="1024"
+                                id="logArchiveMaxFileMb" label="File size limit (MB)" required
+                                helper="Size at which the log file of a container is rotated. One rotated file is kept." />
+                            <x-forms.input canGate="update" :canResource="$server" type="number" min="1" max="102400"
+                                id="logArchiveMaxTotalMb" label="Total size limit (MB)" required
+                                helper="Total size of all log files. Sentinel deletes the oldest files above it." />
+                            <x-forms.input canGate="update" :canResource="$server" type="number" min="1" max="365"
+                                id="logArchiveRetentionDays" label="Retention (days)" required
+                                helper="Sentinel deletes log files that were not written for this many days." />
+                        </div>
+                    @endif
                 </div>
             </x-application.settings-section>
 

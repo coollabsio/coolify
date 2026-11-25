@@ -47,10 +47,12 @@ $server->settings->forceFill([
     'is_metrics_enabled' => true, 'sentinel_metrics_refresh_rate_seconds' => 10, 'sentinel_metrics_history_days' => 14, 'sentinel_push_interval_seconds' => 30,
     'is_traffic_analytics_enabled' => true, 'traffic_topn' => 20, 'traffic_sample_threshold' => 9, 'traffic_retention_1h_days' => 3, 'traffic_retention_1d_days' => 60,
     'traffic_ip_mode' => 'anonymized', 'is_geoip_enabled' => true, 'geoip_maxmind_license_key' => 'fake-maxmind-key', 'geoip_refresh_days' => 14,
-    'logdrain_newrelic_license_key' => 'fake-newrelic', 'logdrain_newrelic_base_uri' => 'https://log-api.eu.newrelic.com/log/v1',
-    'logdrain_axiom_dataset_name' => 'fake-dataset', 'logdrain_axiom_api_key' => 'fake-axiom',
-    'logdrain_custom_config' => "[OUTPUT]\n    Name stdout\n", 'logdrain_custom_config_parser' => "[PARSER]\n    Name fake\n",
-    'logdrain_cloudwatch_region' => 'eu-central-1', 'logdrain_cloudwatch_group' => 'fake-group', 'logdrain_cloudwatch_stream_prefix' => 'fake-prefix',
+    'logdrain_config' => [
+        'newrelic' => ['license_key' => 'fake-newrelic', 'base_uri' => 'https://log-api.eu.newrelic.com/log/v1'],
+        'axiom' => ['dataset_name' => 'fake-dataset', 'api_key' => 'fake-axiom'],
+        'custom' => ['config' => "[OUTPUT]\n    Name stdout\n", 'parser_config' => "[PARSER]\n    Name fake\n"],
+        'cloudwatch' => ['region' => 'eu-central-1', 'group' => 'fake-group', 'stream_prefix' => 'fake-prefix'],
+    ],
 ])->saveQuietly();
 
 // 2. Shared variables: server (multiline, literal, comment, empty), project, environment
@@ -80,6 +82,7 @@ $app->settings->forceFill([
     'include_coolify_default_variables' => false, 'traefik_certificate_resolver' => 'custom', 'connect_to_docker_network' => true,
     'custom_internal_name' => 'whoami-two', 'is_permanent_redirect_enabled' => true, 'is_log_drain_enabled' => false,
     'is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true, 'is_auto_deploy_enabled' => false,
+    'use_build_secrets' => false, 'dismissed_recommendations' => ['use-build-secrets'],
 ])->save();
 
 // Variables of every kind, and references to every shared scope
@@ -144,7 +147,7 @@ $serviceApp->forceFill([
 ])->save();
 $serviceDb = $service->databases()->firstOrFail();
 $serviceDb->forceFill(['public_port' => 26379, 'is_public' => false, 'custom_type' => 'redis', 'human_name' => 'Legacy Cache'])->save();
-EnvironmentVariable::create(['key' => 'SERVICE_EXTRA', 'value' => 'service-extra', 'resourceable_type' => $service->getMorphClass(), 'resourceable_id' => $service->id]);
+EnvironmentVariable::create(['key' => 'SERVICE_EXTRA', 'value' => 'service-extra', 'compose_services' => [$serviceApp->name], 'resourceable_type' => $service->getMorphClass(), 'resourceable_id' => $service->id]);
 ScheduledTask::create(['name' => 'service-task', 'command' => 'echo service', 'frequency' => '0 2 * * *', 'container' => 'cache', 'service_id' => $service->id, 'team_id' => $teamId]);
 $service->tags()->attach(Tag::firstOrCreate(['name' => 'legacy', 'team_id' => $teamId])->id);
 
@@ -174,6 +177,12 @@ DB::table('shared_environment_variables')->where('id', $legacyShared->id)->updat
 $preview = new ApplicationPreview;
 $preview->forceFill(['application_id' => $app->id, 'pull_request_id' => 42, 'pull_request_html_url' => 'https://github.com/acme/shop/pull/42',
     'fqdn' => "http://pr-42.whoami2.{$ip}.sslip.io", 'max_restart_count' => 3, 'docker_registry_image_tag' => 'pr-42'])->save();
+// A fork PR preview with an approved commit and a newer commit that waits. whoami2 keeps the default "approval required";
+// the git apps above get "approval not required" from the fuzzer.
+$forkPreview = new ApplicationPreview;
+$forkPreview->forceFill(['application_id' => $app->id, 'pull_request_id' => 43, 'pull_request_html_url' => 'https://github.com/acme/shop/pull/43',
+    'fqdn' => "http://pr-43.whoami2.{$ip}.sslip.io", 'is_fork_pull_request' => true, 'approved_commit' => str_repeat('a', 40),
+    'approved_at' => now()->subDay(), 'pending_approval_commit' => str_repeat('b', 40)])->save();
 foreach (['StandaloneMysql', 'StandaloneMongodb', 'StandaloneKeydb', 'StandaloneDragonfly', 'StandaloneClickhouse', 'StandaloneRedis', 'StandaloneSqlite'] as $type) {
     foreach (("App\\Models\\{$type}")::where('name', 'like', 'idle-%')->get() as $database) {
         // ssl_mode has a check constraint; pg-ssl covers it.

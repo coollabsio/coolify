@@ -65,7 +65,7 @@ it('shows the first Sentinel report as pending instead of requiring attention', 
     ])->save();
 
     Livewire::test('server.navbar', ['server' => $server->fresh()])
-        ->assertSee('Ready')
+        ->assertSee('Operational')
         ->assertSee('Waiting for first report')
         ->assertDontSee('Attention required')
         ->assertDontSee('Out of sync');

@@ -29,6 +29,7 @@ use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -1320,8 +1321,10 @@ function formatEnvValueForDevView(?string $value): ?string
  * Format a variable for the developer view: its KEY=value line, with a "# coolify:" directive
  * line above it when a flag is not its default. A variable that the view cannot edit gets a
  * placeholder line and no directive.
+ *
+ * @param  bool  $withContainers  write a "containers=" flag when the variable is limited to some Compose services
  */
-function formatEnvVariableForDevView(EnvironmentVariable|SharedEnvironmentVariable $variable, bool $canViewValue): string
+function formatEnvVariableForDevView(EnvironmentVariable|SharedEnvironmentVariable $variable, bool $canViewValue, bool $withContainers = false): string
 {
     if (! $canViewValue) {
         return "{$variable->key}=(Hidden, only admins can view)";
@@ -1343,6 +1346,9 @@ function formatEnvVariableForDevView(EnvironmentVariable|SharedEnvironmentVariab
             $flags[] = $default ? "{$flag}=false" : $flag;
         }
     }
+    if ($withContainers && $variable instanceof EnvironmentVariable && $variable->compose_services !== null) {
+        $flags[] = 'containers='.implode(',', $variable->compose_services);
+    }
     $line = "{$variable->key}={$value}";
 
     return $flags === [] ? $line : '# coolify: '.implode(' ', $flags)."\n".$line;
@@ -1354,12 +1360,17 @@ function formatEnvVariableForDevView(EnvironmentVariable|SharedEnvironmentVariab
  * attributes (for example ['is_literal' => true]). A key without a directive gets empty
  * settings, so its current flags stay.
  *
+ * With $allowContainers, the "containers=app,db" flag sets 'compose_services'. A directive
+ * without that flag sets 'compose_services' => null (all Compose services). A key without a
+ * directive keeps its scope, like its other flags. The caller checks that the names are
+ * services of the Compose file.
+ *
  * @param  array<string, bool>  $flagDefaults  the allowed flags and their defaults
- * @return array<string, array{value: string, comment: ?string, settings: array<string, bool>}>
+ * @return array<string, array{value: string, comment: ?string, settings: array<string, bool|list<string>|null>}>
  *
  * @throws InvalidArgumentException when a directive is not directly above a KEY=value line, or has an unknown flag or value
  */
-function parseEnvDevView(?string $contents, array $flagDefaults): array
+function parseEnvDevView(?string $contents, array $flagDefaults, bool $allowContainers = false): array
 {
     $contents ??= '';
     $settingsByKey = [];
@@ -1373,7 +1384,11 @@ function parseEnvDevView(?string $contents, array $flagDefaults): array
         }
 
         if ($isKeyLine) {
-            $settingsByKey[substr($line, 0, strpos($line, '='))] = $directive ?? [];
+            $settings = $directive ?? [];
+            if ($allowContainers && $directive !== null) {
+                $settings += ['compose_services' => null];
+            }
+            $settingsByKey[substr($line, 0, strpos($line, '='))] = $settings;
             $directive = null;
         } elseif (str_starts_with($line, '# coolify:')) {
             $directiveLine = $index + 1;
@@ -1385,8 +1400,18 @@ function parseEnvDevView(?string $contents, array $flagDefaults): array
             $directive = [];
             foreach ($flags as $flag) {
                 [$name, $value] = array_pad(explode('=', $flag, 2), 2, 'true');
+                if ($allowContainers && $name === 'containers') {
+                    $containers = array_values(array_unique(explode(',', $value)));
+                    if ($value === 'true' || in_array('', $containers, true)) {
+                        throw new InvalidArgumentException("Line {$directiveLine}: \"containers\" needs Compose service names, for example containers=app,db.");
+                    }
+                    $directive['compose_services'] = $containers;
+
+                    continue;
+                }
                 if (! array_key_exists($name, $flagDefaults)) {
-                    throw new InvalidArgumentException("Line {$directiveLine}: unknown flag \"{$name}\". Allowed flags: ".implode(', ', array_keys($flagDefaults)).'.');
+                    $allowedFlags = [...array_keys($flagDefaults), ...($allowContainers ? ['containers'] : [])];
+                    throw new InvalidArgumentException("Line {$directiveLine}: unknown flag \"{$name}\". Allowed flags: ".implode(', ', $allowedFlags).'.');
                 }
                 if ($value !== 'true' && $value !== 'false') {
                     throw new InvalidArgumentException("Line {$directiveLine}: the value of \"{$name}\" must be true or false.");
@@ -4655,29 +4680,17 @@ function generate_fluentd_configuration(): array
     ];
 }
 
+/**
+ * The `logging` setting of a container on a server with an active log drain.
+ */
 function generate_log_drain_configuration(Server $server): array
 {
-    if ($server->isFluentBitLogDrainEnabled()) {
-        return generate_fluentd_configuration();
+    $type = $server->settings->logdrain_type;
+    if (! $type) {
+        return [];
     }
 
-    $settings = $server->settings;
-    $options = [
-        'awslogs-region' => $settings->logdrain_cloudwatch_region,
-        'awslogs-group' => $settings->logdrain_cloudwatch_group,
-        'awslogs-create-group' => 'true',
-        // Like fluentd-async: a CloudWatch outage or missing credentials must not block or fail the container.
-        'mode' => 'non-blocking',
-        // The stream is named after the container; awslogs-stream is never set because it would override this tag.
-        'tag' => ($settings->logdrain_cloudwatch_stream_prefix ?? '').'{{.Name}}',
-    ];
-
-    return [
-        'driver' => 'awslogs',
-        'options' => collect($options)
-            ->reject(fn ($value) => blank($value))
-            ->all(),
-    ];
+    return $type->driver()->containerLogging($server->settings->logDrainConfig($type));
 }
 
 function isAssociativeArray($array)
@@ -4706,7 +4719,7 @@ function isAssociativeArray($array)
  * @param  iterable<int, string>  $definedKeys
  * @return Collection<string, string>
  */
-function coolifyDefaultEnvironmentVariables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|Application|Service $resource, iterable $definedKeys = [], ?Server $server = null): Collection
+function coolifyDefaultEnvironmentVariables(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite|Application|Service $resource, iterable $definedKeys = [], ?Server $server = null): Collection
 {
     // A model created in this request has no column default loaded yet (null), which means on.
     $isEnabled = $resource instanceof Application

@@ -47,35 +47,37 @@ class VulnerabilitiesController extends Controller
         tags: ['Vulnerabilities'],
         parameters: [
             new OA\Parameter(name: 'status', in: 'query', required: false, description: 'Comma-separated statuses to return.', schema: new OA\Schema(type: 'string', example: 'update_now,update_available')),
+            new OA\Parameter(ref: '#/components/parameters/Page'),
+            new OA\Parameter(ref: '#/components/parameters/PerPage'),
         ],
         responses: [
             new OA\Response(
                 response: 200,
                 description: 'Resources with their security status, worst first.',
+                headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')],
                 content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'resources', type: 'array', items: new OA\Items(
-                            properties: [
-                                new OA\Property(property: 'uuid', type: 'string'),
-                                new OA\Property(property: 'name', type: 'string'),
-                                new OA\Property(property: 'type', type: 'string', enum: ['application', 'service', 'database']),
-                                new OA\Property(property: 'project_uuid', type: 'string', nullable: true),
-                                new OA\Property(property: 'environment_uuid', type: 'string', nullable: true),
-                                new OA\Property(property: 'server_uuid', type: 'string', nullable: true),
-                                new OA\Property(property: 'images', properties: [
-                                    new OA\Property(property: 'update', type: 'integer'),
-                                    new OA\Property(property: 'total', type: 'integer'),
-                                ], type: 'object'),
-                                new OA\Property(property: 'security', ref: '#/components/schemas/SecurityStatus'),
-                            ],
-                            type: 'object',
-                        )),
-                    ],
-                    type: 'object',
+                    type: 'array',
+                    items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'uuid', type: 'string'),
+                            new OA\Property(property: 'name', type: 'string'),
+                            new OA\Property(property: 'type', type: 'string', enum: ['application', 'service', 'database']),
+                            new OA\Property(property: 'project_uuid', type: 'string', nullable: true),
+                            new OA\Property(property: 'environment_uuid', type: 'string', nullable: true),
+                            new OA\Property(property: 'server_uuid', type: 'string', nullable: true),
+                            new OA\Property(property: 'images', properties: [
+                                new OA\Property(property: 'update', type: 'integer'),
+                                new OA\Property(property: 'total', type: 'integer'),
+                            ], type: 'object'),
+                            new OA\Property(property: 'security', ref: '#/components/schemas/SecurityStatus'),
+                        ],
+                        type: 'object',
+                    ),
                 ),
             ),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ],
     )]
     public function index(Request $request): JsonResponse
@@ -85,6 +87,7 @@ class VulnerabilitiesController extends Controller
             return invalidTokenResponse();
         }
 
+        $request->validate(apiPaginationRules());
         $statuses = $this->listParameter($request, 'status', TeamVulnerabilities::STATUS_ORDER);
         if ($statuses instanceof JsonResponse) {
             return $statuses;
@@ -106,9 +109,13 @@ class VulnerabilitiesController extends Controller
             ])
             ->values();
 
-        return response()->json([
-            'resources' => $resources,
-        ]);
+        $headers = [];
+        if ($request->filled('page') || $request->filled('per_page')) {
+            $headers['X-Total-Count'] = $resources->count();
+            $resources = $resources->forPage((int) ($request->query('page') ?: 1), (int) ($request->query('per_page') ?: 50))->values();
+        }
+
+        return response()->json($resources, 200, $headers);
     }
 
     #[OA\Get(
@@ -128,7 +135,7 @@ class VulnerabilitiesController extends Controller
             new OA\Parameter(ref: '#/components/parameters/VulnerabilityPerPage'),
         ],
         responses: [
-            new OA\Response(response: 200, description: 'Scan results.', content: new OA\JsonContent(ref: '#/components/schemas/ResourceVulnerabilities')),
+            new OA\Response(response: 200, description: 'Scan results. The X-Total-Count header gives the total number of matching findings.', headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')], content: new OA\JsonContent(ref: '#/components/schemas/ResourceVulnerabilities')),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
@@ -157,7 +164,7 @@ class VulnerabilitiesController extends Controller
             new OA\Parameter(ref: '#/components/parameters/VulnerabilityPerPage'),
         ],
         responses: [
-            new OA\Response(response: 200, description: 'Scan results.', content: new OA\JsonContent(ref: '#/components/schemas/ResourceVulnerabilities')),
+            new OA\Response(response: 200, description: 'Scan results. The X-Total-Count header gives the total number of matching findings.', headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')], content: new OA\JsonContent(ref: '#/components/schemas/ResourceVulnerabilities')),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
@@ -186,7 +193,7 @@ class VulnerabilitiesController extends Controller
             new OA\Parameter(ref: '#/components/parameters/VulnerabilityPerPage'),
         ],
         responses: [
-            new OA\Response(response: 200, description: 'Scan results.', content: new OA\JsonContent(ref: '#/components/schemas/ResourceVulnerabilities')),
+            new OA\Response(response: 200, description: 'Scan results. The X-Total-Count header gives the total number of matching findings.', headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')], content: new OA\JsonContent(ref: '#/components/schemas/ResourceVulnerabilities')),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
             new OA\Response(response: 400, ref: '#/components/responses/400'),
             new OA\Response(response: 404, ref: '#/components/responses/404'),
@@ -210,9 +217,7 @@ class VulnerabilitiesController extends Controller
             'severity' => 'nullable|string',
             'image' => 'nullable|string|max:1000',
             'search' => 'nullable|string|max:200',
-            'page' => 'nullable|integer|min:1',
-            'per_page' => 'nullable|integer|min:1|max:200',
-        ]);
+        ] + apiPaginationRules(200));
         if ($validator->fails()) {
             return response()->json(['message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
         }
@@ -247,8 +252,8 @@ class VulnerabilitiesController extends Controller
             && ($image === '' || $row['image_ref'] === $image)
             && ($search === '' || str_contains(mb_strtolower(implode(' ', [$row['id'], ...$row['aliases'], $row['package'], $row['version']])), $search))));
 
-        $perPage = (int) $request->query('per_page', 50);
-        $page = (int) $request->query('page', 1);
+        $perPage = (int) ($request->query('per_page') ?: 50);
+        $page = (int) ($request->query('page') ?: 1);
 
         return response()->json([
             'uuid' => (string) $resource->getAttribute('uuid'),
@@ -266,8 +271,7 @@ class VulnerabilitiesController extends Controller
                 'security_status' => $imageStatuses[(string) $scan->uuid]->status->value,
             ])->values(),
             'findings' => array_slice($findings, ($page - 1) * $perPage, $perPage),
-            'pagination' => ['page' => $page, 'per_page' => $perPage, 'total' => count($findings)],
-        ]);
+        ], 200, ['X-Total-Count' => count($findings)]);
     }
 
     /**

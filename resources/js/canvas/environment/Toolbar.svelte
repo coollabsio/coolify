@@ -1,5 +1,5 @@
 <script>
-  import BetaBadge from '../BetaBadge.svelte';
+  import ExperimentalBadge from '../ExperimentalBadge.svelte';
   import Select from './Select.svelte';
   // Filters and view toggles. The root docks it (use:dock) into the zoom controls bar
   // (CanvasControls, bottom center) on desktop, or in a rounded box above the canvas on small screens.
@@ -20,7 +20,7 @@
 
 <div use:dock data-ec-toolbar>
   <div class="flex min-w-0 items-center gap-2">
-    <BetaBadge />
+    <ExperimentalBadge />
     <span class="rounded-full border border-neutral-200 bg-neutral-100 px-2 py-0.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.12] dark:bg-white/[0.07] dark:text-fg-dim" class:hidden={!viewOnly} title={viewOnlyTitle}>View only</span>
   </div>
   <!-- Small screens: the actions wrap onto more rows instead of covering the title. -->

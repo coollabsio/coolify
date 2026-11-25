@@ -185,11 +185,16 @@ class CloneMe extends Component
         }
 
         foreach ($databases as $database) {
+            foreach ($database->persistentStorages()->get() as $volume) {
+                $volume->ensureCloneTargetIsAvailable($database->destination->server, $selectedDestination->server);
+            }
             $uuid = new_public_id();
+            // A clone is not managed by coolify.json.
             $newDatabase = $database->replicate([
                 'id',
                 'created_at',
                 'updated_at',
+                'config_key',
             ])->fill([
                 'uuid' => $uuid,
                 'status' => 'exited',
@@ -212,7 +217,9 @@ class CloneMe extends Component
                 $originalName = $volume->name;
                 $newName = '';
 
-                if (str_starts_with($originalName, 'postgres-data-')) {
+                if ($volume->is_external) {
+                    $newName = $originalName;
+                } elseif (str_starts_with($originalName, 'postgres-data-')) {
                     $newName = 'postgres-data-'.$newDatabase->uuid;
                 } elseif (str_starts_with($originalName, 'mysql-data-')) {
                     $newName = 'mysql-data-'.$newDatabase->uuid;
@@ -220,6 +227,10 @@ class CloneMe extends Component
                     $newName = 'redis-data-'.$newDatabase->uuid;
                 } elseif (str_starts_with($originalName, 'clickhouse-data-')) {
                     $newName = 'clickhouse-data-'.$newDatabase->uuid;
+                } elseif (str_starts_with($originalName, 'influxdb-data-')) {
+                    $newName = 'influxdb-data-'.$newDatabase->uuid;
+                } elseif (str_starts_with($originalName, 'influxdb-config-')) {
+                    $newName = 'influxdb-config-'.$newDatabase->uuid;
                 } elseif (str_starts_with($originalName, 'mariadb-data-')) {
                     $newName = 'mariadb-data-'.$newDatabase->uuid;
                 } elseif (str_starts_with($originalName, 'mongodb-data-')) {
@@ -249,7 +260,7 @@ class CloneMe extends Component
                 ]);
                 $newPersistentVolume->save();
 
-                if ($this->cloneVolumeData) {
+                if ($volume->shouldCopyDataWhenCloning($this->cloneVolumeData)) {
                     $pendingVolumeClones[] = new VolumeCloneJob(
                         $volume->name,
                         $newPersistentVolume->name,
@@ -300,6 +311,7 @@ class CloneMe extends Component
                     'id',
                     'created_at',
                     'updated_at',
+                    'config_meta',
                 ])->fill($payload);
                 $newEnvironmentVariable->save();
             }

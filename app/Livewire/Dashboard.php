@@ -76,6 +76,7 @@ class Dashboard extends Component
                 'keydbs',
                 'dragonflies',
                 'clickhouses',
+                'influxdbs',
                 'mongodbs',
                 'mysqls',
                 'mariadbs',
@@ -181,7 +182,7 @@ class Dashboard extends Component
     {
         return $project->applications_count + $project->services_count + $project->postgresqls_count
             + $project->redis_count + $project->keydbs_count + $project->dragonflies_count
-            + $project->clickhouses_count + $project->mongodbs_count + $project->mysqls_count
+            + $project->clickhouses_count + $project->influxdbs_count + $project->mongodbs_count + $project->mysqls_count
             + $project->mariadbs_count + $project->sqlites_count;
     }
 
@@ -199,7 +200,7 @@ class Dashboard extends Component
             ! $server->settings->is_reachable => ['Unreachable', 'error'],
             ! $server->settings->is_usable => ['Not ready', 'warning'],
             $proxyNeedsAttention || $sentinelNeedsAttention => ['Attention required', 'warning'],
-            default => ['Ready', 'success'],
+            default => ['Operational', 'success'],
         };
     }
 

@@ -16,6 +16,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -163,6 +164,15 @@ class CleanupStuckedResources extends Command
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck clickhouse: {$e->getMessage()}\n";
+        }
+        try {
+            $influxdbs = StandaloneInfluxdb::withTrashed()->whereNotNull('deleted_at')->lazyById();
+            foreach ($influxdbs as $influxdb) {
+                echo "Deleting stuck influxdb: {$influxdb->name}\n";
+                DeleteResourceJob::dispatch($influxdb);
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck influxdb: {$e->getMessage()}\n";
         }
         try {
             $mongodbs = StandaloneMongodb::withTrashed()->whereNotNull('deleted_at')->lazyById();

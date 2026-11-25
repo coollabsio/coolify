@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Service;
 
 use App\Models\Service;
+use App\Services\ProjectConfig\ManagedResources;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -58,7 +59,7 @@ class EditCompose extends Component
             $this->service->docker_compose_raw = $this->dockerComposeRaw;
             $this->service->is_container_label_escape_enabled = $this->isContainerLabelEscapeEnabled;
         } else {
-            $canViewCompose = auth()->user()?->can('update', $this->service) ?? false;
+            $canViewCompose = ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->service);
             $this->dockerComposeRaw = $canViewCompose ? $this->service->docker_compose_raw : null;
             $this->dockerCompose = $canViewCompose ? redactLockedValuesInGeneratedCompose($this->service->docker_compose, $this->service) : null;
             $this->isContainerLabelEscapeEnabled = $this->service->is_container_label_escape_enabled ?? false;

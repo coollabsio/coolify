@@ -20,6 +20,7 @@ use App\Http\Controllers\ImageScanSbomController;
 use App\Http\Controllers\OauthController;
 use App\Http\Controllers\ProfileAvatarController;
 use App\Http\Controllers\ProjectIconController;
+use App\Http\Controllers\StarredMenuItemsController;
 use App\Http\Controllers\TeamAvatarController;
 use App\Http\Controllers\UploadController;
 use App\Http\Middleware\CheckForcePasswordReset;
@@ -34,6 +35,7 @@ use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
 use App\Livewire\Dashboard\Canvas as DashboardCanvas;
 use App\Livewire\DeployCanvas;
+use App\Livewire\Deployments\Index as DeploymentsIndex;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Resources as DestinationResources;
 use App\Livewire\Destination\Show as DestinationShow;
@@ -62,6 +64,7 @@ use App\Livewire\Project\Database\Backup\Index as DatabaseBackupIndex;
 use App\Livewire\Project\Database\Configuration as DatabaseConfiguration;
 use App\Livewire\Project\Edit as ProjectEdit;
 use App\Livewire\Project\EnvironmentCanvas;
+use App\Livewire\Project\EnvironmentConfiguration;
 use App\Livewire\Project\EnvironmentEdit;
 use App\Livewire\Project\Index as ProjectIndex;
 use App\Livewire\Project\ProjectCanvas;
@@ -223,6 +226,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware('access.team-wide')->group(function () {
         Route::get('/dashboard/canvas', DashboardCanvas::class)->name('dashboard.canvas');
         Route::get('/analytics', Analytics::class)->name('analytics');
+        Route::get('/deployments', DeploymentsIndex::class)->name('deployments.index');
         Route::get('/metrics', FleetMetrics::class)->name('metrics');
         Route::get('/canvas', DeployCanvas::class)->name('deploy-canvas');
         Route::get('/canvas/tags', TagsCanvas::class)->name('tags.canvas');
@@ -279,6 +283,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/databases/mongodb', [DatabasesController::class, 'create_database_mongodb'])->middleware(['api.ability:write']);
         Route::post('/databases/redis', [DatabasesController::class, 'create_database_redis'])->middleware(['api.ability:write']);
         Route::post('/databases/clickhouse', [DatabasesController::class, 'create_database_clickhouse'])->middleware(['api.ability:write']);
+        Route::post('/databases/influxdb', [DatabasesController::class, 'create_database_influxdb'])->middleware(['api.ability:write']);
         Route::post('/databases/dragonfly', [DatabasesController::class, 'create_database_dragonfly'])->middleware(['api.ability:write']);
         Route::post('/databases/keydb', [DatabasesController::class, 'create_database_keydb'])->middleware(['api.ability:write']);
         Route::post('/deploy', [DeployController::class, 'deploy'])->middleware(['api.ability:deploy']);
@@ -306,6 +311,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', ProfileIndex::class)->name('profile');
     Route::get('/profile/avatar', ProfileAvatarController::class)->name('profile.avatar');
     Route::get('/profile/appearance', ProfileAppearance::class)->name('profile.appearance');
+    Route::put('/profile/starred-menu-items', StarredMenuItemsController::class)->name('profile.starred-menu-items');
     Route::get('/profile/passkeys/confirm', fn () => redirect()->route('profile')->with('status', 'passkey-add'))
         ->middleware('password.confirm')
         ->name('profile.passkeys.confirm');
@@ -422,6 +428,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me')->middleware('can.create.resources');
         Route::get('/new', ResourceCreate::class)->name('project.resource.create')->middleware('can.create.resources');
         Route::get('/edit', EnvironmentEdit::class)->name('project.environment.edit')->middleware('can.update.resource');
+        Route::get('/configuration', EnvironmentConfiguration::class)->name('project.environment.configuration');
         Route::get('/canvas', EnvironmentCanvas::class)->name('project.environment.canvas');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}')->group(function () {
@@ -515,6 +522,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/resource-operations', ServiceConfiguration::class)->name('project.service.resource-operations');
         Route::get('/tags', ServiceConfiguration::class)->name('project.service.tags');
         Route::get('/danger', ServiceConfiguration::class)->name('project.service.danger');
+        Route::get('/template', ServiceConfiguration::class)->name('project.service.template');
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.service.command')->middleware('can.access.terminal');
         Route::get('/files', FileBrowser::class)->name('project.service.files')->middleware('can.access.terminal');
         Route::get('/{stack_service_uuid}/backups', ServiceDatabaseBackups::class)->name('project.service.database.backups');
@@ -630,6 +638,7 @@ Route::middleware(['auth', 'access.team-wide'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::post('/upload/backup/{databaseUuid}', [UploadController::class, 'upload'])->name('upload.backup');
+    Route::post('/upload/static-archive', [UploadController::class, 'uploadStaticArchive'])->name('upload.static-archive');
     Route::get('/download/backup/{executionId}', function () {
         try {
             $exeuctionId = request()->route('executionId');

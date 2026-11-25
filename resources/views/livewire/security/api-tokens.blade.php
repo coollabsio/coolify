@@ -134,7 +134,7 @@
                                                 {{-- The modal is wire:ignore, so a new key re-renders it when the scopes change. --}}
                                                 <x-modal-input title="Access of {{ $token->name }}"
                                                     wire:key="api-token-scopes-{{ $token->id }}-{{ md5(json_encode($token->scopes)) }}"
-                                                    subtitle="This token can use only these projects, environments, and resources.">
+                                                    subtitle="This token can use only these projects, environments, resources, and servers.">
                                                     <x-slot:content>
                                                         <button type="button"
                                                             class="max-w-full truncate underline decoration-dotted underline-offset-2 hover:text-black dark:hover:text-fg">
@@ -160,7 +160,7 @@
                                                 'inline-flex min-h-5 items-center rounded-md border px-2 py-0.5 text-[10px] font-medium',
                                                 'border-error/20 bg-error/10 text-error' => in_array($ability, ['root', 'delete']),
                                                 'border-warning/20 bg-warning/10 text-warning' => in_array($ability, ['write', 'write:sensitive']),
-                                                'border-coollabs/20 bg-coollabs/10 text-coollabs dark:border-brand-light/20 dark:bg-brand/15 dark:text-brand-light' => $ability === 'deploy',
+                                                'border-coollabs/20 bg-coollabs/10 text-coollabs dark:border-brand-light/20 dark:bg-brand/15 dark:text-brand-light' => in_array($ability, ['deploy', 'terminal']),
                                                 'border-neutral-200 bg-neutral-100 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.06] dark:text-fg-dim' => in_array($ability, ['read', 'read:sensitive']),
                                             ])>{{ $ability }}</span>
                                         @endforeach
