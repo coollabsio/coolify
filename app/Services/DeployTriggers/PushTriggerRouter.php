@@ -15,7 +15,17 @@ final class PushTriggerRouter
     /** @var array<int, list<int>> team id => application ids */
     private array $deferred = [];
 
+    private ?bool $instanceEnabled = null;
+
+    /** @var array<int, TriggerRoute> */
+    private array $routes = [];
+
     private function __construct(private readonly PushContext $context) {}
+
+    public function isPullRequest(): bool
+    {
+        return $this->context->pullRequest !== null;
+    }
 
     public static function forPush(PushContext $context): self
     {
@@ -23,6 +33,11 @@ final class PushTriggerRouter
     }
 
     public function route(Application $application): TriggerRoute
+    {
+        return $this->routes[$application->id] ??= $this->decideRoute($application);
+    }
+
+    private function decideRoute(Application $application): TriggerRoute
     {
         if (! $application->git_based() || ! Sha::isValid($this->context->after)) {
             return TriggerRoute::DeployNow;
@@ -32,7 +47,8 @@ final class PushTriggerRouter
             return TriggerRoute::Evaluate;
         }
 
-        $enabled = (bool) (InstanceSettings::query()->whereKey(0)->value('is_smart_triggers_enabled') ?? true)
+        $this->instanceEnabled ??= (bool) (InstanceSettings::query()->whereKey(0)->value('is_smart_triggers_enabled') ?? true);
+        $enabled = $this->instanceEnabled
             && (bool) ($application->settings?->is_smart_triggers_enabled ?? true);
 
         return $enabled && $application->isNarrowable() ? TriggerRoute::Evaluate : TriggerRoute::DeployNow;

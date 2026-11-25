@@ -658,20 +658,8 @@ class Github extends Controller
     }
 
     /**
-     * Files that the push changes between its before and after commits, from
-     * the GitHub compare API.
+     * The push as push evaluation needs it.
      *
-     * The file lists of the pushed commits are not the net change: a merge
-     * commit names the files that it changes relative to its first parent,
-     * also when the push does not change them. Returns null for a new branch,
-     * a missing repository name or an API failure; the caller then uses the
-     * file lists of the pushed commits.
-     *
-     * @return Collection<int, string>|null
-     *
-     * @throws InvalidWebhookPayloadException When the before or after value is not a commit SHA.
-     */
-    /**
      * @param  Collection<int, string>|null  $changedFiles
      */
     private function githubPushContext(mixed $payload, ?GithubApp $githubApp, ?string $fullName, ?Collection $changedFiles): PushContext
@@ -694,6 +682,20 @@ class Github extends Controller
         );
     }
 
+    /**
+     * Files that the push changes between its before and after commits, from
+     * the GitHub compare API.
+     *
+     * The file lists of the pushed commits are not the net change: a merge
+     * commit names the files that it changes relative to its first parent,
+     * also when the push does not change them. Returns null for a new branch,
+     * a missing repository name or an API failure; the caller then uses the
+     * file lists of the pushed commits.
+     *
+     * @return Collection<int, string>|null
+     *
+     * @throws InvalidWebhookPayloadException When the before or after value is not a commit SHA.
+     */
     private function githubPushComparedFiles(GithubApp $githubApp, mixed $payload): ?Collection
     {
         $before = $this->webhookCommitSha($payload, 'before');

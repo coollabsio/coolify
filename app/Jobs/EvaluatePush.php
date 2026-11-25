@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Application\EnsurePullRequestPreview;
+use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -39,6 +40,16 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
     public int $timeout = 300;
 
     public int $uniqueFor = 300;
+
+    public int $maxExceptions = 3;
+
+    /**
+     * @return list<int>
+     */
+    public function backoff(): array
+    {
+        return [30, 60, 120];
+    }
 
     /**
      * @param  list<int>  $applicationIds
@@ -176,7 +187,10 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         foreach ($candidates as $id => $candidate) {
             $decision = $decisions[$id] ?? ApplicationDecision::deployBecause($id, 'error', 'The push could not be evaluated, so it deploys.');
             if ($after !== null) {
-                $recorder->storeTriggerSet($candidate->application, $candidate->preview, $decision->triggerSet, $after, $candidate->fingerprint, $decision->reasonCode === 'evaluation_failed' ? $lastError : null);
+                // A pull request without a preview has nowhere to keep a set; the application's own set must not change.
+                if ($this->context->pullRequest === null || $candidate->preview !== null) {
+                    $recorder->storeTriggerSet($candidate->application, $candidate->preview, $decision->triggerSet, $after, $candidate->fingerprint, $decision->reasonCode === 'evaluation_failed' ? $lastError : null);
+                }
             }
             array_shift($pending);
 
@@ -185,7 +199,7 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             }
 
             if (! $decision->deploys()) {
-                $recorder->recordSkip($candidate->application, $candidate->preview, $decision, $after, $candidate->base, $candidate->isStored, $this->context->commitMessage);
+                $recorder->recordSkip($candidate->application, $candidate->preview, $decision, $after, $candidate->base, $candidate->isStored, $this->context->commitMessage, $this->context->pullRequest);
 
                 continue;
             }
@@ -290,11 +304,19 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             ->get()
             ->filter(fn (Application $application): bool => $application->git_branch === $branch
                 && ($this->dryRun || ($this->context->pullRequest !== null ? $application->isPRDeployable() : $application->isDeployable())))
-            // A redelivered webhook of a push that was already evaluated changes nothing.
-            ->reject(fn (Application $application): bool => ! $this->dryRun && $this->context->pullRequest === null
-                && $this->context->after !== null
-                && data_get($application->trigger_set, 'evaluated_commit') === $this->context->after
-                && data_get($application->trigger_set, 'last_error') === null)
+            // A redelivered webhook of a push that already deployed or skipped changes nothing.
+            ->reject(fn (Application $application): bool => ! $this->dryRun && $this->context->after !== null
+                && ApplicationDeploymentQueue::query()
+                    ->where('application_id', $application->id)
+                    ->where('pull_request_id', $this->context->pullRequest?->number ?? 0)
+                    ->where('commit', $this->context->after)
+                    ->whereIn('status', [
+                        ApplicationDeploymentStatus::QUEUED->value,
+                        ApplicationDeploymentStatus::IN_PROGRESS->value,
+                        ApplicationDeploymentStatus::FINISHED->value,
+                        ApplicationDeploymentStatus::SKIPPED->value,
+                    ])
+                    ->exists())
             ->values();
     }
 }

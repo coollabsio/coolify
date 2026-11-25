@@ -20,14 +20,18 @@ class TriggerRecorder
 {
     public const SKIPPED_LOG_LIMIT = 20;
 
-    public function recordSkip(Application $application, ?ApplicationPreview $preview, ApplicationDecision $decision, string $after, ?string $readBase, bool $baseIsStored, ?string $commitMessage): ApplicationDeploymentQueue
+    /**
+     * @param  PullRequestContext|null  $pullRequest  the pull request of the push; a skip of a pull request never touches the application
+     */
+    public function recordSkip(Application $application, ?ApplicationPreview $preview, ApplicationDecision $decision, string $after, ?string $readBase, bool $baseIsStored, ?string $commitMessage, ?PullRequestContext $pullRequest = null): ApplicationDeploymentQueue
     {
-        return DB::transaction(function () use ($application, $preview, $decision, $after, $readBase, $baseIsStored, $commitMessage): ApplicationDeploymentQueue {
-            if ($baseIsStored) {
-                $this->advanceBase($preview ?? $application, $readBase, $after);
+        return DB::transaction(function () use ($application, $preview, $decision, $after, $readBase, $baseIsStored, $commitMessage, $pullRequest): ApplicationDeploymentQueue {
+            $pullRequestId = $preview?->pull_request_id ?? $pullRequest?->number ?? 0;
+            $baseTarget = $preview ?? ($pullRequestId > 0 ? null : $application);
+            if ($baseIsStored && $baseTarget !== null) {
+                $this->advanceBase($baseTarget, $readBase, $after);
             }
 
-            $pullRequestId = $preview?->pull_request_id ?? 0;
             $newest = ApplicationDeploymentQueue::query()
                 ->where('application_id', $application->id)
                 ->where('pull_request_id', $pullRequestId)
@@ -37,12 +41,12 @@ class TriggerRecorder
 
             $row = $newest?->status === ApplicationDeploymentStatus::SKIPPED->value
                 ? $newest
-                : $this->newSkippedRow($application, $pullRequestId, $after);
+                : $this->newSkippedRow($application, $pullRequestId, $after, $preview?->git_type ?? $pullRequest?->gitType);
 
             $row->forceFill([
                 'commit' => $after,
                 'commit_message' => $commitMessage ?? $row->commit_message,
-                'trigger_reason' => $decision->toTriggerReason($after),
+                'trigger_reason' => [...$decision->toTriggerReason($after), 'pull_request_html_url' => $preview?->pull_request_html_url ?? $pullRequest?->htmlUrl],
                 'skipped_count' => ($row->skipped_count ?? 0) + 1,
                 'first_skipped_commit' => $row->first_skipped_commit ?? $after,
                 'finished_at' => Carbon::now(),
@@ -123,7 +127,7 @@ class TriggerRecorder
         $target->setRawAttributes($locked->getAttributes(), sync: true);
     }
 
-    private function newSkippedRow(Application $application, int $pullRequestId, string $after): ApplicationDeploymentQueue
+    private function newSkippedRow(Application $application, int $pullRequestId, string $after, ?string $gitType): ApplicationDeploymentQueue
     {
         $uuid = new_public_id();
         $server = $application->destination?->server;
@@ -140,6 +144,7 @@ class TriggerRecorder
             'status' => ApplicationDeploymentStatus::SKIPPED->value,
             'is_webhook' => true,
             'commit' => $after,
+            'git_type' => $gitType,
         ]);
     }
 

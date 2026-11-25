@@ -346,3 +346,63 @@ it('leaves an already queued deployment of the same commit alone', function () {
     expect(ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->count())->toBe(1)
         ->and($existing->refresh()->trigger_reason)->toBeNull();
 });
+
+it('deploys the application when the queue-full retry runs', function () {
+    Queue::fake();
+    FakeAffectedRunner::respondWith(epRespond([$this->web->uuid => ['deploy', 'matched']]));
+    $this->fixture['server']->settings->update(['deployment_queue_limit' => 1]);
+    $other = deployTriggerApplication($this->fixture, ['base_directory' => '/apps/other']);
+    $busy = ApplicationDeploymentQueue::create(['application_id' => $other->id, 'deployment_uuid' => 'busy', 'server_id' => $this->fixture['server']->id, 'status' => ApplicationDeploymentStatus::QUEUED->value, 'commit' => EP_BASE]);
+    epRun(epContext(), [$this->web]);
+    $retry = Queue::pushed(EvaluatePush::class)->first();
+    $busy->delete();
+
+    $retry->handle();
+
+    expect(ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->count())->toBe(1);
+});
+
+it('records a new preview skip on the pull request, not on the application', function () {
+    FakeAffectedRunner::respondWith(epRespond([$this->web->uuid.':pr-5' => ['skip', 'no_match']]));
+    $this->web->settings->update(['is_preview_deployments_enabled' => true]);
+    $setBefore = $this->web->trigger_set;
+
+    epRun(epContext(['ref' => 'refs/pull/5/head', 'pullRequest' => new PullRequestContext(5, 'main', false, 'github', 'https://github.com/acme/mono/pull/5')]), [$this->web]);
+
+    $row = ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->sole();
+    expect($row->pull_request_id)->toBe(5)
+        ->and($row->git_type)->toBe('github')
+        ->and($row->trigger_reason['pull_request_html_url'])->toBe('https://github.com/acme/mono/pull/5')
+        ->and($this->web->refresh()->trigger_set)->toBe($setBefore)
+        ->and($this->web->trigger_base_commit)->toBe(EP_BASE);
+});
+
+it('still deploys a production push of a commit that a preview skipped', function () {
+    FakeAffectedRunner::respondWith(epRespond([$this->web->uuid.':pr-5' => ['skip', 'no_match']]));
+    $this->web->settings->update(['is_preview_deployments_enabled' => true]);
+    epRun(epContext(['ref' => 'refs/pull/5/head', 'pullRequest' => new PullRequestContext(5, 'main', false, 'github', null)]), [$this->web]);
+
+    FakeAffectedRunner::respondWith(epRespond([$this->web->uuid => ['deploy', 'matched']]));
+    epRun(epContext(), [$this->web->refresh()]);
+
+    expect(ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->where('pull_request_id', 0)->where('status', '!=', 'skipped')->count())->toBe(1);
+});
+
+it('re-evaluates a redelivered push whose deployment failed', function () {
+    $runner = FakeAffectedRunner::respondWith(epRespond([$this->web->uuid => ['deploy', 'matched']]));
+    ApplicationDeploymentQueue::create(['application_id' => $this->web->id, 'deployment_uuid' => 'failed-one', 'pull_request_id' => 0, 'status' => ApplicationDeploymentStatus::FAILED->value, 'commit' => EP_AFTER]);
+    $this->web->forceFill(['trigger_set' => ['display' => [], 'evaluated_commit' => EP_AFTER, 'last_error' => null]])->save();
+
+    epRun(epContext(), [$this->web->refresh()]);
+
+    expect($runner->requests)->toHaveCount(1);
+});
+
+it('does not drop a push of the commit that evaluate now looked at', function () {
+    $runner = FakeAffectedRunner::respondWith(epRespond([$this->web->uuid => ['deploy', 'matched']]));
+    $this->web->forceFill(['trigger_set' => ['display' => [], 'evaluated_commit' => EP_AFTER, 'last_error' => null]])->save();
+
+    epRun(epContext(), [$this->web->refresh()]);
+
+    expect($runner->requests)->toHaveCount(1);
+});

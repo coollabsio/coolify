@@ -4,6 +4,7 @@ namespace App\Services\DeployTriggers;
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Models\InstanceSettings;
 use App\Services\DeployTriggers\Contract\EvaluateApplicationInput;
 use App\Services\DeployTriggers\Contract\ScanRequest;
 use App\Services\DeployTriggers\Contract\ScanResponse;
@@ -28,7 +29,7 @@ class DeploymentTriggerScan
     {
         $server = $application->destination?->server;
         if ($preview?->is_fork_pull_request || $server === null
-            || (! $application->isNarrowable() && blank($application->watch_paths))
+            || ! $this->usesSmartTriggers($application)
             || ! $this->capability->compatible($server)) {
             return;
         }
@@ -42,6 +43,17 @@ class DeploymentTriggerScan
                 'error' => mb_substr($exception->getMessage(), 0, 300),
             ]);
         }
+    }
+
+    /**
+     * References only matter for smart mode; watch paths replace detection.
+     */
+    private function usesSmartTriggers(Application $application): bool
+    {
+        return blank($application->watch_paths)
+            && (bool) ($application->settings?->is_smart_triggers_enabled ?? true)
+            && (bool) (InstanceSettings::query()->whereKey(0)->value('is_smart_triggers_enabled') ?? true)
+            && $application->isNarrowable();
     }
 
     private function command(Application $application, string $worktree, string $commit): string

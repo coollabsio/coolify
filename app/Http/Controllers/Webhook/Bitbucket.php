@@ -14,7 +14,6 @@ use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Services\DeployTriggers\PushTriggerRouter;
-use App\Services\DeployTriggers\TriggerRoute;
 use App\Services\ServerTransfer\TransferFinishChecklist;
 use Exception;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -227,10 +226,9 @@ class Bitbucket extends Controller
         $router = $this->pushTriggers[$application->git_branch] ??= PushTriggerRouter::forPush(
             $this->genericPushContext('bitbucket', 'bitbucket:'.mb_strtolower($repositoryLabel), $application->git_branch, $pushedBranch['commit'], null, null, null)
         );
-        if ($router->route($application) === TriggerRoute::Evaluate) {
-            $router->defer($application);
-
-            return $router->responseEntry($application);
+        $entries = collect();
+        if ($this->deferPushIfEvaluated($router, $application, $entries)) {
+            return $entries->first();
         }
 
         $deployment_uuid = new_public_id();

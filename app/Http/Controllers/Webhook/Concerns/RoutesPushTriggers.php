@@ -7,6 +7,7 @@ use App\Services\DeployTriggers\PullRequestContext;
 use App\Services\DeployTriggers\PushContext;
 use App\Services\DeployTriggers\PushTriggerRouter;
 use App\Services\DeployTriggers\TriggerRoute;
+use App\Services\ProjectConfig\ConfigPushRouter;
 use Illuminate\Support\Collection;
 
 trait RoutesPushTriggers
@@ -20,6 +21,18 @@ trait RoutesPushTriggers
     {
         if ($router->route($application) !== TriggerRoute::Evaluate) {
             return false;
+        }
+
+        // A push that changes coolify.json holds managed applications until the file is applied, as queue_application_deployment() does.
+        if (! $router->isPullRequest() && app(ConfigPushRouter::class)->hold($application)) {
+            $payloads->push([
+                'application' => $application->name,
+                'status' => 'held',
+                'message' => 'The deployment waits until coolify.json of this push is applied.',
+                'application_uuid' => $application->uuid,
+            ]);
+
+            return true;
         }
 
         $router->defer($application);

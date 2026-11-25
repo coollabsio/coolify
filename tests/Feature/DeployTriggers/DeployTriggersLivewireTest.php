@@ -7,6 +7,7 @@ use App\Livewire\Project\Application\Deployment\Show;
 use App\Livewire\Project\Application\DeployTriggers;
 use App\Livewire\Settings\Advanced;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationPreview;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
@@ -185,4 +186,30 @@ it('lets instance admins turn smart triggers off for the instance', function () 
     Livewire::test(Advanced::class)->set('is_smart_triggers_enabled', false)->call('instantSave');
 
     expect(InstanceSettings::get()->is_smart_triggers_enabled)->toBeFalse();
+});
+
+it('creates the preview when a skipped pull request push is deployed anyway', function () {
+    $row = skippedRow($this->application);
+    $row->update(['pull_request_id' => 7, 'git_type' => 'github', 'trigger_reason' => [
+        'reason_code' => 'no_match', 'reason' => 'No match.', 'matches' => [], 'pull_request_html_url' => 'https://github.com/acme/mono/pull/7',
+    ]]);
+
+    showTriggerDeployment($this, $row)->call('deploySkippedPush');
+
+    $deployment = ApplicationDeploymentQueue::query()->where('application_id', $this->application->id)->where('status', '!=', 'skipped')->sole();
+    expect($deployment->pull_request_id)->toBe(7)
+        ->and($deployment->git_type)->toBe('github')
+        ->and(ApplicationPreview::query()->where('application_id', $this->application->id)->where('pull_request_id', 7)->sole()->pull_request_html_url)->toBe('https://github.com/acme/mono/pull/7');
+});
+
+it('does not let a read-only member deploy a skipped push or evaluate', function () {
+    $row = skippedRow($this->application);
+    $this->application->forceFill(['trigger_base_commit' => str_repeat('d', 40)])->save();
+    actAsMemberOf($this->fixture, 'member');
+
+    showTriggerDeployment($this, $row)->call('deploySkippedPush');
+    Livewire::test(DeployTriggers::class, ['application' => $this->application])->call('evaluateNow');
+
+    expect(ApplicationDeploymentQueue::query()->count())->toBe(1);
+    Queue::assertNotPushed(EvaluatePush::class);
 });

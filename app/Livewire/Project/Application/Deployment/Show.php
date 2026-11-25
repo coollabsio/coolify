@@ -2,12 +2,15 @@
 
 namespace App\Livewire\Project\Application\Deployment;
 
+use App\Actions\Application\EnsurePullRequestPreview;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\StandaloneDocker;
+use App\Services\DeployTriggers\PullRequestContext;
 use App\Services\ImageScan\SecurityCard;
 use App\Traits\AuditsApplicationSettings;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -92,13 +95,28 @@ class Show extends Component
                 return;
             }
 
+            $pullRequestId = (int) $row->pull_request_id;
+            $gitType = $row->git_type;
+            if ($pullRequestId > 0) {
+                // Only non-fork pull requests are ever skipped; forks always deploy.
+                $existing = ApplicationPreview::query()->where('application_id', $this->application->id)->where('pull_request_id', $pullRequestId)->first();
+                $gitType ??= $existing?->git_type;
+                EnsurePullRequestPreview::run($this->application, new PullRequestContext(
+                    number: $pullRequestId,
+                    targetBranch: (string) $this->application->git_branch,
+                    isFork: (bool) $existing?->is_fork_pull_request,
+                    gitType: (string) $gitType,
+                    htmlUrl: $existing?->pull_request_html_url ?? data_get($row->trigger_reason, 'pull_request_html_url'),
+                ), $row->commit);
+            }
+
             $deploymentUuid = new_public_id();
             $result = queue_application_deployment(
                 application: $this->application,
                 deployment_uuid: $deploymentUuid,
-                pull_request_id: (int) $row->pull_request_id,
+                pull_request_id: $pullRequestId,
                 commit: $row->commit,
-                git_type: $row->git_type,
+                git_type: $gitType,
             );
             if ($result['status'] === 'queue_full') {
                 $this->dispatch('error', 'Deployment queue full', $result['message']);

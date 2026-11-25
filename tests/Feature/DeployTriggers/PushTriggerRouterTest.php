@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\Webhook\Concerns\RoutesPushTriggers;
 use App\Jobs\EvaluatePush;
 use App\Models\InstanceSettings;
 use App\Services\DeployTriggers\PushContext;
 use App\Services\DeployTriggers\PushTriggerRouter;
 use App\Services\DeployTriggers\TriggerRoute;
+use App\Services\ProjectConfig\ConfigPushRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 
@@ -67,4 +69,24 @@ it('dispatches one job per team', function () {
 
     Queue::assertPushed(EvaluatePush::class, 2);
     Queue::assertPushed(EvaluatePush::class, fn (EvaluatePush $job) => $job->context->teamId === $otherFixture['team']->id && $job->applicationIds === [$theirs->id]);
+});
+
+it('lets the coolify.json hold take a managed application instead of deferring it', function () {
+    $application = deployTriggerApplication($this->fixture, ['base_directory' => '/apps/web']);
+    $this->mock(ConfigPushRouter::class, fn ($mock) => $mock->shouldReceive('hold')->andReturn(true));
+    $controller = new class
+    {
+        use RoutesPushTriggers;
+
+        public function defer($router, $application, $payloads): bool
+        {
+            return $this->deferPushIfEvaluated($router, $application, $payloads);
+        }
+    };
+    $payloads = collect();
+
+    expect($controller->defer($this->router, $application, $payloads))->toBeTrue()
+        ->and($payloads->first()['status'])->toBe('held');
+    $this->router->dispatch();
+    Queue::assertNotPushed(EvaluatePush::class);
 });

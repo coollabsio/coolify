@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\ApplicationPreview;
+use App\Models\InstanceSettings;
 use App\Services\DeployTriggers\DeploymentTriggerScan;
 use App\Services\DeployTriggers\HelperCapability;
 use App\Services\DeployTriggers\TriggerFingerprint;
@@ -99,3 +100,19 @@ it('keeps trigger state for unrelated changes', function () {
 
     expect($this->application->refresh()->trigger_base_commit)->toBe(str_repeat('a', 40));
 });
+
+it('skips the scan when smart triggers are off for the application or the instance', function (string $case) {
+    if ($case === 'app') {
+        $this->application->settings->update(['is_smart_triggers_enabled' => false]);
+    } else {
+        InstanceSettings::get()->update(['is_smart_triggers_enabled' => false]);
+    }
+
+    app(DeploymentTriggerScan::class)->run($this->application->refresh(), null, '/artifacts/dep', str_repeat('c', 40), function (string $command) {
+        $this->commands[] = $command;
+
+        return scanOutput();
+    });
+
+    expect($this->commands)->toBe([]);
+})->with(['app', 'instance']);
