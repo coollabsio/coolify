@@ -1,6 +1,6 @@
 # Decision 0033: Watch paths, submodules, and LFS of cluster applications
 
-**Status: Proposed**
+**Status: Accepted**
 
 **Date: 2026-11-23**
 
@@ -222,10 +222,19 @@ Watch paths:
 - The shared matcher changes v4 code. The v4 tests of `matchPaths` must keep
   passing.
 
+## Answers to the open questions (2026-11-26)
+
+The user accepted the decision with these answers. They have priority over
+the text above.
+
+- **Git stacks.** A Git stack gets the same Git options (submodules, LFS,
+  shallow clone) as a cluster application.
+- **LFS failure.** An LFS failure fails the build. A build that passes today
+  with pointer files is already broken, so the error shows it.
+
 ## Not decided here
 
 - Watch paths of a Git stack, and of each service of a stack.
-- Git options of a Git stack. Its builds use the defaults (all on).
 - A second credential for a submodule on another host.
 - LFS files inside submodules (v4 does not pull them either).
 - The file list of GitLab and Gitea pull requests through their APIs.

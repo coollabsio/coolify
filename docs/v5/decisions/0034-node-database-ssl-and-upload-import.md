@@ -1,6 +1,6 @@
 # Decision 0034: SSL and import from an upload for cluster databases
 
-**Status: Proposed**
+**Status: Accepted**
 
 **Date: 2026-11-23**
 
@@ -212,6 +212,20 @@ the user uploads. v4 standalone databases have both.
 - Sentinel needs one version for `database.import.v1`, the free space check,
   and the cleanup at start. Coolify does not import to a Node without the
   capability.
+
+## Answers to the open questions (2026-11-26)
+
+The user accepted the decision with these answers. They have priority over
+the text above.
+
+- **Certificate expiry.** Coolify renews the certificate automatically and
+  sends a notification. The database gets the new certificate at its next
+  deploy. Coolify does not restart the database by itself.
+- **Node addresses.** The certificate has the IP addresses of the Node of the
+  database as well as its names.
+- **File transfer.** The upload reaches the Node through the one-time Flux
+  download. The import needs no S3 storage.
+- **Formats.** The import accepts the v4 formats of each engine.
 
 ## Not decided here
 

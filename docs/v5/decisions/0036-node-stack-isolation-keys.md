@@ -1,6 +1,6 @@
 # Decision 0036: Isolation keys that lock templates on Nodes
 
-**Status: Proposed**
+**Status: Accepted**
 
 **Date: 2026-11-23**
 
@@ -224,6 +224,18 @@ manages:
 - Add the new fields to the server transfer (`ServerTransferCoverage`) with
   the revision configuration.
 
+## Answers to the open questions (2026-11-26)
+
+The user accepted the decision with these answers. They have priority over
+the text above.
+
+- **Host paths.** An absolute host path that is not a system path becomes a
+  stack volume, with a note on the service.
+- **`SYS_PTRACE` and `IPC_LOCK`.** They stay in the team-admin tier.
+- **Templates.** Where a safe change exists, the template is fixed instead of
+  Nodes: `SYS_MODULE` of `wireguard-easy` and `network_mode: host` of
+  `cloudflared`.
+
 ## Not decided here
 
 - `devices`, for example `/dev/net/tun` (`tailscale-client`) and `/dev/kvm`.
@@ -231,10 +243,7 @@ manages:
   so they must run on one Node, as for decision 0024.
 - Host paths for a service that mounts the Docker socket (`appwrite`,
   `autobase`, `wings`, `pterodactyl-with-wings`).
-- Template changes that remove a key that the service does not need, for
-  example `SYS_MODULE` of `wireguard-easy` (the kernel has WireGuard),
-  `SYS_TIME` of `pi-hole`, or `network_mode: host` of `cloudflared`. A
-  template change unlocks a template without a change to Nodes.
+- Template changes for other templates, for example `SYS_TIME` of `pi-hole`.
 - The template bug in `deno-kv`: `${COOLIFY_VOLUME_APP}` is not a magic
   variable of Coolify.
 - A cluster setting that allows tier 3 for a team that wants it.

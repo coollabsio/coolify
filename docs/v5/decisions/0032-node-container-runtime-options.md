@@ -1,6 +1,6 @@
 # Decision 0032: Container runtime options of cluster applications
 
-**Status: Proposed**
+**Status: Accepted**
 
 **Date: 2026-11-23**
 
@@ -238,6 +238,19 @@ On Nodes, these parts exist:
   failed build does not run it.
 - A GPU workload has a short downtime on each redeploy.
 
+## Answers to the open questions (2026-11-26)
+
+The user accepted the decision with these answers. They have priority over
+the text above.
+
+- **Pre-deployment command.** It runs with exec in the old container, as in
+  v4. Without an old container, the command is skipped with a note.
+- **GPU workloads.** They always deploy with stop-then-start, because one GPU
+  cannot be shared by two container slots.
+- **NVIDIA driver.** `PrepareNodeHost` does not install the driver or the
+  toolkit. The Node page shows the result of the CDI check and a link to the
+  docs.
+
 ## Not decided here
 
 - `--privileged`, `--cap-add`, `--device`, `--sysctl`, and the other
@@ -247,4 +260,3 @@ On Nodes, these parts exist:
 - AMD and Intel GPUs (`amd.com/gpu`, other CDI kinds), MIG slices, exclusive
   GPU reservation, and GPU metrics.
 - A release phase in a one-shot container of the new image (option F).
-- Installation of the NVIDIA driver and toolkit by `PrepareNodeHost`.

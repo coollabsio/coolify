@@ -1,6 +1,6 @@
 # Decision 0035: Concurrent builds on builder Nodes
 
-**Status: Proposed**
+**Status: Accepted**
 
 **Date: 2026-11-23**
 
@@ -212,9 +212,21 @@ option.
 - `ServerTransferCoverage` lists `Node`, `NodeCluster`, and `NodeBuild` as not
   transferred, so the new columns need no transfer decision.
 
+## Answers to the open questions (2026-11-26)
+
+The user accepted the decision with these answers. They have priority over
+the text above.
+
+- **Default.** `concurrent_builds` is 1. Small Nodes run out of memory with
+  2 builds.
+- **Queue cap.** A fixed limit of 50 waiting builds for each cluster.
+- **Queue worker.** A waiting build does not hold a Horizon worker. The worker
+  is released and the build is dispatched again when a slot is free.
+- **BuildKit memory.** The limit of `coolify-buildkitd` is 50% of the memory of
+  the Node.
+
 ## Not decided here
 
-- A follow step that does not hold a Horizon worker between polls.
 - Priority of a manual build over a webhook build. The queue stays FIFO.
 - Build slots that count by size (CPU or memory of each build).
 - A per-project or per-environment share of the build slots.

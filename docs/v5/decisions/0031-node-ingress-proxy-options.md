@@ -1,6 +1,6 @@
 # Decision 0031: Proxy options for cluster domains
 
-**Status: Proposed**
+**Status: Accepted**
 
 **Date: 2026-11-23**
 
@@ -199,6 +199,20 @@ So:
 - Compose files with proxy labels show a note instead of a silent drop.
 - Users who need a Caddy feature that is not in the table need a new
   structured option and a new capability.
+
+## Answers to the open questions (2026-11-26)
+
+The user accepted the decision with these answers. They have priority over
+the text above.
+
+- **Password copy.** Coolify stores the bcrypt hash in the route and an
+  encrypted copy of the password, so the page can show it again, as v4 does.
+- **Hash type.** Nodes accept bcrypt only. Argon2id is not used on Nodes.
+- **A Node without `ingress.route_options.v1`.** While a domain of the
+  cluster has a route option, Coolify refuses the join of an ingress Node
+  without the capability. It does not take the domain offline.
+- **Free-form Caddy config.** Not for now, also not for team admins. Decide
+  again after the beta.
 
 ## Not decided here
 
