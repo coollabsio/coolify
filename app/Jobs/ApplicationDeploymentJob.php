@@ -4272,7 +4272,9 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             deployment_uuid: $this->deployment_uuid,
             pull_request_id: $this->pull_request_id,
             git_type: $this->git_type,
-            commit: $this->commit
+            commit: $this->commit,
+            // Only the webhooks and the pull request list know that a branch is in the repository; every other preview is untrusted.
+            untrusted_source: $this->pull_request_id !== 0 && $this->preview?->is_same_repository !== true,
         );
 
         return $commands;
