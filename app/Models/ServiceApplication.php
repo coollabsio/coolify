@@ -330,6 +330,9 @@ class ServiceApplication extends BaseModel
         if ($endpoints === [] || $this->service === null) {
             return $endpoints;
         }
+        if ($this->hasLegacyServiceSpecificRouting()) {
+            return [];
+        }
 
         $envKeys = array_map(fn (ServiceEndpoint $endpoint): string => $endpoint->envKey, $endpoints);
         if ($this->service->environment_variables()->whereIn('key', $envKeys)->distinct()->count('key') !== count($envKeys)) {
@@ -340,6 +343,14 @@ class ServiceApplication extends BaseModel
             ->first(fn (ServiceApplication $application): bool => ServiceEndpoints::for($application) !== [])?->id;
 
         return $ownerId === $this->id ? $endpoints : [];
+    }
+
+    /**
+     * The legacy Compose parser still routes these images from their URL variables, so their domains stay unused.
+     */
+    public function hasLegacyServiceSpecificRouting(): bool
+    {
+        return $this->serviceType() !== null && (int) $this->service?->compose_parsing_version < 3;
     }
 
     public function endpointForUrl(string $url): ?ServiceEndpoint

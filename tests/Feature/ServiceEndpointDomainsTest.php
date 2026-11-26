@@ -236,3 +236,17 @@ it('adds a domain to the selected endpoint from the Domains page', function () {
         ->and($this->garage->domain_port_overrides['https://files.example.org'])->toBe(3902)
         ->and(endpointVariable($this->service, 'GARAGE_WEB_URL'))->toBe('https://web.example.org');
 });
+
+it('keeps the variable routing of services on the legacy parser', function () {
+    setEndpointVariables($this->service, ['GARAGE_S3_API_URL' => 'https://s3.example.org', 'GARAGE_WEB_URL' => '', 'GARAGE_ADMIN_URL' => '']);
+    $this->service->forceFill(['compose_parsing_version' => '2'])->saveQuietly();
+
+    $garage = $this->garage->fresh();
+    $garage->importServiceEndpoints();
+
+    expect($garage->hasLegacyServiceSpecificRouting())->toBeTrue()
+        ->and($garage->serviceEndpoints())->toBe([])
+        ->and($garage->refresh()->domain_endpoints)->toBeNull()
+        ->and($garage->fqdn)->toBe('https://never-routed.example.com')
+        ->and($this->service->fresh()->endpointVariableKeys())->toBe([]);
+});
