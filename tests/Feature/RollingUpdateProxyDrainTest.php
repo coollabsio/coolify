@@ -191,7 +191,7 @@ it('stops the old containers without waiting when the proxy labels changed', fun
     );
 
     Sleep::assertNeverSlept();
-    expect($logs)->toBe(['The proxy labels changed, so the old containers stop without waiting.']);
+    expect($logs)->toBe(['The proxy labels changed, so the old containers stop now, without waiting and without the grace period.']);
 });
 
 it('saves the rolling update drain time on the advanced page', function () {

@@ -3732,8 +3732,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         ->all();
                     $this->start_by_compose_file();
                     $this->health_check();
-                    $this->wait_for_proxy_to_route_new_container();
-                    $this->stop_running_container();
+                    $stopImmediately = $this->wait_for_proxy_to_route_new_container();
+                    $this->stop_running_container(stopImmediately: $stopImmediately);
                     $this->application_deployment_queue->addLogEntry('Rolling update completed.');
                 }
             }
@@ -3772,27 +3772,34 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * The proxy adds the new container some seconds after it is healthy. Stopping the old
      * container before that sends requests to a closed port (502), see #8627.
+     *
+     * Returns true when the old containers must stop without the grace period: the proxy drops a
+     * route that two containers define differently (503) until the old container exits.
      */
-    private function wait_for_proxy_to_route_new_container(): void
+    private function wait_for_proxy_to_route_new_container(): bool
     {
-        $seconds = $this->application->settings->rollingUpdateDrainSeconds();
-        if ($seconds === 0 || ! $this->newVersionIsHealthy()) {
-            return;
+        if (! $this->newVersionIsHealthy()) {
+            return false;
         }
         $oldContainerNames = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id)
             ->filter(fn ($container) => data_get($container, 'State') === 'running' && data_get($container, 'Names') !== $this->container_name)
             ->pluck('Names');
         if ($oldContainerNames->isEmpty()) {
-            return;
+            return false;
         }
         if ($this->proxyLabelsChanged($oldContainerNames)) {
-            // The proxy drops a route that two containers define differently until the old one stops.
-            $this->application_deployment_queue->addLogEntry('The proxy labels changed, so the old containers stop without waiting.');
+            $this->application_deployment_queue->addLogEntry('The proxy labels changed, so the old containers stop now, without waiting and without the grace period.');
 
-            return;
+            return true;
+        }
+        $seconds = $this->application->settings->rollingUpdateDrainSeconds();
+        if ($seconds === 0) {
+            return false;
         }
         $this->application_deployment_queue->addLogEntry("Waiting {$seconds} seconds for the proxy to send traffic to the new container.");
         Sleep::for($seconds)->seconds();
+
+        return false;
     }
 
     private function proxyLabelsChanged(Collection $oldContainerNames): bool
@@ -6427,10 +6434,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('Building docker image completed.');
     }
 
-    private function graceful_shutdown_container(string $containerName, bool $skipRemove = false)
+    private function graceful_shutdown_container(string $containerName, bool $skipRemove = false, ?int $timeout = null)
     {
         try {
-            $timeout = $this->application->settings->deploymentStopGracePeriodSeconds();
+            $timeout ??= $this->application->settings->deploymentStopGracePeriodSeconds();
 
             if ($skipRemove) {
                 // The helper container (started with --rm) must also stop when the deployment was cancelled.
@@ -6478,20 +6485,21 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             ->delay(now()->addMinutes(5));
     }
 
-    private function stop_running_container(bool $force = false)
+    private function stop_running_container(bool $force = false, bool $stopImmediately = false)
     {
         try {
             $this->application_deployment_queue->addLogEntry('Removing old containers.');
             if ($this->newVersionIsHealthy() || $force) {
+                $timeout = $stopImmediately ? 0 : null;
                 if ($this->application->settings->is_consistent_container_name_enabled) {
                     $containers = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id);
-                    $this->containerNamesToRemove($containers)->each(function (string $containerName) {
-                        $this->graceful_shutdown_container($containerName);
+                    $this->containerNamesToRemove($containers)->each(function (string $containerName) use ($timeout) {
+                        $this->graceful_shutdown_container($containerName, timeout: $timeout);
                     });
                 } else {
                     $containers = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id);
-                    $this->oldGeneratedContainerNames($containers)->each(function (string $containerName) {
-                        $this->graceful_shutdown_container($containerName);
+                    $this->oldGeneratedContainerNames($containers)->each(function (string $containerName) use ($timeout) {
+                        $this->graceful_shutdown_container($containerName, timeout: $timeout);
                     });
                 }
             } else {
