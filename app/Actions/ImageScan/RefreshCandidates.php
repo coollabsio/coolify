@@ -345,7 +345,7 @@ class RefreshCandidates
         $selected = ['line' => null, 'patch' => null, 'major' => null, 'floating' => false];
 
         if ($isVersion) {
-            $tags = $this->registry(fn () => $this->commands->tags($this->image->qualifiedName(), $this->auth), 'tags');
+            $tags = $this->tags();
             if ($tags === null) {
                 return $this->failure();
             }
@@ -518,7 +518,7 @@ class RefreshCandidates
             return $result('cannot_compare', [], $attributableOf($currentBase), $currentDigest);
         }
 
-        $tags = $this->registry(fn () => $this->commands->tags($this->image->qualifiedName(), $this->auth), 'tags');
+        $tags = $this->tags();
         if ($tags === null) {
             return $failure();
         }
@@ -747,6 +747,26 @@ class RefreshCandidates
             ->where('server_id', $server->id)
             ->where('image_candidate_scans_today', '<', self::DAILY_CANDIDATE_SCANS)
             ->increment('image_candidate_scans_today') > 0;
+    }
+
+    /**
+     * The tag list of the image. A GitLab dependency proxy has none, so its tags are read anonymously from the Docker
+     * Hub image behind it; a failure there is a registry error, never a missing login.
+     */
+    private function tags(): ?string
+    {
+        $upstream = $this->image->dockerHubUpstream();
+        if ($upstream === null) {
+            return $this->registry(fn () => $this->commands->tags($this->image->qualifiedName(), $this->auth), 'tags');
+        }
+
+        $result = $this->runStep($this->commands->tags($upstream->qualifiedName(), null), 'tags', self::TIMEOUT_REGISTRY);
+        if ($result !== null && $result['code'] === 0) {
+            return $this->payload($result)[0];
+        }
+        $this->error ??= 'registry';
+
+        return null;
     }
 
     private function digest(string $tag): ?string
