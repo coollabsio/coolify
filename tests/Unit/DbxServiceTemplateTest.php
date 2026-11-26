@@ -8,10 +8,11 @@ it('includes a DBX one-click service template', function () {
     $compose = file_get_contents($templatePath);
 
     expect($compose)
-        ->toContain('t8y2/dbx:${DBX_VERSION:-latest}')
+        ->toContain('t8y2/dbx:${DBX_VERSION:-0.6.75}')
         ->toContain('SERVICE_URL_DBX_4224')
         ->toContain('DBX_PASSWORD=${SERVICE_PASSWORD_DBX}')
-        ->toContain('dbx-data:/app/data');
+        ->toContain('dbx-data:/app/data')
+        ->toContain('/dev/tcp/127.0.0.1/4224');
 
     foreach (['service-templates.json', 'service-templates-latest.json'] as $templateFile) {
         $templates = json_decode(
@@ -28,7 +29,7 @@ it('includes a DBX one-click service template', function () {
         $generatedCompose = base64_decode($templates['dbx']['compose'], strict: true);
 
         expect($generatedCompose)
-            ->toContain('t8y2/dbx:${DBX_VERSION:-latest}')
+            ->toContain('t8y2/dbx:${DBX_VERSION:-0.6.75}')
             ->toContain('DBX_PASSWORD=${SERVICE_PASSWORD_DBX}')
             ->toContain($templateFile === 'service-templates.json'
                 ? 'SERVICE_FQDN_DBX_4224'

@@ -5947,7 +5947,7 @@
     "dbx": {
         "documentation": "https://dbxio.com/en/docs/getting-started?utm_source=coolify.io",
         "slogan": "Lightweight database client supporting more than 90 databases.",
-        "compose": "c2VydmljZXM6CiAgZGJ4OgogICAgaW1hZ2U6ICd0OHkyL2RieDoke0RCWF9WRVJTSU9OOi1sYXRlc3R9JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfREJYXzQyMjQKICAgICAgLSAnREJYX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9EQlh9JwogICAgdm9sdW1lczoKICAgICAgLSAnZGJ4LWRhdGE6L2FwcC9kYXRhJwp2b2x1bWVzOgogIGRieC1kYXRhOiBudWxsCg==",
+        "compose": "c2VydmljZXM6CiAgZGJ4OgogICAgaW1hZ2U6ICd0OHkyL2RieDoke0RCWF9WRVJTSU9OOi0wLjYuNzV9JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9VUkxfREJYXzQyMjQKICAgICAgLSAnREJYX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9EQlh9JwogICAgdm9sdW1lczoKICAgICAgLSAnZGJ4LWRhdGE6L2FwcC9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtICJiYXNoIC1jICc6PiAvZGV2L3RjcC8xMjcuMC4wLjEvNDIyNCcgfHwgZXhpdCAxIgogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogMTAKdm9sdW1lczoKICBkYngtZGF0YTogbnVsbAo=",
         "tags": [
             "database",
             "sql",

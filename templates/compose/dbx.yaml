@@ -7,12 +7,17 @@
 
 services:
   dbx:
-    image: 't8y2/dbx:${DBX_VERSION:-latest}'
+    image: 't8y2/dbx:${DBX_VERSION:-0.6.75}'
     environment:
       - SERVICE_URL_DBX_4224
       - 'DBX_PASSWORD=${SERVICE_PASSWORD_DBX}'
     volumes:
       - 'dbx-data:/app/data'
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/4224' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   dbx-data:
