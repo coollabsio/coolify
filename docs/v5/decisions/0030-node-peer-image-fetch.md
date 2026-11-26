@@ -182,7 +182,7 @@ images.
   or a move can therefore fetch these images from the Nodes that ran them.
 - A build Node also keeps the last 3 successful local builds of each
   workload, also when no workload runs on it.
-- The export directory of a transfer is temporary and is removed when the
+- The export directory of an image is temporary and is removed when the last
   transfer ends.
 
 ### Capabilities
@@ -199,15 +199,27 @@ images.
 
 - **Coolify.** `FetchNodeImage` (`app/Actions/Node/Build/FetchNodeImage.php`)
   runs in `DeployNodeWorkloadJob` before the deploy request. It returns
-  without a fetch when the image is not local, when the target built it, or
-  when the target runs or keeps it.
+  without a fetch when the image is not local, or when a container of the
+  image is on the target. When the target still has the image without a
+  container, the fetch succeeds at once and sends nothing.
+- **Copy operations.** Each attempt from one source is an `image.copy.v1`
+  operation on the target, which Coolify runs itself. The `Activity` page of
+  the target shows "Copy image from <source>", and the page of the source
+  shows "Send image to <target>". Every 4 seconds Coolify reads `bytes_sent`
+  with a repeated serve and writes it to the operation, so the deploy log
+  shows the progress. At the end, the log shows the time, the size, and the
+  bytes sent. A move log includes the steps of its deploy on the target.
 - **`image.serve.v1`.** Input: the transfer ID, the image, the WireGuard
-  address of the target, the secret, and the expiry. The source runs
-  `podman save --format oci-dir --uncompressed` into
-  `/var/lib/coolify/image-transfer/<id>`, starts the server on a port from
-  7800-7899, and adds the nftables element. The response has the address, the
-  port, the repository, the manifest digest, and the image ID. The serve stops
-  on a request with `stop`, at the expiry, or when Sentinel restarts.
+  address of the target, the secret, and the expiry. The source checks that it
+  has the free disk for the image and 1 GiB, then runs
+  `podman save --format oci-dir --uncompressed` by the image ID into
+  `/var/lib/coolify/image-transfer/image-<image id>`. All transfers of one
+  image share this export, with a reference count; the last stop removes it.
+  Each transfer has its own server on a port from 7800-7899, its own secret,
+  nftables element, and `bytes_sent`. The response has the address, the port,
+  the repository, the manifest digest, the image ID, `size_bytes`, and
+  `bytes_sent`. The serve stops on a request with `stop`, at the expiry, or
+  when Sentinel restarts.
 - **`image.fetch.v1`.** It is asynchronous. The first request starts
   `podman pull` from the source, and the next requests with the same transfer
   ID return the state (`running`, `succeeded`, or `failed`). The target checks
@@ -251,7 +263,7 @@ images.
 
 | Option | Good | Bad |
 | --- | --- | --- |
-| **A. Fetch from a peer, controlled by Coolify (decided)** | No registry, no second copy, only missing layers move, one pattern with the volume transfer | Not available when the only Node with the image is offline. One full export on the source for each transfer |
+| **A. Fetch from a peer, controlled by Coolify (decided)** | No registry, no second copy, only missing layers move, one pattern with the volume transfer | Not available when the only Node with the image is offline. One full export on the source for each image while it is copied |
 | B. Push to every Node at build time (Uncloud) | The image survives the loss of one Node | Each image on every Node, also Nodes that never run it |
 | C. Registry mirror on each Node (Spegel, unregistry pull) | Transparent for Podman | Does not work on Podman: the store has no compressed blobs, so the digests do not match |
 | D. zot replicas | A second copy, registry tools | More registry state and Nodes to manage. zot was removed (history) |

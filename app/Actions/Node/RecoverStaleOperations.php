@@ -47,6 +47,7 @@ class RecoverStaleOperations
         'workload.move.v1' => 'The move stopped before completion. Check the workload on both servers.',
         'network.cluster.leave.v1' => 'The server network cleanup stopped before completion. Check the network state on the server.',
         'sentinel.upgrade.v1' => 'The Sentinel upgrade stopped before completion. Check the Sentinel version on the server.',
+        'image.copy.v1' => 'The image copy stopped before completion. The next deploy copies the image again.',
     ];
 
     /** @var array<int, bool> Whether a fresh inventory is available, by Node ID. */

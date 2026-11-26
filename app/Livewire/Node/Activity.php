@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Node;
 
+use App\Actions\Node\Build\FetchNodeImage;
 use App\Enums\NodeOperationStatus;
 use App\Jobs\DeployNodeWorkloadJob;
 use App\Jobs\ManageNodeWorkloadJob;
@@ -127,12 +128,14 @@ class Activity extends Component
         $this->page = min(max(1, $this->page), $lastPage);
         $skip = ($this->page - 1) * self::PER_PAGE;
         $operations = $this->operationsQuery()
-            ->with(['workload.environment.project', 'requestedBy'])
+            ->with(['workload.environment.project', 'requestedBy', 'node'])
             ->latest('id')
             ->skip($skip)
             ->take(self::PER_PAGE)
             ->get();
-        $moveTargetNames = $this->moveTargetNames($operations->map->moveTargetUuid()->filter()->unique()->values()->all());
+        $moveTargetNames = $this->moveTargetNames($operations->map->moveTargetUuid()
+            ->merge($operations->where('command_type', FetchNodeImage::COMMAND)->map(fn (NodeOperation $copy): ?string => data_get($copy->request, 'source_node_uuid')))
+            ->filter()->unique()->values()->all());
 
         return view('livewire.node.activity', [
             'rows' => $operations->map(fn (NodeOperation $operation): array => $this->row($operation, $moveTargetNames))->all(),
@@ -160,7 +163,13 @@ class Activity extends Component
     private function operationsQuery(): Builder
     {
         return NodeOperation::query()
-            ->where('node_id', $this->node->id)
+            ->where(fn (Builder $query) => $query
+                ->where('node_id', $this->node->id)
+                // A copy of an image is on the target; the source shows it too (decision 0030).
+                ->orWhere(fn (Builder $copies) => $copies
+                    ->where('command_type', FetchNodeImage::COMMAND)
+                    ->where('request->source_node_uuid', $this->node->uuid)
+                    ->whereHas('node', fn (Builder $nodes) => $nodes->where('team_id', $this->node->team_id))))
             ->userFacing()
             ->when($this->statusFilters !== [], fn (Builder $query) => $query->whereIn('status', $this->filteredStatuses()))
             ->when($this->applicationFilters !== [], fn (Builder $query) => $query->whereHas('workload', fn (Builder $workloads) => $workloads
@@ -226,11 +235,23 @@ class Activity extends Component
         ] : null;
         $requestedBy = $operation->requestedBy;
 
+        $action = $operation->actionLabel($moveTargetNames[$operation->moveTargetUuid()] ?? null);
+        $logUuid = $operation->isDeployment() ? $operation->uuid : null;
+        if ($operation->command_type === FetchNodeImage::COMMAND) {
+            $size = (int) data_get($operation->result, 'size_bytes', 0);
+            $sent = (int) data_get($operation->result, 'bytes_sent', 0);
+            $action = ($operation->node_id === $this->node->id
+                ? 'Copy image from '.($moveTargetNames[data_get($operation->request, 'source_node_uuid')] ?? 'another server')
+                : 'Send image to '.($operation->node?->name ?? 'another server'))
+                .($size > 0 ? ' ('.formatBytes($sent).' of '.formatBytes($size).')' : '');
+            $logUuid = $this->copyLogUuid($operation);
+        }
+
         return [
             'uuid' => $operation->uuid,
-            'action' => $operation->actionLabel($moveTargetNames[$operation->moveTargetUuid()] ?? null),
-            'actionHref' => $operation->isDeployment() && $routeParameters
-                ? route('project.cluster-application.deployment.show', [...$routeParameters, 'deployment_uuid' => $operation->uuid])
+            'action' => $action,
+            'actionHref' => $logUuid !== null && $routeParameters
+                ? route('project.cluster-application.deployment.show', [...$routeParameters, 'deployment_uuid' => $logUuid])
                 : null,
             'application' => $workload?->name,
             'applicationHref' => $routeParameters ? route('project.cluster-application.show', $routeParameters) : null,
@@ -242,6 +263,24 @@ class Activity extends Component
             'requestedBy' => $requestedBy ? ($requestedBy->name ?: $requestedBy->email) : 'Coolify',
             'createdAt' => $operation->created_at,
         ];
+    }
+
+    /**
+     * The log that shows a copy: the deploy that needed the image, or the move that ran that deploy.
+     */
+    private function copyLogUuid(NodeOperation $copy): ?string
+    {
+        $deployUuid = data_get($copy->request, 'for_operation_uuid');
+        if (! is_string($deployUuid)) {
+            return null;
+        }
+        $move = NodeOperation::query()
+            ->where('node_workload_id', $copy->node_workload_id)
+            ->where('command_type', 'workload.move.v1')
+            ->where('result->deployment_operation_uuid', $deployUuid)
+            ->value('uuid');
+
+        return $move ?? $deployUuid;
     }
 
     /**

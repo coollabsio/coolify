@@ -1177,9 +1177,15 @@ class Show extends Component
                 ->latest('id')
                 ->first();
         } else {
+            // The deploy on the target of a move has no row of its own: its link shows the move.
+            $moveUuid = NodeOperation::query()
+                ->where('node_workload_id', $this->workload->id)
+                ->where('command_type', 'workload.move.v1')
+                ->where('result->deployment_operation_uuid', $this->deploymentUuid)
+                ->value('uuid');
             $operation = $this->deploymentQuery()
                 ->with(['node', 'revision.build', 'requestedBy'])
-                ->where('uuid', $this->deploymentUuid)
+                ->where('uuid', $moveUuid ?? $this->deploymentUuid)
                 ->firstOrFail();
             $build = $operation->revision?->build;
         }
@@ -1249,7 +1255,11 @@ class Show extends Component
      *
      * @return list<array{timestamp: string, line: string, stderr: bool}>
      */
-    private function deploymentLogLines(NodeOperation $operation): array
+    /**
+     * @param  bool  $nested  The lines of the target deploy inside a move log: without the lines that the move
+     *                        shows itself (queue, revision, end status, error).
+     */
+    private function deploymentLogLines(NodeOperation $operation, bool $nested = false): array
     {
         $lines = [];
         $add = function ($at, string $line, bool $stderr = false) use (&$lines): void {
@@ -1258,15 +1268,25 @@ class Show extends Component
         $nodeName = $operation->node?->name ?? 'the server';
         $requestedBy = $operation->requestedBy?->name ?: $operation->requestedBy?->email;
 
-        if ($operation->command_type === 'workload.move.v1') {
+        $isMove = $operation->command_type === 'workload.move.v1';
+        $isRestore = $isMove && data_get($operation->request, 'restore') !== null;
+        $targetName = null;
+        $inner = null;
+        if ($isMove) {
             $targetName = Node::query()->where('team_id', $this->workload->team_id)
                 ->where('uuid', data_get($operation->request, 'target_node_uuid'))->value('name');
-            $add($operation->created_at, (data_get($operation->request, 'restore') !== null ? 'Restore of a volume backup on ' : 'Move to ')
+            $add($operation->created_at, ($isRestore ? 'Restore of a volume backup on ' : 'Move to ')
                 .($targetName ?? 'another server').' queued'.($requestedBy ? " by {$requestedBy}." : '.'));
-        } else {
+            // The deploy on the target that the move runs; its steps are part of this log.
+            $innerUuid = data_get($operation->result, 'deployment_operation_uuid');
+            $inner = is_string($innerUuid) ? NodeOperation::query()->with(['node', 'revision'])
+                ->where('node_workload_id', $operation->node_workload_id)
+                ->where('uuid', $innerUuid)
+                ->first() : null;
+        } elseif (! $nested) {
             $add($operation->created_at, 'Deployment queued'.($requestedBy ? " by {$requestedBy}." : '.'));
         }
-        if ($operation->revision) {
+        if ($operation->revision && ! $nested) {
             $add($operation->created_at, "Revision {$operation->revision->uuid} uses image {$operation->revision->image}.");
             if ($build = $operation->revision->build) {
                 $add($operation->created_at, $build->source_type->usesGit()
@@ -1275,19 +1295,35 @@ class Show extends Component
             }
         }
         $pullPolicy = data_get($operation->request, 'pull_policy');
-        if ($pullPolicy) {
+        if ($pullPolicy && ! $nested) {
             $add($operation->created_at, $pullPolicy === 'newer' ? 'Sentinel pulls the image when a newer version is available.' : 'Sentinel pulls the image only when it is missing.');
         }
-        if (filled(data_get($operation->result, 'fetched_image'))) {
+        if (filled(data_get($operation->result, 'fetched_image')) && $inner === null) {
             // The copy from a peer runs before the command goes to Sentinel (decision 0030).
             $add($operation->dispatched_at ?? $operation->updated_at, self::fetchedImageLine((array) $operation->result));
+        } elseif (filled($copyUuid = data_get($operation->result, 'image_copy_operation_uuid'))) {
+            // A copy that runs now: its progress, written every few seconds.
+            $copy = NodeOperation::query()->where('node_workload_id', $operation->node_workload_id)->where('uuid', $copyUuid)->first();
+            if ($copy !== null && ! $copy->status->isFinal()) {
+                $size = (int) data_get($copy->result, 'size_bytes', 0);
+                $add($copy->updated_at, 'Copying the image from server '.data_get($copy->result, 'source', 'another server')
+                    .($size > 0 ? ': '.formatBytes((int) data_get($copy->result, 'bytes_sent', 0)).' of '.formatBytes($size).' sent.' : '.'));
+            }
         }
-        if ($operation->dispatched_at) {
-            $attempt = $operation->attempt_count > 1 ? " (attempt {$operation->attempt_count})" : '';
-            $add($operation->dispatched_at, "Command sent to Sentinel on {$nodeName}{$attempt}.");
-        }
-        if ($operation->started_at) {
-            $add($operation->started_at, 'Sentinel started the deployment.');
+        if ($isMove) {
+            if ($operation->started_at) {
+                $add($operation->started_at, $isRestore
+                    ? 'Restore started.'
+                    : "Move started. The application keeps running on {$nodeName} until it is ready on ".($targetName ?? 'the target server').'.');
+            }
+        } else {
+            if ($operation->dispatched_at) {
+                $attempt = $operation->attempt_count > 1 ? " (attempt {$operation->attempt_count})" : '';
+                $add($operation->dispatched_at, "Command sent to Sentinel on {$nodeName}{$attempt}.");
+            }
+            if ($operation->started_at) {
+                $add($operation->started_at, 'Sentinel started the deployment.');
+            }
         }
         if ($operation->command_type === 'workload.move.v1' && data_get($operation->result, 'stateful')) {
             // Moves before per-pass progress stored only the last pass under `transfer`.
@@ -1362,13 +1398,33 @@ class Show extends Component
             );
         }
 
+        if ($inner !== null) {
+            $add($inner->created_at, 'The application starts on '.($inner->node?->name ?? $targetName ?? 'the target server').'.');
+            foreach ($this->deploymentLogLines($inner, nested: true) as $line) {
+                $lines[] = $line;
+            }
+            $removalUuid = data_get($operation->result, 'removal_operation_uuid');
+            $removal = is_string($removalUuid) ? NodeOperation::query()->where('node_workload_id', $operation->node_workload_id)->where('uuid', $removalUuid)->first() : null;
+            if ($removal !== null) {
+                $add($removal->completed_at ?? $removal->updated_at, match ($removal->status) {
+                    NodeOperationStatus::SUCCEEDED => "The old container on {$nodeName} was removed.",
+                    NodeOperationStatus::FAILED, NodeOperationStatus::TIMED_OUT, NodeOperationStatus::UNCERTAIN => "The old container on {$nodeName} could not be removed. ".$removal->error,
+                    default => "Coolify removes the old container on {$nodeName}.",
+                }, in_array($removal->status, [NodeOperationStatus::FAILED, NodeOperationStatus::TIMED_OUT, NodeOperationStatus::UNCERTAIN], true));
+            }
+        }
+        if ($nested) {
+            return $lines;
+        }
+
         $finishedAt = $operation->completed_at ?? $operation->updated_at;
+        $action = $isRestore ? 'Restore' : ($isMove ? 'Move' : 'Deployment');
         match ($operation->status) {
-            NodeOperationStatus::SUCCEEDED => $add($finishedAt, 'Deployment finished successfully.'),
-            NodeOperationStatus::FAILED => $add($finishedAt, 'Deployment failed.', true),
+            NodeOperationStatus::SUCCEEDED => $add($finishedAt, "{$action} finished successfully."),
+            NodeOperationStatus::FAILED => $add($finishedAt, "{$action} failed.", true),
             NodeOperationStatus::TIMED_OUT => $add($finishedAt, 'Sentinel did not report a result in time.', true),
             NodeOperationStatus::UNCERTAIN => $add($finishedAt, 'The result is uncertain. Recover the operation from the Activity page of the server.', true),
-            NodeOperationStatus::CANCELLED => $add($finishedAt, 'Deployment cancelled.'),
+            NodeOperationStatus::CANCELLED => $add($finishedAt, "{$action} cancelled."),
             default => null,
         };
         foreach (preg_split('/\r\n|\r|\n/', trim((string) $operation->error)) as $errorLine) {

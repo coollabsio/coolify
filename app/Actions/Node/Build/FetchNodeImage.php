@@ -2,6 +2,8 @@
 
 namespace App\Actions\Node\Build;
 
+use App\Actions\Node\CreateOperation;
+use App\Actions\Node\TransitionOperation;
 use App\Enums\NodeBuildStatus;
 use App\Enums\NodeOperationStatus;
 use App\Models\Node;
@@ -35,6 +37,12 @@ class FetchNodeImage
     public const MAX_SECONDS = 600;
 
     public const POLL_SECONDS = 2;
+
+    /** The operation of one copy attempt, on the target (decision 0030). */
+    public const COMMAND = 'image.copy.v1';
+
+    /** How often the progress of a copy is written for the deploy log. */
+    private const PROGRESS_SECONDS = 4;
 
     /** How long the source serves the image when the transfer is not stopped. */
     private const SERVE_MINUTES = 30;
@@ -70,9 +78,12 @@ class FetchNodeImage
      *
      * @return array{source: Node, seconds: float, size_bytes: int, bytes_sent: int}|null
      *
+     * Each attempt is an `image.copy.v1` operation on the target, for the Activity page of both
+     * servers and the live progress in the log of `$for`, the deploy that needs the image.
+     *
      * @throws RuntimeException When no source could copy the image.
      */
-    public function handle(Node $target, NodeWorkloadRevision $revision, ?Carbon $deadline = null): ?array
+    public function handle(Node $target, NodeWorkloadRevision $revision, ?Carbon $deadline = null, ?NodeOperation $for = null): ?array
     {
         $image = $revision->image;
         if (! NodeImages::isLocalImage($image)) {
@@ -107,13 +118,17 @@ class FetchNodeImage
                 $errors[] = 'The time for the copy ran out.';
                 break;
             }
+            $attempt = $this->startAttempt($source, $target, $revision, $for);
             try {
                 $started = microtime(true);
-                $copy = $this->fetchFrom($source, $target, $image, $deadline);
+                $copy = $this->fetchFrom($source, $target, $image, $deadline, $attempt);
+                $copy = ['seconds' => round(microtime(true) - $started, 1), ...$copy];
+                rescue(fn () => TransitionOperation::run($attempt, NodeOperationStatus::SUCCEEDED, result: ['source' => $source->name, ...$copy]), report: false);
 
-                return ['source' => $source, 'seconds' => round(microtime(true) - $started, 1), ...$copy];
+                return ['source' => $source, ...$copy];
             } catch (Throwable $exception) {
                 $errors[] = "{$source->name}: ".mb_substr($exception->getMessage(), 0, 500);
+                rescue(fn () => TransitionOperation::run($attempt, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000)), report: false);
             }
         }
 
@@ -186,23 +201,51 @@ class FetchNodeImage
             ->where('status', NodeOperationStatus::SUCCEEDED);
     }
 
+    /**
+     * The operation of one copy attempt, running, linked to the deploy that needs the image. A
+     * coordinated operation: Coolify runs it here and never sends it to Sentinel as one command.
+     */
+    private function startAttempt(Node $source, Node $target, NodeWorkloadRevision $revision, ?NodeOperation $for): NodeOperation
+    {
+        $attempt = CreateOperation::run(
+            $target,
+            self::COMMAND,
+            'image-copy:'.Str::uuid(),
+            $revision->workload,
+            $revision,
+            [
+                'source_node_uuid' => $source->uuid,
+                'image' => $revision->image,
+                ...($for === null ? [] : ['for_operation_uuid' => $for->uuid]),
+            ],
+            $for?->requestedBy,
+        );
+        TransitionOperation::run($attempt, NodeOperationStatus::DISPATCHED);
+        $attempt = TransitionOperation::run($attempt, NodeOperationStatus::RUNNING, result: ['source' => $source->name]);
+        if ($for !== null) {
+            $for->update(['result' => [...($for->refresh()->result ?? []), 'image_copy_operation_uuid' => $attempt->uuid]]);
+        }
+
+        return $attempt;
+    }
+
     /** @return array{size_bytes: int, bytes_sent: int} */
-    private function fetchFrom(Node $source, Node $target, string $image, Carbon $deadline): array
+    private function fetchFrom(Node $source, Node $target, string $image, Carbon $deadline, NodeOperation $attempt): array
     {
         $transferId = (string) Str::uuid();
         $secret = Str::random(64);
         $copy = ['size_bytes' => 0, 'bytes_sent' => 0];
+        $serve = [
+            'server_id' => $source->uuid,
+            'transfer_id' => $transferId,
+            'image' => $image,
+            'peer_ip' => (string) $target->wireguard_ip,
+            'secret' => $secret,
+            'expires_at_unix_ms' => now()->addMinutes(self::SERVE_MINUTES)->getTimestampMs(),
+            'stop' => false,
+        ];
         try {
-            $served = RunImageBuild::flux('image.serve', [
-                'server_id' => $source->uuid,
-                'command_id' => (string) Str::uuid(),
-                'transfer_id' => $transferId,
-                'image' => $image,
-                'peer_ip' => (string) $target->wireguard_ip,
-                'secret' => $secret,
-                'expires_at_unix_ms' => now()->addMinutes(self::SERVE_MINUTES)->getTimestampMs(),
-                'stop' => false,
-            ], 660, [$secret]);
+            $served = RunImageBuild::flux('image.serve', ['command_id' => (string) Str::uuid(), ...$serve], 660, [$secret]);
             $service = Validator::make($served, [
                 'address' => ['required', 'ip'],
                 'port' => ['required', 'integer', 'between:1,65535'],
@@ -215,6 +258,8 @@ class FetchNodeImage
             }
             $service = $service->validated();
             $copy['size_bytes'] = (int) data_get($served, 'size_bytes', 0);
+            $this->progress($attempt, $source, $copy['size_bytes'], 0);
+            $progressAt = microtime(true);
 
             while (true) {
                 $state = RunImageBuild::flux('image.fetch', [
@@ -246,6 +291,14 @@ class FetchNodeImage
                 if (now()->gte($deadline)) {
                     throw new RuntimeException('The copy did not finish in time.');
                 }
+                if (microtime(true) - $progressAt >= self::PROGRESS_SECONDS) {
+                    // A repeated serve of the same transfer returns the bytes sent so far.
+                    $progressAt = microtime(true);
+                    $sent = rescue(fn () => data_get(RunImageBuild::flux('image.serve', ['command_id' => (string) Str::uuid(), ...$serve], 30, [$secret]), 'bytes_sent'), report: false);
+                    if (is_numeric($sent)) {
+                        $this->progress($attempt, $source, $copy['size_bytes'], (int) $sent);
+                    }
+                }
                 Sleep::for(self::POLL_SECONDS)->seconds();
             }
         } finally {
@@ -260,5 +313,10 @@ class FetchNodeImage
         }
 
         return $copy;
+    }
+
+    private function progress(NodeOperation $attempt, Node $source, int $size, int $sent): void
+    {
+        $attempt->update(['result' => ['source' => $source->name, 'size_bytes' => $size, 'bytes_sent' => $sent]]);
     }
 }

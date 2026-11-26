@@ -178,16 +178,16 @@ class MoveNodeWorkloadJob implements ShouldQueue
             $deployments = [];
             foreach (self::inDeployOrder($group) as ['workload' => $workload, 'revision' => $revision]) {
                 $deployment = CreateDeploymentOperation::run($target, $revision, $operation->requestedBy, partOfMove: true);
+                if ($workload->id === $operation->workload->id) {
+                    // At once, so the move log shows the steps of the target deploy while it runs.
+                    self::checkpoint($operation, ['deployment_operation_uuid' => $deployment['operation']->uuid]);
+                }
                 if ($deployment['created']) {
                     // The deployment waits until the target is healthy, so the source serves until then.
                     (new DeployNodeWorkloadJob($deployment['operation']->id, $deadline))->handle();
                 }
                 $deploymentOperation = $this->waitForDeployment($deployment['operation'], $deadline);
                 $deployments[$workload->id] = $deploymentOperation;
-                if ($workload->id === $operation->workload->id && filled(data_get($deploymentOperation->result, 'fetched_image'))) {
-                    // The deployment copied the local image from a peer (decision 0030); the move log shows it.
-                    self::checkpoint($operation, collect($deploymentOperation->result)->only(['fetched_image', 'fetched_image_seconds', 'fetched_image_size', 'fetched_image_sent'])->all());
-                }
                 if ($deploymentOperation->status !== NodeOperationStatus::SUCCEEDED) {
                     $verification = data_get($deploymentOperation->result, 'verification', []);
                     $targetStarted = data_get($verification, 'state') === 'running' || data_get($verification, 'state') === 'exited';

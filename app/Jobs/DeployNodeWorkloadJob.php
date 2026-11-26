@@ -125,7 +125,7 @@ class DeployNodeWorkloadJob implements ShouldQueue
             $deadline = $this->waitUntil;
         }
         try {
-            $copy = FetchNodeImage::run($operation->node, $operation->revision, $deadline);
+            $copy = FetchNodeImage::run($operation->node, $operation->revision, $deadline, $operation);
         } catch (Throwable $exception) {
             if ($operation->refresh()->status->canTransitionTo(NodeOperationStatus::FAILED)) {
                 TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000));

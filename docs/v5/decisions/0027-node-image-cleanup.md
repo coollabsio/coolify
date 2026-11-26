@@ -24,7 +24,9 @@ Other storage already has limits:
 
 - The cluster registry kept `keep_tags` tags of each repository (decision
   0006). Decision 0030 removed it.
-- A local build (`image.load.v1`) keeps `keep_tags` tags of its repository.
+- A local build (`image.load.v1`) keeps the newest 10 local tags of each
+  application on its build Node (`keep_tags`, set by Coolify). Since decision
+  0030 these local images are also the source of the copies to other Nodes.
 - BuildKit garbage collection limits the build cache (decision 0006, "Storage
   limits on builder Nodes").
 
