@@ -28,6 +28,7 @@ class Subscription extends Model
         return [
             'stripe_refunded_at' => 'datetime',
             'ended_at' => 'datetime',
+            'stripe_checkout_reminder_sent_at' => 'datetime',
         ];
     }
 

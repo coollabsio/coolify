@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools;
 
+use App\Enums\CancelPreviousDeployments;
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\CallsRestApi;
 use App\Mcp\Concerns\ChecksTokenAbilities;
@@ -20,7 +21,7 @@ class Deploy extends Tool
 {
     protected string $name = 'deploy';
 
-    protected string $description = 'Queue a deployment for a team-owned application by UUID, or deploy every resource of the authenticated team that has a tag (tag + confirm=true). Give exactly one of uuid or tag. Requires deploy ability. Optional force rebuild and pull_request_id for previews (uuid only).';
+    protected string $description = 'Queue a deployment for a team-owned application by UUID, or deploy every resource of the authenticated team that has a tag (tag + confirm=true). Give exactly one of uuid or tag. Requires deploy ability. Optional force rebuild, pull_request_id for previews (uuid only), and cancel_previous to cancel older queued or building deployments.';
 
     use BuildsResponse;
     use CallsRestApi;
@@ -50,8 +51,12 @@ class Deploy extends Tool
         if ($hasUuid === $hasTag) {
             return $this->mcpError($request, 'Give exactly one of uuid or tag.');
         }
+        $cancelPrevious = CancelPreviousDeployments::tryFrom(strtolower(trim((string) ($request->get('cancel_previous') ?? 'none'))));
+        if (! $cancelPrevious) {
+            return $this->mcpError($request, 'cancel_previous must be one of: none, queued, building.');
+        }
         if ($hasTag) {
-            return $this->deployByTag($request, $teamId, $tag);
+            return $this->deployByTag($request, $teamId, $tag, $cancelPrevious);
         }
         if (! is_string($uuid)) {
             return $this->mcpError($request, 'uuid argument is required.');
@@ -74,15 +79,15 @@ class Deploy extends Tool
             deployment_uuid: $deploymentUuid,
             pull_request_id: $pullRequestId,
             force_rebuild: $force,
-            is_api: true,
-            no_questions_asked: true,
+            is_mcp: true,
+            cancel_previous: $cancelPrevious,
         );
 
         if (($result['status'] ?? null) === 'skipped' || ($result['status'] ?? null) === 'queue_full') {
             return $this->mcpSuccess($request, $this->respond([
                 'ok' => false,
                 'message' => $result['message'] ?? 'Deployment not queued.',
-                'deployment_uuid' => null,
+                'deployment_uuid' => $result['deployment_uuid'] ?? null,
             ]), ['resource_uuid' => $uuid]);
         }
 
@@ -110,7 +115,7 @@ class Deploy extends Tool
     /**
      * Deploys every resource of the token team with the tag through the REST deploy route.
      */
-    private function deployByTag(Request $request, int $teamId, mixed $tag): Response
+    private function deployByTag(Request $request, int $teamId, mixed $tag, CancelPreviousDeployments $cancelPrevious): Response
     {
         if (! is_string($tag)) {
             return $this->mcpError($request, 'tag must be a string.');
@@ -125,7 +130,7 @@ class Deploy extends Tool
         $force = filter_var($request->get('force'), FILTER_VALIDATE_BOOLEAN);
 
         try {
-            $result = $this->callRestApi('POST', 'deploy', [], ['tag' => $tag, 'force' => $force]);
+            $result = $this->callRestApi('POST', 'deploy', [], ['tag' => $tag, 'force' => $force, 'cancel_previous' => $cancelPrevious->value]);
         } catch (\InvalidArgumentException $e) {
             return $this->mcpError($request, $e->getMessage(), ['tag' => $tag]);
         }
@@ -159,6 +164,7 @@ class Deploy extends Tool
             'force' => $schema->boolean()->description('Force rebuild (default false).'),
             'pull_request_id' => $schema->integer()->description('Optional PR id for preview deploy (uuid only).'),
             'confirm' => $schema->boolean()->description('Required true when deploying by tag.'),
+            'cancel_previous' => $schema->string()->enum(['none', 'queued', 'building'])->description('Cancel older webhook, API, and MCP deployments of the same application, pull request, and server: queued ones, or also ones still building. A deployment that started to replace containers always finishes. Manual, restart, and rollback deployments are never cancelled. Default none.'),
         ];
     }
 }

@@ -51,7 +51,7 @@ class CheckAndStartSentinelJob implements ShouldBeEncrypted, ShouldBeUnique, Sho
 
         // An SSH failure throws here, so it is never mistaken for a missing container.
         // A missing container gives empty output and exit code 0.
-        $sentinelStatus = instant_remote_process_with_timeout(["docker ps -a --filter 'name=^coolify-sentinel$' --format '{{.State}} {{.Status}}'"], $this->server);
+        $sentinelStatus = instant_remote_process_with_timeout([remoteCommandWithTimeout("docker ps -a --filter 'name=^coolify-sentinel$' --format '{{.State}} {{.Status}}'")], $this->server);
         if (! str_starts_with((string) $sentinelStatus, 'running')) {
             $this->startSentinel($latestVersion);
 
@@ -65,9 +65,10 @@ class CheckAndStartSentinelJob implements ShouldBeEncrypted, ShouldBeUnique, Sho
         }
 
         // One SSH call reads the version and the last push result. Sentinel versions without
-        // /api/push-status give an empty second line.
+        // /api/push-status give an empty second line; `|| true` keeps their exit code 0, so their version is still read.
+        // printf is a shell builtin, so the token is not a process argument.
         $output = instant_remote_process_with_timeout([
-            "docker exec coolify-sentinel sh -c 'curl -s http://127.0.0.1:8888/api/version; echo; curl -sf -H \"Authorization: Bearer \$TOKEN\" http://127.0.0.1:8888/api/push-status'",
+            remoteCommandWithTimeout("docker exec coolify-sentinel sh -c 'curl -s --max-time 5 http://127.0.0.1:8888/api/version; echo; printf \"Authorization: Bearer %s\\n\" \"\$TOKEN\" | curl -sf --max-time 5 -H @- http://127.0.0.1:8888/api/push-status || true'"),
         ], $this->server, false);
         [$runningVersion, $pushStatus] = array_pad(explode("\n", trim((string) $output), 2), 2, null);
         $this->rememberPushError($pushStatus);

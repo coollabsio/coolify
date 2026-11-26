@@ -31,10 +31,12 @@ class LocalPersistentVolume extends BaseModel
         'container_id',
         'resource_type',
         'resource_id',
+        'is_external',
         'is_preview_suffix_enabled',
     ];
 
     protected $casts = [
+        'is_external' => 'boolean',
         'is_preview_suffix_enabled' => 'boolean',
         'ignores_compose_driver_options' => 'boolean',
     ];
@@ -57,6 +59,54 @@ class LocalPersistentVolume extends BaseModel
     public function database()
     {
         return $this->morphTo('resource');
+    }
+
+    /**
+     * The top-level Compose declaration of this volume. A preview deployment of an existing volume
+     * gets its own volume with the preview suffix, which Docker Compose must create.
+     *
+     * @return array{name: string, external: bool}
+     */
+    public function dockerComposeVolumeDefinition(?string $name = null): array
+    {
+        $name ??= $this->name;
+
+        return [
+            'name' => $name,
+            'external' => $this->is_external && $name === $this->name,
+        ];
+    }
+
+    /**
+     * Coolify does not own an existing volume, so a clone mounts the same volume and copies no data.
+     */
+    public function shouldCopyDataWhenCloning(bool $copyData): bool
+    {
+        return $copyData && ! $this->is_external;
+    }
+
+    /**
+     * A clone on another server mounts the existing volume by name, so the volume must exist there.
+     *
+     * @throws \RuntimeException
+     */
+    public function ensureCloneTargetIsAvailable(Server $sourceServer, Server $targetServer): void
+    {
+        if (! $this->is_external || $sourceServer->id === $targetServer->id) {
+            return;
+        }
+
+        $volumeName = escapeshellarg($this->name);
+        $targetVolumeState = instant_remote_process([
+            "if docker volume inspect {$volumeName} >/dev/null 2>&1; then echo __COOLIFY_VOLUME_PRESENT__; else echo __COOLIFY_VOLUME_ABSENT__; fi",
+        ], $targetServer);
+
+        if ($targetVolumeState === '__COOLIFY_VOLUME_ABSENT__') {
+            throw new \RuntimeException("Volume {$this->name} does not exist on the target server.");
+        }
+        if ($targetVolumeState !== '__COOLIFY_VOLUME_PRESENT__') {
+            throw new \RuntimeException("Could not determine whether volume {$this->name} exists on the target server.");
+        }
     }
 
     public function scheduledBackups(): MorphMany
@@ -130,15 +180,15 @@ class LocalPersistentVolume extends BaseModel
     public function isServiceResource(): bool
     {
         return in_array($this->resource_type, [
-            'App\Models\ServiceApplication',
-            'App\Models\ServiceDatabase',
-        ]);
+            (new ServiceApplication)->getMorphClass(),
+            (new ServiceDatabase)->getMorphClass(),
+        ], true);
     }
 
     // Check if this volume belongs to a dockercompose application
     public function isDockerComposeResource(): bool
     {
-        if ($this->resource_type !== 'App\Models\Application') {
+        if ($this->resource_type !== (new Application)->getMorphClass()) {
             return false;
         }
 
@@ -200,7 +250,10 @@ class LocalPersistentVolume extends BaseModel
 
             foreach ($services as $service) {
                 foreach (data_get($service, 'volumes', []) as $volume) {
-                    $parsedVolume = is_array($volume) ? $volume : parseDockerVolumeString($volume);
+                    // A source that resolves to a host path is a bind, so it is not this volume.
+                    $parsedVolume = is_array($volume) ? $volume : parseDockerVolumeString($volume, str_contains($volume, '${')
+                        ? $volumeSourceVariables ??= composeVolumeSourceVariables($resource instanceof Application ? $resource : $resource->service)
+                        : null);
                     $source = data_get($parsedVolume, 'source');
                     $target = data_get($parsedVolume, 'target');
                     if ($source && isComposeExternalVolume($topLevelVolumes->get((string) $source))) {
@@ -236,6 +289,48 @@ class LocalPersistentVolume extends BaseModel
         }
 
         return $resource->previews()->where('pull_request_id', (int) $matches[1])->exists();
+    }
+
+    /**
+     * The host path that a variable of the Compose file now gives this volume, or null. v4.7.6 and older
+     * made a short-syntax volume such as `${DATA}/config:/config` a named volume, also when the resource
+     * set DATA. While this storage entry exists, the parsers keep the volume so that the resource keeps
+     * its data (see keepSavedComposeNamedVolume()).
+     */
+    public function replacedComposeHostPath(): ?string
+    {
+        try {
+            $resource = $this->resource;
+            if (! $resource) {
+                return null;
+            }
+
+            $parent = $resource instanceof Application ? $resource : $resource->service;
+            if (! $parent || blank($parent->docker_compose_raw)) {
+                return null;
+            }
+
+            $services = data_get(parseDockerComposeYaml($parent->docker_compose_raw), 'services', []);
+            if ($this->isServiceResource()) {
+                $services = array_intersect_key($services, [$resource->name => true]);
+            }
+
+            foreach ($services as $service) {
+                foreach (data_get($service, 'volumes', []) as $volume) {
+                    if (! is_string($volume) || composeShortVolumeSavedName($volume, $parent->uuid) !== $this->name) {
+                        continue;
+                    }
+                    $hostPath = composeShortVolumeVariableHostPath($volume, composeVolumeSourceVariables($parent));
+                    if ($hostPath !== null) {
+                        return $hostPath;
+                    }
+                }
+            }
+
+            return null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**

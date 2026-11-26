@@ -125,6 +125,9 @@ it('parses the compose exactly as recorded', function (string $composePath, ?str
             }
             $application->save();
         }
+        foreach ($options['databases'] ?? [] as $name => $settings) {
+            $service->databases()->where('name', $name)->firstOrFail()->update($settings);
+        }
     });
 
     if ($deployed) {
@@ -260,7 +263,7 @@ it('parses the application compose exactly as recorded', function (array $option
     'application with exact traefik labels' => [['proxy' => 'TRAEFIK', 'server' => ['generate_exact_labels' => true]], 'application-with-exact-traefik-labels'],
     'application with exact caddy labels' => [['proxy' => 'CADDY', 'server' => ['generate_exact_labels' => true]], 'application-with-exact-caddy-labels'],
     'application with settings' => [[
-        'server' => ['is_logdrain_custom_enabled' => true],
+        'server' => ['logdrain_type' => 'custom'],
         'settings' => ['is_gzip_enabled' => false, 'is_stripprefix_enabled' => false, 'is_container_label_escape_enabled' => false, 'is_log_drain_enabled' => true, 'connect_to_docker_network' => true],
     ], 'application-with-settings'],
 ]);
@@ -327,11 +330,14 @@ function serviceParserReferenceCases(): array
         'reference with exact traefik labels' => [$reference, null, ['proxy' => 'TRAEFIK', 'server' => ['generate_exact_labels' => true]]],
         'reference with exact caddy labels' => [$reference, null, ['proxy' => 'CADDY', 'server' => ['generate_exact_labels' => true, 'is_traffic_analytics_enabled' => true]]],
         'reference with application settings' => [$reference, null, [
-            'server' => ['is_logdrain_custom_enabled' => true],
+            'server' => ['logdrain_type' => 'custom'],
             'applications' => [
                 'web' => ['is_gzip_enabled' => false, 'is_force_https_enabled' => false, 'redirect' => 'www', 'noindex' => true, 'is_log_drain_enabled' => true],
                 'api' => ['is_stripprefix_enabled' => false],
                 'www' => ['redirect' => 'non-www'],
+            ],
+            'databases' => [
+                'db' => ['is_log_drain_enabled' => true],
             ],
         ]],
         'reference with migrated services' => [$reference, null, ['migrated' => ['db' => 'application', 'sidecar' => 'database']]],

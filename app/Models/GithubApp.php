@@ -27,6 +27,7 @@ class GithubApp extends BaseModel
         'custom_port',
         'app_id',
         'installation_id',
+        'installation_account',
         'client_id',
         'client_secret',
         'webhook_secret',
@@ -35,6 +36,7 @@ class GithubApp extends BaseModel
         'contents',
         'metadata',
         'pull_requests',
+        'deployments',
         'administration',
         'organization_self_hosted_runners',
         'actions',
@@ -66,7 +68,7 @@ class GithubApp extends BaseModel
      */
     private ?array $installationTokenInMemory = null;
 
-    public function installationToken(): string
+    public function installationToken(?int $timeout = null): string
     {
         $credentials = implode('|', [$this->api_url, $this->app_id, $this->installation_id, $this->private_key_id]);
         $cached = $this->installationTokenInMemory;
@@ -75,7 +77,7 @@ class GithubApp extends BaseModel
             return $cached['token'];
         }
 
-        $token = generateGithubToken($this, 'installation');
+        $token = generateGithubToken($this, 'installation', $timeout);
 
         // GitHub installation tokens expire after one hour; renew them well before that.
         $this->installationTokenInMemory = [
@@ -150,6 +152,24 @@ class GithubApp extends BaseModel
     }
 
     /**
+     * Whether Coolify can create GitHub Deployments and their statuses with this App.
+     */
+    public function canSyncDeployments(): bool
+    {
+        return ! $this->is_public && $this->missingDeploymentRequirements() === [];
+    }
+
+    /**
+     * Permissions that GitHub deployments need but the App does not have.
+     *
+     * @return array<int, string>
+     */
+    public function missingDeploymentRequirements(): array
+    {
+        return $this->deployments === 'write' ? [] : ['Repository permission "Deployments": write'];
+    }
+
+    /**
      * Permissions and webhook events that GitHub Actions runners need but the App does not have.
      *
      * @return array<int, string>
@@ -195,6 +215,15 @@ class GithubApp extends BaseModel
         }
 
         return filled($this->app_id) && filled($this->installation_id);
+    }
+
+    /**
+     * The account that installed this App, or the organization that owns it when the installation account is not known yet.
+     * One App can be installed on several accounts, and each installation is its own source.
+     */
+    public function accountName(): ?string
+    {
+        return $this->installation_account ?: normalizeGithubOrganization($this->organization);
     }
 
     /**

@@ -1,0 +1,167 @@
+# documentation: https://classroomio.com/docs/self-hosted/coolify
+# slogan: Open-source LMS to build and teach courses with lessons, quizzes, certificates, student management, and an AI tutor.
+# category: lms
+# tags: lms, education, courses, teaching, e-learning
+# logo: svgs/classroomio.svg
+# port: 3082
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-classroomio}
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $SERVICE_USER_POSTGRES -d ${POSTGRES_DB:-classroomio}"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Bundled SeaweedFS; credentials are Coolify-generated (SERVICE_USER_STORAGE / SERVICE_PASSWORD_STORAGE).
+  storage:
+    image: chrislusf/seaweedfs:4.48
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        mkdir -p /etc/seaweedfs
+        cat > /etc/seaweedfs/s3.json <<EOF
+        {"identities":[{"name":"admin","credentials":[{"accessKey":"$SERVICE_USER_STORAGE","secretKey":"$SERVICE_PASSWORD_STORAGE"}],"actions":["Admin","Read","Write","List","Tagging"]},{"name":"anonymous","actions":["Read:media"]}]}
+        EOF
+        exec /entrypoint.sh server -s3 -s3.port=9000 -s3.config=/etc/seaweedfs/s3.json -s3.allowedOrigins=*
+    environment:
+      - SERVICE_FQDN_STORAGE_9000
+    volumes:
+      - storage-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9000/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  storage-init:
+    image: chrislusf/seaweedfs:4.48
+    depends_on:
+      storage:
+        condition: service_healthy
+    exclude_from_hc: true
+    # One-off job: without this Coolify's default restart policy re-runs it forever.
+    restart: "no"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo "s3.bucket.create -name videos" | weed shell -master=storage:9333
+        echo "s3.bucket.create -name documents" | weed shell -master=storage:9333
+        echo "s3.bucket.create -name media" | weed shell -master=storage:9333
+        # weed shell exits 0 even when a create fails, so confirm each bucket exists.
+        echo s3.bucket.list | weed shell -master=storage:9333 > /tmp/buckets 2>&1
+        grep -q "^[[:space:]]*videos[[:space:]]" /tmp/buckets &&
+          grep -q "^[[:space:]]*documents[[:space:]]" /tmp/buckets &&
+          grep -q "^[[:space:]]*media[[:space:]]" /tmp/buckets
+
+  api:
+    image: classroomio/api:${CIO_VERSION:-1.0.0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - PORT=3081
+      - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-classroomio}
+      - REDIS_URL=redis://redis:6379
+      - PUBLIC_IS_SELFHOSTED=true
+      - BETTER_AUTH_SECRET=$SERVICE_HEX_64_BETTERAUTH
+      - PRIVATE_SERVER_KEY=$SERVICE_HEX_64_PRIVATESERVER
+      - WEBHOOK_ALLOW_PRIVATE_NETWORKS=${WEBHOOK_ALLOW_PRIVATE_NETWORKS:-false}
+      - DASHBOARD_ORIGIN=$SERVICE_URL_DASHBOARD
+      - PUBLIC_SERVER_URL=$SERVICE_URL_DASHBOARD
+      - OBJECT_STORAGE_ENDPOINT=http://storage:9000
+      - OBJECT_STORAGE_PUBLIC_ENDPOINT=$SERVICE_URL_STORAGE
+      - OBJECT_STORAGE_ACCESS_KEY_ID=$SERVICE_USER_STORAGE
+      - OBJECT_STORAGE_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_STORAGE
+      - OBJECT_STORAGE_FORCE_PATH_STYLE=true
+      - OBJECT_STORAGE_MEDIA_PUBLIC_BASE_URL=$SERVICE_URL_STORAGE/media
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_SENDER=${SMTP_SENDER}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3081/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  dashboard:
+    image: classroomio/dashboard:${CIO_VERSION:-1.0.0}
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      - SERVICE_FQDN_DASHBOARD_3082
+      - NODE_ENV=production
+      - PORT=3082
+      - ORIGIN=$SERVICE_URL_DASHBOARD
+      - PUBLIC_IS_SELFHOSTED=true
+      - PRIVATE_SERVER_URL=http://api:3081
+      - PRIVATE_SERVER_KEY=$SERVICE_HEX_64_PRIVATESERVER
+      - CSP_MEDIA_SRC_DOMAINS=$SERVICE_URL_STORAGE
+      - CSP_CONNECT_SRC_DOMAINS=$SERVICE_URL_STORAGE
+
+  jobs:
+    image: classroomio/jobs:${CIO_VERSION:-1.0.0}
+    # The api runs the database migrations at start, so jobs waits for it.
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - PRIVATE_SERVER_KEY=$SERVICE_HEX_64_PRIVATESERVER
+      - PUBLIC_IS_SELFHOSTED=true
+      - WEBHOOK_ALLOW_PRIVATE_NETWORKS=${WEBHOOK_ALLOW_PRIVATE_NETWORKS:-false}
+      - DATABASE_URL=postgresql://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-classroomio}
+      - OBJECT_STORAGE_ENDPOINT=http://storage:9000
+      - OBJECT_STORAGE_PUBLIC_ENDPOINT=$SERVICE_URL_STORAGE
+      - OBJECT_STORAGE_ACCESS_KEY_ID=$SERVICE_USER_STORAGE
+      - OBJECT_STORAGE_SECRET_ACCESS_KEY=$SERVICE_PASSWORD_STORAGE
+      - OBJECT_STORAGE_FORCE_PATH_STYLE=true
+      - OBJECT_STORAGE_MEDIA_PUBLIC_BASE_URL=$SERVICE_URL_STORAGE/media
+      - OBJECT_STORAGE_BUCKET_VIDEOS=videos
+      - OBJECT_STORAGE_BUCKET_DOCUMENTS=documents
+      - OBJECT_STORAGE_BUCKET_MEDIA=media
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_SENDER=${SMTP_SENDER}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Anonymous weekly usage ping (instance ID, version, counts). CIO_TELEMETRY_DISABLED=true turns it off.
+      - CIO_DEPLOYMENT_METHOD=coolify
+      - CIO_TELEMETRY_DISABLED=${CIO_TELEMETRY_DISABLED:-}
+      - LICENSE_KEY=${LICENSE_KEY:-}
+
+volumes:
+  postgres-data:
+  redis-data:
+  storage-data:

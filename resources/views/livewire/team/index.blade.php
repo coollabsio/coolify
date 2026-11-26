@@ -9,11 +9,6 @@
             <x-unsaved-bar action="submit" />
             <x-application.settings-section title="General"
                 description="Manage this team's identity and shared API access.">
-                <x-slot:actions>
-                    <x-modal-input buttonTitle="New team" title="New Team">
-                        <livewire:team.create />
-                    </x-modal-input>
-                </x-slot:actions>
                 <div class="grid gap-4 lg:grid-cols-2">
                     <div class="lg:col-span-2" x-data="{
                         processing: false,
@@ -81,6 +76,14 @@
                     <div class="lg:col-span-2">
                         <x-forms.listbox canGate="update" :canResource="$team" id="is_mcp_server_enabled" label="MCP server"
                             helper="Controls whether this team's API tokens can use the instance MCP endpoint."
+                            :disabled="! auth()->user()->can('update', $team)" :options="[
+                                ['value' => false, 'label' => 'Disabled for this team'],
+                                ['value' => true, 'label' => 'Enabled for this team'],
+                            ]" />
+                    </div>
+                    <div class="lg:col-span-2">
+                        <x-forms.listbox canGate="update" :canResource="$team" id="is_terminal_api_enabled" label="Terminal API"
+                            helper="Controls whether this team's terminal API tokens can run commands on servers and application containers. The Terminal API setting in Settings > Advanced must also be enabled on the instance."
                             :disabled="! auth()->user()->can('update', $team)" :options="[
                                 ['value' => false, 'label' => 'Disabled for this team'],
                                 ['value' => true, 'label' => 'Enabled for this team'],

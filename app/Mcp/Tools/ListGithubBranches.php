@@ -99,6 +99,11 @@ class ListGithubBranches extends Tool
                     ->get("/repos/{$owner}/{$repo}/branches", ['per_page' => 100, 'page' => $page]);
 
                 if ($response->failed()) {
+                    $rateLimitMessage = githubRateLimitMessage($response);
+                    if ($rateLimitMessage !== null) {
+                        return $this->mcpError($request, $rateLimitMessage, ['resource_uuid' => $appUuid]);
+                    }
+
                     $status = $response->status();
                     $hint = match (true) {
                         $status === 401, $status === 403 => 'GitHub app credentials/installation invalid or missing permissions.',

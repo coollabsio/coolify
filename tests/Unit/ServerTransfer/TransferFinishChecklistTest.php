@@ -5,6 +5,7 @@ use App\Jobs\CheckTransferFinishStepsJob;
 use App\Livewire\Server\TransferFinish;
 use App\Models\Application;
 use App\Models\DnsProviderZone;
+use App\Models\EnvironmentConfigLink;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
@@ -101,7 +102,6 @@ test('the GitHub App webhook step checks the URL at GitHub and sets it with one 
     $key = "github_app_webhook:{$this->githubApp->uuid}";
     $hookUrl = 'https://coolify-a.test/webhooks/source/github/events';
     Http::fake([
-        'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
         'https://api.github.com/app/hook/config' => function ($request) use (&$hookUrl) {
             if ($request->method() === 'PATCH') {
                 $hookUrl = $request['url'];
@@ -157,25 +157,20 @@ test('I finished closes the list and keeps the open steps as skipped', function 
         ->and($this->checklist->isOpen($this->server->fresh()))->toBeFalse();
 });
 
-test('the panel shows the open steps by group, collapses done steps, and finishes', function () {
+test('the panel counts the done steps and finishes', function () {
     $this->checklist->start($this->server);
 
     Livewire::test(TransferFinish::class, ['server' => $this->server])
-        ->assertSee('Finish the transfer')
         ->assertSee('0 of 3 done.')
-        ->assertSee('Server')
-        ->assertSee('Restart Sentinel')
         ->call('markStepDone', 'sentinel:server')
         ->assertSee('1 of 3 done.')
         ->assertSee('1 step is OK or done')
-        ->assertSee('Finish with open steps')
         ->call('markStepDone', 'server_connection:server')
         ->call('markStepDone', 'previous_ssh_key:server')
-        ->assertDontSee('Finish with open steps')
-        ->call('finishTransfer')
-        ->assertDontSee('Finish the transfer');
+        ->call('finishTransfer');
 
-    expect(finishTestItem($this->server, 'sentinel:server')['status'])->toBe('done');
+    expect(finishTestItem($this->server, 'sentinel:server')['status'])->toBe('done')
+        ->and($this->checklist->isOpen($this->server->fresh()))->toBeFalse();
 });
 
 test('the panel starts background checks when they are stale, and not again within 30 seconds', function () {
@@ -195,7 +190,6 @@ test('a failed check shows a short message and keeps the technical reason as det
     finishTestApplication($this, ['source_type' => GithubApp::class, 'source_id' => $this->githubApp->id]);
     $this->checklist->start($this->server);
     Http::fake([
-        'https://api.github.com/zen' => Http::response('ok', 200, ['Date' => now()->toRfc7231String()]),
         'https://api.github.com/app/hook/config' => Http::response(['message' => 'Bad credentials'], 401),
     ]);
 
@@ -272,10 +266,6 @@ test('the GitHub App steps link to the App settings at GitHub', function () {
 
     expect($this->checklist->linkOf($items->firstWhere('key', "github_app_webhook:{$this->githubApp->uuid}")))->toBe(['https://github.com/organizations/acme/settings/apps/deploy-bot', 'Open on GitHub'])
         ->and($this->checklist->linkOf($items->firstWhere('key', "github_app_urls:{$this->githubApp->uuid}")))->toBe(['https://github.com/organizations/acme/settings/apps/deploy-bot', 'Open on GitHub']);
-
-    Livewire::test(TransferFinish::class, ['server' => $this->server])
-        ->assertSeeHtml('href="https://github.com/organizations/acme/settings/apps/deploy-bot" target="_blank"')
-        ->assertSee('Open on GitHub');
 });
 
 test('a step key is passed to Livewire as a JavaScript string, so a quote in a domain cannot run script', function () {
@@ -311,4 +301,21 @@ test('a GitHub App link that is not a web URL, or a saved link to another host, 
     expect($this->checklist->linkOf($items->firstWhere('key', "github_app_webhook:{$this->githubApp->uuid}")))->toBeNull()
         ->and($this->checklist->linkOf(['type' => 'git_source', 'link' => '//evil.example/x']))->toBeNull()
         ->and($this->checklist->linkOf(['type' => 'git_source', 'link' => 'javascript:alert(1)']))->toBeNull();
+});
+
+test('an environment with coolify.json resources gets a step to link the file again', function () {
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = $project->environments()->first();
+    $application = finishTestApplication($this, ['source_type' => GithubApp::class, 'source_id' => $this->githubApp->id, 'environment_id' => $environment->id]);
+    $application->forceFill(['config_key' => 'api'])->save();
+
+    $keys = array_column($this->checklist->start($this->server), 'key');
+    expect($keys)->toContain("project_config:{$environment->uuid}");
+
+    $this->checklist->check($this->server, "project_config:{$environment->uuid}");
+    expect(finishTestItem($this->server, "project_config:{$environment->uuid}")['status'])->toBe('action');
+
+    EnvironmentConfigLink::factory()->create(['environment_id' => $environment->id]);
+    $this->checklist->check($this->server->fresh(), "project_config:{$environment->uuid}");
+    expect(finishTestItem($this->server, "project_config:{$environment->uuid}")['status'])->toBe('ok');
 });

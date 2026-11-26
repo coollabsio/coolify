@@ -12,18 +12,14 @@ test('parseDockerVolumeString correctly handles Windows paths with drive letters
 test('validateVolumeStringForInjection correctly handles Windows paths via parseDockerVolumeString', function () {
     $windowsVolume = 'C:\\Users\\Data:/app/data';
 
-    // Should not throw an exception
-    validateVolumeStringForInjection($windowsVolume);
-
-    // If we get here, the test passed
-    expect(true)->toBeTrue();
+    expect(fn () => validateVolumeStringForInjection($windowsVolume))->not->toThrow(Exception::class);
 });
 
 test('validateVolumeStringForInjection rejects malicious Windows-like paths', function () {
     $maliciousVolume = 'C:\\host\\`whoami`:/container';
 
     expect(fn () => validateVolumeStringForInjection($maliciousVolume))
-        ->toThrow(\Exception::class);
+        ->toThrow(Exception::class);
 });
 
 test('validateDockerComposeForInjection handles Windows paths in compose files', function () {
@@ -35,10 +31,7 @@ services:
       - C:\Users\Data:/app/data
 YAML;
 
-    // Should not throw an exception
-    validateDockerComposeForInjection($dockerComposeYaml);
-
-    expect(true)->toBeTrue();
+    expect(fn () => validateDockerComposeForInjection($dockerComposeYaml))->not->toThrow(Exception::class);
 });
 
 test('validateDockerComposeForInjection rejects Windows paths with injection', function () {
@@ -51,7 +44,7 @@ services:
 YAML;
 
     expect(fn () => validateDockerComposeForInjection($dockerComposeYaml))
-        ->toThrow(\Exception::class);
+        ->toThrow(Exception::class);
 });
 
 test('Windows paths with complex paths and spaces are handled correctly', function () {

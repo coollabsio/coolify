@@ -69,6 +69,7 @@ class ListScheduledTasks extends Tool
                 'frequency' => $task->frequency,
                 'container' => $task->container,
                 'timeout' => $task->timeout,
+                'use_shell' => $task->use_shell,
                 'command_included' => $includeCommand,
             ];
             if ($includeCommand) {

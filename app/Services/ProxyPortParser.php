@@ -38,16 +38,36 @@ class ProxyPortParser
      */
     public static function fromConfiguration(string $configuration): array
     {
-        $ports = [];
+        return array_keys(self::hostAddressesByPort($configuration));
+    }
+
+    /**
+     * Returns the host addresses of each port that fromConfiguration() returns.
+     * The value is null when the port is published on all addresses (no host IP, `0.0.0.0`, or `::`).
+     *
+     * @return array<int, list<string>|null>
+     */
+    public static function hostAddressesByPort(string $configuration): array
+    {
+        $addresses = [];
 
         foreach (self::configuredPorts($configuration) as $configuredPort) {
-            $publishedPort = self::publishedPort($configuredPort);
-            if ($publishedPort !== null) {
-                $ports[] = $publishedPort;
+            $publishedPort = self::publishedPort($configuredPort, $hostIp);
+            if ($publishedPort === null) {
+                continue;
+            }
+
+            $hostIp = $hostIp === null ? null : inet_ntop(inet_pton($hostIp));
+            if ($hostIp === null || $hostIp === '0.0.0.0' || $hostIp === '::') {
+                $addresses[$publishedPort] = null;
+            } elseif (! array_key_exists($publishedPort, $addresses)) {
+                $addresses[$publishedPort] = [$hostIp];
+            } elseif ($addresses[$publishedPort] !== null && ! in_array($hostIp, $addresses[$publishedPort], true)) {
+                $addresses[$publishedPort][] = $hostIp;
             }
         }
 
-        return array_values(array_unique($ports));
+        return $addresses;
     }
 
     /**
@@ -106,10 +126,14 @@ class ProxyPortParser
         return $value;
     }
 
-    private static function publishedPort(mixed $configuredPort): ?int
+    /**
+     * Sets $hostIp to the host IP of the entry, or null when the entry has none.
+     */
+    private static function publishedPort(mixed $configuredPort, ?string &$hostIp = null): ?int
     {
+        $hostIp = null;
         if (is_string($configuredPort) && self::containsVariable($configuredPort)) {
-            return self::publishedPortWithVariables($configuredPort);
+            return self::publishedPortWithVariables($configuredPort, $hostIp);
         }
 
         if (is_array($configuredPort)) {
@@ -122,6 +146,7 @@ class ProxyPortParser
             self::validateProtocol($configuredPort['protocol'] ?? null);
             if (array_key_exists('host_ip', $configuredPort)) {
                 self::validateHostIp($configuredPort['host_ip']);
+                $hostIp = $configuredPort['host_ip'];
             }
             $target = self::portNumber($configuredPort['target']);
             $publishedPort = array_key_exists('published', $configuredPort)
@@ -153,6 +178,7 @@ class ProxyPortParser
                 self::invalid();
             }
             self::validateHostIp($matches[1]);
+            $hostIp = $matches[1];
 
             return self::hostPort($matches[2], $matches[3]);
         }
@@ -162,7 +188,8 @@ class ProxyPortParser
             self::invalid();
         }
         if (count($parts) === 3) {
-            self::validateHostIp(array_shift($parts));
+            $hostIp = array_shift($parts);
+            self::validateHostIp($hostIp);
         }
 
         return count($parts) === 1
@@ -190,7 +217,7 @@ class ProxyPortParser
         return self::containsVariable($resolved) ? null : $resolved;
     }
 
-    private static function publishedPortWithVariables(string $configuredPort): ?int
+    private static function publishedPortWithVariables(string $configuredPort, ?string &$hostIp): ?int
     {
         $resolved = self::resolveDefaults($configuredPort);
         if ($resolved === null) {
@@ -198,7 +225,7 @@ class ProxyPortParser
         }
 
         try {
-            return self::publishedPort($resolved);
+            return self::publishedPort($resolved, $hostIp);
         } catch (\InvalidArgumentException) {
             // The variable may be set to a valid value when Docker Compose starts the proxy.
             return null;

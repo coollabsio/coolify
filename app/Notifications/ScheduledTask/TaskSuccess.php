@@ -2,10 +2,10 @@
 
 namespace App\Notifications\ScheduledTask;
 
-use App\Models\Application;
 use App\Models\ScheduledTask;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -17,11 +17,7 @@ class TaskSuccess extends CustomEmailNotification
     public function __construct(public ScheduledTask $task, public string $output)
     {
         $this->onQueue('high');
-        $resource = $task->application ?? $task->service;
-        if ($resource) {
-            $type = $resource instanceof Application ? 'application' : 'service';
-            $this->url = base_url().'/project/'.data_get($resource, 'environment.project.uuid').'/environment/'.data_get($resource, 'environment.uuid')."/{$type}/{$resource->uuid}/tasks/{$task->uuid}";
-        }
+        $this->url = $task->url();
     }
 
     public function via(object $notifiable): array
@@ -84,6 +80,25 @@ class TaskSuccess extends CustomEmailNotification
         }
 
         return new PushoverMessage(
+            title: 'Scheduled task succeeded',
+            level: 'success',
+            message: $message,
+            buttons: $buttons,
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        $message = "Coolify: Scheduled task ({$this->task->name}) succeeded.";
+        $buttons = [];
+        if ($this->url) {
+            $buttons[] = [
+                'text' => 'Open task in Coolify',
+                'url' => (string) $this->url,
+            ];
+        }
+
+        return new NtfyMessage(
             title: 'Scheduled task succeeded',
             level: 'success',
             message: $message,

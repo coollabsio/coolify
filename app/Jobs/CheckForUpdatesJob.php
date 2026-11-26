@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\AutoUpdateNotifier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -31,6 +32,7 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
             if (isDev() || isCloud()) {
                 return false;
             }
+            AutoUpdateNotifier::checkResult();
             $versions = refresh_versions_file($this->cdnTries);
             if ($versions === null) {
                 return false;
@@ -38,8 +40,9 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
 
             CheckTraefikVersionJob::dispatch();
 
-            $latestVersion = data_get($versions, 'coolify.v4.version');
-            $newVersionAvailable = version_compare($latestVersion, config('constants.coolify.version'), '>');
+            $latestVersion = data_get($versions, 'coolify.version');
+            $newVersionAvailable = instanceSettings()->update_channel !== 'custom'
+                && version_compare($latestVersion, config('constants.coolify.version'), '>');
             instanceSettings()->update(['new_version_available' => $newVersionAvailable]);
 
             return true;

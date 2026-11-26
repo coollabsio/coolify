@@ -43,6 +43,18 @@ enum AccessLevel: string
         };
     }
 
+    public function description(): string
+    {
+        return match ($this) {
+            self::Read => 'See resources, logs, and settings. Secrets stay hidden.',
+            self::ReadSensitive => 'Also see environment variables and other secrets.',
+            self::Deploy => 'Deploy, start, stop, and restart.',
+            self::Write => 'Change settings and create resources.',
+            self::Delete => 'Delete resources.',
+            self::Root => 'Every level, with no limits.',
+        };
+    }
+
     /**
      * Parse stored level or token ability strings. Unknown values are ignored.
      *

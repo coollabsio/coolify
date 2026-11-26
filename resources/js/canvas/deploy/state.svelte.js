@@ -9,7 +9,7 @@ import {
   resourceHref, save, sleep, targetFrom, TYPES, uid, uniqueLabels, withDeploy, withoutSecrets, withTarget,
 } from '../../deploy-canvas.js';
 
-export const PORT_Y = 26; // header centre (3.25rem / 2)
+export const PORT_Y = 26; // header centre (.cv-node-head is 52px; px, so the UI scale does not move the ports)
 const CARD_W = 296;
 
 const emptyRun = () => ({ open: false, title: 'Deploy', sub: '', steps: [], panes: [], active: null, defaultHref: '', openHref: '', showOpen: false });

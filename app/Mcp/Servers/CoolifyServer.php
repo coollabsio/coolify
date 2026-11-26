@@ -27,6 +27,7 @@ use App\Mcp\Tools\GetEnvValues;
 use App\Mcp\Tools\GetInfrastructureOverview;
 use App\Mcp\Tools\GetLogs;
 use App\Mcp\Tools\GetProject;
+use App\Mcp\Tools\GetResourceMetrics;
 use App\Mcp\Tools\GetServer;
 use App\Mcp\Tools\GetServerDomains;
 use App\Mcp\Tools\GetServerMetrics;
@@ -34,6 +35,8 @@ use App\Mcp\Tools\GetServerResources;
 use App\Mcp\Tools\GetService;
 use App\Mcp\Tools\GetServiceApplication;
 use App\Mcp\Tools\GetServiceDatabase;
+use App\Mcp\Tools\GetTrafficAnalytics;
+use App\Mcp\Tools\GetVulnerabilities;
 use App\Mcp\Tools\ListApplicationPreviews;
 use App\Mcp\Tools\ListApplications;
 use App\Mcp\Tools\ListAuditEvents;
@@ -64,10 +67,14 @@ use App\Mcp\Tools\ListTeamMembers;
 use App\Mcp\Tools\ListUnhealthyResources;
 use App\Mcp\Tools\ManageApplication;
 use App\Mcp\Tools\ManageBackup;
+use App\Mcp\Tools\ManageCloudflareTunnel;
 use App\Mcp\Tools\ManageDatabase;
 use App\Mcp\Tools\ManageDestination;
+use App\Mcp\Tools\ManageDns;
 use App\Mcp\Tools\ManageEnv;
 use App\Mcp\Tools\ManageGitSource;
+use App\Mcp\Tools\ManageImageScanning;
+use App\Mcp\Tools\ManageIntegrationTokens;
 use App\Mcp\Tools\ManageNotifications;
 use App\Mcp\Tools\ManagePreview;
 use App\Mcp\Tools\ManagePrivateKey;
@@ -76,6 +83,7 @@ use App\Mcp\Tools\ManageProxy;
 use App\Mcp\Tools\ManageRegistry;
 use App\Mcp\Tools\ManageS3Storage;
 use App\Mcp\Tools\ManageScheduledTask;
+use App\Mcp\Tools\ManageSecretManager;
 use App\Mcp\Tools\ManageServer;
 use App\Mcp\Tools\ManageService;
 use App\Mcp\Tools\ManageSharedEnv;
@@ -114,6 +122,8 @@ Then: list_*/get_* for details. Debug is DB-first:
 - list_deployments → get_deployment(include_log_summary=true)
 - list_env_keys / list_shared_env_keys (names only, never values)
 - get_logs only if status is running; on failure use reason + next_tools (do not loop)
+- get_server_metrics / get_resource_metrics — Sentinel CPU and memory history of a server, or of one application or database container; get_traffic_analytics — requests, visitors, latency, and top paths of one application or service
+- get_vulnerabilities — image vulnerability scan results (list for the team, resource for one app/service/database); manage_image_scanning turns scanning on or off
 
 Lifecycle (requires token ability **deploy**):
 - control (start|stop|restart; stop needs confirm=true)
@@ -124,7 +134,7 @@ Changes (requires token ability **write**, or **delete** for delete actions): ma
 Prompts: troubleshoot_application, explain_failed_deploy.
 Resources: coolify://overview, coolify://application/{uuid}.
 
-Responses: `{ data, _actions?, _pagination? }`. Private keys, S3 secrets, tokens, passwords, and webhook URLs are never returned. Env values only with get_env_values (read:sensitive). Full deploy logs are never returned; optional log summaries are best-effort redacted only.
+Responses: `{ data, _actions?, _pagination? }`. Private keys, storage secrets, tokens, passwords, and webhook URLs are never returned. Env values only with get_env_values (read:sensitive). Full deploy logs are never returned; optional log summaries are best-effort redacted only.
 MD;
 
     /**
@@ -198,18 +208,26 @@ MD;
         ManageBackup::class,
         ManageStorage::class,
         ManageTags::class,
+        ManageDns::class,
+        ManageSecretManager::class,
         ManageServer::class,
         ManageProxy::class,
+        ManageCloudflareTunnel::class,
         DockerCleanup::class,
         ManageDestination::class,
         ManageRegistry::class,
         ManagePrivateKey::class,
         ManageS3Storage::class,
         ManageGitSource::class,
+        ManageIntegrationTokens::class,
         CloudProvider::class,
         ManageNotifications::class,
         ListAuditEvents::class,
         GetServerMetrics::class,
+        GetResourceMetrics::class,
+        GetTrafficAnalytics::class,
+        GetVulnerabilities::class,
+        ManageImageScanning::class,
     ];
 
     /**
@@ -236,14 +254,38 @@ MD;
         ManageTags::class,
         ManageServer::class,
         ManageProxy::class,
+        ManageImageScanning::class,
+        ManageCloudflareTunnel::class,
         DockerCleanup::class,
         ManageDestination::class,
         ManageRegistry::class,
         ManagePrivateKey::class,
         ManageS3Storage::class,
         ManageGitSource::class,
+        ManageIntegrationTokens::class,
         CloudProvider::class,
         ManageNotifications::class,
+    ];
+
+    /**
+     * Team-level tools that a token with server grants gets for its servers (same rule as
+     * ApiAbility::SERVER_SCOPE_SECTIONS for REST). The REST routes behind them check each server.
+     *
+     * @var array<int, class-string<Tool>>
+     */
+    public const SERVER_SCOPE_TOOLS = [
+        ListServers::class,
+        GetServer::class,
+        GetServerDomains::class,
+        GetServerResources::class,
+        GetServerMetrics::class,
+        ListDestinations::class,
+        ManageServer::class,
+        ManageProxy::class,
+        ManageImageScanning::class,
+        ManageCloudflareTunnel::class,
+        DockerCleanup::class,
+        ManageDestination::class,
     ];
 
     protected array $tools = self::TOOLS;
@@ -256,11 +298,20 @@ MD;
         $user = request()->user();
         $teamId = $user?->currentAccessToken()?->team_id;
 
-        if ($user !== null && $teamId !== null && app(AccessResolver::class)->coversWholeTeam($user, (int) $teamId)) {
+        if ($user === null || $teamId === null) {
+            return array_values(array_diff(self::TOOLS, self::TEAM_LEVEL_TOOLS));
+        }
+
+        $resolver = app(AccessResolver::class);
+        if ($resolver->coversWholeTeam($user, (int) $teamId)) {
             return self::TOOLS;
         }
 
-        return array_values(array_diff(self::TOOLS, self::TEAM_LEVEL_TOOLS));
+        $hiddenTools = ($resolver->scopedServerUuids($user, (int) $teamId) ?? []) === []
+            ? self::TEAM_LEVEL_TOOLS
+            : array_diff(self::TEAM_LEVEL_TOOLS, self::SERVER_SCOPE_TOOLS);
+
+        return array_values(array_diff(self::TOOLS, $hiddenTools));
     }
 
     public function createContext(): ServerContext

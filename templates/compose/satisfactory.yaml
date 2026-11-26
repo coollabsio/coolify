@@ -7,7 +7,7 @@
 
 services:
   satisfactory-server:
-    image: wolveix/satisfactory-server:v1.9.10
+    image: wolveix/satisfactory-server:v1.9.11
     ports:
       - ${SERVER_GAME_PORT}:7777/tcp
       - ${SERVER_GAME_PORT}:7777/udp

@@ -305,6 +305,45 @@ describe('Manual Webhook Failed Authentication Rate Limiting', function () {
         expect(RateLimiter::attempts(manualWebhookFailureKey('github')))->toBe(0);
     });
 
+    test('one webhook per application deploys each application of a shared repository', function (string $provider) {
+        Queue::fake();
+        $backend = makeWebhookApplicationServerFunctional(createApplicationWithWebhook(overrides: ['name' => 'backend']));
+        $frontend = makeWebhookApplicationServerFunctional(createApplicationWithWebhook(overrides: ['name' => 'frontend']));
+
+        $response = sendManualWebhookPush($this, $provider, $backend);
+
+        $response->assertOk();
+        expect($response->json())->toHaveCount(1)
+            ->and($response->json('0.message'))->toBe('Deployment queued.');
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $backend->id)->count())->toBe(1)
+            ->and(ApplicationDeploymentQueue::query()->where('application_id', $frontend->id)->count())->toBe(0);
+
+        $response = sendManualWebhookPush($this, $provider, $frontend);
+
+        $response->assertOk();
+        expect($response->json())->toHaveCount(1)
+            ->and($response->json('0.message'))->toBe('Deployment queued.');
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $frontend->id)->count())->toBe(1)
+            ->and(RateLimiter::attempts(manualWebhookFailureKey($provider)))->toBe(0);
+    })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
+
+    test('one webhook deploys every application of a shared repository with the same secret', function (string $provider) {
+        Queue::fake();
+        $backend = makeWebhookApplicationServerFunctional(createApplicationWithWebhook(overrides: ['name' => 'backend']));
+        $frontend = makeWebhookApplicationServerFunctional(createApplicationWithWebhook(overrides: [
+            'name' => 'frontend',
+            "manual_webhook_secret_{$provider}" => $backend->{"manual_webhook_secret_{$provider}"},
+        ]));
+
+        $response = sendManualWebhookPush($this, $provider, $backend);
+
+        $response->assertOk();
+        expect($response->json())->toHaveCount(2)
+            ->and(collect($response->json())->pluck('message')->unique()->all())->toBe(['Deployment queued.']);
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $backend->id)->exists())->toBeTrue()
+            ->and(ApplicationDeploymentQueue::query()->where('application_id', $frontend->id)->exists())->toBeTrue();
+    })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
+
     test('gitlab deliveries without a token are rejected and do not count as failed authentication', function () {
         createApplicationWithWebhook();
 
@@ -660,6 +699,62 @@ describe('Bitbucket Manual Webhook HMAC', function () {
         $content = $response->getContent();
         expect($content)->not->toContain('No matching application or invalid signature.');
         expect($content)->not->toContain('Webhook secret not configured');
+    });
+
+    test('matches a bitbucket data center push by project key and slug', function (string $gitRepository) {
+        $app = createApplicationWithWebhook(branch: 'master', overrides: ['git_repository' => $gitRepository]);
+
+        // Shape of the documented repo:refs_changed payload: the repository has no links.
+        $payload = json_encode([
+            'eventKey' => 'repo:refs_changed',
+            'repository' => ['slug' => 'repo', 'project' => ['key' => '~USER']],
+            'changes' => [[
+                'ref' => ['id' => 'refs/heads/master', 'displayId' => 'master', 'type' => 'BRANCH'],
+                'refId' => 'refs/heads/master',
+                'fromHash' => 'ecddabb624f6f5ba43816f5926e580a5f680a932',
+                'toHash' => '2502c69be7e8570a0fb7a7e2ef1df150433c9549',
+                'type' => 'UPDATE',
+            ]],
+            'commits' => [['message' => 'Fix the build']],
+        ]);
+        $hmac = hash_hmac('sha256', $payload, $app->manual_webhook_secret_bitbucket);
+
+        $response = $this->call('POST', '/webhooks/source/bitbucket/events/manual', [], [], [], [
+            'HTTP_X-Event-Key' => 'repo:refs_changed',
+            'HTTP_X-Hub-Signature' => "sha256={$hmac}",
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertOk();
+        expect($response->getContent())->toContain('Server is not functional');
+    })->with([
+        'ssh' => 'ssh://git@bitbucket.example.com:7999/~user/repo.git',
+        'https' => 'https://bitbucket.example.com/scm/~user/repo.git',
+        'https with context path' => 'https://example.com/bitbucket/scm/~user/repo.git',
+    ]);
+
+    test('returns 429 when the deployment queue is full', function () {
+        $app = createApplicationWithWebhook();
+        $server = $app->destination->server;
+        $server->update(['ip' => '10.0.0.10']);
+        $server->settings->update(['is_reachable' => true, 'is_usable' => true, 'force_disabled' => false, 'deployment_queue_limit' => 0]);
+        $app->settings->update(['is_auto_deploy_enabled' => true]);
+
+        $payload = json_encode([
+            'repository' => ['full_name' => 'test-org/test-repo'],
+            'push' => ['changes' => [['new' => ['name' => 'main', 'target' => ['hash' => str_repeat('a', 40)]]]]],
+        ]);
+        $hmac = hash_hmac('sha256', $payload, $app->manual_webhook_secret_bitbucket);
+
+        $response = $this->call('POST', '/webhooks/source/bitbucket/events/manual', [], [], [], [
+            'HTTP_X-Event-Key' => 'repo:push',
+            'HTTP_X-Hub-Signature' => "sha256={$hmac}",
+            'CONTENT_TYPE' => 'application/json',
+        ], $payload);
+
+        $response->assertStatus(429)
+            ->assertHeader('Retry-After', 60)
+            ->assertSee('Deployment queue is full.');
     });
 });
 

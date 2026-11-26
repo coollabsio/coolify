@@ -108,7 +108,10 @@ class StartKeydb
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
                     'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD', 'keydb-cli', '--pass', $this->resolvedRedisPassword, 'ping',
+                        'CMD', 'keydb-cli',
+                        ...(str_contains((string) $this->database->keydb_conf, 'requirepass') ? [] : ['--pass', $this->resolvedRedisPassword]),
+                        ...$this->database->healthCheckPortArguments($this->database->keydb_conf),
+                        'ping',
                     ]),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
@@ -201,14 +204,14 @@ class StartKeydb
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
-        $this->commands[] = serverDockerConfigPrefix($this->database->destination->server)."docker compose -f $this->configuration_dir/docker-compose.yml pull";
+        array_push($this->commands, ...$this->pullImageCommands("{$this->configuration_dir}/docker-compose.yml"));
         if ($this->database->enable_ssl) {
             $this->commands[] = "chown -R 999:999 $this->configuration_dir/ssl/server.key $this->configuration_dir/ssl/server.crt";
         }
         if (! is_null($this->database->keydb_conf) && ! empty($this->database->keydb_conf)) {
             $this->commands[] = "chown 999:999 $this->configuration_dir/keydb.conf";
         }
-        $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
+        $this->commands[] = dockerStopCommand(30, $container_name, $this->database->destination->server).' 2>/dev/null || true';
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
@@ -239,10 +242,7 @@ class StartKeydb
                 continue;
             }
             $name = $persistentStorage->name;
-            $local_persistent_volumes_names[$name] = [
-                'name' => $name,
-                'external' => false,
-            ];
+            $local_persistent_volumes_names[$name] = $persistentStorage->dockerComposeVolumeDefinition();
         }
 
         return $local_persistent_volumes_names;

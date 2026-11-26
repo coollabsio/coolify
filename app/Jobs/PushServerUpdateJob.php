@@ -21,6 +21,7 @@ use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -132,6 +133,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
 
     public function __construct(public Server $server, public $data)
     {
+        $this->onQueue(sentinel_queue());
         $this->containers = collect();
         $this->foundApplicationIds = collect();
         $this->foundDatabaseUuids = collect();
@@ -247,6 +249,11 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         $this->allTcpProxyUuids = $this->databases->where('is_public', true)->pluck('uuid');
         $this->allServiceApplicationIds = $this->serviceApplicationsById->keys();
         $this->allServiceDatabaseIds = $this->serviceDatabasesById->keys();
+        $upResourceIds = NotifyResourceStoppedJob::upResourceIds($this->applications->whereIn('id', $this->allApplicationIds)
+            ->concat($this->previews)
+            ->concat($this->databases)
+            ->concat($this->serviceApplicationsById)
+            ->concat($this->serviceDatabasesById));
 
         // Owners of application containers outside this server's applications, in one query.
         $foreignApplicationIdsByUuid = containerApplicationIdsByUuid(
@@ -405,6 +412,8 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
         // Aggregate multi-container service statuses
         $this->aggregateServiceContainerStatuses();
 
+        NotifyResourceStoppedJob::dispatchForStopped($upResourceIds);
+
         $this->checkLogDrainContainer();
 
         ServiceChecked::dispatch($this->server->team_id);
@@ -548,6 +557,7 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
             StandaloneKeydb::class,
             StandaloneDragonfly::class,
             StandaloneClickhouse::class,
+            StandaloneInfluxdb::class,
             StandaloneSqlite::class,
         ])->flatMap(function (string $databaseClass) use ($databaseColumns, $standaloneDockerIds, $swarmDockerIds) {
             return $databaseClass::query()
@@ -833,9 +843,14 @@ class PushServerUpdateJob implements ShouldBeEncrypted, ShouldQueue, Silenced
                     }
                 } catch (\Throwable $e) {
                 }
-            } elseif ($this->server->proxy->get('status') !== 'running') {
-                $this->server->proxy->set('status', 'running');
-                $this->server->save();
+            } else {
+                if ($this->server->proxy->get('status') !== 'running') {
+                    $this->server->proxy->set('status', 'running');
+                    $this->server->save();
+                }
+                if (($claimedHash = $this->server->claimOutdatedDefaultRedirectRefresh()) !== null) {
+                    RefreshDefaultRedirectJob::dispatch($this->server, $claimedHash);
+                }
             }
         }
     }

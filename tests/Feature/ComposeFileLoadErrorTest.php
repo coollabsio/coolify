@@ -86,3 +86,21 @@ it('tells the user that a symlinked Compose file is not loaded', function () {
         ->toThrow(RuntimeException::class, 'Docker Compose file at /docker-compose.yml (branch: main) is a symbolic link.');
     expect($this->application->fresh()->docker_compose_raw)->toBe("services:\n  web:\n    image: nginx\n");
 });
+
+it('tells the user that the Compose file is empty, not that it is missing', function () {
+    fakeComposeLoadServer(null, '');
+
+    expect(fn () => $this->application->loadComposeFile())
+        ->toThrow(function (RuntimeException $exception) {
+            expect($exception->getMessage())
+                ->toContain('Docker Compose file at /docker-compose.yml (branch: main) is empty.')
+                ->not->toContain('not found');
+        });
+});
+
+it('tells the user that the Compose file is missing', function () {
+    fakeComposeLoadServer('git ls-tree', 'No such file');
+
+    expect(fn () => $this->application->loadComposeFile())
+        ->toThrow(RuntimeException::class, 'Docker Compose file not found at: /docker-compose.yml (branch: main)');
+});

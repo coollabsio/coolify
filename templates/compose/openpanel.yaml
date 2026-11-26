@@ -4,6 +4,7 @@
 # tags: analytics, insights, privacy, mixpanel, plausible, google, alternative
 # logo: svgs/openpanel.svg
 # port: 3000
+# outdated: true
 
 services:
   openpanel-dashboard:

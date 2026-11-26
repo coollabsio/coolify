@@ -51,10 +51,12 @@ it('creates the root user during the setup window', function () {
     expect(User::find(0)?->email)->toBe('root@example.com');
 });
 
-it('shows how to open the setup window again when it is closed', function () {
+it('does not show the registration form when the setup window is closed', function () {
+    RootSetupWindow::openIfNoUserExists();
+    $this->travel(RootSetupWindow::MINUTES * 60 + 1)->seconds();
+
     $this->get('/register')
         ->assertOk()
-        ->assertSee('docker restart coolify')
         ->assertDontSee('Create account');
 });
 
@@ -64,4 +66,26 @@ it('does not open the setup window when a user exists', function () {
     RootSetupWindow::openIfNoUserExists();
 
     expect(RootSetupWindow::isOpen())->toBeFalse();
+});
+
+it('shows the installer hint instead of the form for a predefined root user', function () {
+    config()->set('constants.seeder.is_root_user_predefined', true);
+    RootSetupWindow::openIfNoUserExists();
+
+    registerRootAccount()->assertSessionHasErrors('email');
+
+    expect(User::count())->toBe(0);
+    $this->get('/register')
+        ->assertOk()
+        ->assertSee('Root user not created')
+        ->assertDontSee('Create account');
+});
+
+it('uses only the predefined root user when an older setup window is cached', function () {
+    RootSetupWindow::openIfNoUserExists();
+    config()->set('constants.seeder.is_root_user_predefined', true);
+
+    registerRootAccount()->assertSessionHasErrors('email');
+
+    expect(User::count())->toBe(0);
 });

@@ -7,6 +7,7 @@ use App\Contracts\ThrottledNotification;
 use App\Events\ServerReachabilityChanged;
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\Channels\SendsNtfy;
 use App\Notifications\Channels\SendsPushover;
 use App\Notifications\Channels\SendsSlack;
 use App\Notifications\Server\Unreachable;
@@ -36,6 +37,7 @@ use OpenApi\Attributes as OA;
         'show_boarding' => ['type' => 'boolean', 'description' => 'Whether to show the boarding screen or not.'],
         'custom_server_limit' => ['type' => 'string', 'description' => 'The custom server limit.'],
         'is_build_server_fallback_enabled' => ['type' => 'boolean', 'description' => 'Whether deployments can fall back to the deployment server when no usable dedicated build server is available.'],
+        'scan_images_on_new_servers' => ['type' => 'boolean', 'description' => 'Whether image scanning is turned on for servers added to the team from now on.'],
         'members' => new OA\Property(
             property: 'members',
             type: 'array',
@@ -45,7 +47,7 @@ use OpenApi\Attributes as OA;
     ]
 )]
 
-class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack
+class Team extends Model implements SendsDiscord, SendsEmail, SendsNtfy, SendsPushover, SendsSlack
 {
     use Auditable, HasFactory, HasNotificationSettings, HasSafeStringAttribute;
     use Notifiable {
@@ -61,12 +63,16 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'is_mcp_server_enabled',
         'is_build_server_fallback_enabled',
         'is_two_factor_required',
+        'scan_images_on_new_servers',
+        'is_terminal_api_enabled',
     ];
 
     protected $attributes = [
         'is_mcp_server_enabled' => true,
         'is_build_server_fallback_enabled' => true,
         'is_two_factor_required' => false,
+        'scan_images_on_new_servers' => false,
+        'is_terminal_api_enabled' => false,
     ];
 
     protected $casts = [
@@ -74,6 +80,8 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'is_mcp_server_enabled' => 'boolean',
         'is_build_server_fallback_enabled' => 'boolean',
         'is_two_factor_required' => 'boolean',
+        'scan_images_on_new_servers' => 'boolean',
+        'is_terminal_api_enabled' => 'boolean',
     ];
 
     protected static function booted()
@@ -110,6 +118,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         $this->telegramNotificationSettings()->create();
         $this->pushoverNotificationSettings()->create();
         $this->webhookNotificationSettings()->create();
+        $this->ntfyNotificationSettings()->create();
     }
 
     /**
@@ -152,6 +161,9 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         foreach (S3Storage::query()->where('team_id', $this->id)->get() as $s3) {
             $s3->delete();
         }
+
+        ImageScanPolicy::query()->where('scope_type', $this->getMorphClass())->where('scope_id', $this->id)->delete();
+        ImageScanIgnore::query()->where('team_id', $this->id)->delete();
     }
 
     public static function serverLimitReached(?Team $team = null)
@@ -258,6 +270,15 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         ];
     }
 
+    public function routeNotificationForNtfy()
+    {
+        return [
+            'url' => data_get($this, 'ntfy_url', null),
+            'topic' => data_get($this, 'ntfy_topic', null),
+            'token' => data_get($this, 'ntfy_token', null),
+        ];
+    }
+
     public function getRecipients(): array
     {
         $recipients = $this->members()->pluck('email')->toArray();
@@ -282,7 +303,8 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $this->getNotificationSettings('slack')?->isEnabled() ||
             $this->getNotificationSettings('telegram')?->isEnabled() ||
             $this->getNotificationSettings('pushover')?->isEnabled() ||
-            $this->getNotificationSettings('webhook')?->isEnabled();
+            $this->getNotificationSettings('webhook')?->isEnabled() ||
+            $this->getNotificationSettings('ntfy')?->isEnabled();
     }
 
     /**
@@ -315,9 +337,14 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     /**
      * Send a notification, unless it is throttled and was already sent within its interval.
      * A throttle claim is released when sending throws, so a failed send is retried on the next check.
+     * A notification without enabled channels is not sent and does not claim the throttle.
      */
     public function notify($instance): void
     {
+        if ($instance->via($this) === []) {
+            return;
+        }
+
         $subject = $instance instanceof ThrottledNotification ? $instance->throttleSubject() : null;
         if ($subject === null) {
             $this->sendNotification($instance);
@@ -490,5 +517,10 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function webhookNotificationSettings()
     {
         return $this->hasOne(WebhookNotificationSettings::class);
+    }
+
+    public function ntfyNotificationSettings()
+    {
+        return $this->hasOne(NtfyNotificationSettings::class);
     }
 }

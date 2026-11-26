@@ -6,12 +6,14 @@ use App\Jobs\GithubAppPermissionJob;
 use App\Models\GithubApp;
 use App\Models\PrivateKey;
 use App\Rules\SafeExternalUrl;
+use App\Support\DnsRecordHints;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Change extends Component
@@ -33,6 +35,8 @@ class Change extends Component
     public ?bool $default_permissions = true;
 
     public ?bool $preview_deployment_permissions = true;
+
+    public ?bool $deployment_status_permissions = true;
 
     public ?bool $administration = false;
 
@@ -79,6 +83,7 @@ class Change extends Component
 
     public $privateKeys;
 
+    #[Locked]
     public string $manifestState = '';
 
     public string $activeTab = 'general';
@@ -198,7 +203,7 @@ class Change extends Component
     public function checkPermissions()
     {
         try {
-            $this->authorize('view', $this->github_app);
+            $this->authorize('update', $this->github_app);
 
             // Validate required fields before attempting to fetch permissions
             $missingFields = [];
@@ -251,7 +256,7 @@ class Change extends Component
     public function testConnection()
     {
         try {
-            $this->authorize('view', $this->github_app);
+            $this->authorize('update', $this->github_app);
 
             if (! $this->github_app->isConnected()) {
                 $this->dispatch('error', 'GitHub App is not fully set up. Please complete installation first.');
@@ -272,6 +277,7 @@ class Change extends Component
             ])->timeout(10)->get("{$this->github_app->api_url}/app");
 
             if (! $appResponse->successful()) {
+                assertGithubClockInSync($appResponse);
                 $error = data_get($appResponse->json(), 'message', 'Unknown error');
                 $this->dispatch('error', "Connection failed: {$error}");
 
@@ -319,13 +325,18 @@ class Change extends Component
             // Override name with kebab case for display
             $this->name = str($this->github_app->name)->kebab();
             $this->fqdn = $settings->fqdn;
-            $this->manifestState = $this->createGithubAppSetupState('manifest');
-
-            if ($settings->public_ipv4) {
-                $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
+            if (auth()->user()->can('update', $this->github_app)) {
+                $this->manifestState = $this->createGithubAppSetupState('manifest');
             }
-            if ($settings->public_ipv6) {
-                $this->ipv6 = 'http://'.formatHostForUrl($settings->public_ipv6).':'.config('app.port');
+
+            // On cloud, the instance IPs are the addresses of the Coolify hosts. Do not send them to the browser.
+            if (! isCloud()) {
+                if ($settings->public_ipv4) {
+                    $this->ipv4 = 'http://'.$settings->public_ipv4.':'.config('app.port');
+                }
+                if ($settings->public_ipv6) {
+                    $this->ipv6 = 'http://'.formatHostForUrl($settings->public_ipv6).':'.config('app.port');
+                }
             }
             if ($this->github_app->installation_id && session('from')) {
                 $source_id = data_get(session('from'), 'source_id');
@@ -368,6 +379,23 @@ class Change extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+
+    /**
+     * Whether GitHub can reach one of the instance endpoints. APP_URL stays http://localhost on a default install.
+     */
+    public function hasPublicWebhookEndpoint(): bool
+    {
+        if (filled($this->fqdn) || filled($this->ipv4) || filled($this->ipv6)) {
+            return true;
+        }
+
+        $host = strtolower(trim((string) parse_url((string) config('app.url'), PHP_URL_HOST), '[]'));
+        if ($host === '' || $host === 'localhost' || str_ends_with($host, '.localhost')) {
+            return false;
+        }
+
+        return filter_var($host, FILTER_VALIDATE_IP) === false || DnsRecordHints::isPublicAddress($host);
     }
 
     public function getGithubAppNameUpdatePath()

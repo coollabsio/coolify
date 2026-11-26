@@ -116,17 +116,17 @@ test('the dashboard opens the canvas again when the user left it there', functio
         ->get(route('dashboard.canvas'))
         ->assertOk()
         ->assertSee('data-endpoint="/dashboard/canvas"', false)
-        ->assertCookie($cookie, 'canvas');
+        ->assertPlainCookie($cookie, 'canvas');
 
     dashboardCanvasSession($this, $this->admin, $this->team)
-        ->withCookie($cookie, 'canvas')
+        ->withUnencryptedCookie($cookie, 'canvas')
         ->get(route('dashboard'))
         ->assertRedirect(route('dashboard.canvas'));
 
     // The list link on the canvas opens the list and makes it the remembered view.
     dashboardCanvasSession($this, $this->admin, $this->team)
-        ->withCookie($cookie, 'canvas')
+        ->withUnencryptedCookie($cookie, 'canvas')
         ->get(route('dashboard', ['view' => 'list']))
         ->assertOk()
-        ->assertCookie($cookie, 'list');
+        ->assertPlainCookie($cookie, 'list');
 });

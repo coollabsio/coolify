@@ -135,11 +135,14 @@ abstract class RestActionTool extends Tool
             if (isset($body['errors']) && is_array($body['errors'])) {
                 $message .= ' '.json_encode($body['errors']);
             }
+            if (isset($body['conflict']) && is_array($body['conflict'])) {
+                $message .= ' '.json_encode(['conflict' => $body['conflict']]);
+            }
 
             return $this->mcpError($request, $message, $context);
         }
 
-        return $this->mcpSuccess($request, $this->respond(is_array($result['body']) ? $result['body'] : []), $context);
+        return $this->mcpSuccess($request, $this->respond(is_array($result['body']) ? $result['body'] : [], [], isset($result['total']) ? ['total' => $result['total']] : null), $context);
     }
 
     public function schema(JsonSchema $schema): array

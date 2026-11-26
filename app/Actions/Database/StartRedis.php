@@ -106,11 +106,7 @@ class StartRedis
                         $this->database->destination->network,
                     ],
                     'labels' => defaultDatabaseLabels($this->database)->toArray(),
-                    'healthcheck' => $this->database->healthCheckConfiguration([
-                        'CMD-SHELL',
-                        'redis-cli',
-                        'ping',
-                    ]),
+                    'healthcheck' => $this->database->healthCheckConfiguration($this->healthCheckCommand()),
                     'mem_limit' => $this->database->limits_memory,
                     'memswap_limit' => $this->database->limits_memory_swap,
                     'mem_swappiness' => $this->database->limits_memory_swappiness,
@@ -198,14 +194,14 @@ class StartRedis
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' | tee $this->configuration_dir/README.md > /dev/null";
         $this->commands[] = 'echo '.escapeshellarg("Pulling {$database->image} image.");
-        $this->commands[] = serverDockerConfigPrefix($this->database->destination->server)."docker compose -f $this->configuration_dir/docker-compose.yml pull";
+        array_push($this->commands, ...$this->pullImageCommands("{$this->configuration_dir}/docker-compose.yml"));
         if ($this->database->enable_ssl) {
             $this->commands[] = "chown -R 999:999 $this->configuration_dir/ssl/server.key $this->configuration_dir/ssl/server.crt";
         }
         if (! is_null($this->database->redis_conf) && ! empty($this->database->redis_conf)) {
             $this->commands[] = "chown 999:999 $this->configuration_dir/redis.conf";
         }
-        $this->commands[] = dockerStopCommand(10, $container_name, $this->database->destination->server).' 2>/dev/null || true';
+        $this->commands[] = dockerStopCommand(30, $container_name, $this->database->destination->server).' 2>/dev/null || true';
         $this->commands[] = "docker rm -f $container_name 2>/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo 'Database started.'";
@@ -236,10 +232,7 @@ class StartRedis
                 continue;
             }
             $name = $persistentStorage->name;
-            $local_persistent_volumes_names[$name] = [
-                'name' => $name,
-                'external' => false,
-            ];
+            $local_persistent_volumes_names[$name] = $persistentStorage->dockerComposeVolumeDefinition();
         }
 
         return $local_persistent_volumes_names;
@@ -338,6 +331,24 @@ class StartRedis
             && strpbrk($this->resolvedRedisPassword, "\\'\";&|<> \t\r\n") !== false;
 
         return $keepsUnquotedPassword ? $this->resolvedRedisPassword : escapeshellarg($this->resolvedRedisPassword);
+    }
+
+    /**
+     * The healthcheck pings with the server password and requires PONG, because redis-cli exits 0 on
+     * error replies (NOAUTH, LOADING). A custom redis.conf with its own requirepass has a password that
+     * Coolify does not know, so that check only requires that the server replies.
+     */
+    private function healthCheckCommand(): array
+    {
+        $port = $this->database->healthCheckPortArguments($this->database->redis_conf);
+
+        if (str_contains((string) $this->database->redis_conf, 'requirepass')) {
+            return ['CMD', 'redis-cli', ...$port, 'ping'];
+        }
+
+        $exitOnError = preg_match('~(^|/)redis:([0-5]|6\.[01])\b~', (string) $this->database->image) === 1 ? [] : ['-e'];
+
+        return ['CMD', 'redis-cli', ...$port, '-a', $this->resolvedRedisPassword, '--no-auth-warning', ...$exitOnError, 'ping'];
     }
 
     private function add_custom_redis()

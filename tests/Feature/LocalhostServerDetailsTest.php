@@ -213,7 +213,6 @@ it('shows validation-only menus as disabled until the server is validated', func
         'server.proxy',
         'server.resources',
         'server.registries',
-        'server.security.patches',
         'server.command',
     ])->map(fn (string $name): string => 'href="'.route($name, ['server_uuid' => $this->server->uuid]).'"');
 

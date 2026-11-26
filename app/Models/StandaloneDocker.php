@@ -51,9 +51,7 @@ class StandaloneDocker extends BaseModel
 
     public function networkCreateCommand(): string
     {
-        $safeNetwork = escapeshellarg($this->network);
-
-        return "docker network inspect {$safeNetwork} >/dev/null 2>&1 || docker network create --attachable {$safeNetwork} >/dev/null";
+        return dockerProxyNetworkEnsureCommand($this->network);
     }
 
     public function proxyConnectCommand(): string
@@ -117,6 +115,11 @@ class StandaloneDocker extends BaseModel
         return $this->morphMany(StandaloneClickhouse::class, 'destination');
     }
 
+    public function influxdbs()
+    {
+        return $this->morphMany(StandaloneInfluxdb::class, 'destination');
+    }
+
     public function sqlites()
     {
         return $this->morphMany(StandaloneSqlite::class, 'destination');
@@ -174,9 +177,10 @@ class StandaloneDocker extends BaseModel
         $keydbs = $this->keydbs;
         $dragonflies = $this->dragonflies;
         $clickhouses = $this->clickhouses;
+        $influxdbs = $this->influxdbs;
         $sqlites = $this->sqlites;
 
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses)->concat($sqlites);
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses)->concat($influxdbs)->concat($sqlites);
     }
 
     public function attachedTo()

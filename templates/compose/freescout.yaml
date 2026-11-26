@@ -7,7 +7,7 @@
 
 services:
   freescout:
-    image: nfrastack/freescout:2.2.21
+    image: nfrastack/freescout:2.2.25
     volumes:
       - freescout-data:/data
       - freescout-logs:/logs
@@ -34,7 +34,7 @@ services:
       timeout: 10s
       retries: 15
   mariadb:
-    image: mariadb
+    image: mariadb:13.0.2
     volumes:
       - mariadb-data:/var/lib/mysql
     environment:

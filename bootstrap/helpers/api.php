@@ -10,13 +10,18 @@ use App\Models\ApplicationSetting;
 use App\Models\Environment;
 use App\Models\EnvironmentVariable;
 use App\Models\ServerSetting;
+use App\Models\Service;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Rules\ManualWebhookSecret;
 use App\Rules\ValidGitBranch;
+use App\Rules\ValidIpAllowlist;
 use App\Support\ValidationPatterns;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection as SupportCollection;
@@ -40,6 +45,46 @@ function getTeamIdFromToken()
 function invalidTokenResponse()
 {
     return response()->json(['message' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api-reference/authorization'], 400);
+}
+
+/**
+ * Validation rules of the page and per_page query parameters of a paginated list endpoint.
+ *
+ * @return array<string, list<string>>
+ */
+function apiPaginationRules(int $maxPerPage = 100): array
+{
+    return [
+        'page' => ['nullable', 'integer', 'min:1', 'max:'.(intdiv(PHP_INT_MAX, $maxPerPage) + 1)],
+        'per_page' => ['nullable', 'integer', 'min:1', 'max:'.$maxPerPage],
+    ];
+}
+
+/**
+ * Page a list query in the standard API style: the body stays a plain array, and the X-Total-Count header gives the total.
+ * Without page or per_page in the request, the full list is returned without the header, unless $alwaysPaginate is set.
+ *
+ * @return array{0: SupportCollection, 1: array<string, int>} the items and the response headers
+ */
+function apiPaginate(EloquentBuilder|QueryBuilder|Relation $query, Request $request, int $defaultPerPage = 50, bool $alwaysPaginate = false): array
+{
+    if (! $alwaysPaginate && ! $request->filled('page') && ! $request->filled('per_page')) {
+        return [$query->get(), []];
+    }
+
+    $total = (clone $query)->count();
+    $items = $query->forPage((int) ($request->query('page') ?: 1), (int) ($request->query('per_page') ?: $defaultPerPage))->get();
+
+    return [$items, ['X-Total-Count' => $total]];
+}
+
+/**
+ * Filter a list query by a case-insensitive literal substring of a column.
+ * Both operands are lowercased, and the LIKE wildcards in $value (%, _, \) match only themselves.
+ */
+function apiWhereContains(EloquentBuilder $query, string $column, string $value): EloquentBuilder
+{
+    return $query->whereRaw("LOWER({$column}) LIKE ? ESCAPE '\\'", ['%'.addcslashes(mb_strtolower($value), '%_\\').'%']);
 }
 
 function serializeApiResponse($data)
@@ -117,9 +162,38 @@ function apiEnvironmentVariableDisplayValue(mixed $data): mixed
 }
 
 /**
+ * Validation rules for the `compose_services` field of an environment variable of the resource.
+ * Null or an empty list means all Compose services; a list must only name services of the resource.
+ *
+ * @return array<string, mixed>
+ */
+function composeServicesValidationRules(mixed $resource): array
+{
+    return [
+        'compose_services' => ['nullable', 'array', function (string $attribute, mixed $value, Closure $fail) use ($resource): void {
+            $requested = is_array($value) ? array_values(array_filter($value, 'is_string')) : [];
+            if ($requested === []) {
+                return;
+            }
+            $available = composeServiceNamesForEnvironmentScope($resource);
+            if ($available === []) {
+                $fail('Only Docker Compose resources with a loaded Compose file can limit a variable to services. For a new Compose application, deploy it once or reload its Compose file first.');
+
+                return;
+            }
+            $unknown = array_values(array_diff($requested, $available));
+            if ($unknown !== []) {
+                $fail('Unknown Compose services: '.implode(', ', $unknown).'. Available services: '.implode(', ', $available).'.');
+            }
+        }],
+        'compose_services.*' => 'string',
+    ];
+}
+
+/**
  * Remove the saved proxy configuration and validation logs from every
  * serialized server in an API payload, including nested ones such as
- * `destination.server`, unless the token can read sensitive data.
+ * `destination.server`, unless the token can read sensitive server data.
  * The saved proxy configuration often contains DNS provider API tokens.
  *
  * @template T
@@ -129,11 +203,36 @@ function apiEnvironmentVariableDisplayValue(mixed $data): mixed
  */
 function removeServerProxySecretsFromApiPayload(mixed $payload): mixed
 {
-    if (request()->attributes->get('can_read_sensitive', false) === true) {
+    if (canReadServerSecretsFromApi()) {
         return $payload;
     }
 
     return removeServerProxySecrets($payload);
+}
+
+/**
+ * True when the API request can read the secrets of one resource (an application, service, database, or
+ * environment variable): admins with a read:sensitive token, and members whose access grants give
+ * read:sensitive on the resource. Team credentials and server secrets stay admin-only.
+ */
+function canReadResourceSecretsFromApi(?Model $resource): bool
+{
+    if (request()->attributes->get('can_read_sensitive', false) === true) {
+        return true;
+    }
+
+    return $resource !== null
+        && request()->attributes->get('has_read_sensitive_ability', false) === true
+        && (request()->user()?->can('viewSensitive', $resource) ?? false);
+}
+
+/**
+ * True when the API token can read server secrets (Sentinel token, log drain keys, proxy configuration).
+ * A token limited to some projects, environments, or resources cannot, because servers are team-level.
+ */
+function canReadServerSecretsFromApi(): bool
+{
+    return request()->attributes->get('can_read_server_sensitive', false) === true;
 }
 
 /**
@@ -179,6 +278,41 @@ function exposeSensitiveFields(Model $model): Model
 }
 
 /**
+ * Hide the locked (shown once) values that a serialized resource still contains, also for tokens
+ * that can read sensitive data: the generated compose of an application or service, and the
+ * connection URLs of a database with a locked password.
+ *
+ * @template T of array|SupportCollection
+ *
+ * @param  T  $payload
+ * @return T
+ */
+function redactLockedApiResourceValues(Model $resource, array|SupportCollection $payload): array|SupportCollection
+{
+    if (($resource instanceof Application || $resource instanceof Service) && filled($payload['docker_compose'] ?? null)) {
+        $payload['docker_compose'] = redactLockedValuesInGeneratedCompose($payload['docker_compose'], $resource);
+    }
+
+    $urlKeys = array_filter(['internal_db_url', 'external_db_url'], fn (string $key): bool => filled($payload[$key] ?? null));
+    if ($urlKeys !== [] && method_exists($resource, 'isCredentialLocked') && $resource->isCredentialLocked()) {
+        foreach ($urlKeys as $key) {
+            $payload[$key] = null;
+        }
+    }
+
+    return $payload;
+}
+
+/**
+ * Serialize a resource for a list API response: sensitive fields when the token can read them,
+ * without locked values.
+ */
+function serializeApiResource(Model $resource): array
+{
+    return redactLockedApiResourceValues($resource, exposeSensitiveFields($resource)->toArray());
+}
+
+/**
  * Shared validation rules for application create and update API endpoints.
  *
  * Pass the existing application on update so unchanged manual webhook secrets
@@ -201,16 +335,22 @@ function sharedDataApplications(?Application $application = null): array
         'is_git_submodules_enabled' => 'boolean',
         'is_git_lfs_enabled' => 'boolean',
         'is_git_shallow_clone_enabled' => 'boolean',
+        'is_auto_cancel_queued_deployments_enabled' => 'boolean',
+        'is_auto_cancel_building_deployments_enabled' => 'boolean',
         'disable_build_cache' => 'boolean',
         'inject_build_args_to_dockerfile' => 'boolean',
         'include_source_commit_in_build' => 'boolean',
+        'include_network_hosts_in_build' => 'boolean',
         'is_env_sorting_enabled' => 'boolean',
         'redact_all_env_values_in_logs' => 'boolean',
         'include_coolify_default_variables' => 'boolean',
         'is_pr_deployments_public_enabled' => 'boolean',
+        'is_pr_deployments_public_approval_required' => 'boolean',
+        'use_production_values_in_previews' => 'boolean',
         'is_gzip_enabled' => 'boolean',
         'is_stripprefix_enabled' => 'boolean',
         'is_permanent_redirect_enabled' => 'boolean',
+        'ip_allowlist' => ['nullable', 'string', new ValidIpAllowlist],
         'traefik_certificate_resolver' => ['nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
         'is_container_label_readonly_enabled' => 'boolean',
         'is_raw_compose_deployment_enabled' => 'boolean',
@@ -225,6 +365,7 @@ function sharedDataApplications(?Application $application = null): array
             }
         }],
         'is_consistent_container_name_enabled' => 'boolean',
+        'is_image_scan_enabled' => 'boolean',
         'custom_internal_name' => ['nullable', ...ValidationPatterns::containerNameRules()],
         'custom_container_name_prefix' => 'string|nullable|max:'.ApplicationSetting::MAX_CONTAINER_NAME_PREFIX_LENGTH,
         'preview_url_template' => 'string',
@@ -244,7 +385,7 @@ function sharedDataApplications(?Application $application = null): array
         'build_command' => ValidationPatterns::shellSafeCommandRules(),
         'start_command' => ValidationPatterns::shellSafeCommandRules(),
         'ports_exposes' => 'string|regex:/^(\d+)(,\d+)*$/',
-        'ports_mappings' => 'string|regex:/^(\d+:\d+)(,\d+:\d+)*$/|nullable',
+        'ports_mappings' => ValidationPatterns::portMappingRules(),
         'custom_network_aliases' => 'string|nullable',
         'base_directory' => ValidationPatterns::directoryPathRules(),
         'publish_directory' => ValidationPatterns::directoryPathRules(),
@@ -259,9 +400,9 @@ function sharedDataApplications(?Application $application = null): array
             }
         }],
         'health_check_method' => 'string|in:GET,HEAD,POST,OPTIONS',
-        'health_check_return_code' => 'numeric',
+        'health_check_return_code' => 'integer|between:100,599',
         'health_check_scheme' => 'string|in:http,https',
-        'health_check_response_text' => 'string|nullable',
+        'health_check_response_text' => ['string', 'nullable', 'max:255', 'not_regex:/[\x00-\x1F\x7F]/'],
         'health_check_interval' => 'numeric',
         'health_check_timeout' => 'numeric',
         'health_check_retries' => 'numeric',
@@ -394,6 +535,7 @@ function migrateResourceToDestination(Request $request, $resource, string $resou
     if (! $destination || ! $destination->server?->canHostResources()) {
         return response()->json(['message' => 'Destination not found.'], 404);
     }
+    Gate::authorize('placeResource', $destination->server);
 
     $sourceDestination = $resource->destination;
     $migrateVolumes = $request->boolean('migrate_volumes', true);
@@ -469,6 +611,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('domains');
     $request->offsetUnset('instant_deploy');
     $request->offsetUnset('github_app_uuid');
+    $request->offsetUnset('gitea_app_uuid');
     $request->offsetUnset('private_key_uuid');
     $request->offsetUnset('use_build_server');
     $request->offsetUnset('use_build_secrets');
@@ -483,15 +626,20 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('is_container_label_escape_enabled');
     $request->offsetUnset('is_preserve_repository_enabled');
     $request->offsetUnset('include_source_commit_in_build');
+    $request->offsetUnset('include_network_hosts_in_build');
     $request->offsetUnset('is_git_submodules_enabled');
     $request->offsetUnset('is_git_lfs_enabled');
     $request->offsetUnset('is_git_shallow_clone_enabled');
+    $request->offsetUnset('is_auto_cancel_queued_deployments_enabled');
+    $request->offsetUnset('is_auto_cancel_building_deployments_enabled');
     $request->offsetUnset('disable_build_cache');
     $request->offsetUnset('inject_build_args_to_dockerfile');
     $request->offsetUnset('is_env_sorting_enabled');
     $request->offsetUnset('redact_all_env_values_in_logs');
     $request->offsetUnset('include_coolify_default_variables');
     $request->offsetUnset('is_pr_deployments_public_enabled');
+    $request->offsetUnset('is_pr_deployments_public_approval_required');
+    $request->offsetUnset('use_production_values_in_previews');
     $request->offsetUnset('stop_grace_period');
     $request->offsetUnset('rolling_update_drain_seconds');
     $request->offsetUnset('docker_images_to_keep');
@@ -508,6 +656,7 @@ function removeUnnecessaryFieldsFromRequest(Request $request)
     $request->offsetUnset('gpu_device_ids');
     $request->offsetUnset('gpu_options');
     $request->offsetUnset('is_consistent_container_name_enabled');
+    $request->offsetUnset('is_image_scan_enabled');
     $request->offsetUnset('custom_internal_name');
     $request->offsetUnset('custom_container_name_prefix');
     $request->offsetUnset('docker_compose_raw');

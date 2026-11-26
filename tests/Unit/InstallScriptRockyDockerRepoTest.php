@@ -22,7 +22,3 @@ function expectRockyInstallScriptToUseRhelRepo(string $path): void
 it('uses the rocky linux documented docker install flow in the stable install script', function () {
     expectRockyInstallScriptToUseRhelRepo('scripts/install.sh');
 });
-
-it('uses the rocky linux documented docker install flow in the nightly install script', function () {
-    expectRockyInstallScriptToUseRhelRepo('other/nightly/install.sh');
-});

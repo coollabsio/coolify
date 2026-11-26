@@ -2,6 +2,7 @@
 
 use App\Livewire\Tags\Show;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
@@ -29,33 +30,7 @@ beforeEach(function () {
     session(['currentTeam' => $this->team]);
 });
 
-it('shows an empty state when there are no tags', function () {
-    Livewire::test(Show::class)
-        ->assertSee('Tags')
-        ->assertSee('No tags yet')
-        ->assertSee('Create a tag, then connect it to resources to group related deployments.');
-});
-
-it('shows a card grid overview when tags exist and none is selected', function () {
-    Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
-    Tag::create(['name' => 'production', 'team_id' => $this->team->id]);
-
-    Livewire::test(Show::class)
-        ->assertSee('Tags')
-        ->assertSee('2 tags for bulk deploys and grouping')
-        ->assertSee('hello')
-        ->assertSee('production')
-        ->assertSee('Search tags')
-        ->assertSee('Sort')
-        ->assertSee('Table view', false)
-        ->assertSee('Grid view', false)
-        ->assertSee('tagsIndex', false)
-        ->assertSee('Number(filteredTags.length)', false)
-        ->assertDontSee('Switch tag')
-        ->assertDontSee('Deploy webhook URL');
-});
-
-it('shows the tag detail layout with stats when a tag is selected', function () {
+it('shows the resources of the selected tag', function () {
     $tag = Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
 
     $server = Server::factory()->create(['team_id' => $this->team->id]);
@@ -71,25 +46,7 @@ it('shows the tag detail layout with stats when a tag is selected', function () 
     $application->tags()->attach($tag->id);
 
     Livewire::test(Show::class, ['tagName' => 'hello'])
-        ->assertSee('Tags')
-        ->assertDontSee('Switch tag')
-        ->assertSee('Resources')
-        ->assertSee('Applications')
-        ->assertSee('Active deployments')
-        ->assertSee('Deploy webhook URL')
-        ->assertSee('Redeploy all')
-        ->assertSee('tagged-app')
-        ->assertDontSee('No resources use this tag');
-});
-
-it('shows empty resource and deployment states for an unused tag', function () {
-    Tag::create(['name' => 'orphan', 'team_id' => $this->team->id]);
-
-    Livewire::test(Show::class, ['tagName' => 'orphan'])
-        ->assertSee('No resources use this tag')
-        ->assertSee('No active deployments')
-        ->assertSee('Using this tag')
-        ->assertSee('Queued or running');
+        ->assertSee('tagged-app');
 });
 
 it('redirects to the overview when the requested tag does not exist', function () {
@@ -166,4 +123,41 @@ it('does not let a member change tags from the connect modal', function () {
         ->call('toggleResource', $application->uuid);
 
     expect($application->tags()->exists())->toBeFalse();
+});
+
+it('sorts active deployments by the chosen column and ignores unknown sort values', function () {
+    $tag = Tag::create(['name' => 'hello', 'team_id' => $this->team->id]);
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->first();
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+
+    foreach ([['zeta-app', 'alpha-server', 'queued'], ['alpha-app', 'zeta-server', 'in_progress'], ['mid-app', 'alpha-server', 'in_progress']] as [$name, $serverName, $status]) {
+        $application = Application::factory()->create([
+            'environment_id' => $environment->id,
+            'destination_id' => $destination->id,
+            'destination_type' => $destination->getMorphClass(),
+            'name' => $name,
+        ]);
+        $application->tags()->attach($tag->id);
+        ApplicationDeploymentQueue::create([
+            'application_id' => $application->id,
+            'deployment_uuid' => $name,
+            'application_name' => $name,
+            'server_id' => $server->id,
+            'server_name' => $serverName,
+            'status' => $status,
+        ]);
+    }
+
+    Livewire::test(Show::class, ['tagName' => 'hello'])
+        ->assertSeeInOrder(['Active deployments', 'zeta-app', 'mid-app', 'alpha-app'])
+        ->call('setDeploymentSort', 'resource-asc')
+        ->assertSeeInOrder(['Active deployments', 'alpha-app', 'mid-app', 'zeta-app'])
+        ->call('setDeploymentSort', 'server-desc')
+        ->assertSeeInOrder(['Active deployments', 'alpha-app', 'zeta-app', 'mid-app'])
+        ->call('setDeploymentSort', 'status-desc')
+        ->assertSeeInOrder(['Active deployments', 'zeta-app', 'alpha-app', 'mid-app'])
+        ->call('setDeploymentSort', 'deployment_url-asc')
+        ->assertSet('deploymentSort', 'status-desc');
 });

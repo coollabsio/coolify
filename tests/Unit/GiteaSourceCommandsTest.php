@@ -71,12 +71,12 @@ it('clones a connected Gitea source over HTTPS with the OAuth token and per-comm
 
     $result = $application->generateGitImportCommands(deployment_uuid: 'test-deployment', exec_in_docker: false);
 
-    $expectedConfig = "git -c 'url.https://oauth2:gt-token%2Fwith%2Bsym@gitea.example.test/.insteadOf=https://gitea.example.test/'";
+    $expectedConfig = "git -c 'url.https://oauth2:gt-token%2Fwith%2Bsym@gitea.example.test/.insteadOf=https://gitea.example.test/' -c 'url.https://oauth2:gt-token%2Fwith%2Bsym@gitea.example.test/.insteadOf=git@gitea.example.test:' -c 'url.https://oauth2:gt-token%2Fwith%2Bsym@gitea.example.test/.insteadOf=ssh://git@gitea.example.test/'";
 
     expect($result['fullRepoUrl'])->toBe('https://oauth2:gt-token%2Fwith%2Bsym@gitea.example.test/owner/private-app.git');
     expect($result['commands'])
         ->not->toContain('git config --global')
-        ->toContain("{$expectedConfig} clone --recurse-submodules -b 'main' 'https://oauth2:gt-token%2Fwith%2Bsym@gitea.example.test/owner/private-app.git'")
+        ->toContain("{$expectedConfig} clone --recurse-submodules -b 'main' -- 'https://oauth2:gt-token%2Fwith%2Bsym@gitea.example.test/owner/private-app.git'")
         ->toContain("{$expectedConfig} submodule update --init --recursive");
 });
 
@@ -93,7 +93,7 @@ it('fetches the Gitea pull request ref through the OAuth git config', function (
 
     expect($result['branch'])->toBe('pull/7/head:pr-7-coolify');
     expect($result['commands'])
-        ->toContain(".insteadOf=https://gitea.example.test/' fetch origin 'pull/7/head:pr-7-coolify'")
+        ->toContain(".insteadOf=ssh://git@gitea.example.test/' fetch origin 'pull/7/head:pr-7-coolify'")
         ->not->toContain('merge-requests');
 });
 
@@ -103,7 +103,7 @@ it('runs ls-remote for a connected Gitea source with the OAuth token and custom 
     $result = $application->generateGitLsRemoteCommands('test-deployment', false);
 
     expect($result['fullRepoUrl'])->toBe('http://oauth2:gt-token%2Fwith%2Bsym@gitea.example.test:3000/owner/private-app.git');
-    expect($result['commands'])->toContain("git ls-remote 'http://oauth2:gt-token%2Fwith%2Bsym@gitea.example.test:3000/owner/private-app.git'");
+    expect($result['commands'])->toContain("git ls-remote -- 'http://oauth2:gt-token%2Fwith%2Bsym@gitea.example.test:3000/owner/private-app.git'");
 });
 
 it('falls back to the Gitea source private key only when it belongs to the source team', function (int $keyTeamId, bool $expectKey) {

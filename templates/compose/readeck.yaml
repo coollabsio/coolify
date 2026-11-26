@@ -7,7 +7,7 @@
 
 services:
   readeck:
-    image: codeberg.org/readeck/readeck:latest
+    image: codeberg.org/readeck/readeck:0.23.5
     environment:
       - SERVICE_URL_READECK
       - READECK_USE_X_FORWARDED=${READECK_USE_X_FORWARDED:-true}

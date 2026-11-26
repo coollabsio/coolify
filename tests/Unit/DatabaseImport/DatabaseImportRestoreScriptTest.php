@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -224,10 +225,12 @@ function restoreScriptResource(string $engine): object
         'mysql' => StandaloneMysql::class,
         'mariadb' => StandaloneMariadb::class,
         'mongodb' => StandaloneMongodb::class,
+        'influxdb' => StandaloneInfluxdb::class,
     };
 
     $resource = Mockery::mock($class);
     $resource->shouldReceive('getMorphClass')->andReturn($class);
+    $resource->shouldReceive('getAttribute')->with('image')->andReturn('postgres:18-alpine');
 
     return $resource;
 }
@@ -245,7 +248,7 @@ function restoreScriptRun(string $engine, string $contents, bool $dumpAll = fals
         mkdir($dir.'/bin');
         mkdir($dir.'/stdin');
 
-        foreach (['pg_restore', 'psql', 'dropdb', 'createdb', 'mysql', 'mariadb', 'mongorestore'] as $client) {
+        foreach (['pg_restore', 'psql', 'dropdb', 'createdb', 'mysql', 'mariadb', 'mongorestore', 'influx'] as $client) {
             $escapedLog = escapeshellarg($log);
             $escapedStdin = escapeshellarg($dir.'/stdin');
             file_put_contents($dir.'/bin/'.$client, <<<SH
@@ -263,6 +266,7 @@ if [ -n "\${STUB_FAIL_MATCH:-}" ]; then
 fi
 case "\$*" in *"SELECT datname FROM pg_database"*) printf '%s\\n' "\${STUB_DATABASES:-}" ;; esac
 case "\$*" in *rolsuper*) printf '%s\\n' "\${STUB_ROLSUPER-t}" ;; esac
+case "\$*" in "bucket list "*) printf '%s\\tbucket\\n' "\${STUB_BUCKET_ID-0abc}" ;; esac
 exit 0
 SH);
             chmod($dir.'/bin/'.$client, 0755);
@@ -288,6 +292,9 @@ SH);
             'MARIADB_ROOT_PASSWORD' => 'root_pass',
             'MONGO_INITDB_ROOT_USERNAME' => 'root',
             'MONGO_INITDB_ROOT_PASSWORD' => 'mongo_pass',
+            'DOCKER_INFLUXDB_INIT_ORG' => 'coolify',
+            'DOCKER_INFLUXDB_INIT_BUCKET' => 'coolify',
+            'DOCKER_INFLUXDB_INIT_ADMIN_TOKEN' => 'influx_token',
         ], $env);
         $result = restoreScriptProcess(['sh', '-c', $script], $dir, array_filter($environment, fn (?string $value): bool => $value !== null));
 
@@ -642,12 +649,28 @@ test('restores single MySQL and MariaDB SQL backups', function (string $engine, 
     'dump of one database made with --databases' => 'mysql-one-database',
 ]);
 
+test('restores MariaDB backups into a container that sets only the MYSQL variables', function (bool $dumpAll, string $arguments) {
+    $run = restoreScriptRun('mariadb', restoreScriptFixture('mysql-sql'), dumpAll: $dumpAll, env: [
+        'MARIADB_USER' => null,
+        'MARIADB_PASSWORD' => null,
+        'MARIADB_DATABASE' => null,
+        'MARIADB_ROOT_PASSWORD' => null,
+    ]);
+
+    expect($run['exit'])->toBe(0, $run['stderr'])
+        ->and(end($run['calls'])['args'])->toBe($arguments);
+})->with([
+    'one database' => [false, '-u app_user -papp_pass app'],
+    'all databases' => [true, '-u root -proot_pass app'],
+]);
+
 test('restores MySQL and MariaDB backups containing all databases after checking the format', function (string $engine, string $fixture) {
     $run = restoreScriptRun($engine, restoreScriptFixture($fixture), dumpAll: true);
 
     expect($run['exit'])->toBe(0, $run['stderr'])
         ->and($run['leftovers'])->toBe([]);
     restoreScriptExpectCalls($run['calls'], [
+        [$engine, '', ['-u root -proot_pass -N -e SELECT 1']],
         [$engine, '', ['-u root -proot_pass -N -e', 'information_schema.processlist']],
         [$engine, '', ['-u root -proot_pass -N -e', 'DROP DATABASE IF EXISTS']],
         [$engine, '', ['-u root -proot_pass']],
@@ -660,6 +683,19 @@ test('restores MySQL and MariaDB backups containing all databases after checking
     'gzip SQL' => 'mysql-sql-gz',
     'tar with one SQL file' => 'mysql-tar',
     'SQL that uses the mysql schema' => 'mysql-cluster',
+]);
+
+test('restores all MySQL and MariaDB databases as the root account that the container accepts', function (string $engine, string $failingLogin, string $arguments) {
+    $run = restoreScriptRun($engine, restoreScriptFixture('mysql-sql'), dumpAll: true, env: ['STUB_FAIL_MATCH' => $failingLogin]);
+
+    $logins = array_map(fn (array $call): string => $call['args'], array_slice($run['calls'], 2));
+
+    expect($run['exit'])->toBe(0, $run['stderr'])
+        ->and($logins)->each->toMatch('/^'.preg_quote($arguments, '/').'( -N -e | -e | app$|$)/')
+        ->and(end($run['calls'])['args'])->toBe($arguments.' app');
+})->with(['mysql', 'mariadb'])->with([
+    'linuxserver.io root without a password' => ['-proot_pass -N -e SELECT 1', '-u root'],
+    'no login works, so the client shows the database error' => ['-N -e SELECT 1', '-u root -proot_pass'],
 ]);
 
 test('skips the MySQL and MariaDB system databases of an all-databases backup by default', function (string $engine, string $fixture) {
@@ -832,6 +868,97 @@ test('rejects unsupported MongoDB backups before calling mongorestore', function
     'single bson file' => ['mongo-bson', false, 'Unsupported MongoDB backup format'],
     'single bson file replacing existing collections' => ['mongo-bson', true, 'Unsupported MongoDB backup format'],
     'tar without a dump directory' => ['mongo-notes-tar', true, 'The tar backup does not contain a mongodump directory.'],
+]);
+
+/**
+ * An `influx backup` directory as Coolify packs it: one directory with the manifest and its data files.
+ *
+ * @param  list<string>  $buckets
+ */
+function influxBackupTar(array $buckets, string $organization = 'source-org'): string
+{
+    $manifest = json_encode(['buckets' => array_map(fn (string $bucket): array => [
+        'organizationName' => $organization,
+        'bucketName' => $bucket,
+        'bucketID' => md5($bucket),
+    ], $buckets)], JSON_PRETTY_PRINT);
+
+    return restoreScriptTar([
+        'influxdb-backup-1/20261119T102228Z.manifest' => $manifest,
+        'influxdb-backup-1/20261119T102228Z.1.tar.gz' => gzencode('shard'),
+    ]);
+}
+
+/**
+ * @param  list<array{name: string, args: string, header: string, stdin: string}>  $calls
+ * @return list<string>
+ */
+function influxCommands(array $calls): array
+{
+    return array_map(fn (array $call): string => preg_replace('/ --host .*$/', '', $call['args']), $calls);
+}
+
+test('restores an influxdb backup into a staging bucket before it replaces the configured bucket', function (bool $gzip) {
+    $backup = influxBackupTar(['metrics']);
+    $run = restoreScriptRun('influxdb', $gzip ? gzencode($backup) : $backup);
+
+    expect($run['exit'])->toBe(0, $run['stderr'])
+        ->and($run['stdout'])->toContain('Restored bucket metrics into coolify.')
+        ->and($run['leftovers'])->toBe([]);
+
+    $commands = influxCommands($run['calls']);
+    expect($commands)->toHaveCount(5)
+        ->and($commands[0])->toMatch('#^restore '.preg_quote($run['dir'], '#').'/tmp\.[^/ ]+/influxdb-backup-1 --bucket metrics --org source-org --new-bucket (coolify-restore-\d+) --new-org coolify$#');
+
+    preg_match('/--new-bucket (\S+)/', $commands[0], $staging);
+    expect(array_slice($commands, 1))->toBe([
+        "bucket list --name {$staging[1]} --org coolify --hide-headers",
+        'bucket list --name coolify --org coolify',
+        'bucket delete --name coolify --org coolify',
+        'bucket update --id 0abc --name coolify',
+    ]);
+
+    foreach ($run['calls'] as $call) {
+        expect($call['args'])->toEndWith('--host http://127.0.0.1:8086 --token influx_token');
+    }
+})->with(['tar' => false, 'tar.gz' => true]);
+
+test('restores the configured bucket from an influxdb backup with more than one bucket', function () {
+    $run = restoreScriptRun('influxdb', influxBackupTar(['other', 'coolify']));
+
+    expect($run['exit'])->toBe(0, $run['stderr'])
+        ->and(influxCommands($run['calls'])[0])->toContain('--bucket coolify --org source-org');
+});
+
+test('renames the staging bucket when the configured influxdb bucket does not exist', function () {
+    $run = restoreScriptRun('influxdb', influxBackupTar(['metrics']), env: ['STUB_FAIL_MATCH' => 'list --name coolify --org']);
+
+    expect($run['exit'])->toBe(0, $run['stderr'])
+        ->and(influxCommands($run['calls']))->not->toContain('bucket delete --name coolify --org coolify')
+        ->and(end($run['calls'])['args'])->toStartWith('bucket update --id 0abc --name coolify');
+});
+
+test('keeps the configured influxdb bucket when the restore fails', function () {
+    $run = restoreScriptRun('influxdb', influxBackupTar(['metrics']), env: ['STUB_FAIL_MATCH' => 'restore ']);
+
+    $commands = influxCommands($run['calls']);
+    expect($run['exit'])->toBe(1)
+        ->and($run['stderr'])->toContain('The restore failed. Nothing was changed.')
+        ->and($commands)->toHaveCount(2)
+        ->and($commands[1])->toMatch('/^bucket delete --name coolify-restore-\d+ --org coolify$/')
+        ->and($run['leftovers'])->toBe([]);
+});
+
+test('rejects influxdb backups that cannot be restored before calling influx', function (string $contents, string $message) {
+    $run = restoreScriptRun('influxdb', $contents);
+
+    expect($run['exit'])->toBe(1)
+        ->and($run['stderr'])->toContain($message)
+        ->and($run['calls'])->toBe([]);
+})->with([
+    'not a tar archive' => fn () => [restoreScriptFixture('garbage'), 'Unsupported InfluxDB backup format.'],
+    'tar without a backup manifest' => fn () => [restoreScriptFixture('mongo-notes-tar'), 'The tar backup does not contain an influx backup directory.'],
+    'several buckets without the configured one' => fn () => [influxBackupTar(['one', 'two']), 'The backup contains more than one bucket and none is named coolify.'],
 ]);
 
 test('normalize moves plain and gzip backups unchanged', function (string $contents) {

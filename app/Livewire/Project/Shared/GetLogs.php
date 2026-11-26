@@ -11,6 +11,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -18,6 +19,7 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
+use App\Support\ContainerLogArchive;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -42,7 +44,7 @@ class GetLogs extends Component
     public string $errors = '';
 
     #[Locked]
-    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite|null $resource = null;
+    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite|null $resource = null;
 
     #[Locked]
     public ServiceApplication|ServiceDatabase|null $servicesubtype = null;
@@ -60,6 +62,12 @@ class GetLogs extends Component
      */
     #[Locked]
     public array $sources = [];
+
+    /**
+     * Sentinel archive file of a removed container. Set, it replaces `docker logs` for $container.
+     */
+    #[Locked]
+    public ?string $archiveFile = null;
 
     public ?string $displayName = null;
 
@@ -172,7 +180,7 @@ class GetLogs extends Component
 
         $since = is_string($since) ? $since : null;
         if (is_string($since) && preg_match(self::DOCKER_TIMESTAMP_PATTERN, $since)) {
-            $options = "--since {$since} -t";
+            $options = $this->sinceOptions($since);
         } else {
             $options = "-n {$this->resolveLogTail()} -t";
         }
@@ -281,7 +289,7 @@ class GetLogs extends Component
             if ($all) {
                 $options = '-t';
             } elseif ($sinceValue !== null) {
-                $options = "--since {$sinceValue} -t";
+                $options = $this->sinceOptions($sinceValue);
             } else {
                 $options = "-n {$tail} -t";
             }
@@ -441,6 +449,16 @@ class GetLogs extends Component
         return collect();
     }
 
+    /**
+     * `--since` without `-n` makes dockerd decode the complete log file of the container on each
+     * stream tick, which keeps it at full CPU for large logs. With `-n`, dockerd reads from the end.
+     * The viewer keeps at most MAX_LOG_LINES lines, so a stream tick never needs more.
+     */
+    private function sinceOptions(string $since): string
+    {
+        return "--since {$since} -n ".self::MAX_LOG_LINES.' -t';
+    }
+
     private function resolveLogTail(): int|string
     {
         if ($this->numberOfLines === -1) {
@@ -461,16 +479,34 @@ class GetLogs extends Component
         $server ??= $this->server;
         $container ??= (string) $this->container;
         $options = trim($options);
-        $options = $options === '' ? '' : "{$options} ";
-        $command = $server->isSwarm()
-            ? "docker service logs {$options}{$container}"
-            : "docker logs {$options}{$container}";
+        if ($this->archiveFile !== null) {
+            $command = $this->archiveLogCommand($options);
+        } else {
+            $options = $options === '' ? '' : "{$options} ";
+            $command = $server->isSwarm()
+                ? "docker service logs {$options}{$container}"
+                : "docker logs {$options}{$container}";
+            $command = remoteCommandWithTimeout($command, 30);
+        }
 
         if ($server->isNonRoot()) {
             $command = parseCommandsByLineForSudo(collect($command), $server)[0];
         }
 
         return $command;
+    }
+
+    /**
+     * Translates the `docker logs` options to a read of the archive. A removed container gets no new lines, so `--since` reads nothing.
+     */
+    private function archiveLogCommand(string $options): string
+    {
+        if (str_contains($options, '--since')) {
+            return 'true';
+        }
+        $tail = preg_match('/-n (\d+)/', $options, $matches) === 1 ? (int) $matches[1] : null;
+
+        return ContainerLogArchive::readCommand((string) $this->resource?->uuid, (string) $this->archiveFile, $tail, str_contains($options, '-t')) ?? 'true';
     }
 
     private function runLogCommand(string $command, int $maxBytes, string $limitLabel, bool $timestamped = true): string
@@ -497,7 +533,7 @@ class GetLogs extends Component
     private function executeLogCommand(Server $server, string $command, int $maxBytes): array
     {
         // boundedLogCommand() caps the output at $maxBytes + 1, so one extra byte means truncation.
-        $output = Process::timeout(config('constants.ssh.command_timeout'))
+        $output = Process::timeout(DOCKER_LOGS_LOCAL_TIMEOUT)
             ->input(SshMultiplexingHelper::sshBatchInput($this->boundedLogCommand($command, $maxBytes)))
             ->run(SshMultiplexingHelper::generateSshBatchCommand($server))
             ->output();

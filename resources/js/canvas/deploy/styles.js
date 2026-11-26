@@ -143,7 +143,7 @@ const CSS = `
   .cv-root :is(input, textarea, .cv-logs) { user-select: text; }
   .cv-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
   .cv-deploy-now { width: 100%; }
-  .cv-node-head { display: flex; align-items: center; gap: 0.625rem; height: 3.25rem; padding: 0 0.5rem 0 0.75rem; cursor: grab; user-select: none; }
+  .cv-node-head { display: flex; align-items: center; gap: 0.625rem; height: 52px; padding: 0 0.5rem 0 0.75rem; cursor: grab; user-select: none; }
   .cv-node-head i svg { width: 1rem; height: 1rem; }
   .cv-node-head div { display: grid; min-width: 0; margin-right: auto; }
   .cv-node-head b { overflow: hidden; font-size: 13.5px; font-weight: 600; line-height: 1.125rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -182,7 +182,7 @@ const CSS = `
 
   /* Ports: filled dots on the header line, like the environment canvas. */
   .cv-port {
-    position: absolute; top: calc(1.625rem - 0.375rem); width: 0.75rem; height: 0.75rem; border-radius: 50%;
+    position: absolute; top: calc(26px - 0.375rem); width: 0.75rem; height: 0.75rem; border-radius: 50%;
     border: 2px solid var(--cv-card); background: light-dark(#a3a3a3, #737373); z-index: 2;
     box-shadow: 0 1px 3px rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
     transition: transform 120ms ease, background-color 120ms ease;
@@ -248,7 +248,7 @@ const CSS = `
 
   /* Result pill after Deploy: the live address(es). */
   .cv-result {
-    position: absolute; display: flex; align-items: center; gap: 0.25rem; height: 2.375rem; padding: 0 0.25rem 0 0.875rem;
+    position: absolute; display: flex; align-items: center; gap: 0.25rem; height: 38px; padding: 0 0.25rem 0 0.875rem;
     border: 1px solid color-mix(in srgb, #10b981 45%, transparent); border-radius: 999px;
     background: var(--cv-card); box-shadow: 0 8px 24px -12px rgb(0 0 0 / 0.25); white-space: nowrap;
   }

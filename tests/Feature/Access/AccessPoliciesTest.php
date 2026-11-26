@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandalonePostgresql;
+use App\Models\Tag;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -215,7 +216,9 @@ it('shows secret values in the variable editor only with read-sensitive access',
     if ($expectedValue === null) {
         expect($component->get('isValueHidden'))->toBeTrue()
             ->and($component->get('value'))->toBeNull();
-        $component->call('loadValues')->assertForbidden();
+        $component->call('loadValues')->assertOk();
+        expect($component->get('value'))->toBeNull()
+            ->and($component->get('valuesLoaded'))->toBeFalse();
 
         return;
     }
@@ -267,3 +270,20 @@ it('opens the new resource page only for environments the member can write to', 
 afterEach(function () {
     Event::forget(RouteMatched::class);
 });
+
+it('lets only members with team-wide write create, rename, and delete tags', function (?array $access, bool $allowed) {
+    $tag = Tag::create(['name' => 'production', 'team_id' => $this->team->id]);
+    $user = accessPoliciesMember($this->team, $access === null ? null : array_map(
+        fn (array $grant) => $grant['scope'] === 'project' ? [...$grant, 'uuid' => $this->shop->uuid] : $grant,
+        $access,
+    ));
+
+    expect($user->can('create', Tag::class))->toBe($allowed)
+        ->and($user->can('update', $tag))->toBe($allowed)
+        ->and($user->can('delete', $tag))->toBe($allowed);
+})->with([
+    'legacy read-only member' => [null, false],
+    'team-wide deploy' => [[['scope' => 'team', 'uuid' => null, 'levels' => ['deploy']]], false],
+    'project write' => [[['scope' => 'project', 'uuid' => null, 'levels' => ['write']]], false],
+    'team-wide write' => [[['scope' => 'team', 'uuid' => null, 'levels' => ['write']]], true],
+]);

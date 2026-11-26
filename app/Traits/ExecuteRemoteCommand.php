@@ -87,6 +87,7 @@ trait ExecuteRemoteCommand
             $command_hidden = data_get($single_command, 'command_hidden', false);
             $skip_command_log = data_get($single_command, 'skip_command_log', false);
             $input = data_get($single_command, 'input');
+            $skip_cancellation_check = data_get($single_command, 'skip_cancellation_check', false);
             $this->save = data_get($single_command, 'save');
             if ($this->server->isNonRoot()) {
                 if (str($command)->startsWith('docker exec')) {
@@ -96,8 +97,8 @@ trait ExecuteRemoteCommand
                 }
             }
 
-            // Check for cancellation before executing commands
-            if (isset($this->application_deployment_queue)) {
+            // Check for cancellation before executing commands. Cleanup commands must also run after a cancel.
+            if (! $skip_cancellation_check && isset($this->application_deployment_queue)) {
                 $this->application_deployment_queue->refresh();
                 if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
                     throw new \RuntimeException('Deployment cancelled by user', 69420);
@@ -109,26 +110,29 @@ trait ExecuteRemoteCommand
             $lastError = null;
             $commandExecuted = false;
 
-            while ($attempt < $maxRetries && ! $commandExecuted) {
+            while (! $commandExecuted) {
                 try {
                     $this->executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors, $command_hidden, $skip_command_log, $input);
                     $commandExecuted = true;
                 } catch (\RuntimeException|DeploymentException $e) {
                     $lastError = $e;
                     $errorMessage = $e->getMessage();
+                    $attemptLimit = $this->sshAttemptLimit($e, $maxRetries);
                     // Only retry if it's an SSH connection error and we haven't exhausted retries
-                    if ($this->isRetryableSshFailure($e) && $attempt < $maxRetries - 1) {
+                    if ($this->isRetryableSshFailure($e) && $attempt < $attemptLimit - 1) {
                         $attempt++;
                         $delay = $this->calculateRetryDelay($attempt - 1);
 
                         // Add log entry for the retry
                         if (isset($this->application_deployment_queue)) {
-                            $this->addRetryLogEntry($attempt, $maxRetries, $delay, $errorMessage);
+                            $this->addRetryLogEntry($attempt, $attemptLimit, $delay, $errorMessage);
 
                             // Check for cancellation during retry wait
-                            $this->application_deployment_queue->refresh();
-                            if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
-                                throw new \RuntimeException('Deployment cancelled by user during retry', 69420);
+                            if (! $skip_cancellation_check) {
+                                $this->application_deployment_queue->refresh();
+                                if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+                                    throw new \RuntimeException('Deployment cancelled by user during retry', 69420);
+                                }
                             }
                         }
 
@@ -151,6 +155,7 @@ trait ExecuteRemoteCommand
                         ->where('status', '!=', ApplicationDeploymentStatus::FINISHED->value)
                         ->update([
                             'status' => ApplicationDeploymentStatus::FAILED->value,
+                            'finished_at' => now(),
                         ]);
                 }
                 throw $lastError;
@@ -192,7 +197,7 @@ trait ExecuteRemoteCommand
         };
         // Output is logged per complete line, so a secret split across two output chunks is still redacted.
         $pending = [];
-        $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->input($input)->start($remote_command, function (string $type, string $output) use ($addLogEntry, $append, &$pending) {
+        $handleOutput = function (string $type, string $output) use ($addLogEntry, $append, &$pending): void {
             $pending[$type] = ($pending[$type] ?? '').$output;
             $complete_output = RunRemoteProcess::takeCompleteOutput($pending[$type]);
             if ($complete_output !== '') {
@@ -200,6 +205,26 @@ trait ExecuteRemoteCommand
             }
 
             $this->saveCommandOutput(sanitize_utf8_text($output), $append);
+        };
+        // The changed host key warning of ssh is left out of logs and saved output; noticeHostKeyMismatch() reads the raw stderr.
+        $heldStderr = '';
+        $releaseHeldStderr = function () use ($handleOutput, &$heldStderr): void {
+            $stderr = SshMultiplexingHelper::filterHostKeyChangedWarning($heldStderr, '', final: true);
+            if ($stderr !== '') {
+                $handleOutput('err', $stderr);
+            }
+        };
+        $process = Process::timeout(config('constants.ssh.command_timeout'))->idleTimeout(3600)->input($input)->start($remote_command, function (string $type, string $output) use ($handleOutput, $releaseHeldStderr, &$heldStderr) {
+            if ($type === 'err') {
+                $output = SshMultiplexingHelper::filterHostKeyChangedWarning($heldStderr, $output);
+                if ($output === '') {
+                    return;
+                }
+            } else {
+                $releaseHeldStderr();
+            }
+
+            $handleOutput($type, $output);
         });
         $this->application_deployment_queue->update([
             'current_process_id' => $process->id(),
@@ -208,6 +233,7 @@ trait ExecuteRemoteCommand
         try {
             $process_result = $process->wait();
         } finally {
+            $releaseHeldStderr();
             foreach ($pending as $type => $output) {
                 $remaining_output = RunRemoteProcess::takeCompleteOutput($pending[$type], final: true);
                 if ($remaining_output !== '') {
@@ -215,6 +241,7 @@ trait ExecuteRemoteCommand
                 }
             }
         }
+        SshMultiplexingHelper::noticeHostKeyMismatch($this->server, $process_result);
         if ($process_result->exitCode() !== 0) {
             if (! $ignore_errors) {
                 // Check if deployment was cancelled while command was running
@@ -229,6 +256,8 @@ trait ExecuteRemoteCommand
                 // This prevents premature status changes during retryable SSH errors
                 $error = $process_result->errorOutput();
                 if (empty($error)) {
+                    // A silent exit 255 can be a refused SSH handshake or the remote command itself (a PHP fatal error in a
+                    // pre-deployment command), so it must not look like a retryable SSH error: a retry would run the command again.
                     $error = $process_result->output() ?: 'Command failed with no error output';
                 }
                 throw new DeploymentException($this->commandFailureMessage((string) $command, (int) $process_result->exitCode(), (string) $error, $skip_command_log), (int) $process_result->exitCode());
@@ -251,7 +280,33 @@ trait ExecuteRemoteCommand
 
         $error = $this->redact_sensitive_info($error);
 
-        return "Command execution failed (exit code {$exitCode}): {$commandText}\nError: {$error}".$this->dockerNetworkGatewayHint($error);
+        return "Command execution failed (exit code {$exitCode}): {$commandText}\nError: {$error}".$this->dockerNetworkGatewayHint($error).$this->registryLoginHint($error).$this->sshConnectionLostHint($exitCode);
+    }
+
+    /**
+     * A registry that refuses a pull or push gives only a generic Docker error, which does not tell on which server
+     * the login is missing. With a build server or a Coolify host that is not the deployment server, users often log
+     * in on the wrong server, or as another user than the SSH user.
+     */
+    private function registryLoginHint(string $error): string
+    {
+        if (! preg_match('~pull access denied|requested access to the resource is denied|no basic auth credentials|unauthorized: authentication required|/v2/[^"\s]*": (?:unauthorized|denied)~i', $error)) {
+            return '';
+        }
+
+        return "\nThe registry refused access to the image. Deployments use the Docker registry logins of the SSH user ({$this->server->user}) on the server {$this->server->name}. Log in to the registry on the Registries page of this server, then deploy again. If a 'docker pull' of the image on the server also fails, the token cannot read the image: check its scopes.";
+    }
+
+    /**
+     * SSH exits with 255 when the connection closes, so the output of the remote command stops without an error.
+     */
+    private function sshConnectionLostHint(int $exitCode): string
+    {
+        if ($exitCode !== 255) {
+            return '';
+        }
+
+        return "\nExit code 255 usually means that the SSH connection to the server closed before the command finished. Check the network between Coolify and the server, and the sshd logs and memory usage of the server, then deploy again.";
     }
 
     /**

@@ -13,6 +13,8 @@ use Throwable;
  * Guzzle middleware that sends a request again once after a connection failure.
  * cURL counts the DNS lookup in the connect timeout, and a lost DNS query waits 5 seconds before the resolver tries again.
  * Only idempotent methods are retried, because a POST or PATCH can reach the server before the timeout.
+ * Guzzle also reports a timeout while waiting for the response as a connection failure; that request reached
+ * the server and already waited the full timeout, so it is not sent again.
  */
 class RetryHttpConnectionFailures
 {
@@ -22,7 +24,7 @@ class RetryHttpConnectionFailures
     {
         return function (RequestInterface $request, array $options) use ($handler): PromiseInterface {
             return $this->send($handler, $request, $options)->otherwise(function (Throwable $exception) use ($handler, $request, $options): PromiseInterface {
-                if (! $exception instanceof ConnectException || ! in_array($request->getMethod(), self::RETRIED_METHODS, true)) {
+                if (! $exception instanceof ConnectException || $this->timedOutAfterSending($exception) || ! in_array($request->getMethod(), self::RETRIED_METHODS, true)) {
                     return Create::rejectionFor($exception);
                 }
 
@@ -31,6 +33,13 @@ class RetryHttpConnectionFailures
                 return $this->send($handler, $request, $options);
             });
         };
+    }
+
+    private function timedOutAfterSending(ConnectException $exception): bool
+    {
+        $context = $exception->getHandlerContext();
+
+        return ($context['errno'] ?? null) === CURLE_OPERATION_TIMEDOUT && ($context['request_size'] ?? 0) > 0;
     }
 
     /**

@@ -33,10 +33,13 @@ class SeedDevelopmentQemuServer
         }
 
         if ($removeOtherServers) {
+            // A server that still has resources stays, because its resources need it.
             Server::query()
                 ->where('uuid', 'like', 'development-qemu-%')
                 ->where('uuid', '!=', $profile['uuid'])
-                ->delete();
+                ->get()
+                ->filter(fn (Server $server) => $server->definedResources()->isEmpty())
+                ->each->delete();
         }
 
         $server = $asLocalhost

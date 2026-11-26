@@ -4,22 +4,38 @@ namespace App\Traits;
 
 use App\Models\Server;
 use App\Services\SentinelMetricsClient;
+use Carbon\CarbonInterface;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Log;
 
 trait HasMetrics
 {
     /**
+     * Server metric types of getServerMetrics() and the Sentinel row fields they read. `field`
+     * gives one series, `fields` one series per output key, and `groupBy` one series per value
+     * of that row field.
+     *
+     * @var array<string, array{field?: string, fields?: array<string, string>, groupBy?: string}>
+     */
+    public const SERVER_METRIC_TYPES = [
+        'cpu' => ['field' => 'percent'],
+        'memory' => ['field' => 'usedPercent'],
+        'disk' => ['field' => 'usedPercent', 'groupBy' => 'mount'],
+        'network' => ['fields' => ['rx' => 'rxBytesPerSec', 'tx' => 'txBytesPerSec']],
+        'load' => ['fields' => ['load1' => 'load1', 'load5' => 'load5', 'load15' => 'load15']],
+    ];
+
+    /**
      * Raw Sentinel responses from prefetchMetrics(), keyed by "type:mins"; each is read once.
      *
-     * @var array<string, string>
+     * @var array<string, string|null>
      */
     protected array $prefetchedMetricResponses = [];
 
     /**
      * Fetch several metric types in one SSH round-trip instead of one per type. The
-     * get*Metrics() getters then read these responses. On a failure nothing is stored,
-     * so each getter fetches on its own as before.
+     * get*Metrics() getters then read these responses. Failed prefetches are remembered
+     * for this request so the getters do not retry the same unavailable server.
      *
      * @param  array<int, string>  $types
      */
@@ -30,23 +46,26 @@ trait HasMetrics
             return;
         }
 
+        foreach ($types as $type) {
+            $this->prefetchedMetricResponses["{$type}:{$mins}"] = null;
+        }
+
         $from = now()->subMinutes($mins)->toIso8601ZuluString();
         $token = $this->metricsToken($server);
         // The token reaches curl on stdin (`-H @-`), so it is not a process argument. The token
         // only has letters, digits and `._-+/=` (ServerSetting::isValidSentinelToken), so it
         // cannot end the heredoc. Responses are separated by a 0x1E record separator.
         $script = implode("\nprintf '\\036'\n", array_map(
-            fn (string $type) => 'curl -s -H @- "'.$this->getMetricsEndpoint($type, $from, $mins)."\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH",
+            fn (string $type) => 'curl -sS --connect-timeout 2 --max-time 3 -H @- "'.$this->getMetricsEndpoint($type, $from, $mins)."\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH",
             $types
         ));
 
-        try {
-            $output = instant_remote_process(
-                ["docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT"],
-                $server,
-                maxAttempts: 1
-            );
-        } catch (\Throwable) {
+        $output = SentinelMetricsClient::fetchOverSsh(
+            $server,
+            ["docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$script}\nCOOLIFY_SENTINEL_SCRIPT"],
+            static::class.':'.$this->uuid.':'.implode(',', $types).':'.$mins
+        );
+        if ($output === null) {
             return;
         }
 
@@ -60,18 +79,21 @@ trait HasMetrics
         }
     }
 
-    public function getCpuMetrics(int $mins = 5): ?array
+    /**
+     * The getters read the $mins minutes before $to, or before now when $to is null.
+     */
+    public function getCpuMetrics(int $mins = 5, ?CarbonInterface $to = null): ?array
     {
-        return $this->getMetrics('cpu', $mins, 'percent');
+        return $this->getMetrics('cpu', $mins, 'percent', $to);
     }
 
-    public function getMemoryMetrics(int $mins = 5): ?array
+    public function getMemoryMetrics(int $mins = 5, ?CarbonInterface $to = null): ?array
     {
         if ($this->isServerMetrics()) {
-            return $this->getMetrics('memory', $mins, 'usedPercent');
+            return $this->getMetrics('memory', $mins, 'usedPercent', $to);
         }
 
-        $metrics = $this->getMetrics('memory', $mins, 'used');
+        $metrics = $this->getMetrics('memory', $mins, 'used', $to);
         if ($metrics === null) {
             return null;
         }
@@ -113,20 +135,38 @@ trait HasMetrics
      */
     public function getNetworkMetrics(int $mins = 5): ?array
     {
-        $rows = $this->fetchMetricRows('network', $mins);
+        return $this->getServerMetrics('network', $mins);
+    }
+
+    /**
+     * Host metrics of one SERVER_METRIC_TYPES type: one [timestampMs, value] series, or an
+     * array of series keyed by output key or by mount. Null when metrics are disabled.
+     */
+    public function getServerMetrics(string $type, int $mins = 5, ?CarbonInterface $to = null): ?array
+    {
+        $spec = self::SERVER_METRIC_TYPES[$type];
+        $rows = $this->fetchMetricRows($type, $mins, $to);
         if ($rows === null) {
             return null;
         }
 
-        return [
-            'rx' => $this->mapRows($rows, 'rxBytesPerSec', $mins),
-            'tx' => $this->mapRows($rows, 'txBytesPerSec', $mins),
-        ];
+        if (isset($spec['groupBy'])) {
+            return collect($rows)
+                ->groupBy(fn (array $row) => (string) ($row[$spec['groupBy']] ?? ''))
+                ->map(fn ($group) => $this->mapRows($group->values()->all(), $spec['field'], $mins))
+                ->all();
+        }
+
+        if (isset($spec['fields'])) {
+            return array_map(fn (string $field) => $this->mapRows($rows, $field, $mins), $spec['fields']);
+        }
+
+        return $this->mapRows($rows, $spec['field'], $mins);
     }
 
-    private function getMetrics(string $type, int $mins, string $valueField): ?array
+    private function getMetrics(string $type, int $mins, string $valueField, ?CarbonInterface $to = null): ?array
     {
-        return $this->mapRows($this->fetchMetricRows($type, $mins), $valueField, $mins);
+        return $this->mapRows($this->fetchMetricRows($type, $mins, $to), $valueField, $mins);
     }
 
     /**
@@ -136,27 +176,33 @@ trait HasMetrics
      *
      * @return array<int, array<string, mixed>>|null
      */
-    protected function fetchMetricRows(string $type, int $mins): ?array
+    protected function fetchMetricRows(string $type, int $mins, ?CarbonInterface $to = null): ?array
     {
         $server = $this->getMetricsServer();
         if (! $server->isMetricsEnabled()) {
             return null;
         }
 
+        // prefetchMetrics() reads only windows that end now.
         $key = "{$type}:{$mins}";
-        if (array_key_exists($key, $this->prefetchedMetricResponses)) {
+        if ($to === null && array_key_exists($key, $this->prefetchedMetricResponses)) {
             $response = $this->prefetchedMetricResponses[$key];
             unset($this->prefetchedMetricResponses[$key]);
         } else {
-            $from = now()->subMinutes($mins)->toIso8601ZuluString();
-            $endpoint = $this->getMetricsEndpoint($type, $from, $mins);
+            $from = ($to ?? now())->copy()->subMinutes($mins)->toIso8601ZuluString();
+            $endpoint = $this->getMetricsEndpoint($type, $from, $mins, $to?->toIso8601ZuluString());
             $token = $this->metricsToken($server);
 
-            $response = instant_remote_process(
-                ["docker exec coolify-sentinel sh -c 'curl -H \"Authorization: Bearer {$token}\" \"{$endpoint}\"'"],
+            $command = "curl -sS --connect-timeout 2 --max-time 3 -H @- \"{$endpoint}\" <<'COOLIFY_SENTINEL_AUTH'\nAuthorization: Bearer {$token}\nCOOLIFY_SENTINEL_AUTH";
+            $response = SentinelMetricsClient::fetchOverSsh(
                 $server,
-                false
+                ["docker exec -i coolify-sentinel sh -s <<'COOLIFY_SENTINEL_SCRIPT'\n{$command}\nCOOLIFY_SENTINEL_SCRIPT"],
+                static::class.':'.$this->uuid.':'.$type.':'.$mins.($to ? ':'.$to->getTimestamp() : '')
             );
+        }
+
+        if ($response === null) {
+            return null;
         }
 
         if (str($response)->contains('error')) {
@@ -255,10 +301,13 @@ trait HasMetrics
      * 1000 per range, so it sends far fewer rows. Older Sentinels ignore `bucket_ms`;
      * mapRows() still downsamples their raw rows.
      */
-    private function getMetricsEndpoint(string $type, string $from, int $mins): string
+    private function getMetricsEndpoint(string $type, string $from, int $mins, ?string $to = null): string
     {
         $base = 'http://localhost:8888/api';
         $query = "from={$from}";
+        if ($to !== null) {
+            $query .= "&to={$to}";
+        }
         if ($mins > 60) {
             $query .= '&bucket_ms='.((int) ceil($mins / 1000) * 60_000);
         }

@@ -6,6 +6,8 @@ use App\Models\Application;
 use App\Models\Environment;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
+use App\Models\ImageScanIgnore;
+use App\Models\ImageScanPolicy;
 use App\Models\IntegrationToken;
 use App\Models\ManagedDnsRecord;
 use App\Models\ResourceLink;
@@ -30,8 +32,10 @@ $check('Infisical token moved with its secret', $infisical?->token === 'fake-inf
 $check('Cloudflare tunnel uses the moved token', $server?->settings?->cloudflare_tunnel_integration_token_id === $cloudflare?->id && $server?->settings?->cloudflare_tunnel_id === 'fake-tunnel');
 
 $app = Application::where('name', 'whoami-2')->first();
-$link = SecretManagerLink::where('resourceable_type', $app?->getMorphClass())->where('resourceable_id', $app?->id)->first();
+$link = SecretManagerLink::where('resourceable_type', $app?->getMorphClass())->where('resourceable_id', $app?->id)->where('name', 'default')->first();
 $check('secret manager link moved to the moved token', $link?->integration_token_id === $infisical?->id && data_get($link?->settings, 'project_id') === 'fake-project');
+$namedLink = SecretManagerLink::where('resourceable_type', $app?->getMorphClass())->where('resourceable_id', $app?->id)->where('name', 'urls')->first();
+$check('named secret manager source moved with its name', $namedLink?->integration_token_id === $infisical?->id && data_get($namedLink?->settings, 'project_id') === 'fake-urls');
 
 $record = ManagedDnsRecord::where('name', 'whoami2.example.test')->first();
 $check('DNS record + zone moved', $record !== null && $record->zone?->provider_zone_id === 'fake-zone-id' && $record->integration_token_id === $cloudflare?->id);
@@ -62,6 +66,14 @@ $check('apps on the other server are not moved', ! Application::whereIn('name', 
 $check('team shared variable created', SharedEnvironmentVariable::where('type', 'team')->where('key', 'FAKE_TEAM_VAR')->value('value') === 'team-value');
 $check('app variable that uses it moved', $app?->environment_variables()->where('key', 'USES_TEAM')->value('value') === '{{team.FAKE_TEAM_VAR}}');
 $check('maintenance mode moved', $app?->is_maintenance_enabled === true && $app?->maintenance_page === '<h1>fake maintenance</h1>');
+
+$check('image scan opt-in of the server moved', $server?->settings?->is_image_scan_enabled === true);
+$serverPolicy = ImageScanPolicy::where('scope_type', $server?->getMorphClass())->where('scope_id', $server?->id)->first();
+$check('server scan rules moved', $serverPolicy?->gate_mode?->value === 'strict');
+$check('app scan rules moved', ImageScanPolicy::where('scope_type', $app?->getMorphClass())->where('scope_id', $app?->id)->first()?->on_scan_error?->value === 'block');
+$check('app scan switch and image builds by team moved', $app?->settings?->is_image_scan_enabled === false && $app->settings->image_builds_by_team === true);
+$check('team-wide ignore stays on the source', ! ImageScanIgnore::where('vulnerability_id', 'CVE-2024-0002')->exists());
+$check('app ignore moved', ImageScanIgnore::where('resource_type', $app?->getMorphClass())->where('resource_id', $app?->id)->where('vulnerability_id', 'CVE-2024-0001')->exists());
 
 $gitShop = Application::where('name', 'git-shop')->first();
 $check('git-shop moved without its system-wide source', $gitShop !== null && $gitShop->source_id === null);

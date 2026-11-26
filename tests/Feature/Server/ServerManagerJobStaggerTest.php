@@ -2,6 +2,8 @@
 
 use App\Enums\ServerRole;
 use App\Jobs\CheckAndStartSentinelJob;
+use App\Jobs\ImageRescanJob;
+use App\Jobs\ServerAutoSecurityUpdatesCheckJob;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\ServerPatchCheckJob;
 use App\Models\InstanceSettings;
@@ -124,3 +126,72 @@ it('does not run every patch check at once after an upgrade from the old weekly 
 
     Queue::assertNotPushed(ServerPatchCheckJob::class);
 });
+
+it('checks the automatic security updates run every hour only on servers that use them', function () {
+    $on = createStaggerTestServer($this->team);
+    $on->settings->update(['is_auto_security_updates_enabled' => true]);
+    $off = createStaggerTestServer($this->team);
+
+    expect(ServerManagerJob::autoSecurityUpdatesCheckCron($on))->toBe(sprintf('%d * * * *', ($on->id + 30) % 60));
+
+    runStaggerTestManagerAt(Carbon::parse('2025-01-15 13:00:00')->setMinute(($on->id + 30) % 60));
+    runStaggerTestManagerAt(Carbon::parse('2025-01-15 14:00:00')->setMinute(($off->id + 30) % 60));
+
+    Queue::assertPushed(ServerAutoSecurityUpdatesCheckJob::class, fn ($job) => $job->server->is($on));
+    Queue::assertNotPushed(ServerAutoSecurityUpdatesCheckJob::class, fn ($job) => $job->server->is($off));
+});
+
+it('gives each server a daily image rescan slot between 02:00 and 04:59', function () {
+    $servers = collect(range(1, 180))->map(fn (int $id) => (new Server)->forceFill(['id' => $id]));
+
+    $slots = $servers->map(fn (Server $server) => ServerManagerJob::imageRescanCron($server));
+
+    expect($slots->unique())->toHaveCount(180)
+        ->and(ServerManagerJob::imageRescanCron($servers[6]))->toBe('7 2 * * *')
+        ->and(ServerManagerJob::imageRescanCron($servers[179]))->toBe('0 2 * * *');
+
+    $slots->each(function (string $cron) {
+        [$minute, $hour, $day, $month, $dayOfWeek] = explode(' ', $cron);
+        expect((int) $minute)->toBeBetween(0, 59)
+            ->and((int) $hour)->toBeBetween(2, 4)
+            ->and([$day, $month, $dayOfWeek])->toBe(['*', '*', '*']);
+    });
+});
+
+function enableStaggerTestImageScan(Server $server): Server
+{
+    $server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
+
+    return $server->refresh();
+}
+
+it('dispatches the image rescan once per day at the server slot', function () {
+    $server = enableStaggerTestImageScan(createStaggerTestServer($this->team));
+    [$minute, $hour] = array_map('intval', explode(' ', ServerManagerJob::imageRescanCron($server)));
+    $slot = Carbon::parse('2025-01-16 00:00:00')->setTime($hour, $minute);
+
+    runStaggerTestManagerAt($slot->copy()->subMinute());
+    Queue::assertNotPushed(ImageRescanJob::class);
+
+    runStaggerTestManagerAt($slot);
+    runStaggerTestManagerAt($slot->copy()->addMinute());
+    Queue::assertPushed(ImageRescanJob::class, 1);
+    Queue::assertPushed(ImageRescanJob::class, fn (ImageRescanJob $job) => $job->server->is($server));
+
+    runStaggerTestManagerAt($slot->copy()->addDay());
+    Queue::assertPushed(ImageRescanJob::class, 2);
+});
+
+it('does not dispatch the image rescan for a server that cannot be scanned', function (Closure $setUp) {
+    $server = enableStaggerTestImageScan(createStaggerTestServer($this->team));
+    $setUp($server);
+    [$minute, $hour] = array_map('intval', explode(' ', ServerManagerJob::imageRescanCron($server)));
+
+    runStaggerTestManagerAt(Carbon::parse('2025-01-16 00:00:00')->setTime($hour, $minute));
+
+    Queue::assertNotPushed(ImageRescanJob::class);
+})->with([
+    'scanning off' => [fn (Server $server) => $server->settings->forceFill(['is_image_scan_enabled' => false])->saveQuietly()],
+    'unreachable' => [fn (Server $server) => $server->settings->forceFill(['is_reachable' => false])->saveQuietly()],
+    'transferred away' => [fn (Server $server) => $server->forceFill(['server_metadata' => ['transfer' => ['status' => 'transferred']]])->saveQuietly()],
+]);

@@ -6,7 +6,7 @@
 
 services:
   newt:
-    image: fosrl/newt:latest
+    image: fosrl/newt:1.20.0
     environment:
       - PANGOLIN_ENDPOINT=${PANGOLIN_ENDPOINT:-https://pangolin.domain.tld}
       - NEWT_ID=${NEWT_ID:?}

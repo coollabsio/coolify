@@ -5,10 +5,12 @@ namespace App\Models;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasDatabaseHealthCheck;
+use App\Traits\HasImageScans;
 use App\Traits\HasLogRedactionSetting;
 use App\Traits\HasMetrics;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
+use App\Traits\HasStars;
 use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,7 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StandalonePostgresql extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, ScopedByAccessGrants, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasDatabaseHealthCheck, HasFactory, HasImageScans, HasLogRedactionSetting, HasMetrics, HasSafeStringAttribute, HasSecretManager, HasStars, ScopedByAccessGrants, SoftDeletes;
 
     protected $fillable = [
         'uuid',
@@ -167,7 +169,7 @@ class StandalonePostgresql extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                return $this->destination->server->isFunctional();
+                return $this->destination?->server?->isFunctional() ?? false;
             }
         );
     }
@@ -189,6 +191,9 @@ class StandalonePostgresql extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
+            if ($storage->is_external) {
+                continue;
+            }
             instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
         }
     }
@@ -281,6 +286,10 @@ class StandalonePostgresql extends BaseModel
 
     public function link()
     {
+        if ($this->isInstanceDatabase()) {
+            return route('settings.backup');
+        }
+
         if (data_get($this, 'environment.project.uuid')) {
             return route('project.database.configuration', [
                 'project_uuid' => data_get($this, 'environment.project.uuid'),
@@ -316,6 +325,11 @@ class StandalonePostgresql extends BaseModel
 
     public function team()
     {
+        // The instance database (coolify-db) has no environment and belongs to the root team.
+        if ($this->isInstanceDatabase()) {
+            return Team::find(0);
+        }
+
         return data_get($this, 'environment.project.team');
     }
 

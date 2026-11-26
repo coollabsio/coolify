@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Exceptions\ComposeRejectedException;
 use App\Services\ContainerStatusAggregator;
 use App\Services\DockerImageParser;
 use App\Support\DomainPortOverrides;
@@ -12,8 +13,11 @@ use App\Traits\HasComposeVolumeWarnings;
 use App\Traits\HasMaintenancePage;
 use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
+use App\Traits\HasStars;
 use App\Traits\ScopedByAccessGrants;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -47,7 +51,7 @@ use OpenApi\Attributes as OA;
 )]
 class Service extends BaseModel
 {
-    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasFactory, HasMaintenancePage, HasSafeStringAttribute, HasSecretManager, ScopedByAccessGrants, SoftDeletes;
+    use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasFactory, HasMaintenancePage, HasSafeStringAttribute, HasSecretManager, HasStars, ScopedByAccessGrants, SoftDeletes;
 
     private static $parserVersion = '5';
 
@@ -59,6 +63,8 @@ class Service extends BaseModel
         'docker_compose',
         'connect_to_docker_network',
         'service_type',
+        'template_reference_hash',
+        'template_dismissed_hash',
         'config_hash',
         'compose_parsing_version',
         'is_container_label_escape_enabled',
@@ -71,9 +77,22 @@ class Service extends BaseModel
 
     protected $appends = ['server_status', 'status'];
 
+    /**
+     * The status that admitted the service to a status-filtered listing (see pageByStatus()).
+     */
+    private ?string $listedStatus = null;
+
     protected $casts = [
         'include_coolify_default_variables' => 'boolean',
         'redact_all_env_values_in_logs' => 'boolean',
+    ];
+
+    /**
+     * Compose files that can embed credentials. Only `read:sensitive` or `root` tokens may read them.
+     */
+    public const COMPOSE_ATTRIBUTES = [
+        'docker_compose_raw',
+        'docker_compose',
     ];
 
     /**
@@ -82,14 +101,12 @@ class Service extends BaseModel
      * `read:sensitive` or `root` token ability. Internal compose generators
      * must makeVisible explicitly before toArray().
      */
-    protected $hidden = [
-        'docker_compose',
-        'docker_compose_raw',
-    ];
+    protected $hidden = self::COMPOSE_ATTRIBUTES;
 
     protected function casts(): array
     {
         return [
+            'config_meta' => 'array',
             'is_maintenance_enabled' => 'boolean',
         ];
     }
@@ -100,10 +117,12 @@ class Service extends BaseModel
             if (blank($service->name)) {
                 $service->name = 'service-'.new_public_id();
             }
-        });
-        static::created(function ($service) {
             $service->compose_parsing_version = self::$parserVersion;
-            $service->save();
+        });
+        static::saving(function ($service) {
+            if ($service->isDirty('docker_compose_raw')) {
+                EnvironmentVariable::authorizeAddedSharedVariableReferencesIn($service, $service->getOriginal('docker_compose_raw'), $service->docker_compose_raw, 'docker_compose_raw');
+            }
         });
     }
 
@@ -131,6 +150,12 @@ class Service extends BaseModel
 
         $newConfigHash = $images.$domains.$images.$storages.$noindexDomains.json_encode($domainPortOverrides);
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
+        // Only added when a variable is scoped, so the hash of an unscoped service stays the same.
+        $scopes = composeEnvironmentVariableScopes($this->environment_variables()->whereNotNull('compose_services')->get());
+        if ($scopes !== []) {
+            ksort($scopes);
+            $newConfigHash .= json_encode($scopes);
+        }
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {
@@ -157,7 +182,7 @@ class Service extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                return $this->server->isFunctional();
+                return $this->server?->isFunctional() ?? false;
             }
         );
     }
@@ -205,6 +230,108 @@ class Service extends BaseModel
      * Get query builder for services owned by current team.
      * If you need all services without further query chaining, use ownedByCurrentTeamCached() instead.
      */
+    /**
+     * Filter the services of a team (API and MCP listings).
+     * A project, environment, or server UUID that the team does not own matches no service.
+     * The name is a case-insensitive substring match. Status is computed, so use pageByStatus() for it.
+     *
+     * @param  array{project_uuid?: ?string, environment_uuid?: ?string, server_uuid?: ?string, name?: ?string}  $filters
+     */
+    public function scopeApplyListFilters(Builder $query, int $teamId, array $filters): Builder
+    {
+        $projectUuid = $filters['project_uuid'] ?? null;
+        $environmentUuid = $filters['environment_uuid'] ?? null;
+        $serverUuid = $filters['server_uuid'] ?? null;
+        $name = $filters['name'] ?? null;
+
+        return $query
+            ->when($projectUuid !== null, function (Builder $query) use ($projectUuid, $teamId) {
+                $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
+                if (! $project) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $query->whereHas('environment', fn (Builder $q) => $q->where('project_id', $project->id));
+            })
+            ->when($environmentUuid !== null, function (Builder $query) use ($environmentUuid, $teamId) {
+                $environment = Environment::ownedByCurrentTeamAPI($teamId)->where('uuid', $environmentUuid)->first();
+                if (! $environment) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $query->where('environment_id', $environment->id);
+            })
+            ->when($serverUuid !== null, function (Builder $query) use ($serverUuid, $teamId) {
+                $server = Server::whereTeamId($teamId)->where('uuid', $serverUuid)->first();
+                if (! $server) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $standaloneDockerIds = $server->standaloneDockers()->pluck('id');
+                $swarmDockerIds = $server->swarmDockers()->pluck('id');
+                $query->where(function (Builder $q) use ($server, $standaloneDockerIds, $swarmDockerIds) {
+                    $q->where('server_id', $server->id)
+                        ->orWhere(fn (Builder $inner) => $inner->where('destination_type', StandaloneDocker::class)->whereIn('destination_id', $standaloneDockerIds))
+                        ->orWhere(fn (Builder $inner) => $inner->where('destination_type', SwarmDocker::class)->whereIn('destination_id', $swarmDockerIds));
+                });
+            })
+            ->when($name !== null, fn (Builder $query) => apiWhereContains($query, 'name', $name));
+    }
+
+    /**
+     * Filter services by their computed status (case-insensitive substring), ordered by name and id.
+     * Reads the ordered ids in one query, so a rename or a new service during the scan cannot shift the set.
+     * Then loads the services in chunks of these ids, so large teams never hydrate every service at once.
+     * Each returned service keeps the status that admitted it, so a start activity that ends
+     * during the request cannot change the status in the response.
+     *
+     * @return array{0: int, 1: EloquentCollection<int, Service>} total matches and the services of the page
+     */
+    public static function pageByStatus(Builder $query, string $status, int $offset = 0, ?int $limit = null): array
+    {
+        $statusNeedle = strtolower(trim($status));
+        $matched = new EloquentCollection;
+        $total = 0;
+
+        $orderedIds = (clone $query)->reorder()->orderBy('name')->orderBy('id')->pluck('id');
+
+        foreach ($orderedIds->chunk(100) as $idChunk) {
+            $services = (clone $query)
+                ->with([
+                    'applications:id,service_id,status,exclude_from_status,is_removed_from_compose',
+                    'databases:id,service_id,status,exclude_from_status,is_removed_from_compose',
+                ])
+                ->whereIn('id', $idChunk)
+                ->get()
+                ->keyBy('id');
+            $startingUuids = ResourceStartActivity::runningTypeUuids($services->pluck('uuid')->all());
+
+            foreach ($idChunk as $id) {
+                $service = $services->get($id);
+                $serviceStatus = match (true) {
+                    $service === null => null,
+                    in_array($service->uuid, $startingUuids, true) => 'starting:unhealthy',
+                    default => $service->containerStatus(),
+                };
+                if (! $service || ! str_contains(strtolower((string) $serviceStatus), $statusNeedle)) {
+                    continue;
+                }
+
+                if ($total >= $offset && ($limit === null || $total < $offset + $limit)) {
+                    $service->listedStatus = $serviceStatus;
+                    $matched->push($service);
+                }
+
+                $total++;
+            }
+        }
+
+        return [$total, $matched->values()];
+    }
+
     public static function ownedByCurrentTeam()
     {
         return Service::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
@@ -253,6 +380,10 @@ class Service extends BaseModel
      */
     public function getStatusAttribute()
     {
+        if ($this->listedStatus !== null) {
+            return $this->listedStatus;
+        }
+
         if ($this->isStarting()) {
             return 'starting:unhealthy';
         }
@@ -311,8 +442,8 @@ class Service extends BaseModel
      * This helper method consolidates status aggregation logic using ContainerStatusAggregator.
      * It processes container status strings stored in the database (not live Docker data).
      *
-     * @param  \Illuminate\Database\Eloquent\Collection  $applications  Collection of Application models
-     * @param  \Illuminate\Database\Eloquent\Collection  $databases  Collection of Database models
+     * @param  EloquentCollection  $applications  Collection of Application models
+     * @param  EloquentCollection  $databases  Collection of Database models
      * @param  bool  $excludedOnly  If true, only process excluded containers; if false, only process non-excluded
      * @return array{0: string|null, 1: string|null, 2?: bool} [status, health, hasNonExcluded (only when excludedOnly=false)]
      */
@@ -325,6 +456,11 @@ class Service extends BaseModel
         $resources = $applications->concat($databases);
 
         foreach ($resources as $resource) {
+            // A part that is not in the compose file has no container, so it does not count.
+            if ($resource->is_removed_from_compose ?? false) {
+                continue;
+            }
+
             $isExcluded = $resource->exclude_from_status || str($resource->status)->contains(':excluded');
 
             // Filter based on excludedOnly flag
@@ -704,6 +840,21 @@ class Service extends BaseModel
                         ]);
                     }
                     $fields->put('Elasticsearch', $data->toArray());
+                    break;
+                case $image->contains('opensearch'):
+                    $data = collect([]);
+                    $opensearch_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_OPENSEARCH')->first();
+                    if ($opensearch_password) {
+                        $data = $data->merge([
+                            'Password (default user: admin)' => [
+                                'key' => data_get($opensearch_password, 'key'),
+                                'value' => data_get($opensearch_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('OpenSearch', $data->toArray());
                     break;
                 case $image->contains('directus'):
                     $data = collect([]);
@@ -1550,7 +1701,7 @@ class Service extends BaseModel
      */
     public function maintenanceDomains(): Collection
     {
-        return $this->applications()->get()
+        return $this->applications
             ->flatMap(fn (ServiceApplication $application) => collect($application->fqdns)
                 ->map(fn ($url) => trim((string) $url))
                 ->filter()
@@ -1627,6 +1778,12 @@ class Service extends BaseModel
         return $this->redact_all_env_values_in_logs ?? true;
     }
 
+    /** Composes before a template change, newest first. */
+    public function templateRevisions(): HasMany
+    {
+        return $this->hasMany(ServiceTemplateRevision::class)->latest('id');
+    }
+
     public function environment_variables()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable');
@@ -1635,6 +1792,32 @@ class Service extends BaseModel
     public function workdir()
     {
         return service_configuration_dir()."/{$this->uuid}";
+    }
+
+    /**
+     * Docker Compose must accept the generated file, or the next deployment fails with the old containers still running.
+     * Call it after parse(), in the transaction that saves the Compose file. The check is best effort: it is skipped
+     * when the server is not reachable or the SSH connection fails, so the file can still be edited.
+     *
+     * @throws ComposeRejectedException If `docker compose config` on the server rejects the generated file
+     */
+    public function ensureDockerComposeAccepted(): void
+    {
+        $server = $this->server;
+        if (! $server?->isFunctional()) {
+            return;
+        }
+        try {
+            checkComposeFileOnServer((string) $this->docker_compose, $server, $this->workdir());
+        } catch (\Throwable $e) {
+            // Only an exit code of the remote command is a rejection: 255 is an SSH failure, 124 a timeout.
+            $exitCode = $e->getCode();
+            if (! $e instanceof \RuntimeException || ! is_int($exitCode) || in_array($exitCode, [0, 124, 255], true)) {
+                return;
+            }
+
+            throw new ComposeRejectedException("Docker Compose rejected the file, so Coolify did not save it.\n{$e->getMessage()}", previous: $e);
+        }
     }
 
     public function saveComposeConfigs()
@@ -1654,11 +1837,12 @@ class Service extends BaseModel
         $envs = collect([]);
 
         // Generate SERVICE_NAME_* environment variables from docker-compose services
+        $composeServiceNames = [];
         if ($this->docker_compose) {
             try {
                 $dockerCompose = parseDockerComposeYaml($this->docker_compose);
-                $services = data_get($dockerCompose, 'services', []);
-                foreach ($services as $serviceName => $_) {
+                $composeServiceNames = array_map('strval', array_keys(data_get($dockerCompose, 'services', [])));
+                foreach ($composeServiceNames as $serviceName) {
                     $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
                 }
             } catch (\Exception $e) {
@@ -1666,6 +1850,10 @@ class Service extends BaseModel
         }
 
         $envs_from_coolify = $this->environment_variables()->get();
+        // So that Docker Compose can resolve ${COOLIFY_RESOURCE_UUID} in the compose file
+        if ($envs_from_coolify->where('key', 'COOLIFY_RESOURCE_UUID')->isEmpty()) {
+            $envs->push("COOLIFY_RESOURCE_UUID={$this->uuid}");
+        }
         $sorted = $envs_from_coolify->sortBy(function ($env) {
             if (str($env->key)->startsWith('SERVICE_')) {
                 return 1;
@@ -1683,7 +1871,15 @@ class Service extends BaseModel
             $envs->push($this->composeEnvironmentFileLine($env));
         }
         instant_remote_write_file($this->server, $environmentFile, $envs->implode("\n"));
-        instant_remote_process(["mv {$environmentFile} $workdir/.env"], $this->server);
+        $moves = ["mv {$environmentFile} $workdir/.env"];
+
+        $scopes = composeEnvironmentVariableScopes($envs_from_coolify);
+        foreach ($composeServiceNames as $serviceName) {
+            $serviceEnvironmentFile = "$workdir/".new_public_id().'.env.tmp';
+            instant_remote_write_file($this->server, $serviceEnvironmentFile, composeEnvironmentLinesForService($envs, $scopes, $serviceName)->implode("\n"));
+            $moves[] = 'mv '.escapeshellarg($serviceEnvironmentFile).' '.escapeshellarg("$workdir/".composeServiceEnvironmentFile($serviceName));
+        }
+        instant_remote_process($moves, $this->server);
     }
 
     /**

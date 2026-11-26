@@ -1,6 +1,9 @@
 <div class="env-table-item"
     x-show="typeof envFilter === 'undefined' || envFilter === 'all' || envFilter === '{{ $isPreview ? 'preview' : 'production' }}'">
-    <div class="data-table-row env-table-grid {{ $showEnvironmentType ? '' : 'env-table-grid-no-type' }}">
+    <div class="data-table-row env-table-grid {{ $showEnvironmentType ? '' : 'env-table-grid-no-type' }} {{ $selectable ? 'env-table-grid-selectable' : '' }}">
+        @if ($selectable)
+            <span></span>
+        @endif
         <div class="flex min-w-0 items-center gap-2">
             <button type="button" data-env-name-trigger
                 class="env-key-label min-w-0 truncate text-left font-mono text-[13px] text-black dark:text-fg"
@@ -12,9 +15,8 @@
                 <x-helper :helper="e($comment)" />
             @endif
             @if ($serviceName)
-                <span class="table-badge shrink-0">{{ $serviceName }}</span>
+                <span class="table-badge shrink-0" title="{{ $composeType === 'derived' ? 'Derived in Compose' : 'Defined in Compose' }} for {{ $serviceName }}">{{ $serviceName }}</span>
             @endif
-            <span class="table-badge shrink-0">{{ $composeType === 'derived' ? 'Derived in Compose' : 'Defined in Compose' }}</span>
         </div>
         <span class="env-managed-desktop data-table-cell-check">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
@@ -29,7 +31,7 @@
         <span class="data-table-cell-dash">-</span>
         <span class="data-table-cell-dash">-</span>
         <span class="data-table-cell-dash">-</span>
-        <div class="flex items-center gap-0.5 justify-self-end">
+        <div class="flex items-center justify-end gap-0.5 justify-self-end">
             @unless ($isValueHidden)
                 <x-copy-button resolve="$wire.copyValue()" label="Copy value" />
             @endunless

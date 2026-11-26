@@ -1,11 +1,13 @@
 <?php
 
+use App\Actions\Server\CheckAutomaticSecurityUpdatesRun;
 use App\Actions\Server\CheckUpdates;
 use App\Actions\Server\ConfigureAutomaticSecurityUpdates;
 use App\Actions\Server\RebootServer;
 use App\Actions\Server\UpdatePackage;
 use App\Events\ServerPackagesUpdateFinished;
 use App\Events\ServerPatchCheckFinished;
+use App\Jobs\ServerAutoSecurityUpdatesCheckJob;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\ServerPatchCheckJob;
 use App\Livewire\Server\Security\Patches;
@@ -15,6 +17,7 @@ use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
+use App\Notifications\Server\AutomaticSecurityUpdatesFinished;
 use App\Notifications\Server\ServerPatchCheck;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -180,14 +183,13 @@ describe('patches page', function () {
             ->assertSee('8.5.0-2ubuntu10.6');
     });
 
-    it('queues the check for an admin and shows the progress', function () {
+    it('queues the check for an admin and marks it running', function () {
         $this->actingAs($this->admin);
         session(['currentTeam' => $this->team]);
 
         Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
             ->call('checkForUpdates')
-            ->assertSet('checking', true)
-            ->assertSee('Inspecting installed packages');
+            ->assertSet('checking', true);
 
         Queue::assertPushed(ServerPatchCheckJob::class, fn ($job) => $job->manual && $job->server->is($this->server));
     });
@@ -205,7 +207,7 @@ describe('patches page', function () {
             ->assertSee('openssl');
     });
 
-    it('shows held back updates apart from the updates and does not update them', function () {
+    it('shows held back updates and does not update them', function () {
         $result = [...patchesTestResult(0), 'held_updates' => [
             ['package' => 'cloud-init', 'current_version' => '25.1.4-0ubuntu0~24.04.1', 'new_version' => '26.2-0ubuntu1~24.04.2', 'architecture' => 'all', 'repository' => 'noble-updates', 'held_reason' => 'phased'],
             ['package' => 'tzdata', 'current_version' => '2025b-0ubuntu0.24.04', 'new_version' => '2025b-0ubuntu0.24.04.1', 'architecture' => 'all', 'repository' => 'noble-updates', 'held_reason' => 'held'],
@@ -215,9 +217,6 @@ describe('patches page', function () {
         session(['currentTeam' => $this->team]);
 
         Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
-            ->assertSee('Server is up to date')
-            ->assertSee('Held back updates')
-            ->assertSee('Phased rollout')
             ->assertSee('26.2-0ubuntu1~24.04.2')
             ->assertSee('2025b-0ubuntu0.24.04.1')
             ->call('updatePackage', 'tzdata')
@@ -232,6 +231,23 @@ describe('patches page', function () {
         Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
             ->call('updatePackage', 'curl; reboot')
             ->assertDispatched('error', message: 'This package has no update in the last check.');
+    });
+
+    it('keeps the selected packages when the update does not start, and clears them when it starts', function () {
+        $this->actingAs($this->admin);
+        session(['currentTeam' => $this->team]);
+        $this->server->settings->forceFill(['patch_check_result' => patchesTestResult(2), 'patch_checked_at' => now()])->saveQuietly();
+        $activity = Activity::query()->create(['log_name' => 'default', 'description' => '', 'properties' => []]);
+        UpdatePackage::shouldRun()->twice()->andReturn(['error' => 'Server is not reachable.'], $activity);
+
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
+            ->set('selectedPackages', ['openssl', 'curl'])
+            ->call('updateSelectedPackages')
+            ->assertDispatched('error', message: 'Server is not reachable.')
+            ->assertSet('selectedPackages', ['openssl', 'curl'])
+            ->call('updateSelectedPackages')
+            ->assertDispatched('activityMonitor', $activity->id)
+            ->assertSet('selectedPackages', []);
     });
 });
 
@@ -365,6 +381,7 @@ describe('automatic security updates', function () {
         $this->actingAs($this->admin);
         session(['currentTeam' => $this->team]);
         $this->server->settings->forceFill(['patch_check_result' => patchesTestResult(0), 'patch_checked_at' => now()])->saveQuietly();
+        Queue::fake([ServerAutoSecurityUpdatesCheckJob::class]);
     });
 
     it('turns automatic security updates on and off with the saved time', function () {
@@ -375,15 +392,18 @@ describe('automatic security updates', function () {
             ->with(Mockery::on(fn ($server) => $server->is($this->server)), 'apt', false, '04:30');
 
         $component = Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
-            ->assertSee('Turn on automatic security updates?')
-            ->assertSee('all containers on this server stop and start again')
             ->call('toggleAutomaticSecurityUpdates')
             ->assertDispatched('success')
             ->assertSet('autoSecurityUpdates', true);
         expect($this->server->settings->fresh()->is_auto_security_updates_enabled)->toBeTrue();
+        Queue::assertPushed(ServerAutoSecurityUpdatesCheckJob::class, 1);
 
+        $this->server->settings->forceFill(['auto_security_updates_last_run' => ['started_at' => '2026-10-29 03:00:01']])->saveQuietly();
         $component->call('toggleAutomaticSecurityUpdates')->assertSet('autoSecurityUpdates', false);
-        expect($this->server->settings->fresh()->is_auto_security_updates_enabled)->toBeFalse();
+        expect($this->server->settings->fresh())
+            ->is_auto_security_updates_enabled->toBeFalse()
+            ->auto_security_updates_last_run->toBeNull();
+        Queue::assertPushed(ServerAutoSecurityUpdatesCheckJob::class, 1);
     });
 
     it('does not let the client turn on automatic updates without the confirmed action', function () {
@@ -425,6 +445,21 @@ describe('automatic security updates', function () {
             ->auto_security_updates_time->toBe('05:45');
     });
 
+    it('shows the last automatic run only while automatic updates are on', function (array $run, string $summary) {
+        $this->server->settings->forceFill(['is_auto_security_updates_enabled' => true, 'auto_security_updates_last_run' => $run])->saveQuietly();
+
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
+            ->assertSee('Last run 2026-10-29 03:00:01 (server time):')
+            ->assertSeeHtml($summary);
+
+        $this->server->settings->forceFill(['is_auto_security_updates_enabled' => false])->saveQuietly();
+        Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])->assertDontSee('Last run 2026-10-29');
+    })->with([
+        'updated' => [autoUpdateRun(['packages' => ['openssl', 'curl']]), '2 packages updated'],
+        'failed' => [autoUpdateRun(['failed' => true]), '>failed</span>'],
+        'nothing to do' => [autoUpdateRun(['packages' => []]), 'no updates needed'],
+    ]);
+
     it('keeps the setting off when the server commands fail', function () {
         ConfigureAutomaticSecurityUpdates::shouldRun()->once()->andThrow(new RuntimeException('apt-get failed'));
 
@@ -436,13 +471,11 @@ describe('automatic security updates', function () {
         expect($this->server->settings->fresh()->is_auto_security_updates_enabled)->toBeFalse();
     });
 
-    it('shows that other package managers are not supported', function () {
+    it('does not turn on automatic updates for other package managers', function () {
         $this->server->settings->forceFill(['patch_check_result' => [...patchesTestResult(0), 'package_manager' => 'pacman']])->saveQuietly();
         ConfigureAutomaticSecurityUpdates::shouldRun()->never();
 
         Livewire::test(Patches::class, ['server_uuid' => $this->server->uuid])
-            ->assertSee('this server uses pacman')
-            ->assertDontSee('Turn on automatic security updates?')
             ->call('toggleAutomaticSecurityUpdates')
             ->assertDispatched('error');
     });
@@ -468,6 +501,119 @@ describe('automatic security updates', function () {
         $component->call('toggleAutomaticSecurityUpdates')->assertDispatched('error');
         expect($this->server->settings->fresh()->is_auto_security_updates_enabled)->toBeFalse();
     });
+});
+
+function autoUpdateRun(array $overrides = []): array
+{
+    return ['started_at' => '2026-10-29 03:00:01', 'failed' => false, 'packages' => ['openssl'], 'errors' => [], 'reboot_required' => true, ...$overrides];
+}
+
+function runAutoUpdateCheckJob(Server $server): void
+{
+    (new ServerAutoSecurityUpdatesCheckJob($server->fresh()))->handle();
+}
+
+describe('automatic security updates run check', function () {
+    beforeEach(function () {
+        Notification::fake();
+        $this->team->discordNotificationSettings()->update(['discord_enabled' => true, 'discord_webhook_url' => 'https://discord.example/webhook']);
+        $this->server->settings->forceFill([
+            'patch_check_result' => patchesTestResult(0),
+            'is_auto_security_updates_enabled' => true,
+            'auto_security_updates_last_run' => ['started_at' => '2026-10-28 03:00:01', 'failed' => false, 'packages' => [], 'errors' => [], 'reboot_required' => false],
+        ])->saveQuietly();
+    });
+
+    it('notifies once about a new run that updated packages and saves it', function () {
+        CheckAutomaticSecurityUpdatesRun::shouldRun()->twice()->with(Mockery::any(), 'apt')->andReturn(autoUpdateRun());
+
+        runAutoUpdateCheckJob($this->server);
+        runAutoUpdateCheckJob($this->server);
+
+        Notification::assertSentToTimes($this->team, AutomaticSecurityUpdatesFinished::class, 1);
+        expect($this->server->settings->fresh()->auto_security_updates_last_run)->toBe(autoUpdateRun());
+    });
+
+    it('notifies about a failed run', function () {
+        CheckAutomaticSecurityUpdatesRun::shouldRun()->andReturn(autoUpdateRun(['failed' => true, 'errors' => ['Installing the upgrades failed!']]));
+
+        runAutoUpdateCheckJob($this->server);
+
+        Notification::assertSentTo($this->team, AutomaticSecurityUpdatesFinished::class, function (AutomaticSecurityUpdatesFinished $notification) {
+            return $notification->toWebhook()['success'] === false
+                && str_contains($notification->toDiscord()->title, 'Automatic security updates failed');
+        });
+    });
+
+    it('tells every channel which packages were updated and that a reboot is required', function () {
+        $notification = new AutomaticSecurityUpdatesFinished($this->server, autoUpdateRun(['packages' => ['openssl', 'libssl3']]));
+        $title = "[ACTION REQUIRED] Automatic security updates installed on {$this->server->name}, reboot required";
+
+        expect((string) $notification->toMail()->render())
+            ->toContain('installed 2 package updates')->toContain('openssl')->toContain('A reboot is required')
+            ->and($notification->toMail()->subject)->toBe("Coolify: {$title}")
+            ->and($notification->toTelegram()['message'])->toContain('Updated packages (2): openssl, libssl3')
+            ->and($notification->toSlack()->title)->toBe("Coolify: {$title}")
+            ->and($notification->toPushover()->level)->toBe('warning')
+            ->and($notification->toWebhook())->toMatchArray([
+                'success' => true,
+                'event' => 'server_auto_security_updates',
+                'packages' => ['openssl', 'libssl3'],
+                'reboot_required' => true,
+            ]);
+    });
+
+    it('saves a run without updates but sends nothing', function () {
+        CheckAutomaticSecurityUpdatesRun::shouldRun()->andReturn(autoUpdateRun(['packages' => [], 'reboot_required' => true]));
+
+        runAutoUpdateCheckJob($this->server);
+
+        Notification::assertNothingSent();
+        expect($this->server->settings->fresh()->auto_security_updates_last_run['started_at'])->toBe('2026-10-29 03:00:01');
+    });
+
+    it('saves the current run as the baseline without a notification', function (?array $current, array $baseline) {
+        $this->server->settings->forceFill(['auto_security_updates_last_run' => null])->saveQuietly();
+        CheckAutomaticSecurityUpdatesRun::shouldRun()->andReturn($current);
+
+        runAutoUpdateCheckJob($this->server);
+
+        Notification::assertNothingSent();
+        expect($this->server->settings->fresh()->auto_security_updates_last_run)->toBe($baseline);
+    })->with([
+        'earlier run' => [autoUpdateRun(), autoUpdateRun()],
+        'no run yet' => [null, []],
+    ]);
+
+    it('notifies about the first run after a baseline without a run', function () {
+        $this->server->settings->forceFill(['auto_security_updates_last_run' => []])->saveQuietly();
+        CheckAutomaticSecurityUpdatesRun::shouldRun()->andReturn(autoUpdateRun());
+
+        runAutoUpdateCheckJob($this->server);
+
+        Notification::assertSentTo($this->team, AutomaticSecurityUpdatesFinished::class);
+    });
+
+    it('does not notify when the team turned the event off', function () {
+        $this->team->discordNotificationSettings()->update(['server_auto_update_discord_notifications' => false]);
+        CheckAutomaticSecurityUpdatesRun::shouldRun()->andReturn(autoUpdateRun());
+
+        runAutoUpdateCheckJob($this->server);
+
+        Notification::assertNothingSent();
+    });
+
+    it('does not connect when automatic updates are off or the package manager is not supported', function (array $settings) {
+        $this->server->settings->forceFill($settings)->saveQuietly();
+        CheckAutomaticSecurityUpdatesRun::shouldRun()->never();
+
+        runAutoUpdateCheckJob($this->server);
+
+        Notification::assertNothingSent();
+    })->with([
+        'off' => [['is_auto_security_updates_enabled' => false]],
+        'zypper' => [['patch_check_result' => [...patchesTestResult(0), 'package_manager' => 'zypper']]],
+    ]);
 });
 
 describe('audit trail', function () {

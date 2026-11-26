@@ -79,7 +79,10 @@ function domainConflictKey(string $domain): string
         ? str($domain)->beforeLast('/')->toString()
         : $domain;
 
-    return preg_replace('#^https?://#i', '', $domain) ?? $domain;
+    $domain = preg_replace('#^https?://#i', '', $domain) ?? $domain;
+
+    // The URL port is the container port. The public address does not include it.
+    return preg_replace('#^([^/:\[]+|\[[^\]]+\]):\d+#', '$1', $domain) ?? $domain;
 }
 
 /**

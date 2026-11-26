@@ -63,6 +63,8 @@ class GitlabPrivateRepository extends Component
 
     private function getGitlabApp(): GitlabApp
     {
+        $this->authorize('useTeamCredentials');
+
         return GitlabApp::private()->where('id', $this->gitlab_app_id)->firstOrFail();
     }
 
@@ -161,6 +163,8 @@ class GitlabPrivateRepository extends Component
     public function submit()
     {
         try {
+            $this->base_directory = ValidationPatterns::normalizeDirectoryPath($this->base_directory);
+
             $validator = validator([
                 'selected_repository_path' => $this->selected_repository_path,
                 'selected_branch_name' => $this->selected_branch_name,

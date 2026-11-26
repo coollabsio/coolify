@@ -1,5 +1,6 @@
 <div class="application-settings-form flex flex-col gap-6">
     <form wire:submit="submit" class="flex flex-col gap-6">
+        <x-project-config.readonly-notice :resource="$database" />
         <x-unsaved-bar action="submit" />
 
         <x-application.settings-section id="database-details-section" title="Database details"
@@ -42,9 +43,11 @@
             <x-application.settings-subsection id="initialization-section" title="Initialization" helper="Configure the options used when PostgreSQL creates its initial data directory.">
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.input label="Initial database arguments" id="postgresInitdbArgs"
-                        placeholder="Leave empty to use the image default." canGate="update" :canResource="$database" />
+                        placeholder="Leave empty to use the image default." canGate="update" :canResource="$database"
+                        helper="Used only on the first start, when PostgreSQL creates the data directory. To apply a change later, delete the data volume or edit the files in the database." />
                     <x-forms.input label="Host authentication method" id="postgresHostAuthMethod"
-                        placeholder="Leave empty to use the image default." canGate="update" :canResource="$database" />
+                        placeholder="Leave empty to use the image default." canGate="update" :canResource="$database"
+                        helper="Used only on the first start, when PostgreSQL creates the data directory. To apply a change later, delete the data volume or edit the files in the database." />
                 </div>
             </x-application.settings-subsection>
         </x-application.settings-section>

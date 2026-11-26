@@ -126,7 +126,7 @@ trait HandlesDatabaseImportsApi
             'id' => $activity->id,
             'status' => $status,
             'exit_code' => data_get($activity, 'properties.exitCode'),
-            'output' => request()->attributes->get('can_read_sensitive', false) === true && request()->user()->can('update', $resource)
+            'output' => canReadResourceSecretsFromApi($resource) && request()->user()->can('update', $resource)
                 ? remove_iip(RunRemoteProcess::decodeOutput($activity))
                 : null,
             'created_at' => $activity->created_at,

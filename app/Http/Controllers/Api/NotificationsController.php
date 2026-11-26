@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\DiscordNotificationSettings;
 use App\Models\EmailNotificationSettings;
+use App\Models\NtfyNotificationSettings;
 use App\Models\PushoverNotificationSettings;
 use App\Models\SlackNotificationSettings;
 use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
 use App\Models\WebhookNotificationSettings;
+use App\Rules\SafeSmtpHost;
 use App\Rules\SafeWebhookUrl;
 use App\Rules\ValidHostname;
 use Illuminate\Database\Eloquent\Model;
@@ -33,7 +35,7 @@ class NotificationsController extends Controller
                     'smtp_from_address' => 'sometimes|nullable|email',
                     'smtp_from_name' => 'sometimes|nullable|string|max:255',
                     'smtp_recipients' => 'sometimes|nullable|string|max:1000',
-                    'smtp_host' => 'sometimes|nullable|string|max:255',
+                    'smtp_host' => ['sometimes', 'nullable', 'string', 'max:255', new SafeSmtpHost],
                     'smtp_port' => 'sometimes|nullable|integer|min:1|max:65535',
                     'smtp_encryption' => 'sometimes|nullable|string|in:starttls,tls,none',
                     'smtp_username' => 'sometimes|nullable|string|max:255',
@@ -42,6 +44,8 @@ class NotificationsController extends Controller
                     'smtp_ehlo_domain' => ['sometimes', 'nullable', 'string', 'max:255', new ValidHostname],
                     'resend_enabled' => 'sometimes|boolean',
                     'resend_api_key' => 'sometimes|nullable|string|max:255',
+                    'resend_from_address' => 'sometimes|nullable|email',
+                    'resend_from_name' => 'sometimes|nullable|string|max:255',
                     'use_instance_email_settings' => 'sometimes|boolean',
                     'deployment_success_email_notifications' => 'sometimes|boolean',
                     'deployment_failure_email_notifications' => 'sometimes|boolean',
@@ -58,7 +62,9 @@ class NotificationsController extends Controller
                     'server_reachable_email_notifications' => 'sometimes|boolean',
                     'server_unreachable_email_notifications' => 'sometimes|boolean',
                     'server_patch_email_notifications' => 'sometimes|boolean',
+                    'server_auto_update_email_notifications' => 'sometimes|boolean',
                     'traefik_outdated_email_notifications' => 'sometimes|boolean',
+                    'image_vulnerabilities_email_notifications' => 'sometimes|boolean',
                 ],
             ],
             'discord' => [
@@ -80,8 +86,11 @@ class NotificationsController extends Controller
                     'server_reachable_discord_notifications' => 'sometimes|boolean',
                     'server_unreachable_discord_notifications' => 'sometimes|boolean',
                     'server_patch_discord_notifications' => 'sometimes|boolean',
+                    'server_auto_update_discord_notifications' => 'sometimes|boolean',
                     'traefik_outdated_discord_notifications' => 'sometimes|boolean',
+                    'image_vulnerabilities_discord_notifications' => 'sometimes|boolean',
                     'discord_ping_enabled' => 'sometimes|boolean',
+                    'discord_ping_text' => 'sometimes|nullable|string|max:500',
                 ],
             ],
             'slack' => [
@@ -103,7 +112,9 @@ class NotificationsController extends Controller
                     'server_reachable_slack_notifications' => 'sometimes|boolean',
                     'server_unreachable_slack_notifications' => 'sometimes|boolean',
                     'server_patch_slack_notifications' => 'sometimes|boolean',
+                    'server_auto_update_slack_notifications' => 'sometimes|boolean',
                     'traefik_outdated_slack_notifications' => 'sometimes|boolean',
+                    'image_vulnerabilities_slack_notifications' => 'sometimes|boolean',
                 ],
             ],
             'telegram' => [
@@ -126,7 +137,9 @@ class NotificationsController extends Controller
                     'server_reachable_telegram_notifications' => 'sometimes|boolean',
                     'server_unreachable_telegram_notifications' => 'sometimes|boolean',
                     'server_patch_telegram_notifications' => 'sometimes|boolean',
+                    'server_auto_update_telegram_notifications' => 'sometimes|boolean',
                     'traefik_outdated_telegram_notifications' => 'sometimes|boolean',
+                    'image_vulnerabilities_telegram_notifications' => 'sometimes|boolean',
                     'telegram_notifications_deployment_success_thread_id' => 'sometimes|nullable|string|max:255',
                     'telegram_notifications_deployment_failure_thread_id' => 'sometimes|nullable|string|max:255',
                     'telegram_notifications_status_change_thread_id' => 'sometimes|nullable|string|max:255',
@@ -141,7 +154,9 @@ class NotificationsController extends Controller
                     'telegram_notifications_server_reachable_thread_id' => 'sometimes|nullable|string|max:255',
                     'telegram_notifications_server_unreachable_thread_id' => 'sometimes|nullable|string|max:255',
                     'telegram_notifications_server_patch_thread_id' => 'sometimes|nullable|string|max:255',
+                    'telegram_notifications_server_auto_update_thread_id' => 'sometimes|nullable|string|max:255',
                     'telegram_notifications_traefik_outdated_thread_id' => 'sometimes|nullable|string|max:255',
+                    'telegram_notifications_image_vulnerabilities_thread_id' => 'sometimes|nullable|string|max:255',
                 ],
             ],
             'pushover' => [
@@ -164,7 +179,44 @@ class NotificationsController extends Controller
                     'server_reachable_pushover_notifications' => 'sometimes|boolean',
                     'server_unreachable_pushover_notifications' => 'sometimes|boolean',
                     'server_patch_pushover_notifications' => 'sometimes|boolean',
+                    'server_auto_update_pushover_notifications' => 'sometimes|boolean',
                     'traefik_outdated_pushover_notifications' => 'sometimes|boolean',
+                    'image_vulnerabilities_pushover_notifications' => 'sometimes|boolean',
+                ],
+            ],
+            'ntfy' => [
+                'model' => NtfyNotificationSettings::class,
+                // Stored credentials must not follow a changed server URL to a new destination.
+                'credentials_bound_to' => ['ntfy_url' => ['ntfy_token', 'ntfy_username', 'ntfy_password']],
+                'rules' => [
+                    'ntfy_enabled' => 'sometimes|boolean',
+                    'ntfy_url' => ['sometimes', 'nullable', 'string', new SafeWebhookUrl],
+                    'ntfy_topic' => ['sometimes', 'nullable', 'string', 'max:64', 'regex:/\A[a-zA-Z0-9_-]+\z/'],
+                    'ntfy_auth_method' => 'sometimes|string|in:none,token,basic',
+                    'ntfy_token' => ['sometimes', 'nullable', 'string', 'max:255', 'not_regex:/[\x00-\x1F\x7F]/'],
+                    'ntfy_username' => ['sometimes', 'nullable', 'string', 'max:255', 'not_regex:/[\x00-\x1F\x7F]/'],
+                    'ntfy_password' => ['sometimes', 'nullable', 'string', 'max:255', 'not_regex:/[\x00-\x1F\x7F]/'],
+                    'ntfy_priority_success_events' => 'sometimes|integer|between:1,5',
+                    'ntfy_priority_info_events' => 'sometimes|integer|between:1,5',
+                    'ntfy_priority_warning_events' => 'sometimes|integer|between:1,5',
+                    'ntfy_priority_error_events' => 'sometimes|integer|between:1,5',
+                    'deployment_success_ntfy_notifications' => 'sometimes|boolean',
+                    'deployment_failure_ntfy_notifications' => 'sometimes|boolean',
+                    'status_change_ntfy_notifications' => 'sometimes|boolean',
+                    'restart_limit_reached_ntfy_notifications' => 'sometimes|boolean',
+                    'backup_success_ntfy_notifications' => 'sometimes|boolean',
+                    'backup_failure_ntfy_notifications' => 'sometimes|boolean',
+                    'scheduled_task_success_ntfy_notifications' => 'sometimes|boolean',
+                    'scheduled_task_failure_ntfy_notifications' => 'sometimes|boolean',
+                    'docker_cleanup_success_ntfy_notifications' => 'sometimes|boolean',
+                    'docker_cleanup_failure_ntfy_notifications' => 'sometimes|boolean',
+                    'server_disk_usage_ntfy_notifications' => 'sometimes|boolean',
+                    'server_reachable_ntfy_notifications' => 'sometimes|boolean',
+                    'server_unreachable_ntfy_notifications' => 'sometimes|boolean',
+                    'server_patch_ntfy_notifications' => 'sometimes|boolean',
+                    'server_auto_update_ntfy_notifications' => 'sometimes|boolean',
+                    'traefik_outdated_ntfy_notifications' => 'sometimes|boolean',
+                    'image_vulnerabilities_ntfy_notifications' => 'sometimes|boolean',
                 ],
             ],
             'webhook' => [
@@ -172,6 +224,7 @@ class NotificationsController extends Controller
                 'rules' => [
                     'webhook_enabled' => 'sometimes|boolean',
                     'webhook_url' => ['sometimes', 'nullable', 'string', new SafeWebhookUrl],
+                    'webhook_authorization_header' => ['sometimes', 'nullable', 'string', 'max:4096', 'not_regex:/[\r\n]/'],
                     'deployment_success_webhook_notifications' => 'sometimes|boolean',
                     'deployment_failure_webhook_notifications' => 'sometimes|boolean',
                     'status_change_webhook_notifications' => 'sometimes|boolean',
@@ -186,7 +239,9 @@ class NotificationsController extends Controller
                     'server_reachable_webhook_notifications' => 'sometimes|boolean',
                     'server_unreachable_webhook_notifications' => 'sometimes|boolean',
                     'server_patch_webhook_notifications' => 'sometimes|boolean',
+                    'server_auto_update_webhook_notifications' => 'sometimes|boolean',
                     'traefik_outdated_webhook_notifications' => 'sometimes|boolean',
+                    'image_vulnerabilities_webhook_notifications' => 'sometimes|boolean',
                 ],
             ],
             default => throw new \InvalidArgumentException("Unknown notification channel [{$channel}]."),
@@ -279,6 +334,14 @@ class NotificationsController extends Controller
         $this->authorize('update', $settings);
 
         $settings->fill(array_intersect_key($body, array_flip($allowedFields)));
+        foreach ($config['credentials_bound_to'] ?? [] as $destinationField => $credentialFields) {
+            if (! $settings->isDirty($destinationField)) {
+                continue;
+            }
+            foreach (array_diff($credentialFields, array_keys($body)) as $credentialField) {
+                $settings->{$credentialField} = null;
+            }
+        }
         $settings->save();
 
         auditLog("api.notifications.{$channel}.updated", [
@@ -480,6 +543,44 @@ class NotificationsController extends Controller
     public function update_pushover(Request $request): JsonResponse
     {
         return $this->updateChannel($request, 'pushover');
+    }
+
+    #[OA\Get(
+        summary: 'Get Ntfy notification settings',
+        description: 'Get the current team Ntfy notification settings. Encrypted secrets are only returned when the token has `read:sensitive` (or `root`) and the user is a team admin/owner.',
+        path: '/notifications/ntfy',
+        operationId: 'get-current-team-ntfy-notifications',
+        security: [['bearerAuth' => []]],
+        tags: ['Notifications'],
+        responses: [
+            new OA\Response(response: 200, description: 'Ntfy notification settings.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+        ]
+    )]
+    public function ntfy(Request $request): JsonResponse
+    {
+        return $this->showChannel('ntfy');
+    }
+
+    #[OA\Patch(
+        summary: 'Update Ntfy notification settings',
+        description: 'Update the current team Ntfy notification settings.',
+        path: '/notifications/ntfy',
+        operationId: 'update-current-team-ntfy-notifications',
+        security: [['bearerAuth' => []]],
+        tags: ['Notifications'],
+        responses: [
+            new OA\Response(response: 200, description: 'Updated Ntfy notification settings.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 403, description: 'Forbidden.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function update_ntfy(Request $request): JsonResponse
+    {
+        return $this->updateChannel($request, 'ntfy');
     }
 
     #[OA\Get(

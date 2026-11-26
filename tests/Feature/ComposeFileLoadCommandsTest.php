@@ -7,6 +7,7 @@ use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Services\ComposeIncludeFlattener;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
@@ -200,6 +201,71 @@ test('the Compose file loads from inside a Git submodule', function (string $sub
     'submodule at the top level' => ['infra', '/infra/templates/wordpress-staging/docker-compose.yml'],
     'nested submodule' => ['infra/templates', '/infra/templates/wordpress-staging/docker-compose.yml'],
     'missing file' => ['infra', '/infra/missing/docker-compose.yml'],
+])->with([
+    'root' => ['root'],
+    'non-root' => ['ubuntu'],
+]);
+
+test('included Compose files are read from the Git submodule that contains them', function (string $file, ?string $expected, string $user) {
+    $submoduleSource = $this->root.'/infra-src';
+    mkdir($submoduleSource);
+    file_put_contents("{$submoduleSource}/docker-compose.yml", "include:\n  - ./extra.yml\n");
+    file_put_contents("{$submoduleSource}/extra.yml", "services:\n  extra:\n    image: nginx\n");
+    $gitEnv = ['GIT_CONFIG_COUNT' => '1', 'GIT_CONFIG_KEY_0' => 'protocol.file.allow', 'GIT_CONFIG_VALUE_0' => 'always'];
+    foreach ([
+        [$submoduleSource, ['git', 'init', '-q', '-b', 'main']],
+        [$submoduleSource, ['git', 'add', '-A']],
+        [$submoduleSource, ['git', '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'infra']],
+        [$submoduleSource, ['git', 'clone', '-q', '--bare', '.', $this->root.'/infra.git']],
+        [$this->root.'/src', ['git', 'submodule', '-q', 'add', $this->root.'/infra.git', 'infra']],
+        [$this->root.'/src', ['git', 'submodule', '-q', 'add', $this->root.'/infra.git', 'other']],
+        [$this->root.'/src', ['git', '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'add infra']],
+        [$this->root.'/src', ['git', 'push', '-q', $this->root.'/repo.git', 'main']],
+    ] as [$cwd, $command]) {
+        (new Process($command, $cwd, $gitEnv))->mustRun();
+    }
+    // A later commit in the submodule source must not change what is read: the gitlink selects the commit.
+    file_put_contents("{$submoduleSource}/extra.yml", "services:\n  changed:\n    image: nginx\n");
+    (new Process(['git', '-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qam', 'change'], $submoduleSource))->mustRun();
+    (new Process(['git', 'push', '-q', $this->root.'/infra.git', 'main'], $submoduleSource))->mustRun();
+
+    $application = Application::factory()->create([
+        'build_pack' => 'dockercompose',
+        'git_repository' => $this->root.'/repo.git',
+        'git_branch' => 'main',
+        'git_commit_sha' => 'HEAD',
+        'base_directory' => '/',
+        'docker_compose_location' => '/infra/docker-compose.yml',
+    ]);
+    $application->settings->update(['is_git_submodules_enabled' => true]);
+    $uuid = 'compose-load-'.bin2hex(random_bytes(4));
+    $commands = (new ReflectionMethod(Application::class, 'composeFileReadCommands'))->invoke($application->fresh(), $uuid)
+        ->push('sh -c '.escapeshellarg(ComposeIncludeFlattener::copyFileScript("/tmp/{$uuid}/checkout", "/tmp/{$uuid}/flat", $file)));
+    if ($user !== 'root') {
+        $server = Mockery::mock(Server::class)->makePartial();
+        $server->shouldReceive('getAttribute')->with('user')->andReturn($user);
+        $server->shouldReceive('setAttribute')->andReturnSelf();
+        $commands = collect(parseCommandsByLineForSudo($commands, $server));
+    }
+
+    $process = new Process(['bash', '-se'], env: ['PATH' => $this->root.'/bin:'.getenv('PATH')] + $gitEnv);
+    $process->setInput($commands->implode("\n")."\n");
+    $process->run();
+    $copied = @file_get_contents("/tmp/{$uuid}/flat/{$file}");
+    (new Process(['rm', '-rf', "/tmp/{$uuid}"]))->run();
+
+    if ($expected === null) {
+        expect($process->getExitCode())->not->toBe(0)
+            ->and($process->getErrorOutput())->toContain('The Git submodule other is not checked out.');
+    } else {
+        expect($process->getExitCode())->toBe(0)
+            ->and($process->getOutput())->toBe("include:\n  - ./extra.yml\n".$expected)
+            ->and($copied)->toBe($expected);
+    }
+})->with([
+    'file in the submodule' => ['infra/extra.yml', "services:\n  extra:\n    image: nginx\n"],
+    'file in the superproject' => ['README.md', 'monorepo'],
+    'file in a submodule that is not checked out' => ['other/extra.yml', null],
 ])->with([
     'root' => ['root'],
     'non-root' => ['ubuntu'],

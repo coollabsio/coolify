@@ -112,8 +112,7 @@
                                     <x-reicon name="x" class="size-3.5" />
                                 </button>
                             </div>
-                            <div class="application-settings-section-body relative w-auto space-y-4 overflow-y-auto p-4"
-                                style="-webkit-overflow-scrolling: touch;">
+                            <div class="application-settings-section-body relative w-auto space-y-4 overflow-y-auto p-4">
                                 {{-- Server count input --}}
                                 <div>
                                     <label class="mb-1.5 block">Paid servers</label>
@@ -227,7 +226,8 @@
                         @php
                             $deleteAccountCheckbox = [
                                 'id' => 'deleteAccount',
-                                'label' => 'Delete my account. Servers, projects, and Git sources of teams where I am the only member are removed from Coolify. Nothing is stopped on the servers.',
+                                'label' => 'Delete my account',
+                                'actions' => $deleteAccountActions,
                             ];
                         @endphp
                         @if ($isRefundEligible)
@@ -267,6 +267,8 @@
                 </div>
                 @if (currentTeam()->subscription->stripe_cancel_at_period_end)
                     <p class="text-sm text-neutral-500">Your subscription is set to cancel at the end of the billing period.</p>
+                @elseif (isCloud() && $deleteAccountBlockers)
+                    <p class="text-sm text-neutral-500">To also delete your account, first: {{ implode(' ', $deleteAccountBlockers) }}</p>
                 @endif
             </section>
 

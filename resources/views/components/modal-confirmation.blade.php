@@ -27,6 +27,9 @@
     'dispatchEventMessage' => '',
     'ignoreWire' => true,
     'temporaryDisableTwoStepConfirmation' => false,
+    // Accepted so that callers' canGate/canResource are not rendered as HTML attributes (the model would leak as JSON).
+    'canGate' => null,
+    'canResource' => null,
 ])
 
 @php
@@ -48,7 +51,7 @@
     $triggerWireTarget = $ignoreWire || $dispatchAction ? '' : $submitAction;
 @endphp
 
-<div {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
+<div {{ $attributes }} {{ $ignoreWire ? 'wire:ignore' : '' }} x-data="{
     modalOpen: false,
     step: {{ empty($checkboxes) ? 2 : 1 }},
     initialStep: {{ empty($checkboxes) ? 2 : 1 }},
@@ -173,11 +176,11 @@
         @else
             @if ($disabled)
                 @if ($buttonFullWidth)
-                    <x-forms.button class="w-full" isError disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
+                    <x-forms.button class="w-full" :isError="$isErrorButton" disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @else
-                    <x-forms.button isError disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
+                    <x-forms.button :isError="$isErrorButton" disabled :authDisabled="$authDisabled" :tooltip="$disabledTooltip" wire:target>
                         {{ $resolvedButtonTitle }}
                     </x-forms.button>
                 @endif
@@ -239,8 +242,7 @@
                         <x-reicon name="x" class="size-4" />
                     </button>
                 </header>
-                <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto"
-                    style="-webkit-overflow-scrolling: touch;">
+                <div class="application-settings-section-body min-h-0 flex-1 overflow-y-auto">
                     @if (!empty($checkboxes))
                         <!-- Step 1: Select actions -->
                         <div x-show="step === 1">
@@ -275,12 +277,15 @@
                                 </li>
                             @endforeach
                             @foreach ($checkboxes as $checkbox)
-                                <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
-                                    <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
-                                        <span class="shrink-0" aria-hidden="true">-</span>
-                                        <span>{{ $checkbox['label'] }}</span>
-                                    </li>
-                                </template>
+                                {{-- A checkbox can list its own `actions`. They replace its label here. --}}
+                                @foreach ($checkbox['actions'] ?? [$checkbox['label']] as $checkboxAction)
+                                    <template x-if="selectedActions.includes('{{ $checkbox['id'] }}')">
+                                        <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">
+                                            <span class="shrink-0" aria-hidden="true">-</span>
+                                            <span>{{ $checkboxAction }}</span>
+                                        </li>
+                                    </template>
+                                @endforeach
                                 @if (isset($checkbox['default_warning']))
                                     <template x-if="!selectedActions.includes('{{ $checkbox['id'] }}')">
                                         <li class="flex items-start gap-2 text-[12px] leading-5 text-red-600 dark:text-red-400">

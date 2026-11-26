@@ -248,7 +248,7 @@ describe('applicationParser', function () {
         $parsed = applicationParser($application, 42, $preview->id)->toArray();
         $name = addPreviewDeploymentSuffix("{$uuid}_opts", 42);
 
-        expect(driverOptionsVolumeSources($parsed['services']['web-pr-42']['volumes']))->toBe([$name])
+        expect(driverOptionsVolumeSources($parsed['services']['web']['volumes']))->toBe([$name])
             ->and($parsed['volumes'][$name])->toBe(expectedPreviewDriverOptionsVolume($name));
     });
 
@@ -300,7 +300,7 @@ describe('applicationParser', function () {
 
         $parsed = applicationParser($application, 42, $preview->id)->toArray();
 
-        expect($parsed['services']['web-pr-42']['volumes'])->toBe(["{$name}:/nfs", addPreviewDeploymentSuffix("{$uuid}_app-data", 42).':/app'])
+        expect($parsed['services']['web']['volumes'])->toBe(["{$name}:/nfs", addPreviewDeploymentSuffix("{$uuid}_app-data", 42).':/app'])
             ->and($parsed['volumes'])->not->toHaveKey('nfs-data')
             ->and($parsed['volumes'][$name])->toBe(['name' => $name])
             ->and(LocalPersistentVolume::where('resource_id', $application->id)->where('name', $name)->exists())->toBeTrue();

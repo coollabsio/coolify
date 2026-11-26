@@ -3,15 +3,19 @@
 namespace App\Livewire\Project;
 
 use App\Actions\Shared\CloneVolumeDataWithSourceStopped;
+use App\Enums\AccessLevel;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Services\Access\AccessResolver;
 use App\Support\ValidationPatterns;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
 
 class CloneMe extends Component
@@ -62,7 +66,9 @@ class CloneMe extends Component
         $this->servers = Server::query()
             ->where('team_id', $this->project->team_id)
             ->get()
-            ->reject(fn ($server) => $server->isBuildServer());
+            ->reject(fn ($server) => $server->isBuildServer())
+            ->filter(fn ($server) => Gate::allows('placeResource', $server))
+            ->values();
         $this->newName = str(clone_resource_name($this->project->name, new_public_id()))->slug();
     }
 
@@ -99,6 +105,9 @@ class CloneMe extends Component
                 'newName' => ValidationPatterns::nameRules(),
             ]);
             $teamId = $this->project->team_id;
+            if ($type === 'project' && ! app(AccessResolver::class)->allowsTeamWide(auth()->user(), AccessLevel::Write, $teamId)) {
+                throw new AuthorizationException('You are not allowed to create projects in this team.');
+            }
             if (! $this->environment || (int) $this->environment->project_id !== (int) $this->project->id) {
                 throw new \Exception('Environment not found.');
             }
@@ -111,6 +120,7 @@ class CloneMe extends Component
             if (! $selectedDestination) {
                 throw new \Exception('Destination not found.');
             }
+            $this->authorize('placeResource', $selectedDestination->server);
             auditLog('ui.project.clone_started', [
                 'team_id' => $this->project->team_id,
                 'project_uuid' => $this->project->uuid,
@@ -175,11 +185,16 @@ class CloneMe extends Component
         }
 
         foreach ($databases as $database) {
+            foreach ($database->persistentStorages()->get() as $volume) {
+                $volume->ensureCloneTargetIsAvailable($database->destination->server, $selectedDestination->server);
+            }
             $uuid = new_public_id();
+            // A clone is not managed by coolify.json.
             $newDatabase = $database->replicate([
                 'id',
                 'created_at',
                 'updated_at',
+                'config_key',
             ])->fill([
                 'uuid' => $uuid,
                 'status' => 'exited',
@@ -202,7 +217,9 @@ class CloneMe extends Component
                 $originalName = $volume->name;
                 $newName = '';
 
-                if (str_starts_with($originalName, 'postgres-data-')) {
+                if ($volume->is_external) {
+                    $newName = $originalName;
+                } elseif (str_starts_with($originalName, 'postgres-data-')) {
                     $newName = 'postgres-data-'.$newDatabase->uuid;
                 } elseif (str_starts_with($originalName, 'mysql-data-')) {
                     $newName = 'mysql-data-'.$newDatabase->uuid;
@@ -210,6 +227,10 @@ class CloneMe extends Component
                     $newName = 'redis-data-'.$newDatabase->uuid;
                 } elseif (str_starts_with($originalName, 'clickhouse-data-')) {
                     $newName = 'clickhouse-data-'.$newDatabase->uuid;
+                } elseif (str_starts_with($originalName, 'influxdb-data-')) {
+                    $newName = 'influxdb-data-'.$newDatabase->uuid;
+                } elseif (str_starts_with($originalName, 'influxdb-config-')) {
+                    $newName = 'influxdb-config-'.$newDatabase->uuid;
                 } elseif (str_starts_with($originalName, 'mariadb-data-')) {
                     $newName = 'mariadb-data-'.$newDatabase->uuid;
                 } elseif (str_starts_with($originalName, 'mongodb-data-')) {
@@ -239,7 +260,7 @@ class CloneMe extends Component
                 ]);
                 $newPersistentVolume->save();
 
-                if ($this->cloneVolumeData) {
+                if ($volume->shouldCopyDataWhenCloning($this->cloneVolumeData)) {
                     $pendingVolumeClones[] = new VolumeCloneJob(
                         $volume->name,
                         $newPersistentVolume->name,
@@ -290,6 +311,7 @@ class CloneMe extends Component
                     'id',
                     'created_at',
                     'updated_at',
+                    'config_meta',
                 ])->fill($payload);
                 $newEnvironmentVariable->save();
             }

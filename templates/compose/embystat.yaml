@@ -3,10 +3,11 @@
 # category: analytics
 # tags: analytics, insights, statistics, web, traffic
 # port: 6555
+# outdated: true
 
 services:
   embystat:
-    image: lscr.io/linuxserver/embystat:latest
+    image: lscr.io/linuxserver/embystat:0.2.0
     environment:
       - SERVICE_URL_EMBYSTAT_6555
       - PUID=1000

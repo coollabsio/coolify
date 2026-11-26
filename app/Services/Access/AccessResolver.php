@@ -9,9 +9,12 @@ use App\Models\Environment;
 use App\Models\PersonalAccessToken;
 use App\Models\Project;
 use App\Models\Scopes\VisibleThroughAccessGrants;
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
+use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -19,6 +22,7 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
+use App\Models\SwarmDocker;
 use App\Models\User;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
@@ -49,6 +53,7 @@ class AccessResolver
         StandaloneKeydb::class,
         StandaloneDragonfly::class,
         StandaloneClickhouse::class,
+        StandaloneInfluxdb::class,
         StandaloneSqlite::class,
     ];
 
@@ -108,7 +113,12 @@ class AccessResolver
             return null;
         }
 
-        $levels = AccessLevel::parseMany($token->abilities ?? []);
+        $abilities = $token->abilities ?? [];
+        $levels = AccessLevel::parseMany($abilities);
+        // Scopes only pick what a terminal token reaches: its abilities still allow only the exec endpoints, and layers only narrow access.
+        if ($levels === [] && in_array('terminal', $abilities, true)) {
+            $levels = [AccessLevel::Read];
+        }
 
         return array_map(
             fn (Grant $scope) => new Grant($scope->scope, $scope->uuid, $levels),
@@ -132,8 +142,11 @@ class AccessResolver
         }
 
         $stored = $membership->access ?? null;
+        if ($stored === null) {
+            return self::defaultMemberGrants();
+        }
 
-        return $stored === null ? self::defaultMemberGrants() : Grant::listFrom($stored);
+        return array_values(array_filter(Grant::listFrom($stored), fn (Grant $grant) => $grant->scope !== AccessScope::Server));
     }
 
     private function isMember(User $user, int $teamId): bool
@@ -228,6 +241,80 @@ class AccessResolver
     }
 
     /**
+     * UUIDs of the servers whose server endpoints the user (and the current token) can use through token server
+     * grants, or null when every layer covers the whole team.
+     *
+     * @return list<string>|null
+     */
+    public function scopedServerUuids(User $user, int $teamId): ?array
+    {
+        $uuids = null;
+        foreach ($this->layersFor($user, $teamId) as $layer) {
+            if ($layer->coversWholeTeam()) {
+                continue;
+            }
+            $uuids = $uuids === null ? $layer->serverUuids() : array_values(array_intersect($uuids, $layer->serverUuids()));
+        }
+
+        return $uuids;
+    }
+
+    /**
+     * True when the user (and the current token) has the level on at least one resource that runs on the server,
+     * as its main destination or as an additional server of an application. A layer with the level on the server
+     * itself (a token server grant) needs no such resource.
+     */
+    public function allowsOnServer(User $user, AccessLevel $level, Server $server): bool
+    {
+        $teamId = (int) $server->team_id;
+        if (! $this->isMember($user, $teamId)) {
+            return false;
+        }
+
+        $layers = array_values(array_filter(
+            $this->layersFor($user, $teamId),
+            fn (AccessGrants $layer) => ! $layer->allowsServer($level, $server->uuid),
+        ));
+        if ($layers === []) {
+            return true;
+        }
+
+        $environmentProjects = $this->teamEnvironments($teamId)->pluck('environments.project_id', 'environments.id')->all();
+        if ($environmentProjects === []) {
+            return false;
+        }
+
+        foreach (self::RESOURCE_MODELS as $modelClass) {
+            $resources = $modelClass::withoutGlobalScope(VisibleThroughAccessGrants::class)
+                ->whereIn('environment_id', array_keys($environmentProjects))
+                ->where(function (Builder $query) use ($modelClass, $server) {
+                    $query->whereHasMorph('destination', [StandaloneDocker::class, SwarmDocker::class], fn (Builder $destination) => $destination->where('server_id', $server->id));
+                    if ($modelClass === Application::class) {
+                        $query->orWhereHas('additional_servers', fn (Builder $servers) => $servers->whereKey($server->id));
+                    }
+                })
+                ->get(['uuid', 'environment_id']);
+
+            foreach ($resources as $resource) {
+                $environmentId = (int) $resource->environment_id;
+                $projectId = $environmentProjects[$environmentId];
+                $allowed = true;
+                foreach ($layers as $layer) {
+                    if (! $layer->allows($level, $projectId, $environmentId, $resource->uuid)) {
+                        $allowed = false;
+                        break;
+                    }
+                }
+                if ($allowed) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * True when the user has every level of every grant, at that scope or above it.
      * A token can never get more access than the user who owns it.
      *
@@ -261,6 +348,7 @@ class AccessResolver
 
     /**
      * Layers of the authenticated user (and token) in their current team, for list queries.
+     * The token team comes first: the canvas API runs with the session, but its token is for the canvas team.
      *
      * @return list<AccessGrants>
      */
@@ -275,7 +363,7 @@ class AccessResolver
             return [];
         }
 
-        $teamId = data_get(session('currentTeam'), 'id') ?? data_get($user->currentAccessToken(), 'team_id');
+        $teamId = data_get($user->currentAccessToken(), 'team_id') ?? data_get(session('currentTeam'), 'id');
         if ($teamId === null || ! $this->isMember($user, (int) $teamId)) {
             return [];
         }
@@ -337,7 +425,7 @@ class AccessResolver
     private function build(int $teamId, array $grants): AccessGrants
     {
         $teamLevels = [];
-        $byScope = [AccessScope::Project->value => [], AccessScope::Environment->value => [], AccessScope::Resource->value => []];
+        $byScope = [AccessScope::Project->value => [], AccessScope::Environment->value => [], AccessScope::Resource->value => [], AccessScope::Server->value => []];
 
         foreach ($grants as $grant) {
             if ($grant->levels === []) {
@@ -398,6 +486,17 @@ class AccessResolver
             }
         }
 
+        $serverLevels = [];
+        if ($byScope[AccessScope::Server->value] !== []) {
+            $serverUuids = Server::query()
+                ->where('team_id', $teamId)
+                ->whereIn('uuid', array_keys($byScope[AccessScope::Server->value]))
+                ->pluck('uuid');
+            foreach ($serverUuids as $serverUuid) {
+                $serverLevels[$serverUuid] = $byScope[AccessScope::Server->value][$serverUuid];
+            }
+        }
+
         return new AccessGrants(
             $teamLevels,
             $projectLevels,
@@ -406,6 +505,7 @@ class AccessResolver
             $environmentProjects,
             $resourceEnvironments,
             $projectEnvironmentIds,
+            $serverLevels,
         );
     }
 
@@ -449,11 +549,13 @@ class AccessResolver
     }
 
     /**
+     * A server grant needs the level on the whole team, so a token never gets server access that the user lacks.
+     *
      * @return array{0: int|null, 1: int|null, 2: string|null}|null project, environment, resource UUID
      */
     private function locateScope(int $teamId, Grant $grant): ?array
     {
-        if ($grant->scope === AccessScope::Team) {
+        if ($grant->scope === AccessScope::Team || $grant->scope === AccessScope::Server) {
             return [null, null, null];
         }
 
@@ -463,6 +565,7 @@ class AccessResolver
             AccessScope::Project => ($layer->visibleProjectIds()[0] ?? null) === null ? null : [$layer->visibleProjectIds()[0], null, null],
             AccessScope::Environment => ($layer->fullEnvironmentIds()[0] ?? null) === null ? null : [$layer->visibleProjectIds()[0], $layer->fullEnvironmentIds()[0], null],
             AccessScope::Resource => $layer->resourceUuids() === [] ? null : [$layer->visibleProjectIds()[0], $layer->visibleEnvironmentIds()[0], $grant->uuid],
+            AccessScope::Team, AccessScope::Server => null,
         };
     }
 }

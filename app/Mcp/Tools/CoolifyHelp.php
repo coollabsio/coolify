@@ -82,10 +82,18 @@ class CoolifyHelp extends Tool
                 ['tool' => 'deploy', 'note' => 'Redeploy after the fix; force=true to rebuild.'],
             ],
         ],
-        'backup_database' => [
-            'description' => 'Back up a database to S3',
+        'configure_dns' => [
+            'description' => 'Point the domains of an application or service to its server with Cloudflare DNS',
             'steps' => [
-                ['tool' => 'manage_s3_storage', 'action' => 'create', 'note' => 'Add the S3 storage (the secret is never returned).'],
+                ['tool' => 'manage_integration_tokens', 'action' => 'create', 'note' => 'Add a Cloudflare token once (provider=cloudflare, capabilities=[dns]); the secret is never returned.'],
+                ['tool' => 'manage_dns', 'action' => 'status', 'note' => 'Check the providers and records of each domain.'],
+                ['tool' => 'manage_dns', 'action' => 'create', 'note' => 'Create the record for one hostname. On a conflict, ask the user before replace.'],
+            ],
+        ],
+        'backup_database' => [
+            'description' => 'Back up a database to an S3, SFTP, FTPS, or WebDAV storage',
+            'steps' => [
+                ['tool' => 'manage_s3_storage', 'action' => 'create', 'note' => 'Add the storage with its type (s3, sftp, ftps, webdav; bucket and region only for s3). The secret is never returned.'],
                 ['tool' => 'manage_s3_storage', 'action' => 'validate', 'note' => 'Check the credentials.'],
                 ['tool' => 'manage_backup', 'action' => 'create', 'note' => 'Set frequency, s3_storage_uuid, save_s3=true; backup_now=true runs it at once.'],
                 ['tool' => 'list_backup_executions', 'note' => 'Check the result.'],

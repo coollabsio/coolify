@@ -7,11 +7,16 @@
             'application_uuid' => $application->uuid,
         ];
 
+        $openRecommendations = \App\Enums\ApplicationRecommendation::openFor($application);
+        $hasRecommendationsSection = $openRecommendations->isNotEmpty()
+            || \App\Enums\ApplicationRecommendation::dismissedFor($application)->isNotEmpty();
+
         $configurationMenuItems = [
             [
                 'label' => 'General',
                 'route' => 'project.application.configuration',
                 'active' => $currentRoute === 'project.application.configuration',
+                'recommendations' => $openRecommendations,
             ],
             [
                 'label' => 'Domains',
@@ -27,7 +32,7 @@
                 'label' => 'Swarm',
                 'route' => 'project.application.swarm',
                 'active' => $currentRoute === 'project.application.swarm',
-                'visible' => $application->destination->server->isSwarm(),
+                'visible' => $application->destination?->server?->isSwarm(),
             ],
             [
                 'label' => 'Environment Variables',
@@ -49,13 +54,13 @@
                 'route' => 'project.application.command',
                 'active' => $currentRoute === 'project.application.command',
                 'navigate' => false,
-                'visible' => ! $application->destination->server->isSwarm() && auth()->user()?->can('canAccessTerminal'),
+                'visible' => ! $application->destination?->server?->isSwarm() && auth()->user()?->can('canAccessTerminal'),
             ],
             [
                 'label' => 'Files',
                 'route' => 'project.application.files',
                 'active' => $currentRoute === 'project.application.files',
-                'visible' => ! $application->destination->server->isSwarm() && auth()->user()?->can('canAccessTerminal'),
+                'visible' => ! $application->destination?->server?->isSwarm() && auth()->user()?->can('canAccessTerminal'),
             ],
             [
                 'label' => 'Deployment Logs',
@@ -110,11 +115,17 @@
                 'label' => 'Resource Limits',
                 'route' => 'project.application.resource-limits',
                 'active' => $currentRoute === 'project.application.resource-limits',
+                'visible' => $application->build_pack !== 'dockercompose',
             ],
             [
                 'label' => 'Resource Operations',
                 'route' => 'project.application.resource-operations',
                 'active' => $currentRoute === 'project.application.resource-operations',
+            ],
+            [
+                'label' => 'Maintenance Mode',
+                'route' => 'project.application.maintenance',
+                'active' => $currentRoute === 'project.application.maintenance',
             ],
             [
                 'label' => 'Metrics',
@@ -125,6 +136,12 @@
                 'label' => 'Analytics',
                 'route' => 'project.application.analytics',
                 'active' => $currentRoute === 'project.application.analytics',
+            ],
+            [
+                'label' => 'Security',
+                'route' => 'project.application.vulnerabilities',
+                'active' => $currentRoute === 'project.application.vulnerabilities',
+                'security' => \App\Services\ImageScan\SecurityStatus::stored($application)->status->value,
             ],
             [
                 'label' => 'Tags',
@@ -140,7 +157,7 @@
 
         $configurationMenuItems = array_values(array_filter(
             $configurationMenuItems,
-            fn (array $item): bool => $item['visible'] ?? true,
+            fn (array $item): bool => ($item['visible'] ?? true) && $application->hasConfigurationPage($item['route']),
         ));
 
         // Icons follow the main sidebar's reicon set
@@ -165,8 +182,10 @@
             'Rollback' => 'time-back',
             'Resource Limits' => 'cpu',
             'Resource Operations' => 'server-update',
+            'Maintenance Mode' => 'bandage',
             'Metrics' => 'graph',
             'Analytics' => 'analytics',
+            'Security' => 'shield-alert',
             'Tags' => 'tags',
             'Danger Zone' => 'danger',
         ];
@@ -174,10 +193,10 @@
         // Discord-style groups for the settings sidebar
         $menuGroups = [
             'Settings' => ['General', 'Domains', 'Environment Variables', 'Persistent Storage', 'Advanced', 'Swarm', 'Healthcheck'],
-            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Files', 'Metrics', 'Analytics'],
+            'Observe & troubleshoot' => ['Runtime Logs', 'Deployment Logs', 'Terminal', 'Files', 'Metrics', 'Analytics', 'Security'],
             'Deploy' => ['Git Source', 'Servers', 'Preview Deployments'],
             'Automation' => ['Scheduled Tasks', 'Webhooks', 'Backups'],
-            'Operations' => ['Resource Operations', 'Resource Limits', 'Rollback', 'Tags'],
+            'Operations' => ['Resource Operations', 'Maintenance Mode', 'Resource Limits', 'Rollback', 'Tags'],
             'Danger Zone' => ['Danger Zone'],
         ];
         $groupedMenuItems = collect($menuGroups)
@@ -191,6 +210,7 @@
         $isComposeApp = $application->build_pack === 'dockercompose';
         $pageSections = [
             'project.application.configuration' => array_values(array_filter([
+                $hasRecommendationsSection ? ['id' => 'recommendations-section', 'label' => 'Recommendations'] : null,
                 ['id' => 'application-details-section', 'label' => 'Application details'],
                 ['id' => 'access-section', 'label' => 'Access'],
                 ['id' => 'build-pipeline-section', 'label' => 'Build & deploy'],
@@ -212,15 +232,21 @@
                     : null,
                 ['id' => 'preview-deployments-section', 'label' => 'Deployments'],
             ])),
-            'project.application.healthcheck' => [
-                ['id' => 'healthcheck-configuration-section', 'label' => 'Configuration'],
-                ['id' => 'healthcheck-timing-section', 'label' => 'Timing and retries'],
-            ],
             'project.application.resource-operations' => [
                 ['id' => 'clone-resource-section', 'label' => 'Clone resource'],
                 ['id' => 'move-resource-section', 'label' => 'Move resource'],
             ],
         ];
+
+        // Pages that the user can star (components/starred-menu)
+        $starrableMenuItems = collect($configurationMenuItems)->map(fn (array $item): array => [
+            'key' => $item['route'],
+            'label' => $item['label'],
+            'icon' => $menuIcons[$item['label']] ?? 'settings',
+            'href' => route($item['route'], $applicationRouteParameters),
+            'active' => $item['active'],
+            'navigate' => $item['navigate'] ?? true,
+        ])->all();
 
         // Pages and in-page sections that the command palette (⌘K) can search on this page
         $settingsSearchItems = settingsSearchItems($groupedMenuItems, $applicationRouteParameters, $pageSections);
@@ -228,7 +254,7 @@
 
 @php
     // The main sidebar and the mobile drawer show this menu (see components/navbar.blade.php).
-    registerMainNavContext(0, 'Dashboard', 'Back to the main menu');
+    registerMainNavContext(0, 'Dashboard', 'Back to the main menu', $application->name);
 @endphp
 
 {{-- Rendered twice: in the page (CSS hides it; it keeps the command palette items), and teleported into the main sidebar.
@@ -245,6 +271,7 @@
 @endif
                 <nav aria-label="Configuration sections"
                     class="grid grid-cols-1 gap-0.5">
+                    <x-starred-menu.group menu="application" :items="$starrableMenuItems" />
                     @foreach ($groupedMenuItems as $groupLabel => $groupItems)
                         @unless ($loop->first)
                             <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]"
@@ -253,6 +280,7 @@
                         @foreach ($groupItems as $menuItem)
                             @php $sections = $pageSections[$menuItem['route']] ?? []; @endphp
                             <div wire:key="{{ $placement }}-application-settings-group-{{ str($menuItem['label'])->slug() }}">
+                                <div class="starred-menu-row">
                                 <a wire:key="{{ $placement }}-application-settings-link-{{ str($menuItem['label'])->slug() }}"
                                     @class([
                                         'menu-item',
@@ -264,8 +292,12 @@
                                     <x-reicon :name="$menuIcons[$menuItem['label']] ?? 'settings'" class="menu-item-icon" />
                                     <span class="menu-item-label">{{ $menuItem['label'] }}</span>
                                     @if ($menuItem['label'] === 'Files')
-                                        <x-beta-badge class="ml-auto shrink-0" />
+                                        <x-experimental-icon class="ml-auto shrink-0" />
                                     @endif
+                                    @if (filled($menuItem['recommendations'] ?? null))
+                                        <x-attention-mark :label="$menuItem['recommendations']->count().' '.str('recommendation')->plural($menuItem['recommendations']->count())" />
+                                    @endif
+                                    <x-image-scan.security-dot :status="$menuItem['security'] ?? null" />
                                     @if ($menuItem['badge'] ?? false)
                                         <span class="shrink-0">
                                             <livewire:project.application.server-status-badge :application="$application"
@@ -273,6 +305,8 @@
                                         </span>
                                     @endif
                                 </a>
+                                <x-starred-menu.toggle menu="application" :page="$menuItem['route']" :label="$menuItem['label']" />
+                                </div>
                                 {{-- Sub-sections belong to the current page only; collapse them for
                                      every other item so the sidebar stays short. --}}
                                 @if ($menuItem['active'] && filled($sections))

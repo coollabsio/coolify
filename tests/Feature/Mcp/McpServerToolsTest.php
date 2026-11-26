@@ -3,20 +3,30 @@
 use App\Actions\Destination\RemoveStandaloneDockerNetwork;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\RestartProxyJob;
+use App\Models\Application;
 use App\Models\AuditEvent;
 use App\Models\CloudProviderToken;
 use App\Models\DiscordNotificationSettings;
+use App\Models\DnsProviderZone;
+use App\Models\Environment;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
+use App\Models\IntegrationToken;
+use App\Models\ManagedDnsRecord;
 use App\Models\PrivateKey;
+use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\Server;
+use App\Models\ServerSetting;
+use App\Models\Service;
 use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\TelegramNotificationSettings;
 use App\Models\User;
 use App\Services\SentinelMetricsClient;
+use App\Services\SentinelTrafficClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
@@ -67,6 +77,29 @@ class McpSrvStubMetricsClient extends SentinelMetricsClient
         self::$calls++;
 
         return ['rx' => [[now()->subMinutes(5)->getTimestampMs(), 5.0]], 'tx' => [[now()->subMinutes(5)->getTimestampMs(), 1.0]]];
+    }
+}
+
+class McpSrvFakeTrafficClient extends SentinelTrafficClient
+{
+    public static int $calls = 0;
+
+    protected function raw(string $url): string
+    {
+        self::$calls++;
+        $responses = [
+            '/traffic/overview' => ['requests' => 200, 'bytes_in' => 5000, 'bytes_out' => 25000, 'status' => ['s2xx' => 180, 's3xx' => 5, 's4xx' => 10, 's5xx' => 5], 'latency' => ['p50' => 12.5, 'p95' => 45.2, 'p99' => 90.1], 'unique_visitors' => 32],
+            '/traffic/breakdown/country' => [['value' => 'US', 'requests' => 120, 'bytes_out' => 15000]],
+            '/traffic/breakdown/ip' => [['value' => '198.51.100.42', 'requests' => 60, 'bytes_out' => 1200]],
+            '/traffic/breakdown/useragent' => [['value' => 'Mozilla/5.0 PerAppAgent/2.0', 'requests' => 55, 'bytes_out' => 1100]],
+        ];
+        foreach ($responses as $needle => $response) {
+            if (str_contains($url, $needle)) {
+                return json_encode($response);
+            }
+        }
+
+        return '[]';
     }
 }
 
@@ -233,6 +266,13 @@ test('server group destructive actions need confirm=true', function (string $too
     'manage_git_source delete' => ['manage_git_source', ['action' => 'delete', 'resource' => 'github', 'source_id' => '1']],
     'cloud_provider delete_token' => ['cloud_provider', ['action' => 'delete_token', 'uuid' => 'x']],
     'cloud_provider provision_server' => ['cloud_provider', ['action' => 'provision_server', 'resource' => 'hetzner']],
+    'manage_integration_tokens delete' => ['manage_integration_tokens', ['action' => 'delete', 'uuid' => 'x']],
+    'manage_dns replace' => ['manage_dns', ['action' => 'replace', 'resource' => 'application', 'uuid' => 'x']],
+    'manage_dns release' => ['manage_dns', ['action' => 'release', 'resource' => 'application', 'uuid' => 'x', 'hostname' => 'app.example.com']],
+    'manage_secret_manager remove' => ['manage_secret_manager', ['action' => 'remove', 'resource' => 'application', 'uuid' => 'x']],
+    'manage_cloudflare_tunnel update' => ['manage_cloudflare_tunnel', ['action' => 'update', 'uuid' => 'x', 'data' => ['is_cloudflare_tunnel' => false]]],
+    'manage_cloudflare_tunnel enable' => ['manage_cloudflare_tunnel', ['action' => 'enable', 'uuid' => 'x']],
+    'manage_cloudflare_tunnel disable' => ['manage_cloudflare_tunnel', ['action' => 'disable', 'uuid' => 'x']],
 ]);
 
 // ---------------------------------------------------------------- manage_server
@@ -419,7 +459,7 @@ test('manage_registry lists registry logins without passwords', function () {
 });
 
 test('manage_registry list needs read:sensitive', function () {
-    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write']), 'manage_registry', ['action' => 'list', 'uuid' => $this->server->uuid]);
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write', 'deploy']), 'manage_registry', ['action' => 'list', 'uuid' => $this->server->uuid]);
 
     expect(mcpSrvIsError($response))->toBeTrue()
         ->and(mcpSrvText($response))->toContain('read:sensitive');
@@ -880,4 +920,271 @@ test('get_server_metrics explains when metrics are disabled', function () {
 
     expect(mcpSrvIsError($response))->toBeTrue()
         ->and(mcpSrvText($response))->toContain('Metrics are not enabled');
+});
+
+// ---------------------------------------------------------------- get_resource_metrics and get_traffic_analytics
+
+/**
+ * An application, a Postgres database, and a service on the server of the token team.
+ *
+ * @return array{application: Application, database: StandalonePostgresql, service: Service}
+ */
+function mcpSrvResources(Server $server, Team $team): array
+{
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $environment = Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $team->id])->id]);
+    $placement = [
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ];
+
+    return [
+        'application' => Application::factory()->create($placement),
+        'database' => StandalonePostgresql::create($placement + ['name' => 'db', 'postgres_user' => 'postgres', 'postgres_password' => 'password', 'postgres_db' => 'app', 'image' => 'postgres:16']),
+        'service' => Service::factory()->create($placement + ['server_id' => $server->id]),
+    ];
+}
+
+function mcpSrvEnableMetrics(Server $server): void
+{
+    ServerSetting::withoutEvents(fn () => $server->settings->update([
+        'is_metrics_enabled' => true,
+        'sentinel_token' => 'mcp-resource-metrics-token',
+        'sentinel_metrics_history_days' => 7,
+    ]));
+    Server::flushIdentityMap();
+}
+
+function mcpSrvEnableTraffic(Server $server): void
+{
+    $server->settings->update(['is_traffic_analytics_enabled' => true]);
+    Server::flushIdentityMap();
+    McpSrvFakeTrafficClient::$calls = 0;
+    app()->bind(SentinelTrafficClient::class, fn ($app, array $parameters) => new McpSrvFakeTrafficClient($parameters['server']));
+}
+
+test('get_resource_metrics returns container cpu and memory capped at the retention of the server', function (string $type) {
+    mcpSrvEnableMetrics($this->server);
+    $resource = mcpSrvResources($this->server, $this->team)[$type];
+    fakeRemoteProcesses([
+        "*container/{$resource->uuid}/cpu/history*" => Process::result(output: json_encode([['time' => 1787259000000, 'percent' => 2.5]])),
+        "*container/{$resource->uuid}/memory/history*" => Process::result(output: json_encode([['time' => 1787259000000, 'used' => 52428800]])),
+    ]);
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read']), 'get_resource_metrics', ['resource' => $type, 'uuid' => $resource->uuid, 'minutes' => 999999]);
+
+    expect(mcpSrvIsError($response))->toBeFalse(mcpSrvText($response));
+    $data = mcpSrvData($response);
+    expect($data['minutes'])->toBe(10080)
+        ->and($data['retention_days'])->toBe(7)
+        ->and($data['series'])->toBe(['cpu_percent' => [[1787259000000, 2.5]], 'memory_mb' => [[1787259000000, 50]]])
+        ->and(mcpSrvText($response))->not->toContain('mcp-resource-metrics-token');
+})->with(['application', 'database']);
+
+test('get_resource_metrics does not read metrics of a resource of another team', function () {
+    mcpSrvEnableMetrics($this->otherServer);
+    $foreign = mcpSrvResources($this->otherServer, $this->otherTeam)['application'];
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read']), 'get_resource_metrics', ['resource' => 'application', 'uuid' => $foreign->uuid]);
+
+    expect(mcpSrvIsError($response))->toBeTrue()
+        ->and(mcpSrvText($response))->toBe("Application [{$foreign->uuid}] not found.");
+    Process::assertNothingRan();
+});
+
+test('get_resource_metrics explains when metrics are disabled', function () {
+    $database = mcpSrvResources($this->server, $this->team)['database'];
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read']), 'get_resource_metrics', ['resource' => 'database', 'uuid' => $database->uuid]);
+
+    expect(mcpSrvIsError($response))->toBeTrue()
+        ->and(mcpSrvText($response))->toBe('Metrics are not enabled for the server of this resource. Enable Sentinel metrics in the server settings first.');
+});
+
+test('get_resource_metrics and get_traffic_analytics need the read ability', function (string $tool) {
+    mcpSrvEnableMetrics($this->server);
+    mcpSrvEnableTraffic($this->server);
+    $application = mcpSrvResources($this->server, $this->team)['application'];
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['deploy']), $tool, ['resource' => 'application', 'uuid' => $application->uuid]);
+
+    expect(mcpSrvIsError($response))->toBeTrue()
+        ->and(mcpSrvText($response))->toContain('Missing required permissions: read')
+        ->and(McpSrvFakeTrafficClient::$calls)->toBe(0);
+    Process::assertNothingRan();
+})->with(['get_resource_metrics', 'get_traffic_analytics']);
+
+test('get_traffic_analytics returns the traffic of an application or service without visitor data', function (string $type) {
+    mcpSrvEnableTraffic($this->server);
+    $resource = mcpSrvResources($this->server, $this->team)[$type];
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read']), 'get_traffic_analytics', ['resource' => $type, 'uuid' => $resource->uuid, 'range' => '7d']);
+
+    expect(mcpSrvIsError($response))->toBeFalse(mcpSrvText($response));
+    $data = mcpSrvData($response);
+    expect($data['uuid'])->toBe($resource->uuid)
+        ->and($data['enabled'])->toBeTrue()
+        ->and($data['range'])->toBe('7d')
+        ->and($data['overview'])->toBe([
+            'requests' => 200,
+            'unique_visitors' => 32,
+            'bytes_in' => 5000,
+            'bytes_out' => 25000,
+            'error_rate' => 7.5,
+            'latency' => ['p50' => 12.5, 'p95' => 45.2, 'p99' => 90.1],
+            'status' => ['s2xx' => 180, 's3xx' => 5, 's4xx' => 10, 's5xx' => 5],
+        ])
+        ->and($data['breakdowns']['country'])->toBe([['value' => 'US', 'requests' => 120, 'bytes_out' => 15000]])
+        ->and($data['breakdowns'])->not->toHaveKeys(['ip', 'useragent'])
+        ->and(mcpSrvText($response))->not->toContain('198.51.100.42');
+})->with(['application', 'service']);
+
+test('get_traffic_analytics returns visitor ip and user agent breakdowns with read:sensitive', function () {
+    mcpSrvEnableTraffic($this->server);
+    $application = mcpSrvResources($this->server, $this->team)['application'];
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'read:sensitive']), 'get_traffic_analytics', ['resource' => 'application', 'uuid' => $application->uuid]);
+
+    $breakdowns = mcpSrvData($response)['breakdowns'];
+    expect($breakdowns['ip'])->toBe([['value' => '198.51.100.42', 'requests' => 60, 'bytes_out' => 1200]])
+        ->and($breakdowns['useragent'])->toBe([['value' => 'Mozilla/5.0 PerAppAgent/2.0', 'requests' => 55, 'bytes_out' => 1100]]);
+});
+
+test('get_traffic_analytics does not read traffic of a service of another team', function () {
+    mcpSrvEnableTraffic($this->otherServer);
+    $foreign = mcpSrvResources($this->otherServer, $this->otherTeam)['service'];
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read']), 'get_traffic_analytics', ['resource' => 'service', 'uuid' => $foreign->uuid]);
+
+    expect(mcpSrvIsError($response))->toBeTrue()
+        ->and(mcpSrvText($response))->toBe("Service [{$foreign->uuid}] not found.")
+        ->and(McpSrvFakeTrafficClient::$calls)->toBe(0);
+});
+
+test('get_traffic_analytics explains when traffic analytics is disabled', function () {
+    $application = mcpSrvResources($this->server, $this->team)['application'];
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read']), 'get_traffic_analytics', ['resource' => 'application', 'uuid' => $application->uuid]);
+
+    expect(mcpSrvIsError($response))->toBeTrue()
+        ->and(mcpSrvText($response))->toBe('Traffic analytics is not enabled for the server of this resource. Enable traffic analytics in the server settings first.');
+});
+
+// ---------------------------------------------------------------- manage_integration_tokens and manage_dns
+
+test('manage_integration_tokens lists team tokens without the secret and cannot read another team token', function () {
+    $token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'cloudflare', 'token' => 'CF_SECRET_VALUE', 'capabilities' => ['dns']]);
+    $foreign = IntegrationToken::factory()->for($this->otherTeam)->create(['provider' => 'cloudflare']);
+    $bearer = mcpSrvToken($this->user, ['read']);
+
+    $list = mcpSrvCall($bearer, 'manage_integration_tokens', ['action' => 'list']);
+    $other = mcpSrvCall($bearer, 'manage_integration_tokens', ['action' => 'get', 'uuid' => $foreign->uuid]);
+
+    expect(mcpSrvIsError($list))->toBeFalse()
+        ->and(collect(mcpSrvData($list))->pluck('uuid')->all())->toBe([$token->uuid])
+        ->and($list->getContent())->not->toContain('CF_SECRET_VALUE')
+        ->and(mcpSrvIsError($other))->toBeTrue()
+        ->and(mcpSrvText($other))->toContain('Integration token not found.');
+});
+
+test('manage_dns creates the dns record of an application domain', function () {
+    $this->server->update(['ip' => '203.0.113.10']);
+    $destination = StandaloneDocker::query()->where('server_id', $this->server->id)->firstOrFail();
+    $application = Application::factory()->create([
+        'environment_id' => Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $this->team->id])->id])->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'fqdn' => 'https://app.example.com',
+    ]);
+    $token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'cloudflare', 'capabilities' => ['dns']]);
+    DnsProviderZone::factory()->for($token)->create(['provider_zone_id' => 'zone-1', 'name' => 'example.com']);
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records?*' => Http::response(['success' => true, 'result' => []]),
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records' => Http::response(['success' => true, 'result' => ['id' => 'record-1']]),
+    ]);
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write']), 'manage_dns', [
+        'action' => 'create', 'resource' => 'application', 'uuid' => $application->uuid, 'data' => ['hostname' => 'app.example.com'],
+    ]);
+
+    expect(mcpSrvIsError($response))->toBeFalse()
+        ->and(mcpSrvData($response)['record'])->toMatchArray(['hostname' => 'app.example.com', 'address' => '203.0.113.10'])
+        ->and(ManagedDnsRecord::query()->where('name', 'app.example.com')->exists())->toBeTrue();
+});
+
+test('manage_dns returns the conflict of a create so the agent can replace the record', function () {
+    $this->server->update(['ip' => '203.0.113.10']);
+    $destination = StandaloneDocker::query()->where('server_id', $this->server->id)->firstOrFail();
+    $application = Application::factory()->create([
+        'environment_id' => Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $this->team->id])->id])->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+        'fqdn' => 'https://app.example.com',
+    ]);
+    $token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'cloudflare', 'capabilities' => ['dns']]);
+    DnsProviderZone::factory()->for($token)->create(['provider_zone_id' => 'zone-1', 'name' => 'example.com']);
+    Http::fake([
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records?*' => Http::response(['success' => true, 'result' => [
+            ['id' => 'record-old', 'type' => 'A', 'name' => 'app.example.com', 'content' => '198.51.100.7'],
+        ]]),
+        'https://api.cloudflare.com/client/v4/zones/zone-1/dns_records/*' => Http::response(['success' => true, 'result' => ['id' => 'record-old']]),
+    ]);
+    $bearer = mcpSrvToken($this->user, ['read', 'write']);
+
+    $create = mcpSrvCall($bearer, 'manage_dns', [
+        'action' => 'create', 'resource' => 'application', 'uuid' => $application->uuid, 'data' => ['hostname' => 'app.example.com'],
+    ]);
+    $text = mcpSrvText($create);
+    $conflict = json_decode(substr($text, strpos($text, '{"conflict"')), true)['conflict'];
+
+    expect(mcpSrvIsError($create))->toBeTrue()
+        ->and($conflict)->toBe(['record_id' => 'record-old', 'current' => '198.51.100.7', 'proposed' => '203.0.113.10']);
+
+    $replace = mcpSrvCall($bearer, 'manage_dns', [
+        'action' => 'replace', 'resource' => 'application', 'uuid' => $application->uuid, 'confirm' => true,
+        'data' => ['hostname' => 'app.example.com', 'record_id' => $conflict['record_id'], 'current' => $conflict['current']],
+    ]);
+
+    expect(mcpSrvIsError($replace))->toBeFalse(mcpSrvText($replace))
+        ->and(mcpSrvData($replace)['record'])->toMatchArray(['address' => '203.0.113.10', 'owned' => false]);
+});
+
+test('manage_integration_tokens renames a token', function () {
+    $token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'doppler', 'token' => 'dp.st.secret', 'capabilities' => ['secrets']]);
+
+    $response = mcpSrvCall(mcpSrvToken($this->user, ['read', 'write']), 'manage_integration_tokens', [
+        'action' => 'update', 'uuid' => $token->uuid, 'data' => ['name' => 'Renamed'],
+    ]);
+
+    expect(mcpSrvIsError($response))->toBeFalse(mcpSrvText($response))
+        ->and($token->fresh()->name)->toBe('Renamed');
+});
+
+test('manage_secret_manager links a token of the team to an application', function () {
+    $destination = StandaloneDocker::query()->where('server_id', $this->server->id)->firstOrFail();
+    $application = Application::factory()->create([
+        'environment_id' => Environment::factory()->create(['project_id' => Project::factory()->create(['team_id' => $this->team->id])->id])->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+    $token = IntegrationToken::factory()->for($this->team)->create(['provider' => 'doppler', 'token' => 'dp.st.secret', 'capabilities' => ['secrets']]);
+    $bearer = mcpSrvToken($this->user, ['read', 'write']);
+
+    $set = mcpSrvCall($bearer, 'manage_secret_manager', ['action' => 'set', 'resource' => 'application', 'uuid' => $application->uuid, 'data' => ['integration_token_uuid' => $token->uuid]]);
+    $get = mcpSrvCall($bearer, 'manage_secret_manager', ['action' => 'get', 'resource' => 'application', 'uuid' => $application->uuid]);
+
+    expect(mcpSrvIsError($set))->toBeFalse(mcpSrvText($set))
+        ->and(mcpSrvData($get))->toMatchArray(['linked' => true, 'integration_token_uuid' => $token->uuid, 'provider' => 'doppler']);
+});
+
+test('manage_cloudflare_tunnel reads the tunnel of its own server only', function () {
+    $bearer = mcpSrvToken($this->user, ['read']);
+
+    $own = mcpSrvCall($bearer, 'manage_cloudflare_tunnel', ['action' => 'get', 'uuid' => $this->server->uuid]);
+    $foreign = mcpSrvCall($bearer, 'manage_cloudflare_tunnel', ['action' => 'get', 'uuid' => $this->otherServer->uuid]);
+
+    expect(mcpSrvIsError($own))->toBeFalse(mcpSrvText($own))
+        ->and(mcpSrvData($own))->toHaveKey('is_cloudflare_tunnel')
+        ->and(mcpSrvIsError($foreign))->toBeTrue();
 });

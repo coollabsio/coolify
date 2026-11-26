@@ -1,13 +1,34 @@
+@php
+    $isDiff = filter_var($attributes->get('diff', false), FILTER_VALIDATE_BOOLEAN);
+    // Undeclared component attributes come back already HTML-escaped from the bag,
+    // so decode once here and let the single {{ }} below re-escape it — otherwise
+    // quotes reach the editor double-escaped (e.g. ' shows as &#039;).
+    $originalContent = html_entity_decode((string) $attributes->get('original', ''), ENT_QUOTES);
+@endphp
 <div wire:key="{{ random_int(0, PHP_INT_MAX) }}" class="coolify-monaco-editor flex-1">
     <div x-ref="monacoRef" x-data="{
         monacoVersion: '0.52.2',
         monacoContent: @entangle($id),
         monacoLanguage: '',
         monacoLoader: true,
+        monacoLoaderInterval: null,
         monacoFontSize: '15px',
         monacoId: $id('monaco-editor'),
         isDarkMode() {
             return document.documentElement.classList.contains('dark') || localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        },
+        destroy() {
+            clearInterval(this.monacoLoaderInterval);
+            this.disposeMonacoEditor(this.$refs.monacoEditorElement);
+        },
+        disposeMonacoEditor(element) {
+            // The editor lives on the DOM node, not in Alpine state. Alpine can
+            // init the same element again, and Monaco does not remove its DOM.
+            element._monacoThemeObserver?.disconnect();
+            element._monacoEditor?.dispose();
+            element._monacoThemeObserver = null;
+            element._monacoEditor = null;
+            element.replaceChildren();
         },
         monacoEditor(editor) {
             editor.onDidChangeModelContent((e) => {
@@ -34,8 +55,9 @@
             monacoEditorAddLoaderScriptToHead();
         }
         checkTheme();
-        let monacoLoaderInterval = setInterval(() => {
+        monacoLoaderInterval = setInterval(() => {
             if (typeof _amdLoaderGlobal !== 'undefined') {
+                clearInterval(monacoLoaderInterval);
                 require.config({ paths: { 'vs': `/js/monaco-editor-${monacoVersion}/min/vs` } });
                 let proxy = URL.createObjectURL(new Blob([`self.MonacoEnvironment={baseUrl:'${window.location.origin}/js/monaco-editor-${monacoVersion}/min'};importScripts('${window.location.origin}/js/monaco-editor-${monacoVersion}/min/vs/base/worker/workerMain.js');`], { type: 'text/javascript' }));
                 window.MonacoEnvironment = { getWorkerUrl: () => proxy };
@@ -86,11 +108,14 @@
                         });
                     }
                     @endif
-                    const editor = monaco.editor.create($refs.monacoEditorElement, {
-                        value: monacoContent ?? '',
+                    const editorElement = $refs.monacoEditorElement;
+                    if (!editorElement.isConnected) {
+                        return;
+                    }
+                    disposeMonacoEditor(editorElement);
+                    const sharedEditorOptions = {
                         theme: document.documentElement.classList.contains('dark') ? 'coolify-dark' : 'vs',
                         wordWrap: 'on',
-                        readOnly: '{{ $readonly ?? false }}',
                         minimap: { enabled: false },
                         fontSize: monacoFontSize,
                         lineNumbersMinChars: 3,
@@ -112,7 +137,34 @@
                             horizontalScrollbarSize: 8,
                             useShadows: false
                         }
+                    };
+
+                    let editor;
+                    @if ($isDiff)
+                    const diffEditor = monaco.editor.createDiffEditor(editorElement, {
+                        ...sharedEditorOptions,
+                        readOnly: '{{ $readonly ?? false }}',
+                        originalEditable: false,
+                        renderSideBySide: true,
+                        renderOverviewRuler: false,
+                        ignoreTrimWhitespace: false,
                     });
+                    const originalText = $refs.monacoOriginalData ? $refs.monacoOriginalData.dataset.content : '';
+                    diffEditor.setModel({
+                        original: monaco.editor.createModel(originalText, '{{ $language }}'),
+                        modified: monaco.editor.createModel(monacoContent ?? '', '{{ $language }}'),
+                    });
+                    editor = diffEditor.getModifiedEditor();
+                    editorElement._monacoEditor = diffEditor;
+                    document.getElementById(monacoId).diffEditor = diffEditor;
+                    @else
+                    editor = monaco.editor.create(editorElement, {
+                        ...sharedEditorOptions,
+                        value: monacoContent ?? '',
+                        readOnly: '{{ $readonly ?? false }}',
+                    });
+                    editorElement._monacoEditor = editor;
+                    @endif
         
                     const observer = new MutationObserver((mutations) => {
                         mutations.forEach((mutation) => {
@@ -127,6 +179,7 @@
                         attributes: true,
                         attributeFilter: ['class']
                     });
+                    editorElement._monacoThemeObserver = observer;
         
                     monacoEditor(editor);
 
@@ -145,13 +198,20 @@
         
         
                 });
-                clearInterval(monacoLoaderInterval);
                 monacoLoader = false;
         
             }
         }, 5);" :id="monacoId">
         </div>
         <div class="relative z-10 w-full h-full">
+            @if ($isDiff)
+                <div x-ref="monacoOriginalData" class="hidden" data-content="{{ $originalContent }}"></div>
+            @endif
+            <div x-cloak x-show="monacoLoader"
+                class="absolute inset-0 z-50 flex items-center justify-center gap-2 bg-white/70 text-[13px] text-neutral-500 backdrop-blur-[1px] dark:bg-[#0b0b0c]/70 dark:text-fg-dim">
+                <span class="size-4 animate-spin rounded-full border-2 border-neutral-300 border-t-transparent dark:border-white/25 dark:border-t-transparent"></span>
+                Loading editor
+            </div>
             <div x-ref="monacoEditorElement" class="w-full text-md {{ $readonly ? 'opacity-65' : '' }}" style="height: var(--editor-height, calc(100vh - 20rem)); min-height: 150px;"></div>
         </div>
     </div>

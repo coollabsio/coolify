@@ -31,6 +31,8 @@ class ReconcileGithubRunnersJob implements ShouldBeUnique, ShouldQueue
 
     private const PROVISIONING_TIMEOUT_MINUTES = 20;
 
+    private const DEFAULT_CAPACITY_WAIT_TIMEOUT_MINUTES = 60;
+
     public function __construct()
     {
         $this->onQueue('high');
@@ -43,11 +45,7 @@ class ReconcileGithubRunnersJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
-        // Disabling keeps running jobs, so a disabled server is reconciled until its last runner is done.
-        Server::query()
-            ->where(fn (Builder $query) => $query
-                ->whereHas('githubRunnerConfig', fn (Builder $config) => $config->where('is_enabled', true))
-                ->orWhereHas('githubRunnerExecutions', fn (Builder $execution) => $execution->whereIn('status', GithubRunnerStatus::occupying())))
+        $this->serversToReconcile()
             ->with('settings')
             ->get()
             ->filter(fn (Server $server) => $server->isFunctional())
@@ -55,6 +53,24 @@ class ReconcileGithubRunnersJob implements ShouldBeUnique, ShouldQueue
 
         $this->removeRunnersOfDeletedServers();
         $this->reconcileQueued();
+    }
+
+    /**
+     * Servers with enabled runners or with executions that still occupy a runner. Disabling keeps
+     * running jobs, so a disabled server is reconciled until its last runner is done. The server ids
+     * come from one UNION: an OR of two EXISTS subqueries makes Postgres estimate a per-server scan
+     * of the executions and spend most of the query time on JIT compilation.
+     *
+     * @return Builder<Server>
+     */
+    public function serversToReconcile(): Builder
+    {
+        return Server::query()->whereIn('id', GithubRunnerConfig::query()
+            ->select('server_id')
+            ->where('is_enabled', true)
+            ->union(GithubRunnerExecution::query()
+                ->select('server_id')
+                ->whereIn('status', GithubRunnerStatus::occupying())));
     }
 
     /**
@@ -154,10 +170,10 @@ class ReconcileGithubRunnersJob implements ShouldBeUnique, ShouldQueue
             ->groupBy('github_app_id');
 
         foreach ($queued as $githubAppId => $executions) {
+            // Disabled configurations count too: disabling pauses admission, it does not drop the queue.
             $timeout = (int) (GithubRunnerConfig::query()
                 ->where('github_app_id', $githubAppId)
-                ->where('is_enabled', true)
-                ->max('capacity_wait_timeout') ?? 0);
+                ->max('capacity_wait_timeout') ?? self::DEFAULT_CAPACITY_WAIT_TIMEOUT_MINUTES);
 
             foreach ($executions as $execution) {
                 if (($execution->queued_at ?? $execution->created_at)->lt(now()->subMinutes($timeout))) {

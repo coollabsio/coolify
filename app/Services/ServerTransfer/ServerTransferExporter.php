@@ -3,6 +3,7 @@
 namespace App\Services\ServerTransfer;
 
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\CloudProviderToken;
 use App\Models\DnsProviderZone;
@@ -12,6 +13,8 @@ use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
+use App\Models\ImageScanIgnore;
+use App\Models\ImageScanPolicy;
 use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
@@ -23,13 +26,16 @@ use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
+use App\Models\SecretManagerLink;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
+use App\Services\ImageScan\ImageScanPolicyResolver;
 use App\Services\ProjectIconStorageService;
+use BackedEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -68,6 +74,13 @@ class ServerTransferExporter
         'patch_check_result',
         'patch_check_error',
         'patch_checked_at',
+        // The target reads the last automatic update run again and keeps it as its baseline.
+        'auto_security_updates_last_run',
+        // The daily candidate scan counter of the source; the target counts its own.
+        'image_candidate_scans_today',
+        'image_candidate_scans_date',
+        // A host key that did not match; the target reads the key again over its own connection.
+        'ssh_host_key_pending',
     ];
 
     /**
@@ -150,6 +163,12 @@ class ServerTransferExporter
 
         $warnings = $this->buildWarnings($applications, $dependencies);
         $warnings = array_merge($warnings, $managedDns['warnings'], $projectWarnings);
+        if (ImageScanIgnore::query()->where('team_id', $server->team_id)->whereNull('resource_type')->exists()) {
+            $warnings[] = 'Team-wide vulnerability ignores stay on this instance.';
+        }
+        if ($server->proxyConfigurationVersions()->exists()) {
+            $warnings[] = 'The proxy configuration history stays on this instance. The current proxy configuration is transferred.';
+        }
         if ($leftOutLinks > 0) {
             $warnings[] = $leftOutLinks.' '.Str::plural('link', $leftOutLinks).' between resources on the environment canvas '
                 .($leftOutLinks === 1 ? 'is' : 'are').' not transferred, because one of the linked resources stays on this instance.';
@@ -162,7 +181,7 @@ class ServerTransferExporter
             ],
             'warnings' => $warnings,
             // Manual steps after the transfer. The source replaces {target_url} with the URL of the target.
-            'post_transfer_checklist' => $this->postTransferChecklist($dependencies, $runnerConfig, $applications),
+            'post_transfer_checklist' => $this->postTransferChecklist($dependencies, $runnerConfig, $applications, $applications->concat($databases)->concat($services)),
             // Back-compat: single server key
             'private_key' => $this->exportPrivateKey($privateKey),
             // All keys needed by server, apps, and git sources
@@ -176,6 +195,8 @@ class ServerTransferExporter
             'dns_zones' => $managedDns['records']->pluck('zone')->unique('id')->map(fn (DnsProviderZone $zone) => $this->exportDnsZone($zone))->values()->all(),
             'managed_dns_records' => $managedDns['records']->map(fn (ManagedDnsRecord $record) => $this->exportManagedDnsRecord($record, $managedDns['resource_keys']))->values()->all(),
             'ssl_certificates' => $this->exportSslCertificates($server),
+            'image_scan_policies' => $this->exportImageScanPolicies($server, $applications),
+            'image_scan_ignores' => $this->exportImageScanIgnores($server, $applications, $databases, $services),
             'volume_backups' => $this->exportVolumeBackups($applications, $databases, $services),
             'server' => $this->exportServer($server),
             'destinations' => $this->exportDestinations($server),
@@ -324,12 +345,20 @@ class ServerTransferExporter
             $cloudTokens->push($this->findTeamRecord(CloudProviderToken::class, $server->cloud_provider_token_id, $teamId, 'cloud provider token'));
         }
 
+        $s3Storages = $this->findTeamS3Storages($s3Ids->unique()->filter()->values()->all(), $teamId);
+        // An SFTP storage that logs in with a private key needs that key on the target.
+        foreach ($s3Storages as $storage) {
+            if ($storage->private_key_id !== null) {
+                $privateKeys->push($this->findTeamRecord(PrivateKey::class, $storage->private_key_id, $teamId, 'private key'));
+            }
+        }
+
         return [
             'private_keys' => $privateKeys->unique('id')->values(),
             'github_apps' => $githubApps->unique('id')->values(),
             'gitlab_apps' => $gitlabApps->unique('id')->values(),
             'gitea_apps' => $giteaApps->unique('id')->values(),
-            's3_storages' => $this->findTeamS3Storages($s3Ids->unique()->filter()->values()->all(), $teamId),
+            's3_storages' => $s3Storages,
             'cloud_provider_tokens' => $cloudTokens->unique('id')->values(),
         ];
     }
@@ -391,6 +420,17 @@ class ServerTransferExporter
     {
         $warnings = [];
 
+        foreach ($dependencies['private_keys'] as $key) {
+            try {
+                $error = PrivateKey::validationError($key->private_key);
+            } catch (Throwable) {
+                continue; // exportPrivateKey() reports a key that cannot be decrypted.
+            }
+            if ($error) {
+                $warnings[] = "SSH key {$key->name}: {$error} The key moves unchanged. Rotate it to an Ed25519 key after the transfer.";
+            }
+        }
+
         $usesSystemWideGithub = $applications->contains(function (Application $app) {
             if ($app->source_type !== GithubApp::class || $app->source_id === null) {
                 return false;
@@ -425,6 +465,16 @@ class ServerTransferExporter
         });
         if ($usesSystemWideGitea) {
             $warnings[] = 'Some applications use a system-wide Gitea App, which is not exported. On import, Coolify will re-link to a matching system-wide Gitea App on the target instance (by UUID) if one exists.';
+        }
+
+        $hasActivePreviewGithubDeployments = ApplicationDeploymentQueue::query()
+            ->whereIn('application_id', $applications->pluck('id'))
+            ->where('pull_request_id', '!=', 0)
+            ->whereNotNull('github_deployment_id')
+            ->where(fn ($query) => $query->whereNull('github_deployment_state')->orWhere('github_deployment_state', '!=', 'inactive'))
+            ->exists();
+        if ($hasActivePreviewGithubDeployments) {
+            $warnings[] = 'Deployment history is not transferred, so the target instance cannot mark the GitHub Deployments of current preview deployments as inactive when their pull requests close. Mark them as inactive on GitHub, or redeploy the previews on the target instance.';
         }
 
         if ($dependencies['s3_storages']->isNotEmpty()) {
@@ -515,8 +565,8 @@ class ServerTransferExporter
     {
         $tokenIds = collect([$server->settings?->cloudflare_tunnel_integration_token_id]);
         foreach ($resources as $resource) {
-            if (method_exists($resource, 'secretManagerLink')) {
-                $tokenIds->push($resource->secretManagerLink()->value('integration_token_id'));
+            if (method_exists($resource, 'secretManagerLinks')) {
+                $tokenIds->push(...$resource->secretManagerLinks()->pluck('integration_token_id'));
             }
         }
         foreach ($dnsRecords as $record) {
@@ -532,11 +582,15 @@ class ServerTransferExporter
      *
      * @param  array{github_apps: Collection<int, GithubApp>, gitlab_apps: Collection<int, GitlabApp>, gitea_apps: Collection<int, GiteaApp>}  $dependencies
      * @param  Collection<int, Application>  $applications
+     * @param  Collection<int, Model>  $resources  applications, databases, and services
      * @return list<string>
      */
-    private function postTransferChecklist(array $dependencies, ?GithubRunnerConfig $runnerConfig, Collection $applications): array
+    private function postTransferChecklist(array $dependencies, ?GithubRunnerConfig $runnerConfig, Collection $applications, Collection $resources): array
     {
         $steps = [];
+        if ($resources->contains(fn (Model $resource) => filled($resource->config_key))) {
+            $steps[] = 'Some resources were managed by coolify.json. Link their environments again on {target_url}: the link does not move with the server.';
+        }
         // A manual webhook is set in the repository itself, so its URL still points to this instance. Every
         // application has the secrets, so list the git applications that do not deploy through a private App.
         $manualWebhookApps = $applications
@@ -564,8 +618,8 @@ class ServerTransferExporter
             $steps[] = 'After the GitHub App sends webhooks to {target_url}, open this server there, check the runner requirements, and enable GitHub runners. '
                 .'Enabling them stops runners that another Coolify instance started on this server.';
         }
-        $steps[] = 'This instance keeps a copy of the SSH key of the server. On {target_url}, add a new SSH key to the server and select it there, '
-            .'then remove the old public key from ~/.ssh/authorized_keys on the server.';
+        $steps[] = 'This instance keeps a copy of the SSH key of the server. On {target_url}, open the SSH key of the server in Security > Private Keys '
+            .'and use Rotate key. It moves the server to a new key and removes the old public key from ~/.ssh/authorized_keys on the server.';
 
         return $steps;
     }
@@ -910,6 +964,7 @@ class ServerTransferExporter
             'custom_labels',
             'is_maintenance_enabled',
             'maintenance_page',
+            'config_key',
         ] as $hidden) {
             if (in_array($hidden, $columns, true)) {
                 $attrs[$hidden] = $application->{$hidden};
@@ -950,11 +1005,12 @@ class ServerTransferExporter
             'scheduled_tasks' => $this->exportScheduledTasks($application->scheduled_tasks()->get()),
             'tags' => $this->exportTags($application->tags),
             'previews' => $this->exportPreviews($application->previews),
-            'secret_manager_link' => $this->exportSecretManagerLink($application),
+            'secret_manager_links' => $this->exportSecretManagerLinks($application),
             'source' => $source,
             'private_key_uuid' => $application->private_key?->uuid,
             'had_git_source' => filled($application->source_id),
             'had_private_key' => filled($application->private_key_id),
+            'checks_health_check_response_text' => true,
         ];
     }
 
@@ -984,6 +1040,7 @@ class ServerTransferExporter
             }
             $attrs[$field] = $database->{$field};
         }
+        $attrs['config_key'] = $database->config_key;
 
         // Secrets are often $hidden and sometimes omitted from $fillable (e.g. redis_password).
         foreach ($columns as $column) {
@@ -1023,7 +1080,7 @@ class ServerTransferExporter
             'scheduled_backups' => method_exists($database, 'scheduledBackups')
                 ? $this->exportScheduledBackups($database->scheduledBackups)
                 : [],
-            'secret_manager_link' => $this->exportSecretManagerLink($database),
+            'secret_manager_links' => $this->exportSecretManagerLinks($database),
         ];
     }
 
@@ -1056,6 +1113,8 @@ class ServerTransferExporter
             }
             $attrs[$field] = $service->{$field};
         }
+        $attrs['config_key'] = $service->config_key;
+        $attrs['config_meta'] = $service->config_meta;
 
         // Hidden compose fields, maintenance mode and the Coolify default variables switch (not fillable)
         foreach (['docker_compose', 'docker_compose_raw', 'is_maintenance_enabled', 'maintenance_page', 'include_coolify_default_variables'] as $hidden) {
@@ -1074,7 +1133,7 @@ class ServerTransferExporter
             'environment_variables' => $this->exportEnvVars($service->environment_variables()->get()),
             'scheduled_tasks' => $this->exportScheduledTasks($service->scheduled_tasks()->get()),
             'tags' => $this->exportTags($service->tags),
-            'secret_manager_link' => $this->exportSecretManagerLink($service),
+            'secret_manager_links' => $this->exportSecretManagerLinks($service),
             'applications' => $service->applications
                 ->map(fn ($app) => $this->exportServiceApplication($app))
                 ->values()
@@ -1245,6 +1304,7 @@ class ServerTransferExporter
                 'is_literal' => (bool) $variable->is_literal,
                 'is_multiline' => (bool) $variable->is_multiline,
                 'is_preview' => (bool) $variable->is_preview,
+                'is_production_value_copy' => (bool) $variable->is_production_value_copy,
                 'is_runtime' => (bool) $variable->is_runtime,
                 'is_buildtime' => (bool) $variable->is_buildtime,
                 'is_shown_once' => (bool) $variable->is_shown_once,
@@ -1253,7 +1313,9 @@ class ServerTransferExporter
                 'uses_legacy_escaping' => (bool) $variable->uses_legacy_escaping,
                 'preserve_compose_null' => (bool) $variable->preserve_compose_null,
                 'comment' => $variable->comment,
+                'compose_services' => $variable->compose_services,
                 'order' => $variable->order,
+                'config_meta' => $variable->config_meta,
                 // The Coolify version that created the variable.
                 'version' => $variable->version,
             ];
@@ -1276,6 +1338,7 @@ class ServerTransferExporter
                 'mount_path' => $volume->mount_path,
                 'host_path' => $volume->host_path,
                 'is_preview_suffix_enabled' => (bool) ($volume->is_preview_suffix_enabled ?? false),
+                'is_external' => (bool) $volume->is_external,
                 'ignores_compose_driver_options' => (bool) $volume->ignores_compose_driver_options,
                 'standalone_sqlite_uuid' => $volume->standaloneSqlite?->uuid,
             ];
@@ -1324,7 +1387,9 @@ class ServerTransferExporter
                 'frequency' => $task->frequency,
                 'container' => $task->container,
                 'timeout' => $task->timeout,
+                'use_shell' => (bool) ($task->use_shell ?? true),
                 'enabled' => (bool) ($task->enabled ?? true),
+                'disabled_reason' => $task->disabled_reason,
             ];
         }
 
@@ -1397,6 +1462,7 @@ class ServerTransferExporter
             'custom_port' => $app->custom_port,
             'app_id' => $app->app_id,
             'installation_id' => $app->installation_id,
+            'installation_account' => $app->installation_account,
             'client_id' => $app->client_id,
             'client_secret' => $app->client_secret,
             'webhook_secret' => $app->webhook_secret,
@@ -1405,6 +1471,7 @@ class ServerTransferExporter
             'contents' => $app->contents,
             'metadata' => $app->metadata,
             'pull_requests' => $app->pull_requests,
+            'deployments' => $app->deployments,
             'administration' => $app->administration,
             'organization_self_hosted_runners' => $app->organization_self_hosted_runners,
             'actions' => $app->actions,
@@ -1482,6 +1549,7 @@ class ServerTransferExporter
     {
         return [
             'uuid' => $storage->uuid,
+            'type' => $storage->type->value,
             'name' => $storage->name,
             'description' => $storage->description,
             'region' => $storage->region,
@@ -1490,6 +1558,9 @@ class ServerTransferExporter
             'bucket' => $storage->bucket,
             'endpoint' => $storage->endpoint,
             'use_path_style_endpoint' => $storage->usesPathStyleEndpoint(),
+            'private_key_uuid' => $storage->privateKey?->uuid,
+            'sftp_host_key' => $storage->sftp_host_key,
+            'skip_tls_verification' => (bool) $storage->skip_tls_verification,
             'is_usable' => (bool) $storage->is_usable,
         ];
     }
@@ -1568,23 +1639,25 @@ class ServerTransferExporter
     }
 
     /**
-     * @return array{uuid: string, integration_token_uuid: string, settings: array<string, mixed>|null}|null
+     * All named secret manager sources of the resource.
+     *
+     * @return list<array{uuid: string, name: string, integration_token_uuid: string, settings: array<string, mixed>|null}>
      */
-    private function exportSecretManagerLink(Model $resource): ?array
+    private function exportSecretManagerLinks(Model $resource): array
     {
-        if (! method_exists($resource, 'secretManagerLink')) {
-            return null;
-        }
-        $link = $resource->secretManagerLink()->with('integrationToken')->first();
-        if (! $link) {
-            return null;
+        if (! method_exists($resource, 'secretManagerLinks')) {
+            return [];
         }
 
-        return [
-            'uuid' => $link->uuid,
-            'integration_token_uuid' => $link->integrationToken->uuid,
-            'settings' => $link->settings,
-        ];
+        return $resource->secretManagerLinks()->with('integrationToken')->orderBy('name')->get()
+            ->map(fn (SecretManagerLink $link): array => [
+                'uuid' => $link->uuid,
+                'name' => $link->sourceName(),
+                'integration_token_uuid' => $link->integrationToken->uuid,
+                'settings' => $link->settings,
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -1626,6 +1699,103 @@ class ServerTransferExporter
     }
 
     /**
+     * Scan rules of the server and of its applications. Team and instance rules stay on the source, but a rule the
+     * server inherits from its team is exported as a rule of the server (where the server has no value of its own),
+     * so the gate is not weaker on the target. Instance defaults are not copied: the target has its own.
+     *
+     * @param  Collection<int, Application>  $applications
+     * @return list<array<string, mixed>>
+     */
+    private function exportImageScanPolicies(Server $server, Collection $applications): array
+    {
+        $fromTeam = collect(ImageScanPolicyResolver::inheritedFor($server))
+            ->filter(fn (array $field): bool => $field['source'] === 'team')
+            ->map(fn (array $field): string|bool => $field['value'] instanceof BackedEnum ? $field['value']->value : $field['value'])
+            ->all();
+        $serverExported = false;
+        $out = [];
+        $policies = ImageScanPolicy::query()
+            ->where(fn ($query) => $query
+                ->where(fn ($query) => $query->where('scope_type', $server->getMorphClass())->where('scope_id', $server->id))
+                ->orWhere(fn ($query) => $query->where('scope_type', (new Application)->getMorphClass())->whereIn('scope_id', $applications->pluck('id')->all())))
+            ->orderBy('id')
+            ->get();
+        foreach ($policies as $policy) {
+            $isServer = $policy->scope_type === $server->getMorphClass();
+            $scope = $isServer ? $server : $applications->firstWhere('id', $policy->scope_id);
+            if ($scope === null) {
+                continue;
+            }
+            $out[] = [
+                'scope_kind' => $isServer ? 'server' : 'application',
+                'scope_uuid' => $scope->uuid,
+                'gate_mode' => $policy->gate_mode?->value ?? ($isServer ? ($fromTeam['gate_mode'] ?? null) : null),
+                'on_scan_error' => $policy->on_scan_error?->value ?? ($isServer ? ($fromTeam['on_scan_error'] ?? null) : null),
+                'count_medium' => $policy->count_medium ?? ($isServer ? ($fromTeam['count_medium'] ?? null) : null),
+            ];
+            $serverExported = $serverExported || $isServer;
+        }
+
+        if (! $serverExported && $fromTeam !== []) {
+            array_unshift($out, [
+                'scope_kind' => 'server',
+                'scope_uuid' => $server->uuid,
+                'gate_mode' => $fromTeam['gate_mode'] ?? null,
+                'on_scan_error' => $fromTeam['on_scan_error'] ?? null,
+                'count_medium' => $fromTeam['count_medium'] ?? null,
+            ]);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Ignores of the resources on the server. Team-wide ignores stay on the source.
+     *
+     * @param  Collection<int, Application>  $applications
+     * @param  Collection<int, Model>  $databases
+     * @param  Collection<int, Service>  $services
+     * @return list<array<string, mixed>>
+     */
+    private function exportImageScanIgnores(Server $server, Collection $applications, Collection $databases, Collection $services): array
+    {
+        $resources = [];
+        foreach ($applications as $application) {
+            $resources[$application->getMorphClass().':'.$application->id] = ['application', $application->uuid];
+        }
+        foreach ($databases as $database) {
+            $resources[$database->getMorphClass().':'.$database->id] = ['database', $database->uuid];
+        }
+        foreach ($services as $service) {
+            foreach ($service->applications as $serviceApplication) {
+                $resources[$serviceApplication->getMorphClass().':'.$serviceApplication->id] = ['service_application', $serviceApplication->uuid];
+            }
+            foreach ($service->databases as $serviceDatabase) {
+                $resources[$serviceDatabase->getMorphClass().':'.$serviceDatabase->id] = ['service_database', $serviceDatabase->uuid];
+            }
+        }
+
+        $out = [];
+        $ignores = ImageScanIgnore::query()->where('team_id', $server->team_id)->whereNotNull('resource_type')->orderBy('id')->get();
+        foreach ($ignores as $ignore) {
+            [$kind, $uuid] = $resources[$ignore->resource_type.':'.$ignore->resource_id] ?? [null, null];
+            if ($kind === null) {
+                continue;
+            }
+            $out[] = [
+                'resource_kind' => $kind,
+                'resource_uuid' => $uuid,
+                'vulnerability_id' => $ignore->vulnerability_id,
+                'package' => $ignore->package,
+                'reason' => $ignore->reason,
+                'expires_at' => $ignore->expires_at?->toIso8601String(),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * @param  Collection<int, ApplicationPreview>|iterable<int, ApplicationPreview>  $previews
      * @return list<array<string, mixed>>
      */
@@ -1645,7 +1815,12 @@ class ServerTransferExporter
                 'docker_registry_image_tag' => $preview->docker_registry_image_tag,
                 'domain_port_overrides' => $preview->domain_port_overrides,
                 'max_restart_count' => $preview->max_restart_count,
+                'is_fork_pull_request' => $preview->is_fork_pull_request,
+                'pending_approval_commit' => $preview->pending_approval_commit,
+                'approved_commit' => $preview->approved_commit,
+                'approved_at' => $preview->approved_at?->toIso8601String(),
                 'keeps_production_values' => $preview->keeps_production_values,
+                'is_same_repository' => $preview->is_same_repository,
                 'persistent_storages' => method_exists($preview, 'persistentStorages')
                     ? $this->exportPersistentStorages($preview->persistentStorages)
                     : [],

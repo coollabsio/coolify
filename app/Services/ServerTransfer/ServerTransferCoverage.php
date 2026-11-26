@@ -15,12 +15,19 @@ use App\Models\DnsProviderZone;
 use App\Models\DockerCleanupExecution;
 use App\Models\EmailNotificationSettings;
 use App\Models\Environment;
+use App\Models\EnvironmentConfigLink;
+use App\Models\EnvironmentConfigRevision;
 use App\Models\EnvironmentVariable;
 use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GithubRunnerExecution;
 use App\Models\GitlabApp;
+use App\Models\ImageSbom;
+use App\Models\ImageScan;
+use App\Models\ImageScanIgnore;
+use App\Models\ImageScanNotificationState;
+use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
@@ -28,12 +35,14 @@ use App\Models\LocalPersistentVolume;
 use App\Models\ManagedDnsRecord;
 use App\Models\ManagedDnsRecordReference;
 use App\Models\NotificationThrottle;
+use App\Models\NtfyNotificationSettings;
 use App\Models\OauthIdentity;
 use App\Models\OauthSetting;
 use App\Models\PersonalAccessToken;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\ProjectSetting;
+use App\Models\ProxyConfigurationVersion;
 use App\Models\PushoverNotificationSettings;
 use App\Models\ResourceLink;
 use App\Models\S3Storage;
@@ -47,16 +56,19 @@ use App\Models\ScheduledVolumeBackup;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\SecretManagerLink;
 use App\Models\Server;
+use App\Models\ServerHostScan;
 use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
+use App\Models\ServiceTemplateRevision;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\SlackNotificationSettings;
 use App\Models\SslCertificate;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -64,6 +76,7 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
+use App\Models\Star;
 use App\Models\Subscription;
 use App\Models\SwarmDocker;
 use App\Models\Tag;
@@ -102,11 +115,13 @@ final class ServerTransferCoverage
         ManagedDnsRecord::class => ['managed_dns_records.*'],
         ManagedDnsRecordReference::class => ['managed_dns_records.*.references.*'],
         SecretManagerLink::class => [
-            'projects.*.environments.*.applications.*.secret_manager_link',
-            'projects.*.environments.*.databases.*.secret_manager_link',
-            'projects.*.environments.*.services.*.secret_manager_link',
+            'projects.*.environments.*.applications.*.secret_manager_links.*',
+            'projects.*.environments.*.databases.*.secret_manager_links.*',
+            'projects.*.environments.*.services.*.secret_manager_links.*',
         ],
         SslCertificate::class => ['ssl_certificates.*'],
+        ImageScanPolicy::class => ['image_scan_policies.*'],
+        ImageScanIgnore::class => ['image_scan_ignores.*'],
         GithubApp::class => ['github_apps.*'],
         GithubRunnerConfig::class => ['github_runner_config'],
         GitlabApp::class => ['gitlab_apps.*'],
@@ -160,6 +175,7 @@ final class ServerTransferCoverage
         StandaloneKeydb::class => ['projects.*.environments.*.databases.*'],
         StandaloneDragonfly::class => ['projects.*.environments.*.databases.*'],
         StandaloneClickhouse::class => ['projects.*.environments.*.databases.*'],
+        StandaloneInfluxdb::class => ['projects.*.environments.*.databases.*'],
         StandaloneSqlite::class => ['projects.*.environments.*.databases.*'],
     ];
 
@@ -168,6 +184,8 @@ final class ServerTransferCoverage
     private const TEAM = 'The target imports into one of its own teams.';
 
     private const RUNTIME = 'Runtime state: the target sets it again when it manages the server.';
+
+    private const FROM_COMPOSE = 'The target sets it again when it parses the Docker Compose file of the service.';
 
     /**
      * Columns of transferred models that are not in the bundle under their own name, with the reason.
@@ -194,7 +212,9 @@ final class ServerTransferCoverage
             'sentinel_token' => 'The target makes a new Sentinel token when it claims the server.',
             'sentinel_custom_url' => 'The target sets its own URL when it claims the server.',
             'cloudflare_tunnel_integration_token_id' => 'Exported as cloudflare_tunnel_integration_token_uuid. '.self::LINKED,
-            'patch_check_result' => self::RUNTIME, 'patch_check_error' => self::RUNTIME, 'patch_checked_at' => self::RUNTIME,
+            'patch_check_result' => self::RUNTIME, 'patch_check_error' => self::RUNTIME, 'patch_checked_at' => self::RUNTIME, 'auto_security_updates_last_run' => self::RUNTIME,
+            'image_candidate_scans_today' => self::RUNTIME, 'image_candidate_scans_date' => self::RUNTIME,
+            'ssh_host_key_pending' => 'A host key that did not match; the target reads the key again over its own connection.',
         ],
         PrivateKey::class => ['team_id' => self::TEAM],
         StandaloneDocker::class => ['server_id' => self::LINKED],
@@ -209,6 +229,18 @@ final class ServerTransferCoverage
         ],
         SecretManagerLink::class => ['resourceable_type' => self::LINKED, 'resourceable_id' => self::LINKED, 'integration_token_id' => self::LINKED],
         SslCertificate::class => ['server_id' => self::LINKED, 'resource_type' => self::LINKED, 'resource_id' => self::LINKED],
+        ImageScanPolicy::class => [
+            'uuid' => 'The target makes its own ID.',
+            'scope_type' => 'Exported as scope_kind and scope_uuid. '.self::LINKED,
+            'scope_id' => 'Exported as scope_kind and scope_uuid. '.self::LINKED,
+        ],
+        ImageScanIgnore::class => [
+            'uuid' => 'The target makes its own ID.',
+            'team_id' => self::TEAM,
+            'resource_type' => 'Exported as resource_kind and resource_uuid. '.self::LINKED,
+            'resource_id' => 'Exported as resource_kind and resource_uuid. '.self::LINKED,
+            'created_by' => 'A user of the source instance; the target leaves it empty.',
+        ],
         GithubApp::class => ['team_id' => self::TEAM, 'private_key_id' => self::LINKED],
         GithubRunnerConfig::class => [
             'server_id' => self::LINKED,
@@ -216,7 +248,7 @@ final class ServerTransferCoverage
         ],
         GitlabApp::class => ['team_id' => self::TEAM, 'private_key_id' => self::LINKED],
         GiteaApp::class => ['team_id' => self::TEAM, 'private_key_id' => self::LINKED],
-        S3Storage::class => ['team_id' => self::TEAM, 'unusable_email_sent' => self::RUNTIME],
+        S3Storage::class => ['team_id' => self::TEAM, 'private_key_id' => self::LINKED, 'unusable_email_sent' => self::RUNTIME],
         Project::class => [
             'team_id' => self::TEAM,
             'icon_path' => 'The icon file is exported as `icon` (base64 content). The target stores it in its own icon storage and sets the path.',
@@ -242,7 +274,7 @@ final class ServerTransferCoverage
             'environment_id' => self::LINKED, 'destination_type' => self::LINKED, 'destination_id' => self::LINKED,
             'source_type' => self::LINKED, 'source_id' => self::LINKED, 'private_key_id' => self::LINKED,
         ],
-        ApplicationSetting::class => ['application_id' => self::LINKED],
+        ApplicationSetting::class => ['application_id' => self::LINKED, 'has_unlinked_config_file' => self::RUNTIME],
         ApplicationPreview::class => [
             'application_id' => self::LINKED, 'last_online_at' => self::RUNTIME, 'domain_dns_statuses' => self::RUNTIME,
             'restart_count' => self::RUNTIME, 'restart_limit_reached' => self::RUNTIME, 'last_restart_at' => self::RUNTIME,
@@ -253,8 +285,11 @@ final class ServerTransferCoverage
             'resource_type' => self::LINKED, 'resource_id' => self::LINKED, 'standalone_sqlite_id' => self::LINKED,
             'container_id' => 'Not used: only listed in $fillable.',
         ],
-        LocalFileVolume::class => ['resource_type' => self::LINKED, 'resource_id' => self::LINKED],
-        ScheduledTask::class => ['team_id' => self::TEAM, 'application_id' => self::LINKED, 'service_id' => self::LINKED],
+        LocalFileVolume::class => ['resource_type' => self::LINKED, 'resource_id' => self::LINKED, 'variable_fs_path' => self::RUNTIME],
+        ScheduledTask::class => [
+            'team_id' => self::TEAM, 'application_id' => self::LINKED, 'service_id' => self::LINKED,
+            'consecutive_failures' => self::RUNTIME, 'failing_since' => self::RUNTIME,
+        ],
         Tag::class => ['team_id' => self::TEAM],
         ScheduledDatabaseBackup::class => [
             'team_id' => self::TEAM, 'database_type' => self::LINKED, 'database_id' => self::LINKED, 's3_storage_id' => self::LINKED,
@@ -266,8 +301,8 @@ final class ServerTransferCoverage
         Service::class => [
             'environment_id' => self::LINKED, 'server_id' => self::LINKED, 'destination_type' => self::LINKED, 'destination_id' => self::LINKED,
         ],
-        ServiceApplication::class => ['service_id' => self::LINKED],
-        ServiceDatabase::class => ['service_id' => self::LINKED],
+        ServiceApplication::class => ['service_id' => self::LINKED, 'is_removed_from_compose' => self::FROM_COMPOSE],
+        ServiceDatabase::class => ['service_id' => self::LINKED, 'is_removed_from_compose' => self::FROM_COMPOSE],
         StandalonePostgresql::class => [
             'destination_type' => self::LINKED, 'destination_id' => self::LINKED, 'environment_id' => self::LINKED,
             'config_hash' => 'Calculated again when the target starts the database.',
@@ -300,6 +335,10 @@ final class ServerTransferCoverage
             'destination_type' => self::LINKED, 'destination_id' => self::LINKED, 'environment_id' => self::LINKED,
             'config_hash' => 'Calculated again when the target starts the database.',
         ],
+        StandaloneInfluxdb::class => [
+            'destination_type' => self::LINKED, 'destination_id' => self::LINKED, 'environment_id' => self::LINKED,
+            'config_hash' => 'Calculated again when the target starts the database.',
+        ],
         StandaloneSqlite::class => [
             'destination_type' => self::LINKED, 'destination_id' => self::LINKED, 'environment_id' => self::LINKED,
             'config_hash' => 'Calculated again when the target starts the database.',
@@ -321,6 +360,8 @@ final class ServerTransferCoverage
      */
     public const NOT_TRANSFERRED = [
         Team::class => 'Instance-wide: the target imports into one of its own teams.',
+        EnvironmentConfigLink::class => 'The coolify.json link belongs to the environment on the source instance; link the environment again on the target.',
+        EnvironmentConfigRevision::class => 'History of the coolify.json link of the source instance.',
         User::class => 'Instance-wide: users are not moved with a server.',
         TeamInvitation::class => 'Team data, not server data.',
         Subscription::class => 'Billing of the source instance.',
@@ -329,6 +370,8 @@ final class ServerTransferCoverage
         OauthIdentity::class => 'User login data of the source instance.',
         PersonalAccessToken::class => 'API tokens of the source instance.',
         UserChangelogRead::class => 'User data of the source instance.',
+        ServiceTemplateRevision::class => 'Undo history of template changes on the source instance; the current compose moves with the service.',
+        Star::class => 'User data of the source instance: users are not moved with a server.',
         AuditEvent::class => 'Audit log of the source instance.',
         NotificationThrottle::class => 'Runtime state of the source instance.',
         ScheduledJobState::class => 'Scheduler state of the source instance.',
@@ -339,15 +382,21 @@ final class ServerTransferCoverage
         TelegramNotificationSettings::class => 'Team notification settings, not server data.',
         PushoverNotificationSettings::class => 'Team notification settings, not server data.',
         WebhookNotificationSettings::class => 'Team notification settings, not server data.',
+        NtfyNotificationSettings::class => 'Team notification settings, not server data.',
         CloudInitScript::class => 'Team server-creation templates, not server data.',
         ProjectSetting::class => 'Created with the project on the target; it has no settings of its own yet.',
         ApplicationDeploymentQueue::class => 'Deployment history.',
+        ImageScan::class => 'Rebuilt by the next rescan.',
+        ImageSbom::class => 'Rebuilt by the next rescan.',
+        ServerHostScan::class => 'Rebuilt by the next host scan on the target.',
+        ImageScanNotificationState::class => 'Notification state restarts as a baseline after a transfer.',
         ScheduledTaskExecution::class => 'Execution history.',
         ScheduledDatabaseBackupExecution::class => 'Execution history.',
         ScheduledVolumeBackupExecution::class => 'Execution history.',
         DatabaseBackupS3Replica::class => 'Backup history.',
         VolumeBackupS3Replica::class => 'Backup history.',
         DockerCleanupExecution::class => 'Execution history.',
+        ProxyConfigurationVersion::class => 'Configuration history. The current proxy configuration moves with the server.',
         GithubRunnerExecution::class => 'Execution history. The source stops tracking the runners of the server when it is transferred.',
     ];
 }

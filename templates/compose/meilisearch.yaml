@@ -7,7 +7,7 @@
 
 services:
   meilisearch:
-    image: getmeili/meilisearch:latest
+    image: getmeili/meilisearch:v1.57.0
     environment:
       - SERVICE_URL_MEILISEARCH_7700
       - MEILI_NO_ANALYTICS=${MEILI_NO_ANALYTICS:-true}

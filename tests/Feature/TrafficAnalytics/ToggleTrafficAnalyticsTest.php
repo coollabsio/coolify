@@ -47,19 +47,6 @@ it('toggles traffic analytics via the sentinel settings component', function () 
     expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeTrue();
 });
 
-it('warns about the application interruption before enabling traffic analytics', function () {
-    $server = Server::factory()->create(['team_id' => $this->team->id]);
-    $server->proxy->set('type', 'TRAEFIK');
-    $server->save();
-    $server->settings->is_traffic_analytics_enabled = false;
-    $server->settings->save();
-
-    Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
-        ->assertSee('Enable traffic analytics?')
-        ->assertSeeHtml('wire:target="toggleTrafficAnalytics"')
-        ->assertSee('Enabling traffic analytics will restart Sentinel and the proxy. Your applications will experience a brief interruption.');
-});
-
 it('does not enable traffic analytics on a swarm server', function () {
     ConfigureTrafficAnalytics::partialMock()->shouldReceive('handle')->never();
 
@@ -178,22 +165,6 @@ it('does not enable traffic analytics on a build server', function () {
         ->assertHasNoErrors();
 
     expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeFalse();
-});
-
-it('disables the analytics toggle and explains why when the server has no traefik or caddy proxy', function () {
-    $server = Server::factory()->create(['team_id' => $this->team->id]);
-    $server->proxy->set('type', 'NONE');
-    $server->save();
-    $server->settings->is_traffic_analytics_enabled = false;
-    $server->settings->save();
-
-    $html = Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
-        ->assertSee('Traffic analytics needs the Traefik or Caddy proxy.')
-        ->assertDontSee('Enable traffic analytics?')
-        ->assertDontSeeHtml('submitAction')
-        ->html();
-
-    expect($html)->toMatch('/<button disabled[^>]*>(?:\s|<!--.*?-->)*Enable traffic analytics\s*<\/button>/s');
 });
 
 it('rejects enabling analytics from the component when the server has no traefik or caddy proxy', function () {

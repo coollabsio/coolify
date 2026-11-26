@@ -13,6 +13,7 @@ use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Services\Dns\ManagedDnsRecordCleanup;
+use App\Services\Dns\ResourceDnsRecords;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -83,6 +84,8 @@ class Index extends Component
 
     public $requiredPort = null;
 
+    public ?int $requestedPort = null;
+
     public ?string $fqdn = null;
 
     public bool $isGzipEnabled = false;
@@ -103,7 +106,6 @@ class Index extends Component
     protected $rules = [
         'humanName' => 'nullable',
         'description' => 'nullable',
-        'image' => 'required',
         'excludeFromStatus' => 'required|boolean',
         'publicPort' => 'nullable|integer|min:1|max:65535',
         'publicPortTimeout' => 'nullable|integer|min:1',
@@ -407,7 +409,7 @@ class Index extends Component
     {
         try {
             $this->authorize('update', $this->serviceDatabase);
-            $this->validate();
+            $this->validate($this->rulesFor($this->serviceDatabase));
             $this->syncDatabaseData(true);
             $changedFields = auditChangedFields($this->serviceDatabase);
             $this->serviceDatabase->save();
@@ -468,6 +470,16 @@ class Index extends Component
             $this->certificateResolverName = $this->certificateResolverMode === 'custom' ? $resolver : null;
             $this->maxRestartCount = $this->serviceApplication->max_restart_count ?? 0;
         }
+    }
+
+    /**
+     * A compose service that has only a `build` key has no image, so its image stays optional.
+     *
+     * @return array<string, mixed>
+     */
+    private function rulesFor(ServiceApplication|ServiceDatabase $persistedPart): array
+    {
+        return [...$this->rules, 'image' => filled($persistedPart->image) ? 'required' : 'nullable'];
     }
 
     private function validateCertificateResolver(): void
@@ -628,7 +640,7 @@ class Index extends Component
         try {
             $persistedApplication = $this->serviceApplication->fresh();
             $previousDnsHostnames = app(ManagedDnsRecordCleanup::class)->hostnamesOf($persistedApplication);
-            $previousEditableUrls = $persistedApplication->url;
+            $previousServiceDnsHostnames = array_keys(app(ResourceDnsRecords::class)->hostnameUsers($this->service));
             $previousFqdn = $persistedApplication->fqdn;
             $previousPortOverrides = $persistedApplication->domain_port_overrides;
             $this->authorize('update', $this->serviceApplication);
@@ -667,8 +679,9 @@ class Index extends Component
                             continue;
                         }
 
-                        if ($this->serviceApplication->portRequiresConfirmation($fqdn, $requiredPort, $previousEditableUrls)) {
+                        if ($this->serviceApplication->portRequiresConfirmation($fqdn, $requiredPort)) {
                             $this->requiredPort = $requiredPort;
+                            $this->requestedPort = ServiceApplication::extractPortFromUrl($fqdn);
                             $this->showPortWarningModal = true;
                             $this->serviceApplication->fqdn = $previousFqdn;
                             $this->serviceApplication->domain_port_overrides = $previousPortOverrides;
@@ -681,12 +694,13 @@ class Index extends Component
                 $this->forceRemovePort = false;
             }
 
-            $this->validate();
+            $this->validate($this->rulesFor($persistedApplication));
             $changedFields = auditChangedFields($this->serviceApplication);
             $this->serviceApplication->save();
             $this->auditServiceSubResourceUpdate($this->serviceApplication, $changedFields);
             $this->serviceApplication->refresh();
             app(ManagedDnsRecordCleanup::class)->queueReleaseOfRemovedHostnames($this->serviceApplication, $previousDnsHostnames, $this->service->team()->id);
+            app(ResourceDnsRecords::class)->queueAutomaticRecords($this->service, $previousServiceDnsHostnames);
             $this->syncApplicationData(false);
             updateCompose($this->serviceApplication);
             if (str($this->serviceApplication->fqdn)->contains(',')) {

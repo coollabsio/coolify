@@ -55,6 +55,7 @@ class Show extends Component
         if (! $project) {
             return redirect()->route('dashboard');
         }
+        $this->authorize('viewSharedVariables', $project);
         $this->project = $project;
         if ($this->prefersCanvasView('project_variables')) {
             return $this->redirectRoute('shared-variables.project.canvas', ['project_uuid' => $project->uuid], navigate: true);
@@ -65,7 +66,7 @@ class Show extends Component
     public function switch()
     {
         try {
-            $this->authorize('view', $this->project);
+            $this->authorize('viewSharedVariables', $this->project);
             $this->view = $this->view === 'normal' ? 'dev' : 'normal';
             $this->getDevView();
         } catch (\Throwable $e) {
@@ -80,9 +81,7 @@ class Show extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        $canViewValues = auth()->user()?->isAdminOfTeam($this->project->team_id) ?? false;
-
-        return $variables->map(fn ($item) => formatEnvVariableForDevView($item, $canViewValues))->join("\n");
+        return $variables->map(fn ($item) => formatEnvVariableForDevView($item, auth()->user()?->can('viewSensitive', $item) ?? false))->join("\n");
     }
 
     public function submit()

@@ -413,7 +413,7 @@ describe('application env PATCH keeps omitted flags', function () {
             ->and((bool) $env->is_shown_once)->toBeTrue();
     });
 
-    test('explicit flags are still applied', function () {
+    test('explicit flags are still applied, but a locked variable stays locked', function () {
         $this->withHeaders($this->headers)
             ->patchJson("/api/v1/applications/{$this->application->uuid}/envs", [
                 'key' => 'FLAGGED_KEY',
@@ -427,7 +427,7 @@ describe('application env PATCH keeps omitted flags', function () {
         $env = $this->env->fresh();
         expect((bool) $env->is_literal)->toBeFalse()
             ->and($env->is_multiline)->toBeFalse()
-            ->and((bool) $env->is_shown_once)->toBeFalse();
+            ->and((bool) $env->is_shown_once)->toBeTrue();
     });
 });
 
@@ -643,4 +643,186 @@ describe('env PATCH keeps the value when value is omitted', function () {
         'database single' => ['database', 'databases', false],
         'database bulk' => ['database', 'databases', true],
     ]);
+});
+
+describe('env API cannot unlock a locked variable', function () {
+    test('is_shown_once false keeps the lock and the value can still be replaced', function (string $resourceType, string $endpoint, bool $bulk) {
+        $resource = match ($resourceType) {
+            'application' => Application::factory()->create([
+                'environment_id' => $this->environment->id,
+                'destination_id' => $this->destination->id,
+                'destination_type' => $this->destination->getMorphClass(),
+            ]),
+            'service' => Service::factory()->create([
+                'server_id' => $this->server->id,
+                'destination_id' => $this->destination->id,
+                'destination_type' => $this->destination->getMorphClass(),
+                'environment_id' => $this->environment->id,
+            ]),
+            'database' => StandalonePostgresql::create([
+                'name' => 'db',
+                'postgres_user' => 'postgres',
+                'postgres_password' => 'password',
+                'postgres_db' => 'app',
+                'image' => 'postgres:16',
+                'environment_id' => $this->environment->id,
+                'destination_id' => $this->destination->id,
+                'destination_type' => $this->destination->getMorphClass(),
+            ]),
+        };
+
+        $env = EnvironmentVariable::create([
+            'key' => 'LOCKED_KEY',
+            'value' => 'locked-secret',
+            'is_shown_once' => true,
+            'resourceable_type' => $resource->getMorphClass(),
+            'resourceable_id' => $resource->id,
+            'is_preview' => false,
+        ]);
+
+        $payload = ['key' => 'LOCKED_KEY', 'value' => 'rotated-secret', 'is_shown_once' => false];
+        $this->withHeaders(['Authorization' => 'Bearer '.$this->bearerToken, 'Content-Type' => 'application/json'])
+            ->patchJson("/api/v1/{$endpoint}/{$resource->uuid}/envs".($bulk ? '/bulk' : ''), $bulk ? ['data' => [$payload]] : $payload)
+            ->assertStatus(201)
+            ->assertDontSee('rotated-secret');
+
+        $env->refresh();
+        expect((bool) $env->is_shown_once)->toBeTrue()
+            ->and($env->value)->toBe('rotated-secret');
+    })->with([
+        'application single' => ['application', 'applications', false],
+        'application bulk' => ['application', 'applications', true],
+        'service single' => ['service', 'services', false],
+        'service bulk' => ['service', 'services', true],
+        'database single' => ['database', 'databases', false],
+        'database bulk' => ['database', 'databases', true],
+    ]);
+});
+
+describe('env API keeps multiline values exact', function () {
+    test('create and bulk update keep the trailing newline of a private key', function () {
+        $application = Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+        $key = "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAA\n-----END OPENSSH PRIVATE KEY-----\n";
+        $headers = ['Authorization' => 'Bearer '.$this->bearerToken];
+
+        $this->withHeaders($headers)->postJson("/api/v1/applications/{$application->uuid}/envs", [
+            'key' => 'SSH_KEY',
+            'value' => $key,
+            'is_multiline' => true,
+        ])->assertStatus(201);
+
+        $this->withHeaders($headers)->patchJson("/api/v1/applications/{$application->uuid}/envs/bulk", [
+            'data' => [
+                ['key' => 'OTHER_KEY', 'value' => $key, 'is_multiline' => true],
+                ['key' => 'PLAIN', 'value' => "  plain \n"],
+            ],
+        ])->assertStatus(201);
+
+        $values = $application->environment_variables()->get()->pluck('value', 'key');
+        expect($values['SSH_KEY'])->toBe($key)
+            ->and($values['OTHER_KEY'])->toBe($key)
+            ->and($values['PLAIN'])->toBe('  plain ');
+    });
+});
+
+describe('compose_services on application and service env APIs', function () {
+    beforeEach(function () {
+        $this->composeRaw = "services:\n  web:\n    image: nginx\n  worker:\n    image: busybox\n";
+        $this->api = fn () => $this->withHeaders(['Authorization' => 'Bearer '.$this->bearerToken, 'Content-Type' => 'application/json']);
+        $this->composeApplication = fn (array $attributes = []) => Application::factory()->create([
+            'environment_id' => $this->environment->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'build_pack' => 'dockercompose',
+            'docker_compose_raw' => $this->composeRaw,
+            ...$attributes,
+        ]);
+    });
+
+    test('application endpoints set, keep, and clear the Compose service scope', function () {
+        $application = ($this->composeApplication)();
+        $url = "/api/v1/applications/{$application->uuid}/envs";
+
+        ($this->api)()->postJson($url, ['key' => 'SCOPED', 'value' => 'v', 'compose_services' => ['web']])->assertStatus(201);
+        $env = $application->environment_variables()->where('key', 'SCOPED')->sole();
+        expect($env->compose_services)->toBe(['web']);
+
+        ($this->api)()->patchJson($url, ['key' => 'SCOPED', 'value' => 'changed'])
+            ->assertStatus(201)
+            ->assertJsonPath('compose_services', ['web']);
+
+        ($this->api)()->patchJson("{$url}/bulk", ['data' => [['key' => 'SCOPED', 'compose_services' => ['web', 'worker']]]])
+            ->assertStatus(201)
+            ->assertJsonPath('0.compose_services', ['web', 'worker']);
+
+        ($this->api)()->patchJson($url, ['key' => 'SCOPED', 'compose_services' => null])
+            ->assertStatus(201)
+            ->assertJsonPath('compose_services', null);
+        expect($env->fresh()->compose_services)->toBeNull();
+
+        ($this->api)()->postJson($url, ['key' => 'UNSCOPED', 'value' => 'v'])->assertStatus(201);
+        expect($application->environment_variables()->where('key', 'UNSCOPED')->sole()->compose_services)->toBeNull();
+    });
+
+    test('application endpoints reject unknown Compose service names', function (string $method, string $suffix, array $body) {
+        $application = ($this->composeApplication)();
+        EnvironmentVariable::create(['key' => 'EXISTING', 'value' => 'v', 'resourceable_type' => Application::class, 'resourceable_id' => $application->id]);
+
+        ($this->api)()->json($method, "/api/v1/applications/{$application->uuid}/envs{$suffix}", $body)
+            ->assertStatus(422)
+            ->assertJsonPath('errors.compose_services.0', 'Unknown Compose services: db. Available services: web, worker.');
+
+        expect(EnvironmentVariable::where('key', 'NEW_VAR')->exists())->toBeFalse()
+            ->and(EnvironmentVariable::where('key', 'EXISTING')->pluck('compose_services')->all())->toBe([null, null]);
+    })->with([
+        'create' => ['POST', '', ['key' => 'NEW_VAR', 'value' => 'v', 'compose_services' => ['web', 'db']]],
+        'update' => ['PATCH', '', ['key' => 'EXISTING', 'compose_services' => ['db']]],
+        'bulk' => ['PATCH', '/bulk', ['data' => [['key' => 'EXISTING', 'compose_services' => ['db']]]]],
+    ]);
+
+    test('application endpoints reject a scope on an application that is not Docker Compose', function () {
+        $application = ($this->composeApplication)(['build_pack' => 'dockerfile']);
+
+        ($this->api)()->postJson("/api/v1/applications/{$application->uuid}/envs", ['key' => 'NEW_VAR', 'value' => 'v', 'compose_services' => ['web']])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.compose_services.0', 'Only Docker Compose resources with a loaded Compose file can limit a variable to services. For a new Compose application, deploy it once or reload its Compose file first.');
+
+        ($this->api)()->postJson("/api/v1/applications/{$application->uuid}/envs", ['key' => 'NEW_VAR', 'value' => 'v', 'compose_services' => null])
+            ->assertStatus(201);
+    });
+
+    test('service endpoints set, reject, and clear the Compose service scope', function () {
+        $service = Service::factory()->create([
+            'server_id' => $this->server->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'environment_id' => $this->environment->id,
+            'docker_compose_raw' => $this->composeRaw,
+        ]);
+        $url = "/api/v1/services/{$service->uuid}/envs";
+
+        ($this->api)()->postJson($url, ['key' => 'SCOPED', 'value' => 'v', 'compose_services' => ['worker']])
+            ->assertStatus(201)
+            ->assertJsonPath('compose_services', ['worker']);
+
+        ($this->api)()->patchJson($url, ['key' => 'SCOPED', 'compose_services' => ['nope']])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.compose_services.0', 'Unknown Compose services: nope. Available services: web, worker.');
+        ($this->api)()->patchJson("{$url}/bulk", ['data' => [['key' => 'SCOPED', 'compose_services' => ['nope']]]])
+            ->assertStatus(422);
+        expect($service->environment_variables()->where('key', 'SCOPED')->sole()->compose_services)->toBe(['worker']);
+
+        ($this->api)()->patchJson("{$url}/bulk", ['data' => [['key' => 'SCOPED', 'compose_services' => ['web']]]])
+            ->assertStatus(201)
+            ->assertJsonPath('0.compose_services', ['web']);
+
+        ($this->api)()->patchJson($url, ['key' => 'SCOPED', 'compose_services' => null])
+            ->assertStatus(201)
+            ->assertJsonPath('compose_services', null);
+        expect($service->environment_variables()->where('key', 'SCOPED')->sole()->compose_services)->toBeNull();
+    });
 });

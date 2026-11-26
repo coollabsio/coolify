@@ -7,7 +7,8 @@
 
 services:
   openwa:
-    image: ghcr.io/rmyndharis/openwa:0.23.1
+    image: ghcr.io/rmyndharis/openwa:0.30.3
+    stop_grace_period: 75s
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -16,6 +17,7 @@ services:
       - CHOWN
       - DAC_OVERRIDE
       - FOWNER
+      - KILL
       - SETGID
       - SETUID
     read_only: true

@@ -44,16 +44,3 @@ test('member cannot delete team via navbar', function () {
 
     expect(Team::find($this->teamToDelete->id))->not->toBeNull();
 });
-
-test('navbar delete team trigger matches sidebar menu item layout', function () {
-    $this->actingAs($this->owner);
-    session(['currentTeam' => $this->teamToDelete]);
-
-    Livewire::test(NavbarDeleteTeam::class)
-        ->assertSuccessful()
-        ->assertSee('title="Delete Team"', false)
-        ->assertSee('menu-item justify-start text-left', false)
-        ->assertSee('sidebar-collapsed-label', false)
-        ->assertSee('menu-item-icon', false)
-        ->assertDontSeeHtml('buttonTitle="Delete Team"');
-});

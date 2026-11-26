@@ -6,6 +6,7 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Models\Server;
 use App\Models\StandaloneClickhouse;
+use App\Services\ProjectConfig\ManagedResources;
 use App\Support\ValidationPatterns;
 use App\Traits\ListensToTeamChannel;
 use Exception;
@@ -73,7 +74,7 @@ class General extends Component
             return handleError($e, $this);
         }
 
-        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
+        $this->isPasswordHiddenForMember = ! ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->database);
     }
 
     protected function rules(): array
@@ -137,7 +138,7 @@ class General extends Component
             $this->database->save();
             $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
-            $canSeeCredentials = auth()->user()?->can('update', $this->database) ?? false;
+            $canSeeCredentials = ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->database);
             $this->name = $this->database->name;
             $this->description = $this->database->description;
             $this->clickhouseAdminUser = $this->database->clickhouse_admin_user;

@@ -11,6 +11,8 @@ use App\Models\GiteaApp;
 use App\Models\GithubApp;
 use App\Models\GithubRunnerConfig;
 use App\Models\GitlabApp;
+use App\Models\ImageScanIgnore;
+use App\Models\ImageScanPolicy;
 use App\Models\InstanceSettings;
 use App\Models\IntegrationToken;
 use App\Models\LocalFileVolume;
@@ -24,6 +26,7 @@ use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\Server;
+use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -32,6 +35,7 @@ use App\Models\SslCertificate;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -155,6 +159,9 @@ beforeEach(function () {
         'source_type' => $application->getMorphClass(), 'source_id' => $application->id,
         'target_type' => $service->getMorphClass(), 'target_id' => $service->id,
     ]);
+    transferCoverageRecord(ImageScanPolicy::class, ['scope_type' => $this->server->getMorphClass(), 'scope_id' => $this->server->id, 'gate_mode' => 'strict', 'on_scan_error' => 'block', 'count_medium' => true]);
+    transferCoverageRecord(ImageScanPolicy::class, ['scope_type' => $application->getMorphClass(), 'scope_id' => $application->id, 'gate_mode' => 'on']);
+    transferCoverageRecord(ImageScanIgnore::class, [...$teamId, 'resource_type' => $application->getMorphClass(), 'resource_id' => $application->id, 'vulnerability_id' => 'CVE-2024-1', 'package' => 'openssl', 'expires_at' => now()->addYear()]);
     transferCoverageRecord(GithubRunnerConfig::class, ['server_id' => $this->server->id, 'github_app_id' => $githubApp->id, 'labels' => ['coverage']]);
     transferCoverageRecord(ServiceApplication::class, ['service_id' => $service->id]);
     transferCoverageRecord(ServiceDatabase::class, ['service_id' => $service->id]);
@@ -234,7 +241,9 @@ test('every exported value arrives unchanged on the target', function () {
         Environment::class => ['canvas_positions'],
     ];
     $values = [
-        Server::class => ['proxy' => ['type' => 'TRAEFIK', 'status' => 'running', 'redirect_enabled' => false, 'redirect_url' => 'https://fuzz.example.test']],
+        Server::class => ['proxy' => ['type' => 'TRAEFIK', 'status' => 'running', 'redirect_enabled' => false, 'redirect_url' => 'https://fuzz.example.test', 'unknown_host_status' => 404]],
+        // The import accepts only valid host key lines.
+        ServerSetting::class => ['ssh_host_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKgKlP9E2JBLjQ8DDxZUaI5vOJlvo8Uv06UAyqDbyC2I'],
         Application::class => ['fqdn' => 'https://fuzz-a.example.test,https://fuzz-b.example.test', 'domain_port_overrides' => null, 'noindex_domains' => ['https://fuzz-b.example.test']],
         ApplicationPreview::class => ['fqdn' => 'https://pr-fuzz.example.test', 'domain_port_overrides' => null],
         ServiceApplication::class => ['fqdn' => 'https://fuzz-service.example.test', 'domain_port_overrides' => null, 'noindex_domains' => []],
@@ -252,6 +261,7 @@ test('every exported value arrives unchanged on the target', function () {
         StandaloneMysql::class => ['mysql_user' => 'fuzz_user', 'mysql_database' => 'fuzz_db', 'ports_mappings' => '13306:3306', 'public_port' => 13306],
         StandaloneMariadb::class => ['mariadb_user' => 'fuzz_user', 'mariadb_database' => 'fuzz_db', 'ports_mappings' => '13307:3306', 'public_port' => 13307],
         StandaloneClickhouse::class => ['clickhouse_admin_user' => 'fuzz_user', 'ports_mappings' => '18123:8123', 'public_port' => 18123],
+        StandaloneInfluxdb::class => ['influxdb_admin_user' => 'fuzz_user', 'influxdb_org' => 'fuzz_org', 'influxdb_bucket' => 'fuzz_bucket', 'ports_mappings' => '18086:8086', 'public_port' => 18086],
         StandaloneRedis::class => ['ports_mappings' => '16379:6379', 'public_port' => 16379],
         StandaloneKeydb::class => ['ports_mappings' => '16380:6379', 'public_port' => 16380],
         StandaloneDragonfly::class => ['ports_mappings' => '16381:6379', 'public_port' => 16381],
@@ -292,6 +302,7 @@ test('every exported value arrives unchanged on the target', function () {
     $changedOnPurpose = [
         'last_online_at' => 'The import sets the status, which sets the time.',
         'GithubRunnerConfig.is_enabled' => 'The target disables the runners until the user enables them.',
+        'ServerSetting.ssh_host_key_source' => 'The import marks a moved host key as transfer.',
     ];
     expect(ServerTransferSnapshot::diff($before, ServerTransferSnapshot::take($this->server->uuid), $changedOnPurpose)['unexplained'])->toBe([]);
 });

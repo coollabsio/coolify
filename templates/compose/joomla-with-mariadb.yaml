@@ -7,7 +7,7 @@
 
 services:
   joomla:
-    image: joomla:latest
+    image: joomla:6.2.0
     volumes:
       - joomla_data:/var/www/html
     environment:

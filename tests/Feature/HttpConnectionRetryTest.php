@@ -38,3 +38,20 @@ test('a post request is not retried because the server can have received it', fu
     expect(fn () => Http::post('https://api.example.com/items'))->toThrow(ConnectionException::class)
         ->and($this->attempts)->toBe(1);
 });
+
+test('a read request is not sent again after it timed out waiting for the response', function () {
+    $server = stream_socket_server('tcp://127.0.0.1:0');
+    $address = stream_socket_get_name($server, false);
+
+    expect(fn () => Http::timeout(1)->get("http://{$address}/slow"))
+        ->toThrow(ConnectionException::class, 'cURL error 28');
+
+    stream_set_blocking($server, false);
+    $connections = 0;
+    while (@stream_socket_accept($server, 0)) {
+        $connections++;
+    }
+    fclose($server);
+
+    expect($connections)->toBe(1);
+});

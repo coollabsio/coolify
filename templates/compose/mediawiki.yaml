@@ -7,7 +7,7 @@
 
 services:
   mediawiki:
-    image: mediawiki:latest
+    image: mediawiki:1.46.2
     environment:
       - SERVICE_URL_MEDIAWIKI_80
     volumes:

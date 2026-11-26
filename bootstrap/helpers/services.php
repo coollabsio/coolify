@@ -36,6 +36,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Services\Dns\ResourceDnsRecords;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Stringable;
@@ -90,6 +91,7 @@ function resource_logo(Model $resource): ?array
 
     if ($resource instanceof Application) {
         $logo = match (true) {
+            $resource->is_archive_source => $resourceLogo('static-archive'),
             $resource->build_pack === 'dockerimage' => $resourceLogo('docker-image'),
             $resource->build_pack === 'dockerfile' => $resourceLogo('dockerfile'),
             $resource->build_pack === 'dockercompose' => $resourceLogo('docker-compose'),
@@ -116,6 +118,7 @@ function resource_logo(Model $resource): ?array
         'keydb' => $resourceLogo('keydb', true),
         'dragonfly' => $resourceLogo('dragonfly', true),
         'clickhouse' => $resourceLogo('clickhouse'),
+        'influxdb' => $resourceLogo('influxdb'),
         'sqlite' => $resourceLogo('sqlite'),
         default => null,
     };
@@ -359,6 +362,8 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 instant_remote_process([
                     'mkdir -p -- "$(dirname -- '.$escapedFileLocation.')"',
                     "echo '$content' | base64 -d | tee -- {$escapedFileLocation}",
+                    // Same mode as LocalFileVolume::saveStorageOnServer(): readable for a non-root container user with any umask.
+                    "chmod a+rx -- {$escapedFileLocation}",
                 ], $server);
             } elseif ($state === 'missing' && $fileVolume->is_directory && $isInit) {
                 // Does not exists (no dir or file), flagged as directory, is init
@@ -394,9 +399,9 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
 
         // Switch Image
         $updatedImage = data_get_str($resource, 'image');
-        $currentImage = data_get_str($dockerCompose, "services.{$name}.image");
-        if ($currentImage !== $updatedImage) {
-            data_set($dockerCompose, "services.{$name}.image", $updatedImage->value());
+        $currentImage = data_get_str($dockerCompose, ['services', $name, 'image']);
+        if ($updatedImage->isNotEmpty() && $currentImage->value() !== $updatedImage->value()) {
+            data_set($dockerCompose, ['services', $name, 'image'], $updatedImage->value());
             $dockerComposeRaw = Yaml::dump($dockerCompose, 10, 2);
             $resource->service->docker_compose_raw = $dockerComposeRaw;
             $resource->service->save();
@@ -408,7 +413,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         // to ensure we use the exact names defined in the template (which may be abbreviated)
         // IMPORTANT: Only extract variables that are DIRECTLY DECLARED for this service,
         // not variables that are merely referenced from other services
-        $serviceConfig = data_get($dockerCompose, "services.{$name}");
+        $serviceConfig = data_get($dockerCompose, ['services', $name]);
         $environment = data_get($serviceConfig, 'environment') ?? [];
         $templateVariableNames = [];
 
@@ -690,10 +695,13 @@ function clone_service(Service $source, StandaloneDocker|SwarmDocker $destinatio
     $teamId = $source->team()->id;
     $uuid = $overrides['uuid'] ?? new_public_id();
 
+    // A clone is not managed by coolify.json: config_key is unique per environment.
     $newService = $source->replicate([
         'id',
         'created_at',
         'updated_at',
+        'config_key',
+        'config_meta',
     ])->fill([
         'name' => clone_resource_name($source->name, $uuid),
         ...$overrides,
@@ -725,6 +733,7 @@ function clone_service(Service $source, StandaloneDocker|SwarmDocker $destinatio
             'id',
             'created_at',
             'updated_at',
+            'config_meta',
         ])->fill([
             'resourceable_id' => $newService->id,
             'resourceable_type' => $newService->getMorphClass(),
@@ -789,6 +798,9 @@ function clone_service(Service $source, StandaloneDocker|SwarmDocker $destinatio
             $pendingVolumeClones,
         ));
     }
+
+    $dnsRecords = app(ResourceDnsRecords::class);
+    $dnsRecords->queueAutomaticRecords($newService, array_keys($dnsRecords->hostnameUsers($source)));
 
     return $newService;
 }

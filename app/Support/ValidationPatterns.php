@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Validation\ValidationException;
+
 /**
  * Shared validation patterns for consistent use across the application
  */
@@ -37,9 +39,11 @@ class ValidationPatterns
 
     /**
      * Pattern for SSH usernames.
-     * Allows alphanumeric characters, dots, hyphens, and underscores.
+     * Allows alphanumeric characters, dots, hyphens, and underscores. The first character must not be
+     * a hyphen, so ssh and scp cannot read the user as an option.
+     * The terminal server uses the same rule (docker/coolify-terminal/terminal-utils.js).
      */
-    public const SERVER_USERNAME_PATTERN = '/^[a-zA-Z0-9._-]+$/';
+    public const SERVER_USERNAME_PATTERN = '/^[a-zA-Z0-9_.][a-zA-Z0-9._-]*$/';
 
     /**
      * Pattern for removing characters not allowed in SSH usernames.
@@ -277,6 +281,18 @@ class ValidationPatterns
     }
 
     /**
+     * Rejects an environment variable value with a NUL byte. A container cannot start with one.
+     *
+     * @throws ValidationException
+     */
+    public static function rejectNulByteInEnvironmentVariableValue(?string $value): void
+    {
+        if ($value !== null && str_contains($value, "\0")) {
+            throw ValidationException::withMessages(['value' => 'The value cannot contain a NUL character.']);
+        }
+    }
+
+    /**
      * Get validation rules for Docker image repository names without tags.
      */
     public static function dockerImageNameRules(bool $required = false, int $maxLength = 255): array
@@ -488,14 +504,16 @@ class ValidationPatterns
 
     /**
      * Get validation rules for name fields
+     *
+     * Set $nullable to false for optional fields that may be left out but not set to null.
      */
-    public static function nameRules(bool $required = true, int $minLength = 3, int $maxLength = 255): array
+    public static function nameRules(bool $required = true, int $minLength = 3, int $maxLength = 255, bool $nullable = true): array
     {
         $rules = [];
 
         if ($required) {
             $rules[] = 'required';
-        } else {
+        } elseif ($nullable) {
             $rules[] = 'nullable';
         }
 
@@ -574,6 +592,17 @@ class ValidationPatterns
     public static function directoryPathRules(int $maxLength = 255): array
     {
         return ['nullable', 'string', 'max:'.$maxLength, 'regex:'.self::DIRECTORY_PATH_PATTERN];
+    }
+
+    /**
+     * Normalize a typed directory path to the form that DIRECTORY_PATH_PATTERN expects:
+     * "apps/web/" becomes "/apps/web", and an empty value becomes "/".
+     */
+    public static function normalizeDirectoryPath(?string $path): string
+    {
+        $path = trim(trim((string) $path), '/');
+
+        return '/'.$path;
     }
 
     /**

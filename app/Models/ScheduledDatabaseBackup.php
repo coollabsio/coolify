@@ -87,11 +87,6 @@ class ScheduledDatabaseBackup extends BaseModel
         return $this->belongsToMany(S3Storage::class, 'scheduled_database_backup_s3_storage')->withTimestamps();
     }
 
-    public function get_last_days_backup_status($days = 7)
-    {
-        return $this->hasMany(ScheduledDatabaseBackupExecution::class)->where('created_at', '>=', now()->subDays($days))->get();
-    }
-
     public function executionsPaginated(int $skip = 0, int $take = 10)
     {
         $executions = $this->hasMany(ScheduledDatabaseBackupExecution::class)->with('s3Replicas.s3')->orderBy('created_at', 'desc');
@@ -102,6 +97,40 @@ class ScheduledDatabaseBackup extends BaseModel
             'count' => $count,
             'executions' => $executions,
         ];
+    }
+
+    /**
+     * The `database_name` values that the next run of this schedule writes to its executions. When the schedule backs
+     * up the default database, the name of the newest execution stands for it.
+     *
+     * @return array<int, string>
+     */
+    public function activeDatabaseNames(): array
+    {
+        $database = $this->database;
+        if ($database instanceof StandalonePostgresql && $database->isInstanceDatabase()) {
+            return ['coolify'];
+        }
+
+        $type = str($database instanceof ServiceDatabase ? $database->databaseType() : $database?->type());
+        $databases = $this->databases_to_backup;
+
+        if ($type->contains('mongo')) {
+            return collect(filled($databases) ? explode('|', $databases) : ['*'])
+                ->map(fn (string $name) => trim($name) === '*' ? 'all' : str($name)->before(':')->trim()->value())
+                ->filter()->values()->all();
+        }
+        if ($this->dump_all && $type->contains(['postgres', 'mysql', 'mariadb'])) {
+            return ['all'];
+        }
+        if (blank($databases) && $database instanceof StandaloneSqlite) {
+            $databases = $database->sqlite_databases;
+        }
+        if (blank($databases)) {
+            return array_filter([$this->executions()->whereNotNull('database_name')->value('database_name')]);
+        }
+
+        return collect(explode(',', $databases))->map(fn (string $name) => trim($name))->filter()->values()->all();
     }
 
     public function server()

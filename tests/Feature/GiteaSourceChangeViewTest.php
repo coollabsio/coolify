@@ -45,17 +45,6 @@ beforeEach(function () {
 });
 
 describe('Gitea source setup view', function () {
-    test('shows incomplete-setup guidance with the credential form', function () {
-        Livewire::withQueryParams(['gitea_app_uuid' => $this->giteaApp->uuid])
-            ->test(Change::class)
-            ->assertSee('Finish connecting this Gitea App before using it as a source')
-            ->assertSee('https://gitea.com/user/settings/applications')
-            ->assertSee('Client ID')
-            ->assertSee('Client secret')
-            ->assertSee('Save')
-            ->assertDontSee('Test connection');
-    });
-
     test('derives api url when gitea url changes', function () {
         Livewire::withQueryParams(['gitea_app_uuid' => $this->giteaApp->uuid])
             ->test(Change::class)
@@ -211,4 +200,29 @@ describe('Gitea source authorization', function () {
         $this->assertModelExists($this->giteaApp);
         expect($this->giteaApp->refresh()->name)->toBe('My Gitea');
     });
+});
+
+test('saves a changed webhook secret', function () {
+    $this->giteaApp->forceFill(['webhook_secret' => str_repeat('a', 32)])->save();
+
+    Livewire::withQueryParams(['gitea_app_uuid' => $this->giteaApp->uuid])
+        ->test(Change::class)
+        ->set('webhookSecret', str_repeat('b', 64))
+        ->call('submit')
+        ->assertDispatched('success');
+
+    expect($this->giteaApp->refresh()->webhook_secret)->toBe(str_repeat('b', 64));
+});
+
+test('the system wide checkbox also saves the other pending edits', function () {
+    $this->giteaApp->forceFill(['webhook_secret' => str_repeat('a', 32)])->save();
+
+    Livewire::withQueryParams(['gitea_app_uuid' => $this->giteaApp->uuid])
+        ->test(Change::class)
+        ->set('webhookSecret', str_repeat('b', 64))
+        ->set('isSystemWide', false)
+        ->call('instantSave')
+        ->assertDispatched('success');
+
+    expect($this->giteaApp->refresh()->webhook_secret)->toBe(str_repeat('b', 64));
 });

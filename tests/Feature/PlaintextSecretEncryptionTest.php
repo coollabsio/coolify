@@ -60,7 +60,8 @@ beforeEach(function () {
         'name' => 'mongodb',
         'mongo_initdb_root_password' => 'mongo-root-password',
     ]);
-    $server->settings->update(['logdrain_custom_config' => "[OUTPUT]\n    Name http\n    http_Passwd secret"]);
+    $server->settings->update(['logdrain_config' => ['custom' => ['config' => "[OUTPUT]\n    Name http\n    http_Passwd secret"]]]);
+    $this->serverSettings = $server->settings;
     $invitation = TeamInvitation::create([
         'team_id' => $team->id,
         'uuid' => 'invite-uuid',
@@ -76,7 +77,6 @@ beforeEach(function () {
         ['gitlab_apps', $gitlabApp, 'app_secret', str_repeat('g', 64)],
         ['standalone_mariadbs', $mariadb, 'mariadb_root_password', 'mariadb-root-password'],
         ['standalone_mongodbs', $mongodb, 'mongo_initdb_root_password', 'mongo-root-password'],
-        ['server_settings', $server->settings, 'logdrain_custom_config', "[OUTPUT]\n    Name http\n    http_Passwd secret"],
         ['team_invitations', $invitation, 'link', 'https://coolify.test/auth/link?token=secret-token'],
     ];
 });
@@ -91,6 +91,13 @@ it('encrypts secrets at rest when they are saved through the model', function ()
         expect(Crypt::decryptString(rawSecret($table, $model, $column)))->toBe($plaintext, "{$table}.{$column}")
             ->and($model->fresh()->{$column})->toBe($plaintext, "{$table}.{$column}");
     }
+});
+
+it('encrypts the log drain config at rest', function () {
+    $config = ['custom' => ['config' => "[OUTPUT]\n    Name http\n    http_Passwd secret"]];
+
+    expect(json_decode(Crypt::decryptString(rawSecret('server_settings', $this->serverSettings, 'logdrain_config')), true))->toBe($config)
+        ->and($this->serverSettings->fresh()->logdrain_config)->toBe($config);
 });
 
 it('stores the GitLab app secret in a text column so the ciphertext fits', function () {

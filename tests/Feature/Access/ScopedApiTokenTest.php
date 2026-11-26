@@ -1,21 +1,26 @@
 <?php
 
 use App\Jobs\ApplicationDeploymentJob;
+use App\Livewire\Forms\ApiTokenForm;
 use App\Livewire\Security\ApiTokens;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\PersonalAccessToken;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Scopes\VisibleThroughAccessGrants;
 use App\Models\Server;
+use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
+use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -74,6 +79,16 @@ function scopedTokenTestToken(User $user, Team $team, array $abilities, ?array $
     return $token->plainTextToken;
 }
 
+/**
+ * Fill the edit form the way the browser does when the user clicks Edit.
+ */
+function scopedTokenTestEdit($component, PersonalAccessToken $token)
+{
+    $values = collect(ApiTokenForm::valuesOf($token))->except(['id', 'keepLabel']);
+
+    return $component->set($values->mapWithKeys(fn ($value, $field) => ["editForm.{$field}" => $value])->all());
+}
+
 function scopedTokenTestMember(Team $team, ?array $access): User
 {
     $member = User::factory()->create();
@@ -121,7 +136,7 @@ describe('admin token scoped to one project', function () {
     test('cannot use team-level endpoints or create projects', function () {
         scopedTokenTestApi($this->token, 'GET', '/api/v1/servers')
             ->assertForbidden()
-            ->assertExactJson(['message' => 'This API token is limited to selected projects, environments, or resources, so it cannot use this endpoint.']);
+            ->assertExactJson(['message' => 'This API token is limited to selected projects, environments, resources, or servers, so it cannot use this endpoint.']);
         scopedTokenTestApi($this->token, 'GET', '/api/v1/security/keys')->assertForbidden();
         scopedTokenTestApi($this->token, 'GET', '/api/v1/team')->assertForbidden();
         scopedTokenTestApi($this->token, 'POST', '/api/v1/projects', ['name' => 'new'])->assertForbidden();
@@ -182,6 +197,74 @@ describe('token scoped to one resource', function () {
         ])->assertForbidden();
 
         expect(Application::withoutGlobalScope(VisibleThroughAccessGrants::class)->where('environment_id', $this->shopProduction->id)->count())->toBe(2);
+    });
+});
+
+describe('server secrets in resource responses', function () {
+    beforeEach(function () {
+        $this->server->settings->forceFill([
+            'sentinel_token' => 'sentinel-token-canary',
+            'logdrain_config' => ['axiom' => ['api_key' => 'axiom-key-canary']],
+        ])->save();
+        $this->server->proxy->last_saved_proxy_configuration = 'proxy-config-canary';
+        $this->server->validation_logs = 'validation-logs-canary';
+        $this->server->save();
+
+        $this->shopService = Service::factory()->create([
+            'environment_id' => $this->shopProduction->id,
+            'server_id' => $this->server->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+            'docker_compose_raw' => "services:\n  web:\n    image: nginx\n",
+        ]);
+        $this->shopDatabase = StandalonePostgresql::create([
+            'uuid' => (string) Str::uuid(),
+            'name' => 'shop-db',
+            'postgres_user' => 'postgres',
+            'postgres_password' => 'password',
+            'postgres_db' => 'db',
+            'image' => 'postgres:17',
+            'environment_id' => $this->shopProduction->id,
+            'destination_id' => $this->destination->id,
+            'destination_type' => $this->destination->getMorphClass(),
+        ]);
+
+        $this->endpoints = [
+            '/api/v1/applications',
+            "/api/v1/applications/{$this->shopApi->uuid}",
+            '/api/v1/services',
+            "/api/v1/services/{$this->shopService->uuid}",
+            '/api/v1/databases',
+            "/api/v1/databases/{$this->shopDatabase->uuid}",
+        ];
+        $this->canaries = ['sentinel-token-canary', 'axiom-key-canary', 'proxy-config-canary', 'validation-logs-canary'];
+    });
+
+    test('a project-scoped token with read:sensitive does not get the secrets of the server', function () {
+        $token = scopedTokenTestToken($this->admin, $this->team, ['read', 'read:sensitive'], [['scope' => 'project', 'uuid' => $this->shop->uuid]]);
+
+        scopedTokenTestApi($token, 'GET', "/api/v1/servers/{$this->server->uuid}")->assertForbidden();
+
+        foreach ($this->endpoints as $endpoint) {
+            $body = scopedTokenTestApi($token, 'GET', $endpoint)->assertOk()->getContent();
+            foreach ($this->canaries as $canary) {
+                expect($body)->not->toContain($canary);
+            }
+        }
+
+        // The secrets of the resources in the scope stay readable.
+        expect(scopedTokenTestApi($token, 'GET', "/api/v1/databases/{$this->shopDatabase->uuid}")->json('postgres_password'))->toBe('password');
+    });
+
+    test('a team-wide token with read:sensitive still gets the secrets of the server', function () {
+        $token = scopedTokenTestToken($this->admin, $this->team, ['read', 'read:sensitive'], null);
+
+        foreach ($this->endpoints as $endpoint) {
+            $body = scopedTokenTestApi($token, 'GET', $endpoint)->assertOk()->getContent();
+            foreach ($this->canaries as $canary) {
+                expect($body)->toContain($canary);
+            }
+        }
     });
 });
 
@@ -289,10 +372,10 @@ describe('token form', function () {
         $this->actingAs($this->admin);
 
         Livewire::test(ApiTokens::class)
-            ->set('description', 'shop deploys')
-            ->set('permissions', ['deploy'])
-            ->set('scopeMode', 'selected')
-            ->set('selectedScopes', ["project:{$this->shop->uuid}"])
+            ->set('form.description', 'shop deploys')
+            ->set('form.permissions', ['deploy'])
+            ->set('form.scopeMode', 'selected')
+            ->set('form.selectedScopes', ["project:{$this->shop->uuid}"])
             ->call('addNewToken')
             ->assertHasNoErrors()
             ->assertNotDispatched('error');
@@ -309,10 +392,10 @@ describe('token form', function () {
         $this->actingAs($this->admin);
 
         Livewire::test(ApiTokens::class)
-            ->set('description', 'foreign')
-            ->set('permissions', ['read'])
-            ->set('scopeMode', 'selected')
-            ->set('selectedScopes', ["project:{$otherProject->uuid}"])
+            ->set('form.description', 'foreign')
+            ->set('form.permissions', ['read'])
+            ->set('form.scopeMode', 'selected')
+            ->set('form.selectedScopes', ["project:{$otherProject->uuid}"])
             ->call('addNewToken')
             ->assertDispatched('error');
 
@@ -323,24 +406,276 @@ describe('token form', function () {
         $member = scopedTokenTestMember($this->team, [['scope' => 'project', 'uuid' => $this->shop->uuid, 'levels' => ['write']]]);
         $this->actingAs($member);
 
-        $form = Livewire::test(ApiTokens::class)->assertSet('scopeMode', 'selected');
+        $form = Livewire::test(ApiTokens::class)->assertSet('form.scopeMode', 'selected');
         expect(collect($form->instance()->scopeOptions())->pluck('value')->filter(fn ($value) => str_starts_with($value, 'project:'))->values()->all())
             ->toBe(["project:{$this->shop->uuid}"]);
 
-        $form->set('description', 'too wide')
-            ->set('permissions', ['write'])
-            ->set('scopeMode', 'team')
+        $form->set('form.description', 'too wide')
+            ->set('form.permissions', ['write'])
+            ->set('form.scopeMode', 'team')
             ->call('addNewToken')
             ->assertDispatched('error');
-        $form->set('description', 'blog')
-            ->set('scopeMode', 'selected')
-            ->set('selectedScopes', ["project:{$this->blog->uuid}"])
+        $form->set('form.description', 'blog')
+            ->set('form.scopeMode', 'selected')
+            ->set('form.selectedScopes', ["project:{$this->blog->uuid}"])
             ->call('addNewToken')
             ->assertDispatched('error');
-        $form->set('description', 'shop')
-            ->set('selectedScopes', ["project:{$this->shop->uuid}"])
+        $form->set('form.description', 'shop')
+            ->set('form.selectedScopes', ["project:{$this->shop->uuid}"])
             ->call('addNewToken');
 
         expect($member->tokens()->pluck('name')->all())->toBe(['shop']);
+    });
+
+    test('edits a team-wide token to one project, and the same token value then sees only that project', function () {
+        $plainToken = scopedTokenTestToken($this->admin, $this->team, ['read'], null);
+        $token = PersonalAccessToken::query()->sole();
+        $this->actingAs($this->admin);
+
+        expect(ApiTokenForm::valuesOf($token))->toMatchArray([
+            'description' => 'scoped-test',
+            'permissions' => ['read'],
+            'scopeMode' => 'team',
+            'expiresInDays' => 'keep',
+        ]);
+
+        scopedTokenTestEdit(Livewire::test(ApiTokens::class), $token)
+            ->set('editForm.scopeMode', 'selected')
+            ->set('editForm.selectedScopes', ["project:{$this->shop->uuid}"])
+            ->call('updateToken', $token->id)
+            ->assertHasNoErrors()
+            ->assertNotDispatched('error')
+            ->assertDispatched('api-token-updated');
+
+        expect($token->fresh()->scopes)->toBe([['scope' => 'project', 'uuid' => $this->shop->uuid]])
+            ->and(scopedTokenTestApi($plainToken, 'GET', '/api/v1/projects')->assertOk()->json('*.name'))->toBe(['shop']);
+    });
+
+    test('edits permissions and keeps the expiry, then sets a new expiry', function () {
+        $plainToken = scopedTokenTestToken($this->admin, $this->team, ['read', 'write'], null);
+        $token = PersonalAccessToken::query()->sole();
+        $expiresAt = now()->addDays(10)->startOfSecond();
+        $token->forceFill(['expires_at' => $expiresAt, 'api_token_expiration_warning_sent_at' => now()])->save();
+        $this->actingAs($this->admin);
+
+        $form = scopedTokenTestEdit(Livewire::test(ApiTokens::class), $token)
+            ->set('editForm.permissions', ['read'])
+            ->call('updateToken', $token->id)
+            ->assertHasNoErrors();
+
+        $token->refresh();
+        expect($token->abilities)->toBe(['read'])
+            ->and($token->expires_at->equalTo($expiresAt))->toBeTrue()
+            ->and($token->api_token_expiration_warning_sent_at)->not->toBeNull();
+        scopedTokenTestApi($plainToken, 'POST', '/api/v1/projects', ['name' => 'new'])->assertForbidden();
+
+        scopedTokenTestEdit($form, $token)
+            ->set('editForm.expiresInDays', 90)
+            ->call('updateToken', $token->id)
+            ->assertHasNoErrors();
+
+        $token->refresh();
+        expect(round(now()->diffInDays($token->expires_at)))->toEqual(90)
+            ->and($token->api_token_expiration_warning_sent_at)->toBeNull();
+    });
+
+    test('a member cannot give a token more access than their grants by editing it', function () {
+        $member = scopedTokenTestMember($this->team, [['scope' => 'project', 'uuid' => $this->shop->uuid, 'levels' => ['read']]]);
+        scopedTokenTestToken($member, $this->team, ['read'], [['scope' => 'project', 'uuid' => $this->shop->uuid]]);
+        $token = PersonalAccessToken::query()->sole();
+        $this->actingAs($member);
+
+        scopedTokenTestEdit(Livewire::test(ApiTokens::class), $token)
+            ->set('editForm.selectedScopes', ["project:{$this->blog->uuid}"])
+            ->call('updateToken', $token->id)
+            ->assertDispatched('error');
+
+        expect($token->fresh()->scopes)->toBe([['scope' => 'project', 'uuid' => $this->shop->uuid]]);
+    });
+
+    test('cannot edit a token of another user or of another team', function () {
+        $otherAdmin = User::factory()->create();
+        $this->team->members()->attach($otherAdmin->id, ['role' => 'admin']);
+        scopedTokenTestToken($otherAdmin, $this->team, ['read'], null);
+        $otherTeam = Team::factory()->create();
+        $otherTeam->members()->attach($this->admin->id, ['role' => 'admin']);
+        scopedTokenTestToken($this->admin, $otherTeam, ['read'], null);
+        $this->actingAs($this->admin);
+
+        foreach (PersonalAccessToken::query()->get() as $token) {
+            scopedTokenTestEdit(Livewire::test(ApiTokens::class), $token)
+                ->set('editForm.description', 'taken over')
+                ->call('updateToken', $token->id)
+                ->assertStatus(404);
+
+            expect($token->fresh()->name)->toBe('scoped-test');
+        }
+    });
+
+    test('a paused token is rejected by the API and MCP until it is resumed', function () {
+        $plainToken = scopedTokenTestToken($this->admin, $this->team, ['read'], null);
+        $token = PersonalAccessToken::query()->sole();
+        $this->actingAs($this->admin);
+
+        Livewire::test(ApiTokens::class)
+            ->call('setPaused', $token->id, true)
+            ->assertDispatched('success', 'API token paused.');
+
+        expect($token->fresh()->isPaused())->toBeTrue();
+
+        // A stale page that still shows "Pause" must not resume the token.
+        Livewire::test(ApiTokens::class)->call('setPaused', $token->id, true);
+        expect($token->fresh()->isPaused())->toBeTrue();
+        scopedTokenTestApi($plainToken, 'GET', '/api/v1/projects')->assertUnauthorized();
+        scopedTokenTestMcp($plainToken, 'tools/list')->assertUnauthorized();
+
+        $this->actingAs($this->admin);
+        Livewire::test(ApiTokens::class)
+            ->call('setPaused', $token->id, false)
+            ->assertDispatched('success', 'API token resumed.');
+
+        expect($token->fresh()->isPaused())->toBeFalse();
+        scopedTokenTestApi($plainToken, 'GET', '/api/v1/projects')->assertOk();
+        scopedTokenTestMcp($plainToken, 'tools/list')->assertOk();
+    });
+
+    test('cannot pause a token of another user', function () {
+        $otherAdmin = User::factory()->create();
+        $this->team->members()->attach($otherAdmin->id, ['role' => 'admin']);
+        scopedTokenTestToken($otherAdmin, $this->team, ['read'], null);
+        $token = PersonalAccessToken::query()->sole();
+        $this->actingAs($this->admin);
+
+        Livewire::test(ApiTokens::class)->call('setPaused', $token->id, true);
+
+        expect($token->fresh()->isPaused())->toBeFalse();
+    });
+});
+
+describe('token scoped to servers', function () {
+    beforeEach(function () {
+        $this->otherServer = Server::factory()->create(['team_id' => $this->team->id]);
+    });
+
+    test('a read token lists and shows only its server', function () {
+        $token = scopedTokenTestToken($this->admin, $this->team, ['read'], [['scope' => 'server', 'uuid' => $this->server->uuid]]);
+
+        expect(scopedTokenTestApi($token, 'GET', '/api/v1/servers')->assertOk()->json('*.uuid'))->toBe([$this->server->uuid]);
+        scopedTokenTestApi($token, 'GET', "/api/v1/servers/{$this->server->uuid}")->assertOk();
+        scopedTokenTestApi($token, 'GET', "/api/v1/servers/{$this->otherServer->uuid}")->assertForbidden();
+        scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['description' => 'changed'])->assertForbidden();
+    });
+
+    test('a write token cannot move its server to another SSH endpoint or private key', function () {
+        $token = scopedTokenTestToken($this->admin, $this->team, ['read', 'write'], [['scope' => 'server', 'uuid' => $this->server->uuid]]);
+        $teamToken = scopedTokenTestToken($this->admin, $this->team, ['read', 'write'], null);
+        $this->server->update(['private_key_id' => PrivateKey::factory()->create(['team_id' => $this->team->id])->id]);
+        $otherKey = PrivateKey::factory()->create(['team_id' => $this->team->id, 'private_key' => PrivateKey::generateNewKeyPair()['private_key']]);
+        $before = $this->server->fresh()->only(['ip', 'port', 'private_key_id']);
+
+        scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['ip' => 'other-host.example.com'])->assertForbidden();
+        scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['port' => 2222])->assertForbidden();
+        scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['private_key_uuid' => $otherKey->uuid])->assertForbidden();
+        expect($this->server->fresh()->only(['ip', 'port', 'private_key_id']))->toBe($before);
+
+        scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['ip' => $before['ip'], 'port' => $before['port'], 'name' => 'renamed'])->assertSuccessful();
+        scopedTokenTestApi($teamToken, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['private_key_uuid' => $otherKey->uuid])->assertSuccessful();
+        expect($this->server->fresh()->private_key_id)->toBe($otherKey->id);
+    });
+
+    test('a write token can update its server but not create, delete, or read shared variables or team endpoints', function () {
+        $token = scopedTokenTestToken($this->admin, $this->team, ['read', 'write', 'delete'], [['scope' => 'server', 'uuid' => $this->server->uuid]]);
+
+        scopedTokenTestApi($token, 'PATCH', "/api/v1/servers/{$this->server->uuid}", ['description' => 'changed'])->assertSuccessful();
+        expect($this->server->fresh()->description)->toBe('changed');
+
+        scopedTokenTestApi($token, 'DELETE', "/api/v1/servers/{$this->server->uuid}")->assertForbidden();
+        scopedTokenTestApi($token, 'POST', '/api/v1/servers', ['name' => 'new'])->assertForbidden();
+        scopedTokenTestApi($token, 'GET', "/api/v1/servers/{$this->server->uuid}/envs")->assertForbidden();
+        scopedTokenTestApi($token, 'GET', "/api/v1/servers/{$this->server->uuid}/transfer")->assertForbidden();
+        scopedTokenTestApi($token, 'GET', '/api/v1/security/keys')->assertForbidden();
+        expect(scopedTokenTestApi($token, 'GET', '/api/v1/projects')->assertOk()->json())->toBe([])
+            ->and(scopedTokenTestApi($token, 'GET', '/api/v1/applications')->assertOk()->json())->toBe([]);
+    });
+
+    test('the resources of the server are only those that the other scopes cover', function () {
+        $serverOnly = scopedTokenTestToken($this->admin, $this->team, ['read'], [['scope' => 'server', 'uuid' => $this->server->uuid]]);
+        $withProject = scopedTokenTestToken($this->admin, $this->team, ['read'], [
+            ['scope' => 'server', 'uuid' => $this->server->uuid],
+            ['scope' => 'project', 'uuid' => $this->shop->uuid],
+        ]);
+
+        expect(scopedTokenTestApi($serverOnly, 'GET', "/api/v1/servers/{$this->server->uuid}/resources")->assertOk()->json())->toBe([])
+            ->and(scopedTokenTestApi($withProject, 'GET', "/api/v1/servers/{$this->server->uuid}/resources")->assertOk()->json('*.name'))
+            ->toEqualCanonicalizing(['shop-api', 'shop-worker']);
+    });
+
+    test('a project and server write token can place a new application on the server', function () {
+        $payload = [
+            'project_uuid' => $this->shop->uuid,
+            'environment_uuid' => $this->shopProduction->uuid,
+            'server_uuid' => $this->otherServer->uuid,
+            'docker_registry_image_name' => 'nginx',
+            'ports_exposes' => '80',
+        ];
+        $projectOnly = scopedTokenTestToken($this->admin, $this->team, ['read', 'write'], [['scope' => 'project', 'uuid' => $this->shop->uuid]]);
+        $withServer = scopedTokenTestToken($this->admin, $this->team, ['read', 'write'], [
+            ['scope' => 'project', 'uuid' => $this->shop->uuid],
+            ['scope' => 'server', 'uuid' => $this->otherServer->uuid],
+        ]);
+
+        scopedTokenTestApi($projectOnly, 'POST', '/api/v1/applications/dockerimage', $payload)->assertForbidden();
+        scopedTokenTestApi($withServer, 'POST', '/api/v1/applications/dockerimage', $payload)->assertCreated();
+    });
+
+    test('a server grant stored on a member is ignored', function () {
+        $member = scopedTokenTestMember($this->team, [['scope' => 'server', 'uuid' => $this->server->uuid, 'levels' => ['read']]]);
+        $token = scopedTokenTestToken($member, $this->team, ['read'], null);
+
+        scopedTokenTestApi($token, 'GET', "/api/v1/servers/{$this->server->uuid}")->assertForbidden();
+    });
+
+    test('the token form offers servers only to users with access to the whole team', function () {
+        session(['currentTeam' => $this->team]);
+        $this->actingAs($this->admin);
+
+        Livewire::test(ApiTokens::class)
+            ->set('form.description', 'proxy restarts')
+            ->set('form.permissions', ['deploy'])
+            ->set('form.scopeMode', 'selected')
+            ->set('form.selectedScopes', ["server:{$this->server->uuid}"])
+            ->call('addNewToken')
+            ->assertHasNoErrors()
+            ->assertNotDispatched('error');
+        expect(PersonalAccessToken::query()->sole()->scopes)->toBe([['scope' => 'server', 'uuid' => $this->server->uuid]]);
+
+        $member = scopedTokenTestMember($this->team, [['scope' => 'project', 'uuid' => $this->shop->uuid, 'levels' => ['write']]]);
+        $this->actingAs($member);
+        $form = Livewire::test(ApiTokens::class);
+        expect(collect($form->instance()->scopeOptions())->pluck('value')->filter(fn ($value) => str_starts_with($value, 'server:'))->all())->toBe([]);
+        $form->set('form.description', 'crafted')
+            ->set('form.permissions', ['read'])
+            ->set('form.scopeMode', 'selected')
+            ->set('form.selectedScopes', ["server:{$this->server->uuid}"])
+            ->call('addNewToken')
+            ->assertDispatched('error');
+
+        expect(PersonalAccessToken::query()->count())->toBe(1);
+    });
+
+    test('the token form rejects a server of another team', function () {
+        session(['currentTeam' => $this->team]);
+        $this->actingAs($this->admin);
+        $foreignServer = Server::factory()->create(['team_id' => Team::factory()->create()->id]);
+
+        Livewire::test(ApiTokens::class)
+            ->set('form.description', 'foreign')
+            ->set('form.permissions', ['read'])
+            ->set('form.scopeMode', 'selected')
+            ->set('form.selectedScopes', ["server:{$foreignServer->uuid}"])
+            ->call('addNewToken')
+            ->assertDispatched('error');
+
+        expect(PersonalAccessToken::query()->count())->toBe(0);
     });
 });

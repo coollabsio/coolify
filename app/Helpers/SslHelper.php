@@ -238,20 +238,25 @@ class SslHelper
     /**
      * Commands that write the CA certificate to the shared CA file on the server.
      *
+     * The file is rewritten in place: containers bind-mount it, and a deleted or replaced file
+     * leaves them with the old inode, which they cannot read (#6081). Only a directory that
+     * Docker created at this path for a missing mount source is removed.
+     *
      * @return array<int, string>
      */
     public static function caCertificateFileCommands(string $certificate): array
     {
-        $caCertPath = config('constants.coolify.base_config_path').'/ssl/';
+        $caCertDirectory = config('constants.coolify.base_config_path').'/ssl';
+        $caCertFile = "$caCertDirectory/coolify-ca.crt";
         $base64Cert = base64_encode($certificate);
 
         return [
-            "mkdir -p $caCertPath",
-            "chown -R 9999:root $caCertPath",
-            "chmod -R 700 $caCertPath",
-            "rm -rf $caCertPath/coolify-ca.crt",
-            "echo '{$base64Cert}' | base64 -d | tee $caCertPath/coolify-ca.crt > /dev/null",
-            "chmod 644 $caCertPath/coolify-ca.crt",
+            "mkdir -p $caCertDirectory",
+            "chown 9999:root $caCertDirectory",
+            "chmod 700 $caCertDirectory",
+            "find $caCertDirectory -mindepth 1 -maxdepth 1 -name coolify-ca.crt -type d -exec rm -rf {} +",
+            "echo '{$base64Cert}' | base64 -d | tee $caCertFile > /dev/null",
+            "chmod 644 $caCertFile",
         ];
     }
 }

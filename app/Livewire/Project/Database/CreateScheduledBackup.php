@@ -80,6 +80,14 @@ class CreateScheduledBackup extends Component
                 $payload['databases_to_backup'] = $database->mariadb_database;
             } elseif ($database->type() === 'standalone-clickhouse') {
                 $payload['databases_to_backup'] = $database->clickhouse_db;
+            } elseif ($database->type() === 'standalone-influxdb') {
+                $payload['databases_to_backup'] = $database->influxdb_bucket;
+            }
+
+            // Odoo keeps its data in databases that the user creates in Odoo, so the database
+            // that the container env names (POSTGRES_DB=postgres) stays empty.
+            if ($database instanceof ServiceDatabase && $database->service?->service_type === 'odoo') {
+                $payload['dump_all'] = true;
             }
 
             $databaseBackup = ScheduledDatabaseBackup::create($payload);
@@ -100,11 +108,11 @@ class CreateScheduledBackup extends Component
                     'backup_uuid' => $databaseBackup->uuid,
                 ], navigate: true);
             } else {
-                $this->redirectRoute('project.database.backup.execution', [
+                $this->redirectRoute('project.database.backup.index', [
                     'project_uuid' => $database->project()->uuid,
                     'environment_uuid' => $database->environment->uuid,
                     'database_uuid' => $database->uuid,
-                    'backup_uuid' => $databaseBackup->uuid,
+                    'schedule' => $databaseBackup->uuid,
                 ], navigate: true);
             }
         } catch (\Throwable $e) {

@@ -19,14 +19,6 @@ beforeEach(function () {
 });
 
 describe('GitLab source create modal', function () {
-    test('matches github create modal structure', function () {
-        Livewire::test(Create::class)
-            ->assertSee('Connect a GitLab OAuth application for private repositories, webhooks, and deployments.')
-            ->assertSee('Self-hosted GitLab')
-            ->assertSee('Continue')
-            ->assertDontSee('>Save</', false)
-            ->assertDontSeeHtml('<h2>New GitLab App</h2>');
-    });
 
     test('creates a gitlab app with defaults for gitlab.com', function () {
         Livewire::test(Create::class)

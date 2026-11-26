@@ -61,6 +61,20 @@ trait ResolvesTeam
         return $this->mcpError($request, "{$action} requires confirm=true.");
     }
 
+    /**
+     * Same rule as the REST API (ApiSensitiveData): a root or read:sensitive token of a team admin or owner.
+     */
+    protected function canReadSensitiveData(Request $request): bool
+    {
+        $user = $request->user();
+        $token = $user?->currentAccessToken();
+        if (! $token || ! ($token->can('root') || $token->can('read:sensitive'))) {
+            return false;
+        }
+
+        return $token->team_id !== null && $user->isAdminOfTeam((int) $token->team_id);
+    }
+
     protected function resolveTeamId(Request $request): ?int
     {
         $user = $request->user();
@@ -75,18 +89,17 @@ trait ResolvesTeam
     }
 
     /**
-     * Servers of the team, or none for a token or member limited to some projects, environments, or resources.
+     * Servers of the team. A token or member limited to some projects, environments, or resources sees only
+     * the servers of its token server grants.
      *
      * @return Builder<Server>
      */
     protected function visibleServers(Request $request, int $teamId): Builder
     {
-        $query = Server::whereTeamId($teamId);
-        if (! app(AccessResolver::class)->coversWholeTeam($request->user(), $teamId)) {
-            $query->whereRaw('1 = 0');
-        }
+        $scopedServerUuids = app(AccessResolver::class)->scopedServerUuids($request->user(), $teamId);
 
-        return $query;
+        return Server::whereTeamId($teamId)
+            ->when($scopedServerUuids !== null, fn (Builder $query) => $query->whereIn('uuid', $scopedServerUuids));
     }
 
     protected function mcpSuccess(Request $request, Response $response, array $context = []): Response

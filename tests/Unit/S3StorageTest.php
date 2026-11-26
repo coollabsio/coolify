@@ -56,6 +56,7 @@ test('S3Storage model fillable attributes are configured correctly', function ()
 
     expect($s3Storage->getFillable())->toBe([
         'team_id',
+        'type',
         'name',
         'description',
         'region',
@@ -64,9 +65,11 @@ test('S3Storage model fillable attributes are configured correctly', function ()
         'bucket',
         'endpoint',
         'use_path_style_endpoint',
+        'private_key_id',
+        'skip_tls_verification',
         'is_usable',
         'unusable_email_sent',
-    ]);
+    ])->not->toContain('sftp_host_key');
 });
 
 test('S3Storage connection validation uses short s3 client timeouts', function () {
@@ -120,6 +123,30 @@ test('S3Storage uses path-style URLs unless the storage turns them off', functio
     'not saved yet' => [null, true, ' --api S3v4'],
     'path-style' => [true, true, ' --api S3v4'],
     'virtual-hosted-style' => [false, false, ' --api S3v4 --path off'],
+]);
+
+test('S3Storage checks the TLS certificate unless the storage skips the check', function (?bool $setting, bool $verify, string $mcOptions) {
+    $disk = Mockery::mock(FilesystemAdapter::class);
+    Storage::expects('build')
+        ->once()
+        ->with(Mockery::on(fn (array $config) => $config['http']['verify'] === $verify))
+        ->andReturn($disk);
+
+    $s3Storage = new S3Storage;
+    $s3Storage->setRawAttributes([
+        'region' => 'us-east-1',
+        'bucket' => 'backups',
+        'endpoint' => 'https://93.184.216.34:9000',
+        'skip_tls_verification' => $setting,
+    ]);
+
+    expect($s3Storage->filesystem())->toBe($disk)
+        ->and($s3Storage->httpClientOptions()['verify'])->toBe($verify)
+        ->and($s3Storage->minioClientEnvOptions())->toBe($mcOptions);
+})->with([
+    'not saved yet' => [null, true, "-e 'MC_REGION=us-east-1'"],
+    'checks the certificate' => [false, true, "-e 'MC_REGION=us-east-1'"],
+    'skips the check' => [true, false, "-e 'MC_REGION=us-east-1' -e MC_INSECURE=true"],
 ]);
 
 test('S3Storage detects the URL style from the endpoint host', function (?string $endpoint, bool $usesPathStyle) {
@@ -233,15 +260,14 @@ test('S3Storage retries a failed MinIO client upload and waits longer before eac
     Sleep::fake();
     $attempts = 0;
 
-    $result = S3Storage::retryMinioClientUpload(function () use (&$attempts) {
+    S3Storage::retryMinioClientUpload(function () use (&$attempts) {
         if (++$attempts < 3) {
             throw new RuntimeException('dial tcp: connect: network is unreachable', 1);
         }
 
-        return 'uploaded';
-    });
+    }, fn (): bool => false);
 
-    expect($result)->toBe('uploaded')->and($attempts)->toBe(3);
+    expect($attempts)->toBe(3);
     Sleep::assertSequence([Sleep::for(10)->seconds(), Sleep::for(30)->seconds()]);
 });
 
@@ -255,7 +281,7 @@ test('S3Storage stops retrying a MinIO client upload after three attempts', func
         throw new RuntimeException('Access Denied.', 1);
     };
 
-    expect(fn () => S3Storage::retryMinioClientUpload($upload))->toThrow(RuntimeException::class, 'Access Denied.');
+    expect(fn () => S3Storage::retryMinioClientUpload($upload, fn (): bool => false))->toThrow(RuntimeException::class, 'Access Denied.');
     expect($attempts)->toBe(3);
 });
 
@@ -269,7 +295,123 @@ test('S3Storage does not retry a MinIO client upload that timed out', function (
         throw new RuntimeException('The command on the server timed out after 3600 seconds.', 124);
     };
 
-    expect(fn () => S3Storage::retryMinioClientUpload($upload))->toThrow(RuntimeException::class, 'timed out');
+    expect(fn () => S3Storage::retryMinioClientUpload($upload, fn (): bool => false))->toThrow(RuntimeException::class, 'timed out');
     expect($attempts)->toBe(1);
     Sleep::assertNeverSlept();
 });
+
+test('S3Storage uploads again at once with Content-MD5 when an Object Lock bucket requires a checksum', function () {
+    Sleep::fake();
+    $checksumOptions = [];
+
+    S3Storage::retryMinioClientUpload(function (string $checksumOption) use (&$checksumOptions) {
+        $checksumOptions[] = $checksumOption;
+        if ($checksumOption === '') {
+            throw new RuntimeException('mc: <ERROR> Failed to copy `/backup.dmp`. Content-MD5 or x-amz-checksum-* HTTP header is required for Put Part requests with Object Lock parameters', 1);
+        }
+    }, fn (): bool => false);
+
+    expect($checksumOptions)->toBe(['', ' --checksum=MD5']);
+    Sleep::assertNeverSlept();
+});
+
+test('S3Storage does not add a checksum to a MinIO client upload that fails for another reason', function () {
+    Sleep::fake();
+    $checksumOptions = [];
+
+    $upload = function (string $checksumOption) use (&$checksumOptions) {
+        $checksumOptions[] = $checksumOption;
+
+        throw new RuntimeException('Access Denied.', 1);
+    };
+
+    expect(fn () => S3Storage::retryMinioClientUpload($upload, fn (): bool => false))->toThrow(RuntimeException::class, 'Access Denied.');
+    expect($checksumOptions)->toBe(['', '', '']);
+});
+
+test('S3Storage sizes MinIO client upload parts for at most 1000 parts', function (int $fileSize, int $partSize) {
+    expect(S3Storage::minioClientPartSizeOption($fileSize))->toBe('-e MC_UPLOAD_MULTIPART_SIZE='.$partSize)
+        ->and((int) ceil($fileSize / $partSize))->toBeLessThanOrEqual(1000);
+})->with([
+    'empty file keeps the 16 MiB default' => [0, 16 * 1024 * 1024],
+    'small file keeps the 16 MiB default' => [128, 16 * 1024 * 1024],
+    '1000 parts of 16 MiB keep the default' => [1000 * 16 * 1024 * 1024, 16 * 1024 * 1024],
+    'one byte more needs 17 MiB parts' => [1000 * 16 * 1024 * 1024 + 1, 17 * 1024 * 1024],
+    '19 GiB dump' => [19 * 1024 * 1024 * 1024, 20 * 1024 * 1024],
+    '1 TiB dump' => [1024 * 1024 * 1024 * 1024, 1049 * 1024 * 1024],
+]);
+
+test('S3Storage uses curl transfers only for endpoints with a path, which the MinIO client rejects', function (string $endpoint, bool $expected) {
+    $s3Storage = new S3Storage;
+    $s3Storage->setRawAttributes(['endpoint' => $endpoint]);
+
+    expect($s3Storage->usesCurlTransfer())->toBe($expected);
+})->with([
+    'Supabase Storage' => ['https://abcd.storage.supabase.co/storage/v1/s3', true],
+    'path with trailing slash' => ['http://minio:9000/s3/', true],
+    'host only' => ['https://s3.amazonaws.com', false],
+    'host with trailing slash' => ['https://s3.amazonaws.com/', false],
+    'host with port' => ['http://coolify-minio:9000', false],
+]);
+
+test('storages of the other types never use the S3 curl transfer, also with a path in the endpoint', function (string $type, string $endpoint) {
+    $storage = new S3Storage;
+    $storage->setRawAttributes(['type' => $type, 'endpoint' => $endpoint]);
+
+    expect($storage->usesCurlTransfer())->toBeFalse();
+})->with([
+    'WebDAV' => ['webdav', 'https://cloud.example.com/remote.php/dav/files/user/backups'],
+    'SFTP' => ['sftp', 'sftp://backup.example.com:22/backups'],
+    'FTPS' => ['ftps', 'ftps://backup.example.com:21/backups'],
+]);
+
+test('S3Storage treats a failed MinIO client upload as done when the complete object is in the bucket', function () {
+    Sleep::fake();
+    $attempts = 0;
+
+    S3Storage::retryMinioClientUpload(function () use (&$attempts) {
+        $attempts++;
+
+        throw new RuntimeException('Unable to copy `/data/backup.dmp`. This multipart completion is already in progress', 1);
+    }, fn (): bool => true);
+
+    expect($attempts)->toBe(1);
+    Sleep::assertNeverSlept();
+});
+
+test('S3Storage checks the bucket again before it uploads a failed MinIO client upload again', function () {
+    Sleep::fake();
+    $attempts = 0;
+    $checks = 0;
+
+    S3Storage::retryMinioClientUpload(function () use (&$attempts) {
+        $attempts++;
+
+        throw new RuntimeException('Error response code SlowDown.', 1);
+    }, function () use (&$checks): bool {
+        return ++$checks === 2;
+    });
+
+    expect($attempts)->toBe(1)->and($checks)->toBe(2);
+    Sleep::assertSequence([Sleep::for(10)->seconds()]);
+});
+
+test('S3Storage treats a timed out MinIO client upload as done when the complete object is in the bucket', function () {
+    Sleep::fake();
+
+    S3Storage::retryMinioClientUpload(function () {
+        throw new RuntimeException('The command on the server timed out after 3600 seconds.', 124);
+    }, fn (): bool => true);
+
+    Sleep::assertNeverSlept();
+});
+
+test('S3Storage accepts only a MinIO client stat of one object with the expected size', function (string $output, bool $expected) {
+    expect(S3Storage::minioClientStatHasSize($output, 12345))->toBe($expected);
+})->with([
+    'same size' => ['{"status":"success","name":"f.dmp","size":12345,"type":"file"}'."\n", true],
+    'other size' => ['{"status":"success","name":"f.dmp","size":12000,"type":"file"}', false],
+    'missing object' => ['{"status":"error","error":{"message":"Object does not exist"}}', false],
+    'folder' => ['{"status":"success","name":"f.dmp/","size":12345,"type":"folder"}', false],
+    'no output' => ['', false],
+]);

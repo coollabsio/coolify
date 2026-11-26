@@ -7,6 +7,8 @@
     </div>
 
     <x-forms.input placeholder="php artisan schedule:run" id="command" label="Command" />
+    <x-forms.checkbox id="useShell" label="Run in a shell"
+        helper="Run the command with <span class='font-mono'>sh -c</span>, so you can use variables, pipes, and redirects. Turn it off for containers without a shell (distroless or scratch images): Coolify then splits the command into arguments and runs it directly." />
 
     <div class="grid gap-4 sm:grid-cols-2">
         <x-forms.input type="number" placeholder="300" id="timeout"

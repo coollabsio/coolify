@@ -34,3 +34,23 @@ it('keeps the --add-host set stable whether or not a build helper is running', f
         ->toBe(addHostFlagsFor([$database]))
         ->toBe('--add-host postgres-main:10.0.1.3');
 });
+
+it('keeps database backup and S3 import helpers out of --add-host', function () {
+    $database = ['Name' => 'postgres-main', 'IPv4Address' => '10.0.1.3/24'];
+
+    expect(addHostFlagsFor([
+        $database,
+        ['Name' => 'backup-of-bk7f2c9d0a1e4b5c6d7e8f9a0', 'IPv4Address' => '10.0.1.11/24'],
+        ['Name' => 's3-restore-k4b2x9q1', 'IPv4Address' => '10.0.1.12/24'],
+    ]))->toBe(addHostFlagsFor([$database]))
+        ->toBe('--add-host postgres-main:10.0.1.3');
+});
+
+it('keeps the Coolify proxy, Sentinel, and error page containers out of --add-host', function () {
+    expect(addHostFlagsFor([
+        ['Name' => 'coolify-proxy', 'IPv4Address' => '10.0.1.2/24'],
+        ['Name' => 'coolify-sentinel', 'IPv4Address' => '10.0.1.3/24'],
+        ['Name' => 'coolify-proxy-error-pages', 'IPv4Address' => '10.0.1.4/24'],
+        ['Name' => 'postgres-main', 'IPv4Address' => '10.0.1.5/24'],
+    ]))->toBe('--add-host postgres-main:10.0.1.5');
+});

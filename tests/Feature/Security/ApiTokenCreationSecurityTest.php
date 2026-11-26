@@ -41,8 +41,8 @@ describe('Livewire ApiTokens — member cannot create elevated tokens', function
         session(['currentTeam' => $this->team]);
 
         Livewire::test(ApiTokens::class)
-            ->set('description', 'invalid-token')
-            ->set('permissions', $permissions)
+            ->set('form.description', 'invalid-token')
+            ->set('form.permissions', $permissions)
             ->call('addNewToken');
 
         expect($this->member->tokens()->count())->toBe(0);
@@ -58,8 +58,8 @@ describe('Livewire ApiTokens — member cannot create elevated tokens', function
         session(['currentTeam' => $this->team]);
 
         Livewire::test(ApiTokens::class)
-            ->set('description', 'my-root-token')
-            ->set('permissions', ['root'])
+            ->set('form.description', 'my-root-token')
+            ->set('form.permissions', ['root'])
             ->call('addNewToken')
             ->assertDispatched('error');
 
@@ -71,8 +71,8 @@ describe('Livewire ApiTokens — member cannot create elevated tokens', function
         session(['currentTeam' => $this->team]);
 
         Livewire::test(ApiTokens::class)
-            ->set('description', 'my-write-token')
-            ->set('permissions', ['write'])
+            ->set('form.description', 'my-write-token')
+            ->set('form.permissions', ['write'])
             ->call('addNewToken')
             ->assertDispatched('error');
 
@@ -84,8 +84,21 @@ describe('Livewire ApiTokens — member cannot create elevated tokens', function
         session(['currentTeam' => $this->team]);
 
         Livewire::test(ApiTokens::class)
-            ->set('description', 'my-deploy-token')
-            ->set('permissions', ['deploy'])
+            ->set('form.description', 'my-deploy-token')
+            ->set('form.permissions', ['deploy'])
+            ->call('addNewToken')
+            ->assertDispatched('error');
+
+        expect($this->member->tokens()->count())->toBe(0);
+    });
+
+    test('member cannot create token with terminal permissions', function () {
+        $this->actingAs($this->member);
+        session(['currentTeam' => $this->team]);
+
+        Livewire::test(ApiTokens::class)
+            ->set('form.description', 'my-terminal-token')
+            ->set('form.permissions', ['terminal'])
             ->call('addNewToken')
             ->assertDispatched('error');
 
@@ -97,8 +110,8 @@ describe('Livewire ApiTokens — member cannot create elevated tokens', function
         session(['currentTeam' => $this->team]);
 
         Livewire::test(ApiTokens::class)
-            ->set('description', 'my-sensitive-token')
-            ->set('permissions', ['read', 'read:sensitive'])
+            ->set('form.description', 'my-sensitive-token')
+            ->set('form.permissions', ['read', 'read:sensitive'])
             ->call('addNewToken')
             ->assertDispatched('error');
 
@@ -121,8 +134,8 @@ describe('Livewire ApiTokens — member cannot create elevated tokens', function
         session(['currentTeam' => $this->team]);
 
         Livewire::test(ApiTokens::class)
-            ->set('description', 'my-read-token')
-            ->set('permissions', ['read'])
+            ->set('form.description', 'my-read-token')
+            ->set('form.permissions', ['read'])
             ->call('addNewToken')
             ->assertNotDispatched('error');
 
@@ -135,8 +148,8 @@ describe('Livewire ApiTokens — member cannot create elevated tokens', function
         session(['currentTeam' => $this->team]);
 
         Livewire::test(ApiTokens::class)
-            ->set('description', 'my-root-token')
-            ->set('permissions', ['root'])
+            ->set('form.description', 'my-root-token')
+            ->set('form.permissions', ['root'])
             ->call('addNewToken')
             ->assertNotDispatched('error');
 
@@ -144,13 +157,57 @@ describe('Livewire ApiTokens — member cannot create elevated tokens', function
         expect($this->owner->tokens()->first()->abilities)->toBe(['root']);
     });
 
+    test('owner can create token with terminal permissions', function () {
+        $this->actingAs($this->owner);
+        session(['currentTeam' => $this->team]);
+
+        Livewire::test(ApiTokens::class)
+            ->set('form.description', 'my-terminal-token')
+            ->set('form.permissions', ['terminal'])
+            ->call('addNewToken')
+            ->assertNotDispatched('error');
+
+        expect($this->owner->tokens()->count())->toBe(1);
+        expect($this->owner->tokens()->first()->abilities)->toBe(['terminal']);
+        expect($this->owner->tokens()->first()->expires_at)->not->toBeNull();
+    });
+
+    test('terminal token expiry is clamped to 90 days', function () {
+        $this->actingAs($this->owner);
+        session(['currentTeam' => $this->team]);
+
+        Livewire::test(ApiTokens::class)
+            ->set('form.description', 'my-terminal-token')
+            ->set('form.permissions', ['terminal'])
+            ->set('form.expiresInDays', 365)
+            ->call('addNewToken')
+            ->assertNotDispatched('error');
+
+        $token = $this->owner->tokens()->first();
+        expect($token->expires_at)->not->toBeNull()
+            ->and($token->expires_at->lessThanOrEqualTo(now()->addDays(90)->addMinute()))->toBeTrue();
+    });
+
+    test('owner cannot combine terminal with other permissions', function () {
+        $this->actingAs($this->owner);
+        session(['currentTeam' => $this->team]);
+
+        Livewire::test(ApiTokens::class)
+            ->set('form.description', 'my-terminal-token')
+            ->set('form.permissions', ['read', 'terminal'])
+            ->call('addNewToken')
+            ->assertDispatched('error');
+
+        expect($this->owner->tokens()->count())->toBe(0);
+    });
+
     test('owner cannot create a wildcard token', function () {
         $this->actingAs($this->owner);
         session(['currentTeam' => $this->team]);
 
         Livewire::test(ApiTokens::class)
-            ->set('description', 'owner-wildcard-token')
-            ->set('permissions', ['*'])
+            ->set('form.description', 'owner-wildcard-token')
+            ->set('form.permissions', ['*'])
             ->call('addNewToken');
 
         expect($this->owner->tokens()->count())->toBe(0);
@@ -197,6 +254,15 @@ describe('API middleware — member with elevated token blocked', function () {
     test('member root token is blocked on non-zero team', function () {
         session(['currentTeam' => $this->team]);
         $token = $this->member->createToken('root-token', ['root']);
+
+        $this->withToken($token->plainTextToken)
+            ->getJson('/api/v1/projects')
+            ->assertStatus(403);
+    });
+
+    test('member terminal token is blocked on non-zero team', function () {
+        session(['currentTeam' => $this->team]);
+        $token = $this->member->createToken('terminal-token', ['terminal']);
 
         $this->withToken($token->plainTextToken)
             ->getJson('/api/v1/projects')

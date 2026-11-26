@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
+use App\Http\Controllers\Webhook\Concerns\RoutesConfigPushes;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Livewire\Source\Gitlab\Change as GitlabSource;
 use App\Models\Application;
@@ -25,6 +26,7 @@ class Gitlab extends Controller
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
     use ReadsWebhookPushPayload;
+    use RoutesConfigPushes;
     use ValidatesPreviewDeploymentRepository;
 
     public function redirect(Request $request)
@@ -144,6 +146,7 @@ class Gitlab extends Controller
                     ]);
                 }
                 $commit = $this->webhookCommitSha($payload, 'after');
+                $this->beginConfigPush($gitlab_app, data_get($payload, 'project.path_with_namespace'), $branch, $commit);
 
                 $applications = $applications->where('git_branch', $branch)->get();
                 $changed_files = $this->webhookPushChangedFiles($payload);
@@ -309,6 +312,13 @@ class Gitlab extends Controller
                             }
                         }
 
+                        $isFork = $this->isForkPreviewRepository(
+                            data_get($payload, 'object_attributes.source_project_id'),
+                            data_get($payload, 'object_attributes.target_project_id'),
+                        );
+                        ($found ?? $pr_app)->recordSameRepository(! $isFork);
+                        ($found ?? $pr_app)->markForkPullRequest($isFork, $commit ?? null);
+
                         $result = queue_application_deployment(
                             application: $application,
                             pull_request_id: $pull_request_id,
@@ -438,6 +448,9 @@ class Gitlab extends Controller
                 return response($return_payloads);
             }
             $matched_branch = $x_gitlab_event === 'merge_request' ? $base_branch : $branch;
+            if ($x_gitlab_event === 'push') {
+                $this->beginConfigPush(null, $full_name, $branch, $commit, fn (string $secret): bool => hash_equals($secret, (string) $x_gitlab_token));
+            }
             $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'gitlab', $full_name, $matched_branch);
             // GitLab sends a static token. A repeated wrong token is one guess.
             $failure_attempt = $this->manualWebhookTokenAttempt($x_gitlab_token);
@@ -605,6 +618,13 @@ class Gitlab extends Controller
                                     $pr_app->generate_preview_fqdn();
                                 }
                             }
+                            $isFork = $this->isForkPreviewRepository(
+                                data_get($payload, 'object_attributes.source_project_id'),
+                                data_get($payload, 'object_attributes.target_project_id'),
+                            );
+                            ($found ?? $pr_app)->recordSameRepository(! $isFork);
+                            ($found ?? $pr_app)->markForkPullRequest($isFork, $commit ?? null);
+
                             $result = queue_application_deployment(
                                 application: $application,
                                 pull_request_id: $pull_request_id,

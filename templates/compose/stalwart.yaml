@@ -7,7 +7,7 @@
 
 services:
   stalwart:
-    image: 'stalwartlabs/stalwart:v0.16.13'
+    image: 'stalwartlabs/stalwart:v1.1.0'
     environment:
     - SERVICE_URL_STALWART_8080
     expose:
@@ -26,7 +26,7 @@ services:
       - 'stalwart-data:/var/lib/stalwart'
       - '/etc/localtime:/etc/localtime:ro'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/healthz/live || curl -fsSk https://127.0.0.1:443/healthz/live"]
       interval: 30s
       timeout: 10s
       retries: 3

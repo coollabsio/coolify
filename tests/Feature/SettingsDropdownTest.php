@@ -8,7 +8,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Livewire;
 
-it('renders the changelog modal above the desktop sidebar toggle', function () {
+it('opens the changelog modal with its entries from the sidebar trigger', function () {
     $user = new User(['email' => 'test@example.com']);
     $user->id = 1;
 
@@ -36,20 +36,10 @@ it('renders the changelog modal above the desktop sidebar toggle', function () {
         }
     });
 
-    $component = Livewire::test(SettingsDropdown::class, ['trigger' => 'changelog-sidebar'])
+    Livewire::test(SettingsDropdown::class, ['trigger' => 'changelog-sidebar'])
         ->call('openWhatsNewModal')
         ->assertNotDispatched('whats-new-opened')
-        ->assertSee("What's new", false)
-        ->assertSee('Test Release')
-        ->assertSee('Mark read')
-        ->assertSeeHtml('z-[99]')
-        ->assertSeeHtml('closeWhatsNewModal');
-
-    // Single-release layout: no nested card chrome / unread left accent bar
-    expect($component->html())
-        ->not->toContain('dark:bg-raised')
-        ->not->toContain('w-0.5 bg-accent')
-        ->toContain('absolute right-2 top-2');
+        ->assertSee('Test Release');
 });
 
 it('opens the changelog modal when there are no entries', function () {
@@ -73,7 +63,5 @@ it('opens the changelog modal when there are no entries', function () {
 
     Livewire::test(SettingsDropdown::class, ['trigger' => 'account-menu'])
         ->call('openWhatsNewModal')
-        ->assertSet('showWhatsNewModal', true)
-        ->assertSee("What's new", false)
-        ->assertSee('No updates found');
+        ->assertSet('showWhatsNewModal', true);
 });

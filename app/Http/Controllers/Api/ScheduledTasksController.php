@@ -24,16 +24,16 @@ class ScheduledTasksController extends Controller
             'application_id',
             'service_id',
         ]);
-        if (! $this->canReadSensitive()) {
+        if (! $this->canReadSensitive($task)) {
             $task->makeHidden(['command']);
         }
 
         return serializeApiResponse($task);
     }
 
-    private function canReadSensitive(): bool
+    private function canReadSensitive(ScheduledTask $task): bool
     {
-        return request()->attributes->get('can_read_sensitive', false) === true;
+        return canReadResourceSecretsFromApi($task->application ?? $task->service);
     }
 
     /**
@@ -78,7 +78,7 @@ class ScheduledTasksController extends Controller
             return $return;
         }
 
-        $allowedFields = ['name', 'command', 'frequency', 'container', 'timeout', 'enabled'];
+        $allowedFields = ['name', 'command', 'frequency', 'container', 'timeout', 'use_shell', 'enabled'];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'required|string|max:255',
@@ -86,6 +86,7 @@ class ScheduledTasksController extends Controller
             'frequency' => 'required|string',
             'container' => 'string|nullable',
             'timeout' => 'integer|min:1|max:36000',
+            'use_shell' => 'boolean',
             'enabled' => 'boolean',
         ]);
 
@@ -124,6 +125,7 @@ class ScheduledTasksController extends Controller
         $task->frequency = $request->frequency;
         $task->container = $request->container;
         $task->timeout = $request->has('timeout') ? $request->timeout : 300;
+        $task->use_shell = $request->has('use_shell') ? $request->boolean('use_shell') : true;
         $task->enabled = $enabled;
         $task->team_id = $teamId;
 
@@ -159,7 +161,7 @@ class ScheduledTasksController extends Controller
             return response()->json(['message' => 'At least one field must be provided.'], 422);
         }
 
-        $allowedFields = ['name', 'command', 'frequency', 'container', 'timeout', 'enabled'];
+        $allowedFields = ['name', 'command', 'frequency', 'container', 'timeout', 'use_shell', 'enabled'];
 
         $validator = customApiValidator($request->all(), [
             'name' => 'string|max:255',
@@ -167,6 +169,7 @@ class ScheduledTasksController extends Controller
             'frequency' => 'string',
             'container' => 'string|nullable',
             'timeout' => 'integer|min:1|max:36000',
+            'use_shell' => 'boolean',
             'enabled' => 'boolean',
         ]);
 
@@ -202,7 +205,13 @@ class ScheduledTasksController extends Controller
             return $response;
         }
 
-        $task->update($request->only($allowedFields));
+        $task->fill($request->only($allowedFields));
+        $changedFields = auditChangedFields($task);
+        $task->save();
+
+        if ($changedFields === []) {
+            return response()->json($this->removeSensitiveData($task), 200);
+        }
 
         auditLog('api.scheduled_task.updated', [
             'team_id' => getTeamIdFromToken(),
@@ -210,7 +219,7 @@ class ScheduledTasksController extends Controller
             'task_name' => $task->name,
             'resource_type' => $resource instanceof Application ? 'application' : 'service',
             'resource_uuid' => $resource->uuid,
-            'changed_fields' => array_values(array_intersect($allowedFields, array_keys($request->all()))),
+            'changed_fields' => $changedFields,
         ]);
 
         return response()->json($this->removeSensitiveData($task), 200);
@@ -218,7 +227,7 @@ class ScheduledTasksController extends Controller
 
     private function deleteTask(Request $request, Application|Service $resource): JsonResponse
     {
-        $this->authorize('update', $resource);
+        $this->authorize('delete', $resource);
 
         $task = $resource->scheduled_tasks()->where('uuid', $request->task_uuid)->first();
         if (! $task) {
@@ -249,16 +258,18 @@ class ScheduledTasksController extends Controller
             return response()->json(['message' => 'Scheduled task not found.'], 404);
         }
 
-        $executions = $task->executions()->get()->map(function ($execution) {
+        $request->validate(apiPaginationRules());
+        [$executions, $headers] = apiPaginate($task->executions()->orderBy('id', 'desc'), $request);
+        $executions = $executions->map(function ($execution) use ($task) {
             $execution->makeHidden(['id', 'scheduled_task_id']);
-            if (! $this->canReadSensitive()) {
+            if (! $this->canReadSensitive($task)) {
                 $execution->makeHidden(['message']);
             }
 
             return serializeApiResponse($execution);
         });
 
-        return response()->json($executions);
+        return response()->json($executions, 200, $headers);
     }
 
     private function executeTask(Request $request, Application|Service $resource): JsonResponse
@@ -376,6 +387,7 @@ class ScheduledTasksController extends Controller
                         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
                         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
                         'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300, 'maximum' => 36000],
+                        'use_shell' => ['type' => 'boolean', 'description' => 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.', 'default' => true],
                         'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.', 'default' => true],
                     ],
                 ),
@@ -467,6 +479,7 @@ class ScheduledTasksController extends Controller
                         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
                         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
                         'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300, 'maximum' => 36000],
+                        'use_shell' => ['type' => 'boolean', 'description' => 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.', 'default' => true],
                         'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.', 'default' => true],
                     ],
                 ),
@@ -614,10 +627,13 @@ class ScheduledTasksController extends Controller
                     type: 'string',
                 )
             ),
+            new OA\Parameter(ref: '#/components/parameters/Page'),
+            new OA\Parameter(ref: '#/components/parameters/PerPage'),
         ],
         responses: [
             new OA\Response(
                 response: 200,
+                headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')],
                 description: 'Get all executions for a scheduled task.',
                 content: [
                     new OA\MediaType(
@@ -637,6 +653,7 @@ class ScheduledTasksController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
     public function executions_by_application_uuid(Request $request): JsonResponse
@@ -747,6 +764,7 @@ class ScheduledTasksController extends Controller
                         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
                         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
                         'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300, 'maximum' => 36000],
+                        'use_shell' => ['type' => 'boolean', 'description' => 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.', 'default' => true],
                         'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.', 'default' => true],
                     ],
                 ),
@@ -838,6 +856,7 @@ class ScheduledTasksController extends Controller
                         'frequency' => ['type' => 'string', 'description' => 'The frequency of the scheduled task.'],
                         'container' => ['type' => 'string', 'nullable' => true, 'description' => 'The container where the command should be executed.'],
                         'timeout' => ['type' => 'integer', 'description' => 'The timeout of the scheduled task in seconds.', 'default' => 300, 'maximum' => 36000],
+                        'use_shell' => ['type' => 'boolean', 'description' => 'Run the command with `sh -c` in the container. Set it to false for containers without a shell: the command is then split into arguments and run directly, without shell features such as variables, pipes, or redirects.', 'default' => true],
                         'enabled' => ['type' => 'boolean', 'description' => 'The flag to indicate if the scheduled task is enabled. An enabled task requires the deploy ability.', 'default' => true],
                     ],
                 ),
@@ -985,10 +1004,13 @@ class ScheduledTasksController extends Controller
                     type: 'string',
                 )
             ),
+            new OA\Parameter(ref: '#/components/parameters/Page'),
+            new OA\Parameter(ref: '#/components/parameters/PerPage'),
         ],
         responses: [
             new OA\Response(
                 response: 200,
+                headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')],
                 description: 'Get all executions for a scheduled task.',
                 content: [
                     new OA\MediaType(
@@ -1008,6 +1030,7 @@ class ScheduledTasksController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
     public function executions_by_service_uuid(Request $request): JsonResponse

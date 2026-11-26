@@ -68,10 +68,19 @@ class Discord extends Component
     public bool $serverPatchDiscordNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $serverAutoUpdateDiscordNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $traefikOutdatedDiscordNotifications = true;
 
     #[Validate(['boolean'])]
+    public bool $imageVulnerabilitiesDiscordNotifications = false;
+
+    #[Validate(['boolean'])]
     public bool $discordPingEnabled = true;
+
+    #[Validate(['nullable', 'string', 'max:500'])]
+    public ?string $discordPingText = null;
 
     public function mount()
     {
@@ -106,9 +115,12 @@ class Discord extends Component
             $this->settings->server_reachable_discord_notifications = $this->serverReachableDiscordNotifications;
             $this->settings->server_unreachable_discord_notifications = $this->serverUnreachableDiscordNotifications;
             $this->settings->server_patch_discord_notifications = $this->serverPatchDiscordNotifications;
+            $this->settings->server_auto_update_discord_notifications = $this->serverAutoUpdateDiscordNotifications;
             $this->settings->traefik_outdated_discord_notifications = $this->traefikOutdatedDiscordNotifications;
+            $this->settings->image_vulnerabilities_discord_notifications = $this->imageVulnerabilitiesDiscordNotifications;
 
             $this->settings->discord_ping_enabled = $this->discordPingEnabled;
+            $this->settings->discord_ping_text = $this->discordPingText;
 
             $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
@@ -134,9 +146,12 @@ class Discord extends Component
             $this->serverReachableDiscordNotifications = $this->settings->server_reachable_discord_notifications;
             $this->serverUnreachableDiscordNotifications = $this->settings->server_unreachable_discord_notifications;
             $this->serverPatchDiscordNotifications = $this->settings->server_patch_discord_notifications;
+            $this->serverAutoUpdateDiscordNotifications = $this->settings->server_auto_update_discord_notifications;
             $this->traefikOutdatedDiscordNotifications = $this->settings->traefik_outdated_discord_notifications;
+            $this->imageVulnerabilitiesDiscordNotifications = $this->settings->image_vulnerabilities_discord_notifications;
 
             $this->discordPingEnabled = $this->settings->discord_ping_enabled;
+            $this->discordPingText = $this->settings->discord_ping_text;
         }
     }
 

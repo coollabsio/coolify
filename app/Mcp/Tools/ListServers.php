@@ -4,7 +4,6 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Concerns\BuildsResponse;
 use App\Mcp\Concerns\ResolvesTeam;
-use App\Models\Server;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -46,7 +45,7 @@ class ListServers extends Tool
 
         $args = $this->paginationArgs($request);
 
-        $query = Server::whereTeamId($teamId)
+        $query = $this->visibleServers($request, $teamId)
             ->with('settings:id,server_id,is_reachable,is_usable')
             ->when($reachableFilter !== null, function ($query) use ($reachableFilter) {
                 $query->whereHas('settings', fn ($q) => $q->where('is_reachable', $reachableFilter));

@@ -22,7 +22,7 @@ beforeEach(function () {
     config()->set('constants.ssh.max_retries', 1);
     config()->set('constants.ssh.mux_enabled', false);
     Http::preventStrayRequests();
-    Cache::put('coolify:versions:all', ['coolify' => ['sentinel' => ['version' => '1.0.0']]], 3600);
+    Cache::put('coolify:versions', ['sentinel' => ['version' => '1.0.0']], 3600);
 
     $user = User::factory()->create();
     $team = $user->teams()->first();
@@ -84,7 +84,7 @@ it('uses sudo for the status check on a non-root server', function () {
 
     (new CheckAndStartSentinelJob($this->server->refresh()))->handle();
 
-    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'sudo docker ps -a'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'sudo timeout -k 5s 20s docker ps -a'));
 });
 
 it('restarts an unhealthy Sentinel and remembers why', function () {
@@ -110,7 +110,7 @@ it('does not restart a Sentinel whose health check is still starting', function 
 
 it('restarts a running Sentinel that stopped pushing, at most once per hour', function () {
     Cache::flush();
-    Cache::put('coolify:versions:all', ['coolify' => ['sentinel' => ['version' => '1.0.0']]], 3600);
+    Cache::put('coolify:versions', ['sentinel' => ['version' => '1.0.0']], 3600);
     $this->server->forceFill(['sentinel_updated_at' => now()->subMinutes(15), 'sentinel_waiting_since' => null])->save();
     fakeRemoteProcesses([
         '*docker ps*' => Process::result(output: 'running Up 2 hours (healthy)'),
@@ -124,7 +124,7 @@ it('restarts a running Sentinel that stopped pushing, at most once per hour', fu
 
 it('does not restart a Sentinel that started recently and has not pushed yet', function () {
     Cache::flush();
-    Cache::put('coolify:versions:all', ['coolify' => ['sentinel' => ['version' => '1.0.0']]], 3600);
+    Cache::put('coolify:versions', ['sentinel' => ['version' => '1.0.0']], 3600);
     $this->server->forceFill(['sentinel_updated_at' => now()->subDays(5), 'sentinel_waiting_since' => now()->subMinutes(3)])->save();
     fakeRemoteProcesses([
         '*docker ps*' => Process::result(output: 'running Up 3 minutes (healthy)'),
@@ -164,8 +164,32 @@ it('reads the push status with the token from inside the Sentinel container on a
 
     (new CheckAndStartSentinelJob($this->server->refresh()))->handle();
 
-    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "sudo bash -c 'docker exec coolify-sentinel sh -c '\\''curl")
-        && str_contains(remoteProcessScript($process), 'Bearer $TOKEN'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "sudo bash -c 'timeout -k 5s 20s docker exec coolify-sentinel sh -c '\\''curl -s --max-time 5")
+        && str_contains(remoteProcessScript($process), '"$TOKEN" | curl -sf --max-time 5 -H @-'));
+});
+
+it('replaces an outdated Sentinel that has no push status endpoint', function () {
+    $this->server->forceFill(['sentinel_updated_at' => now()])->save();
+    // Sentinel 0.0.21 answers /api/version, but has no /api/push-status, so `curl -f` exits 22.
+    $bin = sys_get_temp_dir().'/sentinel-curl-stub-'.uniqid();
+    mkdir($bin);
+    file_put_contents("{$bin}/curl", "#!/bin/sh\ncase \"\$*\" in *api/version*) printf 0.0.21 ;; *) exit 22 ;; esac\n");
+    chmod("{$bin}/curl", 0755);
+    fakeRemoteProcesses([
+        '*docker ps*' => Process::result(output: 'running Up 2 hours (healthy)'),
+        '*api/version*' => function ($process) use ($bin) {
+            preg_match("/coolify-sentinel sh -c '([^']*)'/", remoteProcessScript($process), $matches);
+            exec('PATH='.escapeshellarg("{$bin}:".getenv('PATH')).' TOKEN=secret sh -c '.escapeshellarg($matches[1]), $output, $exitCode);
+
+            return Process::result(output: implode("\n", $output), exitCode: $exitCode);
+        },
+    ]);
+    StartSentinel::shouldRun()->once();
+
+    (new CheckAndStartSentinelJob($this->server))->handle();
+
+    unlink("{$bin}/curl");
+    rmdir($bin);
 });
 
 it('does not restart a starting Sentinel whose API does not answer yet', function () {

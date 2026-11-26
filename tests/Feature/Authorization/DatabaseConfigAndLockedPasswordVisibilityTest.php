@@ -3,6 +3,7 @@
 use App\Livewire\Project\Database\Clickhouse\General as ClickhouseGeneral;
 use App\Livewire\Project\Database\Dragonfly\General as DragonflyGeneral;
 use App\Livewire\Project\Database\Dragonfly\StatusInfo as DragonflyStatusInfo;
+use App\Livewire\Project\Database\Influxdb\General as InfluxdbGeneral;
 use App\Livewire\Project\Database\Keydb\General as KeydbGeneral;
 use App\Livewire\Project\Database\Keydb\StatusInfo as KeydbStatusInfo;
 use App\Livewire\Project\Database\Mariadb\General as MariadbGeneral;
@@ -228,6 +229,18 @@ it('redacts a locked redis password and its connection urls in the api', functio
 
     $list = $this->withHeaders($headers)->getJson('/api/v1/databases')->assertOk();
     expect($list->getContent())->not->toContain('locked-redis-secret');
+
+    $resources = $this->withHeaders($headers)->getJson('/api/v1/resources')->assertOk();
+    expect($resources->getContent())->not->toContain('locked-redis-secret')
+        ->and($resources->json('0.uuid'))->toBe($redis->uuid)
+        ->and($resources->json('0.internal_db_url'))->toBeNull();
+
+    $environment = $this->withHeaders($headers)
+        ->getJson("/api/v1/projects/{$this->environment->project->uuid}/{$this->environment->uuid}")
+        ->assertOk();
+    expect($environment->getContent())->not->toContain('locked-redis-secret')
+        ->and($environment->json('redis.0.uuid'))->toBe($redis->uuid)
+        ->and($environment->json('redis.0.internal_db_url'))->toBeNull();
 });
 
 it('still returns the connection url of an unlocked redis password in the api', function () {
@@ -252,6 +265,7 @@ dataset('database-api-config', [
     'keydb' => ['create_standalone_keydb', null, ['keydb_conf' => 'masterauth secret-config-value']],
     'dragonfly' => ['create_standalone_dragonfly', null, []],
     'clickhouse' => ['create_standalone_clickhouse', null, []],
+    'influxdb' => ['create_standalone_influxdb', null, []],
 ]);
 
 function apiTokenHeaders(User $user, Team $team, array $abilities): array
@@ -323,6 +337,7 @@ dataset('database-docker-options-components', [
     'keydb' => ['create_standalone_keydb', KeydbGeneral::class],
     'dragonfly' => ['create_standalone_dragonfly', DragonflyGeneral::class],
     'clickhouse' => ['create_standalone_clickhouse', ClickhouseGeneral::class],
+    'influxdb' => ['create_standalone_influxdb', InfluxdbGeneral::class],
     'sqlite' => ['create_standalone_sqlite', SqliteGeneral::class],
 ]);
 

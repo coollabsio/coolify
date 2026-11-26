@@ -61,31 +61,33 @@
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
-                    <x-table.dropdown panel-class="w-48!">
-                        <x-slot:trigger>
-                            <button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
-                            <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none"
-                                aria-hidden="true">
-                                <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3"
-                                    stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
-                                    stroke-linejoin="round" />
-                            </svg>
-                            Sort
-                            </button>
-                        </x-slot:trigger>
-                            <template x-for="option in sortOptions" :key="option.value">
-                                <button type="button"
-                                    class="flex h-9 w-full items-center rounded-md px-2 text-left text-[12px] text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-dim dark:hover:bg-white/[0.06] dark:hover:text-fg"
-                                    x-on:click="sortBy = option.value; close(); page = 1">
-                                    <span class="flex-1" x-text="option.label"></span>
-                                    <svg x-show="sortBy === option.value" class="size-3.5 text-black dark:text-fg"
-                                        viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                                        <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor"
-                                            stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
+                    <div :class="viewMode === 'grid' ? '' : 'min-[641px]:hidden'">
+                        <x-table.dropdown panel-class="w-48!">
+                            <x-slot:trigger>
+                                <button type="button" class="button" aria-haspopup="listbox" :aria-expanded="open">
+                                <svg class="size-3.5 opacity-65" viewBox="0 0 24 24" fill="none"
+                                    aria-hidden="true">
+                                    <path d="M8 5v14m0 0-3-3m3 3 3-3M16 19V5m0 0-3 3m3-3 3 3"
+                                        stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+                                        stroke-linejoin="round" />
+                                </svg>
+                                Sort
                                 </button>
-                            </template>
-                    </x-table.dropdown>
+                            </x-slot:trigger>
+                                <template x-for="option in sortOptions" :key="option.value">
+                                    <button type="button"
+                                        class="listbox-option"
+                                        x-on:click="sortBy = option.value; close(); page = 1">
+                                        <span class="flex-1" x-text="option.label"></span>
+                                        <svg x-show="sortBy === option.value" class="size-3.5 text-black dark:text-fg"
+                                            viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                                            <path d="m2.5 6.25 2.1 2.1 4.9-5" stroke="currentColor"
+                                                stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                    </button>
+                                </template>
+                        </x-table.dropdown>
+                    </div>
 
                     <x-canvas-view-toggle
                         :list-url="route('project.show', ['project_uuid' => $project->uuid])"
@@ -116,9 +118,18 @@
                             </div>
 
                             <div class="mt-auto flex items-center justify-between gap-3 pt-4">
-                                <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-dim"
-                                    x-text="`${environment.resourceCount} ${environment.resourceCount === 1 ? 'resource' : 'resources'}`">
-                                </p>
+                                <div class="flex min-w-0 items-center gap-2.5">
+                                    <p class="min-w-0 truncate text-[11px] text-neutral-500 dark:text-fg-dim"
+                                        x-text="`${environment.resourceCount} ${environment.resourceCount === 1 ? 'resource' : 'resources'}`">
+                                    </p>
+                                    <a x-show="environment.config" x-cloak :href="environment.config?.href" {{ wireNavigate() }}
+                                        :title="environment.config?.title"
+                                        class="relative z-10 inline-flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg">
+                                        <x-reicon name="file-content" class="size-3.5" />
+                                        <span class="size-1.5 rounded-full" :class="environment.config?.dotClass"></span>
+                                        <span class="sr-only" x-text="environment.config?.title"></span>
+                                    </a>
+                                </div>
 
                                 <div class="relative z-10 flex shrink-0 items-center gap-0.5">
                                     <a x-show="environment.addResourceHref" :href="environment.addResourceHref"
@@ -148,10 +159,12 @@
                 class="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div
                     class="environments-table-grid border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint">
-                    <div>Environment</div>
-                    <div class="environment-resource-count">Resources</div>
-                    <div class="environment-description">Description</div>
-                    <div></div>
+                    <x-table.sort-header label="Environment" asc="name-asc" desc="name-desc" then="page = 1" />
+                    <x-table.sort-header label="Resources" asc="resources-asc" desc="resources-desc" first="desc" then="page = 1"
+                        class="environment-resource-count" />
+                    <x-table.sort-header label="Description" asc="description-asc" desc="description-desc" then="page = 1"
+                        class="environment-description" />
+                    <span class="text-right">Actions</span>
                 </div>
 
                 <template x-for="environment in paginatedEnvironments" :key="environment.uuid">
@@ -167,6 +180,11 @@
                             <a :href="environment.href" {{ wireNavigate() }}
                                 class="relative truncate text-[13px] font-semibold text-black hover:underline dark:text-fg"
                                 x-text="environment.name"></a>
+                            <span x-show="environment.config" x-cloak :title="environment.config?.title"
+                                class="inline-flex min-w-0 items-center gap-1.5 text-[11px] text-neutral-500 dark:text-fg-dim shrink">
+                                <span class="size-1.5 shrink-0 rounded-full" :class="environment.config?.dotClass"></span>
+                                <span class="truncate" x-text="environment.config?.label"></span>
+                            </span>
                         </div>
 
                         <div class="environment-resource-count text-[12px] text-neutral-600 dark:text-fg-dim"
@@ -230,7 +248,7 @@
                     label: 'Name Z–A'
                 },
                 {
-                    value: 'resources',
+                    value: 'resources-desc',
                     label: 'Most resources'
                 },
             ],
@@ -245,21 +263,27 @@
                     return !query || searchable.includes(query);
                 });
 
-                return environments.sort((first, second) => {
-                    if (this.sortBy === 'name-desc') {
-                        return second.name.localeCompare(first.name);
-                    }
-                    if (this.sortBy === 'resources') {
-                        return second.resourceCount - first.resourceCount ||
-                            first.name.localeCompare(second.name);
-                    }
-                    if (this.sortBy === 'name-asc') {
-                        return first.name.localeCompare(second.name);
-                    }
+                const [column, direction] = this.sortBy.split('-');
+                const sortValues = {
+                    name: (environment) => environment.name,
+                    resources: (environment) => Number(environment.resourceCount),
+                    description: (environment) => environment.description || '',
+                };
+                const sortValue = sortValues[column];
 
-                    // Default: the server order (production, staging, development, then by name).
-                    return 0;
-                });
+                // Default: the server order (production, staging, development, then by name).
+                if (!sortValue) {
+                    return environments;
+                }
+
+                const order = direction === 'desc' ? -1 : 1;
+                const compare = (first, second) => typeof first === 'number' ?
+                    first - second :
+                    first.localeCompare(second);
+
+                return environments.sort((first, second) =>
+                    order * compare(sortValue(first), sortValue(second)) ||
+                    first.name.localeCompare(second.name));
             },
             get totalPages() {
                 return Math.max(1, Math.ceil(this.filteredEnvironments.length / this.pageSize));

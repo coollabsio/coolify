@@ -2,7 +2,6 @@
 
 use App\Actions\Database\StartRedis;
 use App\Models\Environment;
-use App\Models\EnvironmentVariable;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -75,7 +74,7 @@ it('creates one REDIS_USERNAME variable and starts with unique environment entri
 it('removes duplicate REDIS_USERNAME variables and keeps the most recently changed one', function () {
     $database = create_standalone_redis($this->environment->id, $this->destination);
     $other = create_standalone_redis($this->environment->id, $this->destination);
-    $kept = EnvironmentVariable::query()->create([
+    $kept = insertDuplicateEnvironmentVariable([
         'key' => 'REDIS_USERNAME',
         'value' => 'admin',
         'resourceable_type' => StandaloneRedis::class,

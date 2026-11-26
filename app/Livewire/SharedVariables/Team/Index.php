@@ -53,13 +53,14 @@ class Index extends Component
             return $this->redirectRoute('shared-variables.team.canvas', navigate: true);
         }
         $this->team = currentTeam();
+        $this->authorize('viewSharedVariables', $this->team);
         $this->getDevView();
     }
 
     public function switch()
     {
         try {
-            $this->authorize('view', $this->team);
+            $this->authorize('viewSharedVariables', $this->team);
             $this->view = $this->view === 'normal' ? 'dev' : 'normal';
             $this->getDevView();
         } catch (\Throwable $e) {
@@ -74,9 +75,7 @@ class Index extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        $canViewValues = auth()->user()?->isAdminOfTeam($this->team->id) ?? false;
-
-        return $variables->map(fn ($item) => formatEnvVariableForDevView($item, $canViewValues))->join("\n");
+        return $variables->map(fn ($item) => formatEnvVariableForDevView($item, auth()->user()?->can('viewSensitive', $item) ?? false))->join("\n");
     }
 
     public function submit()

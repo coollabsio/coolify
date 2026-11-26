@@ -14,9 +14,13 @@
     @endif
 
     @php
+        $archives ??= [];
+        $archiveOffServers ??= collect();
+        $archiveOptions ??= [];
+        $selectedArchive ??= null;
         $totalContainers = collect($serverContainers)->flatten(1)->count();
         $functionalServers = $servers->filter(fn ($server) => $server->isFunctional());
-        $logsUnavailable = $containersLoaded && (
+        $logsUnavailable = $containersLoaded && $archives === [] && (
             $servers->isEmpty()
             || $functionalServers->isEmpty()
             || $totalContainers === 0
@@ -48,6 +52,13 @@
 
     <div class="w-full" x-init="if (! $wire.containersLoaded) { $wire.loadAllContainers() }"
         wire:loading.remove wire:target="loadAllContainers">
+        @foreach ($archiveOffServers as $archiveOffServer)
+            <x-callout type="info" title="Logs of removed containers are not saved" class="mb-4">
+                {{ $archiveOffServer->name }} deletes the logs of a container when the container is removed.
+                Turn on <a class="underline" href="{{ route('server.sentinel', ['server_uuid' => $archiveOffServer->uuid]) }}" {{ wireNavigate() }}>Keep logs of removed containers</a>
+                to read them here later.
+            </x-callout>
+        @endforeach
         @if (! $containersLoaded)
             <x-skeleton.logs />
         @elseif ($logsUnavailable)
@@ -82,24 +93,47 @@
                     @endif
                 @endforeach
 
-                @if ($selectedLogServer && $logSources !== [])
-                    @if (count($logTargets['deployments']) > 1 || count($logTargets['services']) > 1)
-                        <div class="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-                            @if (count($logTargets['deployments']) > 1)
-                                <div class="w-full sm:w-60" wire:key="runtime-logs-deployments">
-                                    <x-forms.listbox id="pullRequestId" label="Deployment" live searchable portal
-                                        searchPlaceholder="Search deployments" :options="$logTargets['deployments']" />
-                                </div>
-                            @endif
-                            @if (count($logTargets['services']) > 1)
-                                <div class="w-full sm:w-60" wire:key="runtime-logs-services">
-                                    <x-forms.listbox id="service" label="Service" live searchable portal
-                                        searchPlaceholder="Search services" :options="$logTargets['services']" />
-                                </div>
-                            @endif
-                        </div>
-                    @endif
+                @php
+                    $showArchivePicker = count($archiveOptions) > 1 || ($archiveOptions !== [] && $logSources !== []);
+                    $showDeploymentPicker = ! $selectedArchive && $logSources !== [] && count($logTargets['deployments']) > 1;
+                    $showServicePicker = ! $selectedArchive && $logSources !== [] && count($logTargets['services']) > 1;
+                @endphp
+                @if ($showArchivePicker || $showDeploymentPicker || $showServicePicker)
+                    <div class="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                        @if ($showArchivePicker)
+                            <div class="w-full sm:w-60" wire:key="runtime-logs-archives">
+                                <x-forms.listbox id="archive" label="Container" live searchable portal
+                                    searchPlaceholder="Search containers" :options="$archiveOptions" />
+                            </div>
+                        @endif
+                        @if ($showDeploymentPicker)
+                            <div class="w-full sm:w-60" wire:key="runtime-logs-deployments">
+                                <x-forms.listbox id="pullRequestId" label="Deployment" live searchable portal
+                                    searchPlaceholder="Search deployments" :options="$logTargets['deployments']" />
+                            </div>
+                        @endif
+                        @if ($showServicePicker)
+                            <div class="w-full sm:w-60" wire:key="runtime-logs-services">
+                                <x-forms.listbox id="service" label="Service" live searchable portal
+                                    searchPlaceholder="Search services" :options="$logTargets['services']" />
+                            </div>
+                        @endif
+                    </div>
+                @endif
 
+                @if ($selectedArchive && $archiveServer)
+                    <x-callout type="info" title="Removed container">
+                        {{ $selectedArchive['container'] }} no longer exists. These logs come from the Sentinel log archive on {{ $archiveServer->name }}.
+                    </x-callout>
+                    <livewire:project.shared.get-logs
+                        wire:key="runtime-logs-archive-{{ $selectedArchive['server'] }}-{{ $selectedArchive['file'] }}"
+                        :server="$archiveServer"
+                        :resource="$resource"
+                        :container="$selectedArchive['container']"
+                        :archive-file="$selectedArchive['file']"
+                        :collapsible="false"
+                        :fill="true" />
+                @elseif ($selectedLogServer && $logSources !== [])
                     <livewire:project.shared.get-logs
                         wire:key="runtime-logs-{{ $logTargets['streamKey'] }}"
                         :server="$selectedLogServer"

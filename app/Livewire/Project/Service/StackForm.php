@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Service;
 
 use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Service;
+use App\Services\ProjectConfig\ManagedResources;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
@@ -87,7 +88,7 @@ class StackForm extends Component
             // Sync FROM model (on load/refresh)
             $this->name = $this->service->name;
             $this->description = $this->service->description;
-            $canViewCompose = auth()->user()?->can('update', $this->service) ?? false;
+            $canViewCompose = ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->service);
             $this->dockerComposeRaw = $canViewCompose ? $this->service->docker_compose_raw : null;
             $this->dockerCompose = $canViewCompose ? redactLockedValuesInGeneratedCompose($this->service->docker_compose, $this->service) : null;
             $this->connectToDockerNetwork = $this->service->connect_to_docker_network;
@@ -183,12 +184,13 @@ class StackForm extends Component
             $this->authorize('update', $this->service);
             $this->validate();
             $this->syncData(true);
+            $isComposeChanged = $this->service->isDirty('docker_compose_raw');
 
             // Validate for command injection BEFORE any database operations
             validateDockerComposeForInjection($this->service->docker_compose_raw);
 
-            // Use transaction to ensure atomicity - if parse fails, save is rolled back
-            DB::transaction(function () {
+            // Use transaction to ensure atomicity - if parse or the Compose check fails, save is rolled back
+            DB::transaction(function () use ($isComposeChanged) {
                 $this->service->save();
                 if (auth()->user()->can('manageEnvironment', $this->service)) {
                     $lockedKeys = $this->lockedFieldKeys();
@@ -197,6 +199,9 @@ class StackForm extends Component
                     );
                 }
                 $this->service->parse();
+                if ($isComposeChanged) {
+                    $this->service->ensureDockerComposeAccepted();
+                }
             });
             // Refresh and write files after a successful commit
             $this->service->refresh();

@@ -8,11 +8,11 @@ use App\Models\Project;
 use App\Models\ResourceLink;
 use App\Models\Server;
 use App\Models\Service;
+use App\Services\ImageScan\ResourceScans;
+use App\Services\ImageScan\VulnerabilityMarkers;
 use App\Support\ResourceStartActivity;
-use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use Spatie\Activitylog\Models\Activity;
 
 /**
  * Builds the environment canvas graph: server zones, resource cards, manual links and saved positions.
@@ -38,18 +38,20 @@ class EnvironmentCanvas
         'keydbs',
         'dragonflies',
         'clickhouses',
+        'influxdbs',
         'sqlites',
     ];
 
     private const DATABASE_ENGINE_NAMES = [
         'postgresql' => 'PostgreSQL',
-        'redis' => 'Redis',
+        'redis' => 'Redis / Valkey',
         'mongodb' => 'MongoDB',
         'mysql' => 'MySQL',
         'mariadb' => 'MariaDB',
         'keydb' => 'KeyDB',
         'dragonfly' => 'Dragonfly',
         'clickhouse' => 'ClickHouse',
+        'influxdb' => 'InfluxDB',
         'sqlite' => 'SQLite',
     ];
 
@@ -101,13 +103,17 @@ class EnvironmentCanvas
     {
         $startingServiceUuids = $this->startingServiceUuids($resources->filter(fn (Model $resource) => $resource instanceof Service));
 
+        $markers = VulnerabilityMarkers::for($resources->values());
+
         $servers = collect();
-        $nodes = $resources->map(function (Model $resource) use (&$servers, $startingServiceUuids) {
+        $nodes = $resources->map(function (Model $resource) use (&$servers, $startingServiceUuids, $markers) {
             $node = match (true) {
                 $resource instanceof Application => $this->applicationNode($resource),
                 $resource instanceof Service => $this->serviceNode($resource, in_array($resource->uuid, $startingServiceUuids, true)),
                 default => $this->databaseNode($resource),
             };
+            // The security marker of the card: "Update now" or "No fix yet".
+            $node['security'] = $markers[ResourceScans::key($resource)] ?? null;
             foreach ($node['servers'] as $server) {
                 $servers->put($server->id, $server);
             }
@@ -400,25 +406,7 @@ class EnvironmentCanvas
      */
     private function startingServiceUuids(Collection $services): array
     {
-        if ($services->isEmpty()) {
-            return [];
-        }
-
-        $staleAfterSeconds = max(ResourceStartActivity::QUEUED_STALE_AFTER_SECONDS, ResourceStartActivity::IN_PROGRESS_STALE_AFTER_SECONDS);
-
-        /** @var EloquentCollection<int, Activity> $activities */
-        $activities = Activity::query()
-            ->whereIn('properties->type_uuid', $services->pluck('uuid')->all())
-            ->where('updated_at', '>=', now()->subSeconds($staleAfterSeconds))
-            ->latest()
-            ->orderByDesc('id')
-            ->get();
-
-        return $activities
-            ->groupBy(fn (Activity $activity) => (string) data_get($activity, 'properties.type_uuid'))
-            ->filter(fn (EloquentCollection $group) => ResourceStartActivity::isRunning($group->first()))
-            ->keys()
-            ->all();
+        return ResourceStartActivity::runningTypeUuids($services->pluck('uuid')->all());
     }
 
     /**

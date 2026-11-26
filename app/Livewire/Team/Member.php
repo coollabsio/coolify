@@ -74,6 +74,9 @@ class Member extends Component
                 throw new \Exception('You are not authorized to perform this action.');
             }
             $teamId = currentTeam()->id;
+            if ($this->isRootUserInRootTeam()) {
+                throw new \Exception('The root user cannot be removed from the root team.');
+            }
             DB::transaction(function () use ($teamId): void {
                 $this->member->teams()->detach($teamId);
                 RevokeUserTeamTokens::forUserTeam($this->member, $teamId);
@@ -83,7 +86,6 @@ class Member extends Component
                 'team_id' => $teamId,
                 'member_id' => $this->member->id,
                 'member_name' => $this->member->name,
-                'member_email' => $this->member->email,
             ]);
             // Clear cache for the removed user - both old and new key formats
             Cache::forget("team:{$this->member->id}");
@@ -99,8 +101,19 @@ class Member extends Component
         return $this->member->teams()->where('teams.id', currentTeam()->id)->first()?->pivot?->role;
     }
 
+    /**
+     * The root user must stay an owner of the root team, so it is not removed or demoted there.
+     */
+    private function isRootUserInRootTeam(): bool
+    {
+        return $this->member->id === 0 && currentTeam()->id === 0;
+    }
+
     private function updateRole(Role $role): void
     {
+        if ($role !== Role::OWNER && $this->isRootUserInRootTeam()) {
+            throw new \Exception('The root user must stay an owner of the root team.');
+        }
         $teamId = currentTeam()->id;
         $previousRole = Role::from($this->getMemberRole());
         DB::transaction(function () use ($teamId, $role, $previousRole): void {
@@ -117,7 +130,6 @@ class Member extends Component
             'team_id' => $teamId,
             'member_id' => $this->member->id,
             'member_name' => $this->member->name,
-            'member_email' => $this->member->email,
             'role' => $role->value,
         ]);
     }

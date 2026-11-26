@@ -1,7 +1,16 @@
 <nav wire:poll.10000ms="checkStatus" class="w-full max-w-none" x-data
     x-init="@js($loadComposeOnOpen) && $wire.loadComposeFile(true)">
+    @teleport('#resource-star-slot-mobile')
+        <livewire:star-toggle :resource="$application" :wire:key="'star-mobile-'.$application->getMorphClass().'-'.$application->uuid" />
+    @endteleport
+    @teleport('#configuration-warning-hud-slot')
+        <div><x-project-config.hud-chip :resource="$application" /></div>
+    @endteleport
+    @teleport('#configuration-warning-hud-slot-mobile')
+        <div><x-project-config.hud-chip :resource="$application" /></div>
+    @endteleport
     <div>
-        @if ($application->build_pack === 'nixpacks')
+        @if ($application->build_pack === 'nixpacks' && $activeRouteName !== 'project.application.configuration')
             <x-callout type="warning" title="Nixpacks is deprecated" class="mb-4">
                 {{ config('deprecations.nixpacks') }}
                 <a class="underline" href="{{ route('project.application.configuration', $parameters) }}" {{ wireNavigate() }}>
@@ -27,6 +36,11 @@
                     </div>
                     <div class="flex w-full flex-wrap gap-1">
                         <x-application.restart-limit-warning :application="$application" />
+                        @if ($this->imageScanGate)
+                            <x-image-scan.gate-status :result="$this->imageScanGate['result']" :action="$this->imageScanGate['action']"
+                                :vulnerabilities-url="$this->imageScanGate['vulnerabilities_url']"
+                                :deployment-url="$this->imageScanGate['deployment_url']" />
+                        @endif
                     </div>
                 </div>
             </div>
@@ -53,8 +67,9 @@
                                     <x-reicon name="play-circle" class="size-3.5" />
                                     {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment' : 'Deploy' }}
                                 </x-slot:main>
-                                @if (!$application->destination->server->isSwarm())
-                                    <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="deploy(true)"
+                                @if (!$application->destination?->server?->isSwarm())
+                                    <button type="button" class="listbox-option justify-start! gap-2.5! {{ $application->is_archive_source ? 'listbox-option-disabled' : '' }}" wire:click="deploy(true)"
+                                        @disabled($application->is_archive_source) @if ($application->is_archive_source) title="Archive sites build only from a new upload." @endif
                                         @click="open = false" role="menuitem">
                                         <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                         {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment (without cache)' : 'Deploy (without cache)' }}
@@ -68,7 +83,7 @@
                                     </button>
                                 @endif
                             @else
-                                @if ($application->destination->server->isSwarm())
+                                @if ($application->destination?->server?->isSwarm())
                                     @if ($application->build_pack !== 'dockercompose')
                                         <x-slot:main wire:click="deploy">
                                             <x-reicon name="refresh" class="size-3.5" />
@@ -85,8 +100,9 @@
                                         <x-reicon name="refresh" class="size-3.5" />
                                         Redeploy
                                     </x-slot:main>
-                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    <button type="button" class="listbox-option justify-start! gap-2.5! {{ $application->is_archive_source ? 'listbox-option-disabled' : '' }}"
                                         wire:click="{{ str($application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)' }}"
+                                        @disabled($application->is_archive_source) @if ($application->is_archive_source) title="Archive sites build only from a new upload." @endif
                                         @click="open = false" role="menuitem">
                                         <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                         Redeploy (without cache)
@@ -100,7 +116,7 @@
                                         </button>
                                     @endif
                                 @endif
-                                @unless ($application->destination->server->isSwarm() && $application->build_pack === 'dockercompose')
+                                @unless ($application->destination?->server?->isSwarm() && $application->build_pack === 'dockercompose')
                                     <button type="button" class="listbox-option justify-start! gap-2.5!"
                                         @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()"
                                         role="menuitem">
@@ -126,10 +142,28 @@
                             <button id="application-mobile-stop-trigger" type="button">Stop</button>
                         </x-slot:trigger>
                     </x-modal-confirmation>
+                    @php
+                        $restartPlan = $this->restartPlan;
+                        $restartReasons = collect($restartPlan['reasons']);
+                        $restartReasonText = $restartReasons->take(3)->implode(', ')
+                            . ($restartReasons->count() > 3 ? ' and ' . ($restartReasons->count() - 3) . ' more' : '');
+                    @endphp
                     <x-modal-confirmation title="Confirm Application Restart?" buttonTitle="Restart"
-                        submitAction="restart" :actions="[
-                            'This application will be restarted without rebuilding.',
-                        ]" :confirmWithText="false" :confirmWithPassword="false"
+                        submitAction="restart" :ignoreWire="false"
+                        :warningMessage="$restartPlan['builds']
+                            ? 'This restart builds a new image, because a build setting changed: ' . e($restartReasonText) . '.'
+                            : 'This restart does not build. It recreates the container from the current image.'"
+                        :actions="$restartPlan['builds']
+                            ? [
+                                'Build a new image. A restart cannot reuse the current image, because the build output can change.',
+                                'Recreate the container with the new image and the current runtime settings.',
+                            ]
+                            : [
+                                'Recreate the container from the current image.',
+                                'Apply the current runtime environment variables, ports, mounts, and labels.',
+                                'Build only if the image is no longer on the server.',
+                            ]"
+                        :confirmWithText="false" :confirmWithPassword="false"
                         step2ButtonText="Confirm">
                         <x-slot:trigger>
                             <button id="application-mobile-restart-trigger" type="button">Restart</button>
@@ -139,14 +173,25 @@
             </div>
         </div>
 
+        @if ($this->imageScanGate)
+            {{-- From xl the topbar shows the warning. Below xl the in-flow heading above repeats it. --}}
+            @teleport('#configuration-warning-hud-slot')
+                <div class="hidden items-center xl:flex">
+                    <x-image-scan.gate-status :result="$this->imageScanGate['result']" :action="$this->imageScanGate['action']"
+                        :vulnerabilities-url="$this->imageScanGate['vulnerabilities_url']"
+                        :deployment-url="$this->imageScanGate['deployment_url']" />
+                </div>
+            @endteleport
+        @endif
+
         {{-- Desktop actions live in the fixed top bar so they cannot overlap page content. --}}
         @teleport('#resource-action-hud-slot')
         <div class="hidden w-full items-center xl:flex xl:w-auto">
             <div
                 class="resource-heading-navbar application-heading-actions flex w-full min-w-0 items-center justify-start gap-1 overflow-visible xl:w-auto xl:justify-end">
-                <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
+                <div class="resource-heading-actions flex shrink-0 items-center gap-1">
                     @if ($this->runningDeploymentUrl)
-                        <x-deploying-indicator :href="$this->runningDeploymentUrl" class="mr-1" />
+                        <x-deploying-indicator :href="$this->runningDeploymentUrl" size="md" />
                     @endif
                     @if ($this->needsComposeFile())
                         @can('update', $application)
@@ -170,8 +215,9 @@
                                         <x-reicon name="play-circle" class="size-3.5" />
                                         {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment' : 'Deploy' }}
                                     </x-slot:main>
-                                    @if (!$application->destination->server->isSwarm())
-                                        <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="deploy(true)"
+                                    @if (!$application->destination?->server?->isSwarm())
+                                        <button type="button" class="listbox-option justify-start! gap-2.5! {{ $application->is_archive_source ? 'listbox-option-disabled' : '' }}" wire:click="deploy(true)"
+                                            @disabled($application->is_archive_source) @if ($application->is_archive_source) title="Archive sites build only from a new upload." @endif
                                             @click="open = false" role="menuitem">
                                             <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                             {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment (without cache)' : 'Deploy (without cache)' }}
@@ -185,7 +231,7 @@
                                         </button>
                                     @endif
                                 @else
-                                    @if ($application->destination->server->isSwarm())
+                                    @if ($application->destination?->server?->isSwarm())
                                         @if ($application->build_pack !== 'dockercompose')
                                             <x-slot:main wire:click="deploy">
                                                 <x-reicon name="refresh" class="size-3.5" />
@@ -202,8 +248,9 @@
                                             <x-reicon name="refresh" class="size-3.5" />
                                             Redeploy
                                         </x-slot:main>
-                                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        <button type="button" class="listbox-option justify-start! gap-2.5! {{ $application->is_archive_source ? 'listbox-option-disabled' : '' }}"
                                             wire:click="{{ str($application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)' }}"
+                                            @disabled($application->is_archive_source) @if ($application->is_archive_source) title="Archive sites build only from a new upload." @endif
                                             @click="open = false" role="menuitem">
                                             <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                             Redeploy (without cache)
@@ -217,7 +264,7 @@
                                             </button>
                                         @endif
                                     @endif
-                                    @unless ($application->destination->server->isSwarm() && $application->build_pack === 'dockercompose')
+                                    @unless ($application->destination?->server?->isSwarm() && $application->build_pack === 'dockercompose')
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
                                             @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()"
                                             role="menuitem">

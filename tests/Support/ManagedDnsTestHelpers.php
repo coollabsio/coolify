@@ -27,7 +27,7 @@ function fakeCloudflareDns(array $records = []): ArrayObject
         if ($id === null && $request->method() === 'GET') {
             parse_str($matches[2] ?? '', $query);
             $result = collect($records)->filter(fn (array $record): bool => $record['name'] === ($query['name'] ?? null)
-                && $record['type'] === ($query['type'] ?? null))->values()->all();
+                && (! isset($query['type']) || $record['type'] === $query['type']))->values()->all();
 
             return Http::response(['success' => true, 'result' => $result]);
         }

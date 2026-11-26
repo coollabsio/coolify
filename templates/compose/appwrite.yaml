@@ -7,13 +7,15 @@
 
 services:
   appwrite:
-    image: appwrite/appwrite:2.6.1
+    image: appwrite/appwrite:2.7.2
     environment:
       - SERVICE_URL_APPWRITE=/v1
       - _APP_DNS_EXTERNAL=${_APP_DNS_EXTERNAL}
       - _APP_ALLOWED_INTERNAL_ADDRESSES=${_APP_ALLOWED_INTERNAL_ADDRESSES}
       - _APP_ENV=${_APP_ENV:-production}
+      - _APP_MEMORY_LIMIT=${_APP_MEMORY_LIMIT:-512M}
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
+      - _APP_ALERTS_USAGE_LAG=${_APP_ALERTS_USAGE_LAG:-120}
       - _APP_USAGE_PASS=$SERVICE_PASSWORD_CLICKHOUSE
       - _APP_CONNECTIONS_DB_USAGE=http://appwrite:$SERVICE_PASSWORD_CLICKHOUSE@appwrite-clickhouse:8123/appwrite
       - _APP_POOL_SIZE_USAGE=${_APP_POOL_SIZE_USAGE:-2}
@@ -55,6 +57,9 @@ services:
       - _APP_OPTIONS_ROUTER_FORCE_HTTPS=${_APP_OPTIONS_ROUTER_FORCE_HTTPS:-disabled}
       - _APP_ROUTER_AUTO_CERTIFICATES=${_APP_ROUTER_AUTO_CERTIFICATES:-disabled}
       - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
+      - _APP_OPENSSL_KEY_V2=${_APP_OPENSSL_KEY_V2}
+      - _APP_OPENSSL_KEY_CURRENT=${_APP_OPENSSL_KEY_CURRENT:-1}
+      - _APP_OPENSSL_KEY_OLDEST=${_APP_OPENSSL_KEY_OLDEST:-1}
       - _APP_NOTIFICATIONS_TRACKING_SECRET=$SERVICE_PASSWORD_64_NOTIFICATIONS
       - _APP_DOMAIN=${_APP_DOMAIN:-$SERVICE_FQDN_APPWRITE}
       - _APP_CONSOLE_DOMAIN=${_APP_CONSOLE_DOMAIN}
@@ -66,6 +71,7 @@ services:
       - _APP_DOMAIN_TARGET_CAA=${_APP_DOMAIN_TARGET_CAA}
       - _APP_DNS=${_APP_DNS}
       - _APP_DOMAIN_FUNCTIONS=${_APP_DOMAIN_FUNCTIONS:-functions.$SERVICE_FQDN_APPWRITE}
+      - _APP_DOMAIN_FUNCTIONS_FALLBACK=${_APP_DOMAIN_FUNCTIONS_FALLBACK}
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -151,6 +157,7 @@ services:
       - _APP_MAINTENANCE_RETENTION_AUDIT=${_APP_MAINTENANCE_RETENTION_AUDIT:-1209600}
       - _APP_MAINTENANCE_RETENTION_AUDIT_CONSOLE=${_APP_MAINTENANCE_RETENTION_AUDIT_CONSOLE}
       - _APP_MAINTENANCE_RETENTION_SCHEDULES=${_APP_MAINTENANCE_RETENTION_SCHEDULES:-86400}
+      - _APP_MAINTENANCE_RETENTION_ALERTS=${_APP_MAINTENANCE_RETENTION_ALERTS:-7776000}
       - _APP_SMS_PROVIDER=${_APP_SMS_PROVIDER}
       - _APP_SMS_FROM=${_APP_SMS_FROM}
       - _APP_GRAPHQL_INTROSPECTION=${_APP_GRAPHQL_INTROSPECTION:-enabled}
@@ -226,28 +233,13 @@ services:
       retries: 6
       start_period: 120s
 
-  appwrite-console:
-    image: appwrite/new:1.2.97-self-hosted
-    environment:
-      - SERVICE_URL_APPWRITE_3000=/
-      - VITE_CONSOLE_PROFILE=self-hosted
-      - VITE_APPWRITE_VERSION=2.6.1
-      - APPWRITE_ENDPOINT_SAME_ORIGIN=true
-    depends_on:
-      appwrite:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "bun -e \"fetch('http://localhost:3000').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))\""]
-      interval: 20s
-      timeout: 5s
-      retries: 3
-
   appwrite-realtime:
-    image: appwrite/appwrite:2.6.1
+    image: appwrite/appwrite:2.7.2
     entrypoint: realtime
     environment:
       - SERVICE_URL_APPWRITE=/v1/realtime
       - _APP_ENV=${_APP_ENV:-production}
+      - _APP_MEMORY_LIMIT=${_APP_MEMORY_LIMIT:-512M}
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
       - _APP_STATS_USAGE_QUEUE_NAME=${_APP_STATS_USAGE_QUEUE_NAME:-v1-stats-usage}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
@@ -255,7 +247,13 @@ services:
       - _APP_OPTIONS_ROUTER_PROTECTION=${_APP_OPTIONS_ROUTER_PROTECTION:-disabled}
       - _APP_CONSOLE_HOSTNAMES=${_APP_CONSOLE_HOSTNAMES}
       - _APP_REALTIME_TAIL_RATE=${_APP_REALTIME_TAIL_RATE:-50}
+      - _APP_LIMIT_REALTIME_SUBSCRIPTIONS=${_APP_LIMIT_REALTIME_SUBSCRIPTIONS:-100}
+      - _APP_LIMIT_REALTIME_CHANNELS=${_APP_LIMIT_REALTIME_CHANNELS:-100}
+      - _APP_LIMIT_REALTIME_QUERIES=${_APP_LIMIT_REALTIME_QUERIES:-100}
       - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
+      - _APP_OPENSSL_KEY_V2=${_APP_OPENSSL_KEY_V2}
+      - _APP_OPENSSL_KEY_CURRENT=${_APP_OPENSSL_KEY_CURRENT:-1}
+      - _APP_OPENSSL_KEY_OLDEST=${_APP_OPENSSL_KEY_OLDEST:-1}
       - _APP_TRUSTED_HEADERS=${_APP_TRUSTED_HEADERS:-x-forwarded-for}
       - _APP_TRUSTED_PROXIES=${_APP_TRUSTED_PROXIES:-127.0.0.1,::1,10.0.0.0/8,100.64.0.0/10,172.16.0.0/12,192.168.0.0/16}
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
@@ -300,14 +298,34 @@ services:
       timeout: 5s
       retries: 3
 
+  # appwrite-console must stay after appwrite and appwrite-realtime: the last SERVICE_URL_APPWRITE declaration
+  # sets SERVICE_FQDN_APPWRITE, and _APP_DOMAIN needs the host of the console, not the /v1 path of the API.
+  appwrite-console:
+    image: appwrite/new:1.2.181-self-hosted
+    environment:
+      - SERVICE_URL_APPWRITE_3000=/
+      - VITE_CONSOLE_PROFILE=self-hosted
+      - VITE_APPWRITE_VERSION=2.7.2
+      - APPWRITE_ENDPOINT_SAME_ORIGIN=true
+    depends_on:
+      appwrite:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bun -e \"fetch('http://localhost:3000').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))\""]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+
   appwrite-worker:
-    image: appwrite/appwrite:2.6.1
+    image: appwrite/appwrite:2.7.2
     entrypoint: worker
     environment:
       - _APP_ENV=${_APP_ENV:-production}
+      - _APP_MEMORY_LIMIT=${_APP_MEMORY_LIMIT:-512M}
       - _APP_DNS_EXTERNAL=${_APP_DNS_EXTERNAL}
       - _APP_ALLOWED_INTERNAL_ADDRESSES=${_APP_ALLOWED_INTERNAL_ADDRESSES}
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
+      - _APP_ALERTS_USAGE_LAG=${_APP_ALERTS_USAGE_LAG:-120}
       - _APP_USAGE_PASS=$SERVICE_PASSWORD_CLICKHOUSE
       - _APP_CONNECTIONS_DB_USAGE=http://appwrite:$SERVICE_PASSWORD_CLICKHOUSE@appwrite-clickhouse:8123/appwrite
       - _APP_POOL_SIZE_USAGE=${_APP_POOL_SIZE_USAGE:-2}
@@ -319,9 +337,12 @@ services:
       - _APP_MAINTENANCE_QUEUE_NAME=${_APP_MAINTENANCE_QUEUE_NAME:-v1-maintenance}
       - _APP_STATS_RESOURCES_INTERVAL=${_APP_STATS_RESOURCES_INTERVAL:-3600}
       - _APP_WORKERS_NUM=1
-      - _APP_WORKER_MAX_COROUTINES=79
+      - _APP_WORKER_MAX_COROUTINES=83
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
       - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
+      - _APP_OPENSSL_KEY_V2=${_APP_OPENSSL_KEY_V2}
+      - _APP_OPENSSL_KEY_CURRENT=${_APP_OPENSSL_KEY_CURRENT:-1}
+      - _APP_OPENSSL_KEY_OLDEST=${_APP_OPENSSL_KEY_OLDEST:-1}
       - _APP_EMAIL_SECURITY=${_APP_EMAIL_SECURITY:-security@appwrite.io}
       - _APP_EMAIL_CERTIFICATES=${_APP_EMAIL_CERTIFICATES}
       - _APP_DB_ADAPTER=${_APP_DB_ADAPTER:-postgresql}
@@ -476,11 +497,13 @@ services:
       retries: 3
 
   appwrite-task-scheduler:
-    image: appwrite/appwrite:2.6.1
+    image: appwrite/appwrite:2.7.2
     entrypoint: schedule
     environment:
       - _APP_ENV=${_APP_ENV:-production}
+      - _APP_MEMORY_LIMIT=${_APP_MEMORY_LIMIT:-512M}
       - _APP_USAGE_STATS=${_APP_USAGE_STATS:-enabled}
+      - _APP_ALERTS_USAGE_LAG=${_APP_ALERTS_USAGE_LAG:-120}
       - _APP_USAGE_PASS=$SERVICE_PASSWORD_CLICKHOUSE
       - _APP_CONNECTIONS_DB_USAGE=http://appwrite:$SERVICE_PASSWORD_CLICKHOUSE@appwrite-clickhouse:8123/appwrite
       - _APP_POOL_SIZE_USAGE=${_APP_POOL_SIZE_USAGE:-2}
@@ -495,6 +518,9 @@ services:
       - _APP_WORKER_MAX_COROUTINES=8
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
       - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
+      - _APP_OPENSSL_KEY_V2=${_APP_OPENSSL_KEY_V2}
+      - _APP_OPENSSL_KEY_CURRENT=${_APP_OPENSSL_KEY_CURRENT:-1}
+      - _APP_OPENSSL_KEY_OLDEST=${_APP_OPENSSL_KEY_OLDEST:-1}
       - _APP_OPTIONS_FORCE_HTTPS=${_APP_OPTIONS_FORCE_HTTPS:-disabled}
       - _APP_DOMAIN=${_APP_DOMAIN:-$SERVICE_FQDN_APPWRITE}
       - _APP_CONSOLE_DOMAIN=${_APP_CONSOLE_DOMAIN}
@@ -514,7 +540,9 @@ services:
       - _APP_DB_PASS=$SERVICE_PASSWORD_POSTGRES
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
       - _APP_FUNCTIONS_SCHEDULE_SPREAD=${_APP_FUNCTIONS_SCHEDULE_SPREAD:-0}
+      - _APP_MAINTENANCE_INTERVAL=${_APP_MAINTENANCE_INTERVAL:-86400}
       - _APP_MAINTENANCE_INACTIVE_INTERVAL=${_APP_MAINTENANCE_INACTIVE_INTERVAL:-604800}
+      - _APP_ALERTS_INTERVAL=${_APP_ALERTS_INTERVAL:-60}
     depends_on:
       appwrite-postgresql:
         condition: service_healthy
@@ -527,10 +555,11 @@ services:
       retries: 3
 
   appwrite-task-maintenance:
-    image: appwrite/appwrite:2.6.1
+    image: appwrite/appwrite:2.7.2
     entrypoint: maintenance
     environment:
       - _APP_ENV=${_APP_ENV:-production}
+      - _APP_MEMORY_LIMIT=${_APP_MEMORY_LIMIT:-512M}
       - _APP_LOGGING_FORMAT=${_APP_LOGGING_FORMAT:-pretty}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
       - _APP_DOMAIN=${_APP_DOMAIN:-$SERVICE_FQDN_APPWRITE}
@@ -543,6 +572,9 @@ services:
       - _APP_EDITION=${_APP_EDITION:-self-hosted}
       - _APP_ROUTER_AUTO_CERTIFICATES=${_APP_ROUTER_AUTO_CERTIFICATES:-disabled}
       - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
+      - _APP_OPENSSL_KEY_V2=${_APP_OPENSSL_KEY_V2}
+      - _APP_OPENSSL_KEY_CURRENT=${_APP_OPENSSL_KEY_CURRENT:-1}
+      - _APP_OPENSSL_KEY_OLDEST=${_APP_OPENSSL_KEY_OLDEST:-1}
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -560,6 +592,7 @@ services:
       - _APP_MAINTENANCE_RETENTION_AUDIT=${_APP_MAINTENANCE_RETENTION_AUDIT:-1209600}
       - _APP_MAINTENANCE_RETENTION_AUDIT_CONSOLE=${_APP_MAINTENANCE_RETENTION_AUDIT_CONSOLE}
       - _APP_MAINTENANCE_RETENTION_SCHEDULES=${_APP_MAINTENANCE_RETENTION_SCHEDULES:-86400}
+      - _APP_MAINTENANCE_RETENTION_ALERTS=${_APP_MAINTENANCE_RETENTION_ALERTS:-7776000}
       - _APP_MAINTENANCE_START_TIME=${_APP_MAINTENANCE_START_TIME}
       - _APP_DATABASE_SHARED_TABLES=${_APP_DATABASE_SHARED_TABLES}
     depends_on:
@@ -574,10 +607,11 @@ services:
       retries: 3
 
   appwrite-task-interval:
-    image: appwrite/appwrite:2.6.1
+    image: appwrite/appwrite:2.7.2
     entrypoint: interval
     environment:
       - _APP_ENV=${_APP_ENV:-production}
+      - _APP_MEMORY_LIMIT=${_APP_MEMORY_LIMIT:-512M}
       - _APP_LOGGING_FORMAT=${_APP_LOGGING_FORMAT:-pretty}
       - _APP_WORKER_PER_CORE=${_APP_WORKER_PER_CORE:-6}
       - _APP_DOMAIN=${_APP_DOMAIN:-$SERVICE_FQDN_APPWRITE}
@@ -589,6 +623,9 @@ services:
       - _APP_DOMAIN_FUNCTIONS=${_APP_DOMAIN_FUNCTIONS:-functions.$SERVICE_FQDN_APPWRITE}
       - _APP_DOMAIN_SITES=${_APP_DOMAIN_SITES:-sites.$SERVICE_FQDN_APPWRITE}
       - _APP_OPENSSL_KEY_V1=$SERVICE_PASSWORD_64_APPWRITE
+      - _APP_OPENSSL_KEY_V2=${_APP_OPENSSL_KEY_V2}
+      - _APP_OPENSSL_KEY_CURRENT=${_APP_OPENSSL_KEY_CURRENT:-1}
+      - _APP_OPENSSL_KEY_OLDEST=${_APP_OPENSSL_KEY_OLDEST:-1}
       - _APP_REDIS_HOST=${_APP_REDIS_HOST:-appwrite-redis}
       - _APP_REDIS_PORT=${_APP_REDIS_PORT:-6379}
       - _APP_REDIS_USER=${_APP_REDIS_USER}
@@ -625,7 +662,7 @@ services:
       start_period: 10s
 
   appwrite-browser:
-    image: appwrite/browser:0.3.6
+    image: appwrite/browser:0.3.10
     environment:
       - ALLOWED_HOSTS=appwrite
     dns:
@@ -634,7 +671,7 @@ services:
     exclude_from_hc: true
 
   appwrite-exiftool:
-    image: ghcr.io/appwrite/exiftool:0.1.0
+    image: ghcr.io/appwrite/exiftool:0.1.1
     healthcheck:
       test: ["CMD", "healthcheck"]
       interval: 20s
@@ -643,7 +680,7 @@ services:
       start_period: 15s
 
   openruntimes-executor:
-    image: openruntimes/executor:1.1.2
+    image: openruntimes/executor:1.3.1
     hostname: openruntimes-executor
     stop_signal: SIGINT
     environment:
@@ -675,7 +712,7 @@ services:
       start_period: 10s
 
   orchestrator:
-    image: ghcr.io/open-runtimes/orchestrator/orchestrator:2.2.4
+    image: ghcr.io/open-runtimes/orchestrator/orchestrator:4.0.0
     hostname: orchestrator
     user: root
     environment:
@@ -698,7 +735,9 @@ services:
 
   appwrite-postgresql:
     image: appwrite/postgres:0.1.0
+    init: true
     shm_size: 1g
+    command: postgres -c max_connections=${_APP_DB_MAX_CONNECTIONS:-500}
     environment:
       - POSTGRES_DB=${_APP_DB_SCHEMA:-appwrite}
       - POSTGRES_USER=$SERVICE_USER_POSTGRES

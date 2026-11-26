@@ -5,10 +5,16 @@ namespace App\Providers;
 use App\Auth\Oidc\OidcDiscoveryService;
 use App\Auth\Oidc\OidcTokenValidator;
 use App\Auth\Oidc\Socialite\OidcProvider;
+use App\Http\Middleware\EnsureTeamWideAccess;
 use App\Models\PersonalAccessToken;
 use App\Models\Server;
 use App\Rules\SafeExternalUrl;
 use App\Services\Access\AccessResolver;
+use App\Services\ProjectConfig\AdapterRegistry;
+use App\Services\ProjectConfig\Adapters\ApplicationAdapter;
+use App\Services\ProjectConfig\Adapters\ServiceAdapter;
+use App\Services\ProjectConfig\Adapters\StandaloneDatabaseAdapter;
+use App\Services\ProjectConfig\ConfigPushRouter;
 use App\Support\AtomicFilesystem;
 use App\Support\RetryHttpConnectionFailures;
 use Illuminate\Database\Eloquent\Model;
@@ -26,12 +32,19 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\Sanctum;
 use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
+use Livewire\Livewire;
 use Stripe\StripeClient;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->scoped(ConfigPushRouter::class);
+        $this->app->singleton(AdapterRegistry::class, fn () => new AdapterRegistry([
+            new ApplicationAdapter,
+            new ServiceAdapter,
+            ...array_map(fn (string $type) => new StandaloneDatabaseAdapter($type), array_keys(StandaloneDatabaseAdapter::TYPES)),
+        ]));
         $this->app->scoped(AccessResolver::class);
         $this->app->bind(StripeClient::class, fn () => new StripeClient(config('subscription.stripe_api_key')));
 
@@ -52,6 +65,16 @@ class AppServiceProvider extends ServiceProvider
         $this->configureOidcSocialite();
         $this->configureQueue();
         $this->configureServerTransferImport();
+        $this->configureLivewire();
+    }
+
+    /**
+     * Livewire updates skip route middleware. Run the team-wide access check again on each update,
+     * so a page that is already open stops working when an admin limits the member to some projects.
+     */
+    private function configureLivewire(): void
+    {
+        Livewire::addPersistentMiddleware([EnsureTeamWideAccess::class]);
     }
 
     /**
@@ -60,7 +83,7 @@ class AppServiceProvider extends ServiceProvider
      */
     private function configureServerTransferImport(): void
     {
-        $isImport = fn (Request $request): bool => $request->is('api/v1/servers/import');
+        $isImport = fn (Request $request): bool => $request->is('api/v1/servers/import', 'api/v1/environments/*/config/*', 'api/v1/config/*');
         TrimStrings::skipWhen($isImport);
         ConvertEmptyStringsToNull::skipWhen($isImport);
     }
@@ -108,6 +131,9 @@ class AppServiceProvider extends ServiceProvider
     private function configureSanctumModel(): void
     {
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+        Sanctum::authenticateAccessTokensUsing(
+            fn (PersonalAccessToken $token, bool $isValid): bool => $isValid && ! $token->isPaused()
+        );
     }
 
     private function configureOidcSocialite(): void

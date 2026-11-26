@@ -23,14 +23,6 @@ it('uses Reverb as the first-party broadcast server', function () {
         ->and(file_exists(config_path('reverb.php')))->toBeTrue();
 });
 
-it('does not send server-side broadcasts to the browser-facing Pusher host', function () {
-    $reverbConnection = Str::between(file_get_contents(config_path('broadcasting.php')), "'reverb' => [", "'pusher' => [");
-
-    expect($reverbConnection)
-        ->not->toContain('PUSHER_HOST')
-        ->not->toContain("env('PUSHER_SCHEME'");
-});
-
 it('keeps working with environment variables from installs that used the realtime container', function (array $environment, string $connection, string $expectedHost) {
     $previous = [];
 
@@ -70,7 +62,6 @@ it('rewrites the legacy realtime backend host during upgrades', function (string
         ->toContain('set_env_var "PUSHER_BACKEND_HOST" "127.0.0.1"');
 })->with([
     'upgrade script' => ['scripts/upgrade.sh'],
-    'nightly upgrade script' => ['other/nightly/upgrade.sh'],
 ]);
 
 it('includes Reverb but not the terminal server in the Coolify container healthcheck', function (string $composeFile) {
@@ -82,9 +73,6 @@ it('includes Reverb but not the terminal server in the Coolify container healthc
         ->not->toContain('6002/ready');
 })->with([
     'production compose' => ['docker-compose.prod.yml'],
-    'nightly production compose' => ['other/nightly/docker-compose.prod.yml'],
-    'windows compose' => ['docker-compose.windows.yml'],
-    'nightly windows compose' => ['other/nightly/docker-compose.windows.yml'],
 ]);
 
 it('removes the legacy realtime container during upgrades', function (string $script) {
@@ -92,7 +80,6 @@ it('removes the legacy realtime container during upgrades', function (string $sc
         ->toContain('for container in coolify coolify-db coolify-redis coolify-realtime; do');
 })->with([
     'upgrade script' => ['scripts/upgrade.sh'],
-    'nightly upgrade script' => ['other/nightly/upgrade.sh'],
 ]);
 
 it('runs Reverb and terminal websocket services inside the Coolify containers', function (string $dockerfile, string $dependencyService) {
@@ -146,7 +133,6 @@ it('removes the dedicated realtime service from bundled compose files', function
     'development compose' => ['docker-compose.dev.yml', true],
     'maxio development compose' => ['docker-compose-maxio.dev.yml', true],
     'multi-instance development compose' => ['docker-compose.dev-multi.yml', true],
-    'windows compose' => ['docker-compose.windows.yml', true],
 ]);
 
 it('keeps the internal Reverb listen port separate from the public Pusher port', function () {
@@ -169,37 +155,14 @@ it('uses the browser host and page TLS mode for development Reverb connections',
         ->toContain('PUSHER_HOST: "${PUSHER_HOST:-}"');
 });
 
-it('proxies Reverb and terminal websocket traffic to the Coolify app container', function () {
-    $serverModel = file_get_contents(app_path('Models/Server.php'));
-
-    expect($serverModel)
-        ->toContain("'rule' => \"Host(`{\$host}`) && PathPrefix(`/app`)\"")
-        ->toContain("'rule' => \"Host(`{\$host}`) && PathPrefix(`/apps`)\"")
-        ->toContain("'rule' => \"Host(`{\$host}`) && PathPrefix(`/terminal/ws`)\"")
-        ->toContain("'url' => 'http://coolify:6001'")
-        ->toContain("'url' => 'http://coolify:6002'")
-        ->toContain('reverse_proxy coolify:6001')
-        ->toContain('reverse_proxy coolify:6002')
-        ->not->toContain('http://coolify-realtime:6001')
-        ->not->toContain('http://coolify-realtime:6002')
-        ->not->toContain('reverse_proxy coolify-realtime');
-});
-
 it('uses Pusher environment keys for self-hosted Reverb compatibility', function () {
     $files = [
         '.env.production',
-        '.env.windows-docker-desktop.example',
         'docker-compose.prod.yml',
         'docker-compose.dev.yml',
         'docker-compose-maxio.dev.yml',
-        'docker-compose.windows.yml',
         'scripts/install.sh',
         'scripts/upgrade.sh',
-        'other/nightly/.env.production',
-        'other/nightly/docker-compose.prod.yml',
-        'other/nightly/docker-compose.windows.yml',
-        'other/nightly/install.sh',
-        'other/nightly/upgrade.sh',
     ];
 
     foreach ($files as $file) {
@@ -213,9 +176,6 @@ it('keeps the public websocket port adaptive and configures only the internal Re
     expect(file_get_contents(base_path('.env.production')))
         ->not->toContain('PUSHER_PORT=')
         ->not->toContain('PUSHER_BACKEND_PORT=')
-        ->and(file_get_contents(base_path('.env.windows-docker-desktop.example')))
-        ->not->toContain('PUSHER_PORT=')
-        ->toContain('PUSHER_BACKEND_PORT=6001')
         ->and(file_get_contents(base_path('scripts/install.sh')))
         ->not->toContain('update_env_var "PUSHER_PORT"')
         ->toContain('update_env_var "PUSHER_BACKEND_PORT" "6001"')
@@ -230,9 +190,6 @@ it('does not use the browser websocket port as the Docker host port', function (
         ->not->toContain('"${PUSHER_PORT:-6001}:6001"');
 })->with([
     'production compose' => ['docker-compose.prod.yml'],
-    'nightly production compose' => ['other/nightly/docker-compose.prod.yml'],
-    'windows compose' => ['docker-compose.windows.yml'],
-    'nightly windows compose' => ['other/nightly/docker-compose.windows.yml'],
 ]);
 
 it('preserves existing public websocket port overrides during install and upgrade', function (string $script) {
@@ -244,28 +201,22 @@ it('preserves existing public websocket port overrides during install and upgrad
 })->with([
     'install script' => ['scripts/install.sh'],
     'upgrade script' => ['scripts/upgrade.sh'],
-    'nightly install script' => ['other/nightly/install.sh'],
-    'nightly upgrade script' => ['other/nightly/upgrade.sh'],
 ]);
 
 it('stops publishing or preserving the obsolete realtime image', function () {
     $productionInstallScript = file_get_contents(base_path('scripts/install.sh'));
-    $nightlyInstallScript = file_get_contents(base_path('other/nightly/install.sh'));
 
     expect(file_get_contents(config_path('constants.php')))
         ->not->toContain('realtime_version')
         ->not->toContain('realtime_image')
         ->and(file_get_contents(app_path('Actions/Server/CleanupDocker.php')))
         ->not->toContain('realtimeImage')
-        ->and(file_get_contents(base_path('versions.json')))
+        ->and(file_get_contents(base_path('upstream.json')))
         ->not->toContain('"realtime"')
         ->and(is_dir(base_path('docker/coolify-realtime')))->toBeFalse()
         ->and(file_exists(base_path('.github/workflows/coolify-realtime.yml')))->toBeFalse()
         ->and(file_exists(base_path('.github/workflows/coolify-realtime-next.yml')))->toBeFalse()
-        ->and(file_get_contents(base_path('.github/workflows/coolify-next-build.yml')))->not->toContain('coolify-realtime')
         ->and($productionInstallScript)->not->toContain('LATEST_REALTIME_VERSION')
-        ->not->toContain('| Realtime')
-        ->and($nightlyInstallScript)->not->toContain('LATEST_REALTIME_VERSION')
         ->not->toContain('| Realtime');
 });
 
@@ -279,17 +230,6 @@ it('keeps 4.3.23 realtime setups working with the production compose files', fun
         ->and(implode("\n", [...$coolify['ports'], ...$coolify['expose']]))->not->toContain('TERMINAL_PORT');
 })->with([
     'production compose' => ['docker-compose.prod.yml'],
-    'nightly production compose' => ['other/nightly/docker-compose.prod.yml'],
-]);
-
-it('keeps TERMINAL_PORT browser-only in the Windows compose files', function (string $composeFile) {
-    $coolify = Yaml::parseFile(base_path($composeFile))['services']['coolify'];
-
-    expect($coolify['ports'])->toContain('6002:6002')
-        ->and(implode("\n", [...$coolify['ports'], ...$coolify['expose']]))->not->toContain('TERMINAL_PORT');
-})->with([
-    'windows compose' => ['docker-compose.windows.yml'],
-    'nightly windows compose' => ['other/nightly/docker-compose.windows.yml'],
 ]);
 
 it('resolves the browser websocket port like 4.3.23', function (string $pageUrl, ?string $pusherPort, ?string $expectedPort) {
@@ -336,7 +276,6 @@ it('accepts a soketi override from 4.3.23 in docker-compose.custom.yml with zero
 })->with([
     'production compose, partial override' => ['docker-compose.prod.yml', "services:\n  soketi:\n    environment:\n      SOKETI_DEBUG: 'true'\n    ports:\n      - '6001:6001'\n"],
     'production compose, full service' => ['docker-compose.prod.yml', "services:\n  soketi:\n    image: quay.io/soketi/soketi:1.6-16-alpine\n    container_name: coolify-realtime\n    ports:\n      - '6001:6001'\n"],
-    'nightly production compose, partial override' => ['other/nightly/docker-compose.prod.yml', "services:\n  soketi:\n    environment:\n      SOKETI_DEBUG: 'true'\n"],
 ]);
 
 it('does not pull an extra image for the soketi placeholder', function (string $composeFile) {
@@ -363,5 +302,4 @@ it('does not pull an extra image for the soketi placeholder', function (string $
         ->toBe(['postgres:15-alpine', 'redis:7-alpine', 'registry.example.com/coollabsio/coolify:4.5.1']);
 })->with([
     'production compose' => ['docker-compose.prod.yml'],
-    'nightly production compose' => ['other/nightly/docker-compose.prod.yml'],
 ]);

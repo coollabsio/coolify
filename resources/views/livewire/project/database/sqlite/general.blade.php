@@ -1,11 +1,12 @@
 <div class="application-settings-form">
     <form wire:submit="submit" class="flex flex-col gap-6">
+        <x-project-config.readonly-notice :resource="$database" />
         <x-unsaved-bar action="submit" />
 
         <x-application.settings-section id="database-details-section" title="Database details"
             description="Manage the identity, container image, and database files of this SQLite database.">
             <x-slot:actions>
-                <x-status-badge status="Experimental" type="warning" />
+                <x-experimental-badge />
                 <x-modal-input title="Resource details" buttonTitle="Details">
                     <livewire:project.shared.resource-details :resource="$database" />
                 </x-modal-input>

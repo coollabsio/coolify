@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
+use App\Http\Controllers\Webhook\Concerns\RoutesConfigPushes;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Livewire\Source\Gitea\Change as GiteaSource;
 use App\Models\Application;
@@ -25,6 +26,7 @@ class Gitea extends Controller
     use DetectsSkipDeployCommits;
     use MatchesManualWebhookApplications;
     use ReadsWebhookPushPayload;
+    use RoutesConfigPushes;
     use ValidatesPreviewDeploymentRepository;
 
     public function redirect(Request $request)
@@ -48,7 +50,7 @@ class Gitea extends Controller
 
             // Only users who may administer the source can complete OAuth and store tokens.
             if (! $request->user()->can('update', $giteaApp)) {
-                return redirect()->route('source.all')->with('error', 'You are not authorized to connect this Gitea App.');
+                return redirect()->route('source.all')->with('error', 'You are not authorized to connect this Gitea / Forgejo App.');
             }
 
             $baseUrl = rtrim($giteaApp->html_url, '/');
@@ -85,7 +87,7 @@ class Gitea extends Controller
     {
         try {
             $return_payloads = collect([]);
-            $x_gitea_event = Str::lower((string) $request->header('X-Gitea-Event'));
+            $x_gitea_event = Str::lower((string) ($request->header('X-Gitea-Event') ?? $request->header('X-Forgejo-Event')));
 
             if ($x_gitea_event === 'ping') {
                 return response('pong');
@@ -98,7 +100,7 @@ class Gitea extends Controller
                 ]);
             }
 
-            $signature = (string) $request->header('X-Gitea-Signature');
+            $signature = (string) ($request->header('X-Gitea-Signature') ?? $request->header('X-Forgejo-Signature'));
             if ($signature === '') {
                 $signature = Str::after((string) $request->header('X-Hub-Signature-256'), 'sha256=');
             }
@@ -152,6 +154,7 @@ class Gitea extends Controller
                     ]);
                 }
                 $commit = $this->webhookCommitSha($payload, 'after');
+                $this->beginConfigPush($gitea_app, data_get($payload, 'repository.full_name'), $branch, $commit);
 
                 $applications = $applications->where('git_branch', $branch)->get();
                 $changed_files = $this->webhookPushChangedFiles($payload);
@@ -314,6 +317,13 @@ class Gitea extends Controller
                             }
                         }
 
+                        $isFork = $this->isForkPreviewRepository(
+                            data_get($payload, 'pull_request.head.repo.id'),
+                            data_get($payload, 'pull_request.base.repo.id'),
+                        );
+                        ($found ?? $pr_app)->recordSameRepository(! $isFork);
+                        ($found ?? $pr_app)->markForkPullRequest($isFork, $commit ?? null);
+
                         $result = queue_application_deployment(
                             application: $application,
                             pull_request_id: $pull_request_id,
@@ -365,8 +375,8 @@ class Gitea extends Controller
     {
         try {
             $return_payloads = collect([]);
-            $x_gitea_delivery = request()->header('X-Gitea-Delivery');
-            $x_gitea_event = Str::lower((string) $request->header('X-Gitea-Event'));
+            $x_gitea_delivery = $request->header('X-Gitea-Delivery') ?? $request->header('X-Forgejo-Delivery');
+            $x_gitea_event = Str::lower((string) ($request->header('X-Gitea-Event') ?? $request->header('X-Forgejo-Event')));
             $x_hub_signature_256 = Str::after((string) $request->header('X-Hub-Signature-256'), 'sha256=');
             $content_type = $request->header('Content-Type');
             $payload = $request->collect();
@@ -413,6 +423,9 @@ class Gitea extends Controller
                 return response('Nothing to do. Invalid repository.');
             }
             $matched_branch = $x_gitea_event === 'pull_request' ? $base_branch : $branch;
+            if ($x_gitea_event === 'push') {
+                $this->beginConfigPush(null, $full_name, $branch, $commit, fn (string $secret): bool => hash_equals(hash_hmac('sha256', $request->getContent(), $secret), $x_hub_signature_256));
+            }
             $failure_key = $this->manualWebhookFailureRateLimitKey($request, 'gitea', $full_name, $matched_branch);
             // A redelivery of the same signed payload is one guess.
             $failure_attempt = $this->manualWebhookSignedPayloadAttempt($request, $x_hub_signature_256);
@@ -580,6 +593,13 @@ class Gitea extends Controller
                                     $pr_app->generate_preview_fqdn();
                                 }
                             }
+                            $isFork = $this->isForkPreviewRepository(
+                                data_get($payload, 'pull_request.head.repo.id'),
+                                data_get($payload, 'pull_request.base.repo.id'),
+                            );
+                            ($found ?? $pr_app)->recordSameRepository(! $isFork);
+                            ($found ?? $pr_app)->markForkPullRequest($isFork, $commit ?? null);
+
                             $result = queue_application_deployment(
                                 application: $application,
                                 pull_request_id: $pull_request_id,

@@ -144,3 +144,14 @@ test('other failures keep Livewire default handling', () => {
     }
     assert.equal(harness.toasts(), 0);
 });
+
+test('during a Coolify upgrade every failure is suppressed without a toast', () => {
+    const harness = createHarness();
+    global.window.coolifyUpgradeInProgress = true;
+
+    harness.gesture();
+    for (const status of [404, 419, 500, 502]) {
+        assert.equal(harness.fail(status), true, `expected ${status} to be suppressed`);
+    }
+    assert.equal(harness.toasts(), 0);
+});

@@ -2,6 +2,7 @@
 
 use App\Livewire\Notifications\Discord as DiscordNotification;
 use App\Livewire\Notifications\Email as EmailNotification;
+use App\Livewire\Notifications\Ntfy as NtfyNotification;
 use App\Livewire\Notifications\Pushover as PushoverNotification;
 use App\Livewire\Notifications\Slack as SlackNotification;
 use App\Livewire\Notifications\Telegram as TelegramNotification;
@@ -10,7 +11,6 @@ use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Livewire\Exceptions\MethodNotFoundException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -44,25 +44,6 @@ test('member cannot send test notification on discord', function () {
         ->assertDispatched('error');
 });
 
-test('the private discord syncData helper is not remotely callable', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    $component = Livewire::test(DiscordNotification::class);
-
-    expect(fn () => $component->call('syncData', true))
-        ->toThrow(MethodNotFoundException::class);
-});
-
-test('admin can update discord notification settings', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $settings = $this->team->discordNotificationSettings;
-
-    expect($this->admin->can('update', $settings))->toBeTrue();
-});
-
 // --- Slack ---
 
 test('member cannot send test notification on slack', function () {
@@ -78,25 +59,6 @@ test('member cannot send test notification on slack', function () {
     Livewire::test(SlackNotification::class)
         ->call('sendTestNotification')
         ->assertDispatched('error');
-});
-
-test('the private slack syncData helper is not remotely callable', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    $component = Livewire::test(SlackNotification::class);
-
-    expect(fn () => $component->call('syncData', true))
-        ->toThrow(MethodNotFoundException::class);
-});
-
-test('admin can update slack notification settings', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $settings = $this->team->slackNotificationSettings;
-
-    expect($this->admin->can('update', $settings))->toBeTrue();
 });
 
 // --- Telegram ---
@@ -115,25 +77,6 @@ test('member cannot send test notification on telegram', function () {
     Livewire::test(TelegramNotification::class)
         ->call('sendTestNotification')
         ->assertDispatched('error');
-});
-
-test('the private telegram syncData helper is not remotely callable', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    $component = Livewire::test(TelegramNotification::class);
-
-    expect(fn () => $component->call('syncData', true))
-        ->toThrow(MethodNotFoundException::class);
-});
-
-test('admin can update telegram notification settings', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $settings = $this->team->telegramNotificationSettings;
-
-    expect($this->admin->can('update', $settings))->toBeTrue();
 });
 
 test('telegram restart limit thread id accepts 255 characters', function () {
@@ -233,16 +176,6 @@ test('member cannot send test email notification', function () {
         ->assertDispatched('error');
 });
 
-test('the private email syncData helper is not remotely callable', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    $component = Livewire::test(EmailNotification::class);
-
-    expect(fn () => $component->call('syncData', true))
-        ->toThrow(MethodNotFoundException::class);
-});
-
 test('member cannot update smtp email transport directly', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
@@ -270,79 +203,6 @@ test('member cannot update resend email transport directly', function () {
         ->assertForbidden();
 });
 
-test('member cannot copy instance email settings', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(EmailNotification::class)
-        ->call('copyFromInstanceSettings')
-        ->assertForbidden();
-});
-
-test('team admin cannot copy instance email credentials', function () {
-    InstanceSettings::query()->findOrFail(0)->update([
-        'smtp_password' => 'instance-smtp-secret',
-        'resend_api_key' => 'instance-resend-secret',
-    ]);
-
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(EmailNotification::class)
-        ->assertSet('smtpPassword', null)
-        ->assertSet('resendApiKey', null)
-        ->call('copyFromInstanceSettings')
-        ->assertForbidden();
-
-    expect($this->team->emailNotificationSettings->fresh()->smtp_password)->toBeNull();
-    expect($this->team->emailNotificationSettings->fresh()->resend_api_key)->toBeNull();
-});
-
-test('instance admin can copy instance email credentials to an authorized team', function () {
-    $rootTeam = Team::factory()->create(['id' => 0]);
-    $this->admin->teams()->attach($rootTeam, ['role' => 'admin']);
-
-    InstanceSettings::query()->findOrFail(0)->update([
-        'smtp_from_address' => 'instance@example.com',
-        'smtp_from_name' => 'Instance',
-        'smtp_password' => 'instance-smtp-secret',
-        'resend_api_key' => 'instance-resend-secret',
-    ]);
-
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(EmailNotification::class)
-        ->call('copyFromInstanceSettings')
-        ->assertHasNoErrors()
-        ->assertSet('smtpPassword', 'instance-smtp-secret')
-        ->assertSet('resendApiKey', 'instance-resend-secret');
-
-    expect($this->team->emailNotificationSettings->fresh()->smtp_password)->toBe('instance-smtp-secret');
-    expect($this->team->emailNotificationSettings->fresh()->resend_api_key)->toBe('instance-resend-secret');
-});
-
-test('instance admin cannot copy credentials to a team they cannot update', function () {
-    $rootTeam = Team::factory()->create(['id' => 0]);
-    $this->member->teams()->attach($rootTeam, ['role' => 'admin']);
-
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(EmailNotification::class)
-        ->call('copyFromInstanceSettings')
-        ->assertForbidden();
-});
-
-test('admin can update email notification settings', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $settings = $this->team->emailNotificationSettings;
-
-    expect($this->admin->can('update', $settings))->toBeTrue();
-});
-
 test('admin can disable restart limit email notifications', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
@@ -360,11 +220,8 @@ test('admin can save team smtp settings without a resend api key when resend is 
     session(['currentTeam' => $this->team]);
 
     Livewire::test(EmailNotification::class)
-        ->set('smtpFromAddress', 'alerts@example.com')
-        ->set('smtpFromName', 'Coolify')
-        ->set('smtpHost', 'smtp.example.com')
-        ->set('smtpPort', '587')
-        ->set('smtpEncryption', 'starttls')
+        ->set('resendFromAddress', 'alerts@example.com')
+        ->set('resendFromName', 'Coolify')
         ->set('resendEnabled', false)
         ->set('resendApiKey', null)
         ->call('submitResend')
@@ -405,23 +262,85 @@ test('member cannot send test notification on pushover', function () {
         ->assertDispatched('error');
 });
 
-test('the private pushover syncData helper is not remotely callable', function () {
+// --- Ntfy ---
+
+test('member cannot send test notification on ntfy', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
 
-    $component = Livewire::test(PushoverNotification::class);
+    $settings = $this->team->ntfyNotificationSettings;
+    $settings->update([
+        'ntfy_enabled' => true,
+        'ntfy_url' => 'https://ntfy.sh',
+        'ntfy_topic' => 'coolify-alerts',
+    ]);
 
-    expect(fn () => $component->call('syncData', true))
-        ->toThrow(MethodNotFoundException::class);
+    Livewire::test(NtfyNotification::class)
+        ->call('sendTestNotification')
+        ->assertDispatched('error');
 });
 
-test('admin can update pushover notification settings', function () {
+test('admin can update ntfy notification settings', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
-    $settings = $this->team->pushoverNotificationSettings;
+    $settings = $this->team->ntfyNotificationSettings;
 
     expect($this->admin->can('update', $settings))->toBeTrue();
+});
+
+test('admin saves ntfy settings from the settings page', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(NtfyNotification::class)
+        ->set('ntfyUrl', 'https://1.1.1.1')
+        ->set('ntfyTopic', 'coolify-alerts')
+        ->set('ntfyAuthMethod', 'token')
+        ->set('ntfyToken', 'tk_admin')
+        ->set('ntfyPriorityErrorEvents', 4)
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    $settings = $this->team->ntfyNotificationSettings->fresh();
+    expect($settings->ntfy_topic)->toBe('coolify-alerts')
+        ->and($settings->ntfy_token)->toBe('tk_admin')
+        ->and($settings->ntfy_priority_error_events)->toBe(4);
+});
+
+test('the ntfy settings page rejects a topic with a trailing newline', function () {
+    $this->actingAs($this->admin);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(NtfyNotification::class)
+        ->set('ntfyUrl', 'https://1.1.1.1')
+        ->set('ntfyTopic', "coolify-alerts\n")
+        ->call('submit')
+        ->assertDispatched('error', 'The ntfy topic field format is invalid.');
+
+    expect($this->team->ntfyNotificationSettings->fresh()->ntfy_topic)->toBeNull();
+});
+
+test('a member who owns another team cannot save ntfy settings after switching teams', function () {
+    $ownTeam = Team::factory()->create();
+    $this->member->teams()->attach($ownTeam, ['role' => 'owner']);
+
+    $this->actingAs($this->member);
+    session(['currentTeam' => $this->team]);
+
+    $component = Livewire::test(NtfyNotification::class);
+
+    session(['currentTeam' => $ownTeam]);
+
+    $component
+        ->set('ntfyUrl', 'https://1.1.1.1')
+        ->set('ntfyTopic', 'stolen-alerts')
+        ->call('submit')
+        ->assertDispatched('error');
+
+    expect($this->team->ntfyNotificationSettings->fresh()->ntfy_topic)->toBeNull()
+        ->and($ownTeam->ntfyNotificationSettings->fresh()->ntfy_topic)->toBeNull();
 });
 
 // --- Webhook ---
@@ -441,25 +360,6 @@ test('member cannot send test notification on webhook', function () {
         ->assertDispatched('error');
 });
 
-test('the private webhook syncData helper is not remotely callable', function () {
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    $component = Livewire::test(WebhookNotification::class);
-
-    expect(fn () => $component->call('syncData', true))
-        ->toThrow(MethodNotFoundException::class);
-});
-
-test('admin can update webhook notification settings', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $settings = $this->team->webhookNotificationSettings;
-
-    expect($this->admin->can('update', $settings))->toBeTrue();
-});
-
 // --- Send test policy checks ---
 
 test('admin can send test on all notification channels', function () {
@@ -471,6 +371,7 @@ test('admin can send test on all notification channels', function () {
     expect($this->admin->can('sendTest', $this->team->telegramNotificationSettings))->toBeTrue();
     expect($this->admin->can('sendTest', $this->team->emailNotificationSettings))->toBeTrue();
     expect($this->admin->can('sendTest', $this->team->pushoverNotificationSettings))->toBeTrue();
+    expect($this->admin->can('sendTest', $this->team->ntfyNotificationSettings))->toBeTrue();
     expect($this->admin->can('sendTest', $this->team->webhookNotificationSettings))->toBeTrue();
 });
 
@@ -483,12 +384,13 @@ test('member cannot send test on any notification channel', function () {
     expect($this->member->can('sendTest', $this->team->telegramNotificationSettings))->toBeFalse();
     expect($this->member->can('sendTest', $this->team->emailNotificationSettings))->toBeFalse();
     expect($this->member->can('sendTest', $this->team->pushoverNotificationSettings))->toBeFalse();
+    expect($this->member->can('sendTest', $this->team->ntfyNotificationSettings))->toBeFalse();
     expect($this->member->can('sendTest', $this->team->webhookNotificationSettings))->toBeFalse();
 });
 
-test('member cannot view notification secrets', function (string $component, string $settingsRelation, array $secrets) {
+test('member cannot view notification secrets', function (string $component, string $settingsRelation, array $secrets, array $state = []) {
     $settings = $this->team->{$settingsRelation};
-    $settings->update($secrets);
+    $settings->update([...$secrets, ...$state]);
 
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
@@ -519,13 +421,20 @@ test('member cannot view notification secrets', function (string $component, str
         'pushover_user_key' => 'pushover-secret-user',
         'pushover_api_token' => 'pushover-secret-token',
     ]],
+    'ntfy server, topic and credentials' => [NtfyNotification::class, 'ntfyNotificationSettings', [
+        'ntfy_url' => 'https://ntfy.example.com/secret-member',
+        'ntfy_topic' => 'ntfy-secret-topic',
+        'ntfy_username' => 'ntfy-secret-user',
+        'ntfy_password' => 'ntfy-secret-password',
+        'ntfy_token' => 'ntfy-secret-token',
+    ]],
     'generic webhook' => [WebhookNotification::class, 'webhookNotificationSettings', [
         'webhook_url' => 'https://example.com/secret-webhook',
     ]],
     'email credentials' => [EmailNotification::class, 'emailNotificationSettings', [
         'smtp_password' => 'smtp-secret-password',
         'resend_api_key' => 'resend-secret-api-key',
-    ]],
+    ], ['smtp_enabled' => true]],
 ]);
 
 test('admin can view notification secrets', function (string $component, string $settingsRelation, array $secrets) {
@@ -556,6 +465,13 @@ test('admin can view notification secrets', function (string $component, string 
     'pushover credentials' => [PushoverNotification::class, 'pushoverNotificationSettings', [
         'pushover_user_key' => 'pushover-admin-user',
         'pushover_api_token' => 'pushover-admin-token',
+    ]],
+    'ntfy server, topic and credentials' => [NtfyNotification::class, 'ntfyNotificationSettings', [
+        'ntfy_url' => 'https://ntfy.example.com/admin',
+        'ntfy_topic' => 'ntfy-admin-topic',
+        'ntfy_username' => 'ntfy-admin-user',
+        'ntfy_password' => 'ntfy-admin-password',
+        'ntfy_token' => 'ntfy-admin-token',
     ]],
     'generic webhook' => [WebhookNotification::class, 'webhookNotificationSettings', [
         'webhook_url' => 'https://example.com/admin-webhook',

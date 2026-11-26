@@ -45,8 +45,22 @@ class ApplicationPreview extends BaseModel
         'pull_request_id' => 'integer',
         'domain_dns_statuses' => 'array',
         'domain_port_overrides' => 'array',
+        'is_fork_pull_request' => 'boolean',
+        'approved_at' => 'datetime',
         'keeps_production_values' => 'boolean',
+        'is_same_repository' => 'boolean',
     ];
+
+    /**
+     * Records whether the branch of the pull request is in the repository of the application. Only then
+     * does the preview deploy the Compose file of its pull request (ApplicationDeploymentJob::usesPullRequestComposeFile()).
+     */
+    public function recordSameRepository(bool $isSameRepository): void
+    {
+        if ($this->is_same_repository !== $isSameRepository) {
+            $this->forceFill(['is_same_repository' => $isSameRepository])->save();
+        }
+    }
 
     protected static function booted(): void
     {
@@ -176,6 +190,113 @@ class ApplicationPreview extends BaseModel
     public static function findPreviewByApplicationAndPullId(int $application_id, int $pull_request_id)
     {
         return self::where('application_id', $application_id)->where('pull_request_id', $pull_request_id)->firstOrFail();
+    }
+
+    /**
+     * Store if the pull request comes from a fork. Each webhook event of the pull request sets it.
+     *
+     * The webhook also reports the head commit. A pending approval of an older commit becomes
+     * invalid at once, so that an admin cannot approve it before the new deployment runs. An
+     * unknown head (null or `HEAD`) also clears it; the deployment job records it again.
+     */
+    public function markForkPullRequest(bool $isFork, ?string $headCommit): void
+    {
+        if ($this->is_fork_pull_request !== $isFork) {
+            $this->forceFill(['is_fork_pull_request' => $isFork])->save();
+        }
+
+        $headCommit = strtolower((string) $headCommit);
+        $cleared = static::query()
+            ->whereKey($this->getKey())
+            ->whereNotNull('pending_approval_commit')
+            ->where('pending_approval_commit', '!=', $headCommit)
+            ->update(['pending_approval_commit' => null]);
+        if ($cleared > 0) {
+            $this->pending_approval_commit = null;
+            $this->syncOriginalAttribute('pending_approval_commit');
+        }
+    }
+
+    /**
+     * A fork pull request runs code that the repository owner did not review. Each of its commits
+     * waits for an admin, unless the admin turned on public previews without approval. A pull
+     * request with an unknown origin (null) counts as a fork.
+     */
+    public function forkCommitNeedsApproval(string $commit): bool
+    {
+        if ($this->is_fork_pull_request === false || ! $this->forkApprovalIsRequired()) {
+            return false;
+        }
+
+        return blank($this->approved_commit) || ! hash_equals($this->approved_commit, $commit);
+    }
+
+    /**
+     * Approval is off only when the admin turned on public previews without approval.
+     */
+    public function forkApprovalIsRequired(): bool
+    {
+        $settings = $this->application?->settings;
+
+        return ! ($settings?->is_pr_deployments_public_enabled && ! $settings->is_pr_deployments_public_approval_required);
+    }
+
+    /**
+     * A saved pending commit blocks the deployment only while approval is required.
+     */
+    public function isWaitingForApproval(): bool
+    {
+        return filled($this->pending_approval_commit) && $this->forkApprovalIsRequired();
+    }
+
+    public function markWaitingForApproval(string $commit): void
+    {
+        $this->forceFill(['pending_approval_commit' => $commit])->save();
+    }
+
+    public function approveCommit(string $commit): void
+    {
+        $this->forceFill([
+            'approved_commit' => $commit,
+            'approved_at' => now(),
+            'pending_approval_commit' => null,
+        ])->save();
+    }
+
+    /**
+     * Link to the pending commit inside the pull request, so that a reviewer sees the commit
+     * that an approval deploys, also when the pull request got newer commits. Falls back to
+     * the pull request link for providers without a known commit link (Bitbucket).
+     */
+    public function pendingApprovalCommitUrl(): ?string
+    {
+        $url = rtrim((string) $this->pull_request_html_url, '/');
+        $commit = (string) $this->pending_approval_commit;
+        if ($url === '' || ! preg_match('/^[0-9a-f]{40}([0-9a-f]{24})?$/i', $commit)) {
+            return $url === '' ? null : $url;
+        }
+
+        if (preg_match('#/-/merge_requests/\d+$#', $url)) {
+            return "{$url}/diffs?commit_id={$commit}";
+        }
+
+        if (preg_match('#/(pull|pulls)/\d+$#', $url)) {
+            return "{$url}/commits/{$commit}";
+        }
+
+        return $url;
+    }
+
+    /**
+     * @return 'waiting_for_approval'|'approved'|null
+     */
+    public function approvalStatus(): ?string
+    {
+        if ($this->isWaitingForApproval()) {
+            return 'waiting_for_approval';
+        }
+
+        return filled($this->approved_commit) ? 'approved' : null;
     }
 
     public function isRunning()
@@ -393,7 +514,7 @@ class ApplicationPreview extends BaseModel
     }
 
     /**
-     * Original compose service names for this preview (PR suffix stripped), excluding database images.
+     * Compose service names for this preview (the PR suffix of the legacy parser stripped), excluding database images.
      *
      * @return list<string>
      */
@@ -411,9 +532,9 @@ class ApplicationPreview extends BaseModel
                 continue;
             }
 
-            $names[] = str((string) $serviceName)
-                ->replaceLast('-pr-'.$this->pull_request_id, '')
-                ->toString();
+            $names[] = $this->application->renamesPreviewComposeServices()
+                ? str((string) $serviceName)->replaceLast('-pr-'.$this->pull_request_id, '')->toString()
+                : (string) $serviceName;
         }
 
         return array_values(array_unique($names));

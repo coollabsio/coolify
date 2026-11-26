@@ -43,7 +43,7 @@ use OpenApi\Attributes as OA;
                 new OA\Property(property: 'uuid', type: 'string'),
                 new OA\Property(property: 'name', type: 'string'),
                 new OA\Property(property: 'description', type: 'string', nullable: true),
-                new OA\Property(property: 'database_type', type: 'string', enum: ['standalone-postgresql', 'standalone-redis', 'standalone-mongodb', 'standalone-mysql', 'standalone-mariadb', 'standalone-keydb', 'standalone-dragonfly', 'standalone-clickhouse', 'standalone-sqlite']),
+                new OA\Property(property: 'database_type', type: 'string', enum: ['standalone-postgresql', 'standalone-redis', 'standalone-mongodb', 'standalone-mysql', 'standalone-mariadb', 'standalone-keydb', 'standalone-dragonfly', 'standalone-clickhouse', 'standalone-influxdb', 'standalone-sqlite']),
                 new OA\Property(property: 'image', type: 'string'),
                 new OA\Property(property: 'status', type: 'string', description: 'Container status and health, for example running:healthy or exited:unhealthy.'),
                 new OA\Property(property: 'server_status', type: 'boolean', description: 'True when the server of the database is reachable and usable.'),
@@ -126,11 +126,84 @@ use OpenApi\Attributes as OA;
                 new OA\Property(property: 'clickhouse_admin_user', type: 'string'),
                 new OA\Property(property: 'clickhouse_admin_password', type: 'string', format: 'password'),
                 new OA\Property(property: 'clickhouse_db', type: 'string'),
+                new OA\Property(property: 'influxdb_admin_user', type: 'string'),
+                new OA\Property(property: 'influxdb_admin_password', type: 'string', format: 'password'),
+                new OA\Property(property: 'influxdb_admin_token', type: 'string', format: 'password'),
+                new OA\Property(property: 'influxdb_org', type: 'string'),
+                new OA\Property(property: 'influxdb_bucket', type: 'string'),
                 new OA\Property(property: 'sqlite_databases', type: 'string', description: 'Comma-separated SQLite database file names.'),
                 new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
                 new OA\Property(property: 'updated_at', type: 'string', format: 'date-time'),
                 new OA\Property(property: 'deleted_at', type: 'string', format: 'date-time', nullable: true),
             ],
+        ),
+        new OA\Schema(
+            schema: 'SecurityStatus',
+            description: 'Security status of a resource from image scanning.',
+            properties: [
+                new OA\Property(property: 'status', type: 'string', enum: ['update_now', 'update_available', 'no_fix', 'check_needed', 'ok', 'not_checked']),
+                new OA\Property(property: 'label', type: 'string'),
+                new OA\Property(property: 'action', type: 'string', nullable: true, description: 'What to do, as the UI shows it.'),
+                new OA\Property(property: 'check_reason', type: 'string', nullable: true),
+                new OA\Property(property: 'problem_count', type: 'integer'),
+                new OA\Property(property: 'exploited_count', type: 'integer'),
+                new OA\Property(property: 'any_exploited', type: 'boolean'),
+                new OA\Property(property: 'critical_count', type: 'integer'),
+                new OA\Property(property: 'high_count', type: 'integer'),
+                new OA\Property(property: 'medium_count', type: 'integer'),
+                new OA\Property(property: 'eol', type: 'object', nullable: true, description: 'The end-of-life OS of the image.'),
+                new OA\Property(property: 'checked_at', type: 'string', format: 'date-time', nullable: true),
+                new OA\Property(property: 'actions', type: 'array', items: new OA\Items(properties: [
+                    new OA\Property(property: 'type', type: 'string'),
+                    new OA\Property(property: 'sentence', type: 'string'),
+                    new OA\Property(property: 'target', type: 'string', nullable: true),
+                    new OA\Property(property: 'copy', type: 'string', nullable: true),
+                    new OA\Property(property: 'image', type: 'string', nullable: true),
+                    new OA\Property(property: 'ref', type: 'string', nullable: true),
+                ], type: 'object')),
+            ],
+            type: 'object',
+        ),
+        new OA\Schema(
+            schema: 'ResourceVulnerabilities',
+            description: 'Image scan results of a resource.',
+            properties: [
+                new OA\Property(property: 'uuid', type: 'string'),
+                new OA\Property(property: 'type', type: 'string', enum: ['application', 'service', 'database']),
+                new OA\Property(property: 'off_reason', type: 'string', nullable: true, enum: ['server', 'application'], description: 'Why the resource is not scanned. Null when it is scanned.'),
+                new OA\Property(property: 'security', ref: '#/components/schemas/SecurityStatus', nullable: true),
+                new OA\Property(property: 'images', type: 'array', items: new OA\Items(properties: [
+                    new OA\Property(property: 'scan_uuid', type: 'string'),
+                    new OA\Property(property: 'owner_uuid', type: 'string', description: 'The application, database, or service application or database that runs the image.'),
+                    new OA\Property(property: 'image_ref', type: 'string'),
+                    new OA\Property(property: 'scan_status', type: 'string', enum: ['queued', 'running', 'completed', 'failed']),
+                    new OA\Property(property: 'error_code', type: 'string', nullable: true),
+                    new OA\Property(property: 'scanned_at', type: 'string', format: 'date-time', nullable: true),
+                    new OA\Property(property: 'truncated', type: 'boolean'),
+                    new OA\Property(property: 'security_status', type: 'string'),
+                ], type: 'object')),
+                new OA\Property(property: 'findings', type: 'array', items: new OA\Items(properties: [
+                    new OA\Property(property: 'id', type: 'string'),
+                    new OA\Property(property: 'display_id', type: 'string'),
+                    new OA\Property(property: 'aliases', type: 'array', items: new OA\Items(type: 'string')),
+                    new OA\Property(property: 'title', type: 'string'),
+                    new OA\Property(property: 'severity', type: 'string', enum: ['critical', 'high', 'medium', 'low', 'unknown']),
+                    new OA\Property(property: 'package', type: 'string'),
+                    new OA\Property(property: 'version', type: 'string'),
+                    new OA\Property(property: 'package_type', type: 'string'),
+                    new OA\Property(property: 'fixed_in', type: 'string', nullable: true),
+                    new OA\Property(property: 'state', type: 'string', enum: ['fixed', 'no_fix', 'ignored'], description: 'fixed: a fix is available upstream.'),
+                    new OA\Property(property: 'ignore', type: 'object', nullable: true),
+                    new OA\Property(property: 'kev', type: 'boolean', description: 'Listed in the CISA Known Exploited Vulnerabilities catalog.'),
+                    new OA\Property(property: 'epss', type: 'number', nullable: true),
+                    new OA\Property(property: 'risk', type: 'number', nullable: true),
+                    new OA\Property(property: 'cvss_score', type: 'number', nullable: true),
+                    new OA\Property(property: 'advisory_url', type: 'string', nullable: true),
+                    new OA\Property(property: 'image_ref', type: 'string'),
+                    new OA\Property(property: 'owner_uuid', type: 'string'),
+                ], type: 'object')),
+            ],
+            type: 'object',
         ),
     ],
     responses: [
@@ -199,6 +272,23 @@ use OpenApi\Attributes as OA;
                 ]
             )),
         new OA\Response(
+            response: 'TerminalRateLimited',
+            description: 'Terminal command rate or concurrency limit exceeded.',
+            headers: [
+                new OA\Header(
+                    header: 'Retry-After',
+                    description: 'Number of seconds to wait before retrying.',
+                    schema: new OA\Schema(type: 'integer', example: 42)
+                ),
+            ],
+            content: new OA\JsonContent(
+                type: 'object',
+                properties: [
+                    new OA\Property(property: 'message', type: 'string', example: 'Too many terminal command requests. Please retry in 42 seconds.'),
+                    new OA\Property(property: 'retry_after', type: 'integer', description: 'Number of seconds to wait before retrying.', example: 42),
+                ]
+            )),
+        new OA\Response(
             response: 502,
             description: 'The cloud provider API rejected the request.',
             content: new OA\JsonContent(
@@ -211,6 +301,9 @@ use OpenApi\Attributes as OA;
             )),
     ],
 )]
+#[OA\Parameter(parameter: 'Page', name: 'page', in: 'query', required: false, description: 'Page number. With page or per_page, the list is paginated and the X-Total-Count header gives the total.', schema: new OA\Schema(type: 'integer', default: 1, minimum: 1))]
+#[OA\Parameter(parameter: 'PerPage', name: 'per_page', in: 'query', required: false, description: 'Items per page. With page or per_page, the list is paginated and the X-Total-Count header gives the total.', schema: new OA\Schema(type: 'integer', default: 50, minimum: 1, maximum: 100))]
+#[OA\Header(header: 'X-Total-Count', description: 'Total number of items that match the filters, on all pages. Sent when the list is paginated.', schema: new OA\Schema(type: 'integer'))]
 class OpenApi
 {
     // This class is used to generate OpenAPI documentation

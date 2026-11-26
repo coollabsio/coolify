@@ -1,10 +1,11 @@
 <div class="flex flex-col gap-6">
-    @if ($application->git_based())
+    @if ($application->git_based() || $application->build_pack === 'dockerimage')
         @php
             $canUpdate = auth()->user()->can('update', $application);
         @endphp
         <x-application.settings-section id="preview-settings-section" title="Preview settings"
-            helper="Automatic pull request deployments and who can trigger them.">
+            helper="{{ $application->git_based() ? 'Automatic pull request deployments, who can trigger them, and preview variables.' : 'Values of new preview variables.' }}">
+            @if ($application->git_based())
             <x-slot:actions>
                 @can('update', $application)
                     @if ($application->isGithubAppSource())
@@ -27,8 +28,8 @@
                                 </x-forms.button>
                             </x-slot:headerActions>
 
-                            <div class="-m-4" wire:loading wire:target="load_prs">
-                                <x-skeleton.list :rows="3" label="Loading pull requests" />
+                            <div class="-m-4" wire:loading.block wire:target="load_prs">
+                                <x-skeleton.list :rows="3" :buttons="2" label="Loading pull requests" />
                             </div>
 
                             <div class="-m-4" wire:loading.remove wire:target="load_prs">
@@ -52,12 +53,12 @@
                                         </div>
                                         <div class="flex shrink-0 items-center gap-2">
                                             <x-forms.button
-                                                wire:click="add('{{ data_get($pull_request, 'number') }}', '{{ data_get($pull_request, 'html_url') }}')">
+                                                wire:click="add({{ (int) data_get($pull_request, 'number') }}, '{{ data_get($pull_request, 'html_url') }}')">
                                                 Configure
                                             </x-forms.button>
                                             @can('deploy', $application)
                                                 <x-forms.button
-                                                    wire:click="add_and_deploy('{{ data_get($pull_request, 'number') }}', '{{ data_get($pull_request, 'html_url') }}')">
+                                                    wire:click="add_and_deploy({{ (int) data_get($pull_request, 'number') }}, '{{ data_get($pull_request, 'html_url') }}')">
                                                     Deploy preview
                                                 </x-forms.button>
                                             @endcan
@@ -83,15 +84,35 @@
                     @endif
                 @endcan
             </x-slot:actions>
+            @endif
 
-            <div class="w-full">
+            <div class="grid w-full gap-4 md:grid-cols-2">
+                @if ($application->git_based())
                 <x-forms.listbox id="isPrDeploymentsPublicEnabled" label="PR deployment access" onChange="savePreviewSettings"
-                    helper="When public, anyone can trigger PR deployments. Otherwise only PRs from branches in the same repository are deployed and fork PRs are blocked.<br><br><span class='font-bold'>Secrets:</span> the code of a fork PR can read all environment variables of its preview. When public, previews do not get preview variables that still have the production value, and shared variables are resolved only in preview variables, not in the compose file of the PR. This is not full isolation: the preview runs on the same server as production, and with the Docker Compose build pack Coolify deploys the compose file of the PR, which can, for example, mount host paths. Give previews their own values, and do not use production secrets in them."
+                    helper="When public, anyone can trigger PR deployments. Otherwise only PRs from branches in the same repository are deployed and fork PRs are blocked. This setting applies only while preview deployments are enabled. When they are disabled, previews that you deploy by hand are deployed as repository members only.<br><br><span class='font-bold'>Docker Compose:</span> with repository members only, a preview of a branch in the same repository deploys the compose file of its PR. Public previews, and previews added by PR number or through the API, deploy the compose file of the base branch.<br><br><span class='font-bold'>Secrets:</span> the code of a fork PR can read all environment variables of its preview. When public, previews do not get preview variables that have the production value (marked 'Production value', after shared variables are resolved), also after the production value changes, and shared variables are resolved only in preview variables, not in the compose file. This is not full isolation: the preview runs on the same server as production. Give previews their own values, and do not use production secrets in them."
                     :options="[
                         ['value' => false, 'label' => 'Repository members only'],
                         ['value' => true, 'label' => 'Public (fork PRs allowed)'],
                     ]" :disabled="! $canUpdate || ! $isPreviewDeploymentsEnabled" />
+                @endif
+                <x-forms.listbox id="useProductionValuesInPreviews" label="New preview variables" onChange="savePreviewSettings"
+                    helper="Coolify adds a preview copy of each new production variable.<br><br><span class='font-bold'>Copy production value:</span> the copy gets the production value.<br><span class='font-bold'>Leave empty:</span> the copy gets only the name, and previews do not get preview variables that have the production value (marked 'Production value'). Use this when untrusted code can run in previews (for example, branches that cannot be merged, or bot PRs), or when production secrets must not reach previews.<br><br>Existing preview values do not change."
+                    :options="[
+                        ['value' => true, 'label' => 'Copy production value'],
+                        ['value' => false, 'label' => 'Leave empty'],
+                    ]" :disabled="! $canUpdate" />
             </div>
+            @if ($isPrDeploymentsPublicEnabled)
+                <div class="w-full">
+                    <x-forms.listbox id="isPrDeploymentsPublicApprovalRequired"
+                        label="Require approval for fork pull requests" onChange="saveForkApprovalSetting"
+                        helper="When on, each new commit of a fork pull request waits until an admin approves it.<br><br><span class='font-bold'>Warning:</span> when off, Coolify deploys every fork commit automatically, and the code of a fork can take control of the server."
+                        :options="[
+                            ['value' => true, 'label' => 'Required for each commit'],
+                            ['value' => false, 'label' => 'Not required (deploy automatically)'],
+                        ]" :disabled="! $canUpdate || ! $isPreviewDeploymentsEnabled" />
+                </div>
+            @endif
         </x-application.settings-section>
     @endif
 
@@ -108,8 +129,8 @@
             helper="Deploy a preview directly from a Docker image tag.">
             <form wire:submit.prevent="addDockerImagePreview"
                 class="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
-                <x-forms.input id="manualPullRequestId" label="Preview ID"
-                    helper="Used for domains, logs, container names, and cleanup." />
+                <x-forms.input id="manualPullRequestId" label="Preview ID" type="number" min="1"
+                    helper="A positive whole number, for example 1234. Used for domains, logs, container names, and cleanup." />
                 <x-forms.input id="manualDockerTag" label="Docker tag"
                     helper="For example, pr_1234." />
                 @can('deploy', $application)
@@ -166,7 +187,7 @@
                                         <span class="min-w-0 truncate">Open preview</span>
                                     </a>
                                 @endif
-                                @if (filled(data_get($preview, 'pull_request_html_url')))
+                                @if (str(data_get($preview, 'pull_request_html_url'))->startsWith(['https://', 'http://']))
                                     <a target="_blank" title="Open pull request in a new tab"
                                         class="listbox-option justify-start! gap-2.5!"
                                         href="{{ data_get($preview, 'pull_request_html_url') }}" @click="open = false"
@@ -216,37 +237,40 @@
                             </span>
                         </button>
                         <div x-cloak x-show="open" x-transition.origin.top.right
-                            class="listbox-panel top-full! right-0! left-auto! z-[90]! mt-1! w-52! min-w-52!"
+                            class="listbox-panel top-full! right-0! left-auto! z-[90]! mt-1! w-max! min-w-52!"
                             role="menu">
                             @can('deploy', $application)
                                 <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                    wire:click="force_deploy_without_cache({{ data_get($preview, 'pull_request_id') }})"
+                                    wire:click="deploy({{ (int) data_get($preview, 'pull_request_id') }})"
                                     @click="open = false" role="menuitem">
-                                    <x-reicon name="refresh" class="size-3.5 opacity-70" />
-                                    Rebuild
-                                </button>
-                                <button type="button" class="listbox-option justify-start! gap-2.5!"
-                                    wire:click="deploy({{ data_get($preview, 'pull_request_id') }}, null, false, '{{ data_get($preview, 'docker_registry_image_tag') }}')"
-                                    @click="open = false" role="menuitem">
-                                    <x-reicon name="play-circle" class="size-3.5 opacity-70" />
+                                    <x-reicon :name="$previewIsStopped ? 'play-circle' : 'refresh'" class="size-3.5 shrink-0 opacity-70" />
                                     {{ $previewIsStopped ? 'Deploy' : 'Redeploy' }}
                                 </button>
+                                <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    wire:click="force_deploy_without_cache({{ (int) data_get($preview, 'pull_request_id') }})"
+                                    @click="open = false" role="menuitem">
+                                    <x-reicon name="refresh" class="size-3.5 shrink-0 opacity-70" />
+                                    {{ $previewIsStopped ? 'Deploy (without cache)' : 'Redeploy (without cache)' }}
+                                </button>
+                                @if (!$previewIsStopped || auth()->user()->can('delete', $application))
+                                    <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]"></div>
+                                @endif
                                 @if (!$previewIsStopped)
                                     <button type="button"
-                                        class="listbox-option justify-start! gap-2.5! text-error!"
+                                        class="listbox-option justify-start! gap-2.5! text-error! hover:text-error!"
                                         @click="open = false; document.getElementById('preview-stop-trigger-{{ data_get($preview, 'pull_request_id') }}')?.click()"
                                         role="menuitem">
-                                        <x-reicon name="stop" class="size-3.5" />
+                                        <x-reicon name="stop" class="size-3.5 shrink-0" />
                                         Stop
                                     </button>
                                 @endif
                             @endcan
                             @can('delete', $application)
                                 <button type="button"
-                                    class="listbox-option justify-start! gap-2.5! text-error!"
+                                    class="listbox-option justify-start! gap-2.5! text-error! hover:text-error!"
                                     @click="open = false; document.getElementById('preview-delete-trigger-{{ data_get($preview, 'pull_request_id') }}')?.click()"
                                     role="menuitem">
-                                    <x-reicon name="trash" class="size-3.5" />
+                                    <x-reicon name="trash" class="size-3.5 shrink-0" />
                                     Delete
                                 </button>
                             @endcan
@@ -288,19 +312,71 @@
                     </div>
                 </div>
 
+                @if ($preview->isWaitingForApproval())
+                    @php
+                        $pendingCommit = $preview->pending_approval_commit;
+                        $pendingCommitShort = substr($pendingCommit, 0, 7);
+                        $pendingCommitUrl = $preview->pendingApprovalCommitUrl();
+                    @endphp
+                    <div class="mt-4 flex flex-col gap-3 rounded-lg border border-neutral-200 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/[0.07]"
+                        wire:key="preview-approval-{{ $preview->id }}-{{ $pendingCommit }}">
+                        <div class="flex min-w-0 flex-col gap-1.5">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <x-status-badge type="warning" label="Waiting for approval" />
+                                @if (filled($pendingCommitUrl))
+                                    <a target="_blank" title="Open commit {{ $pendingCommit }} in a new tab"
+                                        class="font-mono text-xs text-neutral-600 hover:text-coollabs dark:text-fg-dim dark:hover:text-brand-light"
+                                        href="{{ $pendingCommitUrl }}">{{ $pendingCommitShort }}</a>
+                                @else
+                                    <span class="font-mono text-xs text-neutral-600 dark:text-fg-dim">{{ $pendingCommitShort }}</span>
+                                @endif
+                                <x-copy-button :value="$pendingCommit" label="Copy full commit SHA" />
+                            </div>
+                            <p class="text-xs text-neutral-500 dark:text-fg-dim">
+                                @if ($preview->is_fork_pull_request === false)
+                                    An admin must review and approve this commit before Coolify deploys it.
+                                @elseif ($preview->is_fork_pull_request)
+                                    This pull request comes from a fork. An admin must review and approve this commit before Coolify deploys it.
+                                @else
+                                    Coolify does not know yet if this pull request comes from a fork, so it handles it as a fork. An admin must review and approve this commit before Coolify deploys it.
+                                @endif
+                            </p>
+                        </div>
+                        @can('approve', $preview)
+                            <x-modal-confirmation title="Approve and deploy this commit?" buttonTitle="Approve and deploy"
+                                isHighlightedButton
+                                submitAction="approveForkCommit({{ $preview->id }}, '{{ $pendingCommit }}')"
+                                :actions="[
+                                    'Commit ' . $pendingCommit . ' of this fork pull request will be deployed. Make sure that this is the commit that you reviewed.',
+                                    'The code of the fork runs on your server and can read the environment variables of this preview.',
+                                ]"
+                                :confirmWithText="false" :confirmWithPassword="false"
+                                step2ButtonText="Approve and deploy" />
+                        @endcan
+                    </div>
+                @elseif (filled($preview->pending_approval_commit))
+                    <p class="mt-3 text-xs text-neutral-500 dark:text-fg-dim">
+                        Commit <span class="font-mono">{{ substr($preview->pending_approval_commit, 0, 7) }}</span> waited for approval. Approval is now off, so redeploy the preview to deploy it.
+                    </p>
+                @elseif (filled($preview->approved_commit))
+                    <p class="mt-3 text-xs text-neutral-500 dark:text-fg-dim">
+                        Approved commit <span class="font-mono">{{ substr($preview->approved_commit, 0, 7) }}</span>
+                    </p>
+                @endif
+
                 <div class="mt-4 border-t border-neutral-200 pt-4 dark:border-white/[0.07]">
                     <livewire:project.application.preview-domains
                         wire:key="preview-domains-{{ $preview->id }}"
                         :preview="$preview" />
 
                     @if ($application->build_pack === 'dockerimage')
-                        <form wire:submit="save_preview('{{ $preview->id }}')"
+                        <form wire:submit="save_preview({{ (int) $preview->id }})"
                             class="application-settings-section-body is-flush mt-3 overflow-visible">
                             <div class="data-table-header grid-cols-1"><span>Docker tag</span></div>
                             <div class="p-3">
                                 <x-forms.input id="previewDockerTags.{{ $preview->id }}" canGate="update"
                                     :canResource="$application"
-                                    wire:change="save_preview('{{ $preview->id }}')" />
+                                    wire:change="save_preview({{ (int) $preview->id }})" />
                             </div>
                         </form>
                     @endif

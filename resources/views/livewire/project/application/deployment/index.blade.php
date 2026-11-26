@@ -158,32 +158,35 @@
                                 @endforeach
                             @endif
                 </x-table.filter>
-                <x-table.sort>
-                            @foreach ([
-                                'newest' => 'Newest first',
-                                'oldest' => 'Oldest first',
-                            ] as $sortValue => $sortLabel)
-                                <button type="button" class="listbox-option" role="option"
-                                    aria-selected="{{ $deploymentSort === $sortValue ? 'true' : 'false' }}"
-                                    wire:click="setDeploymentSort('{{ $sortValue }}')"
-                                    @click="open = false">
-                                    <span>{{ $sortLabel }}</span>
-                                    @if ($deploymentSort === $sortValue)
-                                        <svg class="size-3.5 shrink-0" viewBox="0 0 24 24" fill="none">
-                                            <path d="m4.5 12.75 6 6 9-13.5" stroke="currentColor"
-                                                stroke-width="2.5" stroke-linecap="round"
-                                                stroke-linejoin="round" />
-                                        </svg>
-                                    @endif
-                                </button>
-                            @endforeach
-                </x-table.sort>
+                {{-- The Started header sorts the full table; the embedded history has no such header. --}}
+                @if ($embedded)
+                    <x-table.sort>
+                                @foreach ([
+                                    'newest' => 'Newest first',
+                                    'oldest' => 'Oldest first',
+                                ] as $sortValue => $sortLabel)
+                                    <button type="button" class="listbox-option" role="option"
+                                        aria-selected="{{ $deploymentSort === $sortValue ? 'true' : 'false' }}"
+                                        wire:click="setDeploymentSort('{{ $sortValue }}')"
+                                        @click="open = false">
+                                        <span>{{ $sortLabel }}</span>
+                                        @if ($deploymentSort === $sortValue)
+                                            <svg class="size-3.5 shrink-0" viewBox="0 0 24 24" fill="none">
+                                                <path d="m4.5 12.75 6 6 9-13.5" stroke="currentColor"
+                                                    stroke-width="2.5" stroke-linecap="round"
+                                                    stroke-linejoin="round" />
+                                            </svg>
+                                        @endif
+                                    </button>
+                                @endforeach
+                    </x-table.sort>
+                @endif
             </x-table.toolbar>
 
             @if ($deployments->isNotEmpty())
                 <div class="data-table relative w-full transition-opacity"
                     wire:loading.class="opacity-50 pointer-events-none"
-                    wire:target="goToPage,previousPage,nextPage,toggleDeploymentFilter,clearFilter,setPullRequestFilter">
+                    wire:target="goToPage,previousPage,nextPage,toggleDeploymentFilter,clearFilter,setPullRequestFilter,setDeploymentSort">
                     <x-table.loading id="deployment-table-filter-loading"
                         target="toggleDeploymentFilter,clearFilter,setPullRequestFilter"
                         text="Filtering deployments..." class="rounded-lg" />
@@ -202,7 +205,8 @@
                             <span>Source</span>
                             <span>Commit</span>
                             @unless ($embedded)
-                                <span>Started</span>
+                                <x-table.sort-header label="Started" asc="oldest" desc="newest" first="desc"
+                                    action="setDeploymentSort" :current="$deploymentSort" />
                             @endunless
                             <span>Duration</span>
                             <span>Server</span>
@@ -227,15 +231,30 @@
                                 'failed' => 'error',
                                 default => 'neutral',
                             };
+                            if ($deployment->isImageScanBlocked()) {
+                                $statusLabel = 'Blocked';
+                                $statusType = 'error';
+                            }
                             $pullRequestId = (int) data_get($deployment, 'pull_request_id', 0);
                             $sourceLabel = match (true) {
                                 (bool) data_get($deployment, 'is_webhook') && $pullRequestId > 0 => 'Webhook · PR #' . $pullRequestId,
                                 (bool) data_get($deployment, 'is_webhook') => 'Webhook',
                                 $pullRequestId > 0 => 'Pull request #' . $pullRequestId,
                                 (bool) data_get($deployment, 'rollback') => 'Rollback',
+                                (bool) data_get($deployment, 'is_mcp') => 'MCP',
                                 (bool) data_get($deployment, 'is_api') => 'API',
                                 default => 'Manual',
                             };
+                            $sourceKey = match (true) {
+                                $pullRequestId > 0 => 'pull-request',
+                                (bool) data_get($deployment, 'is_webhook') => 'webhook',
+                                (bool) data_get($deployment, 'rollback') => 'rollback',
+                                (bool) data_get($deployment, 'is_mcp') => 'mcp',
+                                (bool) data_get($deployment, 'is_api') => 'api',
+                                default => 'manual',
+                            };
+                            $serverId = data_get($deployment, 'server_id');
+                            $serverName = data_get($deployment, 'server_name') ?: data_get($application, 'destination.server.name', '-');
                             $duration = match ($deploymentStatus) {
                                 'queued' => 'Waiting',
                                 'in_progress' => calculateDuration(data_get($deployment, 'created_at'), now()),
@@ -264,9 +283,22 @@
                                 x-bind:aria-busy="selecting === '{{ data_get($deployment, 'deployment_uuid') }}'"
                             @endif>
                             @unless ($embedded)
-                                <a href="{{ $deploymentUrl }}" {!! $deploymentLinkAttributes !!}><x-status-badge :status="$statusLabel" :type="$statusType" /></a>
+                                <span class="min-w-0">
+                                    <x-status-badge as="button" :status="$statusLabel" :type="$statusType"
+                                        :spinning="$deploymentStatus === 'in_progress'"
+                                        class="table-filter-value table-filter-badge" title="Filter by {{ $statusLabel }}"
+                                        wire:click="toggleDeploymentFilter('status:{{ $deploymentStatus }}')" />
+                                </span>
                             @endunless
-                            <a href="{{ $deploymentUrl }}" {!! $deploymentLinkAttributes !!}>{{ $sourceLabel }}</a>
+                            @if ($embedded)
+                                <a href="{{ $deploymentUrl }}" {!! $deploymentLinkAttributes !!}>{{ $sourceLabel }}</a>
+                            @else
+                                <span class="min-w-0">
+                                    <button type="button" class="table-filter-value truncate"
+                                        title="Filter by {{ $sourceLabel }}"
+                                        wire:click="toggleDeploymentFilter('source:{{ $sourceKey }}')">{{ $sourceLabel }}</button>
+                                </span>
+                            @endif
                             <span class="min-w-0">
                                 @if (data_get($deployment, 'commit'))
                                     <span class="flex min-w-0 items-center gap-2">
@@ -285,7 +317,7 @@
                                 @endif
                                 @if ($embedded)
                                     <span class="mt-0.5 hidden truncate text-xs text-neutral-500 group-hover:text-neutral-950 dark:text-fg-faint dark:group-hover:text-white 2xl:block">
-                                        {{ $sourceLabel }} · <span class="tabular-nums">{{ $duration }}</span> · {{ data_get($deployment, 'server_name') ?: data_get($application, 'destination.server.name', '-') }}
+                                        {{ $sourceLabel }} · <span class="tabular-nums">{{ $duration }}</span> · {{ $serverName }}
                                     </span>
                                 @endif
                             </span>
@@ -295,9 +327,15 @@
                                 </a>
                             @endunless
                             <a href="{{ $deploymentUrl }}" {!! $deploymentLinkAttributes !!} class="tabular-nums">{{ $duration }}</a>
-                            <a href="{{ $deploymentUrl }}" {!! $deploymentLinkAttributes !!} class="truncate">
-                                {{ data_get($deployment, 'server_name') ?: data_get($application, 'destination.server.name', '-') }}
-                            </a>
+                            @if (! $embedded && $serverId)
+                                <span class="min-w-0">
+                                    <button type="button" class="table-filter-value truncate"
+                                        title="Filter by {{ $serverName }}"
+                                        wire:click="toggleDeploymentFilter('server:{{ (int) $serverId }}')">{{ $serverName }}</button>
+                                </span>
+                            @else
+                                <a href="{{ $deploymentUrl }}" {!! $deploymentLinkAttributes !!} class="truncate">{{ $serverName }}</a>
+                            @endif
                             @if ($embedded)
                                 <a href="{{ $deploymentUrl }}" {!! $deploymentLinkAttributes !!}
                                     class="flex items-center justify-end gap-2 pr-1 tabular-nums"
@@ -305,6 +343,10 @@
                                     <span>{{ \Carbon\Carbon::parse(data_get($deployment, 'created_at'))->diffForHumans(syntax: \Carbon\CarbonInterface::DIFF_ABSOLUTE, short: true) }}</span>
                                     <x-loading compact x-cloak x-show="selecting === '{{ data_get($deployment, 'deployment_uuid') }}'"
                                         aria-label="Loading deployment logs..." />
+                                    @if ($deploymentStatus === 'in_progress')
+                                        <x-loading compact x-show="selecting !== '{{ data_get($deployment, 'deployment_uuid') }}'"
+                                            aria-label="Deployment in progress" />
+                                    @else
                                     <span x-show="selecting !== '{{ data_get($deployment, 'deployment_uuid') }}'" @class([
                                         'size-2 shrink-0 rounded-full',
                                         'bg-emerald-500' => $statusType === 'success',
@@ -312,6 +354,7 @@
                                         'bg-red-500' => $statusType === 'error',
                                         'bg-neutral-400 dark:bg-neutral-500' => $statusType === 'neutral',
                                     ])></span>
+                                    @endif
                                 </a>
                             @endif
                             <a href="{{ $deploymentUrl }}" {!! $deploymentLinkAttributes !!} class="deployment-row-link absolute inset-0"

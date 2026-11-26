@@ -2,14 +2,17 @@
 
 namespace App\Livewire\Project\Application;
 
+use App\Actions\Application\ApproveForkPreviewCommit;
 use App\Actions\Docker\GetContainersStatus;
 use App\Events\ServiceStatusChanged;
 use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Support\ValidationPatterns;
 use App\Traits\AuditsApplicationSettings;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Validator;
 use Livewire\Component;
 
 class Previews extends Component
@@ -24,6 +27,10 @@ class Previews extends Component
 
     public bool $isPrDeploymentsPublicEnabled = false;
 
+    public bool $isPrDeploymentsPublicApprovalRequired = true;
+
+    public bool $useProductionValuesInPreviews = true;
+
     public string $deployment_uuid;
 
     public array $parameters;
@@ -34,20 +41,30 @@ class Previews extends Component
 
     public array $previewDockerTags = [];
 
-    public ?int $manualPullRequestId = null;
+    public ?string $manualPullRequestId = null;
 
     public ?string $manualDockerTag = null;
 
-    protected $rules = [
-        'previewDockerTags.*' => 'string|nullable',
-        'manualPullRequestId' => 'integer|min:1|nullable',
-        'manualDockerTag' => 'string|nullable',
-    ];
+    protected function rules(): array
+    {
+        return [
+            'previewDockerTags.*' => ValidationPatterns::dockerImageTagRules(),
+            'manualPullRequestId' => 'integer|min:1|nullable',
+            'manualDockerTag' => ValidationPatterns::dockerImageTagRules(),
+        ];
+    }
+
+    protected function validationAttributes(): array
+    {
+        return ['previewDockerTags.*' => 'docker tag'];
+    }
 
     public function mount()
     {
         $this->isPreviewDeploymentsEnabled = $this->application->settings->is_preview_deployments_enabled;
         $this->isPrDeploymentsPublicEnabled = $this->application->settings->is_pr_deployments_public_enabled ?? false;
+        $this->isPrDeploymentsPublicApprovalRequired = $this->application->settings->is_pr_deployments_public_approval_required ?? true;
+        $this->useProductionValuesInPreviews = $this->application->settings->use_production_values_in_previews ?? true;
         $this->pull_requests = collect();
         $this->parameters = get_route_parameters();
         $this->syncDockerTags();
@@ -59,10 +76,27 @@ class Previews extends Component
         $this->validate([
             'isPreviewDeploymentsEnabled' => 'boolean',
             'isPrDeploymentsPublicEnabled' => 'boolean',
+            'useProductionValuesInPreviews' => 'boolean',
         ]);
 
         $this->application->settings->is_preview_deployments_enabled = $this->isPreviewDeploymentsEnabled;
         $this->application->settings->is_pr_deployments_public_enabled = $this->isPrDeploymentsPublicEnabled;
+        $this->application->settings->use_production_values_in_previews = $this->useProductionValuesInPreviews;
+        $this->saveApplicationSettingsWithAudit($this->application);
+
+        $this->dispatch('success', 'Settings saved.');
+        $this->dispatch('configurationChanged');
+    }
+
+    /**
+     * Saves only the fork approval policy, so that a stale value in another save cannot turn approval off.
+     */
+    public function saveForkApprovalSetting(): void
+    {
+        $this->authorize('update', $this->application);
+        $this->validate(['isPrDeploymentsPublicApprovalRequired' => 'boolean']);
+
+        $this->application->settings->is_pr_deployments_public_approval_required = $this->isPrDeploymentsPublicApprovalRequired;
         $this->saveApplicationSettingsWithAudit($this->application);
 
         $this->dispatch('success', 'Settings saved.');
@@ -108,6 +142,29 @@ class Previews extends Component
         }
     }
 
+    /**
+     * Asks GitHub whether the branch of the pull request is in the repository of the application, because the
+     * browser sends only the number. A pull request from a fork, or one that Coolify cannot check, is not.
+     */
+    private function isPullRequestFromRepository(int $pullRequestId): bool
+    {
+        if (! $this->application->isGithubAppSource()) {
+            return false;
+        }
+        try {
+            ['data' => $pullRequest] = githubApi(
+                source: $this->application->source,
+                endpoint: '/repos/'.gitRepositorySlug($this->application->git_repository)."/pulls/{$pullRequestId}",
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+        $headRepositoryId = data_get($pullRequest, 'head.repo.id');
+        $baseRepositoryId = data_get($pullRequest, 'base.repo.id');
+
+        return is_int($headRepositoryId) && $headRepositoryId === $baseRepositoryId;
+    }
+
     public function save_preview($preview_id)
     {
         try {
@@ -135,6 +192,7 @@ class Previews extends Component
     {
         try {
             $this->authorize('update', $this->application);
+            $this->validatePreviewInput($pull_request_html_url, $docker_registry_image_tag);
             if ($this->application->build_pack === 'dockercompose') {
                 $this->setDeploymentUuid();
                 $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
@@ -146,6 +204,7 @@ class Previews extends Component
                         'docker_compose_domains' => $this->application->docker_compose_domains,
                     ]);
                     $this->auditPreviewEvent('ui.application.preview_created', $pull_request_id);
+                    $found->recordSameRepository($this->isPullRequestFromRepository($pull_request_id));
                 }
                 $found->generate_preview_fqdn_compose(keepExistingDomains: ! $found->wasRecentlyCreated);
                 $this->application->refresh();
@@ -198,6 +257,7 @@ class Previews extends Component
     {
         try {
             $this->authorize('deploy', $this->application);
+            $this->authorize('update', $this->application);
 
             $this->add($pull_request_id, $pull_request_html_url, $docker_registry_image_tag);
             $this->deploy($pull_request_id, $pull_request_html_url, force_rebuild: false, docker_registry_image_tag: $docker_registry_image_tag);
@@ -210,9 +270,11 @@ class Previews extends Component
     {
         try {
             $this->authorize('deploy', $this->application);
+            $this->validatePreviewInput($pull_request_html_url, $docker_registry_image_tag);
             $this->setDeploymentUuid();
             $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
             if (! $found && (! is_null($pull_request_html_url) || ($this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()))) {
+                $this->authorize('update', $this->application);
                 $found = ApplicationPreview::create([
                     'application_id' => $this->application->id,
                     'pull_request_id' => $pull_request_id,
@@ -221,7 +283,8 @@ class Previews extends Component
                 ]);
                 $this->auditPreviewEvent('ui.application.preview_created', $pull_request_id);
             }
-            if ($found && $this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty()) {
+            if ($found && $this->application->build_pack === 'dockerimage' && str($docker_registry_image_tag)->isNotEmpty() && $docker_registry_image_tag !== $found->docker_registry_image_tag) {
+                $this->authorize('update', $this->application);
                 $this->saveDockerTagWithAudit($found, $docker_registry_image_tag);
             }
             $result = queue_application_deployment(
@@ -230,7 +293,7 @@ class Previews extends Component
                 force_rebuild: $force_rebuild,
                 pull_request_id: $pull_request_id,
                 git_type: $found->git_type ?? null,
-                docker_registry_image_tag: $docker_registry_image_tag,
+                docker_registry_image_tag: $this->application->build_pack === 'dockerimage' ? $found?->docker_registry_image_tag : null,
             );
             if ($result['status'] === 'queue_full') {
                 $this->dispatch('error', 'Deployment queue full', $result['message']);
@@ -251,6 +314,50 @@ class Previews extends Component
             ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        }
+    }
+
+    private function validatePreviewInput(?string $pullRequestHtmlUrl, ?string $dockerRegistryImageTag): void
+    {
+        Validator::make([
+            'pull_request_html_url' => $pullRequestHtmlUrl,
+            'docker_registry_image_tag' => $dockerRegistryImageTag,
+        ], [
+            'pull_request_html_url' => ['nullable', 'url:http,https', 'max:2048'],
+            'docker_registry_image_tag' => ValidationPatterns::dockerImageTagRules(),
+        ])->validate();
+    }
+
+    /**
+     * An admin approves the reviewed commit of a fork pull request and deploys it.
+     */
+    public function approveForkCommit(int $previewId, string $commit): void
+    {
+        $preview = $this->application->previews()->whereKey($previewId)->firstOrFail();
+        $this->authorize('approve', $preview);
+
+        try {
+            $result = ApproveForkPreviewCommit::run($preview, $commit);
+            $this->application->refresh();
+            if ($result['status'] === 'queue_full') {
+                $this->dispatch('error', 'Deployment queue full', $result['message']);
+
+                return;
+            }
+            if ($result['status'] === 'skipped') {
+                $this->dispatch('success', 'Deployment skipped', $result['message']);
+
+                return;
+            }
+
+            $this->redirectRoute('project.application.deployment.show', [
+                'project_uuid' => $this->application->environment->project->uuid,
+                'application_uuid' => $this->application->uuid,
+                'deployment_uuid' => $result['deployment_uuid'],
+                'environment_uuid' => $this->application->environment->uuid,
+            ]);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 
@@ -285,6 +392,8 @@ class Previews extends Component
     public function addDockerImagePreview()
     {
         $this->authorize('deploy', $this->application);
+        $this->manualPullRequestId = filled($this->manualPullRequestId) ? trim($this->manualPullRequestId) : null;
+        $this->manualDockerTag = filled($this->manualDockerTag) ? trim($this->manualDockerTag) : null;
         $this->validateOnly('manualPullRequestId');
         $this->validateOnly('manualDockerTag');
 
@@ -300,9 +409,7 @@ class Previews extends Component
             return;
         }
 
-        $dockerTag = str($this->manualDockerTag)->trim()->value();
-
-        $this->add_and_deploy($this->manualPullRequestId, null, $dockerTag);
+        $this->add_and_deploy((int) $this->manualPullRequestId, null, $this->manualDockerTag);
 
         $this->manualPullRequestId = null;
         $this->manualDockerTag = null;

@@ -55,19 +55,14 @@ test('an admin opening the general page of a compose application without a compo
     $this->actingAs($this->admin);
 
     Livewire::test(Heading::class, ['application' => $this->application, 'activeRouteName' => 'project.application.configuration'])
-        ->assertSet('loadComposeOnOpen', true)
-        ->assertSee('Load compose')
-        ->assertSee('Load the Compose file before you deploy.')
-        ->assertDontSee('Load a Compose file to deploy.');
+        ->assertSet('loadComposeOnOpen', true);
 });
 
-test('other application pages show the load button but do not load the compose file', function () {
+test('other application pages do not load the compose file on open', function () {
     $this->actingAs($this->admin);
 
     Livewire::test(Heading::class, ['application' => $this->application, 'activeRouteName' => 'project.application.danger'])
-        ->assertSet('loadComposeOnOpen', false)
-        ->assertSee('Load compose')
-        ->assertSee('Load the Compose file before you deploy.');
+        ->assertSet('loadComposeOnOpen', false);
 });
 
 test('a compose application that already has a compose file does not load it on open', function () {

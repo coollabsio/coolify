@@ -6,6 +6,7 @@ use App\Models\Application;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -13,9 +14,12 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
+use App\Support\ContainerLogArchive;
 use App\Support\RuntimeLogTargets;
 use App\Traits\ListensToTeamChannel;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -25,12 +29,13 @@ class Logs extends Component
 
     public ?string $type = null;
 
-    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneSqlite $resource;
+    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|StandaloneKeydb|StandaloneDragonfly|StandaloneClickhouse|StandaloneInfluxdb|StandaloneSqlite $resource;
 
     public Collection $servers;
 
     public Collection $containers;
 
+    #[Locked]
     public array $serverContainers = [];
 
     /** @var array<int, string> */
@@ -56,6 +61,18 @@ class Logs extends Component
     #[Url(as: 'service', except: '')]
     public string $service = '';
 
+    /**
+     * Sentinel log archives of removed containers, newest first.
+     *
+     * @var list<array{server: string, file: string, container: string, id: string, modifiedAt: int}>
+     */
+    #[Locked]
+    public array $archives = [];
+
+    /** `<server uuid>/<archive file>` of the selected removed container. */
+    #[Url(as: 'archive', except: '')]
+    public string $archive = '';
+
     private bool $syncingSelection = false;
 
     public function getListeners()
@@ -68,12 +85,18 @@ class Logs extends Component
     public function loadAllContainers()
     {
         try {
+            $archives = [];
             foreach ($this->servers as $server) {
                 unset($this->serverErrors[$server->id]);
                 $this->serverContainers[$server->id] = $this->getContainersForServer($server);
+                $archives = [...$archives, ...$this->getArchivesForServer($server, $this->serverContainers[$server->id])];
             }
+            usort($archives, fn (array $left, array $right): int => $right['modifiedAt'] <=> $left['modifiedAt']);
+            $this->archives = $archives;
             $this->containersLoaded = true;
             $this->syncLogSelection();
+            $selectedArchive = $this->selectedArchive($this->selectionTargets()['sources'] !== []);
+            $this->archive = $selectedArchive ? $selectedArchive['server'].'/'.$selectedArchive['file'] : '';
         } catch (\Exception $e) {
             $this->containersLoaded = true;
             $this->syncLogSelection();
@@ -154,6 +177,73 @@ class Logs extends Component
 
             return [];
         }
+    }
+
+    /**
+     * @param  array<int|string, mixed>  $containers
+     * @return list<array{server: string, file: string, container: string, id: string, modifiedAt: int}>
+     */
+    private function getArchivesForServer($server, array $containers): array
+    {
+        $command = ContainerLogArchive::listCommand((string) $this->resource->uuid);
+        if ($command === null || ! $server->isFunctional() || $server->isSwarm()) {
+            return [];
+        }
+
+        try {
+            $output = (string) instant_remote_process([$command], $server, false);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $existingIds = collect($containers)->map(fn ($container): string => (string) data_get($container, 'ID'))->filter()->values()->all();
+
+        return ContainerLogArchive::parseList($output, (string) $server->uuid, $existingIds);
+    }
+
+    /**
+     * The chosen archive, or the newest one when no container exists anymore.
+     *
+     * @return array{server: string, file: string, container: string, id: string, modifiedAt: int}|null
+     */
+    private function selectedArchive(bool $hasContainers): ?array
+    {
+        foreach ($this->archives as $entry) {
+            if ($this->archive === $entry['server'].'/'.$entry['file']) {
+                return $entry;
+            }
+        }
+
+        return $hasContainers ? null : ($this->archives[0] ?? null);
+    }
+
+    /**
+     * @return list<array{value: string, label: string, description?: string}>
+     */
+    private function archiveOptions(bool $hasContainers): array
+    {
+        $options = $hasContainers ? [['value' => '', 'label' => 'Current containers']] : [];
+        foreach ($this->archives as $entry) {
+            $options[] = [
+                'value' => $entry['server'].'/'.$entry['file'],
+                'label' => $entry['container'],
+                'description' => 'Removed. Last log '.Carbon::createFromTimestamp($entry['modifiedAt'])->diffForHumans().'.',
+            ];
+        }
+
+        return $options;
+    }
+
+    /**
+     * Servers of the resource that do not keep the logs of removed containers, which the user can change.
+     */
+    private function archiveOffServers(): Collection
+    {
+        return $this->servers
+            ->filter(fn ($server): bool => $server->isSentinelEnabled()
+                && ! $server->settings->is_container_log_archive_enabled
+                && (auth()->user()?->can('update', $server) ?? false))
+            ->values();
     }
 
     public function mount()
@@ -253,8 +343,16 @@ class Logs extends Component
 
     public function render()
     {
+        $targets = $this->containersLoaded ? $this->selectionTargets() : null;
+        $hasContainers = ($targets['sources'] ?? []) !== [];
+        $selectedArchive = $this->containersLoaded ? $this->selectedArchive($hasContainers) : null;
+
         return view('livewire.project.shared.logs', [
-            'targets' => $this->containersLoaded ? $this->selectionTargets() : null,
+            'targets' => $targets,
+            'selectedArchive' => $selectedArchive,
+            'archiveServer' => $selectedArchive ? $this->servers->firstWhere('uuid', $selectedArchive['server']) : null,
+            'archiveOptions' => $this->archiveOptions($hasContainers),
+            'archiveOffServers' => $this->containersLoaded ? $this->archiveOffServers() : collect(),
         ]);
     }
 }

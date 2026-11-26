@@ -5,6 +5,7 @@ use App\Actions\Proxy\StartProxy;
 use App\Events\ProxyStatusChanged;
 use App\Events\ServiceChecked;
 use App\Jobs\PushServerUpdateJob;
+use App\Jobs\RefreshDefaultRedirectJob;
 use App\Jobs\ServerStorageCheckJob;
 use App\Listeners\ProxyStatusChangedNotification;
 use App\Models\Server;
@@ -178,6 +179,32 @@ it('marks a stale proxy status as running when sentinel reports a running proxy'
     expect($server->fresh()->proxy->get('status'))->toBe('running');
 });
 
+it('queues one catch-all refresh when the running proxy has an outdated catch-all', function (bool $current, int $refreshes) {
+    $team = Team::factory()->create();
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $server->settings->update(['is_reachable' => true, 'is_usable' => true]);
+    $server->proxy->set('type', 'TRAEFIK');
+    $server->proxy->set('status', 'running');
+    $server->save();
+    $server->proxy->set('default_redirect_hash', $current ? md5($server->defaultRedirectConfiguration() ?? '') : null);
+    $server->save();
+    $data = [
+        'containers' => [['name' => 'coolify-proxy', 'state' => 'running', 'health_status' => 'healthy', 'labels' => ['coolify.managed' => true]]],
+        'filesystem_usage_root' => ['used_percentage' => 10],
+    ];
+    Event::fake([ServiceChecked::class]);
+
+    // The second check runs while the first refresh waits in the queue.
+    (new PushServerUpdateJob($server, $data))->handle();
+    Queue::assertPushedTimes(RefreshDefaultRedirectJob::class, $refreshes);
+
+    (new PushServerUpdateJob($server->fresh(), $data))->handle();
+    Queue::assertPushedTimes(RefreshDefaultRedirectJob::class, $refreshes);
+})->with([
+    'outdated catch-all' => [false, 1],
+    'current catch-all' => [true, 0],
+]);
+
 it('does not start a second proxy while a proxy restart runs', function () {
     $team = Team::factory()->create();
     $server = Server::factory()->create(['team_id' => $team->id]);
@@ -221,11 +248,15 @@ it('ends the proxy restart when the proxy status listener runs', function () {
     expect($server->isProxyTransitionInProgress())->toBeFalse();
 });
 
-it('uses default queue for PushServerUpdateJob', function () {
+it('runs PushServerUpdateJob on the sentinel queue on cloud and on the default queue on self-hosted', function (bool $selfHosted, ?string $queue) {
+    config(['constants.coolify.self_hosted' => $selfHosted]);
     $team = Team::factory()->create();
     $server = Server::factory()->create(['team_id' => $team->id]);
 
     $job = new PushServerUpdateJob($server, ['containers' => []]);
 
-    expect($job->queue)->toBeNull();
-});
+    expect($job->queue)->toBe($queue);
+})->with([
+    'cloud' => [false, 'sentinel'],
+    'self-hosted' => [true, null],
+]);

@@ -5,7 +5,9 @@ namespace App\Jobs;
 use App\Actions\Server\CleanupDocker;
 use App\Events\DockerCleanupDone;
 use App\Models\DockerCleanupExecution;
+use App\Models\NotificationThrottle;
 use App\Models\Server;
+use App\Notifications\ScheduledJobRecovered;
 use App\Notifications\Server\DockerCleanupFailed;
 use App\Notifications\Server\DockerCleanupSuccess;
 use App\Services\ScheduledJobDeliveryService;
@@ -13,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -42,6 +45,8 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
     public ?DockerCleanupExecution $execution_log = null;
 
     public const INTERRUPTED_MESSAGE = 'Docker cleanup was interrupted: its worker stopped before the cleanup finished.';
+
+    public const INTERRUPTED_EXECUTIONS_CHUNK_SIZE = 100;
 
     /**
      * Shares the per-server lock with queued CleanupDocker runs, so two cleanups never run on
@@ -129,7 +134,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                     'cleanup_log' => $cleanup_log,
                 ]);
 
-                $this->server->team?->notify(new DockerCleanupSuccess($this->server, $message));
+                $this->notifySuccess($message);
                 event(new DockerCleanupDone($this->execution_log));
 
                 return;
@@ -151,7 +156,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                     'cleanup_log' => $cleanup_log,
                 ]);
 
-                $this->server->team?->notify(new DockerCleanupSuccess($this->server, $message));
+                $this->notifySuccess($message);
                 event(new DockerCleanupDone($this->execution_log));
 
                 return;
@@ -180,7 +185,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                     'cleanup_log' => $cleanup_log,
                 ]);
 
-                $this->server->team?->notify(new DockerCleanupSuccess($this->server, $message));
+                $this->notifySuccess($message);
                 event(new DockerCleanupDone($this->execution_log));
             } else {
                 $message = 'No cleanup needed for '.$this->server->name;
@@ -190,7 +195,7 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
                     'message' => $message,
                 ]);
 
-                $this->server->team?->notify(new DockerCleanupSuccess($this->server, $message));
+                $this->notifySuccess($message);
                 event(new DockerCleanupDone($this->execution_log));
             }
         } catch (\Throwable $e) {
@@ -254,30 +259,48 @@ class DockerCleanupJob implements ShouldBeEncrypted, ShouldQueue
      */
     public static function failInterruptedExecutions(): void
     {
-        $executions = DockerCleanupExecution::query()
+        DockerCleanupExecution::query()
+            ->select(['id', 'server_id'])
             ->with('server.team')
             ->where('status', 'running')
             ->whereNull('finished_at')
             ->where('created_at', '<', now()->subSeconds(CleanupDocker::overlapLockExpiresAfter()))
-            ->get();
+            ->chunkById(self::INTERRUPTED_EXECUTIONS_CHUNK_SIZE, function (Collection $executions): void {
+                foreach ($executions as $execution) {
+                    $updated = DockerCleanupExecution::query()
+                        ->whereKey($execution->id)
+                        ->where('status', 'running')
+                        ->whereNull('finished_at')
+                        ->update([
+                            'status' => 'failed',
+                            'message' => self::INTERRUPTED_MESSAGE,
+                            'finished_at' => Carbon::now()->toImmutable(),
+                        ]);
 
-        foreach ($executions as $execution) {
-            $updated = DockerCleanupExecution::query()
-                ->whereKey($execution->id)
-                ->where('status', 'running')
-                ->whereNull('finished_at')
-                ->update([
-                    'status' => 'failed',
-                    'message' => self::INTERRUPTED_MESSAGE,
-                    'finished_at' => Carbon::now()->toImmutable(),
-                ]);
+                    if ($updated === 0) {
+                        continue;
+                    }
 
-            if ($updated === 0) {
-                continue;
-            }
+                    event(new DockerCleanupDone($execution->refresh()));
+                    $execution->server?->team?->notify(new DockerCleanupFailed($execution->server, 'Docker cleanup job failed with the following error: '.self::INTERRUPTED_MESSAGE));
+                }
+            });
+    }
 
-            event(new DockerCleanupDone($execution->refresh()));
-            $execution->server?->team?->notify(new DockerCleanupFailed($execution->server, 'Docker cleanup job failed with the following error: '.self::INTERRUPTED_MESSAGE));
+    /**
+     * Also tells the team once that a cleanup that failed before works again.
+     */
+    private function notifySuccess(string $message): void
+    {
+        $this->server->team?->notify(new DockerCleanupSuccess($this->server, $message));
+        if (NotificationThrottle::release($this->server, DockerCleanupFailed::class)) {
+            $this->server->team?->notify(new ScheduledJobRecovered(
+                failureEvent: 'docker_cleanup_failure',
+                title: "Docker cleanup job works again on {$this->server->name}.",
+                webhookEvent: 'docker_cleanup_recovered',
+                url: base_url().'/server/'.$this->server->uuid,
+                webhookData: ['server_name' => $this->server->name, 'server_uuid' => $this->server->uuid],
+            ));
         }
     }
 

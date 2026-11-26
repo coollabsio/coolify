@@ -66,6 +66,22 @@ test('environment import stores valid keys and skips malformed keys', function (
     expect($application->environment_variables()->pluck('value', 'key')->all())->toBe(['VALID_KEY' => 'value']);
 });
 
+test('environment import updates a default variable instead of adding a second one', function () {
+    $application = Application::factory()->create(['build_pack' => 'nixpacks']);
+    $component = new class extends PublicGitRepository
+    {
+        public function importInto(Application $application): void
+        {
+            $this->importDetectedEnvironmentVariables($application);
+        }
+    };
+    $component->envImported = true;
+    $component->envExampleVars = ['NIXPACKS_NODE_VERSION' => '20'];
+    $component->importInto($application);
+
+    expect($application->environment_variables()->where('key', 'NIXPACKS_NODE_VERSION')->pluck('value')->all())->toBe(['20']);
+});
+
 class RepositoryScanStateTestComponent extends PublicGitRepository
 {
     public function mount() {}
@@ -89,7 +105,7 @@ test('deploy key scans clone with the key, like a deployment', function () {
     $application->setRelation('private_key', (new PrivateKey)->forceFill(['private_key' => 'test-key']));
     $detector = new RepositoryDetector($application, '/', new Server);
 
-    $clone = (new ReflectionMethod($detector, 'scanCommands'))->invoke($detector, 'scan-test')->get(3);
+    $clone = (new ReflectionMethod($detector, 'scanCommands'))->invoke($detector, 'scan-test')->get(2);
 
     expect($clone)->toStartWith('sh -c ')
         ->toContain(base64_encode('test-key'))

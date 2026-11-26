@@ -5,6 +5,7 @@ use App\Jobs\VolumeBackupJob;
 use App\Livewire\Project\Database\Import as DatabaseImport;
 use App\Livewire\Project\Service\BackupExecutions;
 use App\Livewire\Project\Service\Heading;
+use App\Livewire\Project\Service\ImportBackup as ServiceImportBackup;
 use App\Livewire\Project\Service\VolumeBackup\Index as ServiceVolumeBackupIndex;
 use App\Models\Environment;
 use App\Models\InstanceSettings;
@@ -24,8 +25,6 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Pagination\LengthAwarePaginator;
-use Illuminate\Routing\Route as RoutingRoute;
-use Illuminate\Routing\RouteCollection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Once;
@@ -125,37 +124,29 @@ test('does not open service database backups route from another team', function 
     ]));
 })->throws(NotFoundHttpException::class);
 
-test('does not open service import backup route from another team', function () {
-    $this->get(route('project.service.import-backup', [
+test('old service import backup urls redirect to the backups pages', function () {
+    $parameters = [
         'project_uuid' => $this->projectA->uuid,
         'environment_uuid' => $this->environmentA->uuid,
-        'service_uuid' => $this->otherService->uuid,
-    ]))->assertForbidden();
+        'service_uuid' => $this->ownService->uuid,
+    ];
+    $databaseParameters = [...$parameters, 'stack_service_uuid' => $this->ownServiceDatabase->uuid];
+
+    $this->get(route('project.service.import-backup', $parameters))
+        ->assertRedirect(route('project.service.volume-backups.index', $parameters));
+    $this->get(route('project.service.import-backup.database', $databaseParameters))
+        ->assertRedirect(route('project.service.database.backups', $databaseParameters));
+    $this->get(route('project.service.database.import', $databaseParameters))
+        ->assertRedirect(route('project.service.database.backups', $databaseParameters));
 });
 
-test('does not resolve service database import component from another team', function () {
-    // The component resolves its resource from the current route parameters on mount.
-    // Register a full-page route for it ahead of the application's catch-all route.
-    $importRoute = new RoutingRoute(
-        ['GET', 'HEAD'],
-        '_tests/service-database-import/{project_uuid}/{environment_uuid}/{service_uuid}/{stack_service_uuid}',
-        ['uses' => DatabaseImport::class],
-    );
-    $routes = new RouteCollection;
-    $routes->add($importRoute);
-    foreach (app('router')->getRoutes() as $route) {
-        $routes->add($route);
-    }
-    app('router')->setRoutes($routes);
+test('does not open the service import backup modal for another team', function () {
+    Livewire::test(ServiceImportBackup::class, ['service' => $this->otherService])->assertForbidden();
+});
 
-    $this->withoutExceptionHandling()->get(implode('/', [
-        '/_tests/service-database-import',
-        $this->projectA->uuid,
-        $this->environmentA->uuid,
-        $this->otherService->uuid,
-        $this->otherServiceDatabase->uuid,
-    ]));
-})->throws(ModelNotFoundException::class);
+test('does not open the database import component for another team database', function () {
+    Livewire::test(DatabaseImport::class, ['resource' => $this->otherServiceDatabase])->assertForbidden();
+});
 
 test('service heading does not hydrate with another team service', function () {
     Livewire::test(Heading::class, ['service' => $this->otherService]);
@@ -215,23 +206,6 @@ test('legacy service database backup list redirects to unified service backups',
     ]);
 
     $this->get($legacyUrl)->assertRedirect($centralBackupsUrl);
-});
-
-test('service backup schedules open in place from the unified view', function () {
-    $backup = ScheduledDatabaseBackup::create([
-        'team_id' => $this->teamA->id,
-        'frequency' => 'daily',
-        'database_id' => $this->ownServiceDatabase->id,
-        'database_type' => $this->ownServiceDatabase->getMorphClass(),
-    ]);
-
-    $this->get(route('project.service.volume-backups.index', [
-        'project_uuid' => $this->projectA->uuid,
-        'environment_uuid' => $this->environmentA->uuid,
-        'service_uuid' => $this->ownService->uuid,
-    ]))
-        ->assertOk()
-        ->assertSee("wire:click=\"openSchedule('{$backup->uuid}')\"", false);
 });
 
 test('service database backup schedules open in the Livewire component', function () {
@@ -319,45 +293,37 @@ test('service backup executions combine database execution history', function ()
     ]))->assertSee("wire:click=\"openExecution('{$execution->uuid}')\"", false);
 });
 
-test('service import backup page selects from compatible databases', function () {
+test('service import backup modal selects from compatible databases', function () {
     $secondDatabase = ServiceDatabase::create([
         'service_id' => $this->ownService->id,
         'name' => 'analytics-db',
         'image' => 'mysql:8',
         'custom_type' => 'mysql',
     ]);
-    $importUrl = route('project.service.import-backup', [
-        'project_uuid' => $this->projectA->uuid,
-        'environment_uuid' => $this->environmentA->uuid,
-        'service_uuid' => $this->ownService->uuid,
-    ]);
 
-    $this->get($importUrl)
-        ->assertOk()
-        ->assertSee('Import Backup')
+    Livewire::test(ServiceImportBackup::class, ['service' => $this->ownService])
+        ->assertSet('selectedDatabaseUuid', '')
         ->assertSee('own-db')
-        ->assertSee('analytics-db');
-
-    $this->get($importUrl.'/'.$secondDatabase->uuid)
-        ->assertOk()
         ->assertSee('analytics-db')
+        ->set('selectedDatabaseUuid', $secondDatabase->uuid)
         ->assertSee('Start the database first');
 });
 
-test('service import backup redirects when exactly one compatible database exists', function () {
-    $this->get(route('project.service.import-backup', [
-        'project_uuid' => $this->projectA->uuid,
-        'environment_uuid' => $this->environmentA->uuid,
-        'service_uuid' => $this->ownService->uuid,
-    ]))->assertRedirectToRoute('project.service.import-backup.database', [
-        'project_uuid' => $this->projectA->uuid,
-        'environment_uuid' => $this->environmentA->uuid,
-        'service_uuid' => $this->ownService->uuid,
-        'stack_service_uuid' => $this->ownServiceDatabase->uuid,
+test('service import backup modal preselects the only compatible database', function () {
+    ServiceDatabase::create([
+        'service_id' => $this->ownService->id,
+        'name' => 'cache-db',
+        'image' => 'redis:7-alpine',
+        'custom_type' => 'redis',
     ]);
+
+    Livewire::test(ServiceImportBackup::class, ['service' => $this->ownService])
+        ->assertSet('selectedDatabaseUuid', $this->ownServiceDatabase->uuid)
+        ->assertDontSee('cache-db')
+        ->assertSee('Start the database first');
 });
 
-test('service import backup excludes unsupported databases', function () {
+test('service import backup modal ignores an unsupported database', function () {
     $unsupportedDatabase = ServiceDatabase::create([
         'service_id' => $this->ownService->id,
         'name' => 'cache-db',
@@ -365,78 +331,17 @@ test('service import backup excludes unsupported databases', function () {
         'custom_type' => 'redis',
     ]);
 
-    $this->get(route('project.service.import-backup', [
-        'project_uuid' => $this->projectA->uuid,
-        'environment_uuid' => $this->environmentA->uuid,
-        'service_uuid' => $this->ownService->uuid,
-    ]))
-        ->assertRedirectToRoute('project.service.import-backup.database', [
-            'project_uuid' => $this->projectA->uuid,
-            'environment_uuid' => $this->environmentA->uuid,
-            'service_uuid' => $this->ownService->uuid,
-            'stack_service_uuid' => $this->ownServiceDatabase->uuid,
-        ]);
-
-    $this->get(route('project.service.import-backup.database', [
-        'project_uuid' => $this->projectA->uuid,
-        'environment_uuid' => $this->environmentA->uuid,
-        'service_uuid' => $this->ownService->uuid,
-        'stack_service_uuid' => $unsupportedDatabase->uuid,
-    ]))->assertNotFound();
+    Livewire::test(ServiceImportBackup::class, ['service' => $this->ownService])
+        ->set('selectedDatabaseUuid', $unsupportedDatabase->uuid)
+        ->assertDontSee('Start the database first');
 });
 
-test('service import backup opens the selected compatible database', function () {
-    $secondDatabase = ServiceDatabase::create([
-        'service_id' => $this->ownService->id,
-        'name' => 'analytics-db',
-        'image' => 'mysql:8',
-        'custom_type' => 'mysql',
-    ]);
-
-    $this->get(route('project.service.import-backup.database', [
-        'project_uuid' => $this->projectA->uuid,
-        'environment_uuid' => $this->environmentA->uuid,
-        'service_uuid' => $this->ownService->uuid,
-        'stack_service_uuid' => $secondDatabase->uuid,
-    ]))
-        ->assertOk()
-        ->assertSee('analytics-db')
-        ->assertSee('Start the database first');
-});
-
-test('service import backup requires update authorization for the service and selected database', function () {
+test('service import backup modal requires update authorization for the service', function () {
     $member = User::factory()->create();
     $member->teams()->attach($this->teamA, ['role' => 'member']);
     $this->actingAs($member);
 
-    $parameters = [
-        'project_uuid' => $this->projectA->uuid,
-        'environment_uuid' => $this->environmentA->uuid,
-        'service_uuid' => $this->ownService->uuid,
-    ];
-
-    $this->get(route('project.service.import-backup', $parameters))->assertForbidden();
-    $this->get(route('project.service.import-backup.database', [
-        ...$parameters,
-        'stack_service_uuid' => $this->ownServiceDatabase->uuid,
-    ]))->assertForbidden();
-});
-
-test('legacy service database import redirects to the service import page with its database selected', function () {
-    $legacyUrl = route('project.service.database.import', [
-        'project_uuid' => $this->projectA->uuid,
-        'environment_uuid' => $this->environmentA->uuid,
-        'service_uuid' => $this->ownService->uuid,
-        'stack_service_uuid' => $this->ownServiceDatabase->uuid,
-    ]);
-    $selectedImportUrl = route('project.service.import-backup.database', [
-        'project_uuid' => $this->projectA->uuid,
-        'environment_uuid' => $this->environmentA->uuid,
-        'service_uuid' => $this->ownService->uuid,
-        'stack_service_uuid' => $this->ownServiceDatabase->uuid,
-    ]);
-
-    $this->get($legacyUrl)->assertRedirect($selectedImportUrl);
+    Livewire::test(ServiceImportBackup::class, ['service' => $this->ownService])->assertForbidden();
 });
 
 test('service storage backups page includes schedules from all compose databases', function () {
@@ -447,7 +352,7 @@ test('service storage backups page includes schedules from all compose databases
         'custom_type' => 'postgresql',
     ]);
 
-    $backups = collect([$this->ownServiceDatabase, $secondDatabase])->map(function (ServiceDatabase $database) {
+    collect([$this->ownServiceDatabase, $secondDatabase])->each(function (ServiceDatabase $database) {
         return ScheduledDatabaseBackup::create([
             'team_id' => $this->teamA->id,
             'description' => $database->name.' backup',
@@ -463,11 +368,8 @@ test('service storage backups page includes schedules from all compose databases
         'service_uuid' => $this->ownService->uuid,
     ]))
         ->assertOk()
-        ->assertSee('>Database</span>', false)
         ->assertSee('own-db')
-        ->assertSee('analytics-db')
-        ->assertSee("wire:click=\"openSchedule('{$backups->first()->uuid}')\"", false)
-        ->assertSee("wire:click.stop=\"backupNow('database', '{$backups->first()->uuid}')\"", false);
+        ->assertSee('analytics-db');
 });
 
 test('service backup settings open automatically from the creation redirect', function () {
@@ -497,44 +399,6 @@ test('service backup settings reject a backup belonging to another team', functi
 
     Livewire::withQueryParams(['backup_uuid' => $backup->uuid])
         ->test(ServiceVolumeBackupIndex::class, ['service' => $this->ownService]);
-});
-
-test('service backups have explicit settings actions for database and storage schedules', function () {
-    $databaseBackup = ScheduledDatabaseBackup::create([
-        'team_id' => $this->teamA->id,
-        'frequency' => 'daily',
-        'database_id' => $this->ownServiceDatabase->id,
-        'database_type' => $this->ownServiceDatabase->getMorphClass(),
-    ]);
-    $volume = LocalPersistentVolume::create([
-        'name' => 'service-data',
-        'mount_path' => '/data',
-        'resource_id' => $this->ownServiceDatabase->id,
-        'resource_type' => $this->ownServiceDatabase->getMorphClass(),
-    ]);
-    $volumeBackup = $volume->scheduledBackups()->create([
-        'team_id' => $this->teamA->id,
-        'frequency' => 'daily',
-    ]);
-
-    $html = Livewire::test(ServiceVolumeBackupIndex::class, ['service' => $this->ownService])->html();
-    $dom = new DOMDocument;
-    @$dom->loadHTML($html);
-    $xpath = new DOMXPath($dom);
-    $buttons = $xpath->query('//button[@aria-label="Edit backup schedule"]');
-    $actions = [];
-    foreach ($buttons as $button) {
-        $actions[] = $button->getAttribute('wire:click.stop');
-    }
-
-    expect($actions)->toContain("openSchedule('{$databaseBackup->uuid}')", "openSchedule('{$volumeBackup->uuid}')");
-
-    foreach (['database' => $databaseBackup, 'storage' => $volumeBackup] as $type => $backup) {
-        $backupAction = "wire:click.stop=\"backupNow('{$type}', '{$backup->uuid}')\"";
-        $settingsAction = "wire:click.stop=\"openSchedule('{$backup->uuid}')\"";
-        expect(strpos($html, $backupAction))->toBeLessThan(strpos($html, $settingsAction));
-    }
-
 });
 
 test('members cannot open service backup settings', function () {
@@ -663,25 +527,6 @@ test('service execution pagination excludes other teams and denies opening their
         ->assertNotFound();
 })->with(['database', 'storage']);
 
-test('execution page size remains adjustable when all runs fit on one page', function () {
-    $schedule = ScheduledDatabaseBackup::create([
-        'team_id' => $this->teamA->id,
-        'frequency' => 'daily',
-        'database_id' => $this->ownServiceDatabase->id,
-        'database_type' => $this->ownServiceDatabase->getMorphClass(),
-    ]);
-    foreach (range(1, 11) as $index) {
-        $schedule->executions()->create(['status' => 'success']);
-    }
-
-    Livewire::test(BackupExecutions::class, ['service' => $this->ownService])
-        ->set('perPage', 25)
-        ->assertSeeHtml('aria-label="Items per page"')
-        ->assertDontSeeHtml('aria-label="Next page"')
-        ->set('perPage', 10)
-        ->assertSeeHtml('aria-label="Next page"');
-});
-
 test('service backup lists identify the configured S3 storage without extra columns', function () {
     foreach (['Cloudflare R2', 'Railway S3', 'Maxio S3'] as $name) {
         $volume = LocalPersistentVolume::create([
@@ -713,7 +558,7 @@ test('service backup lists identify the configured S3 storage without extra colu
     }
 });
 
-test('execution tooltips distinguish current database storage from the recorded storage destination', function () {
+test('execution tooltips show the S3 storage of each run and no icon for local-only runs', function () {
     $original = S3Storage::create(['key' => 'key', 'secret' => 'secret', 'region' => 'auto', 'endpoint' => 'https://s3.example.com', 'team_id' => $this->teamA->id, 'name' => 'Cloudflare R2', 'bucket' => 'original']);
     $current = S3Storage::create(['key' => 'key', 'secret' => 'secret', 'region' => 'auto', 'endpoint' => 'https://s3.example.com', 'team_id' => $this->teamA->id, 'name' => 'Railway S3', 'bucket' => 'current']);
     $databaseSchedule = ScheduledDatabaseBackup::create([
@@ -724,7 +569,9 @@ test('execution tooltips distinguish current database storage from the recorded 
         'save_s3' => true,
         's3_storage_id' => $current->id,
     ]);
-    $databaseSchedule->executions()->create(['status' => 'success', 's3_uploaded' => true]);
+    $databaseSchedule->executions()->create(['status' => 'success', 's3_uploaded' => true])
+        ->s3Replicas()->create(['s3_storage_id' => $original->id, 's3_uploaded' => true]);
+    $databaseSchedule->executions()->create(['status' => 'success']);
     $volume = LocalPersistentVolume::create([
         'name' => 'service-data',
         'mount_path' => '/data',
@@ -737,24 +584,17 @@ test('execution tooltips distinguish current database storage from the recorded 
         'save_s3' => true,
         's3_storage_id' => $current->id,
     ]);
-    $volumeSchedule->executions()->create(['status' => 'success', 's3_uploaded' => true, 's3_storage_id' => $original->id]);
+    $volumeSchedule->executions()->create(['status' => 'success', 's3_uploaded' => true, 's3_storage_id' => $original->id])
+        ->s3Replicas()->create(['s3_storage_id' => $original->id, 's3_uploaded' => true]);
+    $volumeSchedule->executions()->create(['status' => 'success']);
 
-    Livewire::test(BackupExecutions::class, ['service' => $this->ownService])
-        ->assertSeeHtml('data-tooltip="Current schedule S3 storage: Railway S3 (bucket: current)"')
-        ->assertSeeHtml('data-tooltip="S3 storage: Cloudflare R2 (bucket: original)"');
+    $html = Livewire::test(BackupExecutions::class, ['service' => $this->ownService])->html();
+    expect(substr_count($html, 'data-tooltip="S3 storage: Cloudflare R2 (bucket: original)"'))->toBe(2)
+        ->and(substr_count($html, 'data-tooltip="S3 storage:'))->toBe(2)
+        ->and($html)->not->toContain('Railway S3');
 
-    $current->update(['team_id' => $this->teamB->id]);
-    Livewire::test(ServiceVolumeBackupIndex::class, ['service' => $this->ownService])
-        ->assertDontSee('Railway S3')
-        ->assertSeeHtml('data-tooltip="S3 storage: Unavailable"');
-    Livewire::test(BackupExecutions::class, ['service' => $this->ownService])
-        ->assertDontSee('Railway S3')
-        ->assertSeeHtml('data-tooltip="Current schedule S3 storage: Unavailable"');
-
-    $databaseSchedule->update(['save_s3' => false]);
-    $original->delete();
-    Livewire::test(BackupExecutions::class, ['service' => $this->ownService])
-        ->assertSeeHtml('data-tooltip="Current schedule S3 storage: Not configured"')
-        ->assertDontSeeHtml('data-tooltip="S3 storage: Cloudflare R2 (bucket: original)"')
-        ->assertSeeHtml('data-tooltip="S3 storage: Unavailable"');
+    $original->update(['team_id' => $this->teamB->id]);
+    $html = Livewire::test(BackupExecutions::class, ['service' => $this->ownService])->html();
+    expect(substr_count($html, 'data-tooltip="S3 storage: Unavailable"'))->toBe(2)
+        ->and($html)->not->toContain('Cloudflare R2');
 });

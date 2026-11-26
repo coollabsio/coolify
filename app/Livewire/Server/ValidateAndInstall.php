@@ -8,6 +8,7 @@ use App\Events\ServerValidated;
 use App\Jobs\CheckAndStartSentinelJob;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -117,7 +118,13 @@ class ValidateAndInstall extends Component
             $this->authorize('update', $this->server);
             Server::throttleValidation($this->server->team_id, $this->server->ip);
             if ($this->server->hetzner_server_id) {
-                $status = $this->server->refreshHetznerState();
+                try {
+                    $status = $this->server->refreshHetznerState();
+                } catch (\Throwable $e) {
+                    // The provider API can be down or the token revoked; the SSH checks below still decide.
+                    Log::warning('Could not refresh the Hetzner server status before validation', ['server_id' => $this->server->id, 'error' => $e->getMessage()]);
+                    $status = null;
+                }
                 $this->server->refresh();
 
                 if (in_array($status, ['initializing', 'starting', 'stopping', 'off', 'deleting', 'rebuilding', 'migrating'], true)) {
@@ -202,7 +209,7 @@ class ValidateAndInstall extends Component
 
         $this->supported_os_type = $this->server->validateOS();
         if (! $this->supported_os_type) {
-            $this->error = 'Server OS type is not supported. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+            $this->error = Server::UNSUPPORTED_OS_MESSAGE;
             $this->server->update([
                 'validation_logs' => $this->error,
             ]);

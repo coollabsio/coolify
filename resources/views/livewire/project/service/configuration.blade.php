@@ -15,6 +15,11 @@
     @endphp
 
     <section class="application-settings-workspace mt-4 w-full max-w-none lg:mt-0">
+        @if ($currentRoute !== 'project.service.template')
+            <livewire:project.service.template-update-banner :service="$service"
+                :href="route('project.service.template', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'service_uuid' => $service->uuid])"
+                :wire:key="'tpl-banner-' . $service->uuid" />
+        @endif
         <div class="grid min-w-0 gap-8 xl:grid-cols-[210px_minmax(0,1fr)] xl:gap-8">
             <x-service.configuration-sidebar :service="$service" :current-route="$currentRoute"
                 :storage-sections="$storageSections" />
@@ -51,7 +56,7 @@
                                         <div>Resource</div>
                                         <div>Image</div>
                                         <div class="justify-self-start">Status</div>
-                                        <div></div>
+                                        <span class="text-right">Actions</span>
                                     </div>
                                 @endif
 
@@ -81,6 +86,7 @@
                         :lazy="(bool) ($service->server ?? $service->destination?->server)?->isTrafficAnalyticsEnabled()" />
                 @elseif ($currentRoute === 'project.service.domains')
                     <livewire:project.service.domains :service="$service" />
+                @elseif ($currentRoute === 'project.service.maintenance')
                     <livewire:project.shared.maintenance :resource="$service" />
                 @elseif ($currentRoute === 'project.service.environment-variables')
                     <livewire:project.shared.environment-variable.all :resource="$service" />
@@ -106,10 +112,18 @@
                     <livewire:project.shared.webhooks :resource="$service" />
                 @elseif ($currentRoute === 'project.service.resource-operations')
                     <livewire:project.shared.resource-operations :resource="$service" />
+                @elseif ($currentRoute === 'project.service.vulnerabilities')
+                    <div class="flex flex-col gap-6">
+                        <livewire:image-scan.vulnerabilities resource-type="service" :resource-uuid="$service->uuid" />
+                        <livewire:image-scan.packages resource-type="service" :resource-uuid="$service->uuid" />
+                        <livewire:image-scan.scan-settings scope-type="service" :scope-uuid="$service->uuid" />
+                    </div>
                 @elseif ($currentRoute === 'project.service.tags')
                     <livewire:project.shared.tags :resource="$service" />
                 @elseif ($currentRoute === 'project.service.danger')
                     <livewire:project.shared.danger :resource="$service" />
+                @elseif ($currentRoute === 'project.service.template')
+                    <livewire:project.service.template-update :service="$service" />
                 @endif
             </div>
         </div>

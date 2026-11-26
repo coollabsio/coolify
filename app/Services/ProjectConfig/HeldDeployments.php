@@ -1,0 +1,139 @@
+<?php
+
+namespace App\Services\ProjectConfig;
+
+use App\Actions\Application\StopApplicationOneServer;
+use App\Actions\Database\RestartDatabase;
+use App\Actions\Database\StartDatabase;
+use App\Actions\Database\StopDatabase;
+use App\Actions\Service\RestartService;
+use App\Actions\Service\StartService;
+use App\Actions\Service\StopService;
+use App\Enums\ApplicationDeploymentStatus;
+use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
+use App\Models\EnvironmentConfigLink;
+use App\Models\EnvironmentConfigRevision;
+use App\Models\Service;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * Deployments of a push that wait until the file of the same push is applied.
+ */
+class HeldDeployments
+{
+    /**
+     * Queues the deployment. When the queue of the server is full, records a failed deployment, so the push is not lost silently.
+     */
+    public function deploy(Application $application, ?string $commit): void
+    {
+        $result = queue_application_deployment(
+            application: $application,
+            deployment_uuid: new_public_id(),
+            commit: $commit,
+            is_webhook: true,
+        );
+        if (data_get($result, 'status') === 'queue_full') {
+            $this->recordFailedDeployment($application, $commit, 'The deployment after the coolify.json apply was not queued: '.data_get($result, 'message'));
+        }
+    }
+
+    /**
+     * Stops a resource that moved to another destination on the destination that it left. The copy keeps the
+     * old destination, because the stop actions stop the containers on the destination of the model.
+     */
+    public function stopOnOldDestination(Model $resource, Model $oldDestination): void
+    {
+        if ($resource instanceof Application) {
+            StopApplicationOneServer::run($resource, $oldDestination->server);
+
+            return;
+        }
+        $copy = $resource->fresh();
+        $copy->setRelation('destination', $oldDestination);
+        $resource instanceof Service ? StopService::run($copy) : StopDatabase::run($copy);
+    }
+
+    /**
+     * Starts a new database or service, or restarts a changed one.
+     */
+    public function restart(Model $resource, bool $created): void
+    {
+        $database = str_starts_with($resource::class, 'App\\Models\\Standalone');
+        match (true) {
+            $database && $created => StartDatabase::dispatch($resource),
+            $database => RestartDatabase::dispatch($resource),
+            $created => StartService::dispatch($resource),
+            default => RestartService::dispatch($resource, false),
+        };
+    }
+
+    /**
+     * Deploys the held applications and the changed applications, each one time.
+     *
+     * @param  list<Application>  $changed
+     * @param  list<string>  $skipUuids  applications that wait for a required value
+     */
+    public function release(EnvironmentConfigRevision $revision, array $changed, array $skipUuids = []): void
+    {
+        $commits = [];
+        foreach ($changed as $application) {
+            $commits[$application->uuid] = null;
+        }
+        foreach ($revision->held_deployments ?? [] as $held) {
+            $commits[$held['application_uuid']] = $held['commit_sha'] ?? null;
+        }
+
+        $this->deployEach($revision->link, array_diff_key($commits, array_flip($skipUuids)));
+    }
+
+    /**
+     * Deploys applications of the environment of the link. Removed applications are soft deleted and skipped.
+     *
+     * @param  array<string, ?string>  $commits  application uuid => commit
+     */
+    public function deployEach(EnvironmentConfigLink $link, array $commits): void
+    {
+        foreach ($commits as $uuid => $commit) {
+            $application = $this->application($link, $uuid);
+            if ($application !== null) {
+                $this->deploy($application, $commit);
+            }
+        }
+    }
+
+    /**
+     * Records a failed deployment for each held application, with the reason.
+     */
+    public function fail(EnvironmentConfigRevision $revision, string $reason): void
+    {
+        foreach ($revision->held_deployments ?? [] as $held) {
+            $application = $this->application($revision->link, $held['application_uuid']);
+            if ($application === null) {
+                continue;
+            }
+            $this->recordFailedDeployment($application, $held['commit_sha'] ?? null, "coolify.json was not applied: {$reason}");
+        }
+    }
+
+    private function recordFailedDeployment(Application $application, ?string $commit, string $message): void
+    {
+        $server = $application->destination?->server;
+        ApplicationDeploymentQueue::create([
+            'application_id' => $application->id,
+            'application_name' => $application->name,
+            'server_id' => $server?->id,
+            'server_name' => $server?->name,
+            'destination_id' => $application->destination_id,
+            'deployment_uuid' => new_public_id(),
+            'commit' => $commit ?? 'HEAD',
+            'is_webhook' => true,
+            'status' => ApplicationDeploymentStatus::FAILED->value,
+        ])->addLogEntry($message, 'stderr');
+    }
+
+    private function application(EnvironmentConfigLink $link, string $uuid): ?Application
+    {
+        return Application::query()->where('environment_id', $link->environment_id)->where('uuid', $uuid)->first();
+    }
+}

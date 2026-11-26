@@ -176,6 +176,7 @@ class ApplicationConfigurationSnapshot
             $this->item('use_build_secrets', 'Use build secrets', data_get($this->application, 'settings.use_build_secrets'), 'build'),
             $this->item('inject_build_args_to_dockerfile', 'Inject build args to Dockerfile', data_get($this->application, 'settings.inject_build_args_to_dockerfile'), 'build'),
             $this->item('include_source_commit_in_build', 'Include source commit in build', data_get($this->application, 'settings.include_source_commit_in_build'), 'build'),
+            $this->item('include_network_hosts_in_build', 'Include network hosts in build', data_get($this->application, 'settings.include_network_hosts_in_build'), 'build'),
             $this->item('disable_build_cache', 'Disable build cache', data_get($this->application, 'settings.disable_build_cache'), 'build'),
             $this->item('is_build_server_enabled', 'Build server', data_get($this->application, 'settings.is_build_server_enabled'), 'build'),
         ];
@@ -243,6 +244,7 @@ class ApplicationConfigurationSnapshot
             $this->item('http_basic_auth_bcrypt_cost', 'HTTP basic auth bcrypt cost factor', $this->application->http_basic_auth_bcrypt_cost, 'redeploy'),
             $this->item('http_basic_auth_argon2id_memory_cost', 'HTTP basic auth Argon2id memory (KiB)', $this->application->http_basic_auth_argon2id_memory_cost, 'redeploy'),
             $this->item('http_basic_auth_argon2id_time_cost', 'HTTP basic auth Argon2id iterations', $this->application->http_basic_auth_argon2id_time_cost, 'redeploy'),
+            $this->item('ip_allowlist', 'IP allowlist', $this->application->ip_allowlist, 'redeploy'),
         ];
     }
 
@@ -349,6 +351,10 @@ class ApplicationConfigurationSnapshot
             'is_buildtime' => $environmentVariable->is_buildtime,
             'is_runtime' => $environmentVariable->is_runtime,
         ];
+        // Only set when scoped, so the snapshots of earlier deployments stay equal.
+        if ($environmentVariable->compose_services !== null) {
+            $compareValue['compose_services'] = $environmentVariable->compose_services;
+        }
 
         // Locked (is_shown_once) variables are always redacted and never store a value.
         if ($locked) {
@@ -398,6 +404,9 @@ class ApplicationConfigurationSnapshot
         $lines->push('Available at runtime: '.($environmentVariable->is_runtime ? 'enabled' : 'disabled'));
         $lines->push('Multiline: '.($environmentVariable->is_multiline ? 'enabled' : 'disabled'));
         $lines->push('Literal: '.($environmentVariable->is_literal ? 'enabled' : 'disabled'));
+        if ($environmentVariable->compose_services !== null) {
+            $lines->push('Compose services: '.implode(', ', $environmentVariable->compose_services));
+        }
 
         return $lines->implode("\n");
     }

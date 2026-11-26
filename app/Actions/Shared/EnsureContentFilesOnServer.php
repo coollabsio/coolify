@@ -10,7 +10,8 @@ use Lorisleiva\Actions\Concerns\AsAction;
 /**
  * `docker compose up` creates a missing bind source as an empty directory. The queued
  * ServerStorageSaveJob writes new content files, but it can run after the containers start. This
- * action writes each missing content file before `docker compose up`.
+ * action writes each missing content file before `docker compose up`. A file without content
+ * becomes an empty file.
  *
  * It checks all files with one server command. It writes a file only when the path is missing or
  * is an empty directory. It does not change a file that exists, and it does not delete a directory

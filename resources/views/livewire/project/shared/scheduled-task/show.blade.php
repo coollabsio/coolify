@@ -12,6 +12,12 @@
         @endforeach
     </nav>
 
+    @if (! $isEnabled && $task->disabled_reason)
+        <x-callout type="danger" title="Disabled because it keeps failing">
+            {{ $task->disabled_reason }} Fix the task, then click Enable.
+        </x-callout>
+    @endif
+
     <form x-show="activeSection === 'general'" wire:submit="submit" class="application-settings-form flex flex-col">
         <x-unsaved-bar action="submit" />
         <x-application.settings-section id="task-configuration-section" title="Task configuration"
@@ -48,6 +54,11 @@
             <div class="mt-4">
                 <x-forms.input canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)"
                     placeholder="php artisan schedule:run" id="command" label="Command" required />
+            </div>
+            <div class="mt-2 md:w-1/2">
+                <x-forms.checkbox canGate="update" :canResource="$resource" :disabled="!auth()->user()->can('update', $resource)"
+                    id="useShell" label="Run in a shell"
+                    helper="Run the command with <span class='font-mono'>sh -c</span>, so you can use variables, pipes, and redirects. Turn it off for containers without a shell (distroless or scratch images): Coolify then splits the command into arguments and runs it directly." />
             </div>
         </x-application.settings-section>
     </form>
