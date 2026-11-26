@@ -332,6 +332,20 @@ class EnvironmentVariable extends BaseModel
     }
 
     /**
+     * Whether this variable has the same value as the other variable. Resolved values are compared too,
+     * so different references to one shared variable, such as {{team.KEY}} and {{ team.KEY }}, are the same value.
+     */
+    public function hasSameValueAs(?self $other): bool
+    {
+        if (! $other) {
+            return false;
+        }
+
+        return $this->value === $other->value
+            || $this->resolveRealValue(escapeLegacyValue: false) === $other->resolveRealValue(escapeLegacyValue: false);
+    }
+
+    /**
      * Resolved value for display and copy. References to locked shared variables, and to shared
      * variables whose value the user cannot read, keep their reference text.
      */

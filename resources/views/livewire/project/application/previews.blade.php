@@ -86,7 +86,7 @@
 
             <div class="w-full">
                 <x-forms.listbox id="isPrDeploymentsPublicEnabled" label="PR deployment access" onChange="savePreviewSettings"
-                    helper="When public, anyone can trigger PR deployments. Otherwise only PRs from branches in the same repository are deployed and fork PRs are blocked.<br><br><span class='font-bold'>Docker Compose:</span> with repository members only, a preview of a branch in the same repository deploys the compose file of its PR. Public previews, and previews added by PR number or through the API, deploy the compose file of the base branch.<br><br><span class='font-bold'>Secrets:</span> the code of a fork PR can read all environment variables of its preview. When public, previews do not get preview variables that still have the production value, and shared variables are resolved only in preview variables, not in the compose file. This is not full isolation: the preview runs on the same server as production. Give previews their own values, and do not use production secrets in them."
+                    helper="When public, anyone can trigger PR deployments. Otherwise only PRs from branches in the same repository are deployed and fork PRs are blocked. This setting applies only while preview deployments are enabled. When they are disabled, previews that you deploy by hand are deployed as repository members only.<br><br><span class='font-bold'>Docker Compose:</span> with repository members only, a preview of a branch in the same repository deploys the compose file of its PR. Public previews, and previews added by PR number or through the API, deploy the compose file of the base branch.<br><br><span class='font-bold'>Secrets:</span> the code of a fork PR can read all environment variables of its preview. When public, previews do not get preview variables that have the same value as in production (after shared variables are resolved), and shared variables are resolved only in preview variables, not in the compose file. This is not full isolation: the preview runs on the same server as production. Give previews their own values, and do not use production secrets in them."
                     :options="[
                         ['value' => false, 'label' => 'Repository members only'],
                         ['value' => true, 'label' => 'Public (fork PRs allowed)'],
@@ -108,8 +108,8 @@
             helper="Deploy a preview directly from a Docker image tag.">
             <form wire:submit.prevent="addDockerImagePreview"
                 class="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
-                <x-forms.input id="manualPullRequestId" label="Preview ID"
-                    helper="Used for domains, logs, container names, and cleanup." />
+                <x-forms.input id="manualPullRequestId" label="Preview ID" type="number" min="1"
+                    helper="A positive whole number, for example 1234. Used for domains, logs, container names, and cleanup." />
                 <x-forms.input id="manualDockerTag" label="Docker tag"
                     helper="For example, pr_1234." />
                 @can('deploy', $application)

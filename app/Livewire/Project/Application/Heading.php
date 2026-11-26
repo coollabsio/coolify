@@ -47,6 +47,7 @@ class Heading extends Component
         return [
             'compose_loaded' => '$refresh',
             'configurationChanged' => '$refresh',
+            'envsUpdated' => '$refresh',
             'update_links' => '$refresh',
             ...$this->teamChannelListeners([
                 'ServiceStatusChanged' => 'checkStatus',
@@ -166,6 +167,24 @@ class Heading extends Component
      *
      * @return array{result: array<string, mixed>, action: ?string, vulnerabilities_url: string, deployment_url: string}|null
      */
+    /**
+     * What the Restart button will do, from the same configuration diff that the deployment job uses to skip
+     * the build. A restart also builds when the image is no longer on the server, which only the job can see.
+     *
+     * @return array{builds: bool, reasons: array<int, string>}
+     */
+    #[Computed]
+    public function restartPlan(): array
+    {
+        if ($this->application->build_pack === 'dockerimage') {
+            return ['builds' => false, 'reasons' => []];
+        }
+
+        $diff = $this->application->pendingDeploymentConfigurationDiff();
+
+        return ['builds' => $diff->requiresBuild(), 'reasons' => $diff->buildReasons()];
+    }
+
     #[Computed]
     public function imageScanGate(): ?array
     {

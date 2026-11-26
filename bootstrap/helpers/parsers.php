@@ -426,6 +426,68 @@ function keepSavedComposeBindSource(Stringable $source, ?string $volume, Stringa
 }
 
 /**
+ * The name of the Docker volume that v4.7.6 and older gave a short-syntax volume with a variable, such as
+ * `${DATA}/config:/config` or `${DATA:-name}:/data`. Those versions ignored the values of the resource, so the
+ * source was a volume name. Null when the source without those values is a host path.
+ */
+function composeShortVolumeSavedName(string $volume, string $uuid): ?string
+{
+    if (! str_contains($volume, '${')) {
+        return null;
+    }
+    try {
+        $source = parseDockerVolumeString($volume)['source'];
+    } catch (Exception) {
+        return null;
+    }
+    if ($source === null || sourceIsLocal($source)) {
+        return null;
+    }
+
+    return "{$uuid}_".Str::slug($source, '-');
+}
+
+/**
+ * The host path that the values of the resource give a short-syntax volume, or null when they give a volume name
+ * or a value that is not valid.
+ *
+ * @param  array<string, string>  $variables  The plain values that the resource sets (composeVolumeSourceVariables())
+ */
+function composeShortVolumeVariableHostPath(string $volume, array $variables): ?string
+{
+    try {
+        $source = parseDockerVolumeString($volume, $variables)['source'];
+    } catch (Exception) {
+        return null;
+    }
+
+    return $source !== null && sourceIsLocal($source) ? $source->value() : null;
+}
+
+/**
+ * Like keepSavedComposeBindSource() for a named volume: a short-syntax volume that v4.7.6 and older saved as a
+ * Docker volume stays that volume while its storage entry exists, also when its variable now gives a host path.
+ * So the data does not move after the upgrade. To use the host path, the user deletes the storage entry
+ * (LocalPersistentVolume::replacedComposeHostPath()).
+ *
+ * @param  array<string, string>  $variables  The plain values that the resource sets (composeVolumeSourceVariables())
+ * @return bool Whether the parser must use the volume without the values of the resource
+ */
+function keepSavedComposeNamedVolume(string $volume, string $uuid, array $variables, Application|ServiceApplication|ServiceDatabase $owner, Application|Service $resource): bool
+{
+    $name = composeShortVolumeSavedName($volume, $uuid);
+    if ($name === null || ! $owner->persistentStorages()->where('name', $name)->exists()) {
+        return false;
+    }
+    $hostPath = composeShortVolumeVariableHostPath($volume, $variables);
+    if ($hostPath !== null) {
+        $resource->addComposeVolumeWarning("The volume {$name} stays in use, so its data does not move. Its variable gives the host path {$hostPath}. To use that path, copy the data, delete the storage entry {$name} in Persistent Storage, and redeploy.");
+    }
+
+    return true;
+}
+
+/**
  * The environment variables that Coolify writes to the `.env` file, where Docker Compose reads the variables of the Compose file.
  */
 function composeEnvironmentVariablesQuery(Application|Service $resource, bool $isPreview = false): mixed
@@ -1349,7 +1411,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         ? ($resource->previews()->find($preview_id) ?? ApplicationPreview::where('application_id', $resource->id)->where('pull_request_id', $pullRequestId)->first())
         : null;
     // A public preview can run the compose file of a fork pull request. A preview from before v4.5.1 keeps the production values.
-    $isPublicPullRequest = $isPullRequest && (bool) data_get($resource, 'settings.is_pr_deployments_public_enabled') && ! $pullRequestPreview?->keeps_production_values;
+    $isPublicPullRequest = $isPullRequest && (bool) $resource->settings?->hasPublicPrDeployments() && ! $pullRequestPreview?->keeps_production_values;
     // The Compose file of a pull request deploys only that preview: it reads the rows of the application, but does not add or change them.
     $keepsApplicationRows = $isPullRequest && $resource->usesPullRequestComposeFile;
     $server = data_get($resource, 'destination.server');
@@ -1726,11 +1788,18 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $content = null;
                 $isDirectory = false;
                 if (is_string($volume)) {
-                    $parsed = parseDockerVolumeString($volume, str_contains($volume, '${')
+                    $volumeVariables = str_contains($volume, '${')
                         ? $volumeSourceVariables ??= composeVolumeSourceVariables($resource, $isPullRequest)
-                        : null);
+                        : null;
+                    $keepsSavedVolume = $volumeVariables !== null
+                        && keepSavedComposeNamedVolume($volume, $uuid, $volumeVariables, $originalResource, $resource);
+                    $parsed = parseDockerVolumeString($volume, $keepsSavedVolume ? null : $volumeVariables);
                     $source = $parsed['source'];
                     $target = $parsed['target'];
+                    if ($keepsSavedVolume && ! $isPullRequest) {
+                        // An earlier parse of this version mounted the host path. That bind is not mounted anymore.
+                        forgetComposeBindStorage($originalResource, $target->value());
+                    }
                     // Mode is available in $parsed['mode'] if needed
                     $foundConfig = findLocalFileVolumeConfig($originalResource, $source, $target, is_string($volume) ? $volume : null);
                     if (sourceIsLocal($source)) {
@@ -1906,23 +1975,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         }
 
         if (! $use_network_mode) {
-            if ($topLevel->get('networks')?->count() > 0) {
-                foreach ($topLevel->get('networks') as $networkName => $network) {
-                    if ($networkName === 'default') {
-                        continue;
-                    }
-                    // ignore aliases
-                    if ($network['aliases'] ?? false) {
-                        continue;
-                    }
-                    $networkExists = $networks->contains(function ($value, $key) use ($networkName) {
-                        return $value == $networkName || $key == $networkName;
-                    });
-                    if (! $networkExists) {
-                        $networks->put($networkName, null);
-                    }
-                }
-            }
             $baseNetworkExists = $networks->contains(function ($value, $_) use ($baseNetwork) {
                 return $value == $baseNetwork;
             });
@@ -2319,8 +2371,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $dbEnv = $isPullRequest
                         ? $resource->environment_variables_preview()->where('key', $key)->first()
                         : $resource->environment_variables()->where('key', $key)->first();
-                    // A public preview does not get preview variables that still have the production value.
-                    if ($dbEnv && $isPublicPullRequest && $resource->environment_variables()->where('key', $key)->first()?->value === $dbEnv->value) {
+                    // A public preview does not get preview variables that have the same value as in production.
+                    if ($dbEnv && $isPublicPullRequest && $dbEnv->hasSameValueAs($resource->environment_variables()->where('key', $key)->first())) {
                         $dbEnv = null;
                     }
                     // Only use database override if it exists AND has a non-empty value
@@ -2484,11 +2536,16 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if (! $use_network_mode) {
             $payload['networks'] = $networks_temp;
         }
+        // Yaml::dump writes an empty list as a mapping ({}), which docker compose rejects.
         if ($ports->count() > 0) {
             $payload['ports'] = $ports;
+        } else {
+            $payload->forget('ports');
         }
         if ($volumesParsed->count() > 0) {
             $payload['volumes'] = $volumesParsed;
+        } else {
+            $payload->forget('volumes');
         }
         if ($environment->count() > 0 || $coolifyEnvironments->count() > 0) {
             $environment = preserveLegacyDockerComposeNullAssignments($environment, $legacyNullEnvironmentVariables);
@@ -3102,11 +3159,18 @@ function serviceParser(Service $resource): Collection
                 $content = null;
                 $isDirectory = false;
                 if (is_string($volume)) {
-                    $parsed = parseDockerVolumeString($volume, str_contains($volume, '${')
+                    $volumeVariables = str_contains($volume, '${')
                         ? $volumeSourceVariables ??= composeVolumeSourceVariables($resource)
-                        : null);
+                        : null;
+                    $keepsSavedVolume = $volumeVariables !== null
+                        && keepSavedComposeNamedVolume($volume, $uuid, $volumeVariables, $originalResource, $resource);
+                    $parsed = parseDockerVolumeString($volume, $keepsSavedVolume ? null : $volumeVariables);
                     $source = $parsed['source'];
                     $target = $parsed['target'];
+                    if ($keepsSavedVolume) {
+                        // An earlier parse of this version mounted the host path. That bind is not mounted anymore.
+                        forgetComposeBindStorage($originalResource, $target->value());
+                    }
                     // Mode is available in $parsed['mode'] if needed
                     $foundConfig = findLocalFileVolumeConfig($originalResource, $source, $target, is_string($volume) ? $volume : null);
                     if (sourceIsLocal($source)) {
@@ -3257,23 +3321,6 @@ function serviceParser(Service $resource): Collection
         }
 
         if (! $use_network_mode) {
-            if ($topLevel->get('networks')?->count() > 0) {
-                foreach ($topLevel->get('networks') as $networkName => $network) {
-                    if ($networkName === 'default') {
-                        continue;
-                    }
-                    // ignore aliases
-                    if ($network['aliases'] ?? false) {
-                        continue;
-                    }
-                    $networkExists = $networks->contains(function ($value, $key) use ($networkName) {
-                        return $value == $networkName || $key == $networkName;
-                    });
-                    if (! $networkExists) {
-                        $networks->put($networkName, null);
-                    }
-                }
-            }
             $baseNetworkExists = $networks->contains(function ($value, $_) use ($baseNetwork) {
                 return $value == $baseNetwork;
             });
@@ -3745,11 +3792,16 @@ function serviceParser(Service $resource): Collection
         if (! $use_network_mode) {
             $payload['networks'] = $networks_temp;
         }
+        // Yaml::dump writes an empty list as a mapping ({}), which docker compose rejects.
         if ($ports->count() > 0) {
             $payload['ports'] = $ports;
+        } else {
+            $payload->forget('ports');
         }
         if ($volumesParsed->count() > 0) {
             $payload['volumes'] = $volumesParsed;
+        } else {
+            $payload->forget('volumes');
         }
         if ($environment->count() > 0 || $coolifyEnvironments->count() > 0) {
             $environment = preserveLegacyDockerComposeNullAssignments($environment, $legacyNullEnvironmentVariables);

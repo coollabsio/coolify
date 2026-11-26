@@ -270,3 +270,33 @@ it('asks GitHub whether a pull request added from the list is a branch of the re
     'branch of the repository' => [100, true],
     'fork' => [200, false],
 ]);
+
+it('shows a validation error for a non-numeric manual preview id', function () {
+    $this->application->update(['build_pack' => 'dockerimage']);
+
+    Livewire::test(Previews::class, ['application' => $this->application])
+        ->set('manualPullRequestId', 'preview')
+        ->set('manualDockerTag', 'main')
+        ->call('addDockerImagePreview')
+        ->assertHasErrors(['manualPullRequestId' => 'integer']);
+
+    expect($this->application->previews()->count())->toBe(0);
+});
+
+it('creates a manual preview from a numeric preview id', function () {
+    Queue::fake();
+    $this->application->update(['build_pack' => 'dockerimage']);
+
+    Livewire::test(Previews::class, ['application' => $this->application])
+        ->set('parameters', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'application_uuid' => $this->application->uuid,
+        ])
+        ->set('manualPullRequestId', ' 12 ')
+        ->set('manualDockerTag', 'main')
+        ->call('addDockerImagePreview')
+        ->assertHasNoErrors();
+
+    expect($this->application->previews()->sole()->pull_request_id)->toBe(12);
+});

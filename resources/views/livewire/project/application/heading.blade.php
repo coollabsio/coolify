@@ -134,10 +134,28 @@
                             <button id="application-mobile-stop-trigger" type="button">Stop</button>
                         </x-slot:trigger>
                     </x-modal-confirmation>
+                    @php
+                        $restartPlan = $this->restartPlan;
+                        $restartReasons = collect($restartPlan['reasons']);
+                        $restartReasonText = $restartReasons->take(3)->implode(', ')
+                            . ($restartReasons->count() > 3 ? ' and ' . ($restartReasons->count() - 3) . ' more' : '');
+                    @endphp
                     <x-modal-confirmation title="Confirm Application Restart?" buttonTitle="Restart"
-                        submitAction="restart" :actions="[
-                            'This application will be restarted without rebuilding.',
-                        ]" :confirmWithText="false" :confirmWithPassword="false"
+                        submitAction="restart" :ignoreWire="false"
+                        :warningMessage="$restartPlan['builds']
+                            ? 'This restart builds a new image, because a build setting changed: ' . e($restartReasonText) . '.'
+                            : 'This restart does not build. It recreates the container from the current image.'"
+                        :actions="$restartPlan['builds']
+                            ? [
+                                'Build a new image. A restart cannot reuse the current image, because the build output can change.',
+                                'Recreate the container with the new image and the current runtime settings.',
+                            ]
+                            : [
+                                'Recreate the container from the current image.',
+                                'Apply the current runtime environment variables, ports, mounts, and labels.',
+                                'Build only if the image is no longer on the server.',
+                            ]"
+                        :confirmWithText="false" :confirmWithPassword="false"
                         step2ButtonText="Confirm">
                         <x-slot:trigger>
                             <button id="application-mobile-restart-trigger" type="button">Restart</button>

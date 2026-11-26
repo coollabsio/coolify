@@ -36,8 +36,9 @@ it('upstream.json contains traefik branches with patch versions', function () {
 
     // Track current supported branches so the checker can surface security patches
     // (see https://github.com/coollabsio/coolify/issues/11025)
-    expect($traefikVersions)->toHaveKeys(['v3.7', 'v3.6', 'v2.11']);
-    expect(version_compare($traefikVersions['v3.7'], '3.7.8', '>='))->toBeTrue();
+    expect($traefikVersions)->toHaveKeys(['v3.8', 'v3.7', 'v3.6', 'v2.11']);
+    expect(version_compare($traefikVersions['v3.8'], '3.8.0', '>='))->toBeTrue();
+    expect(version_compare($traefikVersions['v3.7'], '3.7.20', '>='))->toBeTrue();
     expect(version_compare($traefikVersions['v3.6'], '3.6.23', '>='))->toBeTrue();
     expect(version_compare($traefikVersions['v2.11'], '2.11.52', '>='))->toBeTrue();
 
@@ -47,7 +48,7 @@ it('upstream.json contains traefik branches with patch versions', function () {
         ->map(fn (string $branch) => ltrim($branch, 'v'))
         ->sort(SORT_NATURAL)
         ->last();
-    expect($newestBranch)->toBe('3.7');
+    expect($newestBranch)->toBe('3.8');
 });
 
 it('notification generates correct server proxy URLs', function () {

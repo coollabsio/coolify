@@ -2,6 +2,7 @@
 
 namespace App\Services\ImageScan;
 
+use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Server;
 use App\Models\ServerSetting;
 use App\Support\ValidationPatterns;
@@ -63,6 +64,12 @@ class ScannerCommands
     public const PAYLOAD_SEPARATOR = 'coolify-scan-payload';
 
     public const OOM_MARKER = 'coolify-scan-oom';
+
+    /** Printed by a captured step whose tool failed on TLS (for example an unknown CA): `coolify-scan-tls {step}`. */
+    public const TLS_MARKER = 'coolify-scan-tls';
+
+    /** The CA bundle of the server, copied into the work directory, that containers with network trust in addition to their own. */
+    private const CA_DIR = '/etc/coolify-ca';
 
     /** SBOM name of the server OS packages (`sboms/host.json`); image SBOMs are named by their 64-character ID. */
     public const HOST_SBOM = 'host';
@@ -552,9 +559,9 @@ class ScannerCommands
 
     /**
      * Splits batch output into the marker lines before `coolify-scan-payload` and the payload after it. `oom` lists
-     * the steps whose container Docker stopped at the memory limit.
+     * the steps whose container Docker stopped at the memory limit, `tls` the steps whose tool failed on TLS.
      *
-     * @return array{exit_codes: array<string, int>, sizes: array<string, int>, oom: list<string>, payload: string}
+     * @return array{exit_codes: array<string, int>, sizes: array<string, int>, oom: list<string>, tls: list<string>, payload: string}
      */
     public static function parseOutput(?string $output): array
     {
@@ -563,10 +570,16 @@ class ScannerCommands
         $exitCodes = [];
         $sizes = [];
         $oom = [];
+        $tls = [];
 
         foreach ($separator === false ? $lines : array_slice($lines, 0, $separator) as $line) {
             if (preg_match('/\A'.self::OOM_MARKER.' ([a-z-]+)\z/', $line, $matches) === 1) {
                 $oom[] = $matches[1];
+
+                continue;
+            }
+            if (preg_match('/\A'.self::TLS_MARKER.' ([a-z-]+)\z/', $line, $matches) === 1) {
+                $tls[] = $matches[1];
 
                 continue;
             }
@@ -583,6 +596,7 @@ class ScannerCommands
             'exit_codes' => $exitCodes,
             'sizes' => $sizes,
             'oom' => array_values(array_unique($oom)),
+            'tls' => array_values(array_unique($tls)),
             'payload' => $separator === false ? '' : implode("\n", array_slice($lines, $separator + 1)),
         ];
     }
@@ -671,6 +685,12 @@ class ScannerCommands
             'XDG_CACHE_HOME' => '/scratch/cache',
         ], $env);
         $mounts = ['type=bind,src='.$this->workDir().'/scratch,dst=/scratch', ...$mounts];
+        if ($network) {
+            // Go reads the files in SSL_CERT_DIR in addition to the bundle of the image, so a registry with a CA that is
+            // only installed on the server works, and public registries keep working when the directory is empty.
+            $env['SSL_CERT_DIR'] = self::CA_DIR;
+            $mounts[] = 'type=bind,src='.$this->workDir().'/ca,dst='.self::CA_DIR.',readonly';
+        }
 
         $parts = [
             "timeout -k 10 {$timeout} docker run",
@@ -697,7 +717,8 @@ class ScannerCommands
 
     /**
      * Runs a tool whose stdout is the payload: stdout goes to a root-owned file in the work directory
-     * (not mounted into the container), then at most 10485761 bytes of it are printed.
+     * (not mounted into the container), then at most 10485761 bytes of it are printed. When stderr names a TLS or
+     * certificate error, the line `coolify-scan-tls {step}` comes before the exit marker.
      *
      * With $hostFilter the output keeps one line per vulnerability ID, package, package version, fix state, and fix
      * versions, and drops the problems that the distribution will not fix, before the size is counted. All packages of
@@ -719,6 +740,7 @@ class ScannerCommands
     private function capture(string $step, string $dockerRun, ?string $template = null, ?array $auth = null, bool $hostFilter = false): array
     {
         $out = escapeshellarg($this->workDir().'/out');
+        $err = escapeshellarg($this->workDir().'/out.err');
         $dedupe = implode(' ', [
             '{ if (!match($0, /"id":"[^"]*"/)) { line[++n] = $0; next }',
             'k = substr($0, RSTART, RLENGTH); image = 0;',
@@ -733,7 +755,8 @@ class ScannerCommands
         ]);
         $run = $hostFilter
             ? "( {$dockerRun} 2>/dev/null; echo \$? > {$out}.rc ) | grep -v -F '\"fix\":\"wont-fix\"' | awk '{$dedupe}' > {$out}; frc=\$?; rc=\$(cat {$out}.rc 2>/dev/null || echo 1); if [ \"\$rc\" -eq 0 ]; then rc=\$frc; fi"
-            : "{$dockerRun} > {$out} 2>/dev/null; rc=\$?";
+            : "{$dockerRun} > {$out} 2> {$err}; rc=\$?";
+        $tls = "if grep -q -e 'x509: ' -e 'tls: ' {$err} 2>/dev/null; then echo '".self::TLS_MARKER." {$step}'; fi";
         $commands = [...$this->start($template === null ? ['scratch'] : ['scratch', 'tpl'])];
         if ($template !== null) {
             $commands[] = $this->writeFile(file_get_contents(resource_path("image-scan/{$template}")), $this->workDir()."/tpl/{$template}");
@@ -745,7 +768,7 @@ class ScannerCommands
         return [
             ...$commands,
             ...$this->ownWorkDir($auth !== null),
-            $this->shell('ulimit -f '.self::OUTPUT_FILE_LIMIT_BLOCKS."; {$run}; {$this->oomCheck($step)}; size=\$(wc -c < {$out} 2>/dev/null | tr -cd 0-9); size=\${size:-0}; if [ \"\$size\" -ge ".(self::OUTPUT_FILE_LIMIT_BLOCKS * 512).' ]; then rc=0; fi; echo "'.self::MARKER." {$step} \$rc \$size\""),
+            $this->shell('ulimit -f '.self::OUTPUT_FILE_LIMIT_BLOCKS."; {$run}; {$this->oomCheck($step)}; {$tls}; size=\$(wc -c < {$out} 2>/dev/null | tr -cd 0-9); size=\${size:-0}; if [ \"\$size\" -ge ".(self::OUTPUT_FILE_LIMIT_BLOCKS * 512).' ]; then rc=0; fi; echo "'.self::MARKER." {$step} \$rc \$size\""),
             ...$this->finish(['echo '.self::PAYLOAD_SEPARATOR, 'head -c '.(self::OUTPUT_LIMIT + 1)." {$out} 2>/dev/null || true"]),
         ];
     }
@@ -801,13 +824,18 @@ class ScannerCommands
     }
 
     /**
-     * Runs before any container used the directory, so nothing in it can be a planted link.
+     * Runs before any container used the directory, so nothing in it can be a planted link. Copies the first CA bundle
+     * of the server into `ca/` (mounted by every `dockerRun()` with network); without a bundle the directory stays empty.
      *
      * @return list<string>
      */
     private function ownWorkDir(bool $hasAuth = false): array
     {
+        $ca = escapeshellarg($this->workDir().'/ca');
+        $copy = escapeshellarg($this->workDir().'/ca/host.pem');
+        $bundles = implode(' ', ApplicationDeploymentJob::HOST_CA_BUNDLE_PATHS);
         $commands = [
+            $this->shell("mkdir -p -m 0700 {$ca} && for f in {$bundles}; do if [ -f \"\$f\" ]; then cp \"\$f\" {$copy} || true; break; fi; done"),
             'chown -R '.self::SCANNER_USER.' '.escapeshellarg($this->workDir()),
             'chmod 700 '.escapeshellarg($this->workDir()),
         ];

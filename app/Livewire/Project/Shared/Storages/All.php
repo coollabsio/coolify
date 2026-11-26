@@ -24,7 +24,7 @@ class All extends Component
     /**
      * Editable form state keyed by storage id.
      *
-     * @var array<int|string, array{name: string, mountPath: string, isPreviewSuffixEnabled: bool, isReadOnly: bool, isShared: bool, canDeleteStale: bool, replacedExternalVolume: ?string, ignoresDriverOptions: bool, canDeleteToApplyDriverOptions: bool, usedByContainers: list<string>}>
+     * @var array<int|string, array{name: string, mountPath: string, isPreviewSuffixEnabled: bool, isReadOnly: bool, isShared: bool, canDeleteStale: bool, replacedExternalVolume: ?string, replacedHostPath: ?string, ignoresDriverOptions: bool, canDeleteToApplyDriverOptions: bool, usedByContainers: list<string>}>
      */
     public array $forms = [];
 
@@ -247,6 +247,7 @@ class All extends Component
                     && ! $storage->isDeclaredInCompose(),
                 'canDeleteToApplyDriverOptions' => $this->canUpdate && $ignoresDriverOptions,
                 'replacedExternalVolume' => $this->isComposeOrService ? $storage->replacedExternalComposeVolume() : null,
+                'replacedHostPath' => $this->isComposeOrService ? $storage->replacedComposeHostPath() : null,
                 'ignoresDriverOptions' => $ignoresDriverOptions,
                 'usedByContainers' => [],
             ];

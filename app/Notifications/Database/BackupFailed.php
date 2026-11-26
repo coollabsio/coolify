@@ -3,6 +3,7 @@
 namespace App\Notifications\Database;
 
 use App\Contracts\ThrottledNotification;
+use App\Enums\BackupTrigger;
 use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\CustomEmailNotification;
@@ -21,9 +22,12 @@ class BackupFailed extends CustomEmailNotification implements ThrottledNotificat
 
     public string $frequency;
 
-    public function __construct(public ScheduledDatabaseBackup $backup, public $database, public $output, public $database_name)
+    public BackupTrigger $trigger = BackupTrigger::Scheduled;
+
+    public function __construct(public ScheduledDatabaseBackup $backup, public $database, public $output, public $database_name, BackupTrigger $trigger = BackupTrigger::Scheduled)
     {
         $this->onQueue('high');
+        $this->trigger = $trigger;
         $this->name = $database->name;
         $this->frequency = $backup->frequency;
     }
@@ -51,6 +55,7 @@ class BackupFailed extends CustomEmailNotification implements ThrottledNotificat
             'name' => $this->name,
             'database_name' => $this->database_name,
             'frequency' => $this->frequency,
+            'trigger' => $this->trigger->label(),
             'output' => $this->output,
             'reminder' => NotificationThrottle::FAILURE_REMINDER_TEXT,
         ]);
@@ -68,6 +73,7 @@ class BackupFailed extends CustomEmailNotification implements ThrottledNotificat
         );
 
         $message->addField('Frequency', $this->frequency, true);
+        $message->addField('Trigger', $this->trigger->label(), true);
         $message->addField('Output', $this->output);
 
         return $message;
@@ -75,7 +81,7 @@ class BackupFailed extends CustomEmailNotification implements ThrottledNotificat
 
     public function toTelegram(): array
     {
-        $message = "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was FAILED.\n\nReason:\n{$this->output}";
+        $message = "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was FAILED.\nTrigger: {$this->trigger->label()}\n\nReason:\n{$this->output}";
 
         return [
             'message' => $message,
@@ -87,7 +93,7 @@ class BackupFailed extends CustomEmailNotification implements ThrottledNotificat
         return new PushoverMessage(
             title: 'Database backup failed',
             level: 'error',
-            message: "Database backup for {$this->name} (db:{$this->database_name}) was FAILED<br/><br/><b>Frequency:</b> {$this->frequency} .<br/><b>Reason:</b> {$this->output}",
+            message: "Database backup for {$this->name} (db:{$this->database_name}) was FAILED<br/><br/><b>Frequency:</b> {$this->frequency}.<br/><b>Trigger:</b> {$this->trigger->label()}<br/><b>Reason:</b> {$this->output}",
         );
     }
 
@@ -97,6 +103,7 @@ class BackupFailed extends CustomEmailNotification implements ThrottledNotificat
         $description = "Database backup for {$this->name} (db:{$this->database_name}) has FAILED.";
 
         $description .= "\n\n*Frequency:* {$this->frequency}";
+        $description .= "\n\n*Trigger:* {$this->trigger->label()}";
         $description .= "\n\n*Error Output:* {$this->output}";
 
         return new SlackMessage(
@@ -118,6 +125,7 @@ class BackupFailed extends CustomEmailNotification implements ThrottledNotificat
             'database_uuid' => $this->database->uuid,
             'database_type' => $this->database_name,
             'frequency' => $this->frequency,
+            'trigger' => $this->trigger->value,
             'error_output' => $this->output,
             'url' => $url,
         ];

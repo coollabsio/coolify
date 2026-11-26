@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\BackupTrigger;
 use App\Events\BackupCreated;
 use App\Helpers\SshMultiplexingHelper;
 use App\Helpers\SshRetryHandler;
@@ -99,6 +100,11 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
     public $timeout = 3600 + self::WORKER_TIMEOUT_MARGIN_SECONDS;
 
     public ?string $backup_log_uuid = null;
+
+    /**
+     * Set by UpdateCoolify for the backup that runs before an update.
+     */
+    public bool $beforeUpdate = false;
 
     /**
      * Queued with the payload, so failed() finds this run's executions after a worker timeout.
@@ -473,7 +479,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                         ]);
                     }
                     try {
-                        $this->team?->notify(new BackupFailed($this->backup, $this->database, $failureMessage, $database));
+                        $this->team?->notify(new BackupFailed($this->backup, $this->database, $failureMessage, $database, $this->trigger()));
                     } catch (Throwable $notifyException) {
                         Log::channel('scheduled-errors')->warning('Failed to send backup failure notification', [
                             'backup_id' => $this->backup->uuid,
@@ -528,9 +534,9 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
                     // failures never affect backup status — see GitHub issue #9088)
                     try {
                         if ($s3UploadError) {
-                            $this->team->notify(new BackupSuccessWithS3Warning($this->backup, $this->database, $database, $s3UploadError));
+                            $this->team->notify(new BackupSuccessWithS3Warning($this->backup, $this->database, $database, $s3UploadError, $this->trigger()));
                         } else {
-                            $this->team->notify(new BackupSuccess($this->backup, $this->database, $database));
+                            $this->team->notify(new BackupSuccess($this->backup, $this->database, $database, $this->trigger()));
                         }
                     } catch (Throwable $e) {
                         Log::channel('scheduled-errors')->warning('Failed to send backup success notification', [
@@ -1037,19 +1043,20 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
             $key = ltrim($this->backup_dir, '/').'/'.basename($this->backup_location);
             $isUploaded = fn (): bool => false;
             if ($s3->usesCurlTransfer()) {
-                $uploadCommand = $s3->prepareCurlUpload($this->server, $container, $this->backup_location, $key);
+                $curlUploadCommand = $s3->prepareCurlUpload($this->server, $container, $this->backup_location, $key);
+                $uploadCommand = fn (): string => $curlUploadCommand;
             } else {
                 $escapedBackupLocation = escapeshellarg($this->backup_location);
                 $escapedS3Destination = escapeshellarg("temporary/{$bucket}{$this->backup_dir}/");
                 $resolveOptions = $s3->minioClientResolveOptions($this->server, $fullImageName, $network);
                 $partSizeOption = S3Storage::minioClientPartSizeOption($this->size);
                 $this->setMinioClientAlias($this->server, "backup-of-{$this->backup_log_uuid}", $s3, $resolveOptions);
-                $uploadCommand = "docker exec {$partSizeOption} backup-of-{$this->backup_log_uuid} mc cp{$resolveOptions} {$escapedBackupLocation} {$escapedS3Destination}";
+                $uploadCommand = fn (string $checksumOption): string => "docker exec {$partSizeOption} backup-of-{$this->backup_log_uuid} mc cp{$resolveOptions}{$checksumOption} {$escapedBackupLocation} {$escapedS3Destination}";
                 $size = (int) $this->size;
                 $isUploaded = fn (): bool => $s3->minioClientObjectHasSize($this->server, $container, $key, $size, $resolveOptions);
             }
-            S3Storage::retryMinioClientUpload(fn () => instant_remote_process(
-                [$uploadCommand],
+            S3Storage::retryMinioClientUpload(fn (string $checksumOption) => instant_remote_process(
+                [$uploadCommand($checksumOption)],
                 $this->server, true, false, $this->commandTimeout(), disableMultiplexing: true,
             ), $isUploaded);
 
@@ -1255,6 +1262,15 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         return $this->backup->databases_to_backup;
     }
 
+    private function trigger(): BackupTrigger
+    {
+        return match (true) {
+            $this->beforeUpdate => BackupTrigger::BeforeUpdate,
+            $this->occurrenceUuid !== null => BackupTrigger::Scheduled,
+            default => BackupTrigger::Manual,
+        };
+    }
+
     /**
      * Show a run that cannot start because no database is known in the execution list, and notify the team.
      */
@@ -1264,7 +1280,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         $this->recordSkippedBackup($message);
         $this->logSkippedRun('no_databases_determined');
         try {
-            $this->team->notify(new BackupFailed($this->backup, $this->database, $message, 'unknown'));
+            $this->team->notify(new BackupFailed($this->backup, $this->database, $message, 'unknown', $this->trigger()));
         } catch (Throwable $e) {
             Log::channel('scheduled-errors')->warning('Failed to send backup failure notification', [
                 'backup_id' => $this->backup->uuid,
@@ -1340,7 +1356,7 @@ class DatabaseBackupJob implements ShouldBeEncrypted, ShouldQueue
         $databaseNames = $unfinished->isEmpty() ? ['unknown'] : $unfinished->map(fn (ScheduledDatabaseBackupExecution $execution) => $execution->database_name ?? 'unknown');
         foreach ($databaseNames as $databaseName) {
             try {
-                $this->team?->notify(new BackupFailed($this->backup, $this->backup->database, $output, $databaseName));
+                $this->team?->notify(new BackupFailed($this->backup, $this->backup->database, $output, $databaseName, $this->trigger()));
             } catch (Throwable $e) {
                 Log::channel('scheduled-errors')->warning('Failed to send backup permanent failure notification', [
                     'backup_id' => $this->backup->uuid,

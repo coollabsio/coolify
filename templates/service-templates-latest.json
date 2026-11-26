@@ -3356,6 +3356,25 @@
         "port": "8065",
         "amd_only": true
     },
+    "mcphub": {
+        "documentation": "https://docs.mcphub.app/?utm_source=coolify.io",
+        "slogan": "MCPHub is a unified hub for centrally managing and dynamically orchestrating multiple MCP servers.",
+        "compose": "c2VydmljZXM6CiAgbWNwaHViOgogICAgaW1hZ2U6ICdzYW1hbmhhcHB5L21jcGh1YjoxLjMuMScKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfVVJMX01DUEhVQl8zMDAwCiAgICAgIC0gTk9ERV9FTlY9cHJvZHVjdGlvbgogICAgICAtIFBPUlQ9MzAwMAogICAgICAtIFRSVVNUX1BST1hZPTEKICAgICAgLSAnSU5TVEFMTF9CQVNFX1VSTD0ke1NFUlZJQ0VfVVJMX01DUEhVQn0nCiAgICAgIC0gJ0RCX1VSTD1wb3N0Z3Jlc3FsOi8vJHtTRVJWSUNFX1VTRVJfUE9TVEdSRVN9OiR7U0VSVklDRV9QQVNTV09SRF9QT1NUR1JFU31AcG9zdGdyZXM6NTQzMi8ke1BPU1RHUkVTX0RCOi1tY3BodWJ9JwogICAgICAtICdBRE1JTl9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfQURNSU59JwogICAgICAtICdKV1RfU0VDUkVUPSR7U0VSVklDRV9QQVNTV09SRF82NF9KV1R9JwogICAgICAtICdNQ1BIVUJfQ1JFREVOVElBTF9FTkNSWVBUSU9OX0tFWT0ke1NFUlZJQ0VfUkVBTEJBU0U2NF8zMl9DUkVERU5USUFMU30nCiAgICAgIC0gJ1NNQVJUX1JPVVRJTkdfRU5BQkxFRD0ke1NNQVJUX1JPVVRJTkdfRU5BQkxFRDotZmFsc2V9JwogICAgICAtICdPUEVOQUlfQVBJX0JBU0VfVVJMPSR7T1BFTkFJX0FQSV9CQVNFX1VSTDotaHR0cHM6Ly9hcGkub3BlbmFpLmNvbS92MX0nCiAgICAgIC0gJ09QRU5BSV9BUElfS0VZPSR7T1BFTkFJX0FQSV9LRVl9JwogICAgICAtICdFTUJFRERJTkdfTU9ERUw9JHtFTUJFRERJTkdfTU9ERUw6LXRleHQtZW1iZWRkaW5nLTMtc21hbGx9JwogICAgdm9sdW1lczoKICAgICAgLSAnbWNwaHViLWRhdGE6L2FwcC9kYXRhJwogICAgZGVwZW5kc19vbjoKICAgICAgcG9zdGdyZXM6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWZzUycKICAgICAgICAtICdodHRwOi8vMTI3LjAuMC4xOjMwMDAvaGVhbHRoJwogICAgICBpbnRlcnZhbDogMTBzCiAgICAgIHRpbWVvdXQ6IDVzCiAgICAgIHJldHJpZXM6IDEwCiAgICAgIHN0YXJ0X3BlcmlvZDogNjBzCiAgcG9zdGdyZXM6CiAgICBpbWFnZTogJ3BndmVjdG9yL3BndmVjdG9yOnBnMTcnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnUE9TVEdSRVNfVVNFUj0ke1NFUlZJQ0VfVVNFUl9QT1NUR1JFU30nCiAgICAgIC0gJ1BPU1RHUkVTX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9QT1NUR1JFU30nCiAgICAgIC0gJ1BPU1RHUkVTX0RCPSR7UE9TVEdSRVNfREI6LW1jcGh1Yn0nCiAgICB2b2x1bWVzOgogICAgICAtICdtY3BodWItcG9zdGdyZXMtZGF0YTovdmFyL2xpYi9wb3N0Z3Jlc3FsL2RhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ3BnX2lzcmVhZHkgLVUgJCR7UE9TVEdSRVNfVVNFUn0gLWQgJCR7UE9TVEdSRVNfREJ9JwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogMTAKdm9sdW1lczoKICBtY3BodWItZGF0YTogbnVsbAogIG1jcGh1Yi1wb3N0Z3Jlcy1kYXRhOiBudWxsCg==",
+        "tags": [
+            "ai",
+            "mcp",
+            "mcp-server",
+            "mcp-gateway",
+            "mcp-router",
+            "pgvector",
+            "postgresql"
+        ],
+        "category": "ai",
+        "logo": "svgs/mcphub.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-11-25T21:03:52+01:00",
+        "port": "3000"
+    },
     "mealie": {
         "documentation": "https://docs.mealie.io/?utm_source=coolify.io",
         "slogan": "A recipe manager and meal planner.",
@@ -4147,6 +4166,24 @@
         "template_last_updated_at": "2026-11-17T13:17:42+01:00",
         "port": "3000",
         "outdated": true
+    },
+    "opensearch": {
+        "documentation": "https://docs.opensearch.org/latest?utm_source=coolify.io",
+        "slogan": "OpenSearch is an open-source search and analytics engine.",
+        "compose": "c2VydmljZXM6CiAgb3BlbnNlYXJjaDoKICAgIGltYWdlOiAnb3BlbnNlYXJjaHByb2plY3Qvb3BlbnNlYXJjaDozLjEwLjEnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX1VSTF9PUEVOU0VBUkNIXzkyMDAKICAgICAgLSBjbHVzdGVyLm5hbWU9b3BlbnNlYXJjaC1jbHVzdGVyCiAgICAgIC0gbm9kZS5uYW1lPW9wZW5zZWFyY2gtbm9kZTEKICAgICAgLSBkaXNjb3ZlcnkudHlwZT1zaW5nbGUtbm9kZQogICAgICAtIGJvb3RzdHJhcC5tZW1vcnlfbG9jaz10cnVlCiAgICAgIC0gJ09QRU5TRUFSQ0hfSkFWQV9PUFRTPS1YbXM1MTJtIC1YbXg1MTJtJwogICAgICAtICdPUEVOU0VBUkNIX0lOSVRJQUxfQURNSU5fUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX09QRU5TRUFSQ0h9JwogICAgICAtIHBsdWdpbnMuc2VjdXJpdHkuc3NsLmh0dHAuZW5hYmxlZD1mYWxzZQogICAgdWxpbWl0czoKICAgICAgbWVtbG9jazoKICAgICAgICBzb2Z0OiAtMQogICAgICAgIGhhcmQ6IC0xCiAgICAgIG5vZmlsZToKICAgICAgICBzb2Z0OiA2NTUzNgogICAgICAgIGhhcmQ6IDY1NTM2CiAgICB2b2x1bWVzOgogICAgICAtICdvcGVuc2VhcmNoLWRhdGE6L3Vzci9zaGFyZS9vcGVuc2VhcmNoL2RhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ2N1cmwgLS11c2VyIGFkbWluOiR7U0VSVklDRV9QQVNTV09SRF9PUEVOU0VBUkNIfSAtLXNpbGVudCAtLWZhaWwgaHR0cDovL2xvY2FsaG9zdDo5MjAwL19jbHVzdGVyL2hlYWx0aCB8fCBleGl0IDEnCiAgICAgIGludGVydmFsOiAzMHMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDEwCnZvbHVtZXM6CiAgb3BlbnNlYXJjaC1kYXRhOiBudWxsCg==",
+        "tags": [
+            "search",
+            "engine",
+            "fulltext",
+            "full",
+            "text",
+            "opensearch"
+        ],
+        "category": "search",
+        "logo": "svgs/opensearch.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": "2026-11-25T19:28:15+01:00",
+        "port": "9200"
     },
     "openwa-with-postgresql-and-redis": {
         "documentation": "https://github.com/rmyndharis/OpenWA?utm_source=coolify.io",

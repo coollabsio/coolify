@@ -15,6 +15,9 @@
       required_port: 2368
       exclude_from_status: false
       ports: ''
+    empty-lists:
+      exclude_from_status: false
+      ports: ''
     gateway:
       fqdn: 'http://gateway-referenceservice00000001.10.0.0.1.sslip.io'
       exclude_from_status: false
@@ -208,6 +211,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         labels:
           - com.example.team=platform
           - com.example.dollar=price-$$5
@@ -262,7 +266,6 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
-          internal: null
           referenceservice00000001: null
       api:
         image: 'node:22-alpine'
@@ -296,6 +299,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         ports:
           - '3000:3000'
           -
@@ -345,7 +349,6 @@
           - traefik.http.routers.http-0-referenceservice00000001-api-8a5d.service=http-0-referenceservice00000001-api-8a5d
           - traefik.http.services.http-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -373,6 +376,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: my-app-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -399,7 +403,6 @@
           - traefik.http.routers.http-0-referenceservice00000001-my-app-4dcb.service=http-0-referenceservice00000001-my-app-4dcb
           - traefik.http.services.http-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -427,6 +430,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: www-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -451,7 +455,6 @@
           - traefik.http.routers.http-0-referenceservice00000001-www-4eae.middlewares=gzip-no-media
           - 'traefik.http.routers.http-0-referenceservice00000001-www-4eae.rule=Host(`www-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -479,6 +482,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: blog-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -510,7 +514,6 @@
           - traefik.http.routers.http-0-referenceservice00000001-blog-126a.service=http-0-referenceservice00000001-blog-126a
           - traefik.http.services.http-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -538,6 +541,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: gateway-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -562,7 +566,6 @@
           - traefik.http.routers.http-0-referenceservice00000001-gateway-3e21.middlewares=gzip-no-media
           - 'traefik.http.routers.http-0-referenceservice00000001-gateway-3e21.rule=Host(`gateway-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -590,6 +593,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: gateway-ws-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -615,7 +619,6 @@
           - 'traefik.http.routers.http-0-referenceservice00000001-gateway-ws-d203.middlewares=http-0-referenceservice00000001-gateway-ws-d203-stripprefix,gzip-no-media'
           - 'traefik.http.routers.http-0-referenceservice00000001-gateway-ws-d203.rule=Host(`gateway-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/ws`)'
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -645,6 +648,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: worker-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -662,7 +666,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=worker
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -690,6 +693,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: scheduler-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -707,7 +711,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=scheduler
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -736,6 +739,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         volumes:
           - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
           - 'shared-external:/backups'
@@ -806,6 +810,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         env_file:
           - .env
       sidecar:
@@ -848,6 +853,49 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
+        env_file:
+          - .env
+      empty-lists:
+        image: 'nginx:alpine'
+        container_name: empty-lists-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=empty-lists-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=empty-lists
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:empty-lists>'
+          - coolify.service.subType=application
+          - coolify.service.subName=empty-lists
+        networks:
+          referenceservice00000001: null
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: empty-lists-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         env_file:
           - .env
     volumes:
@@ -895,6 +943,9 @@
     blog:
       fqdn: 'https://blog.example.com/blog'
       required_port: 2368
+      exclude_from_status: false
+      ports: ''
+    empty-lists:
       exclude_from_status: false
       ports: ''
     gateway:
@@ -1090,6 +1141,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         labels:
           - com.example.team=platform
           - com.example.dollar=price-$$5
@@ -1151,7 +1203,6 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
-          internal: null
           referenceservice00000001: null
       api:
         image: 'node:22-alpine'
@@ -1185,6 +1236,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         ports:
           - '3000:3000'
           -
@@ -1241,7 +1293,6 @@
           - traefik.http.services.http-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
           - traefik.http.services.https-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1269,6 +1320,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: my-app-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -1302,7 +1354,6 @@
           - traefik.http.services.http-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
           - traefik.http.services.https-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1330,6 +1381,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: www-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -1359,7 +1411,6 @@
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.tls=true
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1387,6 +1438,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: blog-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -1425,7 +1477,6 @@
           - traefik.http.services.http-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
           - traefik.http.services.https-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1453,6 +1504,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: gateway-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -1482,7 +1534,6 @@
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.tls=true
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1510,6 +1561,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: gateway-ws-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -1540,7 +1592,6 @@
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.tls=true
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1570,6 +1621,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: worker-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -1587,7 +1639,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=worker
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1615,6 +1666,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: scheduler-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -1632,7 +1684,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=scheduler
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1661,6 +1712,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         volumes:
           - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
           - 'shared-external:/backups'
@@ -1731,6 +1783,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         env_file:
           - .env
       sidecar:
@@ -1773,6 +1826,49 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
+        env_file:
+          - .env
+      empty-lists:
+        image: 'nginx:alpine'
+        container_name: empty-lists-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=empty-lists-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=empty-lists
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:empty-lists>'
+          - coolify.service.subType=application
+          - coolify.service.subName=empty-lists
+        networks:
+          referenceservice00000001: null
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: empty-lists-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         env_file:
           - .env
     volumes:
@@ -1820,6 +1916,10 @@
     blog:
       fqdn: 'https://blog.example.com/blog'
       required_port: 2368
+      exclude_from_status: false
+      ports: ''
+    empty-lists:
+      fqdn: 'https://empty-lists-extra.example.com'
       exclude_from_status: false
       ports: ''
     gateway:
@@ -2018,6 +2118,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         labels:
           - com.example.team=platform
           - com.example.dollar=price-$$5
@@ -2079,7 +2180,6 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
-          internal: null
           referenceservice00000001: null
       api:
         image: 'node:22-alpine'
@@ -2113,6 +2213,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         ports:
           - '3000:3000'
           -
@@ -2169,7 +2270,6 @@
           - traefik.http.services.http-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
           - traefik.http.services.https-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2197,6 +2297,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: my-app-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -2230,7 +2331,6 @@
           - traefik.http.services.http-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
           - traefik.http.services.https-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2258,6 +2358,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: www-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -2287,7 +2388,6 @@
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.tls=true
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2315,6 +2415,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: blog-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -2353,7 +2454,6 @@
           - traefik.http.services.http-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
           - traefik.http.services.https-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2381,6 +2481,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: gateway-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -2410,7 +2511,6 @@
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.tls=true
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2438,6 +2538,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: gateway-ws-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -2468,7 +2569,6 @@
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.tls=true
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2500,6 +2600,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: worker-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -2533,7 +2634,6 @@
           - traefik.http.services.http-0-referenceservice00000001-worker-b618.loadbalancer.server.port=8080
           - traefik.http.services.https-0-referenceservice00000001-worker-b618.loadbalancer.server.port=8080
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2563,6 +2663,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: scheduler-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -2596,7 +2697,6 @@
           - traefik.http.services.http-0-referenceservice00000001-scheduler-499f.loadbalancer.server.port=8080
           - traefik.http.services.https-0-referenceservice00000001-scheduler-499f.loadbalancer.server.port=8080
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2625,6 +2725,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         volumes:
           - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
           - 'shared-external:/backups'
@@ -2695,6 +2796,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         env_file:
           - .env
       sidecar:
@@ -2750,6 +2852,63 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
+        env_file:
+          - .env
+      empty-lists:
+        image: 'nginx:alpine'
+        container_name: empty-lists-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=empty-lists-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=empty-lists
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:empty-lists>'
+          - coolify.service.subType=application
+          - coolify.service.subName=empty-lists
+          - traefik.docker.network=referenceservice00000001
+          - traefik.enable=true
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceservice00000001-empty-lists-625d.entryPoints=http
+          - traefik.http.routers.http-0-referenceservice00000001-empty-lists-625d.middlewares=redirect-to-https
+          - 'traefik.http.routers.http-0-referenceservice00000001-empty-lists-625d.rule=Host(`empty-lists-extra.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceservice00000001-empty-lists-625d.entryPoints=https
+          - traefik.http.routers.https-0-referenceservice00000001-empty-lists-625d.middlewares=gzip-no-media
+          - 'traefik.http.routers.https-0-referenceservice00000001-empty-lists-625d.rule=Host(`empty-lists-extra.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceservice00000001-empty-lists-625d.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-0-referenceservice00000001-empty-lists-625d.tls=true
+        networks:
+          referenceservice00000001: null
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: empty-lists-referenceservice00000001
+          COOLIFY_FQDN: empty-lists-extra.example.com
+          COOLIFY_URL: 'https://empty-lists-extra.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         env_file:
           - .env
     volumes:

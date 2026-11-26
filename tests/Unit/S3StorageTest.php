@@ -300,6 +300,35 @@ test('S3Storage does not retry a MinIO client upload that timed out', function (
     Sleep::assertNeverSlept();
 });
 
+test('S3Storage uploads again at once with Content-MD5 when an Object Lock bucket requires a checksum', function () {
+    Sleep::fake();
+    $checksumOptions = [];
+
+    S3Storage::retryMinioClientUpload(function (string $checksumOption) use (&$checksumOptions) {
+        $checksumOptions[] = $checksumOption;
+        if ($checksumOption === '') {
+            throw new RuntimeException('mc: <ERROR> Failed to copy `/backup.dmp`. Content-MD5 or x-amz-checksum-* HTTP header is required for Put Part requests with Object Lock parameters', 1);
+        }
+    }, fn (): bool => false);
+
+    expect($checksumOptions)->toBe(['', ' --checksum=MD5']);
+    Sleep::assertNeverSlept();
+});
+
+test('S3Storage does not add a checksum to a MinIO client upload that fails for another reason', function () {
+    Sleep::fake();
+    $checksumOptions = [];
+
+    $upload = function (string $checksumOption) use (&$checksumOptions) {
+        $checksumOptions[] = $checksumOption;
+
+        throw new RuntimeException('Access Denied.', 1);
+    };
+
+    expect(fn () => S3Storage::retryMinioClientUpload($upload, fn (): bool => false))->toThrow(RuntimeException::class, 'Access Denied.');
+    expect($checksumOptions)->toBe(['', '', '']);
+});
+
 test('S3Storage sizes MinIO client upload parts for at most 1000 parts', function (int $fileSize, int $partSize) {
     expect(S3Storage::minioClientPartSizeOption($fileSize))->toBe('-e MC_UPLOAD_MULTIPART_SIZE='.$partSize)
         ->and((int) ceil($fileSize / $partSize))->toBeLessThanOrEqual(1000);

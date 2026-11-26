@@ -224,7 +224,7 @@ test('a preview uses the Compose file of the base branch when it can come from a
         ->and($this->application->fresh()->docker_compose_raw)->toBe("services:\n  base:\n    image: nginx")
         ->and(collect($logEntries)->pluck(0))->toContain("This preview uses the Docker Compose file of the main branch, because {$reason}.");
 })->with([
-    'public PR deployments' => [['is_pr_deployments_public_enabled' => true], true, 'public PR deployments are on, and a pull request from a fork could add host mounts to it'],
+    'public PR deployments' => [['is_preview_deployments_enabled' => true, 'is_pr_deployments_public_enabled' => true], true, 'public PR deployments are on, and a pull request from a fork could add host mounts to it'],
     'raw Compose deployment' => [['is_raw_compose_deployment_enabled' => true], true, 'raw Compose deployments are on'],
     // A preview added by hand or through the API can be a pull request from a fork.
     'pull request that is not known to come from the repository' => [[], false, 'Coolify does not know that the branch of the pull request is in this repository. A pull request from a fork could add host mounts to it'],

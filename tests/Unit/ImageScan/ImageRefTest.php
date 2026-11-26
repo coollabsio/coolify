@@ -100,6 +100,24 @@ it('replaces the tag and drops the digest', function () use ($imageRefDigest) {
     ImageRef::parse('postgres')->withTag('bad tag');
 })->throws(InvalidArgumentException::class);
 
+it('maps a GitLab dependency proxy reference to its Docker Hub image', function (string $input, string $upstream) {
+    expect((string) ImageRef::parse($input)->dockerHubUpstream())->toBe($upstream);
+})->with([
+    'official image' => ['gitlab.example.com/group/dependency_proxy/containers/redis:7.4', 'redis:7.4'],
+    'official image with library' => ['gitlab.example.com/group/dependency_proxy/containers/library/redis:7.4', 'redis:7.4'],
+    'namespaced image' => ['gitlab.example.com/group/dependency_proxy/containers/temporalio/server:1.30.9', 'temporalio/server:1.30.9'],
+    'subgroup and port' => ['gitlab.example.com:443/group/sub/dependency_proxy/containers/postgres', 'postgres'],
+]);
+
+it('has no Docker Hub upstream for other references', function (string $input) {
+    expect(ImageRef::parse($input)->dockerHubUpstream())->toBeNull();
+})->with([
+    'Docker Hub' => 'redis:7.4',
+    'other registry' => 'ghcr.io/acme/api:1.0',
+    'GitLab registry' => 'gitlab.example.com:5050/group/api:1.0',
+    'proxy path without image' => 'gitlab.example.com/group/dependency_proxy/other/redis',
+]);
+
 it('validates tags and digests', function () use ($imageRefDigest) {
     expect(ImageRef::isValidTag('15.0-alpine'))->toBeTrue()
         ->and(ImageRef::isValidTag('_x'))->toBeTrue()

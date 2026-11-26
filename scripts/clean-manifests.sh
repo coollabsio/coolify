@@ -7,6 +7,8 @@ IMAGE=coollabsio/coolify
 VARIANTS=""
 KEEP_TAG_PATTERN='^(latest|preview|main|nightly|v?[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?)$'
 KEEP_TAG_EXCEPTIONS=v3,4.0.0-beta.420.1,4.0.0-beta.420.2,4.0.0-beta.420.3,4.0.0-beta.420.4,4.0.0-beta.420.5,4.0.0-beta.420.6,4.0.0-beta.420.7,4.0.0-beta.420.8,4.0.0-beta.420.9,4.0.0-beta.420.10
+# Temporary: the Docker Hub API still lists this deleted tag, its images without a push date. Remove it once the API no longer lists the tag
+SKIP_DOCKERHUB_TAG=sha-710f236
 KEEP_NIGHTLY_DAYS=14
 MIN_AGE_DAYS=1
 DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME:-}"
@@ -72,6 +74,7 @@ read_dockerhub_tags() {
 	: > "$WORK_DIR/dockerhub-images.tsv"
 	while [ -n "$url" ]; do
 		page="$(curl -sSf --retry 3 -H "Authorization: Bearer $hub" "$url")" || die "could not list the tags of docker.io/$IMAGE from the Docker Hub API"
+		page="$(jq --arg tag "$SKIP_DOCKERHUB_TAG" 'del(.results[] | select(.name == $tag))' <<< "$page")"
 		jq -r '.results[] | [.name, (.digest // ""), (.media_type // ""), (.tag_last_pushed // .last_updated // ""), (.full_size // 0)] | @tsv' <<< "$page" >> "$WORK_DIR/hub-tags.tsv"
 		jq -r '.results[] | .name as $tag | .images[]? | select(.digest) | [$tag, .digest, ([.os, .architecture] | join("/")), (.last_pushed // ""), (.size // 0)] | @tsv' <<< "$page" >> "$WORK_DIR/hub-images.tsv"
 		url="$(jq -r '.next // empty' <<< "$page")"

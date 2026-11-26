@@ -2370,6 +2370,16 @@ function railpackBuilderBootstrapScript(): string
 }
 
 /**
+ * Prune the build cache of the Railpack builder. Only a Railpack deployment creates the builder,
+ * so skip the prune when it does not exist. The prune fails on a stopped builder, so start it first.
+ */
+function railpackBuilderPruneScript(): string
+{
+    return 'if DOCKER_CONFIG=/root/.docker docker buildx inspect coolify-railpack >/dev/null 2>&1; then '
+        .railpackBuilderBootstrapScript().'; DOCKER_CONFIG=/root/.docker docker buildx prune --builder coolify-railpack -af; fi';
+}
+
+/**
  * The buildx metadata of a server, as the `docker run -v` source that the deployment helper uses.
  */
 function railpackBuildxMetadataVolume(Server $server): string
