@@ -5,16 +5,21 @@ namespace App\Livewire\Project\Service;
 use App\Actions\Docker\GetContainersStatus;
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
+use App\Actions\Service\StopServiceApplication;
 use App\Enums\ProcessStatus;
 use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
+use App\Support\ResourceStartActivity;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
 
 class Heading extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public Service $service;
 
@@ -24,13 +29,24 @@ class Heading extends Component
 
     public $isDeploymentProgress = false;
 
+    public $runningActivityId = null;
+
     public $docker_cleanup = true;
 
     public $title = 'Configuration';
 
+    /**
+     * The container statuses of the stack resources at the last check.
+     * The heading polls them, so it tells the resource cards when they change.
+     */
+    public ?string $resourceStatuses = null;
+
     public function mount()
     {
         $this->authorizeService('view');
+
+        $this->checkDeployments();
+        $this->resourceStatuses = $this->currentResourceStatuses();
 
         if (str($this->service->status)->contains('running') && is_null($this->service->config_hash)) {
             $this->service->isConfigurationChanged(true);
@@ -40,13 +56,13 @@ class Heading extends Component
 
     public function getListeners()
     {
-        $teamId = Auth::user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ServiceStatusChanged" => 'checkStatus',
-            "echo-private:team.{$teamId},ServiceChecked" => 'serviceChecked',
             'refresh' => '$refresh',
             'envsUpdated' => '$refresh',
+            ...$this->teamChannelListeners([
+                'ServiceStatusChanged' => 'checkStatus',
+                'ServiceChecked' => 'serviceChecked',
+            ]),
         ];
     }
 
@@ -54,11 +70,33 @@ class Heading extends Component
     {
         $this->authorizeService('view');
 
-        if ($this->service->server->isFunctional()) {
-            GetContainersStatus::dispatch($this->service->server);
+        $this->checkDeployments();
+        $this->dispatchIfResourceStatusesChanged();
+
+        $server = $this->service->server;
+        if ($server?->isFunctional()) {
+            GetContainersStatus::dispatch($server);
         } else {
             $this->dispatch('error', 'Server is not functional.');
         }
+    }
+
+    private function dispatchIfResourceStatusesChanged(): void
+    {
+        $statuses = $this->currentResourceStatuses();
+        if ($statuses === $this->resourceStatuses) {
+            return;
+        }
+
+        $this->resourceStatuses = $statuses;
+        $this->dispatch('serviceResourceStatusesChanged');
+    }
+
+    private function currentResourceStatuses(): string
+    {
+        return $this->service->applications->pluck('status', 'uuid')
+            ->merge($this->service->databases->pluck('status', 'uuid'))
+            ->toJson();
     }
 
     public function manualCheckStatus()
@@ -94,33 +132,55 @@ class Heading extends Component
         $this->authorizeService('view');
 
         try {
-            $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
-            $status = data_get($activity, 'properties.status');
-            if ($status === ProcessStatus::QUEUED->value || $status === ProcessStatus::IN_PROGRESS->value) {
-                $this->isDeploymentProgress = true;
-            } else {
-                $this->isDeploymentProgress = false;
-            }
+            $activity = ResourceStartActivity::latestRunning($this->service->uuid);
+            $this->isDeploymentProgress = $activity !== null;
+            $this->runningActivityId = $activity?->id;
         } catch (\Throwable) {
             $this->isDeploymentProgress = false;
+            $this->runningActivityId = null;
         }
 
         return $this->isDeploymentProgress;
     }
 
+    /**
+     * Re-attach the live log dialog to a deployment that is already running.
+     * Used by the "Deploying…" indicator and when Deploy/Restart is clicked
+     * while a deployment is in progress, so the running log reappears instead
+     * of a dead-end error.
+     */
+    public function reopenDeployment()
+    {
+        $this->authorizeService('view');
+
+        $this->checkDeployments();
+
+        if ($this->isDeploymentProgress && $this->runningActivityId) {
+            $this->dispatch('activityMonitor', $this->runningActivityId);
+            $this->js("window.dispatchEvent(new CustomEvent('startservice'))");
+        } else {
+            $this->dispatch('info', 'No deployment is currently running.');
+        }
+    }
+
     public function start()
     {
-        $this->authorizeService('deploy');
-
-        $activity = StartService::run($this->service, pullLatestImages: true);
-        $this->dispatch('activityMonitor', $activity->id);
+        try {
+            $this->authorizeService('deploy');
+            $activity = StartService::run($this->service, pullLatestImages: true);
+            $this->auditServiceAction('ui.service.started');
+            $this->markDeploymentRunning($activity->id);
+            $this->js("window.dispatchEvent(new CustomEvent('startservice'))");
+            $this->dispatch('activityMonitor', $activity->id);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function forceDeploy()
     {
-        $this->authorizeService('deploy');
-
         try {
+            $this->authorizeService('deploy');
             $activities = Activity::where('properties->type_uuid', $this->service->uuid)
                 ->where(function ($q) {
                     $q->where('properties->status', ProcessStatus::IN_PROGRESS->value)
@@ -131,49 +191,92 @@ class Heading extends Component
                 $activity->save();
             }
             $activity = StartService::run($this->service, pullLatestImages: true, stopBeforeStart: true);
+            $this->markDeploymentRunning($activity->id);
+            $this->js("window.dispatchEvent(new CustomEvent('startservice'))");
             $this->dispatch('activityMonitor', $activity->id);
-        } catch (\Exception $e) {
-            $this->dispatch('error', $e->getMessage());
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
+    }
+
+    private function markDeploymentRunning($activityId): void
+    {
+        $this->isDeploymentProgress = true;
+        $this->runningActivityId = $activityId;
     }
 
     public function stop()
     {
-        $this->authorizeService('stop');
-
         try {
+            $this->authorizeService('stop');
             StopService::dispatch($this->service, false, $this->docker_cleanup);
-        } catch (\Exception $e) {
-            $this->dispatch('error', $e->getMessage());
+            $this->auditServiceAction('ui.service.stopped');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
     }
 
     public function restart()
     {
-        $this->authorizeService('deploy');
+        try {
+            $this->authorizeService('deploy');
+            $this->checkDeployments();
+            if ($this->isDeploymentProgress) {
+                $this->dispatch('error', 'There is a deployment in progress.');
 
-        $this->checkDeployments();
-        if ($this->isDeploymentProgress) {
-            $this->dispatch('error', 'There is a deployment in progress.');
+                return;
+            }
+            $activity = StartService::run($this->service, stopBeforeStart: true);
+            $this->auditServiceAction('ui.service.restarted');
+            $this->markDeploymentRunning($activity->id);
+            $this->js("window.dispatchEvent(new CustomEvent('startservice'))");
+            $this->dispatch('activityMonitor', $activity->id);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
 
+    public function removeSelectedResourceContainer(): void
+    {
+        $resource = $this->selectedResource();
+        if (! $resource) {
             return;
         }
-        $activity = StartService::run($this->service, stopBeforeStart: true);
-        $this->dispatch('activityMonitor', $activity->id);
+
+        $this->authorize('update', $resource);
+        StopServiceApplication::run($resource, true, true);
+        $this->dispatch('success', 'Container removed.');
+    }
+
+    private function selectedResource(): ServiceApplication|ServiceDatabase|null
+    {
+        $uuid = data_get($this->parameters, 'stack_service_uuid');
+        if (! $uuid) {
+            return null;
+        }
+
+        return $this->service->applications()->whereUuid($uuid)->first()
+            ?? $this->service->databases()->whereUuid($uuid)->first();
     }
 
     public function pullAndRestartEvent()
     {
-        $this->authorizeService('deploy');
+        try {
+            $this->authorizeService('deploy');
+            $this->checkDeployments();
+            if ($this->isDeploymentProgress) {
+                $this->dispatch('error', 'There is a deployment in progress.');
 
-        $this->checkDeployments();
-        if ($this->isDeploymentProgress) {
-            $this->dispatch('error', 'There is a deployment in progress.');
-
-            return;
+                return;
+            }
+            $activity = StartService::run($this->service, pullLatestImages: true, stopBeforeStart: true);
+            $this->auditServiceAction('ui.service.restarted');
+            $this->markDeploymentRunning($activity->id);
+            $this->js("window.dispatchEvent(new CustomEvent('startservice'))");
+            $this->dispatch('activityMonitor', $activity->id);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $activity = StartService::run($this->service, pullLatestImages: true, stopBeforeStart: true);
-        $this->dispatch('activityMonitor', $activity->id);
     }
 
     private function authorizeService(string $ability): void
@@ -183,6 +286,15 @@ class Heading extends Component
             ->firstOrFail();
 
         $this->authorize($ability, $this->service);
+    }
+
+    private function auditServiceAction(string $event): void
+    {
+        auditLog($event, [
+            'team_id' => $this->service->team()?->id,
+            'service_uuid' => $this->service->uuid,
+            'service_name' => $this->service->name,
+        ]);
     }
 
     public function render()

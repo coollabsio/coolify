@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
 use App\Models\ApplicationPreview;
 use App\Models\User;
 use Illuminate\Auth\Access\Response;
@@ -21,8 +22,7 @@ class ApplicationPreviewPolicy
      */
     public function view(User $user, ApplicationPreview $applicationPreview): bool
     {
-        // return $user->teams->contains('id', $applicationPreview->application->team()->first()->id);
-        return true;
+        return $this->allows($user, AccessLevel::Read, $applicationPreview);
     }
 
     /**
@@ -30,21 +30,19 @@ class ApplicationPreviewPolicy
      */
     public function create(User $user): bool
     {
-        // return $user->isAdmin();
-        return true;
+        return $user->isAdmin();
     }
 
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, ApplicationPreview $applicationPreview)
+    public function update(User $user, ApplicationPreview $applicationPreview): Response
     {
-        // if ($user->isAdmin()) {
-        //    return Response::allow();
-        // }
+        if ($this->allows($user, AccessLevel::Write, $applicationPreview)) {
+            return Response::allow();
+        }
 
-        // return Response::deny('As a member, you cannot update this preview.<br/><br/>You need at least admin or owner permissions.');
-        return true;
+        return Response::deny('You need at least admin or owner permissions to update this preview.');
     }
 
     /**
@@ -52,8 +50,7 @@ class ApplicationPreviewPolicy
      */
     public function delete(User $user, ApplicationPreview $applicationPreview): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $applicationPreview->application->team()->first()->id);
-        return true;
+        return $this->allows($user, AccessLevel::Delete, $applicationPreview);
     }
 
     /**
@@ -61,8 +58,7 @@ class ApplicationPreviewPolicy
      */
     public function restore(User $user, ApplicationPreview $applicationPreview): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $applicationPreview->application->team()->first()->id);
-        return true;
+        return false;
     }
 
     /**
@@ -70,8 +66,7 @@ class ApplicationPreviewPolicy
      */
     public function forceDelete(User $user, ApplicationPreview $applicationPreview): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $applicationPreview->application->team()->first()->id);
-        return true;
+        return false;
     }
 
     /**
@@ -79,16 +74,26 @@ class ApplicationPreviewPolicy
      */
     public function deploy(User $user, ApplicationPreview $applicationPreview): bool
     {
-        // return $user->teams->contains('id', $applicationPreview->application->team()->first()->id);
-        return true;
+        return $this->allows($user, AccessLevel::Deploy, $applicationPreview);
     }
 
     /**
-     * Determine whether the user can manage preview deployments.
+     * Determine whether the user can approve a commit of a fork pull request. Approving lets
+     * untrusted code run on the server, so it needs write access to the application.
      */
-    public function manageDeployments(User $user, ApplicationPreview $applicationPreview): bool
+    public function approve(User $user, ApplicationPreview $applicationPreview): Response
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $applicationPreview->application->team()->first()->id);
-        return true;
+        if ($this->allows($user, AccessLevel::Write, $applicationPreview)) {
+            return Response::allow();
+        }
+
+        return Response::deny('You need write access to this application to approve a fork pull request.');
+    }
+
+    private function allows(User $user, AccessLevel $level, ApplicationPreview $applicationPreview): bool
+    {
+        $application = $applicationPreview->application;
+
+        return $application !== null && $user->canAccess($level, $application);
     }
 }

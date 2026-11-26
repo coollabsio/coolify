@@ -1,0 +1,16 @@
+# documentation: https://docs.termix.site/install/server/docker
+# slogan: All-in-One SSH & Remote Desktop management app.
+# category: developer-tools
+# tags: ssh,terminal,remote-desktop,rdp,vnc,server-management,remote-access
+# logo: svgs/termix.svg
+# port: 8080
+
+services:
+  termix:
+    image: ghcr.io/termix-ssh/termix:26.11.1
+    environment:
+      - SERVICE_URL_TERMIX_8080
+      - PORT=8080
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - termix-data:/app/data

@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\Auth;
  */
 trait HasDatabaseStatusInfo
 {
+    use ListensToTeamChannel;
+
     public ?string $dbUrl = null;
 
     public ?string $dbUrlPublic = null;
@@ -29,6 +31,8 @@ trait HasDatabaseStatusInfo
     public ?string $sslMode = null;
 
     public ?Carbon $certificateValidUntil = null;
+
+    public bool $isPasswordHiddenForMember = false;
 
     abstract protected function databaseLabel(): string;
 
@@ -63,12 +67,10 @@ trait HasDatabaseStatusInfo
 
         $listeners["echo-private:user.{$user->id},DatabaseStatusChanged"] = 'refresh';
 
-        $team = $user->currentTeam();
-        if ($team) {
-            $listeners["echo-private:team.{$team->id},ServiceChecked"] = 'refresh';
-        }
-
-        return $listeners;
+        return [
+            ...$listeners,
+            ...$this->teamChannelListeners(['ServiceChecked' => 'refresh']),
+        ];
     }
 
     public function mount(): void
@@ -79,8 +81,15 @@ trait HasDatabaseStatusInfo
     public function refresh(): void
     {
         $this->database->refresh();
-        $this->dbUrl = $this->database->internal_db_url;
-        $this->dbUrlPublic = $this->database->external_db_url;
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
+        $isCredentialLocked = method_exists($this->database, 'isCredentialLocked') && $this->database->isCredentialLocked();
+        if ($this->isPasswordHiddenForMember || $isCredentialLocked) {
+            $this->dbUrl = null;
+            $this->dbUrlPublic = null;
+        } else {
+            $this->dbUrl = $this->database->internal_db_url;
+            $this->dbUrlPublic = $this->database->external_db_url;
+        }
         if ($this->supportsSsl()) {
             $this->enableSsl = (bool) $this->database->enable_ssl;
             $this->certificateValidUntil = $this->database->sslCertificates()->first()?->valid_until;
@@ -148,8 +157,16 @@ trait HasDatabaseStatusInfo
                 caKey: $caCert->ssl_private_key,
                 configurationDir: $existingCert->configuration_dir,
                 mountPath: $existingCert->mount_path,
-                isPemKeyFileRequired: true,
+                isPemKeyFileRequired: $existingCert->requiresPemKeyFile(),
             );
+
+            auditLog('ui.database.ssl_certificate_regenerated', [
+                'team_id' => $server->team_id,
+                'database_uuid' => $this->database->uuid,
+                'database_name' => $this->database->name,
+                'database_type' => $this->database->type(),
+                'server_uuid' => $server->uuid,
+            ]);
 
             $this->refresh();
             $this->dispatch('success', 'SSL certificates regenerated. Restart database to apply changes.');
@@ -167,6 +184,7 @@ trait HasDatabaseStatusInfo
             'sslModeHelper' => $this->sslModeHelper(),
             'showPublicUrlPlaceholder' => $this->showPublicUrlPlaceholder(),
             'isExited' => str($this->database->status)->contains('exited'),
+            'isPasswordHiddenForMember' => $this->isPasswordHiddenForMember,
         ]);
     }
 }

@@ -3,8 +3,7 @@
 use App\Livewire\Project\New\Select;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\View;
-use Illuminate\Support\ViewErrorBag;
+use Illuminate\Support\Facades\File;
 
 beforeEach(function () {
     Cache::flush();
@@ -22,49 +21,144 @@ it('returns the service templates bundle last updated timestamp', function () {
         ->toBe(CarbonImmutable::createFromTimestamp(filemtime($templatePath))->timezone(config('app.timezone'))->format('M j, Y H:i'));
 });
 
-it('returns each service template last updated timestamp', function () {
+it('returns each service template last updated timestamp from the generated bundle', function () {
     $component = new Select;
-    $templatePath = base_path('templates/compose/activepieces.yaml');
+    $templates = json_decode(file_get_contents(base_path('templates/'.config('constants.services.file_name'))), true);
+    $templateTimestamp = $templates['activepieces']['template_last_updated_at'];
 
     $resources = $component->loadServices();
 
     expect($resources['services']['activepieces'])
         ->toHaveKey('templateLastUpdated')
         ->and($resources['services']['activepieces']['templateLastUpdated'])
-        ->toBe(CarbonImmutable::createFromTimestamp(filemtime($templatePath))->timezone(config('app.timezone'))->format('M j, Y H:i'));
+        ->toBe(CarbonImmutable::parse($templateTimestamp)->timezone(config('app.timezone'))->format('M j, Y H:i'));
 });
 
-it('uses a service template timestamp cache keyed by bundle mtime', function () {
-    $bundleMtime = filemtime(base_path('templates/'.config('constants.services.file_name')));
-    Cache::put("service-template-last-updated-map:{$bundleMtime}", [
-        'activepieces' => 'Cached timestamp',
-    ], now()->addDay());
+it('returns local, CDN, and default logo fallbacks for every service', function () {
+    $services = (new Select)->loadServices()['services'];
 
-    $resources = (new Select)->loadServices();
-
-    expect($resources['services']['activepieces']['templateLastUpdated'])->toBe('Cached timestamp');
+    expect($services['opnform']['logo'])->toBe(asset('svgs/opnform.svg'))
+        ->and($services['pydio-cells']['logo'])->toBe(asset('svgs/cells.svg'))
+        ->and($services['pydio-cells']['logo_cdn_url'])
+        ->toBe('https://raw.githubusercontent.com/coollabsio/coolify/refs/heads/main/public/svgs/cells.svg')
+        ->and($services['pydio-cells']['logo_default_url'])->toBe(asset('svgs/default.webp'));
 });
 
-it('does not use stale service template timestamp cache entries from another bundle mtime', function () {
-    $bundleMtime = filemtime(base_path('templates/'.config('constants.services.file_name')));
-    Cache::put('service-template-last-updated-map:'.($bundleMtime - 1), [
-        'activepieces' => 'Stale cached timestamp',
-    ], now()->addDay());
+it('uses resource tile icons for databases', function () {
+    $databases = collect((new Select)->loadServices()['databases'])->keyBy('id');
 
-    $resources = (new Select)->loadServices();
-
-    expect($resources['services']['activepieces']['templateLastUpdated'])->not->toBe('Stale cached timestamp');
+    foreach (['keydb', 'dragonfly', 'clickhouse'] as $database) {
+        expect($databases[$database]['logo'])->toBe(resource_logo_url($database));
+    }
 });
 
-it('renders the service templates last updated hint placeholder', function () {
-    View::share('errors', new ViewErrorBag);
-
-    $view = $this->view('livewire.project.new.select', [
-        'current_step' => 'type',
-        'environments' => collect(),
+it('prefers embedded service template git timestamps from the templates bundle', function () {
+    $path = base_path('templates/'.config('constants.services.file_name'));
+    $payload = json_encode([
+        'activepieces' => [
+            'documentation' => 'https://coolify.io/docs',
+            'slogan' => 'Open source no-code business automation.',
+            'compose' => '',
+            'tags' => null,
+            'category' => 'automation',
+            'logo' => 'images/default.webp',
+            'minversion' => '0.0.0',
+            'template_last_updated_at' => '2026-05-31T12:34:56+00:00',
+        ],
     ]);
 
-    $view->assertSee('Last Updated on Service Templates:');
-    $view->assertSee('serviceTemplatesLastUpdated');
-    $view->assertSee('service.templateLastUpdated');
+    File::partialMock()
+        ->shouldReceive('exists')
+        ->with($path)
+        ->andReturn(true)
+        ->shouldReceive('get')
+        ->with($path)
+        ->andReturn($payload);
+
+    $resources = (new Select)->loadServices();
+
+    expect($resources['services']['activepieces']['templateLastUpdated'])->toBe('May 31, 2026 12:34');
+});
+
+it('caches parsed local service templates by bundle mtime', function () {
+    Cache::flush();
+
+    $path = base_path('templates/'.config('constants.services.file_name'));
+    $json = file_get_contents($path);
+
+    File::partialMock()
+        ->shouldReceive('get')
+        ->once()
+        ->with($path)
+        ->andReturn($json);
+
+    $first = get_service_templates();
+    $second = get_service_templates();
+
+    expect($first->keys()->all())->toBe($second->keys()->all());
+});
+
+it('keeps service template keys for service selection and docs links', function () {
+    $path = base_path('templates/'.config('constants.services.file_name'));
+    File::partialMock()
+        ->shouldReceive('exists')
+        ->with($path)
+        ->andReturn(true)
+        ->shouldReceive('get')
+        ->with($path)
+        ->andReturn(json_encode([
+            'denoKV' => [
+                'documentation' => 'https://coolify.io/docs',
+                'slogan' => 'Deno KV.',
+                'compose' => '',
+                'tags' => null,
+                'category' => 'database',
+                'logo' => 'images/default.webp',
+                'minversion' => '0.0.0',
+            ],
+        ]));
+
+    $services = collect((new Select)->loadServices()['services']);
+    $denoKv = $services->firstWhere('id', 'denoKV');
+
+    expect($denoKv)
+        ->not->toBeNull()
+        ->and($denoKv['docsSlug'])->toBe('denokv');
+});
+
+it('preserves one click service key casing when selecting a service template', function () {
+    $component = new Select;
+    $component->servers = collect();
+    $component->allServers = collect();
+
+    $component->setType('one-click-service-denoKV');
+
+    expect($component->type)->toBe('one-click-service-denoKV');
+});
+
+it('links service websites to the project page instead of a shared host root', function () {
+    $path = base_path('templates/'.config('constants.services.file_name'));
+    $payload = json_encode([
+        'uptime-kuma' => ['documentation' => 'https://github.com/louislam/uptime-kuma?tab=readme-ov-file&utm_source=coolify.io'],
+        'alexandrie' => ['documentation' => 'https://www.github.com/Smaug6739/Alexandrie/tree/main/docs'],
+        'radarr' => ['documentation' => 'https://hub.docker.com/r/linuxserver/radarr?utm_source=coolify.io'],
+        'n8n' => ['documentation' => 'https://n8n.io/docs?utm_source=coolify.io'],
+        'broken' => ['documentation' => 'not a url'],
+    ]);
+
+    File::partialMock()
+        ->shouldReceive('exists')
+        ->with($path)
+        ->andReturn(true)
+        ->shouldReceive('get')
+        ->with($path)
+        ->andReturn($payload);
+
+    $services = (new Select)->loadServices()['services'];
+
+    expect($services['uptime-kuma']['website'])->toBe('https://github.com/louislam/uptime-kuma?ref=coolify.io')
+        ->and($services['alexandrie']['website'])->toBe('https://www.github.com/Smaug6739/Alexandrie?ref=coolify.io')
+        ->and($services['radarr']['website'])->toBe('https://hub.docker.com/r/linuxserver/radarr?ref=coolify.io')
+        ->and($services['n8n']['website'])->toBe('https://n8n.io?ref=coolify.io')
+        ->and($services['broken']['website'])->toBeNull();
 });

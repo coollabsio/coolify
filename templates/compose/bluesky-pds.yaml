@@ -7,7 +7,7 @@
 
 services:
   pds:
-    image: 'ghcr.io/bluesky-social/pds:0.4.182'
+    image: 'ghcr.io/bluesky-social/pds:0.4.5051'
     volumes:
       - pds-data:/pds
     environment:

@@ -2,84 +2,126 @@
 
 namespace App\Livewire\Project\Database;
 
+use App\Livewire\Concerns\ManagesDatabaseBackup;
 use App\Models\ScheduledDatabaseBackup;
+use App\Traits\ListensToTeamChannel;
+use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class ScheduledBackups extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
+    use ManagesDatabaseBackup;
 
     public $database;
 
     public $parameters;
 
-    public $type;
-
-    public ?ScheduledDatabaseBackup $selectedBackup;
-
-    public $selectedBackupId;
-
-    public $s3s;
-
     public string $custom_type = 'mysql';
 
-    protected $listeners = ['refreshScheduledBackups'];
+    public bool $scheduleModalOpen = false;
 
-    protected $queryString = ['selectedBackupId'];
+    public ?ScheduledDatabaseBackup $selectedBackup = null;
+
+    public function getListeners(): array
+    {
+        return [
+            'refreshScheduledBackups',
+            'modalClosed' => 'closeScheduleModal',
+            ...$this->teamChannelListeners(['BackupCreated' => '$refresh']),
+        ];
+    }
 
     public function mount(): void
     {
-        if ($this->selectedBackupId) {
-            $this->setSelectedBackup($this->selectedBackupId, true);
-        }
         $this->parameters = get_route_parameters();
-        if ($this->database->getMorphClass() === \App\Models\ServiceDatabase::class) {
-            $this->type = 'service-database';
-        } else {
-            $this->type = 'database';
+        $scheduleUuid = request()->query('schedule');
+        if (is_string($scheduleUuid) && $this->database->scheduledBackups()->where('uuid', $scheduleUuid)->exists()) {
+            $this->openSchedule($scheduleUuid);
         }
-        $this->s3s = currentTeam()->s3s;
     }
 
-    public function setSelectedBackup($backupId, $force = false)
+    public function openSchedule(string $backupUuid): void
     {
-        if ($this->selectedBackupId === $backupId && ! $force) {
-            return;
-        }
-        $this->selectedBackupId = $backupId;
-        $this->selectedBackup = $this->database->scheduledBackups->find($backupId);
-        if (is_null($this->selectedBackup)) {
-            $this->selectedBackupId = null;
+        $this->authorize('view', $this->database);
+        $this->selectedBackup = $this->database->scheduledBackups()->where('uuid', $backupUuid)->firstOrFail();
+        $this->scheduleModalOpen = true;
+    }
+
+    public function closeScheduleModal(): void
+    {
+        $this->scheduleModalOpen = false;
+        $this->selectedBackup = null;
+        $this->database->refresh();
+        // A link with ?schedule= opened the modal; a reload must not open it again.
+        $this->js("history.replaceState(history.state, '', location.pathname)");
+    }
+
+    public function backupNow(string $backupUuid): void
+    {
+        $this->authorize('manageBackups', $this->database);
+        $backup = $this->database->scheduledBackups()->where('uuid', $backupUuid)->first();
+        abort_unless($backup, 404);
+
+        try {
+            $this->queueDatabaseBackup($backup);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
         }
     }
 
     public function setCustomType()
     {
-        $this->authorize('update', $this->database);
+        try {
+            $this->authorize('update', $this->database);
 
-        $this->database->custom_type = $this->custom_type;
-        $this->database->save();
-        $this->dispatch('success', 'Database type set.');
-        $this->refreshScheduledBackups();
+            $this->database->custom_type = $this->custom_type;
+            $this->database->save();
+            $this->dispatch('success', 'Database type set.');
+            $this->refreshScheduledBackups();
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
     public function delete($scheduled_backup_id): void
     {
-        $backup = $this->database->scheduledBackups->find($scheduled_backup_id);
-        $this->authorize('manageBackups', $this->database);
+        try {
+            $this->authorize('delete', $this->database);
 
-        $backup->delete();
-        $this->dispatch('success', 'Scheduled backup deleted.');
-        $this->refreshScheduledBackups();
+            $backup = $this->database->scheduledBackups->find($scheduled_backup_id);
+            $backup->delete();
+            auditLog('ui.database.backup_schedule_deleted', [
+                'team_id' => $this->database->team()?->id,
+                'database_uuid' => $this->database->uuid,
+                'database_name' => $this->database->name,
+                'backup_uuid' => $backup->uuid,
+            ]);
+            $this->dispatch('success', 'Scheduled backup deleted.');
+            $this->refreshScheduledBackups();
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
     public function refreshScheduledBackups(?int $id = null): void
     {
         $this->database->refresh();
-        if ($id) {
-            $this->setSelectedBackup($id);
-        }
         $this->dispatch('refreshScheduledBackups');
+    }
+
+    public function render(): View
+    {
+        $this->database->load([
+            'scheduledBackups' => fn ($query) => $query->withCount('executions')->with([
+                's3',
+                's3Storages',
+                'latest_log' => fn ($query) => $query->limit(1),
+            ]),
+        ]);
+
+        return view('livewire.project.database.scheduled-backups');
     }
 }

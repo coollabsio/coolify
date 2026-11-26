@@ -3,11 +3,11 @@
 namespace App\Notifications;
 
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Collection;
-use Spatie\Url\Url;
 
 class SslExpirationNotification extends CustomEmailNotification
 {
@@ -19,39 +19,9 @@ class SslExpirationNotification extends CustomEmailNotification
     {
         $this->onQueue('high');
         $this->resources = collect($resources);
-
-        // Collect URLs for each resource
-        $this->resources->each(function ($resource) {
-            if (data_get($resource, 'environment.project.uuid')) {
-                $routeName = match ($resource->type()) {
-                    'application' => 'project.application.configuration',
-                    'database' => 'project.database.configuration',
-                    'service' => 'project.service.configuration',
-                    default => null
-                };
-
-                if ($routeName) {
-                    $route = route($routeName, [
-                        'project_uuid' => data_get($resource, 'environment.project.uuid'),
-                        'environment_uuid' => data_get($resource, 'environment.uuid'),
-                        $resource->type().'_uuid' => data_get($resource, 'uuid'),
-                    ]);
-
-                    $settings = instanceSettings();
-                    if (data_get($settings, 'fqdn')) {
-                        $url = Url::fromString($route);
-                        $url = $url->withPort(null);
-                        $fqdn = data_get($settings, 'fqdn');
-                        $fqdn = str_replace(['http://', 'https://'], '', $fqdn);
-                        $url = $url->withHost($fqdn);
-
-                        $this->urls[$resource->name] = $url->__toString();
-                    } else {
-                        $this->urls[$resource->name] = $route;
-                    }
-                }
-            }
-        });
+        $this->urls = $this->resources->mapWithKeys(fn ($resource) => [
+            $resource->name => base_url().'/project/'.data_get($resource, 'environment.project.uuid').'/environment/'.data_get($resource, 'environment.uuid')."/database/{$resource->uuid}",
+        ])->all();
     }
 
     public function via(object $notifiable): array
@@ -129,6 +99,28 @@ class SslExpirationNotification extends CustomEmailNotification
         );
     }
 
+    public function toNtfy(): NtfyMessage
+    {
+        $resourceNames = $this->resources->pluck('name')->join(', ');
+        $message = "SSL certificates have been renewed for: {$resourceNames}\n\n";
+        $message .= "Action Required: These resources need to be redeployed manually for the new SSL certificates to take effect.";
+
+        $buttons = [];
+        foreach ($this->urls as $name => $url) {
+            $buttons[] = [
+                'text' => "View {$name}",
+                'url' => $url,
+            ];
+        }
+
+        return new NtfyMessage(
+            title: 'SSL Certificates Renewed',
+            message: $message,
+            buttons: $buttons,
+            level: 'warning',
+        );
+    }
+
     public function toSlack(): SlackMessage
     {
         $resourceNames = $this->resources->pluck('name')->join(', ');
@@ -147,5 +139,19 @@ class SslExpirationNotification extends CustomEmailNotification
             description: $description,
             color: SlackMessage::warningColor()
         );
+    }
+
+    public function toWebhook(): array
+    {
+        $resourceNames = $this->resources->pluck('name');
+
+        return [
+            'success' => false,
+            'message' => "SSL certificates have been renewed for: {$resourceNames->join(', ')}. These resources need to be redeployed manually for the new SSL certificates to take effect.",
+            'event' => 'ssl_certificate_renewal',
+            'resources' => $resourceNames->values()->all(),
+            'urls' => $this->urls,
+            'url' => base_url(),
+        ];
     }
 }

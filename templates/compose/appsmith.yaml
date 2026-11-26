@@ -3,10 +3,11 @@
 # category: productivity
 # tags: lowcode, nocode, no, low, platform
 # logo: svgs/appsmith.svg
+# port: 80
 
 services:
   appsmith:
-    image: index.docker.io/appsmith/appsmith-ce:latest
+    image: index.docker.io/appsmith/appsmith-ce:v2.7.0
     environment:
       - SERVICE_URL_APPSMITH
       - APPSMITH_MAIL_ENABLED=${APPSMITH_MAIL_ENABLED:-false}

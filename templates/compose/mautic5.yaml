@@ -8,7 +8,7 @@
 
 services:
   mysql:
-    image: 'mysql:8.0'
+    image: 'mysql:8.4'
     environment:
       - 'MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_64_MYSQLROOT}'
       - 'MYSQL_DATABASE=${MYSQL_DATABASE:-mautic}'
@@ -27,14 +27,15 @@ services:
     environment:
       - 'RABBITMQ_DEFAULT_VHOST=${RABBITMQ_DEFAULT_VHOST:-mautic}'
     healthcheck:
-      test: rabbitmq-diagnostics -q ping
+      test: rabbitmq-diagnostics -q check_port_connectivity
       interval: 5s
       timeout: 30s
-      retries: 10
+      retries: 20
+      start_period: 60s
     volumes:
       - 'rabbitmq-data:/var/lib/rabbitmq'
   mautic_web:
-    image: 'mautic/mautic:latest'
+    image: 'mautic/mautic:7.2.2-apache'
     volumes:
       - 'mautic_data/config:/var/www/html/config:z'
       - 'mautic_data/logs:/var/www/html/var/logs:z'
@@ -65,7 +66,7 @@ services:
       timeout: 10s
       retries: 15
   mautic_cron:
-    image: 'mautic/mautic:latest'
+    image: 'mautic/mautic:7.2.2-apache'
     volumes:
       - 'mautic_data/config:/var/www/html/config:z'
       - 'mautic_data/logs:/var/www/html/var/logs:z'
@@ -93,7 +94,7 @@ services:
       timeout: 10s
       retries: 15
   mautic_worker:
-    image: 'mautic/mautic:latest'
+    image: 'mautic/mautic:7.2.2-apache'
     volumes:
       - 'mautic_data/config:/var/www/html/config:z'
       - 'mautic_data/logs:/var/www/html/var/logs:z'

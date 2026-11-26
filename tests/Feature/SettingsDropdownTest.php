@@ -8,7 +8,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Livewire;
 
-it('renders the changelog modal above the desktop sidebar toggle', function () {
+it('opens the changelog modal with its entries from the sidebar trigger', function () {
     $user = new User(['email' => 'test@example.com']);
     $user->id = 1;
 
@@ -38,7 +38,30 @@ it('renders the changelog modal above the desktop sidebar toggle', function () {
 
     Livewire::test(SettingsDropdown::class, ['trigger' => 'changelog-sidebar'])
         ->call('openWhatsNewModal')
-        ->assertSee('Changelog')
-        ->assertSee('z-[60]', false)
-        ->assertSee('closeWhatsNewModal', false);
+        ->assertNotDispatched('whats-new-opened')
+        ->assertSee('Test Release');
+});
+
+it('opens the changelog modal when there are no entries', function () {
+    $user = new User(['email' => 'test@example.com']);
+    $user->id = 1;
+
+    Auth::setUser($user);
+
+    app()->instance(ChangelogService::class, new class extends ChangelogService
+    {
+        public function getEntriesForUser(User $user): Collection
+        {
+            return collect();
+        }
+
+        public function getUnreadCountForUser(User $user): int
+        {
+            return 0;
+        }
+    });
+
+    Livewire::test(SettingsDropdown::class, ['trigger' => 'account-menu'])
+        ->call('openWhatsNewModal')
+        ->assertSet('showWhatsNewModal', true);
 });

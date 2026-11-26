@@ -7,7 +7,7 @@
 
 services:
   chromadb:
-    image: chromadb/chroma:1.0.15
+    image: chromadb/chroma:1.5.9
     volumes:
       - chroma-data:/data
     environment:

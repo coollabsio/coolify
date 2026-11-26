@@ -7,7 +7,7 @@
 
 services:
   syncthing:
-    image: lscr.io/linuxserver/syncthing:latest
+    image: lscr.io/linuxserver/syncthing:2.1.7
     environment:
       - SERVICE_URL_SYNCTHING_8384
       - PUID=1000

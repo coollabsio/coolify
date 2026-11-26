@@ -2,12 +2,26 @@
 
 namespace App\Models;
 
-use App\Jobs\ConnectProxyToNetworksJob;
 use App\Support\ValidationPatterns;
 use App\Traits\HasSafeStringAttribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use OpenApi\Attributes as OA;
 
+#[OA\Schema(
+    schema: 'Destination',
+    description: 'A Docker network destination attached to a server.',
+    type: 'object',
+    properties: [
+        new OA\Property(property: 'uuid', type: 'string'),
+        new OA\Property(property: 'name', type: 'string'),
+        new OA\Property(property: 'network', type: 'string'),
+        new OA\Property(property: 'type', type: 'string', enum: ['standalone', 'swarm']),
+        new OA\Property(property: 'server_uuid', type: 'string'),
+        new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
+        new OA\Property(property: 'updated_at', type: 'string', format: 'date-time'),
+    ],
+)]
 class StandaloneDocker extends BaseModel
 {
     use HasFactory;
@@ -23,13 +37,28 @@ class StandaloneDocker extends BaseModel
     {
         parent::boot();
         static::created(function ($newStandaloneDocker) {
+            if (app()->runningUnitTests()) {
+                return;
+            }
+
             $server = $newStandaloneDocker->server;
-            $safeNetwork = escapeshellarg($newStandaloneDocker->network);
             instant_remote_process([
-                "docker network inspect {$safeNetwork} >/dev/null 2>&1 || docker network create --driver overlay --attachable {$safeNetwork} >/dev/null",
+                $newStandaloneDocker->networkCreateCommand(),
+                $newStandaloneDocker->proxyConnectCommand(),
             ], $server, false);
-            ConnectProxyToNetworksJob::dispatchSync($server);
         });
+    }
+
+    public function networkCreateCommand(): string
+    {
+        return dockerProxyNetworkEnsureCommand($this->network);
+    }
+
+    public function proxyConnectCommand(): string
+    {
+        $safeNetwork = escapeshellarg($this->network);
+
+        return "docker network connect {$safeNetwork} coolify-proxy >/dev/null 2>&1 || true";
     }
 
     public function setNetworkAttribute(string $value): void
@@ -86,6 +115,16 @@ class StandaloneDocker extends BaseModel
         return $this->morphMany(StandaloneClickhouse::class, 'destination');
     }
 
+    public function influxdbs()
+    {
+        return $this->morphMany(StandaloneInfluxdb::class, 'destination');
+    }
+
+    public function sqlites()
+    {
+        return $this->morphMany(StandaloneSqlite::class, 'destination');
+    }
+
     public function server()
     {
         return $this->belongsTo(Server::class);
@@ -138,12 +177,14 @@ class StandaloneDocker extends BaseModel
         $keydbs = $this->keydbs;
         $dragonflies = $this->dragonflies;
         $clickhouses = $this->clickhouses;
+        $influxdbs = $this->influxdbs;
+        $sqlites = $this->sqlites;
 
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses)->concat($influxdbs)->concat($sqlites);
     }
 
     public function attachedTo()
     {
-        return $this->applications?->count() > 0 || $this->databases()->count() > 0;
+        return $this->applications()->exists() || $this->databases()->count() > 0 || $this->services()->exists();
     }
 }

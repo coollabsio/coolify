@@ -6,7 +6,7 @@
 
 services:
   redis:
-    image: redis:7.4
+    image: valkey/valkey:9-alpine
     volumes:
       - paperless-redis:/data
     healthcheck:
@@ -15,7 +15,7 @@ services:
       retries: 3
 
   paperless:
-    image: paperlessngx/paperless-ngx:latest
+    image: paperlessngx/paperless-ngx:3.4.2
     depends_on:
       redis:
         condition: service_healthy

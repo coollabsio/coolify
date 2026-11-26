@@ -158,3 +158,20 @@ test('cloning application reassigns scheduled tasks and previews to the cloned a
         ->and($clonedPreview?->application_id)->toBe($newApp->id)
         ->and($clonedPreview?->status)->toBe('exited');
 });
+
+test('cloning application gives the cloned volume the Compose driver options', function () {
+    $volume = LocalPersistentVolume::create([
+        'name' => $this->application->uuid.'_data',
+        'mount_path' => '/data',
+        'resource_id' => $this->application->id,
+        'resource_type' => $this->application->getMorphClass(),
+    ]);
+    LocalPersistentVolume::query()->update(['ignores_compose_driver_options' => true]);
+
+    $newApp = clone_application($this->application, $this->destination, [
+        'environment_id' => $this->environment->id,
+    ]);
+
+    expect($newApp->persistentStorages()->sole()->ignores_compose_driver_options)->toBeFalse()
+        ->and($volume->refresh()->ignores_compose_driver_options)->toBeTrue();
+});

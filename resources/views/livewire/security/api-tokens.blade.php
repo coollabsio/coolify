@@ -1,153 +1,306 @@
-<div>
+{{-- The new token value lives only in Alpine, so a Livewire update can not hide it or close its modal. --}}
+<div x-data="{
+    editingToken: null,
+    issuedToken: null,
+    editToken(values) {
+        this.editingToken = values;
+        for (const field of ['description', 'expiresInDays', 'permissions', 'scopeMode', 'selectedScopes']) {
+            this.$wire.$set(`editForm.${field}`, values[field], false);
+        }
+        this.$dispatch('open-api-token-edit');
+    },
+}" @api-token-issued.window="issuedToken = $event.detail.token">
     <x-slot:title>
         API Tokens | Coolify
     </x-slot>
-    <x-security.navbar />
-    <div class="pb-4">
-        <h2>API Tokens</h2>
-        @if (!$isApiEnabled)
-            <div>API is disabled. If you want to use the API, please enable it in the <a
-                    href="{{ route('settings.advanced') }}" class="underline dark:text-white" {{ wireNavigate() }}>Settings</a> menu.</div>
-        @else
-            <div>Tokens are created with the current team as scope.</div>
-    </div>
-    <h3>New Token</h3>
-    @can('create', App\Models\PersonalAccessToken::class)
-        <form class="flex flex-col gap-2" wire:submit='addNewToken'>
-            <div class="flex gap-2 items-end w-lg">
-                <x-forms.input class="w-64" required id="description" label="Description" />
-                <x-forms.select id="expiresInDays" label="Expires in" wire:model="expiresInDays">
-                    @foreach ($expirationOptions as $days => $label)
-                        <option value="{{ $days }}">{{ $label }}</option>
-                    @endforeach
-                    <option value="">Never</option>
-                </x-forms.select>
-                <x-forms.button type="submit">Create</x-forms.button>
-            </div>
-            <div class="flex">
-                Permissions
-                <span
-                    class="pr-1">:</span>
-                <div class="flex gap-1 font-bold dark:text-white">
-                    @if ($permissions)
-                        @foreach ($permissions as $permission)
-                            <div>{{ $permission }}</div>
-                        @endforeach
+
+    <x-security.settings-layout>
+
+        @php
+            $expirationList = collect($expirationOptions)
+                ->map(fn ($label, $days) => ['value' => (string) $days, 'label' => $label])
+                ->values()
+                ->push(['value' => '', 'label' => 'Never'])
+                ->all();
+        @endphp
+
+        <div class="application-settings-form flex flex-col gap-6">
+            <x-api-disabled-callout
+                message="REST API requests are rejected. Tokens still authenticate the MCP endpoint when the MCP server is enabled." />
+
+            <x-application.settings-section title="Issued tokens" flush>
+                @can('create', App\Models\PersonalAccessToken::class)
+                    <x-slot:actions>
+                        <button type="button" class="button button-highlighted" @click="$dispatch('open-api-token-create')">
+                            <x-reicon name="plus" class="size-3.5" />
+                            New token
+                        </button>
+                    </x-slot:actions>
+                @endcan
+                <div x-data="{
+                    search: '',
+                    page: 1,
+                    perPage: 10,
+                    get tokens() {
+                        return this.$wire.tokenSearchIndex;
+                    },
+                    get filteredTokens() {
+                        const query = this.search.trim().toLowerCase();
+
+                        return query
+                            ? this.tokens.filter(token => token.search.includes(query))
+                            : this.tokens;
+                    },
+                    get lastPage() {
+                        return Math.max(1, Math.ceil(this.filteredTokens.length / this.perPage));
+                    },
+                    get firstVisibleRow() {
+                        return this.filteredTokens.length === 0 ? 0 : ((this.page - 1) * this.perPage) + 1;
+                    },
+                    get lastVisibleRow() {
+                        return Math.min(this.page * this.perPage, this.filteredTokens.length);
+                    },
+                    isVisible(id) {
+                        const start = (this.page - 1) * this.perPage;
+
+                        return this.filteredTokens
+                            .slice(start, start + this.perPage)
+                            .some(token => token.id === String(id));
+                    },
+                    goToPage(page) {
+                        this.page = Math.min(Math.max(page, 1), this.lastPage);
+                    }
+                }">
+                    @if ($tokens->count() > 1)
+                        <div class="flex items-center gap-2 border-b border-neutral-200 p-3 dark:border-white/[0.08]">
+                            <div class="relative w-full max-w-sm">
+                                <x-reicon name="search"
+                                    class="pointer-events-none absolute top-1/2 left-2.5 z-10 size-3.5 -translate-y-1/2 text-neutral-400 dark:text-fg-faint" />
+                                <input x-model.debounce.150ms="search" x-on:input="page = 1" type="search"
+                                    placeholder="Search tokens" aria-label="Search tokens"
+                                    class="h-8! w-full rounded-lg! border-neutral-200! bg-white! py-0! pr-8! pl-8! text-[12px]! shadow-none! placeholder:text-neutral-400 focus:border-accent! focus:ring-0! dark:border-white/[0.08]! dark:bg-white/[0.035]! dark:text-fg! dark:placeholder:text-fg-faint">
+                                <button x-cloak x-show="search" x-on:click="search = ''; page = 1" type="button"
+                                    class="absolute top-1/2 right-2 flex size-5 -translate-y-1/2 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.07] dark:hover:text-fg"
+                                    aria-label="Clear search">
+                                    <x-reicon name="x" class="size-3" />
+                                </button>
+                            </div>
+                            <x-helper label="Search help"
+                                helper="Search by token name, ability, or the name of a project, environment, or resource that the token can use." />
+                        </div>
                     @endif
-                </div>
-            </div>
 
-            <div class="w-64">
-                @if ($canUseRootPermissions)
-                    <x-forms.checkbox label="root" wire:model.live="permissions" domValue="root"
-                        helper="Root access, be careful!" :checked="in_array('root', $permissions)"></x-forms.checkbox>
-                @else
-                    <x-forms.checkbox label="root (admin/owner only)" disabled domValue="root"
-                        helper="Root access requires admin or owner role" :checked="false"></x-forms.checkbox>
-                @endif
-
-                @if (!in_array('root', $permissions))
-                    @if ($canUseWritePermissions)
-                        <x-forms.checkbox label="write" wire:model.live="permissions" domValue="write"
-                            helper="Write access to all resources." :checked="in_array('write', $permissions)"></x-forms.checkbox>
+                    @if ($tokens->isEmpty())
+                        <div class="p-4">
+                            <x-empty title="No API tokens" description="Create a token when an external client needs access."
+                                icon-name="keys" size="sm" />
+                        </div>
                     @else
-                        <x-forms.checkbox label="write (admin/owner only)" disabled domValue="write"
-                            helper="Write access requires admin or owner role" :checked="false"></x-forms.checkbox>
-                    @endif
-
-                    <x-forms.checkbox label="deploy" wire:model.live="permissions" domValue="deploy"
-                        helper="Can trigger deploy webhooks." :checked="in_array('deploy', $permissions)"></x-forms.checkbox>
-                    <x-forms.checkbox label="read" domValue="read" wire:model.live="permissions" domValue="read"
-                        :checked="in_array('read', $permissions)"></x-forms.checkbox>
-                    <x-forms.checkbox label="read:sensitive" wire:model.live="permissions" domValue="read:sensitive"
-                        helper="Responses will include secrets, logs, passwords, and compose file contents."
-                        :checked="in_array('read:sensitive', $permissions)"></x-forms.checkbox>
-                @endif
-            </div>
-            @if (in_array('root', $permissions))
-                <div class="font-bold dark:text-warning">Root access, be careful!</div>
-            @endif
-        </form>
-    @endcan
-    @if (session()->has('token'))
-        <div class="py-4 font-bold dark:text-warning">Please copy this token now. For your security, it won't be shown
-            again.
-        </div>
-        <div class="pb-4 font-bold dark:text-white"> {{ session('token') }}</div>
-    @endif
-    <h3 class="py-4">Issued Tokens</h3>
-    <div class="flex flex-col">
-        <div class="flex flex-col">
-            <div class="overflow-x-auto">
-                <div class="inline-block min-w-full">
-                    <div class="overflow-hidden">
-                        <table class="min-w-full">
-                            <thead>
-                                <tr>
-                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Description</th>
-                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Permissions</th>
-                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Last used</th>
-                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Created</th>
-                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Expires</th>
-                                    <th class="px-5 py-3 text-xs font-medium text-left uppercase">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse ($tokens as $token)
-                                    <tr wire:key="token-{{ $token->id }}">
-                                        <td class="px-5 py-4 text-sm whitespace-nowrap">{{ $token->name }}</td>
-                                        <td class="px-5 py-4 text-sm whitespace-nowrap">
-                                            @if ($token->abilities)
-                                                <div class="flex gap-1">
-                                                    @foreach ($token->abilities as $ability)
-                                                        <div class="font-bold dark:text-white">{{ $ability }}</div>
-                                                    @endforeach
-                                                </div>
+                        <div x-cloak x-show="filteredTokens.length > 0" class="data-table">
+                            <div class="data-table-header api-tokens-table-grid">
+                                <span>Description</span>
+                                <span>Permissions</span>
+                                <span>Last used</span>
+                                <span>Created</span>
+                                <span>Expires</span>
+                                <span class="text-right">Actions</span>
+                            </div>
+                            @foreach ($tokens as $token)
+                                <div wire:key="api-token-{{ $token->id }}"
+                                    x-show="isVisible(@js((string) $token->id))"
+                                    class="data-table-row api-tokens-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]">
+                                    <div class="min-w-0">
+                                        <div class="flex min-w-0 items-center gap-1.5">
+                                            <span class="truncate text-[12px] font-medium text-black dark:text-fg">{{ $token->name }}</span>
+                                            @if ($token->isPaused())
+                                                <x-status-badge label="Paused" type="warning" size="sm" />
                                             @endif
-                                        </td>
-                                        <td class="px-5 py-4 text-sm whitespace-nowrap">
-                                            {{ $token->last_used_at ? $token->last_used_at->diffForHumans() : 'Never' }}
-                                        </td>
-                                        <td class="px-5 py-4 text-sm whitespace-nowrap">
-                                            {{ $token->created_at->diffForHumans() }}
-                                        </td>
-                                        <td class="px-5 py-4 text-sm whitespace-nowrap">
-                                            @if (! $token->expires_at)
-                                                Never
-                                            @elseif ($token->expires_at->isPast())
-                                                <span class="font-bold dark:text-error">Expired
-                                                    {{ $token->expires_at->format('Y-m-d H:i:s') }}</span>
+                                        </div>
+                                        <div class="truncate text-[11px] text-neutral-500 dark:text-fg-dim">
+                                            @if ($token->scopes === null)
+                                                All resources in the team
                                             @else
-                                                {{ $token->expires_at->format('Y-m-d H:i:s') }}
+                                                @php
+                                                    $tokenScopes = collect($token->scopes)
+                                                        ->map(fn ($scope) => [
+                                                            'type' => $scope['scope'] ?? 'scope',
+                                                            'label' => $scopeLabels[($scope['scope'] ?? '').':'.($scope['uuid'] ?? '')] ?? 'Unavailable '.($scope['scope'] ?? 'scope'),
+                                                        ])
+                                                        ->sortBy([
+                                                            fn ($a, $b) => array_search($a['type'], ['project', 'environment', 'resource']) <=> array_search($b['type'], ['project', 'environment', 'resource']),
+                                                            fn ($a, $b) => strnatcasecmp($a['label'], $b['label']),
+                                                        ]);
+                                                @endphp
+                                                {{-- The modal is wire:ignore, so a new key re-renders it when the scopes change. --}}
+                                                <x-modal-input title="Access of {{ $token->name }}"
+                                                    wire:key="api-token-scopes-{{ $token->id }}-{{ md5(json_encode($token->scopes)) }}"
+                                                    subtitle="This token can use only these projects, environments, resources, and servers.">
+                                                    <x-slot:content>
+                                                        <button type="button"
+                                                            class="max-w-full truncate underline decoration-dotted underline-offset-2 hover:text-black dark:hover:text-fg">
+                                                            {{ $tokenScopes->countBy('type')->map(fn ($count, $type) => $count.' '.Str::plural($type, $count))->join(', ') }}
+                                                        </button>
+                                                    </x-slot:content>
+                                                    <div
+                                                        class="divide-y divide-neutral-200 rounded-md border border-neutral-200 dark:divide-white/[0.06] dark:border-white/[0.08]">
+                                                        @foreach ($tokenScopes as $tokenScope)
+                                                            <div class="flex min-h-8 items-center gap-3 px-3 py-1.5 text-[12px]">
+                                                                <span class="w-20 shrink-0 text-[11px] capitalize text-neutral-500 dark:text-fg-dim">{{ $tokenScope['type'] }}</span>
+                                                                <span class="min-w-0 flex-1 break-words text-black dark:text-fg">{{ $tokenScope['label'] }}</span>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                </x-modal-input>
                                             @endif
-                                        </td>
-                                        <td class="px-5 py-4 text-sm font-medium whitespace-nowrap">
-                                            @if (auth()->id() === $token->tokenable_id)
-                                                <x-modal-confirmation title="Confirm API Token Revocation?" isErrorButton
-                                                    buttonTitle="Revoke token"
-                                                    submitAction="revoke({{ data_get($token, 'id') }})" :actions="[
-                                                        'This API Token will be revoked and permanently deleted.',
-                                                        'Any API call made with this token will fail.',
+                                        </div>
+                                    </div>
+                                    <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+                                        @foreach ($token->abilities ?? [] as $ability)
+                                            <span @class([
+                                                'inline-flex min-h-5 items-center rounded-md border px-2 py-0.5 text-[10px] font-medium',
+                                                'border-error/20 bg-error/10 text-error' => in_array($ability, ['root', 'delete']),
+                                                'border-warning/20 bg-warning/10 text-warning' => in_array($ability, ['write', 'write:sensitive']),
+                                                'border-coollabs/20 bg-coollabs/10 text-coollabs dark:border-brand-light/20 dark:bg-brand/15 dark:text-brand-light' => in_array($ability, ['deploy', 'terminal']),
+                                                'border-neutral-200 bg-neutral-100 text-neutral-600 dark:border-white/[0.08] dark:bg-white/[0.06] dark:text-fg-dim' => in_array($ability, ['read', 'read:sensitive']),
+                                            ])>{{ $ability }}</span>
+                                        @endforeach
+                                    </div>
+                                    <div class="text-[11px] text-neutral-500 dark:text-fg-dim">
+                                        {{ $token->last_used_at?->diffForHumans() ?? 'Never' }}
+                                    </div>
+                                    <div class="text-[11px] text-neutral-500 dark:text-fg-dim">
+                                        {{ $token->created_at->format('Y-m-d') }}
+                                    </div>
+                                    <div class="text-[11px] text-neutral-500 dark:text-fg-dim">
+                                        @if (!$token->expires_at)
+                                            Never
+                                        @elseif ($token->expires_at->isPast())
+                                            <x-status-badge label="Expired" type="error" size="sm" />
+                                        @else
+                                            {{ $token->expires_at->format('Y-m-d') }}
+                                        @endif
+                                    </div>
+                                    <div class="flex items-center justify-end gap-1">
+                                        @if (auth()->id() === $token->tokenable_id)
+                                            <x-table.row-actions label="Token actions">
+                                                <x-table.row-action
+                                                    x-on:click="editToken({{ \Illuminate\Support\Js::from(App\Livewire\Forms\ApiTokenForm::valuesOf($token)) }})">
+                                                    Edit
+                                                </x-table.row-action>
+                                                <x-table.row-action
+                                                    wire:click="setPaused({{ $token->id }}, {{ $token->isPaused() ? 'false' : 'true' }})">
+                                                    {{ $token->isPaused() ? 'Resume' : 'Pause' }}
+                                                </x-table.row-action>
+                                                <x-modal-confirmation title="Roll API Token?" buttonFullWidth
+                                                    submitAction="roll({{ $token->id }})" :actions="[
+                                                        'A new secret replaces this token. The current secret stops working at once.',
+                                                        'The description, permissions, scopes, and expiry do not change.',
                                                     ]"
                                                     confirmationText="{{ $token->name }}"
-                                                    confirmationLabel="Please confirm the execution of the actions by entering the API Token Description below"
-                                                    shortConfirmationLabel="API Token Description" :confirmWithPassword="false"
-                                                    step2ButtonText="Revoke API Token" />
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr>
-                                        <td class="px-5 py-4 text-sm whitespace-nowrap" colspan="6">No API tokens found.
-                                        </td>
-                                    </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
+                                                    confirmationLabel="Enter the token description to confirm"
+                                                    shortConfirmationLabel="Token description"
+                                                    :confirmWithPassword="false" step2ButtonText="Roll token">
+                                                    <x-slot:trigger>
+                                                        <x-table.row-action>Roll</x-table.row-action>
+                                                    </x-slot:trigger>
+                                                </x-modal-confirmation>
+                                                <x-slot:danger>
+                                                <x-modal-confirmation title="Confirm API Token Revocation?" buttonFullWidth
+                                                    submitAction="revoke({{ $token->id }})" :actions="[
+                                                        'This API token will be permanently revoked.',
+                                                    ]"
+                                                    confirmationText="{{ $token->name }}"
+                                                    confirmationLabel="Enter the token description to confirm"
+                                                    shortConfirmationLabel="Token description"
+                                                    :confirmWithPassword="false" step2ButtonText="Revoke token">
+                                                    <x-slot:trigger>
+                                                        <x-table.row-action>Revoke</x-table.row-action>
+                                                    </x-slot:trigger>
+                                                </x-modal-confirmation>
+                                                </x-slot:danger>
+                                            </x-table.row-actions>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+
+                        <div x-cloak x-show="filteredTokens.length === 0" class="p-4">
+                            <x-empty size="sm" title="No matching tokens"
+                                description="Try a different description or permission." />
+                        </div>
+
+                        <x-client-pagination total="filteredTokens.length" x-cloak x-show="filteredTokens.length > 0"
+                            summary="`${firstVisibleRow}-${lastVisibleRow} of ${filteredTokens.length}`"
+                            page-size-model="perPage" storage-key="coolify.page-size.api-tokens"
+                            previous-action="goToPage(page - 1)" next-action="goToPage(page + 1)"
+                            next-disabled="page >= lastPage" />
+                    @endif
+                </div>
+            </x-application.settings-section>
+        </div>
+
+        @can('create', App\Models\PersonalAccessToken::class)
+            <x-modal-input title="New API token" :wireIgnore="false" :closeOutside="false"
+                @open-api-token-create.window="modalOpen = true" @api-token-issued.window="modalOpen = false">
+                <x-slot:content><span></span></x-slot:content>
+
+                <form wire:submit="addNewToken" id="api-token-create-form" class="lg:w-3xl">
+                    @include('livewire.security.partials.api-token-fields', [
+                        'form' => 'form',
+                        'expiryOptions' => $expirationList,
+                        'inModal' => true,
+                    ])
+                </form>
+
+                <x-slot:footer>
+                    <x-forms.button @click="modalOpen = false">Cancel</x-forms.button>
+                    <x-forms.button isHighlighted type="submit" form="api-token-create-form">Create token</x-forms.button>
+                </x-slot:footer>
+            </x-modal-input>
+
+            <x-modal-input title="Edit API token" :wireIgnore="false" :closeOutside="false"
+                @open-api-token-edit.window="modalOpen = true" @api-token-updated.window="modalOpen = false">
+                <x-slot:content><span></span></x-slot:content>
+
+                <form x-on:submit.prevent="$wire.updateToken(editingToken.id)" id="api-token-edit-form" class="lg:w-3xl">
+                    <p class="mb-4 text-[12px] text-neutral-500 dark:text-fg-dim">
+                        The token value does not change. Clients that use it get the new access on their next request.
+                    </p>
+
+                    @include('livewire.security.partials.api-token-fields', [
+                        'form' => 'editForm',
+                        'expiryOptions' => [['value' => 'keep', 'label' => 'Keep current'], ...$expirationList],
+                        'inModal' => true,
+                    ])
+                </form>
+
+                <x-slot:footer>
+                    <x-forms.button @click="modalOpen = false">Cancel</x-forms.button>
+                    <x-forms.button isHighlighted type="submit" form="api-token-edit-form">Save changes</x-forms.button>
+                </x-slot:footer>
+            </x-modal-input>
+        @endcan
+
+        <x-modal-input title="Copy your token" :closeOutside="false"
+            @api-token-issued.window="modalOpen = true" x-effect="if (!modalOpen) issuedToken = null">
+            <x-slot:content><span></span></x-slot:content>
+
+            <div class="flex flex-col gap-3 lg:w-2xl">
+                <p class="text-sm text-neutral-500 dark:text-fg-dim">
+                    Copy the token now. It is not shown again after you close this window.
+                </p>
+                <div class="relative">
+                    <input type="text" :value="issuedToken" readonly @focus="$el.select()"
+                        class="input w-full pr-12! font-mono text-[12px] text-black dark:text-fg">
+                    <x-copy-button resolve="issuedToken" label="Copy token"
+                        class="absolute top-1/2 right-2 -translate-y-1/2" />
                 </div>
             </div>
-        </div>
-    </div>
-    @endif
+
+            <x-slot:footer>
+                <x-forms.button isHighlighted @click="modalOpen = false">Done</x-forms.button>
+            </x-slot:footer>
+        </x-modal-input>
+    </x-security.settings-layout>
 </div>

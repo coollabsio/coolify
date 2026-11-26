@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -61,6 +62,15 @@ class ForceDisabled extends CustomEmailNotification
         );
     }
 
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
+            title: 'Server disabled',
+            level: 'error',
+            message: "Server ({$this->server->name}) disabled because it is not paid!\nAll automations and integrations are stopped.\nPlease update your subscription to enable the server again: https://app.coolify.io/subscription",
+        );
+    }
+
     public function toSlack(): SlackMessage
     {
         $title = 'Server disabled';
@@ -73,5 +83,17 @@ class ForceDisabled extends CustomEmailNotification
             description: $description,
             color: SlackMessage::errorColor()
         );
+    }
+
+    public function toWebhook(): array
+    {
+        return [
+            'success' => false,
+            'message' => "Server ({$this->server->name}) disabled because it is not paid! All automations and integrations are stopped.",
+            'event' => 'server_force_disabled',
+            'server_name' => $this->server->name,
+            'server_uuid' => $this->server->uuid,
+            'url' => base_url().'/server/'.$this->server->uuid,
+        ];
     }
 }

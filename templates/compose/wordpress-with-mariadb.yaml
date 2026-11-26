@@ -3,10 +3,11 @@
 # category: cms
 # tags: cms, blog, content, management, mariadb
 # logo: svgs/wordpress.svg
+# port: 80
 
 services:
   wordpress:
-    image: wordpress:latest
+    image: wordpress:7.1.4
     volumes:
       - wordpress-files:/var/www/html
     environment:

@@ -5,7 +5,9 @@
 *.html diff=html
 *.md diff=markdown
 *.php diff=php
+CHANGELOG.md merge=union
 
 /.github export-ignore
 CHANGELOG.md export-ignore
+.changes export-ignore
 .styleci.yml export-ignore

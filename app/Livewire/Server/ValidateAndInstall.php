@@ -5,8 +5,11 @@ namespace App\Livewire\Server;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Events\ServerValidated;
+use App\Jobs\CheckAndStartSentinelJob;
 use App\Models\Server;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class ValidateAndInstall extends Component
@@ -21,6 +24,7 @@ class ValidateAndInstall extends Component
 
     public bool $install = true;
 
+    #[Locked]
     public $uptime = null;
 
     public $supported_os_type = null;
@@ -39,6 +43,8 @@ class ValidateAndInstall extends Component
 
     public bool $ask = false;
 
+    public bool $isInstalling = false;
+
     protected $listeners = [
         'init',
         'validateConnection',
@@ -51,6 +57,24 @@ class ValidateAndInstall extends Component
 
     public function init(int $data = 0)
     {
+        $this->authorize('update', $this->server);
+
+        if (! $this->server->canBeValidated()) {
+            $this->error = 'This server was transferred to another Coolify instance and cannot be revalidated here.';
+            $this->server->update([
+                'validation_logs' => $this->error,
+                'is_validating' => false,
+            ]);
+            $this->dispatch(
+                'error',
+                'Cannot revalidate',
+                $this->error
+            );
+
+            return;
+        }
+
+        $this->isInstalling = false;
         $this->uptime = null;
         $this->supported_os_type = null;
         $this->prerequisites_installed = null;
@@ -72,39 +96,120 @@ class ValidateAndInstall extends Component
 
     public function retry()
     {
-        $this->authorize('update', $this->server);
-        $this->uptime = null;
-        $this->supported_os_type = null;
-        $this->prerequisites_installed = null;
-        $this->docker_installed = null;
-        $this->docker_compose_installed = null;
-        $this->docker_version = null;
-        $this->error = null;
-        $this->number_of_tries = 0;
-        $this->init();
+        try {
+            $this->authorize('update', $this->server);
+            $this->uptime = null;
+            $this->supported_os_type = null;
+            $this->prerequisites_installed = null;
+            $this->docker_installed = null;
+            $this->docker_compose_installed = null;
+            $this->docker_version = null;
+            $this->error = null;
+            $this->number_of_tries = 0;
+            $this->init();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function validateConnection()
     {
-        $this->authorize('update', $this->server);
-        ['uptime' => $this->uptime, 'error' => $error] = $this->server->validateConnection();
-        if (! $this->uptime) {
-            $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');
-            $this->error = 'Server is not reachable. Please validate your configuration and connection.<br>Check this <a target="_blank" class="text-black underline dark:text-white" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br><div class="text-error">Error: '.$sanitizedError.'</div>';
-            $this->server->update([
-                'validation_logs' => $this->error,
-            ]);
+        try {
+            $this->authorize('update', $this->server);
+            Server::throttleValidation($this->server->team_id, $this->server->ip);
+            if ($this->server->hetzner_server_id) {
+                try {
+                    $status = $this->server->refreshHetznerState();
+                } catch (\Throwable $e) {
+                    // The provider API can be down or the token revoked; the SSH checks below still decide.
+                    Log::warning('Could not refresh the Hetzner server status before validation', ['server_id' => $this->server->id, 'error' => $e->getMessage()]);
+                    $status = null;
+                }
+                $this->server->refresh();
 
-            return;
+                if (in_array($status, ['initializing', 'starting', 'stopping', 'off', 'deleting', 'rebuilding', 'migrating'], true)) {
+                    $this->error = $status === 'off'
+                        ? 'Hetzner server is off. Power it on before validating.'
+                        : "Hetzner server is {$status}. Wait until it is running, then validate.";
+                    $this->server->update([
+                        'validation_logs' => $this->error,
+                    ]);
+
+                    return;
+                }
+            }
+
+            if ($this->server->vultr_instance_id) {
+                $status = $this->server->refreshVultrState();
+                $this->server->refresh();
+
+                if (in_array($status, ['stopped', 'suspended', 'deleted'], true)) {
+                    $this->error = $status === 'deleted'
+                        ? 'Vultr instance is deleted or no longer accessible. Relink this server before validating.'
+                        : 'Vultr instance is '.($status ?? 'not running').'. Power it on before validating.';
+                    $this->server->update([
+                        'validation_logs' => $this->error,
+                    ]);
+
+                    return;
+                }
+            }
+
+            if ($this->server->digitalocean_droplet_id) {
+                $status = $this->server->refreshDigitalOceanState();
+                $this->server->refresh();
+
+                if (in_array($status, ['off', 'archive', 'deleted'], true)) {
+                    $this->error = $status === 'deleted'
+                        ? 'DigitalOcean droplet is deleted or no longer accessible. Relink this server before validating.'
+                        : 'DigitalOcean droplet is '.($status ?? 'not running').'. Power it on before validating.';
+                    $this->server->update([
+                        'validation_logs' => $this->error,
+                    ]);
+
+                    return;
+                }
+            }
+
+            if ($this->server->hostinger_virtual_machine_id) {
+                $status = $this->server->refreshHostingerState();
+                $this->server->refresh();
+
+                if (in_array($status, ['stopping', 'stopped', 'suspending', 'suspended', 'destroying', 'destroyed', 'error'], true)) {
+                    $this->error = 'Hostinger VPS is '.($status ?? 'not running').'. Power it on before validating.';
+                    $this->server->update(['validation_logs' => $this->error]);
+
+                    return;
+                }
+            }
+
+            ['uptime' => $this->uptime, 'error' => $error] = $this->server->validateConnection();
+            if (! $this->uptime) {
+                $sanitizedError = htmlspecialchars($error ?? '', ENT_QUOTES, 'UTF-8');
+                $this->error = 'Server is not reachable. Please validate your configuration and connection.<br>Check this <a target="_blank" class="text-black underline dark:text-white" href="https://coolify.io/docs/knowledge-base/server/openssh">documentation</a> for further help. <br><br><div class="text-error">Error: '.$sanitizedError.'</div>';
+                $this->server->update([
+                    'validation_logs' => $this->error,
+                ]);
+
+                return;
+            }
+            $this->dispatch('validateOS');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        $this->dispatch('validateOS');
     }
 
     public function validateOS()
     {
+        $this->authorize('update', $this->server);
+
+        if (! $this->uptime) {
+            return;
+        }
+
         $this->supported_os_type = $this->server->validateOS();
         if (! $this->supported_os_type) {
-            $this->error = 'Server OS type is not supported. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+            $this->error = Server::UNSUPPORTED_OS_MESSAGE;
             $this->server->update([
                 'validation_logs' => $this->error,
             ]);
@@ -116,6 +221,12 @@ class ValidateAndInstall extends Component
 
     public function validatePrerequisites()
     {
+        $this->authorize('update', $this->server);
+
+        if (! $this->uptime) {
+            return;
+        }
+
         $validationResult = $this->server->validatePrerequisites();
         $this->prerequisites_installed = $validationResult['success'];
         if (! $validationResult['success']) {
@@ -132,6 +243,7 @@ class ValidateAndInstall extends Component
                     if ($this->number_of_tries <= $this->max_tries) {
                         $this->installationStep = 'Prerequisites';
                         $activity = $this->server->installPrerequisites();
+                        $this->isInstalling = true;
                         $this->number_of_tries++;
                         $this->dispatch('activityMonitor', $activity->id, 'init', $this->number_of_tries, "{$this->installationStep} Installation Logs");
                     }
@@ -153,6 +265,12 @@ class ValidateAndInstall extends Component
 
     public function validateDockerEngine()
     {
+        $this->authorize('update', $this->server);
+
+        if (! $this->uptime) {
+            return;
+        }
+
         $this->docker_installed = $this->server->validateDockerEngine();
         $this->docker_compose_installed = $this->server->validateDockerCompose();
         if (! $this->docker_installed || ! $this->docker_compose_installed) {
@@ -168,6 +286,7 @@ class ValidateAndInstall extends Component
                     if ($this->number_of_tries <= $this->max_tries) {
                         $this->installationStep = 'Docker';
                         $activity = $this->server->installDocker();
+                        $this->isInstalling = true;
                         $this->number_of_tries++;
                         $this->dispatch('activityMonitor', $activity->id, 'init', $this->number_of_tries, "{$this->installationStep} Installation Logs");
                     }
@@ -188,6 +307,12 @@ class ValidateAndInstall extends Component
 
     public function validateDockerVersion()
     {
+        $this->authorize('update', $this->server);
+
+        if (! $this->uptime) {
+            return;
+        }
+
         if ($this->server->isSwarm()) {
             $swarmInstalled = $this->server->validateDockerSwarm();
             if ($swarmInstalled) {
@@ -205,6 +330,14 @@ class ValidateAndInstall extends Component
                 $this->dispatch('refreshServerShow');
                 $this->dispatch('refreshBoardingIndex');
                 ServerValidated::dispatch($this->server->team_id, $this->server->uuid);
+                if ($this->server->isSentinelEnabled()) {
+                    CheckAndStartSentinelJob::dispatch($this->server);
+                }
+                if (! $this->server->isProxyShouldRun()) {
+                    $this->dispatch('success', 'Server validated.');
+
+                    return;
+                }
                 $this->dispatch('success', 'Server validated, proxy is starting in a moment.');
                 $proxyShouldRun = CheckProxy::run($this->server, true);
                 if (! $proxyShouldRun) {
@@ -215,8 +348,7 @@ class ValidateAndInstall extends Component
                 instant_remote_process(ensureProxyNetworksExist($this->server)->toArray(), $this->server, false);
                 StartProxy::dispatch($this->server);
             } else {
-                $requiredDockerVersion = str(config('constants.docker.minimum_required_version'))->before('.');
-                $this->error = 'Minimum Docker Engine version '.$requiredDockerVersion.' is not installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                $this->error = $this->server->dockerEngineVersionError();
                 $this->server->update([
                     'validation_logs' => $this->error,
                 ]);

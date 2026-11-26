@@ -2,7 +2,11 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
+use App\Models\Environment;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
+use App\Services\ProjectConfig\ManagedResources;
 use Illuminate\Auth\Access\Response;
 
 class DatabasePolicy
@@ -20,30 +24,34 @@ class DatabasePolicy
      */
     public function view(User $user, $database): bool
     {
-        // return $user->teams->contains('id', $database->team()->first()->id);
-        return true;
+        if ($this->isInstanceDatabase($database)) {
+            return $user->teams->contains('id', 0);
+        }
+
+        return $user->canAccess(AccessLevel::Read, $database);
     }
 
     /**
-     * Determine whether the user can create models.
+     * Determine whether the user can create models, in the environment when one is given.
      */
-    public function create(User $user): bool
+    public function create(User $user, ?Environment $environment = null): bool
     {
-        // return $user->isAdmin();
-        return true;
+        return app(ResourceCreatePolicy::class)->createAny($user, $environment);
     }
 
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, $database)
+    public function update(User $user, $database): Response
     {
-        // if ($user->isAdmin() && $user->teams->contains('id', $database->team()->first()->id)) {
-        //    return Response::allow();
-        // }
+        if (ManagedResources::isManaged($database)) {
+            return Response::deny(ManagedResources::denyReason($database));
+        }
+        if ($this->allows($user, AccessLevel::Write, $database)) {
+            return Response::allow();
+        }
 
-        // return Response::deny('As a member, you cannot update this database.<br/><br/>You need at least admin or owner permissions.');
-        return true;
+        return Response::deny('You need at least admin or owner permissions to update this database.');
     }
 
     /**
@@ -51,8 +59,7 @@ class DatabasePolicy
      */
     public function delete(User $user, $database): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $database->team()->first()->id);
-        return true;
+        return $this->allows($user, AccessLevel::Delete, $database);
     }
 
     /**
@@ -60,8 +67,7 @@ class DatabasePolicy
      */
     public function restore(User $user, $database): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $database->team()->first()->id);
-        return true;
+        return false;
     }
 
     /**
@@ -69,17 +75,28 @@ class DatabasePolicy
      */
     public function forceDelete(User $user, $database): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $database->team()->first()->id);
-        return true;
+        return false;
     }
 
     /**
-     * Determine whether the user can start/stop the database.
+     * Determine whether the user can start, stop, restart, and flush the database.
+     * Needs write access because flushing deletes the data.
      */
     public function manage(User $user, $database): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $database->team()->first()->id);
-        return true;
+        return $this->allows($user, AccessLevel::Write, $database);
+    }
+
+    /**
+     * Determine whether the user can upload a backup archive for this database.
+     */
+    public function uploadBackup(User $user, $database): Response
+    {
+        if ($this->allows($user, AccessLevel::Write, $database)) {
+            return Response::allow();
+        }
+
+        return Response::deny('You need at least admin or owner permissions to upload backups for this database.');
     }
 
     /**
@@ -87,8 +104,15 @@ class DatabasePolicy
      */
     public function manageBackups(User $user, $database): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $database->team()->first()->id);
-        return true;
+        return $this->allows($user, AccessLevel::Write, $database);
+    }
+
+    /**
+     * Determine whether the user can read secret values, such as environment variable values.
+     */
+    public function viewSensitive(User $user, $database): bool
+    {
+        return $this->allows($user, AccessLevel::ReadSensitive, $database);
     }
 
     /**
@@ -96,7 +120,24 @@ class DatabasePolicy
      */
     public function manageEnvironment(User $user, $database): bool
     {
-        // return $user->isAdmin() && $user->teams->contains('id', $database->team()->first()->id);
-        return true;
+        return $this->allows($user, AccessLevel::Write, $database);
+    }
+
+    /**
+     * The instance database (coolify-db) belongs to the root team; only its owners and admins can change it.
+     * It has no environment, so the check uses the root team grants and the API token limits.
+     */
+    private function allows(User $user, AccessLevel $level, $database): bool
+    {
+        if ($this->isInstanceDatabase($database)) {
+            return $user->isAdminOfTeam(0) && app(AccessResolver::class)->allowsTeamWide($user, $level, 0);
+        }
+
+        return $user->canAccess($level, $database);
+    }
+
+    private function isInstanceDatabase($database): bool
+    {
+        return isset($database->id) && $database->id === 0;
     }
 }

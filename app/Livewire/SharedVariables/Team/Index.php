@@ -2,6 +2,8 @@
 
 namespace App\Livewire\SharedVariables\Team;
 
+use App\Livewire\Concerns\RemembersCanvasView;
+use App\Models\SharedEnvironmentVariable;
 use App\Models\Team;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\DB;
@@ -10,6 +12,7 @@ use Livewire\Component;
 class Index extends Component
 {
     use AuthorizesRequests;
+    use RemembersCanvasView;
 
     public Team $team;
 
@@ -35,7 +38,7 @@ class Index extends Component
                 'is_literal' => $data['is_literal'],
                 'comment' => $data['comment'] ?? null,
                 'type' => 'team',
-                'team_id' => currentTeam()->id,
+                'team_id' => $this->team->id,
             ]);
             $this->team->refresh();
             $this->getDevView();
@@ -46,15 +49,23 @@ class Index extends Component
 
     public function mount()
     {
+        if ($this->prefersCanvasView('team_variables')) {
+            return $this->redirectRoute('shared-variables.team.canvas', navigate: true);
+        }
         $this->team = currentTeam();
+        $this->authorize('viewSharedVariables', $this->team);
         $this->getDevView();
     }
 
     public function switch()
     {
-        $this->authorize('view', $this->team);
-        $this->view = $this->view === 'normal' ? 'dev' : 'normal';
-        $this->getDevView();
+        try {
+            $this->authorize('viewSharedVariables', $this->team);
+            $this->view = $this->view === 'normal' ? 'dev' : 'normal';
+            $this->getDevView();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function getDevView()
@@ -64,23 +75,21 @@ class Index extends Component
 
     private function formatEnvironmentVariables($variables)
     {
-        return $variables->map(function ($item) {
-            if ($item->is_shown_once) {
-                return "$item->key=(Locked Secret, delete and add again to change)";
-            }
-            if ($item->is_multiline) {
-                return "$item->key=(Multiline environment variable, edit in normal view)";
-            }
-
-            return "$item->key=$item->value";
-        })->join("\n");
+        return $variables->map(fn ($item) => formatEnvVariableForDevView($item, auth()->user()?->can('viewSensitive', $item) ?? false))->join("\n");
     }
 
     public function submit()
     {
+        // Parse before the save, so that an invalid "# coolify:" line changes nothing and keeps the edited text.
         try {
             $this->authorize('update', $this->team);
-            $this->handleBulkSubmit();
+            $variables = parseEnvDevView($this->variables, SharedEnvironmentVariable::DEV_VIEW_FLAG_DEFAULTS);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+
+        try {
+            $this->handleBulkSubmit($variables);
             $this->getDevView();
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -89,9 +98,8 @@ class Index extends Component
         }
     }
 
-    private function handleBulkSubmit()
+    private function handleBulkSubmit(array $variables)
     {
-        $variables = parseEnvFormatToArray($this->variables);
         $changesMade = false;
 
         DB::transaction(function () use ($variables, &$changesMade) {
@@ -135,9 +143,12 @@ class Index extends Component
             $found = $this->team->environment_variables()->where('key', $key)->first();
 
             if ($found) {
-                if (! $found->is_shown_once && ! $found->is_multiline) {
+                if (! $found->is_shown_once && ! $found->is_multiline && formatEnvValueForDevView($found->value) !== null) {
                     if ($found->value !== $value) {
                         $found->value = $value;
+                    }
+                    $found->fill($data['settings']);
+                    if ($found->isDirty()) {
                         $found->save();
                         $count++;
                     }
@@ -148,8 +159,9 @@ class Index extends Component
                     'value' => $value,
                     'is_multiline' => false,
                     'is_literal' => false,
+                    ...$data['settings'],
                     'type' => 'team',
-                    'team_id' => currentTeam()->id,
+                    'team_id' => $this->team->id,
                 ]);
                 $count++;
             }

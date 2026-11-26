@@ -3,6 +3,7 @@
 namespace App\Notifications\Internal;
 
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Bus\Queueable;
@@ -15,7 +16,7 @@ class GeneralNotification extends Notification implements ShouldQueue
 
     public $tries = 1;
 
-    public function __construct(public string $message)
+    public function __construct(public string $message, public bool $success = true)
     {
         $this->onQueue('high');
     }
@@ -28,9 +29,9 @@ class GeneralNotification extends Notification implements ShouldQueue
     public function toDiscord(): DiscordMessage
     {
         return new DiscordMessage(
-            title: 'Coolify: General Notification',
+            title: $this->success ? 'Coolify: General Notification' : 'Coolify: Action required',
             description: $this->message,
-            color: DiscordMessage::infoColor(),
+            color: $this->success ? DiscordMessage::infoColor() : DiscordMessage::errorColor(),
         );
     }
 
@@ -44,18 +45,37 @@ class GeneralNotification extends Notification implements ShouldQueue
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
-            title: 'General Notification',
-            level: 'info',
+            title: $this->success ? 'General Notification' : 'Action required',
+            level: $this->success ? 'info' : 'error',
             message: $this->message,
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
+            title: $this->success ? 'General Notification' : 'Action required',
+            message: $this->message,
+            level: $this->success ? 'info' : 'error',
         );
     }
 
     public function toSlack(): SlackMessage
     {
         return new SlackMessage(
-            title: 'Coolify: General Notification',
+            title: $this->success ? 'Coolify: General Notification' : 'Coolify: Action required',
             description: $this->message,
-            color: SlackMessage::infoColor(),
+            color: $this->success ? SlackMessage::infoColor() : SlackMessage::errorColor(),
         );
+    }
+
+    public function toWebhook(): array
+    {
+        return [
+            'success' => $this->success,
+            'message' => $this->message,
+            'event' => 'general',
+            'url' => base_url(),
+        ];
     }
 }

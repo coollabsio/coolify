@@ -45,8 +45,8 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
                     return;
                 }
                 $deploymentQueueId = explode(':', $deploymentQueueId)[1];
-                $deploymentQueue = ApplicationDeploymentQueue::find($deploymentQueueId);
-                $deploymentQueue->update([
+                // The deployment can be deleted while its job waits in Redis. A throw here kills the worker in pop().
+                ApplicationDeploymentQueue::query()->whereKey($deploymentQueueId)->update([
                     'horizon_job_id' => $id,
                 ]);
             }
@@ -75,12 +75,16 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
 
     protected function gate(): void
     {
-        Gate::define('viewHorizon', function ($user) {
-            $root_user = User::find(0);
+        Gate::define('viewHorizon', function (User $user) {
+            if ($user->id === 0) {
+                return true;
+            }
 
-            return in_array($user->email, [
-                $root_user->email,
-            ]);
+            return str(config()->string('horizon.allowed_emails'))
+                ->lower()
+                ->explode(',')
+                ->map(fn (string $email) => trim($email))
+                ->contains($user->email);
         });
     }
 }

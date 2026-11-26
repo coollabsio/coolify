@@ -3,11 +3,14 @@
 namespace App\Livewire\Server\Sentinel;
 
 use App\Models\Server;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\View\View;
 use Livewire\Component;
 
 class Show extends Component
 {
+    use AuthorizesRequests;
+
     public ?Server $server = null;
 
     public array $parameters = [];
@@ -19,7 +22,11 @@ class Show extends Component
             $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->firstOrFail();
         } catch (\Throwable $e) {
             handleError($e, $this);
+
+            return;
         }
+
+        $this->authorize('viewSentinel', $this->server);
     }
 
     public function render(): View

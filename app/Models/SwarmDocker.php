@@ -51,6 +51,16 @@ class SwarmDocker extends BaseModel
         return $this->morphMany(StandaloneClickhouse::class, 'destination');
     }
 
+    public function influxdbs()
+    {
+        return $this->morphMany(StandaloneInfluxdb::class, 'destination');
+    }
+
+    public function sqlites()
+    {
+        return $this->morphMany(StandaloneSqlite::class, 'destination');
+    }
+
     public function mongodbs()
     {
         return $this->morphMany(StandaloneMongodb::class, 'destination');
@@ -118,12 +128,14 @@ class SwarmDocker extends BaseModel
         $keydbs = $this->keydbs;
         $dragonflies = $this->dragonflies;
         $clickhouses = $this->clickhouses;
+        $influxdbs = $this->influxdbs;
+        $sqlites = $this->sqlites;
 
-        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses);
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs)->concat($keydbs)->concat($dragonflies)->concat($clickhouses)->concat($influxdbs)->concat($sqlites);
     }
 
     public function attachedTo()
     {
-        return $this->applications?->count() > 0 || $this->databases()->count() > 0;
+        return $this->applications()->exists() || $this->databases()->count() > 0 || $this->services()->exists();
     }
 }

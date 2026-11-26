@@ -4,14 +4,22 @@ namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\StopApplication;
 use App\Actions\Docker\GetContainersStatus;
+use App\Livewire\Project\Service\Storage;
+use App\Livewire\Project\Shared\EnvironmentVariable\All;
 use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
+use App\Services\ImageScan\ImageScanPolicyResolver;
+use App\Services\ImageScan\SecurityCard;
+use App\Traits\ListensToTeamChannel;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Heading extends Component
 {
     use AuthorizesRequests;
+    use ListensToTeamChannel;
 
     public Application $application;
 
@@ -21,32 +29,94 @@ class Heading extends Component
 
     public array $parameters;
 
+    public string $activeRouteName = '';
+
     protected string $deploymentUuid;
 
     public bool $docker_cleanup = true;
 
+    /**
+     * Set once when the General page opens, where the user sees the Compose file location. Other pages
+     * only show the button, and a later switch to the Compose build pack waits for the user.
+     */
+    #[Locked]
+    public bool $loadComposeOnOpen = false;
+
     public function getListeners()
     {
-        $teamId = auth()->user()->currentTeam()->id;
-
         return [
-            "echo-private:team.{$teamId},ServiceStatusChanged" => 'checkStatus',
-            "echo-private:team.{$teamId},ServiceChecked" => '$refresh',
             'compose_loaded' => '$refresh',
+            'configurationChanged' => '$refresh',
+            'envsUpdated' => '$refresh',
             'update_links' => '$refresh',
+            ...$this->teamChannelListeners([
+                'ServiceStatusChanged' => 'checkStatus',
+                'ServiceChecked' => '$refresh',
+                'ApplicationStopFailed' => 'stopFailed',
+            ]),
         ];
     }
 
     public function mount()
     {
+        $this->syncActiveRouteName();
         $this->parameters = [
             'project_uuid' => $this->application->project()->uuid,
             'environment_uuid' => $this->application->environment->uuid,
             'application_uuid' => $this->application->uuid,
         ];
-        $lastDeployment = $this->application->get_last_successful_deployment();
+        $lastDeployment = $this->application->get_last_successful_deployment(['commit', 'commit_message']);
         $this->lastDeploymentInfo = data_get_str($lastDeployment, 'commit')->limit(7).' '.data_get($lastDeployment, 'commit_message');
         $this->lastDeploymentLink = $this->application->gitCommitLink(data_get($lastDeployment, 'commit'));
+        $this->loadComposeOnOpen = $this->activeRouteName === 'project.application.configuration'
+            && $this->needsComposeFile()
+            && auth()->user()?->can('update', $this->application);
+    }
+
+    public function needsComposeFile(): bool
+    {
+        return $this->application->build_pack === 'dockercompose' && is_null($this->application->docker_compose_raw);
+    }
+
+    public function loadComposeFile(bool $isInit = false)
+    {
+        try {
+            $this->authorize('update', $this->application);
+
+            if ($isInit && ! $this->needsComposeFile()) {
+                return;
+            }
+
+            $loaded = $this->application->loadComposeFile();
+            if (is_null(data_get($loaded, 'parsedServices'))) {
+                $this->dispatch('error', 'Failed to parse your docker-compose file. Please check the syntax and try again.');
+
+                return;
+            }
+
+            $this->dispatch('success', 'Docker compose file loaded.');
+            $this->dispatch('composeFileLoaded')->to(General::class);
+            $this->dispatch('storageCountsChanged')->to(Storage::class);
+            $this->dispatch('refreshEnvs')->to(All::class);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        } finally {
+            $this->application->refresh();
+        }
+    }
+
+    /**
+     * Keep the active tab in sync with the real page route.
+     * Only update when the request is a full page route (not livewire.update),
+     * so wire:poll re-renders do not wipe the highlighted tab.
+     */
+    protected function syncActiveRouteName(): void
+    {
+        $routeName = request()->route()?->getName();
+
+        if (is_string($routeName) && str_starts_with($routeName, 'project.application.')) {
+            $this->activeRouteName = $routeName;
+        }
     }
 
     public function checkStatus()
@@ -58,118 +128,225 @@ class Heading extends Component
         }
     }
 
+    /**
+     * @param  array{applicationUuid?: mixed, message?: mixed}  $event
+     */
+    public function stopFailed(array $event): void
+    {
+        $event = $this->teamChannelPayload($event);
+        if (($event['applicationUuid'] ?? null) !== $this->application->uuid || ! is_string($event['message'] ?? null)) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->dispatch('error', 'Failed to stop the application.', $event['message']);
+    }
+
     public function manualCheckStatus()
     {
         $this->checkStatus();
     }
 
+    /**
+     * Log-page URL of the deployment currently running for this application, so a
+     * "Deploying… View log" indicator can link back to it after the user navigates
+     * away. Re-evaluated on the heading's 10s poll. Null when nothing is running.
+     */
+    public function getRunningDeploymentUrlProperty(): ?string
+    {
+        return ApplicationDeploymentQueue::where('application_id', $this->application->id)
+            ->whereIn('status', ['in_progress', 'queued'])
+            ->orderByDesc('id')
+            ->value('deployment_url');
+    }
+
+    /**
+     * Gate warning for the latest deployment of the application (not a preview) when the image scan
+     * gate blocked it or could not run. Re-evaluated on the heading's existing 10s poll.
+     *
+     * @return array{result: array<string, mixed>, action: ?string, vulnerabilities_url: string, deployment_url: string}|null
+     */
+    /**
+     * What the Restart button will do, from the same configuration diff that the deployment job uses to skip
+     * the build. A restart also builds when the image is no longer on the server, which only the job can see.
+     *
+     * @return array{builds: bool, reasons: array<int, string>}
+     */
+    #[Computed]
+    public function restartPlan(): array
+    {
+        if ($this->application->build_pack === 'dockerimage') {
+            return ['builds' => false, 'reasons' => []];
+        }
+
+        $diff = $this->application->pendingDeploymentConfigurationDiff();
+
+        return ['builds' => $diff->requiresBuild(), 'reasons' => $diff->buildReasons()];
+    }
+
+    #[Computed]
+    public function imageScanGate(): ?array
+    {
+        // The gate never runs without both. Scanning off on the server still shows: the gate reports it.
+        if (! ImageScanPolicyResolver::isAllowedFor($this->application)) {
+            return null;
+        }
+
+        $deployment = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->application->id)
+            ->where('pull_request_id', 0)
+            ->orderByDesc('id')
+            ->first(['id', 'deployment_uuid', 'status', 'scan_gate_result']);
+
+        if (! $deployment || (! $deployment->isImageScanBlocked() && ! $deployment->isImageScanSkipped())) {
+            return null;
+        }
+
+        $parameters = [
+            'project_uuid' => $this->parameters['project_uuid'],
+            'environment_uuid' => $this->parameters['environment_uuid'],
+            'application_uuid' => $this->parameters['application_uuid'],
+        ];
+
+        return [
+            'result' => $deployment->scan_gate_result,
+            'action' => $deployment->isImageScanBlocked() ? SecurityCard::gateAction($this->application, $deployment)['sentence'] ?? null : null,
+            'vulnerabilities_url' => route('project.application.vulnerabilities', $parameters),
+            'deployment_url' => route('project.application.deployment.show', [...$parameters, 'deployment_uuid' => $deployment->deployment_uuid]),
+        ];
+    }
+
     public function force_deploy_without_cache()
     {
-        $this->authorize('deploy', $this->application);
+        try {
+            $this->authorize('deploy', $this->application);
 
-        $this->deploy(force_rebuild: true);
+            $this->deploy(force_rebuild: true);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function deploy(bool $force_rebuild = false)
     {
-        $this->authorize('deploy', $this->application);
+        try {
+            $this->authorize('deploy', $this->application);
 
-        if ($this->application->build_pack === 'dockercompose' && is_null($this->application->docker_compose_raw)) {
-            $this->dispatch('error', 'Failed to deploy', 'Please load a Compose file first.');
+            if ($this->needsComposeFile()) {
+                $this->dispatch('error', 'Failed to deploy', 'Please load a Compose file first.');
 
-            return;
+                return;
+            }
+            if ($this->application->destination->server->isSwarm() && str($this->application->docker_registry_image_name)->isEmpty()) {
+                $this->dispatch('error', 'Failed to deploy.', 'To deploy to a Swarm cluster you must set a Docker image name first.');
+
+                return;
+            }
+            if ($this->application->isBuildServerEnabled() && str($this->application->docker_registry_image_name)->isEmpty()) {
+                $this->dispatch('error', 'Failed to deploy.', 'To use a build server, you must first set a Docker image.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/build-server">documentation</a>');
+
+                return;
+            }
+            if ($this->application->additional_servers->count() > 0 && str($this->application->docker_registry_image_name)->isEmpty()) {
+                $this->dispatch('error', 'Failed to deploy.', 'Before deploying to multiple servers, you must first set a Docker image in the General tab.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/multiple-servers">documentation</a>');
+
+                return;
+            }
+            $this->setDeploymentUuid();
+            $result = queue_application_deployment(
+                application: $this->application,
+                deployment_uuid: $this->deploymentUuid,
+                force_rebuild: $force_rebuild,
+            );
+            if ($result['status'] === 'queue_full') {
+                $this->dispatch('error', 'Deployment queue full', $result['message']);
+
+                return;
+            }
+            if ($result['status'] === 'skipped') {
+                $this->dispatch('error', 'Deployment skipped', $result['message']);
+
+                return;
+            }
+
+            return redirectRoute($this, 'project.application.deployment.show', [
+                'project_uuid' => $this->parameters['project_uuid'],
+                'application_uuid' => $this->parameters['application_uuid'],
+                'deployment_uuid' => $this->deploymentUuid,
+                'environment_uuid' => $this->parameters['environment_uuid'],
+            ]);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-        if ($this->application->destination->server->isSwarm() && str($this->application->docker_registry_image_name)->isEmpty()) {
-            $this->dispatch('error', 'Failed to deploy.', 'To deploy to a Swarm cluster you must set a Docker image name first.');
-
-            return;
-        }
-        if (data_get($this->application, 'settings.is_build_server_enabled') && str($this->application->docker_registry_image_name)->isEmpty()) {
-            $this->dispatch('error', 'Failed to deploy.', 'To use a build server, you must first set a Docker image.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/build-server">documentation</a>');
-
-            return;
-        }
-        if ($this->application->additional_servers->count() > 0 && str($this->application->docker_registry_image_name)->isEmpty()) {
-            $this->dispatch('error', 'Failed to deploy.', 'Before deploying to multiple servers, you must first set a Docker image in the General tab.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/multiple-servers">documentation</a>');
-
-            return;
-        }
-        $this->setDeploymentUuid();
-        $result = queue_application_deployment(
-            application: $this->application,
-            deployment_uuid: $this->deploymentUuid,
-            force_rebuild: $force_rebuild,
-        );
-        if ($result['status'] === 'queue_full') {
-            $this->dispatch('error', 'Deployment queue full', $result['message']);
-
-            return;
-        }
-        if ($result['status'] === 'skipped') {
-            $this->dispatch('error', 'Deployment skipped', $result['message']);
-
-            return;
-        }
-
-        return $this->redirectRoute('project.application.deployment.show', [
-            'project_uuid' => $this->parameters['project_uuid'],
-            'application_uuid' => $this->parameters['application_uuid'],
-            'deployment_uuid' => $this->deploymentUuid,
-            'environment_uuid' => $this->parameters['environment_uuid'],
-        ], navigate: false);
     }
 
     protected function setDeploymentUuid()
     {
-        $this->deploymentUuid = new Cuid2;
+        $this->deploymentUuid = new_public_id();
         $this->parameters['deployment_uuid'] = $this->deploymentUuid;
     }
 
     public function stop()
     {
-        $this->authorize('deploy', $this->application);
+        try {
+            $this->authorize('deploy', $this->application);
 
-        $this->dispatch('info', 'Gracefully stopping application.<br/>It could take a while depending on the application.');
-        StopApplication::dispatch($this->application, false, $this->docker_cleanup);
+            $this->dispatch('info', 'Gracefully stopping application.<br/>It could take a while depending on the application.');
+            StopApplication::dispatch($this->application, false, $this->docker_cleanup);
+            auditLog('ui.application.stopped', [
+                'team_id' => $this->application->team()?->id,
+                'application_uuid' => $this->application->uuid,
+                'application_name' => $this->application->name,
+            ]);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function restart()
     {
-        $this->authorize('deploy', $this->application);
+        try {
+            $this->authorize('deploy', $this->application);
 
-        if ($this->application->additional_servers->count() > 0 && str($this->application->docker_registry_image_name)->isEmpty()) {
-            $this->dispatch('error', 'Failed to deploy', 'Before deploying to multiple servers, you must first set a Docker image in the General tab.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/multiple-servers">documentation</a>');
+            if ($this->application->additional_servers->count() > 0 && str($this->application->docker_registry_image_name)->isEmpty()) {
+                $this->dispatch('error', 'Failed to deploy', 'Before deploying to multiple servers, you must first set a Docker image in the General tab.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/multiple-servers">documentation</a>');
 
-            return;
+                return;
+            }
+
+            $this->setDeploymentUuid();
+            $result = queue_application_deployment(
+                application: $this->application,
+                deployment_uuid: $this->deploymentUuid,
+                restart_only: true,
+            );
+            if ($result['status'] === 'queue_full') {
+                $this->dispatch('error', 'Deployment queue full', $result['message']);
+
+                return;
+            }
+            if ($result['status'] === 'skipped') {
+                $this->dispatch('success', 'Deployment skipped', $result['message']);
+
+                return;
+            }
+
+            return redirectRoute($this, 'project.application.deployment.show', [
+                'project_uuid' => $this->parameters['project_uuid'],
+                'application_uuid' => $this->parameters['application_uuid'],
+                'deployment_uuid' => $this->deploymentUuid,
+                'environment_uuid' => $this->parameters['environment_uuid'],
+            ]);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
         }
-
-        $this->setDeploymentUuid();
-        $result = queue_application_deployment(
-            application: $this->application,
-            deployment_uuid: $this->deploymentUuid,
-            restart_only: true,
-        );
-        if ($result['status'] === 'queue_full') {
-            $this->dispatch('error', 'Deployment queue full', $result['message']);
-
-            return;
-        }
-        if ($result['status'] === 'skipped') {
-            $this->dispatch('success', 'Deployment skipped', $result['message']);
-
-            return;
-        }
-
-        return $this->redirectRoute('project.application.deployment.show', [
-            'project_uuid' => $this->parameters['project_uuid'],
-            'application_uuid' => $this->parameters['application_uuid'],
-            'deployment_uuid' => $this->deploymentUuid,
-            'environment_uuid' => $this->parameters['environment_uuid'],
-        ], navigate: false);
     }
 
     public function render()
     {
+        $this->syncActiveRouteName();
+
         return view('livewire.project.application.heading', [
             'checkboxes' => [
                 ['id' => 'docker_cleanup', 'label' => __('resource.docker_cleanup')],

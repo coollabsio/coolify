@@ -7,7 +7,7 @@
 
 services:
   foundryvtt:
-    image: felddy/foundryvtt:release
+    image: felddy/foundryvtt:14.370.0
     expose:
     - 30000
     environment:

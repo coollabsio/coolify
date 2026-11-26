@@ -6,11 +6,13 @@ use App\Models\Application;
 use App\Models\Project;
 use App\Services\DockerImageParser;
 use App\Support\ValidationPatterns;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class DockerImage extends Component
 {
+    use AuthorizesRequests;
+
     public string $imageName = '';
 
     public string $imageTag = '';
@@ -111,7 +113,7 @@ class DockerImage extends Component
         $parser->parse($dockerImage);
 
         $destination_uuid = $this->query['destination'] ?? null;
-        $destination = find_destination_for_current_team($destination_uuid);
+        $destination = find_resource_destination_for_current_team($destination_uuid);
         if (! $destination) {
             throw new \Exception('Destination not found.');
         }
@@ -119,6 +121,7 @@ class DockerImage extends Component
 
         $project = Project::ownedByCurrentTeam()->where('uuid', $this->parameters['project_uuid'])->firstOrFail();
         $environment = $project->environments()->where('uuid', $this->parameters['environment_uuid'])->firstOrFail();
+        $this->authorize('create', [Application::class, $environment]);
 
         // Append @sha256 to image name if using digest and not already present
         $imageName = $parser->getFullImageNameWithoutTag();
@@ -129,8 +132,8 @@ class DockerImage extends Component
         // Determine the image tag based on whether it's a hash or regular tag
         $imageTag = $parser->isImageHash() ? 'sha256-'.$parser->getTag() : $parser->getTag();
 
-        $application = Application::create([
-            'name' => 'docker-image-'.new Cuid2,
+        $application = new Application([
+            'name' => 'docker-image-'.new_public_id(),
             'repository_project_id' => 0,
             'git_repository' => 'coollabsio/coolify',
             'git_branch' => 'main',
@@ -143,6 +146,7 @@ class DockerImage extends Component
             'destination_type' => $destination_class,
             'health_check_enabled' => false,
         ]);
+        $application->save();
 
         $fqdn = generateUrl(server: $destination->server, random: $application->uuid);
         $application->update([

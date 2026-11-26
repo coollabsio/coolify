@@ -27,6 +27,21 @@ it('StandaloneDocker accepts valid network names', function (string $network) {
     'alphanumeric' => 'network123',
 ]);
 
+it('creates standalone destinations with a bridge network that prefers IPv6', function () {
+    $model = new StandaloneDocker;
+    $model->network = 'test-network';
+
+    expect($model->networkCreateCommand())->toBe(dockerProxyNetworkEnsureCommand('test-network'));
+});
+
+it('connects the proxy to a new standalone destination network', function () {
+    $model = new StandaloneDocker;
+    $model->network = 'test-network';
+
+    expect($model->proxyConnectCommand())
+        ->toBe("docker network connect 'test-network' coolify-proxy >/dev/null 2>&1 || true");
+});
+
 it('SwarmDocker rejects network names with shell metacharacters', function (string $network) {
     $model = new SwarmDocker;
     $model->network = $network;

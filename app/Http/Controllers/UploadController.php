@@ -2,6 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Application;
+use App\Services\UploadStorageService;
+use App\Support\DatabaseBackupFileValidator;
+use App\Support\StaticSiteArchive;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Routing\Controller as BaseController;
@@ -11,33 +17,25 @@ use Pion\Laravel\ChunkUpload\Receiver\FileReceiver;
 
 class UploadController extends BaseController
 {
+    use AuthorizesRequests;
+
     private const MAX_BYTES = 10 * 1024 * 1024 * 1024; // 10 GiB
 
-    private const ALLOWED_EXTENSIONS = [
-        'sql',
-        'sql.gz',
-        'gz',
-        'zip',
-        'tar',
-        'tar.gz',
-        'tgz',
-        'dump',
-        'bak',
-        'bson',
-        'bson.gz',
-        'archive',
-        'archive.gz',
-        'bz2',
-        'xz',
-        'dmp',
-    ];
+    private const ALLOWED_EXTENSIONS = DatabaseBackupFileValidator::ALLOWED_EXTENSIONS;
 
     public function upload(Request $request)
     {
         $databaseIdentifier = request()->route('databaseUuid');
         $resource = getResourceByUuid($databaseIdentifier, data_get(auth()->user()->currentTeam(), 'id'));
         if (is_null($resource)) {
-            return response()->json(['error' => 'You do not have permission for this database'], 500);
+            return response()->json(['error' => 'Database not found.'], 404);
+        }
+
+        $this->authorize('uploadBackup', $resource);
+
+        // The instance admin sent uploads to an S3 storage, so they must not use disk space on this instance.
+        if (UploadStorageService::configuredStorage() !== null) {
+            return response()->json(['error' => 'Uploads go to an S3 storage on this instance. Reload the page.'], 409);
         }
 
         $chunk = $request->file('file');
@@ -78,12 +76,32 @@ class UploadController extends BaseController
         ]);
     }
 
+    /**
+     * A chunk of a static site archive. With application_uuid, it is a new version of that archive site,
+     * staged for the team of the application. Without, it is for a new site in the current team.
+     */
+    public function uploadStaticArchive(Request $request): JsonResponse
+    {
+        $applicationUuid = $request->input('application_uuid');
+        if (filled($applicationUuid)) {
+            $application = Application::query()->where('uuid', $applicationUuid)->where('is_archive_source', true)->first();
+            if (! $application) {
+                return response()->json(['message' => 'Application not found.'], 404);
+            }
+            $this->authorize('update', $application);
+            $this->authorize('deploy', $application);
+            $teamId = (int) $application->team()->id;
+        } else {
+            $this->authorize('create', Application::class);
+            $teamId = (int) auth()->user()->currentTeam()->id;
+        }
+
+        return StaticSiteArchive::receiveUpload($request, $teamId);
+    }
+
     protected function saveFile(UploadedFile $file, string $resourceIdentifier)
     {
-        $originalName = $file->getClientOriginalName();
-        $size = $file->getSize();
-
-        if (! self::hasAllowedExtension($originalName) || $size === false || $size > self::MAX_BYTES) {
+        if (! DatabaseBackupFileValidator::isUploadAllowed($file, self::MAX_BYTES)) {
             @unlink($file->getPathname());
 
             return response()->json([
@@ -103,24 +121,7 @@ class UploadController extends BaseController
 
     private static function hasAllowedExtension(string $name): bool
     {
-        $lower = strtolower($name);
-        $suffixes = array_map(fn ($ext) => '.'.$ext, self::ALLOWED_EXTENSIONS);
-        usort($suffixes, fn ($a, $b) => strlen($b) <=> strlen($a));
-
-        foreach ($suffixes as $suffix) {
-            if (! str_ends_with($lower, $suffix)) {
-                continue;
-            }
-
-            $stem = substr($lower, 0, -strlen($suffix));
-            if ($stem !== '' && ! str_ends_with($stem, '.')) {
-                return true;
-            }
-
-            return false;
-        }
-
-        return false;
+        return DatabaseBackupFileValidator::hasAllowedExtension($name);
     }
 
     private static function formatMaxSize(): string

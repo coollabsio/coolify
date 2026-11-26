@@ -2,7 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Models\DiscordNotificationSettings;
 use App\Notifications\Dto\DiscordMessage;
+use App\Rules\SafeWebhookUrl;
+use App\Traits\HandlesNotificationResponse;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -10,10 +13,12 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 
 class SendMessageToDiscordJob implements ShouldBeEncrypted, ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, HandlesNotificationResponse, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
      * The number of times the job may be attempted.
@@ -31,7 +36,8 @@ class SendMessageToDiscordJob implements ShouldBeEncrypted, ShouldQueue
 
     public function __construct(
         public DiscordMessage $message,
-        public string $webhookUrl
+        public string $webhookUrl,
+        public ?DiscordNotificationSettings $settings = null,
     ) {
         $this->onQueue('high');
     }
@@ -41,6 +47,34 @@ class SendMessageToDiscordJob implements ShouldBeEncrypted, ShouldQueue
      */
     public function handle(): void
     {
-        Http::post($this->webhookUrl, $this->message->toPayload());
+        $validator = Validator::make(
+            ['webhook_url' => $this->webhookUrl],
+            ['webhook_url' => ['required', 'url', new SafeWebhookUrl]]
+        );
+
+        if ($validator->fails()) {
+            Log::warning('SendMessageToDiscordJob: blocked unsafe webhook URL', [
+                'url' => SafeWebhookUrl::redactedUrlForLog($this->webhookUrl),
+                'errors' => $validator->errors()->all(),
+            ]);
+
+            return;
+        }
+
+        try {
+            $httpOptions = SafeWebhookUrl::httpClientOptions($this->webhookUrl);
+        } catch (\RuntimeException $e) {
+            Log::warning('SendMessageToDiscordJob: blocked unsafe webhook URL at send time', [
+                'url' => SafeWebhookUrl::redactedUrlForLog($this->webhookUrl),
+                'error' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+
+        $response = $this->sendNotificationRequest('Discord', $this->webhookUrl, fn () => Http::withOptions($httpOptions)->post($this->webhookUrl, $this->message->toPayload()));
+
+        // 401: invalid webhook token, 403: missing access, 404: unknown (deleted) webhook.
+        $this->handleNotificationResponse($response, 'Discord', in_array($response->status(), [401, 403, 404], true));
     }
 }

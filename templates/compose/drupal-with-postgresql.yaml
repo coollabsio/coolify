@@ -3,10 +3,11 @@
 # category: cms
 # tags: cms, blog, content, management, postgresql
 # logo: svgs/drupal.svg
+# port: 80
 
 services:
   drupal:
-    image: "drupal:10-apache"
+    image: "drupal:11-apache"
     environment:
       - SERVICE_URL_DRUPAL
       - DB_HOST=postgres

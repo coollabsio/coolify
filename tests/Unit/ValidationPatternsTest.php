@@ -132,27 +132,61 @@ it('generates nullable dockerNetworkRules when not required', function () {
         ->not->toContain('required');
 });
 
-it('accepts Docker-compatible environment variable keys', function (string $key) {
+it('accepts shell-safe environment variable keys', function (string $key) {
     expect(ValidationPatterns::isValidEnvironmentVariableKey($key))->toBeTrue();
 })->with([
     'letters' => 'APP_ENV',
     'leading underscore' => '_TOKEN',
     'railpack control variable' => 'RAILPACK_NODE_VERSION',
     'digits after first character' => 'NODE_VERSION_20',
-    'starts with digit' => '1BAD',
-    'hyphen' => 'BAD-KEY',
-    'dot' => 'node.name',
+    'lowercase' => 'node_version',
+    'dot notation' => 'node.name',
     'uppercase dots' => 'XPACK.SECURITY.ENABLED',
-    'semicolon' => 'BAD;KEY',
-    'space' => 'BAD KEY',
 ]);
 
-it('rejects environment variable keys Docker cannot represent', function (string $key) {
+it('rejects invalid environment variable keys', function (string $key) {
     expect(ValidationPatterns::isValidEnvironmentVariableKey($key))->toBeFalse();
 })->with([
+    'starts with digit' => '1BAD',
+    'hyphen' => 'BAD-KEY',
+    'semicolon' => 'BAD;KEY',
+    'space' => 'BAD KEY',
+    'command substitution' => 'BAD$(id)',
+    'backticks' => 'BAD`id`',
+    'pipe' => 'BAD|id',
+    'ampersand' => 'BAD&id',
+    'newline' => 'BAD
+KEY',
     'equals' => 'BAD=KEY',
     'empty' => '',
 ]);
+
+it('accepts shell-safe keys for sourced build-time env files', function (string $key) {
+    expect(ValidationPatterns::validatedShellEnvironmentVariableKey($key))->toBe($key);
+})->with([
+    'letters' => 'APP_ENV',
+    'leading underscore' => '_TOKEN',
+    'digits after first character' => 'NODE_VERSION_20',
+]);
+
+it('rejects keys that bash would interpret when sourcing a build-time env file', function (string $key) {
+    expect(fn () => ValidationPatterns::validatedShellEnvironmentVariableKey($key))
+        ->toThrow(InvalidArgumentException::class);
+})->with([
+    'command substitution' => 'X$(id)',
+    'dot notation' => 'X.VALUE',
+    'command substitution with arguments' => 'X$(docker run --rm -v /:/mnt alpine true)',
+]);
+
+it('makes unsafe environment variable keys safe to show in logs', function () {
+    expect(ValidationPatterns::displayShellEnvironmentVariableKey('APP_ENV'))->toBe('APP_ENV');
+    expect(ValidationPatterns::displayShellEnvironmentVariableKey("X\nid"))->toBe('X\\nid');
+    expect(ValidationPatterns::displayShellEnvironmentVariableKey("X\e[2Jid\x7F"))->toBe('X\\x1B[2Jid\\x7F');
+    expect(ValidationPatterns::displayShellEnvironmentVariableKey(''))->toBe('(empty)');
+    expect(ValidationPatterns::displayShellEnvironmentVariableKey(str_repeat('A', 100)))
+        ->toEndWith('...')
+        ->toBe(str_repeat('A', 80).'...');
+});
 
 it('generates environment variable key rules with correct defaults', function () {
     $rules = ValidationPatterns::environmentVariableKeyRules();
@@ -164,7 +198,7 @@ it('generates environment variable key rules with correct defaults', function ()
 });
 
 it('normalizes environment variable keys by trimming surrounding whitespace', function () {
-    expect(ValidationPatterns::normalizeEnvironmentVariableKey(' node.name '))->toBe('node.name');
+    expect(ValidationPatterns::normalizeEnvironmentVariableKey(' APP_ENV '))->toBe('APP_ENV');
 });
 
 it('normalizes environment variable keys before model validation', function () {
@@ -173,3 +207,34 @@ it('normalizes environment variable keys before model validation', function () {
 
     expect($environmentVariable->key)->toBe('APP_ENV');
 });
+
+it('normalizes application domain scheme and host without lowercasing path query or fragment', function () {
+    $domains = ' HTTPS://EXAMPLE.COM/MixedCase/Path?Token=ABC#Fragment, http://Sub.EXAMPLE.com/Api/V1 ';
+
+    expect(ValidationPatterns::normalizeApplicationDomains($domains))
+        ->toBe('https://example.com/MixedCase/Path?Token=ABC#Fragment,http://sub.example.com/Api/V1');
+});
+
+it('validates application domains with underscores in the hostname', function () {
+    expect(ValidationPatterns::validateApplicationDomains('https://myapp_service.example.com'))->toBeEmpty();
+});
+
+it('rejects single-label application hostnames but allows IP addresses', function () {
+    expect(ValidationPatterns::validateApplicationDomains('https://aaa'))->not->toBeEmpty()
+        ->and(ValidationPatterns::validateApplicationDomains('https://localhost'))->not->toBeEmpty()
+        ->and(ValidationPatterns::validateApplicationDomains('http://192.0.2.10:8000'))->toBeEmpty();
+});
+
+it('rejects application domain ports outside the valid TCP range', function (string $domain) {
+    expect(ValidationPatterns::validateApplicationDomains($domain))->not->toBeEmpty();
+})->with([
+    'zero' => 'https://example.com:0',
+    'above maximum' => 'https://example.com:65536',
+]);
+
+it('accepts application domain ports at the TCP range boundaries', function (string $domain) {
+    expect(ValidationPatterns::validateApplicationDomains($domain))->toBeEmpty();
+})->with([
+    'minimum' => 'https://example.com:1',
+    'maximum' => 'https://example.com:65535',
+]);

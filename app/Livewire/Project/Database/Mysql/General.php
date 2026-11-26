@@ -6,6 +6,7 @@ use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
 use App\Models\Server;
 use App\Models\StandaloneMysql;
+use App\Services\ProjectConfig\ManagedResources;
 use App\Support\ValidationPatterns;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -46,6 +47,8 @@ class General extends Component
     public bool $isLogDrainEnabled = false;
 
     public ?string $customDockerRunOptions = null;
+
+    public bool $isPasswordHiddenForMember = false;
 
     protected function rules(): array
     {
@@ -126,9 +129,11 @@ class General extends Component
         } catch (Exception $e) {
             return handleError($e, $this);
         }
+
+        $this->isPasswordHiddenForMember = ! ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->database);
     }
 
-    public function syncData(bool $toModel = false)
+    private function syncData(bool $toModel = false): void
     {
         if ($toModel) {
             $this->validate();
@@ -147,21 +152,23 @@ class General extends Component
             $this->database->is_log_drain_enabled = $this->isLogDrainEnabled;
             $this->database->custom_docker_run_options = $this->customDockerRunOptions;
             $this->database->save();
+            $this->dispatch('name-changed', uuid: $this->database->uuid, name: $this->database->name);
         } else {
+            $canSeeCredentials = ManagedResources::canUpdateIgnoringFile(auth()->user(), $this->database);
             $this->name = $this->database->name;
             $this->description = $this->database->description;
-            $this->mysqlRootPassword = $this->database->mysql_root_password;
+            $this->mysqlRootPassword = $canSeeCredentials ? $this->database->mysql_root_password : '';
             $this->mysqlUser = $this->database->mysql_user;
-            $this->mysqlPassword = $this->database->mysql_password;
+            $this->mysqlPassword = $canSeeCredentials ? $this->database->mysql_password : '';
             $this->mysqlDatabase = $this->database->mysql_database;
-            $this->mysqlConf = $this->database->mysql_conf;
+            $this->mysqlConf = $canSeeCredentials ? $this->database->mysql_conf : null;
             $this->image = $this->database->image;
             $this->portsMappings = $this->database->ports_mappings;
             $this->isPublic = $this->database->is_public;
             $this->publicPort = $this->database->public_port;
             $this->publicPortTimeout = $this->database->public_port_timeout;
             $this->isLogDrainEnabled = $this->database->is_log_drain_enabled;
-            $this->customDockerRunOptions = $this->database->custom_docker_run_options;
+            $this->customDockerRunOptions = $canSeeCredentials ? $this->database->custom_docker_run_options : null;
         }
     }
 
@@ -236,6 +243,7 @@ class General extends Component
             }
             $this->dispatch('databaseUpdated');
         } catch (\Throwable $e) {
+            $this->authorize('update', $this->database);
             $this->isPublic = ! $this->isPublic;
             $this->syncData(true);
 

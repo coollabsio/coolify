@@ -7,222 +7,411 @@
     s3FileSize: $wire.entangle('s3FileSize'),
     s3StorageId: $wire.entangle('s3StorageId'),
     s3Path: $wire.entangle('s3Path'),
-    restoreType: null
-}">
-    <script type="text/javascript" src="{{ URL::asset('js/dropzone.js') }}"></script>
-    @script
-    <script data-navigate-once>
-        Dropzone.options.myDropzone = {
-            chunking: true,
-            method: "POST",
-            maxFilesize: 1000000000,
-            chunkSize: 10000000,
-            createImageThumbnails: false,
-            disablePreviews: true,
-            parallelChunkUploads: false,
-            init: function () {
-                let button = this.element.querySelector('button');
-                button.innerText = 'Select or drop a backup file here.'
-                this.on('sending', function (file, xhr, formData) {
-                    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-                    formData.append("_token", token);
-                });
-                this.on("addedfile", file => {
-                    $wire.isUploading = true;
-                    $wire.customLocation = '';
-                });
-                this.on('uploadprogress', function (file, progress, bytesSent) {
-                    $wire.progress = progress;
-                });
-                this.on('complete', function (file) {
-                    $wire.filename = file.name;
-                    $wire.filesize = Number(file.size / 1024 / 1024).toFixed(2) + ' MB';
-                    $wire.isUploading = false;
-                });
-                this.on('error', function (file, message) {
-                    $wire.error = true;
-                    $wire.$dispatch('error', message.error)
-                });
-            }
+    s3Uploading: false,
+    s3Progress: 0,
+    s3Cancel: null,
+    restoreType: null,
+    {{-- Uploads the file in parts directly to the instance's import storage, with presigned URLs from the server. --}}
+    async uploadToS3(file) {
+        if (! file || this.s3Uploading) {
+            return;
+        }
+        const wire = this.$wire;
+        const requests = new Set();
+        let stopped = false;
+        this.s3Cancel = () => {
+            stopped = true;
+            requests.forEach((request) => request.abort());
         };
-    </script>
-    @endscript
-        <div class="pt-2 rounded-sm alert-error">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <span>This is a destructive action, existing data will be replaced!</span>
-        </div>
-        {{-- Restore Command Configuration --}}
-            @if ($resourceDbType === 'standalone-postgresql')
-                @if ($dumpAll)
-                    <x-forms.textarea rows="6" readonly label="Custom Import Command"
-                        wire:model='restoreCommandText' canGate="update" :canResource="$this->resource"></x-forms.textarea>
-                @else
-                    <x-forms.input label="Custom Import Command" wire:model='postgresqlRestoreCommand' canGate="update" :canResource="$this->resource"></x-forms.input>
-                    <div class="flex flex-col gap-1 pt-1">
-                        <span class="text-xs">You can add "--clean" to drop objects before creating them, avoiding
-                            conflicts.</span>
-                        <span class="text-xs">You can add "--verbose" to log more things.</span>
-                    </div>
-                @endif
-                <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll' canGate="update" :canResource="$this->resource"></x-forms.checkbox>
-                </div>
-            @elseif ($resourceDbType === 'standalone-mysql')
-                @if ($dumpAll)
-                    <x-forms.textarea rows="14" readonly label="Custom Import Command"
-                        wire:model='restoreCommandText' canGate="update" :canResource="$this->resource"></x-forms.textarea>
-                @else
-                    <x-forms.input label="Custom Import Command" wire:model='mysqlRestoreCommand' canGate="update" :canResource="$this->resource"></x-forms.input>
-                @endif
-                <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll' canGate="update" :canResource="$this->resource"></x-forms.checkbox>
-                </div>
-            @elseif ($resourceDbType === 'standalone-mariadb')
-                @if ($dumpAll)
-                    <x-forms.textarea rows="14" readonly label="Custom Import Command"
-                        wire:model='restoreCommandText' canGate="update" :canResource="$this->resource"></x-forms.textarea>
-                @else
-                    <x-forms.input label="Custom Import Command" wire:model='mariadbRestoreCommand' canGate="update" :canResource="$this->resource"></x-forms.input>
-                @endif
-                <div class="w-64 pt-2">
-                    <x-forms.checkbox label="Backup includes all databases" wire:model.live='dumpAll' canGate="update" :canResource="$this->resource"></x-forms.checkbox>
-                </div>
+        this.s3Uploading = true;
+        this.s3Progress = 0;
+        this.error = false;
+        this.filename = null;
+        this.filesize = null;
+        let started = false;
+        try {
+            started = await wire.startS3Upload(file.name, file.size);
+            if (! started) {
+                return;
+            }
+            const loaded = started.parts.map(() => 0);
+            const report = (index, bytes) => {
+                loaded[index] = bytes;
+                this.s3Progress = Math.min(100, Math.floor(loaded.reduce((sum, value) => sum + value, 0) / file.size * 100));
+            };
+            let next = 0;
+            const worker = async () => {
+                while (! stopped && next < started.parts.length) {
+                    const index = next++;
+                    const offset = (started.parts[index].number - 1) * started.partSize;
+                    await this.putS3Part(started.parts[index].url, file.slice(offset, offset + started.partSize), requests, (bytes) => report(index, bytes), () => stopped);
+                }
+            };
+            await Promise.all(Array.from({ length: Math.min(3, started.parts.length) }, worker));
+            if (stopped) {
+                throw new Error('The upload was cancelled.');
+            }
+            await wire.completeS3Upload();
+        } catch (error) {
+            this.s3Cancel();
+            if (started) {
+                await wire.abortS3Upload();
+            }
+            wire.$dispatch('error', error.message);
+        } finally {
+            this.s3Uploading = false;
+            this.s3Cancel = null;
+        }
+    },
+    putS3Part(url, blob, requests, onProgress, isStopped, attempt = 1) {
+        return new Promise((resolve, reject) => {
+            const request = new XMLHttpRequest();
+            requests.add(request);
+            request.open('PUT', url);
+            request.upload.onprogress = (event) => onProgress(event.loaded);
+            request.onload = () => request.status >= 200 && request.status < 300
+                ? resolve()
+                : reject(new Error(`The storage rejected the upload (HTTP ${request.status}).`));
+            request.onerror = () => reject(new Error('The browser could not upload to the upload storage. Its bucket probably needs a CORS rule that allows PUT from ' + window.location.origin + ', or the storage is not reachable from this browser. Ask the administrator of this Coolify instance to check the storage.'));
+            request.onabort = () => reject(new Error('The upload was cancelled.'));
+            request.onloadend = () => requests.delete(request);
+            request.send(blob);
+        }).then(() => onProgress(blob.size)).catch((error) => {
+            if (attempt >= 3 || isStopped()) {
+                throw error;
+            }
+            onProgress(0);
+
+            return this.putS3Part(url, blob, requests, onProgress, isStopped, attempt + 1);
+        });
+    },
+    {{-- Dropzone attaches here, not by auto-discovery: the form can render after page load (in a modal, or when the database starts). --}}
+    mountDropzone(element) {
+        const wire = this.$wire;
+        const attach = () => {
+            window.Dropzone.autoDiscover = false;
+            if (element.dropzone) {
+                return;
+            }
+            new window.Dropzone(element, {
+                chunking: true,
+                method: 'POST',
+                maxFilesize: 1000000000,
+                chunkSize: 10000000,
+                createImageThumbnails: false,
+                disablePreviews: true,
+                parallelChunkUploads: false,
+                dictDefaultMessage: 'Select or drop a backup file here.',
+                init() {
+                    this.on('sending', (file, xhr, formData) => {
+                        formData.append('_token', document.querySelector('meta[name=csrf-token]').getAttribute('content'));
+                    });
+                    this.on('addedfile', () => {
+                        wire.isUploading = true;
+                        wire.customLocation = '';
+                    });
+                    this.on('uploadprogress', (file, progress) => {
+                        wire.progress = progress;
+                    });
+                    this.on('complete', (file) => {
+                        wire.filename = file.name;
+                        if (file.status === window.Dropzone.SUCCESS) {
+                            wire.selectUploadedFile(file.name);
+                        }
+                        wire.filesize = Number(file.size / 1024 / 1024).toFixed(2) + ' MB';
+                        wire.isUploading = false;
+                    });
+                    this.on('error', (file, message) => {
+                        wire.error = true;
+                        wire.$dispatch('error', message.error);
+                    });
+                },
+            });
+        };
+        if (window.Dropzone) {
+            attach();
+            return;
+        }
+        let script = document.querySelector('script[data-dropzone]');
+        if (! script) {
+            script = document.createElement('script');
+            script.src = @js(URL::asset('js/dropzone.js'));
+            script.dataset.dropzone = '';
+            document.head.appendChild(script);
+        }
+        script.addEventListener('load', attach, { once: true });
+    },
+}">
+        <div class="flex flex-col gap-6">
+            <x-callout type="danger" title="Restoring a backup changes database data">
+                Review the source and import command before continuing. Existing objects can cause the import to fail unless replacement is enabled.
+            </x-callout>
+
+            <section>
+                <h3 class="text-sm font-semibold text-black dark:text-fg">Restore configuration</h3>
+                <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">Configure how the selected backup is applied to this database.</p>
+                <div class="mt-4 space-y-4">
+            @if ($resourceDbType === 'standalone-postgresql' && $dumpAll)
+                            <x-callout type="warning" title="Full restore runs as a superuser">
+                                Restoring all databases needs a PostgreSQL superuser (it recreates databases and roles), so Coolify cannot restrict it. Only use a backup you trust.
+                                <span class="mt-1 block">The backup also replaces PostgreSQL administrator role passwords, including the destination administrator password. If the administrator password changes, update it in Coolify's database configuration after the restore.</span>
+                            </x-callout>
             @endif
-
-            {{-- Restore Type Selection Boxes --}}
-            <h3 class="pt-6">Choose Restore Method</h3>
-            <div class="flex gap-4 pt-2">
-                <div @click="restoreType = 'file'"
-                     class="flex-1 p-6 border-2 rounded-sm cursor-pointer transition-all"
-                     :class="restoreType === 'file' ? 'border-warning bg-warning/10' : 'border-neutral-200 dark:border-neutral-800 hover:border-warning/50'">
-                    <div class="flex flex-col gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
-                        <h4 class="text-lg font-bold">Restore from File</h4>
-                        <p class="text-sm text-neutral-600 dark:text-neutral-400">Upload a backup file or specify a file path on the server</p>
+                    @if ($resourceDbType === 'standalone-influxdb')
+                        <x-callout type="warning" title="The restore replaces the bucket">
+                            Coolify restores the backup into a temporary bucket first. When that succeeds, it deletes the configured bucket and renames the temporary bucket to its name. If the restore fails, the current bucket stays unchanged.
+                        </x-callout>
+                    @endif
+                    @if (! in_array($resourceDbType, ['standalone-sqlite', 'standalone-influxdb'], true))
+                    <div class="max-w-sm">
+                        <x-forms.listbox id="dumpAll" label="Backup contents" live :options="[
+                            ['value' => true, 'label' => 'Backup contains all databases'],
+                            ['value' => false, 'label' => 'Backup contains one database'],
+                        ]" />
                     </div>
-                </div>
-
-                @if (count($availableS3Storages) > 0)
-                    <div @click="restoreType = 's3'"
-                         class="flex-1 p-6 border-2 rounded-sm cursor-pointer transition-all"
-                         :class="restoreType === 's3' ? 'border-warning bg-warning/10' : 'border-neutral-200 dark:border-neutral-800 hover:border-warning/50'">
-                        <div class="flex flex-col gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-                            </svg>
-                            <h4 class="text-lg font-bold">Restore from S3</h4>
-                            <p class="text-sm text-neutral-600 dark:text-neutral-400">Download and restore a backup from S3 storage</p>
+                    @endif
+                    @if (in_array($resourceDbType, ['standalone-postgresql', 'postgresql'], true) && ! $dumpAll)
+                        <div class="max-w-sm">
+                            <x-forms.checkbox id="replaceExisting" live label="Replace objects that already exist"
+                                helper="Archive backups: drops matching tables, functions, types, and other PostgreSQL objects before restoring them. SQL backups: recreates the database before the restore."
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                        <div class="max-w-sm">
+                            <x-forms.checkbox id="keepOwners" live label="Keep owners and privileges"
+                                helper="Archive backups: restores object owners and GRANTs from the backup. Leave this off for backups from another server (for example Amazon RDS): its roles usually do not exist here, and the whole restore would be rolled back."
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                    @endif
+                    @if (in_array($resourceDbType, ['standalone-mysql', 'standalone-mariadb', 'mysql', 'mariadb'], true) && $dumpAll)
+                        <div class="max-w-sm">
+                            <x-forms.checkbox id="restoreMysqlUsers" live label="Restore users and privileges (mysql system database)"
+                                helper="Off: the system databases (mysql, sys) of the backup are skipped, so this database keeps its own users and passwords. On: the users, passwords, and privileges of the backup replace the current ones."
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                        @if ($restoreMysqlUsers)
+                            <x-callout type="warning" title="Restoring users changes passwords">
+                                The backup replaces all users, passwords, and privileges, including the root password. After the next restart of the database, the passwords from the backup apply, so the credentials Coolify stores for this database, and its health check, may stop working.
+                                <span class="mt-1 block">Update the passwords in Coolify's database configuration after the restore.</span>
+                            </x-callout>
+                        @endif
+                    @endif
+                    @if ($resourceDbType === 'standalone-sqlite' && count($this->sqliteDatabaseFiles) > 0)
+                        <div class="max-w-sm">
+                            <x-forms.listbox id="sqliteDatabase" label="Restore into" live
+                                helper="The database file the backup replaces. Coolify preselects the file named in the backup file name."
+                                :options="collect($this->sqliteDatabaseFiles)->map(fn ($file) => ['value' => $file, 'label' => $file])->all()"
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                    @endif
+                    @if ($resourceDbType === 'standalone-mongodb')
+                        <div class="max-w-sm">
+                            <x-forms.checkbox id="replaceExisting" live label="Replace collections that already exist"
+                                helper="Drops each collection from the backup before restoring it. Without this option, documents that already exist are skipped."
+                                canGate="update" :canResource="$this->resource" />
+                        </div>
+                    @endif
+                    <div x-data="{ showCommand: false }">
+                        <button type="button" @click="showCommand = !showCommand" :aria-expanded="showCommand"
+                            class="inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-neutral-500 hover:text-black dark:text-fg-dim dark:hover:text-fg">
+                            <x-reicon name="chevron-down" class="size-3.5 transition-transform"
+                                ::class="showCommand ? '' : '-rotate-90'" />
+                            <span x-text="showCommand ? 'Hide import command' : 'Show import command'">Show import command</span>
+                        </button>
+                        <div x-cloak x-show="showCommand" class="mt-3">
+                            <x-forms.textarea rows="10" readonly label="Import command"
+                                helper="Coolify detects the backup format (SQL, archive, gzip, bz2, xz, zip, or tar) before it changes the database."
+                                wire:model="restoreCommandText" canGate="update"
+                                :canResource="$this->resource" />
                         </div>
                     </div>
+                </div>
+            </section>
+
+            <section class="border-t border-neutral-200 pt-6 dark:border-white/[0.06]">
+                <h3 class="text-sm font-semibold text-black dark:text-fg">Backup source</h3>
+                <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">Choose a local file or a file in a backup storage.</p>
+                <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                    <button type="button" @click="restoreType = 'file'"
+                        class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
+                        :class="restoreType === 'file'
+                            ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-brand-light/30 dark:bg-brand/[0.08] dark:text-brand-light'
+                            : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]'">
+                        <span
+                            class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]">
+                            <x-reicon name="file" class="size-4" />
+                        </span>
+                        <span>
+                            <span class="block text-[13px] font-semibold">File</span>
+                            <span class="mt-0.5 block text-[11px] text-neutral-500 dark:text-fg-faint">Upload a
+                                backup or use a server path.</span>
+                        </span>
+                    </button>
+
+                @if (count($availableS3Storages) > 0)
+                        <button type="button" @click="restoreType = 's3'"
+                            class="flex min-h-20 items-center gap-3 rounded-[10px] border p-3 text-left transition-colors"
+                            :class="restoreType === 's3'
+                                ? 'border-coollabs/35 bg-coollabs/[0.06] text-coollabs dark:border-brand-light/30 dark:bg-brand/[0.08] dark:text-brand-light'
+                                : 'border-neutral-200 bg-white hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]'">
+                            <span
+                                class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-white/[0.06]">
+                                <x-reicon name="storages" class="size-4" />
+                            </span>
+                            <span>
+                                <span class="block text-[13px] font-semibold">Storage</span>
+                                <span class="mt-0.5 block text-[11px] text-neutral-500 dark:text-fg-faint">Download
+                                    a backup from a backup storage.</span>
+                            </span>
+                        </button>
                 @endif
-            </div>
+                </div>
 
             {{-- File Restore Section --}}
             @can('update', $this->resource)
-                <div x-show="restoreType === 'file'" class="pt-6">
-                    <h3>Backup File</h3>
-                    <form class="flex gap-2 items-end pt-2">
-                        <x-forms.input label="Location of the backup file on the server" placeholder="e.g. /home/user/backup.sql.gz"
-                            wire:model='customLocation' x-model="$wire.customLocation" canGate="update" :canResource="$this->resource"></x-forms.input>
-                        <x-forms.button class="w-full" wire:click='checkFile' x-bind:disabled="!$wire.customLocation" canGate="update" :canResource="$this->resource">Check File</x-forms.button>
+                <div x-cloak x-show="restoreType === 'file'"
+                    class="mt-4">
+                    <form class="flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <div class="min-w-0 flex-1">
+                            <x-forms.input label="File path on the server"
+                                placeholder="/home/user/backup.sql.gz" wire:model="customLocation"
+                                x-model="$wire.customLocation" canGate="update"
+                                :canResource="$this->resource" />
+                        </div>
+                        <x-forms.button wire:click="checkFile" x-bind:disabled="!$wire.customLocation"
+                            canGate="update" :canResource="$this->resource">Check file</x-forms.button>
                     </form>
-                    <div class="pt-2 text-center text-xl font-bold">
-                        Or
-                    </div>
-                    <form action="{{ route('upload.backup', ['databaseUuid' => $resourceUuid]) }}" class="dropzone" id="my-dropzone" wire:ignore>
-                        @csrf
-                    </form>
-                    <div x-show="isUploading">
-                        <progress max="100" x-bind:value="progress" class="progress progress-warning"></progress>
+
+                    <div class="my-4 flex items-center gap-3 text-[10px] font-medium uppercase tracking-wide text-neutral-400 dark:text-fg-faint">
+                        <span class="h-px flex-1 bg-neutral-200 dark:bg-white/[0.08]"></span>
+                        or upload
+                        <span class="h-px flex-1 bg-neutral-200 dark:bg-white/[0.08]"></span>
                     </div>
 
-                    <div x-show="filename && !error" class="pt-6">
-                        <h3>File Information</h3>
-                        <div class="pt-2">Location: <span x-text="filename ?? 'N/A'"></span><span x-show="filesize" x-text="' / ' + filesize"></span></div>
-                        <div class="pt-2">
+                    @if ($this->uploadsToS3)
+                        <div>
+                            <label
+                                class="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-neutral-300 bg-white p-4 text-center text-sm dark:border-white/[0.12] dark:bg-white/[0.05]"
+                                :class="s3Uploading ? 'pointer-events-none opacity-60' : ''"
+                                @dragover.prevent @drop.prevent="uploadToS3($event.dataTransfer.files[0])">
+                                <span>Select or drop a backup file here.</span>
+                                <span class="text-[11px] text-neutral-500 dark:text-fg-faint">Maximum 10 GiB. Coolify deletes the uploaded file after the import, or after one day when it is not imported.</span>
+                                <input type="file" class="hidden" @change="uploadToS3($event.target.files[0]); $event.target.value = ''">
+                            </label>
+                            <div x-show="s3Uploading" class="mt-3 flex items-center gap-3">
+                                <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/[0.08]">
+                                    <div class="h-full rounded-full bg-coollabs dark:bg-brand" :style="`width: ${s3Progress}%`"></div>
+                                </div>
+                                <span class="text-[11px] tabular-nums text-neutral-500 dark:text-fg-faint" x-text="`${s3Progress}%`"></span>
+                                <x-forms.button @click="s3Cancel && s3Cancel()">Cancel</x-forms.button>
+                            </div>
+                        </div>
+                    @else
+                    <form action="{{ route('upload.backup', ['databaseUuid' => $resourceUuid]) }}"
+                        class="dropzone rounded-lg! border! border-dashed! border-neutral-300! bg-white! dark:border-white/[0.12]! dark:bg-white/[0.05]!"
+                        x-init="mountDropzone($el)" wire:ignore>
+                        @csrf
+                    </form>
+                    <div x-show="isUploading" class="mt-3 h-1.5 overflow-hidden rounded-full bg-neutral-200 dark:bg-white/[0.08]">
+                        <div class="h-full rounded-full bg-coollabs dark:bg-brand"
+                            :style="`width: ${progress}%`"></div>
+                    </div>
+                    @endif
+
+                    <div x-cloak x-show="filename && !error"
+                        class="mt-4 flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                            <p class="truncate text-[12px] font-medium" x-text="filename ?? 'N/A'"></p>
+                            <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint"
+                                x-show="filesize" x-text="filesize"></p>
+                        </div>
+                        <div class="shrink-0">
                             <x-modal-confirmation title="Restore Database from File?" buttonTitle="Restore from File"
                                 submitAction="runImport" isErrorButton>
                                 <x-slot:button-title>
-                                    Restore Database from File
+                                    Restore from file
                                 </x-slot:button-title>
-                                This will perform the following actions:
+                                This will:
                                 <ul class="list-disc list-inside pt-2">
                                     <li>Copy backup file to database container</li>
                                     <li>Execute restore command</li>
                                 </ul>
-                                <div class="pt-2 font-bold text-error">WARNING: This will REPLACE all existing data!</div>
+                                <p class="pt-2 font-semibold text-error">Existing objects can cause the import to fail unless replacement is enabled.</p>
                             </x-modal-confirmation>
                         </div>
                     </div>
                 </div>
             @endcan
 
-            {{-- S3 Restore Section --}}
+            {{-- Storage Restore Section --}}
             @if (count($availableS3Storages) > 0)
                 @can('update', $this->resource)
-                    <div x-show="restoreType === 's3'" class="pt-6">
-                        <h3>Restore from S3</h3>
-                        <div class="flex flex-col gap-2 pt-2">
-                            <x-forms.select label="S3 Storage" wire:model.live="s3StorageId" canGate="update" :canResource="$this->resource">
-                                <option value="">Select S3 Storage</option>
-                                @foreach ($availableS3Storages as $storage)
-                                    <option value="{{ $storage['id'] }}">{{ $storage['name'] }}
-                                        @if ($storage['description'])
-                                            - {{ $storage['description'] }}
-                                        @endif
-                                    </option>
-                                @endforeach
-                            </x-forms.select>
+                    @php
+                        $s3StorageOptions = collect($availableS3Storages)
+                            ->map(fn ($storage) => [
+                                'value' => $storage['id'],
+                                'label' => $storage['name']
+                                    .($storage['description'] ? ' - '.$storage['description'] : ''),
+                            ])
+                            ->values()
+                            ->all();
+                    @endphp
+                    <div x-cloak x-show="restoreType === 's3'"
+                        class="mt-4">
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <x-forms.listbox id="s3StorageId" label="Storage" :options="$s3StorageOptions"
+                                placeholder="Select storage" live />
 
-                            <x-forms.input label="S3 File Path (within bucket)"
-                                helper="Path to the backup file in your S3 bucket, e.g., /backups/database-2025-01-15.gz"
-                                placeholder="/backups/database-backup.gz" wire:model.blur='s3Path'
-                                wire:keydown.enter='checkS3File' canGate="update" :canResource="$this->resource"></x-forms.input>
+                            <x-forms.input label="File path"
+                                helper="Path to the backup file in the storage, e.g., /backups/database-2025-01-15.gz"
+                                placeholder="/backups/database-backup.gz" wire:model.blur="s3Path"
+                                wire:keydown.enter="checkS3File" canGate="update"
+                                :canResource="$this->resource" />
+                        </div>
 
-                            <div class="flex gap-2">
-                                <x-forms.button class="w-full" wire:click='checkS3File' x-bind:disabled="!s3StorageId || !s3Path" canGate="update" :canResource="$this->resource">
-                                    Check File
-                                </x-forms.button>
-                            </div>
+                        <div class="mt-3 flex justify-end">
+                            <x-forms.button wire:click="checkS3File" x-bind:disabled="!s3StorageId || !s3Path"
+                                canGate="update" :canResource="$this->resource">
+                                Check file
+                            </x-forms.button>
+                        </div>
 
                             @if ($s3FileSize)
-                                <div class="pt-6">
-                                    <h3>File Information</h3>
-                                    <div class="pt-2">Location: {{ $s3Path }} {{ formatBytes($s3FileSize ?? 0) }}</div>
-                                    <div class="pt-2">
-                                        <x-modal-confirmation title="Restore Database from S3?" buttonTitle="Restore from S3"
+                            <div
+                                class="mt-4 flex flex-col gap-3 rounded-lg border border-neutral-200 bg-white p-3 dark:border-white/[0.08] dark:bg-white/[0.03] sm:flex-row sm:items-center sm:justify-between">
+                                <div class="min-w-0">
+                                    <p class="truncate text-[12px] font-medium">{{ $s3Path }}</p>
+                                    <p class="mt-0.5 text-[11px] text-neutral-500 dark:text-fg-faint">
+                                        {{ formatBytes($s3FileSize ?? 0) }}</p>
+                                </div>
+                                <div class="shrink-0">
+                                        <x-modal-confirmation title="Restore Database from Storage?" buttonTitle="Restore from storage"
                                             submitAction="restoreFromS3" isErrorButton>
                                             <x-slot:button-title>
-                                                Restore Database from S3
+                                            Restore from storage
                                             </x-slot:button-title>
-                                            This will perform the following actions:
+                                        This will:
                                             <ul class="list-disc list-inside pt-2">
-                                                <li>Download backup from S3 storage</li>
+                                                <li>Download backup from the storage</li>
                                                 <li>Copy file into database container</li>
                                                 <li>Execute restore command</li>
                                             </ul>
-                                            <div class="pt-2 font-bold text-error">WARNING: This will REPLACE all existing data!</div>
+                                        <p class="pt-2 font-semibold text-error">Existing objects can cause the import to fail unless replacement is enabled.</p>
                                         </x-modal-confirmation>
-                                    </div>
                                 </div>
+                            </div>
                             @endif
-                        </div>
                     </div>
                 @endcan
             @endif
+            </section>
+        </div>
 
-            {{-- Slide-over for activity monitor (all restore operations) --}}
-            <x-slide-over @databaserestore.window="slideOverOpen = true" closeWithX fullScreen>
+            <x-process-dialog @databaserestore.window="processDialogOpen = true" closeWithX size="xl">
                 <x-slot:title>Database Restore Output</x-slot:title>
                 <x-slot:content>
-                    <div wire:ignore>
-                        <livewire:activity-monitor wire:key="database-restore-{{ $resourceUuid }}" header="Logs" fullHeight />
+                    <div class="flex h-full min-h-0 flex-col" wire:ignore>
+                        <livewire:activity-monitor wire:key="database-restore-{{ $resourceUuid }}" fullHeight />
                     </div>
                 </x-slot:content>
-            </x-slide-over>
+            </x-process-dialog>
 </div>

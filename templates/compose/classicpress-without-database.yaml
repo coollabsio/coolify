@@ -3,10 +3,11 @@
 # category: cms
 # tags: cms, blog, content, management
 # logo: svgs/classicpress.svg
+# port: 80
 
 services:
    classicpress:
-    image: classicpress/classicpress:latest
+    image: classicpress/classicpress:2.7.4-php8.5-apache
     volumes:
        - classicpress-files:/var/www/html
     environment:
