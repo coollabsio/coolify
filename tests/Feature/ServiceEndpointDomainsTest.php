@@ -101,8 +101,18 @@ it('imports endpoint urls from the environment and generates the empty ones', fu
         ->and(endpointVariable($this->service, 'GARAGE_S3_API_URL'))->toBe('https://s3.example.org:3900');
 });
 
-it('skips endpoints without an environment variable and imports only once', function () {
-    setEndpointVariables($this->service, ['GARAGE_S3_API_URL' => 'https://s3.example.org']);
+it('treats the image as a normal application when an endpoint variable is missing', function () {
+    setEndpointVariables($this->service, ['GARAGE_S3_API_URL' => 'https://s3.example.org', 'GARAGE_WEB_URL' => '']);
+
+    $this->garage->importServiceEndpoints();
+
+    expect($this->garage->serviceEndpoints())->toBe([])
+        ->and($this->garage->refresh()->domain_endpoints)->toBeNull()
+        ->and($this->garage->fqdn)->toBe('https://never-routed.example.com');
+});
+
+it('imports the endpoints only once', function () {
+    setEndpointVariables($this->service, ['GARAGE_S3_API_URL' => 'https://s3.example.org', 'GARAGE_WEB_URL' => '', 'GARAGE_ADMIN_URL' => '']);
 
     $this->garage->importServiceEndpoints();
     $this->garage->update(['fqdn' => 'https://s3.example.org,https://other.example.org']);
@@ -116,7 +126,7 @@ it('skips endpoints without an environment variable and imports only once', func
 });
 
 it('gives the endpoints only to the first application with the image', function () {
-    setEndpointVariables($this->service, ['GARAGE_S3_API_URL' => 'https://s3.example.org']);
+    setEndpointVariables($this->service, ['GARAGE_S3_API_URL' => 'https://s3.example.org', 'GARAGE_WEB_URL' => 'https://web.example.org', 'GARAGE_ADMIN_URL' => 'https://admin.example.org']);
     $helper = ServiceApplication::create([
         'name' => 'garage-setup',
         'service_id' => $this->service->id,
@@ -129,11 +139,15 @@ it('gives the endpoints only to the first application with the image', function 
 
     expect($helper->refresh()->domain_endpoints)->toBeNull()
         ->and($helper->fqdn)->toBe('https://helper.example.org')
-        ->and($this->garage->refresh()->domain_endpoints)->toBe(['https://s3.example.org' => 's3']);
+        ->and($this->garage->refresh()->domain_endpoints)->toBe([
+            'https://s3.example.org' => 's3',
+            'https://web.example.org' => 'web',
+            'https://admin.example.org' => 'admin',
+        ]);
 });
 
 it('maps new domains by port, by www counterpart, or to the primary endpoint', function () {
-    setEndpointVariables($this->service, ['GARAGE_S3_API_URL' => 'https://s3.example.org', 'GARAGE_WEB_URL' => 'https://web.example.org']);
+    setEndpointVariables($this->service, ['GARAGE_S3_API_URL' => 'https://s3.example.org', 'GARAGE_WEB_URL' => 'https://web.example.org', 'GARAGE_ADMIN_URL' => '']);
     $this->garage->importServiceEndpoints();
 
     $this->garage->setEditableUrls('https://s3.example.org,https://web.example.org,https://plain.example.org,https://site.example.org:3902,https://www.web.example.org');
