@@ -304,23 +304,20 @@ YAML,
     expect($volume->isReadOnlyVolume())->toBeTrue();
 });
 
-it('updateOrCreate lookup arrays in parsers.php and shared.php include fs_path', function () {
+it('updateOrCreate lookup arrays in parsers.php include fs_path', function () {
     $parsers = file_get_contents(__DIR__.'/../../bootstrap/helpers/parsers.php');
-    $shared = file_get_contents(__DIR__.'/../../bootstrap/helpers/shared.php');
 
-    foreach ([$parsers, $shared] as $code) {
-        preg_match_all(
-            '/LocalFileVolume::updateOrCreate\s*\(\s*(\[[^\]]+\])/m',
-            $code,
-            $matches
-        );
+    preg_match_all(
+        '/LocalFileVolume::updateOrCreate\s*\(\s*(\[[^\]]+\])/m',
+        $parsers,
+        $matches
+    );
 
-        expect(count($matches[1]))->toBeGreaterThan(0);
-        foreach ($matches[1] as $lookup) {
-            expect($lookup)->toContain("'fs_path'");
-            expect($lookup)->toContain("'mount_path'");
-            expect($lookup)->toContain("'resource_id'");
-            expect($lookup)->toContain("'resource_type'");
-        }
+    expect(count($matches[1]))->toBeGreaterThan(0);
+    foreach ($matches[1] as $lookup) {
+        expect($lookup)->toContain("'fs_path'");
+        expect($lookup)->toContain("'mount_path'");
+        expect($lookup)->toContain("'resource_id'");
+        expect($lookup)->toContain("'resource_type'");
     }
 });

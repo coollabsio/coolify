@@ -2192,6 +2192,25 @@ function findLocalFileVolumeConfig(
 }
 
 /**
+ * Finds the file storage of a mount whose host path changed in the Compose file, so the storage keeps its
+ * content at the new path. It takes a storage only when it is the one storage at the mount path that no
+ * volume of the Compose file uses, so a sibling mount never takes the storage of another mount.
+ */
+function findRenamedComposeFileStorage(
+    Application|ServiceApplication|ServiceDatabase $resource,
+    Application|Service $composeResource,
+    Stringable $target,
+): ?LocalFileVolume {
+    $unusedStorages = $resource->fileStorages()
+        ->where('mount_path', $target->value())
+        ->where('is_host_file', false)
+        ->get()
+        ->reject(fn (LocalFileVolume $storage): bool => $storage->isUsedInCompose($composeResource));
+
+    return $unusedStorages->count() === 1 ? $unusedStorages->first() : null;
+}
+
+/**
  * The host path of a local Compose bind source. A mount whose storage row already has the legacy path
  * (also with a preview suffix) keeps it, because its data is there.
  *
@@ -3363,7 +3382,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $content = data_get($volume, 'content');
                             $isDirectory = (bool) data_get($volume, 'isDirectory', null) || (bool) data_get($volume, 'is_directory', null);
                             validateComposeContentVolumeSource($volume);
-                            $foundConfig = findLocalFileVolumeConfig($savedService, $source, $target);
+                            $foundConfig = $savedService->fileStorages()->whereMountPath($target)->first();
                             if ($foundConfig) {
                                 $contentNotNull = data_get($foundConfig, 'content');
                                 if ($contentNotNull) {
@@ -3386,13 +3405,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
                             LocalFileVolume::updateOrCreate(
                                 [
-                                    'fs_path' => (string) $source,
                                     'mount_path' => $target,
                                     'resource_id' => $savedService->id,
                                     'resource_type' => get_class($savedService),
                                 ],
                                 [
-                                    'fs_path' => (string) $source,
+                                    'fs_path' => $source,
                                     'mount_path' => $target,
                                     'content' => $content,
                                     'is_directory' => $isDirectory,

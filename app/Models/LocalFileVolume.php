@@ -811,16 +811,44 @@ class LocalFileVolume extends BaseModel
 
     public function isReadOnlyVolume(): bool
     {
+        $volume = $this->composeVolume();
+        if (is_array($volume)) {
+            return (bool) data_get($volume, 'read_only', false);
+        }
+        if ($volume === null) {
+            return false;
+        }
+        $options = array_map('trim', explode(',', parseDockerVolumeString($volume)['mode']?->value() ?? ''));
+
+        return in_array('ro', $options, true);
+    }
+
+    /**
+     * Whether a volume of the Compose file of the resource still mounts this host path.
+     */
+    public function isUsedInCompose(Application|Service $composeResource): bool
+    {
+        return $this->composeVolume($composeResource) !== null;
+    }
+
+    /**
+     * The volume of the Compose file that mounts this host path at this mount path. Without a resource,
+     * it reads the saved Compose file.
+     *
+     * @return string|array<string, mixed>|null
+     */
+    private function composeVolume(Application|Service|null $composeResource = null): string|array|null
+    {
         try {
             $resource = $this->service;
             if (! $resource) {
-                return false;
+                return null;
             }
 
             if ($this->isServiceResource()) {
-                $composeResource = $resource->service;
+                $composeResource ??= $resource->service;
                 if (! $composeResource) {
-                    return false;
+                    return null;
                 }
 
                 $baseDirectory = (int) $composeResource->compose_parsing_version >= 4
@@ -829,7 +857,7 @@ class LocalFileVolume extends BaseModel
                 $mainDirectory = str(base_configuration_dir()."/{$baseDirectory}/{$composeResource->uuid}");
                 $services = [data_get(parseDockerComposeYaml($composeResource->docker_compose_raw), "services.{$resource->name}")];
             } else {
-                $composeResource = $resource;
+                $composeResource ??= $resource;
                 $mainDirectory = str(base_configuration_dir()."/applications/{$composeResource->uuid}");
                 $services = data_get(parseDockerComposeYaml($composeResource->docker_compose_raw), 'services', []);
             }
@@ -838,32 +866,24 @@ class LocalFileVolume extends BaseModel
                 foreach (data_get($service, 'volumes', []) as $volume) {
                     if (is_string($volume)) {
                         $parsedVolume = parseDockerVolumeString($volume);
-                        $source = $parsedVolume['source'];
-                        $target = $parsedVolume['target'];
-                        if ($source === null || $target === null) {
-                            continue;
-                        }
-
-                        if ($this->matchesComposeVolume($source->value(), $target->value(), $mainDirectory)) {
-                            $options = array_map('trim', explode(',', $parsedVolume['mode']?->value() ?? ''));
-
-                            return in_array('ro', $options, true);
-                        }
+                        $source = $parsedVolume['source']?->value();
+                        $target = $parsedVolume['target']?->value();
                     } elseif (is_array($volume)) {
                         $source = data_get($volume, 'source');
                         $target = data_get($volume, 'target');
+                    } else {
+                        continue;
+                    }
 
-                        if ($source !== null && $target !== null && $this->matchesComposeVolume($source, $target, $mainDirectory)) {
-                            return (bool) data_get($volume, 'read_only', false);
-                        }
+                    if ($source !== null && $target !== null && $this->matchesComposeVolume($source, $target, $mainDirectory)) {
+                        return $volume;
                     }
                 }
             }
 
-            return false;
-        } catch (\Throwable $e) {
-
-            return false;
+            return null;
+        } catch (\Throwable) {
+            return null;
         }
     }
 
