@@ -8,8 +8,9 @@ it('includes an ALTCHA Sentinel one-click service template', function () {
     $compose = file_get_contents($templatePath);
 
     expect($compose)
-        ->toContain('ghcr.io/altcha-org/sentinel:${ALTCHA_VERSION:-latest}')
+        ->toContain('ghcr.io/altcha-org/sentinel:${ALTCHA_VERSION:-1.43.0}')
         ->toContain('SERVICE_URL_ALTCHA_8080')
+        ->toContain('DEFAULT_ROOT_PASSWORD=${SERVICE_PASSWORD_ALTCHA}')
         ->toContain('altcha-data:/data')
         ->toContain("grep -q ':1F90 ' /proc/net/tcp /proc/net/tcp6")
         ->toContain("volumes:\n  altcha-data:")
@@ -30,7 +31,8 @@ it('includes an ALTCHA Sentinel one-click service template', function () {
         $generatedCompose = base64_decode($templates['altcha']['compose'], strict: true);
 
         expect($generatedCompose)
-            ->toContain('ghcr.io/altcha-org/sentinel:${ALTCHA_VERSION:-latest}')
+            ->toContain('ghcr.io/altcha-org/sentinel:${ALTCHA_VERSION:-1.43.0}')
+            ->toContain('DEFAULT_ROOT_PASSWORD=${SERVICE_PASSWORD_ALTCHA}')
             ->toContain("grep -q ':1F90 ' /proc/net/tcp /proc/net/tcp6")
             ->toContain("volumes:\n  altcha-data:")
             ->toContain($templateFile === 'service-templates.json'
