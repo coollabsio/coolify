@@ -533,8 +533,15 @@ function keepSavedComposeBindSource(Stringable $source, ?string $volume, Stringa
     }
     $variablePath = resolveComposeVolumeSourceVariables($source->value(), composeVolumeSourceVariables($resource));
     if ($variablePath === $defaultSource->value()) {
-        // The variable has no value now. The saved path stays, so the data does not move when it gets one.
-        return [$defaultSource, null];
+        preg_match_all('/\$\{([A-Za-z_][A-Za-z0-9_]*)/', $source->value(), $names);
+        $hasValue = composeEnvironmentVariablesQuery($resource)->whereIn('key', $names[1])->get()
+            ->contains(fn ($variable) => filled($variable->real_value));
+        if (! $hasValue) {
+            // The variable has no value now. The saved path stays, so the data does not move when it gets one.
+            return [$defaultSource, null];
+        }
+        // A value with a variable or vault reference: only Docker Compose can resolve it.
+        $variablePath = $source->value();
     }
     $resource->addComposeVolumeWarning("The storage {$savedStorage->mount_path} keeps its saved host path {$defaultSource}. Its variable gives {$variablePath}. To use that path, open the storage and click Use the variable path.");
 
