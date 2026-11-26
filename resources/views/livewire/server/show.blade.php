@@ -281,8 +281,8 @@
                                     helper="Builds can use large amounts of CPU and memory. Deployments on the same server can become slow or unreachable during a build. GitHub Actions runners need the Builds only or the Deployments and builds role."
                                     :disabled="$isValidating" :options="[
                                         ['value' => 'deployment', 'label' => 'Deployments only', 'description' => 'Runs your resources. Images are built on a build server.'],
-                                        ['value' => 'build', 'label' => 'Builds only', 'description' => 'Builds images for other servers and runs GitHub Actions runners.'],
-                                        ['value' => 'both', 'label' => 'Deployments and builds', 'description' => 'Builds and runs your resources on this server. Can also run GitHub Actions runners.'],
+                                        ['value' => 'build', 'label' => 'Builds only', 'description' => 'The only role that builds images for other servers. Can also run GitHub Actions runners.'],
+                                        ['value' => 'both', 'label' => 'Deployments and builds', 'description' => 'Builds and runs only the resources on this server. Not used as a build server for other servers. Can also run GitHub Actions runners.'],
                                     ]" />
                             </div>
                         @endif

@@ -98,6 +98,22 @@ final class ImageRef implements Stringable
     }
 
     /**
+     * The Docker Hub image behind a GitLab dependency proxy reference
+     * (`gitlab.example.com/group/dependency_proxy/containers/redis` → `docker.io/library/redis`), with the same tag.
+     * The proxy has no tag list, so the tags are read upstream. Null for every other reference.
+     */
+    public function dockerHubUpstream(): ?self
+    {
+        if ($this->registry === 'docker.io'
+            || preg_match('#\A(?:[^/]+/)+dependency_proxy/containers/([^/]+(?:/[^/]+)*)\z#', $this->repository, $matches) !== 1) {
+            return null;
+        }
+        $repository = str_contains($matches[1], '/') ? $matches[1] : 'library/'.$matches[1];
+
+        return new self('docker.io', $repository, $this->tag, null);
+    }
+
+    /**
      * Registry and repository without tag or digest, for example `docker.io/library/nginx`.
      */
     public function qualifiedName(): string

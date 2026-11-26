@@ -2047,23 +2047,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         }
 
         if (! $use_network_mode) {
-            if ($topLevel->get('networks')?->count() > 0) {
-                foreach ($topLevel->get('networks') as $networkName => $network) {
-                    if ($networkName === 'default') {
-                        continue;
-                    }
-                    // ignore aliases
-                    if ($network['aliases'] ?? false) {
-                        continue;
-                    }
-                    $networkExists = $networks->contains(function ($value, $key) use ($networkName) {
-                        return $value == $networkName || $key == $networkName;
-                    });
-                    if (! $networkExists) {
-                        $networks->put($networkName, null);
-                    }
-                }
-            }
             $baseNetworkExists = $networks->contains(function ($value, $_) use ($baseNetwork) {
                 return $value == $baseNetwork;
             });
@@ -2625,11 +2608,16 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if (! $use_network_mode) {
             $payload['networks'] = $networks_temp;
         }
+        // Yaml::dump writes an empty list as a mapping ({}), which docker compose rejects.
         if ($ports->count() > 0) {
             $payload['ports'] = $ports;
+        } else {
+            $payload->forget('ports');
         }
         if ($volumesParsed->count() > 0) {
             $payload['volumes'] = $volumesParsed;
+        } else {
+            $payload->forget('volumes');
         }
         if ($environment->count() > 0 || $coolifyEnvironments->count() > 0) {
             $environment = preserveLegacyDockerComposeNullAssignments($environment, $legacyNullEnvironmentVariables);
@@ -3406,23 +3394,6 @@ function serviceParser(Service $resource): Collection
         }
 
         if (! $use_network_mode) {
-            if ($topLevel->get('networks')?->count() > 0) {
-                foreach ($topLevel->get('networks') as $networkName => $network) {
-                    if ($networkName === 'default') {
-                        continue;
-                    }
-                    // ignore aliases
-                    if ($network['aliases'] ?? false) {
-                        continue;
-                    }
-                    $networkExists = $networks->contains(function ($value, $key) use ($networkName) {
-                        return $value == $networkName || $key == $networkName;
-                    });
-                    if (! $networkExists) {
-                        $networks->put($networkName, null);
-                    }
-                }
-            }
             $baseNetworkExists = $networks->contains(function ($value, $_) use ($baseNetwork) {
                 return $value == $baseNetwork;
             });
@@ -3894,11 +3865,16 @@ function serviceParser(Service $resource): Collection
         if (! $use_network_mode) {
             $payload['networks'] = $networks_temp;
         }
+        // Yaml::dump writes an empty list as a mapping ({}), which docker compose rejects.
         if ($ports->count() > 0) {
             $payload['ports'] = $ports;
+        } else {
+            $payload->forget('ports');
         }
         if ($volumesParsed->count() > 0) {
             $payload['volumes'] = $volumesParsed;
+        } else {
+            $payload->forget('volumes');
         }
         if ($environment->count() > 0 || $coolifyEnvironments->count() > 0) {
             $environment = preserveLegacyDockerComposeNullAssignments($environment, $legacyNullEnvironmentVariables);
