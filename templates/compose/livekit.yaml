@@ -7,7 +7,7 @@
 
 services:
   livekit:
-    image: livekit/livekit-server:v1.13.7
+    image: livekit/livekit-server:v1.13.11
     restart: unless-stopped
     environment:
       SERVICE_URL_LIVEKIT_7880: ""
