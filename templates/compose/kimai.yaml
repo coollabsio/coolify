@@ -22,7 +22,7 @@ services:
       timeout: 20s
       retries: 10
   kimai:
-    image: kimai/kimai2:apache
+    image: kimai/kimai2:2.72.0
     container_name: kimai
     depends_on:
       mysql:

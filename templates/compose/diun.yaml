@@ -6,7 +6,7 @@
 
 services:
   diun:
-    image: crazymax/diun:latest
+    image: crazymax/diun:4.33.1
     command: serve
     volumes:
       - "diun_data:/data"

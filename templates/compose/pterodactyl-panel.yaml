@@ -24,7 +24,7 @@ services:
       - pterodactyl-db:/var/lib/mysql
 
   redis:
-    image: redis:alpine
+    image: redis:8.10.3-alpine
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping || exit 1"]
       interval: 10s

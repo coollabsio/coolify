@@ -41,7 +41,7 @@
             'right-0! left-auto! min-w-60! max-w-96!' => !$fullWidth && !$compact,
         ])>
         @if ($hasLinks)
-            @if (data_get($application, 'gitBrancLocation'))
+            @if (data_get($application, 'gitBranchLocation'))
                 <a target="_blank" class="{{ $linkItemClasses }}" href="{{ $application->gitBranchLocation }}">
                     <x-git-icon git="{{ $application->source?->getMorphClass() }}" />
                     <span class="min-w-0 truncate">Git Repository</span>

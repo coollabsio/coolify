@@ -37,13 +37,13 @@ class RcloneTransfer
     /**
      * Starts the rclone container and writes the storage config to it.
      *
-     * @param  array<int, string>  $volumes  `docker run -v` values, for example "/host/path:/path:ro".
+     * @param  array<string, string>  $files  Host files to mount read-only, host path => container path.
      * @param  ?int  $timeout  Timeout of the job. The container stops itself shortly after it, also when a worker
      *                         timeout kills the job before it removes the container with the config.
      */
-    public function start(array $volumes = [], ?string $network = null, ?int $timeout = null): void
+    public function start(array $files = [], ?string $network = null, ?int $timeout = null): void
     {
-        $options = collect($volumes)->map(fn (string $volume): string => ' -v '.escapeshellarg($volume))->implode('');
+        $options = collect($files)->map(fn (string $target, string $source): string => ' '.dockerReadOnlyFileMountOption($source, $target))->implode('');
         if ($network !== null) {
             $options .= ' --network '.escapeshellarg($network);
         }

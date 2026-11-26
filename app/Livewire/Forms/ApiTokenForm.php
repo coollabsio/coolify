@@ -93,6 +93,13 @@ class ApiTokenForm extends Form
             return;
         }
 
+        if ($permissionToUpdate == 'terminal' && ! auth()->user()->can('useTerminalPermissions', PersonalAccessToken::class)) {
+            $this->getComponent()->dispatch('error', 'You do not have permission to use terminal permissions.');
+            $this->permissions = array_diff($this->permissions, ['terminal']);
+
+            return;
+        }
+
         if ($permissionToUpdate == 'delete' && ! auth()->user()->can('useDeletePermissions', PersonalAccessToken::class)) {
             $this->getComponent()->dispatch('error', 'You do not have permission to use delete permissions.');
             $this->permissions = array_diff($this->permissions, ['delete']);
@@ -102,6 +109,10 @@ class ApiTokenForm extends Form
 
         if ($permissionToUpdate == 'root' && in_array('root', $this->permissions, true)) {
             $this->permissions = ['root'];
+        } elseif ($permissionToUpdate == 'terminal' && in_array('terminal', $this->permissions, true)) {
+            $this->permissions = ['terminal'];
+        } elseif (in_array('terminal', $this->permissions, true) && in_array($permissionToUpdate, $this->permissions, true)) {
+            $this->permissions = [$permissionToUpdate];
         } elseif ($permissionToUpdate == 'read:sensitive' && ! in_array('read', $this->permissions, true)) {
             $this->permissions[] = 'read';
         } else {

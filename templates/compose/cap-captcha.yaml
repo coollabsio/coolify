@@ -7,17 +7,19 @@
 
 services:
   cap:
-    image: tiago2/cap:3.0.4 # Released on 22nd April 2026
+    image: tiago2/cap:4.0.15
     environment:
       - SERVICE_URL_CAP_3000
       - ADMIN_KEY=$SERVICE_PASSWORD_ADMIN
-      - REDIS_URL=redis://valkey:6379
+      - VALKEY_URL=redis://valkey:6379
+    volumes:
+      - cap-data:/usr/src/app/data
     healthcheck:
-      test: ["CMD", "bun", "-e", "fetch('http://localhost:3000').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3000/health').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 5s
+      start_period: 20s
     depends_on:
       valkey:
         condition: service_healthy

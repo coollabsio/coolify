@@ -43,6 +43,7 @@ use App\Http\Controllers\Api\ServiceApplicationsController;
 use App\Http\Controllers\Api\ServiceDatabasesController;
 use App\Http\Controllers\Api\ServicesController;
 use App\Http\Controllers\Api\SharedEnvironmentVariablesController;
+use App\Http\Controllers\Api\StaticSiteArchivesController;
 use App\Http\Controllers\Api\TagsController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\VolumeBackupsController;
@@ -96,6 +97,8 @@ Route::group([
     Route::patch('/notifications/telegram', [NotificationsController::class, 'update_telegram'])->middleware(['api.ability:write']);
     Route::get('/notifications/pushover', [NotificationsController::class, 'pushover'])->middleware(['api.ability:read']);
     Route::patch('/notifications/pushover', [NotificationsController::class, 'update_pushover'])->middleware(['api.ability:write']);
+    Route::get('/notifications/ntfy', [NotificationsController::class, 'ntfy'])->middleware(['api.ability:read']);
+    Route::patch('/notifications/ntfy', [NotificationsController::class, 'update_ntfy'])->middleware(['api.ability:write']);
     Route::get('/notifications/webhook', [NotificationsController::class, 'webhook'])->middleware(['api.ability:read']);
     Route::patch('/notifications/webhook', [NotificationsController::class, 'update_webhook'])->middleware(['api.ability:write']);
     Route::get('/settings/email', [InstanceEmailSettingsController::class, 'show'])->middleware(['api.ability:read']);
@@ -210,6 +213,7 @@ Route::group([
     Route::get('/servers/{uuid}/validate', [OtherController::class, 'post_required'])->middleware(['api.ability:write']);
     Route::post('/servers/{uuid}/validate', [ServersController::class, 'validate_server'])->middleware(['api.ability:write']);
     Route::post('/servers/{uuid}/host-key/reset', [ServersController::class, 'reset_host_key'])->middleware(['api.ability:write']);
+    Route::post('/servers/{uuid}/exec', [ServersController::class, 'execute_command'])->middleware(['api.ability:terminal', 'terminal.team.enabled', 'throttle:terminal-api-exec']);
 
     Route::get('/servers/{uuid}/registries', [ServerDockerRegistriesController::class, 'index'])->middleware(['api.ability:read:sensitive']);
     Route::post('/servers/{uuid}/registries', [ServerDockerRegistriesController::class, 'login'])->middleware(['api.ability:write', 'api.ability:deploy']);
@@ -261,6 +265,7 @@ Route::group([
     Route::get('/vulnerabilities', [VulnerabilitiesController::class, 'index'])->middleware(['api.ability:read']);
 
     Route::get('/environments/{uuid}/config/export', [ProjectConfigController::class, 'export'])->middleware(['api.ability:read']);
+    Route::get('/applications/{uuid}/config/export', [ProjectConfigController::class, 'exportApplication'])->middleware(['api.ability:read']);
     Route::post('/environments/{uuid}/config/plan', [ProjectConfigController::class, 'plan'])->middleware(['api.ability:read']);
     Route::post('/environments/{uuid}/config/template/plan', [ProjectConfigController::class, 'templatePlan'])->middleware(['api.ability:write']);
     Route::post('/environments/{uuid}/config/template', [ProjectConfigController::class, 'templateCreate'])->middleware(['api.ability:write']);
@@ -288,6 +293,10 @@ Route::group([
     Route::post('/applications/private-deploy-key', [ApplicationsController::class, 'create_private_deploy_key_application'])->middleware(['api.ability:write']);
     Route::post('/applications/dockerfile', [ApplicationsController::class, 'create_dockerfile_application'])->middleware(['api.ability:write']);
     Route::post('/applications/dockerimage', [ApplicationsController::class, 'create_dockerimage_application'])->middleware(['api.ability:write']);
+    Route::post('/applications/archive/uploads', [StaticSiteArchivesController::class, 'upload'])->middleware(['api.ability:write']);
+    Route::post('/applications/archive/uploads/s3', [StaticSiteArchivesController::class, 'prepareS3Upload'])->middleware(['api.ability:write']);
+    Route::post('/applications/archive', [StaticSiteArchivesController::class, 'create'])->middleware(['api.ability:write']);
+    Route::post('/applications/{uuid}/archive', [StaticSiteArchivesController::class, 'deploy'])->middleware(['api.ability:write']);
 
     Route::get('/applications/{uuid}', [ApplicationsController::class, 'application_by_uuid'])->middleware(['api.ability:read']);
     Route::get('/applications/{uuid}/vulnerabilities', [VulnerabilitiesController::class, 'application'])->middleware(['api.ability:read']);
@@ -313,6 +322,7 @@ Route::group([
     Route::patch('/applications/{uuid}/envs/bulk', [ApplicationsController::class, 'create_bulk_envs'])->middleware(['api.ability:write']);
     Route::patch('/applications/{uuid}/envs', [ApplicationsController::class, 'update_env_by_uuid'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/envs/{env_uuid}', [ApplicationsController::class, 'delete_env_by_uuid'])->middleware(['api.ability:delete']);
+    Route::post('/applications/{uuid}/exec', [ApplicationsController::class, 'execute_command'])->middleware(['api.ability:terminal', 'terminal.team.enabled', 'throttle:terminal-api-exec']);
     Route::get('/applications/{uuid}/logs', [ApplicationsController::class, 'logs_by_uuid'])->middleware(['api.ability:read:sensitive']);
     Route::get('/applications/{uuid}/metrics', [ResourceMetricsController::class, 'application'])->middleware(['api.ability:read']);
     Route::get('/applications/{uuid}/traffic', [ResourceTrafficController::class, 'application'])->middleware(['api.ability:read']);
@@ -321,6 +331,9 @@ Route::group([
     Route::post('/applications/{uuid}/storages', [ApplicationsController::class, 'create_storage'])->middleware(['api.ability:write']);
     Route::patch('/applications/{uuid}/storages', [ApplicationsController::class, 'update_storage'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/storages/{storage_uuid}', [ApplicationsController::class, 'delete_storage'])->middleware(['api.ability:delete']);
+    Route::get('/applications/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'show'])
+        ->defaults('resource_type', 'application')
+        ->middleware(['api.ability:read']);
     Route::put('/applications/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'upsert'])
         ->defaults('resource_type', 'application')
         ->middleware(['api.ability:write']);
@@ -404,6 +417,9 @@ Route::group([
     Route::post('/databases/{uuid}/storages', [DatabasesController::class, 'create_storage'])->middleware(['api.ability:write']);
     Route::patch('/databases/{uuid}/storages', [DatabasesController::class, 'update_storage'])->middleware(['api.ability:write']);
     Route::delete('/databases/{uuid}/storages/{storage_uuid}', [DatabasesController::class, 'delete_storage'])->middleware(['api.ability:delete']);
+    Route::get('/databases/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'show'])
+        ->defaults('resource_type', 'database')
+        ->middleware(['api.ability:read']);
     Route::put('/databases/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'upsert'])
         ->defaults('resource_type', 'database')
         ->middleware(['api.ability:write']);
@@ -447,6 +463,9 @@ Route::group([
     Route::post('/services/{uuid}/storages', [ServicesController::class, 'create_storage'])->middleware(['api.ability:write']);
     Route::patch('/services/{uuid}/storages', [ServicesController::class, 'update_storage'])->middleware(['api.ability:write']);
     Route::delete('/services/{uuid}/storages/{storage_uuid}', [ServicesController::class, 'delete_storage'])->middleware(['api.ability:delete']);
+    Route::get('/services/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'show'])
+        ->defaults('resource_type', 'service')
+        ->middleware(['api.ability:read']);
     Route::put('/services/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'upsert'])
         ->defaults('resource_type', 'service')
         ->middleware(['api.ability:write']);

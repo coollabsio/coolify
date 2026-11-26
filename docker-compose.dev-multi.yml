@@ -93,7 +93,7 @@ services:
       POSTGRES_DB: "${DB_DATABASE:-coolify}"
       POSTGRES_HOST_AUTH_METHOD: "trust"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: ["CMD", "pg_isready", "-U", "${DB_USERNAME:-coolify}", "-d", "${DB_DATABASE:-coolify}"]
       interval: 5s
       retries: 10
       timeout: 2s
@@ -108,7 +108,7 @@ services:
     ports:
       - "${DEV_BIND_ADDRESS:-0.0.0.0}:${FORWARD_REDIS_PORT:-6379}:6379"
     healthcheck:
-      test: redis-cli ping
+      test: ["CMD", "redis-cli", "-e", "ping"]
       interval: 5s
       retries: 10
       timeout: 2s
@@ -202,7 +202,7 @@ services:
 
   minio-init:
     profiles: ["minio"]
-    image: ghcr.io/coollabsio/mx:0.1.0
+    image: ghcr.io/coollabsio/mx:0.2.1
     pull_policy: always
     restart: "no"
     depends_on:

@@ -209,7 +209,7 @@ class ValidateAndInstall extends Component
 
         $this->supported_os_type = $this->server->validateOS();
         if (! $this->supported_os_type) {
-            $this->error = 'Server OS type is not supported. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+            $this->error = Server::UNSUPPORTED_OS_MESSAGE;
             $this->server->update([
                 'validation_logs' => $this->error,
             ]);

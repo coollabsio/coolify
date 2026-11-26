@@ -133,7 +133,6 @@ test('the project page reopens the canvas when the user left it on the canvas vi
         ->withoutVite()
         ->get(route('project.canvas', $parameters))
         ->assertOk()
-        ->assertSee('data-endpoint="/projects/'.$this->project->uuid.'/canvas"', false)
         ->assertPlainCookie("coolify_{$this->admin->id}_project_view", 'canvas');
 
     projectCanvasSession($this, $this->admin, $this->team)

@@ -169,3 +169,55 @@ it('logs without notifying when the CDN responds with a non-success status', fun
     expect(Cache::get(service_templates_cache_key()))->toBeNull();
     Notification::assertNothingSent();
 });
+
+it('takes the service templates of the channel of the running version', function (string $version, ?string $url) {
+    config(['app.env' => 'production', 'constants.coolify.version' => $version]);
+
+    expect(service_templates_cdn_url())->toBe($url);
+})->with([
+    'stable' => ['4.7.5', 'https://cdn.coollabs.io/coolify/service-templates-latest.json'],
+    'beta' => ['4.8.0-beta.1', 'https://cdn.coollabs.io/coolify/preview/service-templates-latest.json'],
+    'release candidate' => ['4.8.0-rc.2', 'https://cdn.coollabs.io/coolify/preview/service-templates-latest.json'],
+    'alpha' => ['4.8.0-alpha.1', 'https://cdn.coollabs.io/coolify/nightly/service-templates-latest.json'],
+    'nightly' => ['4.8.0-alpha.0.20261116.1', 'https://cdn.coollabs.io/coolify/nightly/service-templates-latest.json'],
+    'pull request' => ['4.7.5-pr.12345', null],
+]);
+
+it('uses the service templates of the image in development', function () {
+    config(['app.env' => 'local', 'constants.coolify.version' => '4.7.5']);
+
+    expect(service_templates_cdn_url())->toBeNull();
+});
+
+it('pulls the service templates of the nightly channel on a nightly', function () {
+    $json = json_encode(['buzz' => ['category' => 'messaging', 'compose' => '', 'slogan' => 'Buzz']], JSON_THROW_ON_ERROR);
+    Http::preventStrayRequests();
+    Http::fake(['https://cdn.coollabs.io/coolify/nightly/service-templates-latest.json' => Http::response($json)]);
+    config(['app.env' => 'production', 'constants.coolify.version' => '4.8.0-alpha.0.20261116.1']);
+    $path = service_templates_path();
+    $original = File::get($path);
+
+    try {
+        (new PullTemplatesFromCDN)->handle();
+
+        expect(get_service_templates()->keys()->all())->toBe(['buzz']);
+    } finally {
+        File::put($path, $original);
+    }
+});
+
+it('uses the service templates of the image on a pull request build', function () {
+    Http::preventStrayRequests();
+    config(['app.env' => 'production']);
+    Cache::forever(service_templates_cache_key(), [
+        'fetched_at' => now()->toIso8601String(),
+        'json' => json_encode(['cdn-only' => ['category' => 'other', 'compose' => '']], JSON_THROW_ON_ERROR),
+    ]);
+    config(['constants.coolify.version' => '4.7.5-pr.12345']);
+
+    (new PullTemplatesFromCDN)->handle();
+
+    expect(get_service_templates(force: true))
+        ->has('cdn-only')->toBeFalse()
+        ->has('activepieces')->toBeTrue();
+});

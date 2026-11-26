@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Services\Access\AccessResolver;
 use App\Services\Access\Grant;
+use Carbon\CarbonInterface;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -57,6 +58,9 @@ class ApiTokens extends Component
 
     #[Locked]
     public bool $canUseDeployPermissions = false;
+
+    #[Locked]
+    public bool $canUseTerminalPermissions = false;
 
     #[Locked]
     public bool $canUseSensitivePermissions = false;
@@ -163,6 +167,7 @@ class ApiTokens extends Component
         $this->canUseRootPermissions = auth()->user()->can('useRootPermissions', PersonalAccessToken::class);
         $this->canUseWritePermissions = auth()->user()->can('useWritePermissions', PersonalAccessToken::class);
         $this->canUseDeployPermissions = auth()->user()->can('useDeployPermissions', PersonalAccessToken::class);
+        $this->canUseTerminalPermissions = auth()->user()->can('useTerminalPermissions', PersonalAccessToken::class);
         $this->canUseSensitivePermissions = auth()->user()->can('useSensitivePermissions', PersonalAccessToken::class);
         $this->canUseDeletePermissions = auth()->user()->can('useDeletePermissions', PersonalAccessToken::class);
         $this->canUseTeamScope = app(AccessResolver::class)->coversWholeTeam(auth()->user(), currentTeam()->id);
@@ -195,7 +200,7 @@ class ApiTokens extends Component
 
             $teamId = currentTeam()->id;
             ['permissions' => $permissions, 'scopes' => $storedScopes, 'expiresInDays' => $expiresInDays] = $this->validateTokenForm($this->form, $teamId);
-            $expiresAt = filled($expiresInDays) ? now()->addDays((int) $expiresInDays) : null;
+            $expiresAt = $this->limitTerminalTokenExpiry($permissions, filled($expiresInDays) ? now()->addDays((int) $expiresInDays) : null);
             // One transaction, so a token never exists team-wide when saving its scopes fails.
             $token = DB::transaction(function () use ($permissions, $expiresAt, $teamId, $storedScopes) {
                 $token = auth()->user()->createToken($this->form->description, $permissions, $expiresAt, $teamId);
@@ -245,6 +250,10 @@ class ApiTokens extends Component
                     'api_token_expiration_warning_sent_at' => null,
                 ]);
             }
+            $limitedExpiry = $this->limitTerminalTokenExpiry($permissions, $token->expires_at);
+            if ($limitedExpiry != $token->expires_at) {
+                $token->forceFill(['expires_at' => $limitedExpiry, 'api_token_expiration_warning_sent_at' => null]);
+            }
             $token->save();
 
             auditLog('ui.api_token.updated', [
@@ -279,7 +288,7 @@ class ApiTokens extends Component
             'description' => 'required|min:3|max:255',
             'expiresInDays' => ['nullable', Rule::in($expiryChoices)],
             'permissions' => 'required|array|min:1',
-            'permissions.*' => ['required', 'string', Rule::in(['read', 'read:sensitive', 'write', 'write:sensitive', 'deploy', 'delete', 'root'])],
+            'permissions.*' => ['required', 'string', Rule::in(['read', 'read:sensitive', 'write', 'write:sensitive', 'deploy', 'delete', 'root', 'terminal'])],
             'scopeMode' => ['required', Rule::in(['team', 'selected'])],
             'selectedScopes' => ['exclude_unless:scopeMode,selected', 'required', 'array', 'min:1'],
             'selectedScopes.*' => ['string', 'regex:/^(project|environment|resource|server):[A-Za-z0-9_-]+$/'],
@@ -292,6 +301,14 @@ class ApiTokens extends Component
 
         if (in_array('write:sensitive', $permissions, true) && ! auth()->user()->isAdminOfTeam($teamId)) {
             throw new \Exception('You do not have permission to give tokens write:sensitive permissions.');
+        }
+        if (in_array('terminal', $permissions, true)) {
+            if (! auth()->user()->isAdminOfTeam($teamId)) {
+                throw new \Exception('You do not have permission to give tokens terminal permissions.');
+            }
+            if ($permissions !== ['terminal']) {
+                throw new \Exception('A terminal token must have only the terminal permission.');
+            }
         }
         $levels = AccessLevel::parseMany($permissions);
         $grants = $scopes === null
@@ -306,6 +323,22 @@ class ApiTokens extends Component
             'scopes' => $scopes === null ? null : array_map(fn (Grant $scope) => ['scope' => $scope->scope->value, 'uuid' => $scope->uuid], $scopes),
             'expiresInDays' => $validated['expiresInDays'] ?? null,
         ];
+    }
+
+    /**
+     * Terminal tokens can run commands on servers, so they always expire after at most 90 days.
+     *
+     * @param  list<string>  $permissions
+     */
+    private function limitTerminalTokenExpiry(array $permissions, ?CarbonInterface $expiresAt): ?CarbonInterface
+    {
+        if (! in_array('terminal', $permissions, true)) {
+            return $expiresAt;
+        }
+
+        $maxExpiry = now()->addDays(90);
+
+        return $expiresAt === null || $expiresAt->greaterThan($maxExpiry) ? $maxExpiry : $expiresAt;
     }
 
     private function findOwnToken(int $id): PersonalAccessToken

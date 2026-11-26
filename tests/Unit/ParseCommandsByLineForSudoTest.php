@@ -886,13 +886,13 @@ test('railpack builder helper command gets sudo only outside the helper script',
     );
 });
 
-test('railpack builder bootstrap script gets no sudo inside the helper script', function () {
-    $command = railpackBuilderHelperCommand('$HOME/.docker/buildx', 'coolify-helper:1.0.0', railpackBuilderBootstrapScript().'; docker buildx prune --builder coolify-railpack -af');
+test('railpack builder prune script gets no sudo inside the helper script', function () {
+    $command = railpackBuilderHelperCommand('$HOME/.docker/buildx', 'coolify-helper:1.0.0', railpackBuilderPruneScript());
 
     $parsed = parseCommandsByLineForSudo(collect([$command]), $this->server)[0];
 
     expect($parsed)
         ->toStartWith('sudo docker run --rm ')
-        ->toContain(railpackBuilderBootstrapScript().'; docker buildx prune --builder coolify-railpack -af; status=$?;')
+        ->toContain(railpackBuilderPruneScript().'; status=$?;')
         ->toEndWith("exit \$status' 2>/dev/null || sudo true");
 });

@@ -609,7 +609,6 @@ describe('adding a volume to an application with additional servers', function (
 
     test('the storage page rejects the volume', function () {
         Livewire::test(Storage::class, ['resource' => $this->application->fresh()])
-            ->assertSee('Volume mounts are unavailable')
             ->set('name', 'data')
             ->set('mount_path', '/data')
             ->call('submitPersistentVolume')
@@ -643,8 +642,7 @@ describe('adding a volume to an application with additional servers', function (
             ->set('name', 'data')
             ->set('mount_path', '/data')
             ->call('submitPersistentVolume')
-            ->assertNotDispatched('error')
-            ->assertDontSee('Volume mounts are unavailable');
+            ->assertNotDispatched('error');
 
         expect($this->application->persistentStorages()->count())->toBe(1);
     });

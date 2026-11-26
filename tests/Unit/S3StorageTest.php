@@ -260,15 +260,14 @@ test('S3Storage retries a failed MinIO client upload and waits longer before eac
     Sleep::fake();
     $attempts = 0;
 
-    $result = S3Storage::retryMinioClientUpload(function () use (&$attempts) {
+    S3Storage::retryMinioClientUpload(function () use (&$attempts) {
         if (++$attempts < 3) {
             throw new RuntimeException('dial tcp: connect: network is unreachable', 1);
         }
 
-        return 'uploaded';
-    });
+    }, fn (): bool => false);
 
-    expect($result)->toBe('uploaded')->and($attempts)->toBe(3);
+    expect($attempts)->toBe(3);
     Sleep::assertSequence([Sleep::for(10)->seconds(), Sleep::for(30)->seconds()]);
 });
 
@@ -282,7 +281,7 @@ test('S3Storage stops retrying a MinIO client upload after three attempts', func
         throw new RuntimeException('Access Denied.', 1);
     };
 
-    expect(fn () => S3Storage::retryMinioClientUpload($upload))->toThrow(RuntimeException::class, 'Access Denied.');
+    expect(fn () => S3Storage::retryMinioClientUpload($upload, fn (): bool => false))->toThrow(RuntimeException::class, 'Access Denied.');
     expect($attempts)->toBe(3);
 });
 
@@ -296,9 +295,38 @@ test('S3Storage does not retry a MinIO client upload that timed out', function (
         throw new RuntimeException('The command on the server timed out after 3600 seconds.', 124);
     };
 
-    expect(fn () => S3Storage::retryMinioClientUpload($upload))->toThrow(RuntimeException::class, 'timed out');
+    expect(fn () => S3Storage::retryMinioClientUpload($upload, fn (): bool => false))->toThrow(RuntimeException::class, 'timed out');
     expect($attempts)->toBe(1);
     Sleep::assertNeverSlept();
+});
+
+test('S3Storage uploads again at once with Content-MD5 when an Object Lock bucket requires a checksum', function () {
+    Sleep::fake();
+    $checksumOptions = [];
+
+    S3Storage::retryMinioClientUpload(function (string $checksumOption) use (&$checksumOptions) {
+        $checksumOptions[] = $checksumOption;
+        if ($checksumOption === '') {
+            throw new RuntimeException('mc: <ERROR> Failed to copy `/backup.dmp`. Content-MD5 or x-amz-checksum-* HTTP header is required for Put Part requests with Object Lock parameters', 1);
+        }
+    }, fn (): bool => false);
+
+    expect($checksumOptions)->toBe(['', ' --checksum=MD5']);
+    Sleep::assertNeverSlept();
+});
+
+test('S3Storage does not add a checksum to a MinIO client upload that fails for another reason', function () {
+    Sleep::fake();
+    $checksumOptions = [];
+
+    $upload = function (string $checksumOption) use (&$checksumOptions) {
+        $checksumOptions[] = $checksumOption;
+
+        throw new RuntimeException('Access Denied.', 1);
+    };
+
+    expect(fn () => S3Storage::retryMinioClientUpload($upload, fn (): bool => false))->toThrow(RuntimeException::class, 'Access Denied.');
+    expect($checksumOptions)->toBe(['', '', '']);
 });
 
 test('S3Storage sizes MinIO client upload parts for at most 1000 parts', function (int $fileSize, int $partSize) {
@@ -335,4 +363,55 @@ test('storages of the other types never use the S3 curl transfer, also with a pa
     'WebDAV' => ['webdav', 'https://cloud.example.com/remote.php/dav/files/user/backups'],
     'SFTP' => ['sftp', 'sftp://backup.example.com:22/backups'],
     'FTPS' => ['ftps', 'ftps://backup.example.com:21/backups'],
+]);
+
+test('S3Storage treats a failed MinIO client upload as done when the complete object is in the bucket', function () {
+    Sleep::fake();
+    $attempts = 0;
+
+    S3Storage::retryMinioClientUpload(function () use (&$attempts) {
+        $attempts++;
+
+        throw new RuntimeException('Unable to copy `/data/backup.dmp`. This multipart completion is already in progress', 1);
+    }, fn (): bool => true);
+
+    expect($attempts)->toBe(1);
+    Sleep::assertNeverSlept();
+});
+
+test('S3Storage checks the bucket again before it uploads a failed MinIO client upload again', function () {
+    Sleep::fake();
+    $attempts = 0;
+    $checks = 0;
+
+    S3Storage::retryMinioClientUpload(function () use (&$attempts) {
+        $attempts++;
+
+        throw new RuntimeException('Error response code SlowDown.', 1);
+    }, function () use (&$checks): bool {
+        return ++$checks === 2;
+    });
+
+    expect($attempts)->toBe(1)->and($checks)->toBe(2);
+    Sleep::assertSequence([Sleep::for(10)->seconds()]);
+});
+
+test('S3Storage treats a timed out MinIO client upload as done when the complete object is in the bucket', function () {
+    Sleep::fake();
+
+    S3Storage::retryMinioClientUpload(function () {
+        throw new RuntimeException('The command on the server timed out after 3600 seconds.', 124);
+    }, fn (): bool => true);
+
+    Sleep::assertNeverSlept();
+});
+
+test('S3Storage accepts only a MinIO client stat of one object with the expected size', function (string $output, bool $expected) {
+    expect(S3Storage::minioClientStatHasSize($output, 12345))->toBe($expected);
+})->with([
+    'same size' => ['{"status":"success","name":"f.dmp","size":12345,"type":"file"}'."\n", true],
+    'other size' => ['{"status":"success","name":"f.dmp","size":12000,"type":"file"}', false],
+    'missing object' => ['{"status":"error","error":{"message":"Object does not exist"}}', false],
+    'folder' => ['{"status":"success","name":"f.dmp/","size":12345,"type":"folder"}', false],
+    'no output' => ['', false],
 ]);

@@ -9,7 +9,7 @@
 
 services:
   calcom:
-    image: calcom.docker.scarf.sh/calcom/cal.com
+    image: calcom.docker.scarf.sh/calcom/cal.com:v6.2.0
     platform: linux/amd64
     environment:
       # Some variables still uses Calcom previous name, Calendso

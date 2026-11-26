@@ -254,3 +254,30 @@ YAML);
     'read-only' => ['ro', true],
     'read-write' => ['rw', false],
 ]);
+
+it('keeps a long-form bind with is_directory false as a file', function (string $kind, string $key) {
+    $result = parseLongBind($kind, longBindCompose('./config/prometheus.yml', "        {$key}: false"));
+
+    expect($result['storages'])->toHaveCount(1)
+        ->and($result['storages']->first()->is_directory)->toBeFalse()
+        ->and($result['storages']->first()->content)->toBeNull();
+})->with(['service', 'application'])->with(['is_directory', 'isDirectory']);
+
+it('treats a long-form bind without is_directory or content as a directory', function (string $kind) {
+    $result = parseLongBind($kind, longBindCompose('./data', LONG_BIND_READ_ONLY_OPTIONS));
+
+    expect($result['storages']->first()->is_directory)->toBeTrue();
+})->with(['service', 'application']);
+
+it('keeps the stored type of an existing bind storage when the Compose file sets is_directory false', function (string $kind) {
+    $first = parseLongBind($kind, longBindCompose('./config/prometheus.yml', LONG_BIND_READ_ONLY_OPTIONS));
+    $storage = $first['storages']->first();
+    expect($storage->is_directory)->toBeTrue();
+
+    $owner = $storage->resource;
+    $resource = $kind === 'service' ? $owner->service : $owner;
+    $resource->update(['docker_compose_raw' => longBindCompose('./config/prometheus.yml', '        is_directory: false')]);
+    $kind === 'service' ? serviceParser($resource->fresh()) : applicationParser($resource->fresh());
+
+    expect($storage->fresh()->is_directory)->toBeTrue();
+})->with(['service', 'application']);

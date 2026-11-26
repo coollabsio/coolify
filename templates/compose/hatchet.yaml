@@ -7,7 +7,7 @@
 
 services:
   hatchet-dashboard:
-    image: ghcr.io/hatchet-dev/hatchet/hatchet-dashboard:latest
+    image: ghcr.io/hatchet-dev/hatchet/hatchet-dashboard:v0.120.6
     command: sh ./entrypoint.sh --config /hatchet/config
     environment:
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/${POSTGRES_DB:-hatchet}
@@ -28,7 +28,7 @@ services:
       - hatchet-config:/hatchet/config
 
   hatchet-engine:
-    image: ghcr.io/hatchet-dev/hatchet/hatchet-engine:latest
+    image: ghcr.io/hatchet-dev/hatchet/hatchet-engine:v0.120.6
     command: /hatchet/hatchet-engine --config /hatchet/config
     restart: on-failure
     depends_on:
@@ -80,7 +80,7 @@ services:
       - rabbitmq-data:/var/lib/rabbitmq/
 
   migration:
-    image: ghcr.io/hatchet-dev/hatchet/hatchet-migrate:latest
+    image: ghcr.io/hatchet-dev/hatchet/hatchet-migrate:v0.120.6
     command: /hatchet/hatchet-migrate
     restart: no
     exclude_from_hc: true
@@ -91,7 +91,7 @@ services:
         condition: service_healthy
 
   setup-config:
-    image: ghcr.io/hatchet-dev/hatchet/hatchet-admin:latest
+    image: ghcr.io/hatchet-dev/hatchet/hatchet-admin:v0.120.6
     command: /hatchet/hatchet-admin quickstart --skip certs --generated-config-dir /hatchet/config --overwrite=false
     restart: no
     environment:
@@ -103,7 +103,7 @@ services:
       - SERVER_GRPC_INSECURE=${SERVER_GRPC_INSECURE:-t}
       - SERVER_GRPC_BROADCAST_ADDRESS=${SERVER_GRPC_BROADCAST_ADDRESS:-localhost:7077}
       - SERVER_DEFAULT_ENGINE_VERSION=V1
-      - SERVER_INTERNAL_CLIENT_INTERNAL_GRPC_BROADCAST_ADDRESS=${SERVER_INTERNAL_CLIENT_INTERNAL_GRPC_BROADCAST_ADDRESS:-hatchet-engine:7077}
+      - SERVER_INTERNAL_CLIENT_INTERNAL_GRPC_BROADCAST_ADDRESS=${SERVER_INTERNAL_CLIENT_INTERNAL_GRPC_BROADCAST_ADDRESS:-hatchet-engine:7070}
     volumes:
       - hatchet-certs:/hatchet/certs
       - hatchet-config:/hatchet/config

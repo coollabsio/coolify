@@ -153,6 +153,7 @@ class UpdateCoolify
         // Runs inline so the update waits for the result. dispatchSync() would go through the job's
         // WithoutOverlapping middleware, which silently drops the run while the scheduled backup is running.
         $job = new DatabaseBackupJob($backup);
+        $job->beforeUpdate = true;
         $job->handle();
         if ($job->backup_log?->status !== 'success') {
             $reason = $job->backup_log?->message;

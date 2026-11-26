@@ -32,6 +32,13 @@ trait HasDatabaseHealthCheck
         ];
     }
 
+    public function healthCheckPortArguments(?string $configuration, string $option = '-p'): array
+    {
+        preg_match_all('/^\s*port\s*[=:\s]\s*["\']?(\d+)/mi', (string) $configuration, $ports);
+
+        return $ports[1] === [] ? [] : [$option, end($ports[1])];
+    }
+
     protected function healthCheckConfigurationHash(): string
     {
         return implode('|', [

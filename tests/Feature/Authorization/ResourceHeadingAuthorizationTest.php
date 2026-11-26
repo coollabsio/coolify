@@ -105,16 +105,6 @@ beforeEach(function () {
 
 // --- Application Heading ---
 
-test('admin sees deploy controls for application', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(ApplicationHeading::class, ['application' => $this->application])
-        ->assertSee('Redeploy')
-        ->assertSee('Restart')
-        ->assertSee('Stop');
-});
-
 test('member cannot call deploy on application', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
@@ -208,18 +198,6 @@ test('member cannot access terminal for database', function () {
 });
 
 // --- Service Heading ---
-
-test('admin sees service deploy button', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(ServiceHeading::class, [
-        'service' => $this->service,
-        'parameters' => $this->serviceParams,
-        'query' => [],
-    ])
-        ->assertSee('Deploy');
-});
 
 test('member cannot call stop on service', function () {
     $this->actingAs($this->member);

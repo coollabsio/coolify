@@ -58,6 +58,9 @@ class SharedEnvironmentVariable extends Model
             if ($sharedVariable->exists && $sharedVariable->getOriginal('is_shown_once')) {
                 $sharedVariable->is_shown_once = true;
             }
+            if ($sharedVariable->isDirty('value')) {
+                ValidationPatterns::rejectNulByteInEnvironmentVariableValue($sharedVariable->value);
+            }
         });
     }
 

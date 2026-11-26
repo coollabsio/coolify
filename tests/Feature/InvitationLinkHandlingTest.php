@@ -277,3 +277,21 @@ it('rejects a malformed magic link token', function () {
 
     $this->assertGuest();
 });
+
+it('lets a user who must reset the password log out from the reset page', function () {
+    [, $user] = createInvitationLinkFixture();
+    $this->withMiddleware(CheckForcePasswordReset::class);
+
+    $this->actingAs($user)
+        ->get('/dashboard')
+        ->assertRedirect(route('auth.force-password-reset'));
+
+    $this->get(route('auth.force-password-reset'))
+        ->assertSuccessful()
+        ->assertSee('action="'.url('/logout').'"', false);
+
+    $this->post('/logout')->assertRedirect();
+    $this->assertGuest();
+
+    $this->get(route('login'))->assertSuccessful();
+});

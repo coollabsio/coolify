@@ -278,6 +278,7 @@ function notifyChatPayloads(object $notification): array
         'slack' => json_encode(get_object_vars($notification->toSlack())),
         'telegram' => json_encode($notification->toTelegram()),
         'pushover' => json_encode($notification->toPushover()->toPayload('token', 'user')),
+        'ntfy' => json_encode($notification->toNtfy()->toPayload('topic')),
         'webhook' => json_encode($notification->toWebhook()),
     ];
 }
@@ -1081,12 +1082,14 @@ describe('content', function () {
         $telegram = $digest->toTelegram()['message'];
         $slack = $digest->toSlack()->description;
         $pushover = $digest->toPushover()->toPayload('token', 'user')['message'];
+        $ntfy = $digest->toNtfy()->toPayload('topic')['message'];
 
         expect(mb_strlen($discord))->toBeLessThanOrEqual(4096)->toBeGreaterThan(3000)
             ->and(mb_strlen($telegram))->toBeLessThanOrEqual(4096)->toBeGreaterThan(3000)
             ->and(mb_strlen($slack))->toBeLessThanOrEqual(3000)->toBeGreaterThan(2000)
-            ->and(mb_strlen($pushover))->toBeLessThanOrEqual(1024);
-        foreach ([$discord, $telegram, $slack, $pushover] as $text) {
+            ->and(mb_strlen($pushover))->toBeLessThanOrEqual(1024)
+            ->and(strlen($ntfy))->toBeLessThanOrEqual(4096);
+        foreach ([$discord, $telegram, $slack, $pushover, $ntfy] as $text) {
             expect($text)->toMatch('/And \d+ more\./');
         }
         expect(count($digest->toWebhook()['resources']))->toBe(60);
@@ -1105,6 +1108,7 @@ describe('content', function () {
         $mail = (string) $notification->toMail($this->team)->render();
 
         expect(mb_strlen($notification->toPushover()->toPayload('token', 'user')['message']))->toBeLessThanOrEqual(1024)
+            ->and(strlen($notification->toNtfy()->toPayload('topic')['message']))->toBeLessThanOrEqual(4096)
             ->and(mb_strlen($notification->toDiscord()->toPayload()['embeds'][0]['description']))->toBeLessThanOrEqual(4096)
             ->and($mail)->toContain('CVE-2026-0002')
             ->and($mail)->toContain('2 problems that attackers are using');

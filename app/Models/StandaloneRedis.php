@@ -145,7 +145,7 @@ class StandaloneRedis extends BaseModel
     {
         return Attribute::make(
             get: function () {
-                return $this->destination->server->isFunctional();
+                return $this->destination?->server?->isFunctional() ?? false;
             }
         );
     }

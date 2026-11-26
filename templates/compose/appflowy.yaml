@@ -7,7 +7,7 @@
 
 services:
   nginx:
-    image: nginx:1.29.2
+    image: nginx:1.31.8
     environment:
       - SERVICE_URL_ADMIN
     volumes:
@@ -43,6 +43,9 @@ services:
                   set $appflowy_cloud_backend "http://appflowy_cloud:8000";
                   set $gotrue_backend "http://gotrue:9999";
                   set $admin_frontend_backend "http://admin_frontend:3000";
+                  set $minio_api_backend "http://minio:9000";
+                  # Host name for minio, used internally within docker compose
+                  set $minio_internal_host "minio:9000";
                   # GoTrue Authentication Service
                   location /gotrue/ {
                       proxy_pass $gotrue_backend;
@@ -115,6 +118,28 @@ services:
                       }
                   }
 
+                  # Used for presigned URLs, which must be reachable by the AppFlowy client application
+                  location /minio-api/ {
+                      proxy_pass $minio_api_backend;
+
+                      # Set the host to the internal host because the presigned URL was signed against it
+                      proxy_set_header Host $minio_internal_host;
+                      proxy_set_header X-Real-IP $remote_addr;
+                      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                      proxy_set_header X-Forwarded-Proto $scheme;
+
+                      rewrite ^/minio-api/(.*) /$1 break;
+
+                      proxy_connect_timeout 300s;
+                      proxy_read_timeout 600s;
+                      proxy_send_timeout 600s;
+                      proxy_request_buffering off;
+                      proxy_http_version 1.1;
+                      proxy_set_header Connection "";
+                      chunked_transfer_encoding off;
+                      client_max_body_size 0;
+                  }
+
                   # Admin Frontend
                   # Optional Module, comment this section if you did not deploy admin_frontend in docker-compose.yml
                   location /console {
@@ -167,15 +192,17 @@ services:
       - APPFLOWY_BASE_URL=${SERVICE_URL_ADMIN}
       - APPFLOWY_GOTRUE_BASE_URL=${SERVICE_URL_ADMIN}/gotrue
       - APPFLOWY_WS_BASE_URL=${SERVICE_URL_ADMIN}/ws/v2
-    image: appflowyinc/appflowy_web:0.9.132
+    image: appflowyinc/appflowy_web:0.20.14
     depends_on:
-      - appflowy_cloud
+      appflowy_cloud:
+        condition: service_healthy
 
   appflowy_cloud:
-    image: appflowyinc/appflowy_cloud:0.9.149
+    image: appflowyinc/appflowy_cloud:0.21.7
     environment:
       - RUST_LOG=${RUST_LOG:-info}
-      - APPFLOWY_BASE_URL=${SERVICE_URL_ADMIN}
+      # AppFlowy Cloud refuses to start when the base URL does not use HTTPS
+      - APPFLOWY_BASE_URL=https://${SERVICE_FQDN_ADMIN}
       - APPFLOWY_ENVIRONMENT=production
       - APPFLOWY_DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-appflowy}
       - APPFLOWY_REDIS_URI=redis://redis:6379
@@ -188,6 +215,7 @@ services:
       - APPFLOWY_S3_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
       - APPFLOWY_S3_BUCKET=${APPFLOWY_S3_BUCKET:-appflowy}
       - APPFLOWY_S3_REGION=${APPFLOWY_S3_REGION:-us-east-1}
+      - APPFLOWY_S3_PRESIGNED_URL_ENDPOINT=https://${SERVICE_FQDN_ADMIN}/minio-api
       - APPFLOWY_MAILER_SMTP_HOST=${APPFLOWY_MAILER_SMTP_HOST:-smtp.gmail.com}
       - APPFLOWY_MAILER_SMTP_PORT=${APPFLOWY_MAILER_SMTP_PORT:-587}
       - APPFLOWY_MAILER_SMTP_USERNAME=${APPFLOWY_MAILER_SMTP_USERNAME:-notify@appflowy.io}
@@ -200,6 +228,15 @@ services:
       - AI_SERVER_PORT=5001
       - AI_OPENAI_API_KEY=${AI_OPENAI_API_KEY:-}
       - APPFLOWY_WEB_URL=${SERVICE_URL_APPFLOWYWEB}
+      - ASSEMBLYAI_API_KEY=${ASSEMBLYAI_API_KEY:-}
+      - ASSEMBLYAI_API_BASE=${ASSEMBLYAI_API_BASE:-https://api.assemblyai.com/v2}
+      - ASSEMBLYAI_STREAMING_API_BASE=${ASSEMBLYAI_STREAMING_API_BASE:-https://streaming.assemblyai.com/v3}
+      - APPFLOWY_SEARCH_SERVICE_URL=http://appflowy_search:4002
+      - APPFLOWY_SEARCH_REQUEST_TIMEOUT_SECS=${APPFLOWY_SEARCH_REQUEST_TIMEOUT_SECS:-10}
+      - AI_ENABLED=${AI_ENABLED:-true}
+      # SIGNUP_WHITELIST_ENABLED=true requires GOTRUE_DISABLE_SIGNUP=false on the gotrue service
+      - SIGNUP_WHITELIST_ENABLED=${SIGNUP_WHITELIST_ENABLED:-false}
+      - GUEST_INVITES_REQUIRE_ADMIN_APPROVAL=${GUEST_INVITES_REQUIRE_ADMIN_APPROVAL:-false}
     healthcheck:
       test: "curl --fail http://127.0.0.1:8000/api/health || exit 1"
       interval: 5s
@@ -215,7 +252,7 @@ services:
         condition: service_started
 
   gotrue:
-    image: appflowyinc/gotrue:0.9.149
+    image: appflowyinc/gotrue:0.20.6
     environment:
       - GOTRUE_API_HOST=0.0.0.0
       - GOTRUE_API_PORT=9999
@@ -229,6 +266,8 @@ services:
       - GOTRUE_CORS_ALLOWED_HEADERS=redirect_to
       - GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - GOTRUE_JWT_EXP=${GOTRUE_JWT_EXP:-7200}
+      # Without this, the createuser command creates an admin with the `admin` role instead of `supabase_admin`
+      - GOTRUE_JWT_ADMIN_GROUP_NAME=supabase_admin
       - GOTRUE_DB_DRIVER=postgres
       - API_EXTERNAL_URL=${SERVICE_URL_ADMIN}/gotrue
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-appflowy}?search_path=auth
@@ -236,10 +275,10 @@ services:
       - GOTRUE_SMTP_PORT=${GOTRUE_SMTP_PORT:-587}
       - GOTRUE_SMTP_USER=${GOTRUE_SMTP_USER}
       - GOTRUE_SMTP_PASS=${GOTRUE_SMTP_PASS}
-      - GOTRUE_MAILER_URLPATHS_CONFIRMATION=/verify
-      - GOTRUE_MAILER_URLPATHS_INVITE=/verify
-      - GOTRUE_MAILER_URLPATHS_RECOVERY=/verify
-      - GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE=/verify
+      - GOTRUE_MAILER_URLPATHS_CONFIRMATION=/gotrue/verify
+      - GOTRUE_MAILER_URLPATHS_INVITE=/gotrue/verify
+      - GOTRUE_MAILER_URLPATHS_RECOVERY=/gotrue/verify
+      - GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE=/gotrue/verify
       - GOTRUE_SMTP_ADMIN_EMAIL=${GOTRUE_SMTP_ADMIN_EMAIL}
       - GOTRUE_SMTP_MAX_FREQUENCY=1ns
       - GOTRUE_RATE_LIMIT_EMAIL_SENT=100
@@ -252,9 +291,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
+      start_period: 40s
 
   admin_frontend:
-    image: appflowyinc/admin_frontend:0.9.149
+    image: appflowyinc/admin_frontend:0.20.3
     environment:
       - APPFLOWY_GOTRUE_BASE_URL=${SERVICE_URL_ADMIN}/gotrue
       - APPFLOWY_BASE_URL=${SERVICE_URL_ADMIN}
@@ -262,10 +302,10 @@ services:
       gotrue:
         condition: service_healthy
       appflowy_cloud:
-        condition: service_started
+        condition: service_healthy
 
   ai:
-    image: appflowyinc/appflowy_ai:0.9.149
+    image: appflowyinc/appflowy_ai:0.21.7
     environment:
       - OPENAI_API_KEY=${AI_OPENAI_API_KEY:-}
       - AI_SERVER_PORT=5001
@@ -285,12 +325,20 @@ services:
       - AI_REDIS_URL=redis://redis:6379
       - AI_USE_MINIO=true
       - AI_MINIO_URL=http://minio:9000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     depends_on:
       postgres:
         condition: service_healthy
+      appflowy_cloud:
+        condition: service_healthy
 
   appflowy_worker:
-    image: appflowyinc/appflowy_worker:0.9.149
+    image: appflowyinc/appflowy_worker:0.21.7
     environment:
       - RUST_LOG=info
       - APPFLOWY_ENVIRONMENT=production
@@ -316,6 +364,56 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      appflowy_cloud:
+        condition: service_healthy
+
+  appflowy_search:
+    image: appflowyinc/appflowy_search:0.21.7
+    environment:
+      - RUST_LOG=${RUST_LOG:-info}
+      - APPFLOWY_SEARCH_HOST=[::]
+      - APPFLOWY_SEARCH_PORT=4002
+      - APPFLOWY_SEARCH_DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-appflowy}
+      - APPFLOWY_SEARCH_REDIS_URL=redis://redis:6379
+      - AI_OPENAI_API_KEY=${AI_OPENAI_API_KEY:-}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION}
+      - APPFLOWY_S3_USE_MINIO=true
+      - APPFLOWY_S3_MINIO_URL=http://minio:9000
+      - APPFLOWY_S3_ACCESS_KEY=${SERVICE_USER_MINIO}
+      - APPFLOWY_S3_SECRET_KEY=${SERVICE_PASSWORD_MINIO}
+      - APPFLOWY_S3_BUCKET=${APPFLOWY_S3_BUCKET:-appflowy}
+      - APPFLOWY_S3_REGION=${APPFLOWY_S3_REGION:-us-east-1}
+      - APPFLOWY_BACKGROUND_INDEXER_ENABLED=true
+      - APPFLOWY_INDEXER_DATABASE_ENABLED=${APPFLOWY_INDEXER_DATABASE_ENABLED:-false}
+      - APPFLOWY_KEYWORD_SEARCH_ENABLED=${APPFLOWY_KEYWORD_SEARCH_ENABLED:-true}
+      - APPFLOWY_KEYWORD_WORKER_ENABLED=true
+      - APPFLOWY_KEYWORD_INDEX_MAP_SIZE_BYTES=${APPFLOWY_KEYWORD_INDEX_MAP_SIZE_BYTES:-2147483648}
+      - APPFLOWY_KEYWORD_INDEX_DIR=/var/lib/appflowy/keyword_index
+      - APPFLOWY_GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+    volumes:
+      - keyword_index_data:/var/lib/appflowy/keyword_index
+    healthcheck:
+      # The image has no curl or wget, so use the /dev/tcp support of bash
+      test:
+        - CMD
+        - bash
+        - -ec
+        - |
+          exec 3<>/dev/tcp/127.0.0.1/4002
+          printf 'GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3
+          read -r _ status _ <&3
+          [ "$$status" = 200 ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      appflowy_cloud:
+        condition: service_healthy
 
   minio:
     image: pgsty/silo:RELEASE.2026-10-15T00-00-00Z
@@ -333,7 +431,7 @@ services:
       - minio_data:/data
 
   postgres:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:0.8.7-pg16
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_DB=${POSTGRES_DB:-appflowy}
@@ -349,7 +447,7 @@ services:
       retries: 12
 
   redis:
-    image: redis:8.2.2-alpine3.22
+    image: redis:8.4.8-alpine3.22
     volumes:
       - "redis_data:/data"
     healthcheck:

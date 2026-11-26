@@ -35,7 +35,7 @@ beforeEach(function () {
 
     $compose = "services:\n  app:\n    image: nginx:2\n";
     Cache::flush();
-    Cache::forever('coolify:service-templates-bundle', [
+    Cache::forever(service_templates_cache_key(), [
         'fetched_at' => now()->toIso8601String(),
         'json' => json_encode(['demo' => ['compose' => base64_encode($compose), 'envs' => base64_encode('NEWKEY=hi')]]),
     ]);
@@ -253,7 +253,7 @@ it('refuses to apply hunks once the template changed after render', function () 
     $component = Livewire::test(TemplateUpdate::class, ['service' => $service])
         ->set('acceptedHunks', [0 => true]);
 
-    Cache::forever('coolify:service-templates-bundle', [
+    Cache::forever(service_templates_cache_key(), [
         'fetched_at' => now()->addMinute()->toIso8601String(),
         'json' => json_encode(['demo' => ['compose' => base64_encode("services:\n  app:\n    image: nginx:3\n")]]),
     ]);

@@ -761,7 +761,7 @@ class PreviewDomains extends Component
                 }
 
                 $serviceName = (string) $serviceName;
-                if (str_ends_with($serviceName, $previewSuffix)) {
+                if ($this->preview->application->renamesPreviewComposeServices() && str_ends_with($serviceName, $previewSuffix)) {
                     $serviceName = substr($serviceName, 0, -strlen($previewSuffix));
                 }
                 $serviceNames[] = $serviceName;

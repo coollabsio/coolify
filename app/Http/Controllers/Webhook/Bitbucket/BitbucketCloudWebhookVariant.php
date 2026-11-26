@@ -53,31 +53,24 @@ class BitbucketCloudWebhookVariant implements BitbucketWebhookVariant
         $repositoryIdentifiers = BitbucketRepositoryIdentifiers::fromPayload($payload);
 
         if ($rawEvent === 'repo:push') {
-            // A deleted branch has no "new" state, so no branch is found.
-            $branch = $this->webhookString(data_get($payload, 'push.changes.0.new.name'));
-            $commit = $this->webhookCommitSha($payload, 'push.changes.0.new.target.hash');
-            // Bitbucket webhooks ship up to 5 commits per change. Larger pushes
-            // are evaluated only on the visible 5.
+            // A push of several branches sends one change for each branch. A
+            // deleted branch has no "new" state and is ignored. Bitbucket sends
+            // up to 5 commits for each change, so a larger push is checked for
+            // [skip ci] / [skip cd] only on the 5 commits that it sends.
             $changes = data_get($payload, 'push.changes');
-            $skipDeployCommits = self::shouldSkipDeploy(
-                collect(is_array($changes) ? $changes : [])
-                    ->flatMap(fn (mixed $change): array => $this->webhookPushCommitMessages($change))
-                    ->values()
-                    ->all()
-            );
-
-            if ($branch === null) {
-                return null;
+            $pushedBranches = [];
+            foreach (is_array($changes) ? $changes : [] as $index => $change) {
+                $branch = $this->webhookString(data_get($change, 'new.name'));
+                if ($branch === null || isset($pushedBranches[$branch])) {
+                    continue;
+                }
+                $pushedBranches[$branch] = [
+                    'commit' => $this->webhookCommitSha($payload, "push.changes.{$index}.new.target.hash"),
+                    'skip_deploy' => self::shouldSkipDeploy($this->webhookPushCommitMessages($change)),
+                ];
             }
 
-            return new BitbucketWebhookContext(
-                rawEvent: $rawEvent,
-                action: 'push',
-                branch: $branch,
-                repositoryIdentifiers: $repositoryIdentifiers,
-                commit: $commit,
-                skipDeployCommits: $skipDeployCommits,
-            );
+            return BitbucketWebhookContext::push($rawEvent, $repositoryIdentifiers, $pushedBranches);
         }
 
         if (in_array($rawEvent, ['pullrequest:created', 'pullrequest:updated', 'pullrequest:rejected', 'pullrequest:fulfilled'], true)) {

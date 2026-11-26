@@ -4,6 +4,7 @@
 # tags: go,html,monitoring,sqlite,self,hosted,status,page,htmx,smtp,slack
 # logo: svgs/statusnook.svg
 # port: 8000
+# outdated: true
 
 services:
   statusnook:

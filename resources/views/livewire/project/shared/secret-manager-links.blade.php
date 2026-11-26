@@ -141,5 +141,29 @@
                 @endif
             @endcan
         @endif
+
+        @if ($otherSources->isNotEmpty())
+            <div class="mt-6 flex flex-col gap-2">
+                <div class="text-[13px] font-medium text-black dark:text-fg">Named sources</div>
+                <div class="divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-white/[0.07] dark:border-white/[0.08]">
+                    @foreach ($otherSources as $source)
+                        <div wire:key="secret-source-{{ $source->uuid }}"
+                            class="flex flex-wrap items-center justify-between gap-3 px-3 py-2">
+                            <div class="flex min-w-0 flex-col">
+                                <span class="font-mono text-[12px] text-black dark:text-fg">{{ $source->sourceName() }}</span>
+                                <span class="text-[12px] text-neutral-500 dark:text-fg-dim">
+                                    {{ $source->integrationToken->providerName() }} &middot; {{ $source->integrationToken->name }}
+                                </span>
+                            </div>
+                            <span class="font-mono text-[11px] text-neutral-400 dark:text-fg-dim">{{ $source->referenceFor('KEY') }}</span>
+                        </div>
+                    @endforeach
+                </div>
+                <p class="text-[11px] text-neutral-500 dark:text-fg-dim">
+                    Reference a key of a named source with <span class="font-mono">{{ '{{vault.<source>.KEY}'.'}' }}</span>.
+                    Manage these sources in <span class="font-mono">coolify.json</span> or through the API.
+                </p>
+            </div>
+        @endif
     </x-application.settings-section>
 </div>

@@ -104,7 +104,7 @@ it('quotes the container name, the database name, and the backup paths in the ba
         ->not->toContain("docker exec {$database->uuid} ");
 });
 
-it('quotes the backup file in the mount of the S3 upload container', function () {
+it('mounts the backup file in the S3 upload container with --mount, which fails instead of creating a directory', function () {
     $storage = S3Storage::create([
         'name' => 'Destination',
         'region' => 'us-east-1',
@@ -132,9 +132,22 @@ it('quotes the backup file in the mount of the S3 upload container', function ()
 
     $file = ScheduledDatabaseBackupExecution::query()->sole()->filename;
     expect($this->commands->first(fn (string $command) => str_contains($command, 'docker run -d')))
-        ->toContain(' -v '.escapeshellarg("{$file}:{$file}:ro").' ')
-        ->not->toContain(" -v {$file}:");
+        ->toContain(' --mount '.escapeshellarg("type=bind,source={$file},target={$file},readonly").' ')
+        ->not->toContain("{$file}:{$file}:ro");
 });
+
+it('dumps Supabase images over 127.0.0.1, because their socket refuses users other than postgres and supabase_admin', function (bool $dumpAll) {
+    $database = create_standalone_postgresql($this->environment->id, $this->destination, ['status' => 'running:healthy', 'postgres_user' => 'app'], 'supabase/postgres:17.11.0.018');
+    $official = create_standalone_postgresql($this->environment->id, $this->destination, ['status' => 'running:healthy']);
+
+    (new DatabaseBackupJob(backupQuotingSchedule($database, $this->team, ['dump_all' => $dumpAll])))->handle();
+    (new DatabaseBackupJob(backupQuotingSchedule($official, $this->team, ['dump_all' => $dumpAll])))->handle();
+
+    $dumps = $this->commands->filter(fn (string $command) => str_contains($command, 'pg_dump'))->values();
+    expect($dumps)->toHaveCount(2)
+        ->and($dumps[0])->toContain('-e PGHOST=')->toContain('127.0.0.1')->toContain($database->uuid)
+        ->and($dumps[1])->not->toContain('PGHOST')->toContain($official->uuid);
+})->with(['one database' => [false], 'all databases' => [true]]);
 
 it('backs up a service database with a supported container name', function () {
     $service = backupQuotingService($this->server, $this->destination, $this->environment);

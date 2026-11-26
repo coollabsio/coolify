@@ -60,6 +60,20 @@ it('parses a digest reference without a tag', function () use ($imageRefDigest) 
         ->and((string) $ref)->toBe("ghcr.io/a/b@{$imageRefDigest}");
 });
 
+it('reads a tag and digest reference by its digest, as Docker does', function (string $input, string $registry, string $repository, string $short) use ($imageRefDigest) {
+    $ref = ImageRef::parse("{$input}@{$imageRefDigest}");
+
+    expect($ref->registry)->toBe($registry)
+        ->and($ref->repository)->toBe($repository)
+        ->and($ref->tag)->toBeNull()
+        ->and($ref->digest)->toBe($imageRefDigest)
+        ->and((string) $ref)->toBe("{$short}@{$imageRefDigest}");
+})->with([
+    'official image' => ['redis:7-alpine', 'docker.io', 'library/redis', 'redis'],
+    'registry with a port' => ['localhost:5000/team/app:1.2', 'localhost:5000', 'team/app', 'localhost:5000/team/app'],
+    'registry with a port, no tag' => ['localhost:5000/team/app', 'localhost:5000', 'team/app', 'localhost:5000/team/app'],
+]);
+
 it('refuses references that are not valid image names', function (string $input) {
     ImageRef::parse($input);
 })->with([
@@ -71,7 +85,8 @@ it('refuses references that are not valid image names', function (string $input)
     'empty tag' => 'nginx:',
     'digest without hash' => 'nginx@sha256',
     'uppercase digest' => 'nginx@sha256:'.str_repeat('AB', 32),
-    'tag and digest' => 'nginx:1@sha256:'.str_repeat('ab', 32),
+    'bad tag before digest' => 'nginx:$(id)@sha256:'.str_repeat('ab', 32),
+    'empty tag before digest' => 'nginx:@sha256:'.str_repeat('ab', 32),
     'empty' => '',
 ])->throws(InvalidArgumentException::class);
 
@@ -84,6 +99,24 @@ it('replaces the tag and drops the digest', function () use ($imageRefDigest) {
 
     ImageRef::parse('postgres')->withTag('bad tag');
 })->throws(InvalidArgumentException::class);
+
+it('maps a GitLab dependency proxy reference to its Docker Hub image', function (string $input, string $upstream) {
+    expect((string) ImageRef::parse($input)->dockerHubUpstream())->toBe($upstream);
+})->with([
+    'official image' => ['gitlab.example.com/group/dependency_proxy/containers/redis:7.4', 'redis:7.4'],
+    'official image with library' => ['gitlab.example.com/group/dependency_proxy/containers/library/redis:7.4', 'redis:7.4'],
+    'namespaced image' => ['gitlab.example.com/group/dependency_proxy/containers/temporalio/server:1.30.9', 'temporalio/server:1.30.9'],
+    'subgroup and port' => ['gitlab.example.com:443/group/sub/dependency_proxy/containers/postgres', 'postgres'],
+]);
+
+it('has no Docker Hub upstream for other references', function (string $input) {
+    expect(ImageRef::parse($input)->dockerHubUpstream())->toBeNull();
+})->with([
+    'Docker Hub' => 'redis:7.4',
+    'other registry' => 'ghcr.io/acme/api:1.0',
+    'GitLab registry' => 'gitlab.example.com:5050/group/api:1.0',
+    'proxy path without image' => 'gitlab.example.com/group/dependency_proxy/other/redis',
+]);
 
 it('validates tags and digests', function () use ($imageRefDigest) {
     expect(ImageRef::isValidTag('15.0-alpine'))->toBeTrue()

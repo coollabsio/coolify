@@ -7,7 +7,7 @@
 
 services:
   libreoffice:
-    image: lscr.io/linuxserver/libreoffice:latest
+    image: lscr.io/linuxserver/libreoffice:25.8.7
     environment:
       - SERVICE_URL_LIBREOFFICE_3000
       - PUID=${PUID:-1000}

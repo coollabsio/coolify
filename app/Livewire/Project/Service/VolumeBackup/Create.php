@@ -25,6 +25,8 @@ class Create extends Component
 
     public string $frequency = 'daily';
 
+    public ?string $existingBackupUrl = null;
+
     public Collection $targets;
 
     protected function rules(): array
@@ -52,7 +54,7 @@ class Create extends Component
 
     public function submit(): void
     {
-        $this->authorize('update', $this->service);
+        $this->authorize('manageBackups', $this->service);
         $this->validate();
         $target = $this->selectedTarget();
 
@@ -137,8 +139,15 @@ class Create extends Component
     private function loadSelectedBackup(): void
     {
         $backup = $this->selectedTarget()?->scheduledBackups()->first();
+        $this->existingBackupUrl = null;
         if ($backup) {
             $this->frequency = $backup->frequency;
+            $this->existingBackupUrl = route('project.service.volume-backups.index', [
+                'project_uuid' => $this->service->project()->uuid,
+                'environment_uuid' => $this->service->environment->uuid,
+                'service_uuid' => $this->service->uuid,
+                'backup_uuid' => $backup->uuid,
+            ]);
         }
     }
 

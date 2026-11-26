@@ -7,7 +7,7 @@
 
 services:
   browserless:
-    image: ghcr.io/browserless/chromium
+    image: ghcr.io/browserless/chromium:v2.63.1
     environment:
       - SERVICE_URL_BROWSERLESS_3000
       - TOKEN=$SERVICE_PASSWORD_BROWSERLESS

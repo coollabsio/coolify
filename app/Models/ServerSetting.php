@@ -6,6 +6,7 @@ use App\Enums\LogDrainType;
 use App\Enums\ServerRole;
 use App\Enums\TrafficIpMode;
 use App\Helpers\SshMultiplexingHelper;
+use App\Jobs\RefreshImageScanSummariesJob;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -43,6 +44,8 @@ use OpenApi\Attributes as OA;
         'log_archive_max_total_mb' => ['type' => 'integer'],
         'log_archive_retention_days' => ['type' => 'integer'],
         'traefik_certificate_resolver' => ['type' => 'string', 'nullable' => true, 'description' => 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'],
+        'public_ipv4' => ['type' => 'string', 'nullable' => true, 'description' => 'Public IPv4 address that DNS records of resources on this server point to. Null uses the server IP.'],
+        'public_ipv6' => ['type' => 'string', 'nullable' => true, 'description' => 'Public IPv6 address that DNS records of resources on this server point to. Null uses the server IP.'],
         'is_reachable' => ['type' => 'boolean'],
         'ssh_host_key' => ['type' => 'string', 'nullable' => true, 'description' => 'Pinned SSH host key(s) of the server, one "type base64" line per key.'],
         'ssh_host_key_source' => ['type' => 'string', 'nullable' => true, 'enum' => ['tofu', 'upgrade', 'transfer', 'manual']],
@@ -53,6 +56,7 @@ use OpenApi\Attributes as OA;
         'ssh_host_key_fingerprints' => ['type' => 'array', 'items' => ['type' => 'string'], 'readOnly' => true, 'description' => 'SHA256 fingerprints of the pinned host keys, as `ssh-keygen -lf` shows them.'],
         'ssh_host_key_pending_fingerprints' => ['type' => 'array', 'items' => ['type' => 'string'], 'readOnly' => true, 'description' => 'SHA256 fingerprints of the host key that did not match.'],
         'is_sentinel_enabled' => ['type' => 'boolean'],
+        'is_sentinel_pull_enabled' => ['type' => 'boolean', 'description' => 'Coolify reads Sentinel reports over SSH instead of Sentinel pushing them.'],
         'is_swarm_manager' => ['type' => 'boolean'],
         'is_swarm_worker' => ['type' => 'boolean'],
         'is_terminal_enabled' => ['type' => 'boolean'],
@@ -127,15 +131,24 @@ class ServerSetting extends Model
     /** @var list<float> */
     public const array IMAGE_SCAN_CPU_OPTIONS = [0.5, 1.0, 2.0, 4.0];
 
+    /** Days between two rescans of the running images. 0: only deployments and manual scans scan images. */
+    public const int DEFAULT_IMAGE_RESCAN_DAYS = 1;
+
+    /** @var list<int> */
+    public const array IMAGE_RESCAN_DAYS_OPTIONS = [1, 3, 7, 14, 30, 0];
+
     protected $fillable = [
         'server_id',
         'is_image_scan_enabled',
         'image_scan_memory_mb',
+        'public_ipv4',
+        'public_ipv6',
         'image_candidate_scans_today',
         'image_candidate_scans_date',
         'image_scan_syft_timeout',
         'image_scan_grype_timeout',
         'image_scan_cpus',
+        'image_rescan_days',
         'is_swarm_manager',
         'is_jump_server',
         'is_build_server',
@@ -167,6 +180,7 @@ class ServerSetting extends Model
         'sentinel_metrics_history_days',
         'sentinel_push_interval_seconds',
         'sentinel_custom_url',
+        'is_sentinel_pull_enabled',
         'server_disk_usage_notification_threshold',
         'is_sentinel_debug_enabled',
         'is_container_log_archive_enabled',
@@ -211,12 +225,14 @@ class ServerSetting extends Model
      */
     protected $attributes = [
         'is_traffic_analytics_enabled' => false,
+        'is_sentinel_pull_enabled' => false,
         'is_image_scan_enabled' => false,
         'image_scan_memory_mb' => self::DEFAULT_IMAGE_SCAN_MEMORY_MB,
         'image_candidate_scans_today' => 0,
         'image_scan_syft_timeout' => self::DEFAULT_IMAGE_SCAN_TIMEOUT_SECONDS,
         'image_scan_grype_timeout' => self::DEFAULT_IMAGE_SCAN_TIMEOUT_SECONDS,
         'image_scan_cpus' => self::DEFAULT_IMAGE_SCAN_CPUS,
+        'image_rescan_days' => self::DEFAULT_IMAGE_RESCAN_DAYS,
     ];
 
     protected $casts = [
@@ -224,9 +240,11 @@ class ServerSetting extends Model
         'image_scan_syft_timeout' => 'integer',
         'image_scan_grype_timeout' => 'integer',
         'image_scan_cpus' => 'float',
+        'image_rescan_days' => 'integer',
         'force_docker_cleanup' => 'boolean',
         'docker_cleanup_threshold' => 'integer',
         'sentinel_token' => 'encrypted',
+        'is_sentinel_pull_enabled' => 'boolean',
         'is_reachable' => 'boolean',
         'is_usable' => 'boolean',
         'is_build_server' => 'boolean',
@@ -304,9 +322,14 @@ class ServerSetting extends Model
             if ($settings->wasChanged('ssh_host_key') && $settings->server) {
                 SshMultiplexingHelper::deleteStaleKnownHostsFiles($settings->server->uuid, $settings->ssh_host_key);
             }
+            // The stored security statuses mark a result stale by the rescan days of its server.
+            if ($settings->wasChanged('image_rescan_days') && $settings->server) {
+                RefreshImageScanSummariesJob::dispatch((int) $settings->server->team_id, (int) $settings->server->id);
+            }
             if (
                 $settings->wasChanged('sentinel_token') ||
                 $settings->wasChanged('sentinel_custom_url') ||
+                $settings->wasChanged('is_sentinel_pull_enabled') ||
                 $settings->wasChanged('is_metrics_enabled') ||
                 $settings->wasChanged('is_sentinel_debug_enabled') ||
                 $settings->wasChanged('is_container_log_archive_enabled') ||
@@ -529,6 +552,16 @@ class ServerSetting extends Model
     public function server()
     {
         return $this->belongsTo(Server::class);
+    }
+
+    protected function publicIpv4(): Attribute
+    {
+        return Attribute::make(set: fn (?string $value): ?string => filled($value) ? normalizeIpAddress($value) : null);
+    }
+
+    protected function publicIpv6(): Attribute
+    {
+        return Attribute::make(set: fn (?string $value): ?string => filled($value) ? normalizeIpAddress($value) : null);
     }
 
     public function dockerCleanupFrequency(): Attribute

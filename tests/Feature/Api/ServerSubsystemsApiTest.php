@@ -242,7 +242,7 @@ describe('Log drains API', function () {
 
     test('PATCH lets a write and deploy token enable the custom log drain with its saved config', function () {
         Queue::fake();
-        $this->server->settings->update(['logdrain_config' => ['custom' => ['config' => "[OUTPUT]\n    Name stdout"]]]);
+        $this->server->settings->update(['logdrain_config' => ['custom' => ['config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout"]]]);
         $deployToken = $this->user->createToken('server-subsystems-deploy', ['write', 'deploy'])->plainTextToken;
 
         $this->withHeaders([
@@ -251,7 +251,7 @@ describe('Log drains API', function () {
         ])
             ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
                 'is_logdrain_custom_enabled' => true,
-                'logdrain_custom_config' => "[OUTPUT]\n    Name stdout",
+                'logdrain_custom_config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout",
             ])
             ->assertOk();
 
@@ -267,11 +267,11 @@ describe('Log drains API', function () {
             'Accept' => 'application/json',
         ])
             ->patchJson("/api/v1/servers/{$this->server->uuid}/log-drains", [
-                'logdrain_custom_config' => "[OUTPUT]\n    Name stdout",
+                'logdrain_custom_config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout",
             ])
             ->assertOk();
 
-        expect($this->server->settings->fresh()->logDrainConfig(LogDrainType::Custom)['config'])->toBe("[OUTPUT]\n    Name stdout");
+        expect($this->server->settings->fresh()->logDrainConfig(LogDrainType::Custom)['config'])->toBe("[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout");
     });
 
     test('PATCH enables the Amazon CloudWatch Logs drain', function () {
@@ -430,6 +430,32 @@ describe('Sentinel API', function () {
         expect(Queue::pushed(JobDecorator::class, fn (JobDecorator $job): bool => $job->getAction() instanceof StartSentinel))
             ->toHaveCount(1);
     })->with(['anonymized', 'off']);
+
+    test('PATCH turns on Sentinel pull mode and restarts Sentinel', function () {
+        Queue::fake();
+
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/sentinel", [
+                'is_sentinel_pull_enabled' => true,
+            ])
+            ->assertOk()
+            ->assertJsonPath('is_sentinel_pull_enabled', true);
+
+        expect($this->server->settings->fresh()->is_sentinel_pull_enabled)->toBeTrue();
+        expect(Queue::pushed(JobDecorator::class, fn (JobDecorator $job): bool => $job->getAction() instanceof StartSentinel))
+            ->toHaveCount(1);
+    });
+
+    test('PATCH rejects a pull mode that is not a boolean', function () {
+        $this->withHeaders(serverSubsystemsHeaders())
+            ->patchJson("/api/v1/servers/{$this->server->uuid}/sentinel", [
+                'is_sentinel_pull_enabled' => 'sometimes',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('is_sentinel_pull_enabled');
+
+        expect($this->server->settings->fresh()->is_sentinel_pull_enabled)->toBeFalse();
+    });
 
     test('PATCH rejects an unknown client IP mode', function () {
         $this->withHeaders(serverSubsystemsHeaders())

@@ -83,7 +83,7 @@ class ContainerFilesystemService
     public function list(string $path): array
     {
         try {
-            $raw = instant_remote_process([$this->buildListCommand($path)], $this->server);
+            $raw = instant_remote_process([remoteCommandWithTimeout($this->buildListCommand($path), 30)], $this->server, timeout: 45);
         } catch (\RuntimeException $e) {
             if ($this->useHelper || in_array($e->getCode(), [126, 127], true)) {
                 throw new ContainerShellUnavailableException($e->getMessage(), (int) $e->getCode(), $e);
@@ -118,8 +118,9 @@ class ContainerFilesystemService
             .'echo OK; base64 -- '.$escaped.' || exit 1';
 
         $raw = (string) instant_remote_process(
-            [$this->dockerExecShell($cmd)],
+            [remoteCommandWithTimeout($this->dockerExecShell($cmd), 30)],
             $this->server,
+            timeout: 45,
         );
 
         $newline = strpos($raw, "\n");
@@ -254,9 +255,10 @@ class ContainerFilesystemService
     {
         $escapedContainer = escapeshellarg($this->container);
         $workingDir = instant_remote_process(
-            ["docker inspect --format '{{.Config.WorkingDir}}' {$escapedContainer}"],
+            [remoteCommandWithTimeout("docker inspect --format '{{.Config.WorkingDir}}' {$escapedContainer}", 30)],
             $this->server,
             throwError: false,
+            timeout: 45,
         );
 
         $workingDir = trim((string) $workingDir);

@@ -43,6 +43,10 @@ class Show extends Component
 
     public ?string $wildcardDomain = null;
 
+    public ?string $publicIpv4 = null;
+
+    public ?string $publicIpv6 = null;
+
     public bool $isReachable;
 
     public bool $isUsable;
@@ -160,6 +164,8 @@ class Show extends Component
             'connectionTimeout' => 'required|integer|min:1|max:300',
             'validationLogs' => 'nullable',
             'wildcardDomain' => 'nullable|url',
+            'publicIpv4' => 'nullable|ipv4',
+            'publicIpv6' => 'nullable|ipv6',
             'isReachable' => 'required',
             'isUsable' => 'required',
             'isSwarmManager' => 'required',
@@ -191,6 +197,8 @@ class Show extends Component
                 'connectionTimeout.min' => 'The SSH Connection Timeout must be at least 1 second.',
                 'connectionTimeout.max' => 'The SSH Connection Timeout must not exceed 300 seconds.',
                 'wildcardDomain.url' => 'The Wildcard Domain must be a valid URL.',
+                'publicIpv4.ipv4' => 'The Public IPv4 must be a valid IPv4 address.',
+                'publicIpv6.ipv6' => 'The Public IPv6 must be a valid IPv6 address.',
                 'sentinelToken.required' => 'The Sentinel Token field is required.',
                 'sentinelMetricsRefreshRateSeconds.required' => 'The Metrics Refresh Rate field is required.',
                 'sentinelMetricsRefreshRateSeconds.integer' => 'The Metrics Refresh Rate must be an integer.',
@@ -269,6 +277,10 @@ class Show extends Component
 
             $this->server->settings->connection_timeout = $this->connectionTimeout;
             $this->server->settings->wildcard_domain = $this->wildcardDomain;
+            if (! $this->server->isLocalhost()) {
+                $this->server->settings->public_ipv4 = $this->publicIpv4;
+                $this->server->settings->public_ipv6 = $this->publicIpv6;
+            }
             // The role is only changed through requestServerRoleChange()/confirmServerRoleChange().
             $this->serverRole = $this->server->settings->effectiveServerRole()->value;
             $this->server->settings->is_metrics_enabled = $this->isMetricsEnabled;
@@ -298,6 +310,8 @@ class Show extends Component
             $this->connectionTimeout = $this->server->settings->connection_timeout;
 
             $this->wildcardDomain = $this->server->settings->wildcard_domain;
+            $this->publicIpv4 = $this->server->settings->public_ipv4;
+            $this->publicIpv6 = $this->server->settings->public_ipv6;
             $this->isReachable = $this->server->settings->is_reachable;
             $this->isUsable = $this->server->settings->is_usable;
             $this->isSwarmManager = $this->server->settings->is_swarm_manager;

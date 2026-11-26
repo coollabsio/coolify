@@ -251,3 +251,133 @@ it('leaves a new preview copy empty when previews do not use production values',
         ->and(childPreviewRow($app, 'TOKEN')->is_production_value_copy)->toBeFalse()
         ->and($this->adapter->read($app, $this->ctx)['env'])->toBe(['TOKEN' => ['value' => 'secret']]);
 });
+
+it('writes several named secret manager sources and removes the ones the file drops', function () {
+    IntegrationToken::factory()->create(['team_id' => $this->fx['team']->id, 'provider' => 'doppler', 'name' => 'doppler-prod', 'capabilities' => ['secrets']]);
+    IntegrationToken::factory()->create(['team_id' => $this->fx['team']->id, 'provider' => 'doppler', 'name' => 'doppler-urls', 'capabilities' => ['secrets']]);
+    $list = [
+        ['name' => 'urls', 'token' => 'doppler-urls', 'settings' => ['project' => 'urls', 'config' => 'prd']],
+        ['name' => 'default', 'token' => 'doppler-prod'],
+    ];
+
+    $app = childWrite(['secret_manager' => $list]);
+
+    expect($this->adapter->read($app, $this->ctx)['secret_manager'])->toBe([
+        ['name' => 'default', 'token' => 'doppler-prod'],
+        ['name' => 'urls', 'token' => 'doppler-urls', 'settings' => ['config' => 'prd', 'project' => 'urls']],
+    ])
+        ->and($this->adapter->read($app, $this->ctx))->toEqual($this->adapter->canonical('api', childWriteDesired(['secret_manager' => $list])))
+        ->and($app->secretManagerLinks()->orderBy('name')->pluck('name')->all())->toBe(['default', 'urls']);
+
+    $app = childWrite(['secret_manager' => ['token' => 'doppler-prod']]);
+
+    expect($this->adapter->read($app, $this->ctx)['secret_manager'])->toBe(['token' => 'doppler-prod'])
+        ->and($app->secretManagerLinks()->pluck('name')->all())->toBe(['default']);
+});
+
+it('keeps the object form for a list with only the default source', function () {
+    IntegrationToken::factory()->create(['team_id' => $this->fx['team']->id, 'provider' => 'doppler', 'name' => 'doppler-prod', 'capabilities' => ['secrets']]);
+
+    $app = childWrite(['secret_manager' => [['name' => 'default', 'token' => 'doppler-prod']]]);
+
+    expect($this->adapter->read($app, $this->ctx)['secret_manager'])->toBe(['token' => 'doppler-prod']);
+});
+
+it('writes a reference to a named secret manager source and reads it back', function () {
+    $app = childWrite(['env' => ['API_URL' => ['ref' => 'vault.urls.API_URL']]]);
+
+    expect(childWriteValue($app, 'API_URL'))->toBe('{{vault.urls.API_URL}}')
+        ->and($this->adapter->read($app, $this->ctx)['env']['API_URL'])->toBe(['ref' => 'vault.urls.API_URL']);
+});
+
+it('rejects a list of secret manager sources with invalid or duplicate names and foreign tokens', function () {
+    IntegrationToken::factory()->create(['team_id' => $this->fx['team']->id, 'provider' => 'doppler', 'name' => 'doppler-prod', 'capabilities' => ['secrets']]);
+    $other = projectConfigFixture();
+    IntegrationToken::factory()->create(['team_id' => $other['team']->id, 'provider' => 'doppler', 'name' => 'foreign', 'capabilities' => ['secrets']]);
+
+    $errors = $this->adapter->validate('api', childWriteDesired([
+        'secret_manager' => [
+            ['name' => 'urls', 'token' => 'doppler-prod'],
+            ['name' => 'urls', 'token' => 'doppler-prod'],
+            ['name' => 'Bad.Name', 'token' => 'doppler-prod'],
+            ['token' => 'doppler-prod'],
+            ['name' => 'other', 'token' => 'foreign'],
+        ],
+    ]), $this->ctx);
+
+    expect(array_map(fn ($e) => $e->path, $errors))->toBe([
+        'resources.api.secret_manager.1.name',
+        'resources.api.secret_manager.2.name',
+        'resources.api.secret_manager.3.name',
+        'resources.api.secret_manager.4.token',
+    ]);
+});
+
+it('rejects a vault reference to a source that the file does not link', function () {
+    IntegrationToken::factory()->create(['team_id' => $this->fx['team']->id, 'provider' => 'doppler', 'name' => 'doppler-prod', 'capabilities' => ['secrets']]);
+
+    $errors = $this->adapter->validate('api', childWriteDesired([
+        'secret_manager' => [['name' => 'urls', 'token' => 'doppler-prod']],
+        'env' => [
+            'API_URL' => ['ref' => 'vault.urls.API_URL'],
+            'BROKEN' => ['ref' => 'vault.nope.X'],
+            'APP_KEY' => ['ref' => 'vault.APP_KEY'],
+        ],
+    ]), $this->ctx);
+
+    expect(array_map(fn ($e) => $e->path, $errors))->toBe(['resources.api.env.BROKEN.ref', 'resources.api.env.APP_KEY.ref']);
+});
+
+it('rejects vault references in values that read a source the file does not link or that are malformed', function () {
+    IntegrationToken::factory()->create(['team_id' => $this->fx['team']->id, 'provider' => 'doppler', 'name' => 'doppler-prod', 'capabilities' => ['secrets']]);
+
+    $errors = $this->adapter->validate('api', childWriteDesired([
+        'secret_manager' => [['name' => 'urls', 'token' => 'doppler-prod']],
+        'env' => [
+            'OK' => ['value' => 'https://{{vault.urls.HOST}}/api'],
+            'MISSING' => ['value' => 'x-{{vault.nope.X}}'],
+            'UPPER' => ['value' => '{{vault.URLS.HOST}}'],
+            'PREVIEW' => ['value' => 'a', 'preview' => ['value' => '{{vault.nope.Y}}']],
+        ],
+    ]), $this->ctx);
+
+    expect(array_map(fn ($e) => $e->path, $errors))->toBe([
+        'resources.api.env.MISSING.value',
+        'resources.api.env.UPPER.value',
+        'resources.api.env.PREVIEW.preview.value',
+    ]);
+});
+
+it('rejects vault references in service and database values that read a source the file does not link', function (string $type, array $desired) {
+    $errors = app(AdapterRegistry::class)->for($type)->validate('res', [
+        ...$desired,
+        'type' => $type,
+        'server' => 'prod-1',
+        'env' => ['URL' => ['value' => '{{vault.urls.URL}}'], 'KEY' => ['value' => '{{vault.KEY}}']],
+    ], $this->ctx);
+
+    expect(array_map(fn ($e) => $e->path, $errors))->toBe(['resources.res.env.URL.value']);
+})->with([
+    'service' => ['service', ['compose' => "services:\n  web:\n    image: 'nginx:alpine'\n"]],
+    'database' => ['postgresql', []],
+]);
+
+it('writes the IP allowlist, rejects an invalid one, and keeps build secrets on for a new application', function () {
+    expect($this->application->fresh()->settings->use_build_secrets)->toBeTrue();
+
+    $app = childWrite(['ip_allowlist' => '10.0.0.0/8, 192.168.1.10']);
+    expect($app->ip_allowlist)->toBe('10.0.0.0/8,192.168.1.10')
+        ->and($this->adapter->read($app, $this->ctx)['ip_allowlist'])->toBe($this->adapter->canonical('api', childWriteDesired(['ip_allowlist' => '10.0.0.0/8, 192.168.1.10']))['ip_allowlist']);
+
+    $errors = $this->adapter->validate('api', childWriteDesired(['ip_allowlist' => 'not-an-ip']), $this->ctx);
+    expect(array_map(fn ($e) => $e->path, $errors))->toBe(['resources.api.ip_allowlist']);
+});
+
+it('reads back secret manager settings with empty values as the file has them', function () {
+    IntegrationToken::factory()->create(['team_id' => $this->fx['team']->id, 'provider' => 'doppler', 'name' => 'doppler-prod', 'capabilities' => ['secrets']]);
+    $desired = childWriteDesired(['secret_manager' => ['token' => 'doppler-prod', 'settings' => ['project' => 'api', 'config' => '']]]);
+
+    $app = childWrite($desired);
+
+    expect($this->adapter->read($app, $this->ctx)['secret_manager'])->toBe($this->adapter->canonical('api', $desired)['secret_manager']);
+});

@@ -72,12 +72,13 @@
                     <x-forms.input canGate="update" :canResource="$resource" id="healthCheckPath"
                         placeholder="/health" label="Path" required />
                     <x-forms.input canGate="update" :canResource="$resource" type="number"
-                        id="healthCheckReturnCode" placeholder="200" label="Expected code" required />
+                        id="healthCheckReturnCode" placeholder="200"
+                        helper="Any 2xx or 3xx response always passes. Set a 4xx or 5xx code (for example 401) to also pass that response." label="Expected code" required />
                 </div>
                 <div class="mt-4">
                     <x-forms.input canGate="update" :canResource="$resource" id="healthCheckResponseText"
                         placeholder="OK" label="Expected response text"
-                        helper="Leave empty when the response body does not need to contain specific text." />
+                        helper="The response body must contain this text. Leave empty to check only the response code. A HEAD response has no body, so HEAD does not check the text." />
                 </div>
             </x-application.settings-subsection>
         </div>

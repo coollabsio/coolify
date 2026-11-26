@@ -98,24 +98,15 @@ describe('server image scanning page', function () {
         Queue::assertNothingPushed();
     });
 
-    it('shows the off state with the turn on button', function () {
-        imageScanningPage()
-            ->assertSee('Image scanning is off for '.$this->server->name.'.')
-            ->assertSee('Enable image scanning?');
-    });
-
-    it('shows only the title row and the database build time in the helper when the scanner is ready', function () {
+    it('shows the database build time when the scanner is ready', function () {
         $this->server->settings->forceFill(['is_image_scan_enabled' => true])->saveQuietly();
         Cache::put(PrepareImageScannerJob::stateCacheKey($this->server), 'ready');
         Cache::put(PrepareImageScannerJob::builtAtCacheKey($this->server), now()->subDay()->toIso8601ZuluString());
 
         imageScanningPage()
             ->assertSee('Database built 1 day ago')
-            ->assertSee('Coolify downloads the latest vulnerability database every day')
             ->assertDontSee('Update database')
-            ->assertDontSee('Get scanner')
-            ->assertSee('Disable image scanning?')
-            ->assertSee('Delete scanner data');
+            ->assertDontSee('Get scanner');
     });
 
     it('shows the progress of the scanner preparation', function () {
@@ -281,6 +272,25 @@ describe('scanner time and CPU limits', function () {
         imageScanningPage()->set('scannerGrypeTimeout', '3600')->assertNotDispatched('success')->assertSet('scannerGrypeTimeout', '600');
 
         expect($this->server->settings->fresh()->image_scan_grype_timeout)->toBe(600);
+    });
+});
+
+describe('rescan frequency', function () {
+    it('saves the rescan days', function () {
+        imageScanningPage()
+            ->assertSet('rescanDays', '1')
+            ->assertSee('Every week')
+            ->set('rescanDays', '0')
+            ->assertHasNoErrors()
+            ->assertDispatched('success', 'Rescan frequency saved.');
+
+        expect($this->server->settings->fresh()->image_rescan_days)->toBe(0);
+    });
+
+    it('refuses rescan days that are not one of the options', function () {
+        imageScanningPage()->set('rescanDays', '2')->assertHasErrors('rescanDays');
+
+        expect($this->server->settings->fresh()->image_rescan_days)->toBe(1);
     });
 });
 

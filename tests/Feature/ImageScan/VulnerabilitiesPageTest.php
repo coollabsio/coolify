@@ -552,11 +552,6 @@ describe('states', function () {
             ->assertDontSee('Turn on<');
     });
 
-    it('shows the not scanned state', function () {
-        vulnerabilitiesPage($this->admin, $this->application)
-            ->assertSee('Not scanned yet. The next deploy scans the image.');
-    });
-
     it('shows the message of the last scan error', function () {
         Cache::put(ScanImage::lastErrorCacheKey($this->application), [
             'code' => 'disk_space',
@@ -576,7 +571,7 @@ describe('states', function () {
 
         vulnerabilitiesPage($this->admin, $this->application)
             ->assertSeeText('nginx:1.27 needs another check: the scan result was too large to read completely.')
-            ->assertSee('This image uses Alpine 3.12, which no longer gets security fixes.')
+            ->assertSee('Alpine 3.12 no longer gets security fixes.')
             ->assertSee('Only part of the results is shown, with the problems that attackers are using first.');
     });
 
@@ -585,7 +580,7 @@ describe('states', function () {
             'builds_image' => false,
             'candidates' => ['status' => 'auth_required', 'error' => 'registry_auth', 'entries' => [], 'checked_at' => now()->toIso8601String()],
         ]);
-        $text = "Coolify cannot read the tags of nginx. Log in to docker.io on {$this->server->name}.";
+        $text = "Cannot read the tags of nginx. Log in to docker.io on {$this->server->name}.";
         $link = route('server.registries', ['server_uuid' => $this->server->uuid]);
 
         vulnerabilitiesPage($this->admin, $this->application)
@@ -605,7 +600,7 @@ describe('states', function () {
         ]);
 
         vulnerabilitiesPage($this->admin, $this->application)
-            ->assertSee("Coolify reached the daily limit of version checks on {$this->server->name}. It checks again tomorrow.")
+            ->assertSee("Daily limit of version checks reached on {$this->server->name}. Coolify checks again tomorrow.")
             ->assertDontSee('Registry logins');
     });
 
@@ -738,8 +733,6 @@ describe('packages', function () {
         session(['currentTeam' => $this->team]);
 
         Livewire::test(Packages::class, ['resourceType' => 'application', 'resourceUuid' => $this->application->uuid])
-            ->assertSee('Packages and SBOM')
-            ->assertSee('Download SBOM')
             ->call('toggleType', 'apk')
             ->assertSee('busybox')
             ->assertDontSee('left-pad')

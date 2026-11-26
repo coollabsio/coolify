@@ -110,7 +110,7 @@ final class ImageStartPin
             return trim($ref);
         }
 
-        return $image->qualifiedName().':'.($image->tag ?? 'latest');
+        return $image->qualifiedName().($image->digest !== null ? '@'.$image->digest : ':'.($image->tag ?? 'latest'));
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\ImageScan;
 
+use App\Enums\AccessLevel;
 use App\Enums\ImageScanGateMode;
 use App\Enums\ImageScanOnError;
 use App\Jobs\RefreshImageScanSummariesJob;
@@ -301,7 +302,7 @@ class ScanSettings extends Component
     {
         match (true) {
             $scope === null => abort_unless(isInstanceAdmin(), 403),
-            $scope instanceof Team => abort_unless(auth()->user()->isAdminOfTeam($scope->id), 403),
+            $scope instanceof Team => abort_unless($this->canEditTeam($scope), 403),
             default => $this->authorize('update', $scope),
         };
     }
@@ -310,9 +311,17 @@ class ScanSettings extends Component
     {
         return match (true) {
             $scope === null => isInstanceAdmin(),
-            $scope instanceof Team => auth()->user()->isAdminOfTeam($scope->id),
+            $scope instanceof Team => $this->canEditTeam($scope),
             default => auth()->user()->can('update', $scope),
         };
+    }
+
+    /**
+     * Team scan settings apply to every resource of the team, so they need team-wide write.
+     */
+    private function canEditTeam(Team $team): bool
+    {
+        return app(AccessResolver::class)->allowsTeamWide(auth()->user(), AccessLevel::Write, $team->id);
     }
 
     private function audit(?Model $scope, string $field): void

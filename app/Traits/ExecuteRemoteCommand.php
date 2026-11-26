@@ -110,21 +110,22 @@ trait ExecuteRemoteCommand
             $lastError = null;
             $commandExecuted = false;
 
-            while ($attempt < $maxRetries && ! $commandExecuted) {
+            while (! $commandExecuted) {
                 try {
                     $this->executeCommandWithProcess($command, $hidden, $customType, $append, $ignore_errors, $command_hidden, $skip_command_log, $input);
                     $commandExecuted = true;
                 } catch (\RuntimeException|DeploymentException $e) {
                     $lastError = $e;
                     $errorMessage = $e->getMessage();
+                    $attemptLimit = $this->sshAttemptLimit($e, $maxRetries);
                     // Only retry if it's an SSH connection error and we haven't exhausted retries
-                    if ($this->isRetryableSshFailure($e) && $attempt < $maxRetries - 1) {
+                    if ($this->isRetryableSshFailure($e) && $attempt < $attemptLimit - 1) {
                         $attempt++;
                         $delay = $this->calculateRetryDelay($attempt - 1);
 
                         // Add log entry for the retry
                         if (isset($this->application_deployment_queue)) {
-                            $this->addRetryLogEntry($attempt, $maxRetries, $delay, $errorMessage);
+                            $this->addRetryLogEntry($attempt, $attemptLimit, $delay, $errorMessage);
 
                             // Check for cancellation during retry wait
                             if (! $skip_cancellation_check) {
@@ -154,6 +155,7 @@ trait ExecuteRemoteCommand
                         ->where('status', '!=', ApplicationDeploymentStatus::FINISHED->value)
                         ->update([
                             'status' => ApplicationDeploymentStatus::FAILED->value,
+                            'finished_at' => now(),
                         ]);
                 }
                 throw $lastError;
@@ -254,6 +256,8 @@ trait ExecuteRemoteCommand
                 // This prevents premature status changes during retryable SSH errors
                 $error = $process_result->errorOutput();
                 if (empty($error)) {
+                    // A silent exit 255 can be a refused SSH handshake or the remote command itself (a PHP fatal error in a
+                    // pre-deployment command), so it must not look like a retryable SSH error: a retry would run the command again.
                     $error = $process_result->output() ?: 'Command failed with no error output';
                 }
                 throw new DeploymentException($this->commandFailureMessage((string) $command, (int) $process_result->exitCode(), (string) $error, $skip_command_log), (int) $process_result->exitCode());
@@ -276,7 +280,21 @@ trait ExecuteRemoteCommand
 
         $error = $this->redact_sensitive_info($error);
 
-        return "Command execution failed (exit code {$exitCode}): {$commandText}\nError: {$error}".$this->dockerNetworkGatewayHint($error).$this->sshConnectionLostHint($exitCode);
+        return "Command execution failed (exit code {$exitCode}): {$commandText}\nError: {$error}".$this->dockerNetworkGatewayHint($error).$this->registryLoginHint($error).$this->sshConnectionLostHint($exitCode);
+    }
+
+    /**
+     * A registry that refuses a pull or push gives only a generic Docker error, which does not tell on which server
+     * the login is missing. With a build server or a Coolify host that is not the deployment server, users often log
+     * in on the wrong server, or as another user than the SSH user.
+     */
+    private function registryLoginHint(string $error): string
+    {
+        if (! preg_match('~pull access denied|requested access to the resource is denied|no basic auth credentials|unauthorized: authentication required|/v2/[^"\s]*": (?:unauthorized|denied)~i', $error)) {
+            return '';
+        }
+
+        return "\nThe registry refused access to the image. Deployments use the Docker registry logins of the SSH user ({$this->server->user}) on the server {$this->server->name}. Log in to the registry on the Registries page of this server, then deploy again. If a 'docker pull' of the image on the server also fails, the token cannot read the image: check its scopes.";
     }
 
     /**

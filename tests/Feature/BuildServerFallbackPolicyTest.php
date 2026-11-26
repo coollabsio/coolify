@@ -287,6 +287,22 @@ test('deployments-only servers do not need a build server when nothing is built'
         ->and(usesRemoteBuildServer($job))->toBeFalse();
 })->with(['dockerimage', 'dockercompose']);
 
+test('build packs without build server support ignore a build server setting left from another build pack', function (string $buildPack) {
+    $team = Team::factory()->create(['is_build_server_fallback_enabled' => false]);
+    $deploymentServer = makeRoleServer($team, 'both');
+    makeRoleServer($team, 'build');
+    [$job, $deploymentQueue] = makeBuildServerSelectionJob($team, $deploymentServer, ['build_pack' => $buildPack], buildServerEnabled: true);
+
+    $deploymentQueue->shouldNotReceive('addLogEntry');
+    $deploymentQueue->shouldNotReceive('update');
+
+    invokeBuildServerSelection($job);
+
+    expect(selectedBuildServer($job)->is($deploymentServer))->toBeTrue()
+        ->and(usesRemoteBuildServer($job))->toBeFalse()
+        ->and((new ReflectionProperty(ApplicationDeploymentJob::class, 'application'))->getValue($job)->buildServerCandidates($deploymentServer))->toBeEmpty();
+})->with(['dockerimage', 'dockercompose']);
+
 test('applications on combined servers build locally unless they use a build server', function () {
     $team = Team::factory()->create(['is_build_server_fallback_enabled' => false]);
     $deploymentServer = makeRoleServer($team, 'both');

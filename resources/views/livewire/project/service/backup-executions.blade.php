@@ -12,10 +12,11 @@
         <x-modal-input title="Backup execution" wireOpen="executionModalOpen" :wireIgnore="false" isLarge>
             <x-slot:content><span></span></x-slot:content>
             <div class="flex flex-col gap-5">
-                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                     <div><p class="text-xs text-neutral-500 dark:text-fg-dim">Target</p><p class="mt-1 text-sm font-medium">{{ $selectedExecution['target'] }}</p></div>
                     <div><p class="text-xs text-neutral-500 dark:text-fg-dim">Status</p><p class="mt-1 text-sm font-medium">{{ str($selectedExecution['status'])->headline() }}</p></div>
                     <div><p class="text-xs text-neutral-500 dark:text-fg-dim">Started</p><p class="mt-1 text-sm font-medium" title="{{ $selectedExecution['started_at']->diffForHumans() }}">{{ formatDateInServerTimezone($selectedExecution['started_at'], $server) }}</p></div>
+                    <div><p class="text-xs text-neutral-500 dark:text-fg-dim">{{ $selectedExecution['status'] === 'running' ? 'Running for' : 'Ended' }}</p><p class="mt-1 text-sm font-medium">@if ($selectedExecution['status'] === 'running'){{ calculateDuration($selectedExecution['started_at'], now()) }}@else{{ formatDateInServerTimezone($selectedExecution['finished_at'], $server) }}<span class="block text-xs font-normal text-neutral-500 dark:text-fg-dim">Took {{ calculateDuration($selectedExecution['started_at'], $selectedExecution['finished_at']) }}</span>@endif</p></div>
                     <div><p class="text-xs text-neutral-500 dark:text-fg-dim">Size</p><p class="mt-1 text-sm font-medium">{{ $selectedExecution['size'] ? formatBytes($selectedExecution['size']) : '-' }}</p></div>
                 </div>
                 @if ($selectedExecution['filename'])
@@ -53,7 +54,7 @@
                     <x-table.sort-header label="Type" asc="type_asc" desc="type_desc" action="sortExecutions" :current="$sortBy" />
                     <x-table.sort-header label="Schedule" asc="schedule_asc" desc="schedule_desc" action="sortExecutions" :current="$sortBy" />
                     <x-table.sort-header label="Status" asc="status_asc" desc="status_desc" action="sortExecutions" :current="$sortBy" />
-                    <x-table.sort-header label="Started" asc="started_asc" desc="started_desc" first="desc" action="sortExecutions" :current="$sortBy" />
+                    <x-table.sort-header label="Time" asc="started_asc" desc="started_desc" first="desc" action="sortExecutions" :current="$sortBy" />
                     <x-table.sort-header label="Size" asc="size_asc" desc="size_desc" first="desc" action="sortExecutions" :current="$sortBy" />
                     <span class="text-right">Actions</span>
                 </div>
@@ -81,7 +82,15 @@
                         <span>{{ $execution['type'] }}</span><span>{{ $execution['schedule'] }}</span>
                         <span><x-status-badge :status="str($execution['status'])->headline()" :type="$statusType" /></span>
                         <span>
-                            <span tabindex="0" data-tooltip="{{ formatDateInServerTimezone($execution['started_at'], $server) }}">{{ $execution['started_at']->diffForHumans() }}</span>
+                            <span class="block text-[11px] text-neutral-500 dark:text-fg-faint" tabindex="0"
+                                title="Started: {{ formatDateInServerTimezone($execution['started_at'], $server) }}@if ($execution['status'] !== 'running')&#10;Ended: {{ formatDateInServerTimezone($execution['finished_at'], $server) }}@endif">
+                                @if ($execution['status'] === 'running')
+                                    Running for {{ calculateDuration($execution['started_at'], now()) }}
+                                @else
+                                    <span class="block text-[13px] text-black dark:text-fg">{{ formatDateInServerTimezone($execution['finished_at'], $server) }}</span>
+                                    {{ $execution['finished_at']->diffForHumans() }} · {{ calculateDuration($execution['started_at'], $execution['finished_at']) }}
+                                @endif
+                            </span>
                         </span>
                         <span>{{ $execution['size'] ? formatBytes($execution['size']) : '-' }}</span>
                         <span class="flex justify-end">

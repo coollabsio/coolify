@@ -30,6 +30,7 @@ test('api token permission flags are locked', function (string $property, mixed 
 })->throws(CannotUpdateLockedPropertyException::class)->with([
     'root permission flag' => ['canUseRootPermissions', true],
     'write permission flag' => ['canUseWritePermissions', true],
+    'terminal permission flag' => ['canUseTerminalPermissions', true],
     'token search index' => ['tokenSearchIndex', []],
 ]);
 

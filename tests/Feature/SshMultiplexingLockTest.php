@@ -10,6 +10,7 @@ use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Exception\ProcessTimedOutException as SymfonyTimeoutException;
@@ -224,6 +225,36 @@ it('replaces a master whose health check times out', function () {
 
     Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -F /dev/null -O stop'));
     Process::assertRan(fn ($process) => isMuxEstablishCommand($process->command));
+});
+
+it('replaces a master that refuses new sessions', function () {
+    config([
+        'constants.ssh.mux_enabled' => true,
+        'constants.ssh.mux_health_check_enabled' => true,
+    ]);
+    $server = makeMuxServer();
+
+    // ssh falls back to a direct connection, so the health check output is there and the exit code is 0.
+    Process::fake([
+        '*-O check*' => Process::result(output: 'Master running (pid=222)', exitCode: 0),
+        '*health_check_ok*' => Process::result(
+            output: 'health_check_ok',
+            errorOutput: "mux_client_request_session: session request failed: Session open refused by peer\r\n",
+            exitCode: 0,
+        ),
+        '*-O stop*' => Process::result(exitCode: 0),
+        '* true' => Process::result(exitCode: 0),
+    ]);
+
+    Log::spy();
+
+    expect(SshMultiplexingHelper::ensureMultiplexedConnection($server))->toBeTrue();
+
+    Process::assertRan(fn ($process) => str_contains($process->command, 'ssh -F /dev/null -O stop'));
+    Process::assertRan(fn ($process) => isMuxEstablishCommand($process->command));
+    Log::shouldHaveReceived('info')->with('SSH mux master refused a new session, replacing it', Mockery::on(
+        fn (array $context) => $context['server_uuid'] === $server->uuid && str_contains($context['error'], 'Session open refused by peer'),
+    ));
 });
 
 it('gives the mux health check at least the server connection timeout', function () {

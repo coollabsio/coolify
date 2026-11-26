@@ -9,6 +9,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -120,6 +121,21 @@ class RestartLimitReached extends CustomEmailNotification
             title: 'Restart limit reached',
             level: 'error',
             message: $message,
+            buttons: [
+                [
+                    'text' => 'Open Resource in Coolify',
+                    'url' => $this->resource_url,
+                ],
+            ],
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
+            title: 'Restart limit reached',
+            level: 'error',
+            message: "{$this->resource_name} has been stopped after {$this->restart_count} restarts (limit: {$this->max_restart_count}).",
             buttons: [
                 [
                     'text' => 'Open Resource in Coolify',

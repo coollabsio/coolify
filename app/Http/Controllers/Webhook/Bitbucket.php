@@ -62,8 +62,8 @@ class Bitbucket extends Controller
             $repositoryLabel = $full_names->implode(', ');
 
             $x_bitbucket_token = (string) $request->header('X-Hub-Signature', '');
-            if ($context->action === 'push') {
-                $this->beginConfigPush(null, $full_names->all(), $context->branch, $context->commit, function (string $secret) use ($request, $x_bitbucket_token): bool {
+            foreach ($context->pushedBranches as $branch => $pushedBranch) {
+                $this->beginConfigPush(null, $full_names->all(), (string) $branch, $pushedBranch['commit'], function (string $secret) use ($request, $x_bitbucket_token): bool {
                     $parts = explode('=', $x_bitbucket_token, 2);
 
                     return count($parts) === 2 && $parts[0] === 'sha256' && hash_equals(hash_hmac('sha256', $request->getContent(), $secret), $parts[1]);
@@ -150,8 +150,8 @@ class Bitbucket extends Controller
 
     /**
      * Applications whose repository matches one of the payload repository names.
-     * A closed pull request matches every branch, so its preview is removed
-     * even when the application branch changed.
+     * A push matches every pushed branch. A closed pull request matches every
+     * branch, so its preview is removed even when the application branch changed.
      *
      * @param  Collection<int, string>  $fullNames
      * @return Collection<int, Application>
@@ -161,7 +161,9 @@ class Bitbucket extends Controller
         return $fullNames
             ->flatMap(function (string $fullName) use ($context): Collection {
                 $query = Application::query();
-                if ($context->action !== 'preview_close') {
+                if ($context->action === 'push') {
+                    $query->whereIn('git_branch', array_map('strval', array_keys($context->pushedBranches)));
+                } elseif ($context->action !== 'preview_close') {
                     $query->where('git_branch', $context->branch);
                 }
 
@@ -201,7 +203,8 @@ class Bitbucket extends Controller
             ];
         }
 
-        if ($context->skipDeployCommits) {
+        $pushedBranch = $context->pushedBranches[$application->git_branch];
+        if ($pushedBranch['skip_deploy']) {
             return [
                 'application' => $application->name,
                 'status' => 'skipped',
@@ -215,7 +218,7 @@ class Bitbucket extends Controller
         $result = queue_application_deployment(
             application: $application,
             deployment_uuid: $deployment_uuid,
-            commit: $context->commit,
+            commit: $pushedBranch['commit'],
             force_rebuild: false,
             is_webhook: true
         );
@@ -238,7 +241,7 @@ class Bitbucket extends Controller
             'application_uuid' => $application->uuid,
             'application_name' => $application->name,
             'deployment_uuid' => $deployment_uuid,
-            'commit' => $context->commit,
+            'commit' => $pushedBranch['commit'],
             'repository' => $repositoryLabel,
         ]);
 
@@ -304,10 +307,9 @@ class Bitbucket extends Controller
                 $pr_app->generate_preview_fqdn();
             }
         }
-        ($found ?? $pr_app)->markForkPullRequest($this->isForkPreviewRepository(
-            $context->sourceRepository,
-            $context->targetRepository,
-        ), $context->commit);
+        $isFork = $this->isForkPreviewRepository($context->sourceRepository, $context->targetRepository);
+        ($found ?? $pr_app)->recordSameRepository(! $isFork);
+        ($found ?? $pr_app)->markForkPullRequest($isFork, $context->commit);
 
         $result = queue_application_deployment(
             application: $application,

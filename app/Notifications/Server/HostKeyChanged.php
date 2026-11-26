@@ -5,6 +5,7 @@ namespace App\Notifications\Server;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -60,6 +61,16 @@ class HostKeyChanged extends CustomEmailNotification
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
+            title: 'SSH host key changed',
+            level: 'error',
+            message: $this->text(),
+            buttons: [['text' => 'Check the new key', 'url' => $this->url()]],
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
             title: 'SSH host key changed',
             level: 'error',
             message: $this->text(),

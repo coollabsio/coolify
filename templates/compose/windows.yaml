@@ -8,7 +8,7 @@
 
 services:
   windows:
-    image: dockurr/windows
+    image: dockurr/windows:6.06
     volumes:
       - windows-storage:/storage
     environment:

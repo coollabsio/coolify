@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Enums\ConfigRevisionStatus;
 use App\Http\Controllers\Controller;
 use App\Jobs\PlanEnvironmentConfigJob;
+use App\Models\Application;
 use App\Models\Environment;
 use App\Models\EnvironmentConfigLink;
 use App\Models\EnvironmentConfigRevision;
@@ -55,6 +56,40 @@ class ProjectConfigController extends Controller
         }
 
         return response()->json($exporter->export($environment));
+    }
+
+    #[OA\Get(
+        summary: 'Export application as coolify.json',
+        description: 'Export one application as a coolify.json file for its environment. Variable values are never exported. Requires the `read:sensitive` or `root` token ability, because commands and Compose files can hold credentials.',
+        path: '/applications/{uuid}/config/export',
+        operationId: 'export-application-config',
+        security: [['bearerAuth' => []]],
+        tags: ['Project config'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The coolify.json file.', content: new OA\JsonContent(type: 'object')),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'The token cannot read sensitive data.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function exportApplication(string $uuid, ConfigExporter $exporter): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $application = Application::ownedByCurrentTeamAPI($teamId)->where('uuid', $uuid)->first();
+        if ($application === null || ! auth()->user()->can('view', $application)) {
+            return response()->json(['message' => 'Application not found.'], 404);
+        }
+
+        if (! self::canReadSensitive()) {
+            return response()->json(['message' => 'Exporting needs the read:sensitive ability.'], 403);
+        }
+
+        return response()->json($exporter->export($application->environment, $application));
     }
 
     #[OA\Post(

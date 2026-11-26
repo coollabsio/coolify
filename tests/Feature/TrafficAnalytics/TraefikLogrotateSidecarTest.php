@@ -28,7 +28,7 @@ it('uses the latest stable traefik branch for new proxy configurations', functio
 
     $config = Yaml::parse(generateDefaultProxyConfiguration($server->fresh()));
 
-    expect($config['services']['traefik']['image'])->toBe('traefik:v3.7');
+    expect($config['services']['traefik']['image'])->toBe('traefik:v3.8');
 });
 
 it('does not expose the proxy container through its own docker provider', function () {

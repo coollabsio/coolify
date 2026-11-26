@@ -7,7 +7,7 @@
 
 services:
   firefox:
-    image: jlesage/firefox
+    image: jlesage/firefox:v26.09.1
     environment:
       - SERVICE_URL_FIREFOX_5800
     volumes:

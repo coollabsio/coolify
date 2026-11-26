@@ -7,7 +7,7 @@
 
 services:
   qdrant:
-    image: "qdrant/qdrant:latest"
+    image: "qdrant/qdrant:v1.20.1"
     environment:
       - SERVICE_URL_QDRANT_6333
       - QDRANT__SERVICE__API_KEY=${SERVICE_PASSWORD_QDRANTAPIKEY}

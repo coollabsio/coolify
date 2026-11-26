@@ -74,6 +74,7 @@ return [
 
     'seeder' => [
         'is_seeder_enabled' => env('SEEDER_ENABLED', true),
+        'is_root_user_predefined' => env('ROOT_USER_EMAIL') && env('ROOT_USER_PASSWORD'),
     ],
 
     'horizon' => [
@@ -109,6 +110,8 @@ return [
         'server_interval' => 20,
         'command_timeout' => $sshCommandTimeout > 0 ? $sshCommandTimeout : 3600,
         'max_retries' => env('SSH_MAX_RETRIES', 3),
+        // Attempts in total when sshd closes the connection before the key exchange (kex_exchange_identification). With the default delays, about 30s.
+        'handshake_max_retries' => env('SSH_HANDSHAKE_MAX_RETRIES', 5),
         'retry_base_delay' => env('SSH_RETRY_BASE_DELAY', 2), // seconds
         'retry_max_delay' => env('SSH_RETRY_MAX_DELAY', 30), // seconds
         'retry_multiplier' => env('SSH_RETRY_MULTIPLIER', 2),

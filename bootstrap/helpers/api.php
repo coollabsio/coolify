@@ -15,6 +15,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Rules\ManualWebhookSecret;
 use App\Rules\ValidGitBranch;
+use App\Rules\ValidIpAllowlist;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Collection;
@@ -210,6 +211,22 @@ function removeServerProxySecretsFromApiPayload(mixed $payload): mixed
 }
 
 /**
+ * True when the API request can read the secrets of one resource (an application, service, database, or
+ * environment variable): admins with a read:sensitive token, and members whose access grants give
+ * read:sensitive on the resource. Team credentials and server secrets stay admin-only.
+ */
+function canReadResourceSecretsFromApi(?Model $resource): bool
+{
+    if (request()->attributes->get('can_read_sensitive', false) === true) {
+        return true;
+    }
+
+    return $resource !== null
+        && request()->attributes->get('has_read_sensitive_ability', false) === true
+        && (request()->user()?->can('viewSensitive', $resource) ?? false);
+}
+
+/**
  * True when the API token can read server secrets (Sentinel token, log drain keys, proxy configuration).
  * A token limited to some projects, environments, or resources cannot, because servers are team-level.
  */
@@ -333,6 +350,7 @@ function sharedDataApplications(?Application $application = null): array
         'is_gzip_enabled' => 'boolean',
         'is_stripprefix_enabled' => 'boolean',
         'is_permanent_redirect_enabled' => 'boolean',
+        'ip_allowlist' => ['nullable', 'string', new ValidIpAllowlist],
         'traefik_certificate_resolver' => ['nullable', 'string', 'max:255', 'regex:'.ServerSetting::TRAEFIK_CERTIFICATE_RESOLVER_PATTERN],
         'is_container_label_readonly_enabled' => 'boolean',
         'is_raw_compose_deployment_enabled' => 'boolean',
@@ -382,9 +400,9 @@ function sharedDataApplications(?Application $application = null): array
             }
         }],
         'health_check_method' => 'string|in:GET,HEAD,POST,OPTIONS',
-        'health_check_return_code' => 'numeric',
+        'health_check_return_code' => 'integer|between:100,599',
         'health_check_scheme' => 'string|in:http,https',
-        'health_check_response_text' => 'string|nullable',
+        'health_check_response_text' => ['string', 'nullable', 'max:255', 'not_regex:/[\x00-\x1F\x7F]/'],
         'health_check_interval' => 'numeric',
         'health_check_timeout' => 'numeric',
         'health_check_retries' => 'numeric',

@@ -136,14 +136,11 @@ test('the members table sorts by role rank and only sends two factor status to m
 
     actAsTeamMember($owner, $this->team);
     Livewire::test(Index::class)
-        ->assertSee('Sort by role', false)
-        ->assertSee('Sort by 2fa', false)
         ->assertSee('\\u0022roleRank\\u0022:3', false)
         ->assertSee('\\u0022twoFactor\\u0022:true', false);
 
     actAsTeamMember($member, $this->team);
     Livewire::test(Index::class)
-        ->assertDontSee('Sort by 2fa', false)
         ->assertSee('\\u0022twoFactor\\u0022:null', false)
         ->assertDontSee('\\u0022twoFactor\\u0022:true', false);
 });

@@ -355,6 +355,11 @@
                                         <span x-show="service.amd_only || service.arm_only"
                                             class="shrink-0 rounded-md border border-amber-300/50 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:border-warning/20 dark:bg-warning/10 dark:text-warning"
                                             x-text="service.arm_only ? 'ARM only' : 'AMD only'"></span>
+                                        <span x-show="service.outdated"
+                                            title="The image of this service has not been updated in the last 2 months"
+                                            class="shrink-0 cursor-help rounded-md border border-amber-300/50 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:border-warning/20 dark:bg-warning/10 dark:text-warning">
+                                            Outdated
+                                        </span>
                                     </div>
 
                                     <p class="text-[12px] leading-5 text-neutral-600 dark:text-fg-dim" :class="viewClasses.description"

@@ -4,6 +4,7 @@ namespace App\Livewire\ImageScan;
 
 use App\Actions\ImageScan\ScanImage;
 use App\Actions\ImageScan\UpdateResourceImage;
+use App\Enums\AccessLevel;
 use App\Enums\ImageScanErrorCode;
 use App\Jobs\RefreshImageScanSummariesJob;
 use App\Jobs\ScanResourceImagesJob;
@@ -14,6 +15,7 @@ use App\Models\ImageScanIgnore;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
+use App\Services\Access\AccessResolver;
 use App\Services\ImageScan\Finding;
 use App\Services\ImageScan\FindingsExport;
 use App\Services\ImageScan\ImageScanPolicyResolver;
@@ -506,7 +508,7 @@ class Vulnerabilities extends Component
         abort_unless($teamId !== null, 404);
 
         if ($scope === 'team') {
-            abort_unless(auth()->user()->isAdminOfTeam($teamId), 403);
+            abort_unless(app(AccessResolver::class)->allowsTeamWide(auth()->user(), AccessLevel::Write, $teamId), 403);
         }
 
         $package = $kind === 'package' ? (preg_replace('/\p{Cc}/u', '', $target) ?? '') : null;
@@ -1077,7 +1079,7 @@ class Vulnerabilities extends Component
             'imageOptions' => count($imageOptions) > 1 ? $imageOptions : [],
             'showsImage' => count($imageOptions) > 1,
             'isService' => $resource instanceof Service,
-            'canIgnoreForTeam' => $canUpdate && $user->isAdminOfTeam((int) $resource->team()?->id),
+            'canIgnoreForTeam' => $canUpdate && app(AccessResolver::class)->allowsTeamWide($user, AccessLevel::Write, (int) $resource->team()?->id),
             'hasFilters' => $this->severities !== [] || $this->images !== [] || trim($this->search) !== '',
             'severityOptions' => self::SEVERITIES,
         ]);

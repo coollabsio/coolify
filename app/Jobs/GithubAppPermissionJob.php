@@ -47,7 +47,12 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
             $this->github_app->contents = data_get($permissions, 'contents');
             $this->github_app->metadata = data_get($permissions, 'metadata');
             $this->github_app->pull_requests = data_get($permissions, 'pull_requests');
-            $this->github_app->deployments = $this->approvedInstallationPermission($github, 'deployments');
+            $installation = $this->installation($github);
+            // GET /app returns the permissions the App requests. A new permission counts only after the installation approves it.
+            $this->github_app->deployments = data_get($installation, 'permissions.deployments');
+            if ($installation) {
+                $this->github_app->installation_account = data_get($installation, 'account.login');
+            }
             $this->github_app->administration = data_get($permissions, 'administration');
             $this->github_app->organization_self_hosted_runners = data_get($permissions, 'organization_self_hosted_runners');
             $this->github_app->actions = data_get($permissions, 'actions');
@@ -63,10 +68,9 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * GET /app returns the permissions the App requests. A new permission
-     * counts only after the installation approves it.
+     * @return array<string, mixed>|null
      */
-    private function approvedInstallationPermission(PendingRequest $github, string $permission): ?string
+    private function installation(PendingRequest $github): ?array
     {
         if (! $this->github_app->installation_id) {
             return null;
@@ -77,6 +81,6 @@ class GithubAppPermissionJob implements ShouldBeEncrypted, ShouldQueue
             throw new \RuntimeException('Failed to fetch GitHub app installation permissions: '.$response->body());
         }
 
-        return data_get($response->json(), "permissions.{$permission}");
+        return $response->json();
     }
 }
