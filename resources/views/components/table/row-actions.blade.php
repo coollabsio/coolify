@@ -15,8 +15,8 @@
     </x-slot:trigger>
     <div class="contents" @click="if ($event.target.closest('[role=menuitem]')) close()">
         {{ $slot }}
-        @if (isset($danger) && $danger->isNotEmpty())
-            @if ($slot->isNotEmpty())
+        @if (isset($danger) && $danger->hasActualContent())
+            @if ($slot->hasActualContent())
                 <div class="my-1 border-t border-neutral-200 dark:border-white/[0.08]"></div>
             @endif
             <div class="row-actions-danger contents">

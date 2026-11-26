@@ -20,6 +20,12 @@ class LocalFileVolume extends BaseModel
 
     public const TOO_LARGE_PLACEHOLDER = '[file too large to display]';
 
+    /** The last successful Compose parse mounted this file. */
+    public const COMPOSE_STATUS_ACTIVE = 'active';
+
+    /** A Compose parse mounted this file before, but the current Compose file does not. */
+    public const COMPOSE_STATUS_DETACHED = 'detached';
+
     /**
      * Resolves $1 and $2 like `realpath -m`, but only with POSIX sh and `readlink -f`, which
      * BusyBox also has. It walks up to the deepest existing path, resolves it, and appends the
@@ -103,9 +109,10 @@ class LocalFileVolume extends BaseModel
         'is_based_on_git',
         'is_preview_suffix_enabled',
         'variable_fs_path',
+        'compose_status',
     ];
 
-    public $appends = ['is_binary', 'is_too_large'];
+    public $appends = ['is_binary', 'is_too_large', 'is_detached_from_compose'];
 
     protected static function booted()
     {
@@ -140,6 +147,13 @@ class LocalFileVolume extends BaseModel
     {
         return Attribute::make(
             get: fn () => $this->content === self::TOO_LARGE_PLACEHOLDER
+        );
+    }
+
+    protected function isDetachedFromCompose(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->compose_status === self::COMPOSE_STATUS_DETACHED
         );
     }
 
@@ -802,30 +816,38 @@ class LocalFileVolume extends BaseModel
     public function isReadOnlyVolume(): bool
     {
         try {
-            // Only check for services
-            $service = $this->service;
-            if (! $service || ! method_exists($service, 'service')) {
-                return false;
-            }
+            // An application mounts files from all its Compose services; a service part only from its own.
+            $resource = $this->resource;
+            if ($resource instanceof Application) {
+                $compose = $resource->docker_compose_raw ? parseDockerComposeYaml($resource->docker_compose_raw) : [];
+                $volumes = collect(data_get($compose, 'services', []))
+                    ->flatMap(fn ($service) => (array) data_get($service, 'volumes', []))
+                    ->all();
+            } else {
+                $service = $this->service;
+                if (! $service || ! method_exists($service, 'service')) {
+                    return false;
+                }
 
-            $actualService = $service->service;
-            if (! $actualService || ! $actualService->docker_compose_raw) {
-                return false;
-            }
+                $actualService = $service->service;
+                if (! $actualService || ! $actualService->docker_compose_raw) {
+                    return false;
+                }
 
-            // Parse the docker-compose content
-            $compose = parseDockerComposeYaml($actualService->docker_compose_raw);
-            if (! isset($compose['services'])) {
-                return false;
-            }
+                // Parse the docker-compose content
+                $compose = parseDockerComposeYaml($actualService->docker_compose_raw);
+                if (! isset($compose['services'])) {
+                    return false;
+                }
 
-            // Find the service that this volume belongs to
-            $serviceName = $service->name;
-            if (! isset($compose['services'][$serviceName]['volumes'])) {
-                return false;
-            }
+                // Find the service that this volume belongs to
+                $serviceName = $service->name;
+                if (! isset($compose['services'][$serviceName]['volumes'])) {
+                    return false;
+                }
 
-            $volumes = $compose['services'][$serviceName]['volumes'];
+                $volumes = $compose['services'][$serviceName]['volumes'];
+            }
 
             // Check each volume to find a match
             // Note: We match on mount_path (container path) only, since fs_path gets transformed

@@ -100,7 +100,14 @@
                                         <span>PR suffix</span>
                                         <x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />
                                     </div>
-                                    <span>{{ $form['isPreviewSuffixEnabled'] ? 'Add suffix' : 'Share volume' }}</span>
+                                    @if ($canUpdate)
+                                        <x-forms.listbox id="forms.{{ $id }}.isPreviewSuffixEnabled" portal live :options="[
+                                            ['value' => true, 'label' => 'Add suffix'],
+                                            ['value' => false, 'label' => 'Share volume'],
+                                        ]" canGate="update" :canResource="$resource" />
+                                    @else
+                                        <span>{{ $form['isPreviewSuffixEnabled'] ? 'Add suffix' : 'Share volume' }}</span>
+                                    @endif
                                 </div>
                             @endif
 

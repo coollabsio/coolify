@@ -40,6 +40,8 @@ class FileStorage extends Component
 
     public bool $isReadOnly = false;
 
+    public bool $isDetachedFromCompose = false;
+
     public bool $hasEnabledBackup = false;
 
     public ?string $backupUrl = null;
@@ -73,7 +75,9 @@ class FileStorage extends Component
             $this->fs_path = $this->fileStorage->fs_path;
         }
 
-        $this->isReadOnly = $this->fileStorage->shouldBeReadOnlyInUI() || $this->fileStorage->is_too_large;
+        // A detached storage is not mounted anymore: Coolify does not change its files on the server.
+        $this->isDetachedFromCompose = $this->fileStorage->is_detached_from_compose;
+        $this->isReadOnly = $this->fileStorage->shouldBeReadOnlyInUI() || $this->fileStorage->is_too_large || $this->isDetachedFromCompose;
         $this->syncData();
         $this->refreshBackupStatus();
     }
@@ -181,6 +185,7 @@ class FileStorage extends Component
     {
         try {
             $this->authorize('update', $this->resource);
+            $this->abortIfDetachedFromCompose();
 
             if ($this->fileStorage->is_host_file) {
                 throw new \Exception('Host file mounts are bind-only and cannot be converted.');
@@ -226,6 +231,7 @@ class FileStorage extends Component
     {
         try {
             $this->authorize('update', $this->resource);
+            $this->abortIfDetachedFromCompose();
 
             if ($this->fileStorage->scheduledBackups()->exists()) {
                 throw new \RuntimeException('Delete this directory backup schedule and its archives before converting it to a file.');
@@ -275,6 +281,9 @@ class FileStorage extends Component
             } elseif ($this->fileStorage->is_host_file) {
                 $message = 'Host file mount removed.';
             }
+            if ($this->isDetachedFromCompose) {
+                $message = 'Storage record deleted. The files on the server stay.';
+            }
             $deletedFromServer = $this->canDeleteFromServer() && in_array('permanently_delete', $selectedActions, true);
             if ($deletedFromServer) {
                 $message = $this->fileStorage->is_directory ? 'Directory deleted from the server.' : 'File deleted from the server.';
@@ -298,6 +307,12 @@ class FileStorage extends Component
     public function submit()
     {
         $this->authorize('update', $this->resource);
+
+        if ($this->isDetachedFromCompose) {
+            $this->dispatch('error', 'This storage is not in the Docker Compose file anymore and cannot be edited.');
+
+            return;
+        }
 
         if ($this->fileStorage->is_host_file) {
             $this->dispatch('error', 'Host file mounts are bind-only and cannot be edited from the UI.');
@@ -373,17 +388,26 @@ class FileStorage extends Component
      */
     private function canDeleteFromServer(): bool
     {
-        return ! $this->fileStorage->is_host_file && ! $this->fileStorage->isOutsideResourceDirectory();
+        return ! $this->isDetachedFromCompose
+            && ! $this->fileStorage->is_host_file
+            && ! $this->fileStorage->isOutsideResourceDirectory();
+    }
+
+    private function abortIfDetachedFromCompose(): void
+    {
+        if ($this->isDetachedFromCompose) {
+            throw new \RuntimeException('This storage is not in the Docker Compose file anymore. Coolify does not change its files on the server.');
+        }
     }
 
     public function render()
     {
         $kind = $this->fileStorage->is_directory ? 'directory' : 'file';
-        $deletionActions = [
-            $this->fileStorage->is_host_file
-                ? 'The mount will be removed from the container.'
-                : "The selected {$kind} will be permanently deleted from the container.",
-        ];
+        $deletionActions = match (true) {
+            $this->isDetachedFromCompose => [],
+            $this->fileStorage->is_host_file => ['The mount will be removed from the container.'],
+            default => ["The selected {$kind} will be permanently deleted from the container."],
+        };
         $deletionCheckboxes = [];
 
         if ($this->canDeleteFromServer()) {
