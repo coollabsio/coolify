@@ -496,6 +496,34 @@ it('reports a registry certificate that the server does not trust instead of ask
         ->and(candidatesRan('.docker/config.json'))->toBe(0);
 });
 
+it('reads the tags of a GitLab dependency proxy image from Docker Hub and keeps the proxy for digests and scans', function () {
+    candidatesFake();
+    $scan = candidatesScan('gitlab.example.com/group/dependency_proxy/containers/postgres:15.0-alpine');
+
+    RefreshCandidates::run($scan);
+
+    $scan->refresh();
+    Process::assertRan(fn (PendingProcess $process) => str_contains(candidatesCommand($process), "'tag' 'ls' 'docker.io/library/postgres'"));
+    Process::assertNotRan(fn (PendingProcess $process) => str_contains(candidatesCommand($process), "'tag' 'ls' 'gitlab.example.com/"));
+    Process::assertRan(fn (PendingProcess $process) => str_contains(candidatesCommand($process), "'registry:gitlab.example.com/group/dependency_proxy/containers/postgres@".CANDIDATES_LINE."'"));
+    expect($scan->candidateStatus())->toBe('ok')
+        ->and(collect($scan->candidateEntries())->firstWhere('kind', 'line')['ref'])->toBe('gitlab.example.com/group/dependency_proxy/containers/postgres:15.15-alpine');
+});
+
+it('reports a registry error, not a missing login, when Docker Hub does not list the tags of a proxy image', function () {
+    candidatesFake();
+    $this->anonymousFails = true;
+    $scan = candidatesScan('gitlab.example.com/group/dependency_proxy/containers/postgres:15.0-alpine');
+
+    RefreshCandidates::run($scan);
+
+    $scan->refresh();
+    expect($scan->candidateStatus())->toBe('failed')
+        ->and(data_get($scan->candidates, 'error'))->toBe('registry')
+        ->and(RefreshCandidates::message($scan))->not->toContain('Log in')
+        ->and(candidatesRan('.docker/config.json'))->toBe(0);
+});
+
 it('reads the tags of an image from a registry with a port', function () {
     candidatesFake();
     $this->tags = ['1.2', '1.3', '2.0'];

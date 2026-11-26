@@ -15,6 +15,9 @@
       required_port: 2368
       exclude_from_status: false
       ports: ''
+    empty-lists:
+      exclude_from_status: false
+      ports: ''
     gateway:
       fqdn: 'http://gateway-referenceservice00000001.10.0.0.1.sslip.io'
       exclude_from_status: false
@@ -208,6 +211,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         labels:
           - com.example.team=platform
           - com.example.dollar=price-$$5
@@ -274,7 +278,6 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
-          internal: null
           referenceservice00000001: null
         logging:
           driver: fluentd
@@ -316,6 +319,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         ports:
           - '3000:3000'
           -
@@ -372,7 +376,6 @@
           - 'caddy_0=http://api-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.api.env
@@ -400,6 +403,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: my-app-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -434,7 +438,6 @@
           - 'caddy_0=http://my_app-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.my-app.env
@@ -462,6 +465,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: www-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -494,7 +498,6 @@
           - 'caddy_0=http://www-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.www.env
@@ -522,6 +525,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: blog-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -561,7 +565,6 @@
           - 'caddy_0=http://blog-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.blog.env
@@ -589,6 +592,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: gateway-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -621,7 +625,6 @@
           - 'caddy_0=http://gateway-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.gateway.env
@@ -649,6 +652,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: gateway-ws-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -682,7 +686,6 @@
           - 'caddy_0=http://gateway-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.gateway-ws.env
@@ -712,6 +715,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: worker-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -729,7 +733,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=worker
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.worker.env
@@ -757,6 +760,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: scheduler-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -774,7 +778,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=scheduler
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.scheduler.env
@@ -803,6 +806,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         volumes:
           - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
           - 'shared-external:/backups'
@@ -881,6 +885,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         env_file:
           - .coolify.cache.env
       sidecar:
@@ -923,8 +928,51 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         env_file:
           - .coolify.sidecar.env
+      empty-lists:
+        image: 'nginx:alpine'
+        container_name: empty-lists-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=empty-lists-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=empty-lists
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:empty-lists>'
+          - coolify.service.subType=application
+          - coolify.service.subName=empty-lists
+        networks:
+          referenceservice00000001: null
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: empty-lists-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
+        env_file:
+          - .coolify.empty-lists.env
     volumes:
       db-data:
         driver_opts:
@@ -970,6 +1018,9 @@
     blog:
       fqdn: 'https://blog.example.com/blog'
       required_port: 2368
+      exclude_from_status: false
+      ports: ''
+    empty-lists:
       exclude_from_status: false
       ports: ''
     gateway:
@@ -1165,6 +1216,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         labels:
           - com.example.team=platform
           - com.example.dollar=price-$$5
@@ -1236,7 +1288,6 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
-          internal: null
           referenceservice00000001: null
         logging:
           driver: fluentd
@@ -1278,6 +1329,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         ports:
           - '3000:3000'
           -
@@ -1341,7 +1393,6 @@
           - 'caddy_0=https://api.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.api.env
@@ -1369,6 +1420,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: my-app-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -1410,7 +1462,6 @@
           - 'caddy_0=https://my_app.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.my-app.env
@@ -1438,6 +1489,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: www-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -1479,7 +1531,6 @@
           - 'caddy_0=https://www.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.www.env
@@ -1507,6 +1558,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: blog-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -1553,7 +1605,6 @@
           - 'caddy_0=https://blog.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.blog.env
@@ -1581,6 +1632,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: gateway-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -1618,7 +1670,6 @@
           - 'caddy_0=https://gateway.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.gateway.env
@@ -1646,6 +1697,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: gateway-ws-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -1684,7 +1736,6 @@
           - 'caddy_0=https://gateway.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.gateway-ws.env
@@ -1714,6 +1765,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: worker-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -1731,7 +1783,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=worker
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.worker.env
@@ -1759,6 +1810,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: scheduler-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -1776,7 +1828,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=scheduler
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.scheduler.env
@@ -1805,6 +1856,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         volumes:
           - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
           - 'shared-external:/backups'
@@ -1883,6 +1935,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         env_file:
           - .coolify.cache.env
       sidecar:
@@ -1925,8 +1978,51 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         env_file:
           - .coolify.sidecar.env
+      empty-lists:
+        image: 'nginx:alpine'
+        container_name: empty-lists-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=empty-lists-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=empty-lists
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:empty-lists>'
+          - coolify.service.subType=application
+          - coolify.service.subName=empty-lists
+        networks:
+          referenceservice00000001: null
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: empty-lists-referenceservice00000001
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
+        env_file:
+          - .coolify.empty-lists.env
     volumes:
       db-data:
         driver_opts:
@@ -1972,6 +2068,10 @@
     blog:
       fqdn: 'https://blog.example.com/blog'
       required_port: 2368
+      exclude_from_status: false
+      ports: ''
+    empty-lists:
+      fqdn: 'https://empty-lists-extra.example.com'
       exclude_from_status: false
       ports: ''
     gateway:
@@ -2170,6 +2270,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         labels:
           - com.example.team=platform
           - com.example.dollar=price-$$5
@@ -2241,7 +2342,6 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
-          internal: null
           referenceservice00000001: null
         logging:
           driver: fluentd
@@ -2283,6 +2383,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         ports:
           - '3000:3000'
           -
@@ -2346,7 +2447,6 @@
           - 'caddy_0=https://api.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.api.env
@@ -2374,6 +2474,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: my-app-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -2415,7 +2516,6 @@
           - 'caddy_0=https://my_app.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.my-app.env
@@ -2443,6 +2543,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: www-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -2484,7 +2585,6 @@
           - 'caddy_0=https://www.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.www.env
@@ -2512,6 +2612,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: blog-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -2558,7 +2659,6 @@
           - 'caddy_0=https://blog.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.blog.env
@@ -2586,6 +2686,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: gateway-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -2623,7 +2724,6 @@
           - 'caddy_0=https://gateway.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.gateway.env
@@ -2651,6 +2751,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: gateway-ws-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -2689,7 +2790,6 @@
           - 'caddy_0=https://gateway.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.gateway-ws.env
@@ -2721,6 +2821,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: worker-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -2762,7 +2863,6 @@
           - 'caddy_0=https://worker-extra.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.worker.env
@@ -2792,6 +2892,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         container_name: scheduler-referenceservice00000001
         restart: unless-stopped
         labels:
@@ -2833,7 +2934,6 @@
           - 'caddy_0=https://scheduler-extra.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .coolify.scheduler.env
@@ -2862,6 +2962,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         volumes:
           - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
           - 'shared-external:/backups'
@@ -2940,6 +3041,7 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         env_file:
           - .coolify.cache.env
       sidecar:
@@ -3003,8 +3105,73 @@
           SERVICE_NAME_DB: db
           SERVICE_NAME_CACHE: cache
           SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
         env_file:
           - .coolify.sidecar.env
+      empty-lists:
+        image: 'nginx:alpine'
+        container_name: empty-lists-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=empty-lists-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=empty-lists
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:empty-lists>'
+          - coolify.service.subType=application
+          - coolify.service.subName=empty-lists
+          - traefik.docker.network=referenceservice00000001
+          - traefik.enable=true
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceservice00000001-empty-lists-625d.entryPoints=http
+          - traefik.http.routers.http-0-referenceservice00000001-empty-lists-625d.middlewares=redirect-to-https
+          - 'traefik.http.routers.http-0-referenceservice00000001-empty-lists-625d.rule=Host(`empty-lists-extra.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceservice00000001-empty-lists-625d.entryPoints=https
+          - traefik.http.routers.https-0-referenceservice00000001-empty-lists-625d.middlewares=gzip-no-media
+          - 'traefik.http.routers.https-0-referenceservice00000001-empty-lists-625d.rule=Host(`empty-lists-extra.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceservice00000001-empty-lists-625d.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-0-referenceservice00000001-empty-lists-625d.tls=true
+          - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://empty-lists-extra.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        environment:
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: empty-lists-referenceservice00000001
+          COOLIFY_FQDN: empty-lists-extra.example.com
+          COOLIFY_URL: 'https://empty-lists-extra.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
+        env_file:
+          - .coolify.empty-lists.env
     volumes:
       db-data:
         driver_opts:

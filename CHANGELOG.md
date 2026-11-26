@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v4.7.9] - 2026-11-26
+
+### Added
+
+- `OpenSearch` one-click service, an open-source search and analytics engine
+- `MCPHub` one-click service, a hub that manages and routes many MCP servers, with PostgreSQL and pgvector
+
+### Changed
+
+- Clarified the `Server role` and `Builder selection` help texts, which now say that only `Builds only` servers build for other servers
+- Default Traefik image of new proxy configurations from `traefik:v3.7` to `traefik:v3.8` ([#12661](https://github.com/coollabsio/coolify/issues/12661))
+  - Existing proxies keep their saved image. The proxy update notice offers Traefik 3.8 to servers on older versions
+
+### Fixed
+
+- Asked for a registry login in the version check of images from a GitLab dependency proxy, which has no tag list ([#12670](https://github.com/coollabsio/coolify/issues/12670))
+  - Coolify reads the tags from the Docker Hub image behind the proxy, and keeps the proxy for digests and scans
+- Attached every service of a Compose stack to every top-level network, also to networks that only one service declares ([#12668](https://github.com/coollabsio/coolify/issues/12668))
+  - Each service joins only the networks it declares, plus the network of its stack
+- Hid the `Swarm` menu on build servers and Cloudflare Tunnel servers that still have a Swarm role, so the role could not be turned off
+  - The `Swarm` menu shows on every server that has a Swarm role
+- Showed a 404 page for a direct link to a resource of another team of the user ([#12669](https://github.com/coollabsio/coolify/issues/12669))
+  - Coolify switches to the team of the resource when the user is a member of it. This applies to projects and their resources, servers, destinations, S3 storages, private keys, cloud tokens, cloud-init scripts, and git sources that are not system-wide
+- Wrote empty `ports` and `volumes` lists of a Docker Compose service as `{}`, which `docker compose` rejects ([#12667](https://github.com/coollabsio/coolify/issues/12667))
+
 ## [v4.7.8] - 2026-11-25
 
 ### Fixed
