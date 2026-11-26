@@ -1,6 +1,6 @@
 # documentation: https://docs.livekit.io/transport/self-hosting/
 # slogan: Self-hosted real-time audio and video infrastructure
-# category: communication
+# category: messaging
 # tags: livekit,webrtc,audio,video,realtime
 # logo: svgs/livekit.svg
 # port: 7880
@@ -8,7 +8,6 @@
 services:
   livekit:
     image: livekit/livekit-server:v1.13.11
-    restart: unless-stopped
     environment:
       SERVICE_URL_LIVEKIT_7880: ""
       LIVEKIT_KEYS: "${SERVICE_USER_LIVEKIT}: ${SERVICE_PASSWORD_64_LIVEKIT}"
@@ -34,8 +33,7 @@ services:
       retries: 5
 
   redis:
-    image: redis:8.10.1-alpine
-    restart: unless-stopped
+    image: redis:8.12.0-alpine
     environment:
       REDIS_PASSWORD: ${SERVICE_PASSWORD_64_REDIS}
     command: ["redis-server", "--requirepass", "${SERVICE_PASSWORD_64_REDIS}", "--appendonly", "yes"]
@@ -46,6 +44,3 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-volumes:
-  redis-data:
