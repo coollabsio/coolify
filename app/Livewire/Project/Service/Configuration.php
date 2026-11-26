@@ -63,6 +63,7 @@ class Configuration extends Component
             $this->service = $environment->services()->whereUuid(request()->route('service_uuid'))->firstOrFail();
 
             $this->authorize('view', $this->service);
+            $this->service->applications->each->importServiceEndpoints();
 
             $this->project = $project;
             $this->environment = $environment;
