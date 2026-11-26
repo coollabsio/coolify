@@ -1,0 +1,27 @@
+# documentation: https://garethgeorge.github.io/backrest/
+# slogan: Backrest is a web UI and orchestrator for restic backup.
+# category: storage
+# tags: backup,restic,backrest,storage,recovery
+# logo: svgs/backrest.svg
+# port: 9898
+
+services:
+  backrest:
+    image: ghcr.io/garethgeorge/backrest:v1.14.1-alpine
+    environment:
+      - SERVICE_URL_BACKREST_9898
+      - TZ=${TZ:-UTC}
+    volumes:
+      - backrest-data:/data
+      - backrest-config:/config
+      - backrest-cache:/cache
+      - backrest-repos:/repos
+      # To back up host files, add a read-only bind mount, e.g. /path/on/host:/userdata:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:9898/"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
+    security_opt:
+      - no-new-privileges:true
