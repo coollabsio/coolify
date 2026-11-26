@@ -36,23 +36,106 @@ function actAsMemberOf(array $fixture, string $role): User
     return $user;
 }
 
-it('saves the toggle', function () {
-    Livewire::test(DeployTriggers::class, ['application' => $this->application])
-        ->set('isSmartTriggersEnabled', false)
-        ->call('instantSave')
-        ->assertHasNoErrors();
+it('chooses which pushes deploy', function (string $mode, bool $smart) {
+    $this->application->update(['watch_paths' => 'apps/web/**']);
 
-    expect($this->application->settings->refresh()->is_smart_triggers_enabled)->toBeFalse();
+    Livewire::test(DeployTriggers::class, ['application' => $this->application])
+        ->set('triggerMode', $mode)
+        ->call('setTriggerMode')
+        ->assertHasNoErrors()
+        ->assertSet('triggerMode', $mode);
+
+    expect($this->application->settings->refresh()->is_smart_triggers_enabled)->toBe($smart)
+        ->and($this->application->refresh()->watch_paths)->toBeNull();
+})->with([
+    'every push' => ['all', false],
+    'smart' => ['smart', true],
+]);
+
+it('shows the mode that decides which pushes deploy', function (array $attributes, bool $smart, string $mode) {
+    $this->application->update($attributes);
+    $this->application->settings->update(['is_smart_triggers_enabled' => $smart]);
+
+    Livewire::test(DeployTriggers::class, ['application' => $this->application->refresh()])->assertSet('triggerMode', $mode);
+})->with([
+    'smart' => [[], true, 'smart'],
+    'every push' => [[], false, 'all'],
+    'watch paths win over smart' => [['watch_paths' => 'apps/web/**'], true, 'watch_paths'],
+]);
+
+it('keeps the current mode until watch paths are saved', function () {
+    Livewire::test(DeployTriggers::class, ['application' => $this->application])
+        ->set('triggerMode', 'watch_paths')
+        ->call('setTriggerMode')
+        ->assertSet('triggerMode', 'watch_paths')
+        ->assertSee('No watch paths yet')
+        ->assertSee('Until then, smart deploy triggers decide which pushes deploy.')
+        ->assertDontSeeHtml('wire:click="evaluateNow"');
+
+    expect($this->application->refresh()->watch_paths)->toBeNull()
+        ->and($this->application->settings->refresh()->is_smart_triggers_enabled)->toBeTrue();
 });
 
-it('does not let a read-only member change the toggle', function () {
-    actAsMemberOf($this->fixture, 'member');
-
+it('saves watch paths', function () {
     Livewire::test(DeployTriggers::class, ['application' => $this->application])
-        ->set('isSmartTriggersEnabled', false)
-        ->call('instantSave');
+        ->set('triggerMode', 'watch_paths')
+        ->call('setTriggerMode')
+        ->set('watchPaths', "/apps/web/**\n!apps/web/test/**")
+        ->call('saveWatchPaths')
+        ->assertHasNoErrors()
+        ->assertSet('triggerMode', 'watch_paths')
+        ->assertSee('Watch paths decide which pushes deploy');
+
+    expect($this->application->refresh()->watch_paths)->toBe("apps/web/**\n!apps/web/test/**");
+});
+
+it('goes back to the previous mode when the watch paths are emptied', function () {
+    $this->application->update(['watch_paths' => 'apps/web/**']);
+    $this->application->settings->update(['is_smart_triggers_enabled' => false]);
+
+    Livewire::test(DeployTriggers::class, ['application' => $this->application->refresh()])
+        ->set('watchPaths', '')
+        ->call('saveWatchPaths')
+        ->assertSet('triggerMode', 'all');
+
+    expect($this->application->refresh()->watch_paths)->toBeNull();
+});
+
+it('restores the cleared watch paths when switching back', function () {
+    $this->application->update(['watch_paths' => 'apps/web/**']);
+
+    Livewire::test(DeployTriggers::class, ['application' => $this->application->refresh()])
+        ->set('triggerMode', 'smart')
+        ->call('setTriggerMode')
+        ->set('triggerMode', 'watch_paths')
+        ->call('setTriggerMode')
+        ->assertSet('triggerMode', 'watch_paths');
+
+    expect($this->application->refresh()->watch_paths)->toBe('apps/web/**');
+});
+
+it('rejects an unknown mode', function () {
+    Livewire::test(DeployTriggers::class, ['application' => $this->application])
+        ->set('triggerMode', 'sometimes')
+        ->call('setTriggerMode')
+        ->assertSet('triggerMode', 'smart');
 
     expect($this->application->settings->refresh()->is_smart_triggers_enabled)->toBeTrue();
+});
+
+it('does not let a read-only member change which pushes deploy', function () {
+    $this->application->update(['watch_paths' => 'apps/web/**']);
+    actAsMemberOf($this->fixture, 'member');
+
+    Livewire::test(DeployTriggers::class, ['application' => $this->application->refresh()])
+        ->set('triggerMode', 'all')
+        ->call('setTriggerMode')
+        ->assertSet('triggerMode', 'watch_paths')
+        ->set('watchPaths', 'src/**')
+        ->call('saveWatchPaths');
+
+    expect($this->application->refresh()->watch_paths)->toBe('apps/web/**')
+        ->and($this->application->settings->refresh()->is_smart_triggers_enabled)->toBeTrue();
 });
 
 it('acts on the application team after the session switches teams', function () {
@@ -61,7 +144,21 @@ it('acts on the application team after the session switches teams', function () 
     $otherTeam->members()->attach($this->fixture['user']->id, ['role' => 'owner']);
     session(['currentTeam' => $otherTeam]);
 
-    $component->set('isSmartTriggersEnabled', false)->call('instantSave');
+    $component->set('triggerMode', 'all')->call('setTriggerMode');
+    $component->set('triggerMode', 'watch_paths')->call('setTriggerMode')->set('watchPaths', 'src/**')->call('saveWatchPaths');
+
+    expect($this->application->settings->refresh()->is_smart_triggers_enabled)->toBeFalse()
+        ->and($this->application->refresh()->watch_paths)->toBe('src/**');
+});
+
+it('offers smart deploy triggers only when the instance allows them', function () {
+    InstanceSettings::get()->update(['is_smart_triggers_enabled' => false]);
+    $this->application->settings->update(['is_smart_triggers_enabled' => false]);
+
+    Livewire::test(DeployTriggers::class, ['application' => $this->application->refresh()])
+        ->set('triggerMode', 'smart')
+        ->call('setTriggerMode')
+        ->assertSet('triggerMode', 'all');
 
     expect($this->application->settings->refresh()->is_smart_triggers_enabled)->toBeFalse();
 });

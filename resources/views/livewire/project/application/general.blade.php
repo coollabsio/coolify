@@ -8,7 +8,7 @@
 }">
     <form wire:submit='submit' class="application-settings-form flex flex-col">
         <x-unsaved-bar action="submit"
-            targets="name,description,buildPack,staticImage,baseDirectory,dockerComposeLocation,dockerComposeCustomBuildCommand,dockerComposeCustomStartCommand,watchPaths,dockerfileLocation,dockerfileTargetBuild,publishDirectory,installCommand,buildCommand,startCommand,customNginxConfiguration,dockerfile,dockerRegistryImageName,dockerRegistryImageTag,portsExposes,portsMappings,customNetworkAliases,customDockerRunOptions,httpBasicAuthUsername,httpBasicAuthPassword,ipAllowlist,preDeploymentCommand,preDeploymentCommandContainer,postDeploymentCommand,postDeploymentCommandContainer,isContainerLabelReadonlyEnabled,isContainerLabelEscapeEnabled,customLabels" />
+            targets="name,description,buildPack,staticImage,baseDirectory,dockerComposeLocation,dockerComposeCustomBuildCommand,dockerComposeCustomStartCommand,dockerfileLocation,dockerfileTargetBuild,publishDirectory,installCommand,buildCommand,startCommand,customNginxConfiguration,dockerfile,dockerRegistryImageName,dockerRegistryImageTag,portsExposes,portsMappings,customNetworkAliases,customDockerRunOptions,httpBasicAuthUsername,httpBasicAuthPassword,ipAllowlist,preDeploymentCommand,preDeploymentCommandContainer,postDeploymentCommand,postDeploymentCommandContainer,isContainerLabelReadonlyEnabled,isContainerLabelEscapeEnabled,customLabels" />
         <div class="application-settings-grid flex flex-col gap-6">
             <x-project-config.readonly-notice :resource="$application" />
             @if (app(\App\Services\ProjectConfig\UnlinkedConfigFileHint::class)->shows($application))
@@ -342,12 +342,6 @@
                 <x-application.settings-subsection id="deploy-triggers-section" title="Deploy triggers"
                     helper="Which Git pushes deploy this application.">
                     <livewire:project.application.deploy-triggers :application="$application" wire:key="deploy-triggers-{{ $application->uuid }}" />
-                    <div class="pt-4">
-                        <x-forms.textarea
-                            helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins. Set watch paths to replace smart deploy triggers."
-                            placeholder="{{ $buildPack === 'dockercompose' ? 'services/api/**' : 'src/pages/**' }}" id="watchPaths" label="Watch paths"
-                            x-bind:disabled="{{ $buildPack === 'dockercompose' ? 'shouldDisable()' : '!canUpdate' }}" />
-                    </div>
                 </x-application.settings-subsection>
             @endif
             @if ($isStatic || $buildPack === 'static')

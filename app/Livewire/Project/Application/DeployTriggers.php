@@ -23,7 +23,11 @@ class DeployTriggers extends Component
 
     public Application $application;
 
-    public bool $isSmartTriggersEnabled = true;
+    /** Which pushes deploy: `all`, `smart`, or `watch_paths`. Saved watch paths win over smart deploy triggers. */
+    public string $triggerMode = 'smart';
+
+    /** The watch paths as typed. Switching to another mode clears the saved ones but keeps them here, so switching back restores them. */
+    public ?string $watchPaths = null;
 
     /** Polls for the result of Evaluate now until the stored set changes or two minutes pass. */
     public bool $isEvaluating = false;
@@ -32,22 +36,85 @@ class DeployTriggers extends Component
 
     public ?string $evaluatedAtBefore = null;
 
+    private const TRIGGER_MODES = ['all', 'smart', 'watch_paths'];
+
     public function mount(): void
     {
-        $this->isSmartTriggersEnabled = (bool) ($this->application->settings?->is_smart_triggers_enabled ?? true);
+        $this->watchPaths = $this->application->watch_paths;
+        $this->triggerMode = $this->savedTriggerMode();
     }
 
-    public function instantSave(): void
+    public function setTriggerMode(): void
     {
         try {
             $this->authorize('update', $this->application);
-            $this->application->settings->is_smart_triggers_enabled = $this->isSmartTriggersEnabled;
+            if (! in_array($this->triggerMode, self::TRIGGER_MODES, true)) {
+                throw new \InvalidArgumentException('Choose which pushes deploy.');
+            }
+            if ($this->triggerMode === 'smart' && ! self::isSmartAllowedOnInstance()) {
+                throw new \InvalidArgumentException('Smart deploy triggers are turned off for this instance.');
+            }
+
+            if ($this->triggerMode === 'watch_paths') {
+                if (filled($this->watchPaths) && blank($this->application->watch_paths)) {
+                    $this->storeWatchPaths();
+                }
+
+                return;
+            }
+
+            $this->application->watch_paths = null;
+            $this->application->save();
+            $this->application->settings->is_smart_triggers_enabled = $this->triggerMode === 'smart';
             $this->saveApplicationSettingsWithAudit($this->application);
-            $this->dispatch('success', 'Smart deploy triggers updated.');
+            unset($this->triggerSummary);
+            $this->dispatch('success', $this->triggerMode === 'smart' ? 'Smart deploy triggers decide which pushes deploy.' : 'Every push deploys.');
         } catch (\Throwable $e) {
-            $this->isSmartTriggersEnabled = (bool) $this->application->settings->refresh()->is_smart_triggers_enabled;
+            $this->application->refresh();
+            $this->triggerMode = $this->savedTriggerMode();
             handleError($e, $this);
         }
+    }
+
+    public function saveWatchPaths(): void
+    {
+        try {
+            $this->authorize('update', $this->application);
+            $this->validate(['watchPaths' => 'nullable|string']);
+            $this->storeWatchPaths();
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    private function storeWatchPaths(): void
+    {
+        $this->application->watch_paths = $this->watchPaths;
+        $this->application->save();
+        $this->watchPaths = $this->application->watch_paths;
+        unset($this->triggerSummary);
+        if (filled($this->application->watch_paths)) {
+            $this->triggerMode = 'watch_paths';
+            $this->dispatch('success', 'Watch paths decide which pushes deploy.');
+
+            return;
+        }
+        $this->triggerMode = $this->savedTriggerMode();
+        $this->dispatch('success', 'Watch paths cleared.');
+    }
+
+    private function savedTriggerMode(): string
+    {
+        return match (true) {
+            filled($this->application->watch_paths) => 'watch_paths',
+            (bool) ($this->application->settings?->is_smart_triggers_enabled ?? true) => 'smart',
+            default => 'all',
+        };
+    }
+
+    public static function isSmartAllowedOnInstance(): bool
+    {
+        return (bool) (InstanceSettings::query()->whereKey(0)->value('is_smart_triggers_enabled') ?? true);
     }
 
     /**
@@ -141,8 +208,8 @@ class DeployTriggers extends Component
 
         $state = match (true) {
             filled($this->application->watch_paths) => 'watch_paths',
-            ! (bool) (InstanceSettings::query()->whereKey(0)->value('is_smart_triggers_enabled') ?? true) => 'disabled_instance',
-            ! $this->isSmartTriggersEnabled => 'disabled',
+            ! self::isSmartAllowedOnInstance() => 'disabled_instance',
+            ! (bool) ($this->application->settings?->is_smart_triggers_enabled ?? true) => 'disabled',
             ! $this->application->isNarrowable() => 'not_narrowable',
             $summary['evaluatedCommit'] === null => 'none',
             default => 'evaluated',

@@ -102,3 +102,13 @@ it('hides the watch paths field for applications without a Git repository', func
     Livewire::test(General::class, ['application' => $application->fresh()])
         ->assertDontSee('Watch paths');
 });
+
+it('keeps the watch paths that deploy triggers saved when the general settings are saved', function () {
+    $application = watchPathsTestApplication(['build_pack' => 'nixpacks', 'watch_paths' => 'src/**']);
+    $component = Livewire::test(General::class, ['application' => $application->fresh()]);
+    $application->update(['watch_paths' => 'apps/web/**']);
+
+    $component->call('submit')->assertHasNoErrors();
+
+    expect($application->refresh()->watch_paths)->toBe('apps/web/**');
+});
