@@ -137,6 +137,7 @@ beforeEach(function () {
     $git($this->root.'/srv/app.git', ['update-ref', 'refs/heads/main', $this->commit]);
 
     $this->repository = $this->baseUrl.'/app.git';
+    $this->git = $git;
 });
 
 afterEach(function () {
@@ -163,6 +164,27 @@ test('the deployment clone uses the HTTPS credential for the repository, the com
 })->with([
     'pinned commit' => [0],
     'pull request preview' => [7],
+]);
+
+test('a fork preview sends the HTTPS credential only to its repository, not to other repositories on the host', function (string $submoduleUrl) {
+    // The fork points its submodule at another private repository on the same host.
+    ($this->git)($this->root.'/src', ['config', '-f', '.gitmodules', 'submodule.lib.url', str_replace('BASE', $this->baseUrl, $submoduleUrl)]);
+    ($this->git)($this->root.'/src', ['commit', '-qam', 'fork', '--allow-empty']);
+    ($this->git)($this->root.'/src', ['push', '-q', $this->root.'/srv/app.git', 'HEAD:refs/pull/8/head']);
+    $application = gitHttpsCredentialApplication($this->repository);
+    $checkout = $this->root.'/work/checkout';
+
+    ['commands' => $commands] = $application->generateGitImportCommands('deploy-uuid', pull_request_id: 8, git_type: 'gitea', exec_in_docker: true, custom_base_dir: $checkout, untrusted_source: true);
+    $process = runGitHttpsCredentialCommands($this->root, $commands);
+
+    expect($process->getExitCode())->not->toBe(0)
+        ->and($process->getErrorOutput())->toContain('could not read Username')
+        ->and(file_get_contents($checkout.'/pr.txt'))->toBe('pull request')
+        ->and(file_exists($checkout.'/lib/lib.txt'))->toBeFalse()
+        ->and(file_get_contents($checkout.'/.git/config'))->not->toContain('plain-test-value')->not->toContain('extraHeader');
+})->with([
+    'absolute URL' => ['BASE/sub.git'],
+    'relative URL' => ['../sub.git'],
 ]);
 
 test('git fails without the right HTTPS credential', function () {

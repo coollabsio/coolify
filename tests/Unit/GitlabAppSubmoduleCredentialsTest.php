@@ -5,6 +5,7 @@ use App\Models\ApplicationSetting;
 use App\Models\GitlabApp;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Encryption\Encrypter;
+use Symfony\Component\Process\Process;
 
 beforeEach(function () {
     Model::encryptUsing(new Encrypter(str_repeat('a', 32), 'AES-256-CBC'));
@@ -53,4 +54,43 @@ test('connected gitlab oauth submodule credentials use per command git config', 
         ->toContain("{$expectedConfig} clone --recurse-submodules -b 'main'")
         ->toContain("{$expectedConfig} submodule sync")
         ->toContain("{$expectedConfig} submodule update --init --recursive");
+});
+
+test('a fork preview sends the gitlab token only to its repository', function () {
+    $application = new Application;
+    $application->forceFill([
+        'uuid' => 'test-app-uuid',
+        'git_repository' => 'group/private-app',
+        'git_branch' => 'main',
+        'git_commit_sha' => 'HEAD',
+    ]);
+
+    $settings = new ApplicationSetting;
+    $settings->is_git_shallow_clone_enabled = false;
+    $settings->is_git_submodules_enabled = true;
+    $settings->is_git_lfs_enabled = false;
+    $application->setRelation('settings', $settings);
+
+    $source = new GitlabApp;
+    $source->forceFill([
+        'html_url' => 'https://gitlab.example.test/prefix',
+        'api_url' => 'https://gitlab.example.test/api/v4',
+        'is_public' => false,
+    ]);
+    $source->access_token = 'gl-token/with+sym';
+    $source->refresh_token = 'gl-refresh-token';
+    $source->expires_at = time() + 3600;
+    $application->setRelation('source', $source);
+
+    $result = $application->generateGitImportCommands(deployment_uuid: 'test-deployment', pull_request_id: 3, exec_in_docker: false, untrusted_source: true);
+
+    $header = fn (string $url): string => trim(tap(Process::fromShellCommandline("{$result['git']} config --get-urlmatch http.extraHeader ".escapeshellarg($url)))->run()->getOutput());
+
+    expect($result['commands'])
+        ->not->toContain('oauth2:gl-token')
+        ->not->toContain('insteadOf')
+        ->toContain("'https://gitlab.example.test/prefix/group/private-app.git'")
+        ->toContain('fetch origin \'merge-requests/3/head:pr-3-coolify\'')
+        ->and($header('https://gitlab.example.test/prefix/group/private-app.git/info/lfs'))->toBe('Authorization: Basic '.base64_encode('oauth2:gl-token/with+sym'))
+        ->and($header('https://gitlab.example.test/prefix/group/other.git'))->toBe('');
 });

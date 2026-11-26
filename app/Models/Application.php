@@ -1789,7 +1789,11 @@ class Application extends BaseModel
         return application_configuration_dir()."/{$this->uuid}";
     }
 
-    public function setGitImportSettings(string $deployment_uuid, string $git_clone_command, bool $public = false, ?string $commit = null, ?string $gitSshCommand = null, ?string $git_ssh_command = null, ?string $gitConfigOptions = null, ?string $baseDir = null, bool $onlyCheckout = false)
+    /**
+     * @param  string|null  $untrustedSshCommand  For an untrusted source: the SSH command without a key, for the steps that read the
+     *                                            checked-out content (checkout, submodules, Git LFS). Only the fetch from origin uses the key.
+     */
+    public function setGitImportSettings(string $deployment_uuid, string $git_clone_command, bool $public = false, ?string $commit = null, ?string $gitSshCommand = null, ?string $git_ssh_command = null, ?string $gitConfigOptions = null, ?string $baseDir = null, bool $onlyCheckout = false, ?string $untrustedSshCommand = null)
     {
         // The folder the repository was cloned into; a checkout on the server passes its own folder.
         $baseDir ??= $this->generateBaseDir($deployment_uuid);
@@ -1803,6 +1807,7 @@ class Application extends BaseModel
                 ? $resolvedGitSshCommand
                 : 'GIT_SSH_COMMAND="'.$resolvedGitSshCommand.'"')
             : 'GIT_SSH_COMMAND="'.gitSshCommand($deployment_uuid).'"';
+        $contentSshCommand = $untrustedSshCommand === null ? $sshCommand : 'GIT_SSH_COMMAND="'.$untrustedSshCommand.'"';
 
         $git_clone_command = $this->gitLfsSkipSmudgePrefix($onlyCheckout).$git_clone_command;
 
@@ -1818,7 +1823,7 @@ class Application extends BaseModel
             // so fetch the tip of each branch and let the checkout expand it. When the
             // commit is not a branch tip, fetch the full history of the branches.
             if ($isShallowCloneEnabled) {
-                $checkoutCommand = "{$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
+                $checkoutCommand = ($untrustedSshCommand === null ? '' : "{$contentSshCommand} ")."{$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
                 if (preg_match('/\A[0-9a-fA-F]{7,39}\z/', $commitToUse) === 1) {
                     $branchesRefspec = escapeshellarg('+refs/heads/*:refs/remotes/origin/*');
                     $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && echo 'Fetching the commit.' && {$sshCommand} {$gitCommand} fetch --depth=1 origin {$branchesRefspec} && ({$checkoutCommand} || (echo 'The commit is not a branch tip. Fetching the full history.' && {$sshCommand} {$gitCommand} fetch --unshallow origin {$branchesRefspec} && {$checkoutCommand}))";
@@ -1826,11 +1831,12 @@ class Application extends BaseModel
                     $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && echo 'Fetching the commit.' && {$sshCommand} {$gitCommand} fetch --depth=1 origin {$escapedCommit} && {$checkoutCommand}";
                 }
             } else {
-                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} {$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
+                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$contentSshCommand} {$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
             }
         }
         // A checkout that only reads files (the Compose file) needs neither submodules nor LFS objects.
-        if ($this->settings->is_git_submodules_enabled && ! $onlyCheckout) {
+        // An untrusted source updates its submodules after the checkout of the pull request (buildGitCheckoutCommand()).
+        if ($this->settings->is_git_submodules_enabled && ! $onlyCheckout && $untrustedSshCommand === null) {
             // Check if .gitmodules file exists before running submodule commands
             $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && if [ -f .gitmodules ]; then";
             if ($public) {
@@ -1838,12 +1844,12 @@ class Application extends BaseModel
             }
             // Add shallow submodules flag if shallow clone is enabled
             $submoduleFlags = $isShallowCloneEnabled ? '--depth=1' : '';
-            $git_clone_command = "{$git_clone_command} echo 'Updating submodules.' && {$gitCommand} submodule sync && {$sshCommand} {$gitCommand} submodule update --init --recursive {$submoduleFlags}; fi";
+            $git_clone_command = "{$git_clone_command} echo 'Updating submodules.' && {$gitCommand} submodule sync && {$contentSshCommand} {$gitCommand} submodule update --init --recursive {$submoduleFlags}; fi";
         }
         // `git lfs pull` opens an SSH session even without LFS files, which can hang on hosts
         // without LFS over SSH (Azure DevOps). `git lfs ls-files` is offline.
         if ($this->settings->is_git_lfs_enabled && ! $onlyCheckout) {
-            $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && if {$gitCommand} lfs ls-files -n | grep -q .; then echo 'Downloading Git LFS objects.' && {$sshCommand} {$gitCommand} lfs pull; fi";
+            $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && if {$gitCommand} lfs ls-files -n | grep -q .; then echo 'Downloading Git LFS objects.' && {$contentSshCommand} {$gitCommand} lfs pull; fi";
         }
 
         return $git_clone_command;
@@ -2094,6 +2100,29 @@ class Application extends BaseModel
             ->implode(' ');
     }
 
+    /**
+     * `git -c` options that send a credential only to one repository: its path with and without `.git`, which also
+     * covers its Git LFS endpoint (`<path>.git/info/lfs`). Git matches `http.<url>` by whole path segments, so
+     * submodules and LFS URLs of other repositories on the same host get no credential.
+     */
+    private function gitRepositoryCredentialOptions(string $repositoryUrl, string $username, string $password): string
+    {
+        $path = Str::replaceEnd('.git', '', rtrim($repositoryUrl, '/'));
+        $header = 'Authorization: Basic '.base64_encode("{$username}:{$password}");
+
+        return collect([$path, "{$path}.git"])
+            ->map(fn (string $url): string => '-c '.escapeshellarg("http.{$url}.extraHeader={$header}"))
+            ->implode(' ');
+    }
+
+    /**
+     * The SSH command of an untrusted source for the steps that read its content: it sends no key.
+     */
+    private function gitSshCommandWithoutKey(string $deploymentUuid): string
+    {
+        return gitSshCommand($deploymentUuid).' -o IdentityFile=none -o IdentitiesOnly=yes';
+    }
+
     private function gitHttpsCredentialOrigin(): ?string
     {
         $url = parse_url((string) $this->git_repository);
@@ -2205,13 +2234,19 @@ class Application extends BaseModel
         return $this->git_branch;
     }
 
-    public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null)
+    /**
+     * @param  bool  $untrusted_source  The pull request comes from a fork (or Coolify does not know where its branch is). Its
+     *                                  content then gets the credential only for the repository of the application: an HTTPS
+     *                                  credential is sent only to the repository path, and an SSH key is used only to fetch.
+     */
+    public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null, bool $untrusted_source = false)
     {
         $commit = $commit ?: ($this->git_commit_sha ?: 'HEAD');
         $branch = $this->git_branch;
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
         $baseDir = $custom_base_dir ?? $this->generateBaseDir($deployment_uuid);
         $customSshKeyLocation = "/root/.ssh/id_rsa_coolify_{$deployment_uuid}";
+        $untrustedSshCommand = $untrusted_source ? $this->gitSshCommandWithoutKey($deployment_uuid) : null;
 
         // Escape shell arguments for safety to prevent command injection
         $escapedBranch = escapeshellarg($branch);
@@ -2224,7 +2259,8 @@ class Application extends BaseModel
         $depthFlag = $isShallowCloneEnabled ? ' --depth=1' : '';
 
         $submoduleFlags = '';
-        if ($this->settings->is_git_submodules_enabled) {
+        // An untrusted source fetches its submodules after the checkout of its own commit.
+        if ($this->settings->is_git_submodules_enabled && ! $untrusted_source) {
             $submoduleFlags = ' --recurse-submodules';
             if ($isShallowCloneEnabled) {
                 $submoduleFlags .= ' --shallow-submodules';
@@ -2250,7 +2286,7 @@ class Application extends BaseModel
                     $fullRepoUrl = "{$this->source->html_url}/{$customRepository}";
                     $escapedRepoUrl = escapeshellarg("{$this->source->html_url}/{$customRepository}");
                     $git_clone_command = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
-                    $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, baseDir: $baseDir, onlyCheckout: $only_checkout);
+                    $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, baseDir: $baseDir, onlyCheckout: $only_checkout, untrustedSshCommand: $untrustedSshCommand);
                     if ($exec_in_docker) {
                         $commands->push($this->gitCommand(executeInDocker($deployment_uuid, $git_clone_command)));
                     } else {
@@ -2260,26 +2296,23 @@ class Application extends BaseModel
                     $github_access_token = generateGithubInstallationToken($this->source);
                     $encodedToken = rawurlencode($github_access_token);
 
-                    $gitConfigOption = $this->gitTokenUrlRewriteOptions(
-                        tokenBaseUrl: "{$source_html_url_scheme}://x-access-token:{$encodedToken}@{$source_html_url_host}/",
-                        httpsBaseUrl: "{$source_html_url_scheme}://{$source_html_url_host}/",
-                        sshHost: $source_html_url_host,
-                        sshUser: $this->source->custom_user,
-                    );
+                    $untrustedCloneUrl = "{$source_html_url_scheme}://{$source_html_url_host}/{$customRepository}.git";
+                    $gitConfigOption = $untrusted_source
+                        ? $this->gitRepositoryCredentialOptions($untrustedCloneUrl, 'x-access-token', $github_access_token)
+                        : $this->gitTokenUrlRewriteOptions(
+                            tokenBaseUrl: "{$source_html_url_scheme}://x-access-token:{$encodedToken}@{$source_html_url_host}/",
+                            httpsBaseUrl: "{$source_html_url_scheme}://{$source_html_url_host}/",
+                            sshHost: $source_html_url_host,
+                            sshUser: $this->source->custom_user,
+                        );
                     $git_clone_command = str_replace('git clone', "git {$gitConfigOption} clone", $git_clone_command);
 
-                    if ($exec_in_docker) {
-                        $repoUrl = "$source_html_url_scheme://x-access-token:$encodedToken@$source_html_url_host/{$customRepository}.git";
-                        $escapedRepoUrl = escapeshellarg($repoUrl);
-                        $git_clone_command = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
-                        $fullRepoUrl = $repoUrl;
-                    } else {
-                        $repoUrl = "$source_html_url_scheme://x-access-token:$encodedToken@$source_html_url_host/{$customRepository}";
-                        $escapedRepoUrl = escapeshellarg($repoUrl);
-                        $git_clone_command = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
-                        $fullRepoUrl = $repoUrl;
-                    }
-                    $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false, commit: $commit, gitConfigOptions: $gitConfigOption, baseDir: $baseDir, onlyCheckout: $only_checkout);
+                    $fullRepoUrl = "$source_html_url_scheme://x-access-token:$encodedToken@$source_html_url_host/{$customRepository}".($exec_in_docker ? '.git' : '');
+                    // The origin URL of an untrusted clone has no token, so relative submodule URLs do not get it.
+                    // fullRepoUrl keeps it: the deployment uses it only for ls-remote of the repository itself.
+                    $escapedRepoUrl = escapeshellarg($untrusted_source ? $untrustedCloneUrl : $fullRepoUrl);
+                    $git_clone_command = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
+                    $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: false, commit: $commit, gitConfigOptions: $gitConfigOption, baseDir: $baseDir, onlyCheckout: $only_checkout, untrustedSshCommand: $untrustedSshCommand);
                     if ($exec_in_docker) {
                         $commands->push($this->gitCommand(executeInDocker($deployment_uuid, $git_clone_command)));
                     } else {
@@ -2289,9 +2322,11 @@ class Application extends BaseModel
                 if ($pull_request_id !== 0) {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
 
-                    $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitSshCommand($deployment_uuid), $gitConfigOption ?? null);
+                    $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitSshCommand($deployment_uuid), $gitConfigOption ?? null, untrustedSshCommand: $untrustedSshCommand);
                     $escapedPrBranch = escapeshellarg($branch);
-                    $git_pr_command = "{$this->gitLfsSkipSmudgePrefix($only_checkout)}cd {$escapedBaseDir} && git fetch origin {$escapedPrBranch} && $git_checkout_command";
+                    // The origin URL of an untrusted clone has no token, so its fetch needs the credential options.
+                    $gitFetch = $untrusted_source && isset($gitConfigOption) ? "git {$gitConfigOption} fetch" : 'git fetch';
+                    $git_pr_command = "{$this->gitLfsSkipSmudgePrefix($only_checkout)}cd {$escapedBaseDir} && {$gitFetch} origin {$escapedPrBranch} && $git_checkout_command";
                     if ($exec_in_docker) {
                         $commands->push($this->gitCommand(executeInDocker($deployment_uuid, $git_pr_command)));
                     } else {
@@ -2318,19 +2353,23 @@ class Application extends BaseModel
                     $pathPrefix = rtrim($url['path'] ?? '', '/');
                     $source_html_url_host = $this->urlHostWithPort($url ?: []);
 
-                    $gitConfigOption = $this->gitTokenUrlRewriteOptions(
-                        tokenBaseUrl: "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/",
-                        httpsBaseUrl: "{$source_html_url_scheme}://{$source_html_url_host}{$pathPrefix}/",
-                        sshHost: $url['host'] ?? '',
-                        sshUser: $oauthSource->custom_user,
-                    );
+                    $untrustedCloneUrl = "{$source_html_url_scheme}://{$source_html_url_host}{$pathPrefix}/{$customRepository}.git";
+                    $gitConfigOption = $untrusted_source
+                        ? $this->gitRepositoryCredentialOptions($untrustedCloneUrl, 'oauth2', $token)
+                        : $this->gitTokenUrlRewriteOptions(
+                            tokenBaseUrl: "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/",
+                            httpsBaseUrl: "{$source_html_url_scheme}://{$source_html_url_host}{$pathPrefix}/",
+                            sshHost: $url['host'] ?? '',
+                            sshUser: $oauthSource->custom_user,
+                        );
                     $git_clone_command = str_replace('git clone', "git {$gitConfigOption} clone", $git_clone_command);
 
                     $repoUrl = "{$source_html_url_scheme}://oauth2:{$encodedToken}@{$source_html_url_host}{$pathPrefix}/{$customRepository}.git";
-                    $escapedRepoUrl = escapeshellarg($repoUrl);
                     $fullRepoUrl = $repoUrl;
+                    // The origin URL of an untrusted clone has no token, so relative submodule URLs do not get it.
+                    $escapedRepoUrl = escapeshellarg($untrusted_source ? $untrustedCloneUrl : $repoUrl);
                     $git_clone_command_base = "{$git_clone_command} {$escapedRepoUrl} {$escapedBaseDir}";
-                    $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitConfigOptions: $gitConfigOption, baseDir: $baseDir, onlyCheckout: $only_checkout);
+                    $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitConfigOptions: $gitConfigOption, baseDir: $baseDir, onlyCheckout: $only_checkout, untrustedSshCommand: $untrustedSshCommand);
 
                     if ($pull_request_id !== 0) {
                         $branch = "{$pullRequestRef}:{$pr_branch_name}";
@@ -2339,7 +2378,7 @@ class Application extends BaseModel
                         } else {
                             $commands->push("echo 'Checking out {$branch}'");
                         }
-                        $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitSshCommand($deployment_uuid), $gitConfigOption);
+                        $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitSshCommand($deployment_uuid), $gitConfigOption, untrustedSshCommand: $untrustedSshCommand);
                         $escapedPrBranch = escapeshellarg($branch);
                         $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && git {$gitConfigOption} fetch origin {$escapedPrBranch} && {$git_checkout_command}";
                     }
@@ -2368,7 +2407,7 @@ class Application extends BaseModel
                     $gitlabSshCommand = gitSshCommand($deployment_uuid, $gitlabPort, $customSshKeyLocation);
                     $gitlabGitSshCommand = "GIT_SSH_COMMAND=\"{$gitlabSshCommand}\"";
                     $git_clone_command_base = "{$gitlabGitSshCommand} {$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
-                    $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitSshCommand: $gitlabSshCommand, baseDir: $baseDir, onlyCheckout: $only_checkout);
+                    $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitSshCommand: $gitlabSshCommand, baseDir: $baseDir, onlyCheckout: $only_checkout, untrustedSshCommand: $untrustedSshCommand);
                     $commands = $this->gitSshKeySetupCommands($deployment_uuid, $private_key, $exec_in_docker);
 
                     if ($pull_request_id !== 0) {
@@ -2378,7 +2417,7 @@ class Application extends BaseModel
                         } else {
                             $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                         }
-                        $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$gitlabGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $gitlabSshCommand);
+                        $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$gitlabGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $gitlabSshCommand, untrustedSshCommand: $untrustedSshCommand);
                     }
 
                     if ($exec_in_docker) {
@@ -2398,7 +2437,7 @@ class Application extends BaseModel
                 $fullRepoUrl = $customRepository;
                 $escapedCustomRepository = escapeshellarg($customRepository);
                 $git_clone_command = "{$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
-                $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, baseDir: $baseDir, onlyCheckout: $only_checkout);
+                $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, baseDir: $baseDir, onlyCheckout: $only_checkout, untrustedSshCommand: $untrustedSshCommand);
 
                 if ($exec_in_docker) {
                     $commands->push($this->gitCommand(executeInDocker($deployment_uuid, $git_clone_command)));
@@ -2425,7 +2464,7 @@ class Application extends BaseModel
             $deployKeySshCommand = gitSshCommand($deployment_uuid, $customPort, $customSshKeyLocation);
             $deployKeyGitSshCommand = "GIT_SSH_COMMAND=\"{$deployKeySshCommand}\"";
             $git_clone_command_base = "{$deployKeyGitSshCommand} {$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
-            $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitSshCommand: $deployKeySshCommand, baseDir: $baseDir, onlyCheckout: $only_checkout);
+            $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base, commit: $commit, gitSshCommand: $deployKeySshCommand, baseDir: $baseDir, onlyCheckout: $only_checkout, untrustedSshCommand: $untrustedSshCommand);
             $commands = $this->gitSshKeySetupCommands($deployment_uuid, $private_key, $exec_in_docker);
             if ($pull_request_id !== 0) {
                 if ($git_type === 'gitlab') {
@@ -2435,7 +2474,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$deployKeyGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $deployKeySshCommand);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$deployKeyGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $deployKeySshCommand, untrustedSshCommand: $untrustedSshCommand);
                 } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -2443,14 +2482,14 @@ class Application extends BaseModel
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$deployKeyGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $deployKeySshCommand);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$deployKeyGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $deployKeySshCommand, untrustedSshCommand: $untrustedSshCommand);
                 } elseif ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push($this->gitCommand(executeInDocker($deployment_uuid, "echo 'Checking out $branch'")));
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$deployKeyGitSshCommand} ".$this->buildGitCheckoutCommand($commit, $deployKeySshCommand);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$deployKeyGitSshCommand} ".$this->buildGitCheckoutCommand($commit, $deployKeySshCommand, untrustedSshCommand: $untrustedSshCommand);
                 }
             }
 
@@ -2471,10 +2510,20 @@ class Application extends BaseModel
             $fullRepoUrl = $customRepository;
             $escapedCustomRepository = escapeshellarg($customRepository);
             $gitConfigOption = $this->gitHttpsCredentialConfigOption();
+            if ($untrusted_source && preg_match('#\Ahttps?://#i', $customRepository) === 1) {
+                // The credential moves out of the URL, which git saves as origin, to a header for the repository only.
+                $url = parse_url($customRepository) ?: [];
+                [$username, $password] = $this->usesGitHttpsCredential()
+                    ? [$this->git_https_username ?? '', $this->git_https_password]
+                    : [$url['user'] ?? '', $url['pass'] ?? ''];
+                $cloneUrl = (string) Url::fromString($customRepository)->withUserInfo('');
+                $escapedCustomRepository = escapeshellarg($cloneUrl);
+                $gitConfigOption = filled($username) || filled($password) ? $this->gitRepositoryCredentialOptions($cloneUrl, $username, $password) : null;
+            }
             $gitCommand = $gitConfigOption ? "git {$gitConfigOption}" : 'git';
             $git_clone_command = str_replace('git clone', "{$gitCommand} clone", $git_clone_command);
             $git_clone_command = "{$git_clone_command} {$escapedCustomRepository} {$escapedBaseDir}";
-            $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, gitConfigOptions: $gitConfigOption, baseDir: $baseDir, onlyCheckout: $only_checkout);
+            $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true, commit: $commit, gitConfigOptions: $gitConfigOption, baseDir: $baseDir, onlyCheckout: $only_checkout, untrustedSshCommand: $untrustedSshCommand);
             $otherSshCommand = gitSshCommand($deployment_uuid, $customPort, '/root/.ssh/id_rsa', identitiesOnly: false);
 
             if ($pull_request_id !== 0) {
@@ -2485,7 +2534,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" {$gitCommand} fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $otherSshCommand, $gitConfigOption);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" {$gitCommand} fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $otherSshCommand, $gitConfigOption, untrustedSshCommand: $untrustedSshCommand);
                 } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -2493,14 +2542,14 @@ class Application extends BaseModel
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" {$gitCommand} fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $otherSshCommand, $gitConfigOption);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" {$gitCommand} fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $otherSshCommand, $gitConfigOption, untrustedSshCommand: $untrustedSshCommand);
                 } elseif ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push($this->gitCommand(executeInDocker($deployment_uuid, "echo 'Checking out $branch'")));
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" ".$this->buildGitCheckoutCommand($commit, $otherSshCommand, $gitConfigOption);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" ".$this->buildGitCheckoutCommand($commit, $otherSshCommand, $gitConfigOption, untrustedSshCommand: $untrustedSshCommand);
                 }
             }
 
@@ -2956,11 +3005,19 @@ class Application extends BaseModel
         );
     }
 
-    protected function buildGitCheckoutCommand(string $target, string $gitSshCommand, ?string $gitConfigOptions = null): string
+    /**
+     * @param  string|null  $untrustedSshCommand  For an untrusted source: the SSH command without a key, used instead of
+     *                                            $gitSshCommand also for the checkout, which downloads Git LFS objects.
+     */
+    protected function buildGitCheckoutCommand(string $target, string $gitSshCommand, ?string $gitConfigOptions = null, ?string $untrustedSshCommand = null): string
     {
         $escapedTarget = escapeshellarg($target);
         $gitCommand = $gitConfigOptions ? "git {$gitConfigOptions}" : 'git';
         $command = "{$gitCommand} checkout {$escapedTarget}";
+        if ($untrustedSshCommand !== null) {
+            $gitSshCommand = $untrustedSshCommand;
+            $command = "GIT_SSH_COMMAND=\"{$gitSshCommand}\" {$command}";
+        }
 
         if ($this->settings->is_git_submodules_enabled) {
             $command .= " && GIT_SSH_COMMAND=\"{$gitSshCommand}\" {$gitCommand} submodule update --init --recursive";

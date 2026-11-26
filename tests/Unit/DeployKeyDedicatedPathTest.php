@@ -83,7 +83,7 @@ it('keeps the deploy key out of the deployment log when ls-remote runs inside do
     $deployKey = 'deploy-key-material-that-must-stay-secret';
     $application = new class extends Application
     {
-        public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null)
+        public function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null, bool $untrusted_source = false)
         {
             return ['commands' => collect(), 'branch' => 'main', 'fullRepoUrl' => 'git@gitlab.com:user/repo.git'];
         }
