@@ -167,6 +167,12 @@ services:
     network_mode: "service:web"
     command: ["true"]
 
+  # Empty ports and volumes lists: left out, not written as {}.
+  empty-lists:
+    image: nginx:alpine
+    ports: []
+    volumes: []
+
 volumes:
   web-data:
   db-data:

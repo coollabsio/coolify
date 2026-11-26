@@ -2551,11 +2551,16 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         if (! $use_network_mode) {
             $payload['networks'] = $networks_temp;
         }
+        // Yaml::dump writes an empty list as a mapping ({}), which docker compose rejects.
         if ($ports->count() > 0) {
             $payload['ports'] = $ports;
+        } else {
+            $payload->forget('ports');
         }
         if ($volumesParsed->count() > 0) {
             $payload['volumes'] = $volumesParsed;
+        } else {
+            $payload->forget('volumes');
         }
         if ($environment->count() > 0 || $coolifyEnvironments->count() > 0) {
             $environment = preserveLegacyDockerComposeNullAssignments($environment, $legacyNullEnvironmentVariables);
@@ -3818,11 +3823,16 @@ function serviceParser(Service $resource): Collection
         if (! $use_network_mode) {
             $payload['networks'] = $networks_temp;
         }
+        // Yaml::dump writes an empty list as a mapping ({}), which docker compose rejects.
         if ($ports->count() > 0) {
             $payload['ports'] = $ports;
+        } else {
+            $payload->forget('ports');
         }
         if ($volumesParsed->count() > 0) {
             $payload['volumes'] = $volumesParsed;
+        } else {
+            $payload->forget('volumes');
         }
         if ($environment->count() > 0 || $coolifyEnvironments->count() > 0) {
             $environment = preserveLegacyDockerComposeNullAssignments($environment, $legacyNullEnvironmentVariables);
