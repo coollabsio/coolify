@@ -69,6 +69,23 @@
         "port": "3010",
         "outdated": true
     },
+    "altcha": {
+        "documentation": "https://altcha.org/docs/sentinel/install/docker/?utm_source=coolify.io",
+        "slogan": "ALTCHA Sentinel protects websites and APIs from spam, bots, and abuse.",
+        "compose": "c2VydmljZXM6CiAgYWx0Y2hhOgogICAgaW1hZ2U6ICdnaGNyLmlvL2FsdGNoYS1vcmcvc2VudGluZWw6JHtBTFRDSEFfVkVSU0lPTjotMS40My4wfScKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9BTFRDSEFfODA4MAogICAgICAtICdERUZBVUxUX1JPT1RfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX0FMVENIQX0nCiAgICB2b2x1bWVzOgogICAgICAtICdhbHRjaGEtZGF0YTovZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAiZ3JlcCAtcSAnOjFGOTAgJyAvcHJvYy9uZXQvdGNwIC9wcm9jL25ldC90Y3A2IgogICAgICBpbnRlcnZhbDogMTBzCiAgICAgIHRpbWVvdXQ6IDVzCiAgICAgIHJldHJpZXM6IDEwCiAgICAgIHN0YXJ0X3BlcmlvZDogMTBzCnZvbHVtZXM6CiAgYWx0Y2hhLWRhdGE6IG51bGwK",
+        "tags": [
+            "captcha",
+            "anti-spam",
+            "bot protection",
+            "privacy",
+            "security"
+        ],
+        "category": "security",
+        "logo": "svgs/altcha.svg",
+        "minversion": "0.0.0",
+        "template_last_updated_at": null,
+        "port": "8080"
+    },
     "alexandrie": {
         "documentation": "https://github.com/Smaug6739/Alexandrie/tree/main/docs?utm_source=coolify.io",
         "slogan": "A powerful Markdown workspace designed for speed, clarity, and creativity.",
@@ -6272,5 +6289,22 @@
         "minversion": "0.0.0",
         "template_last_updated_at": "2026-11-16T16:19:39+01:00",
         "port": "8080"
+    },
+    "dbx": {
+        "documentation": "https://dbxio.com/en/docs/getting-started?utm_source=coolify.io",
+        "slogan": "Lightweight database client supporting more than 90 databases.",
+        "compose": "c2VydmljZXM6CiAgZGJ4OgogICAgaW1hZ2U6ICd0OHkyL2RieDoke0RCWF9WRVJTSU9OOi0wLjYuNzV9JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0RCWF80MjI0CiAgICAgIC0gJ0RCWF9QQVNTV09SRD0ke1NFUlZJQ0VfUEFTU1dPUkRfREJYfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2RieC1kYXRhOi9hcHAvZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAiYmFzaCAtYyAnOj4gL2Rldi90Y3AvMTI3LjAuMC4xLzQyMjQnIHx8IGV4aXQgMSIKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDVzCiAgICAgIHJldHJpZXM6IDEwCnZvbHVtZXM6CiAgZGJ4LWRhdGE6IG51bGwK",
+        "tags": [
+            "database",
+            "sql",
+            "client",
+            "management",
+            "development"
+        ],
+        "category": "database",
+        "logo": "svgs/dbx.png",
+        "minversion": "0.0.0",
+        "template_last_updated_at": null,
+        "port": "4224"
     }
 }
