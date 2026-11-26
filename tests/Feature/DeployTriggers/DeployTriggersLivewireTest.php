@@ -109,11 +109,11 @@ it('explains the trigger state', function (string $case, string $copy) {
 
     Livewire::test(DeployTriggers::class, ['application' => $this->application->refresh()])->assertSee($copy, escape: false);
 })->with([
-    ['not evaluated', 'Not evaluated yet. The next push evaluates it.'],
-    ['not narrowable', 'builds from the root of the repository, so every push deploys'],
-    ['watch paths', 'override detection'],
+    ['not evaluated', 'Not evaluated yet'],
+    ['not narrowable', 'This application builds from the root of the repository.'],
+    ['watch paths', 'Watch paths decide which pushes deploy'],
     ['instance off', 'Turned off for this instance'],
-    ['evaluated', 'packages/ui/**'],
+    ['evaluated', '2 paths trigger a deploy'],
     ['last error', "couldn't be evaluated (server unreachable), so it deployed"],
 ]);
 
@@ -252,6 +252,15 @@ it('shows the new trigger paths once evaluate now finishes', function () {
     $component->call('checkEvaluation')->assertSee('apps/web/**')->assertSet('isEvaluating', false);
 });
 
+it('shows that evaluate now is running', function () {
+    $this->application->forceFill(['trigger_base_commit' => str_repeat('c', 40)])->save();
+
+    Livewire::test(DeployTriggers::class, ['application' => $this->application])
+        ->call('evaluateNow')
+        ->assertSee('Evaluating the deployed commit')
+        ->assertSeeHtml('wire:poll.3s="checkEvaluation"');
+});
+
 it('updates the trigger state after the general settings change', function () {
     $component = Livewire::test(DeployTriggers::class, ['application' => $this->application])->assertSee('Not evaluated yet');
     $this->application->update(['base_directory' => '/']);
@@ -266,8 +275,8 @@ it('names where each trigger path comes from', function () {
     ]])->save();
 
     Livewire::test(DeployTriggers::class, ['application' => $this->application->refresh()])
-        ->assertSeeInOrder(['apps/web/**', 'Build context', 'apps/web/**', 'Application package', 'packages/ui/**', 'Workspace package',
-            'pnpm-lock.yaml', 'Workspace file', 'apps/web/test/**', 'Build context, excluded'])
+        ->assertSeeInOrder(['4 paths trigger a deploy', 'Application', 'apps/web/**', 'Workspace packages', 'packages/ui/**', 'Workspace files',
+            'pnpm-lock.yaml', 'Build context', 'apps/web/**', 'Ignored', 'apps/web/test/**'])
         ->assertDontSee('workspace:');
 });
 

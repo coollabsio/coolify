@@ -121,7 +121,7 @@ class DeployTriggers extends Component
     }
 
     /**
-     * @return array{state: 'none'|'not_narrowable'|'watch_paths'|'disabled_instance'|'disabled'|'evaluated', display: list<array{path: string, source: ?string, excluded: bool}>, resolvers: list<string>, anchor: ?string, notes: list<string>, lastError: ?string, lastErrorFromEvaluateNow: bool, evaluatedCommit: ?string}
+     * @return array{state: 'none'|'not_narrowable'|'watch_paths'|'disabled_instance'|'disabled'|'evaluated', display: list<array{path: string, source: ?string, excluded: bool}>, groups: list<array{label: string, paths: list<string>}>, resolvers: list<string>, anchor: ?string, notes: list<string>, lastError: ?string, lastErrorFromEvaluateNow: bool, evaluatedCommit: ?string}
      */
     #[Computed]
     public function triggerSummary(): array
@@ -137,6 +137,8 @@ class DeployTriggers extends Component
             'evaluatedCommit' => is_string($set['evaluated_commit'] ?? null) ? $set['evaluated_commit'] : null,
         ];
 
+        $summary['groups'] = self::pathGroups($summary['display']);
+
         $state = match (true) {
             filled($this->application->watch_paths) => 'watch_paths',
             ! (bool) (InstanceSettings::query()->whereKey(0)->value('is_smart_triggers_enabled') ?? true) => 'disabled_instance',
@@ -147,6 +149,37 @@ class DeployTriggers extends Component
         };
 
         return ['state' => $state, ...$summary];
+    }
+
+    /** Group headings in display order, keyed by the source of a path. */
+    private const GROUP_LABELS = [
+        'Application package' => 'Application',
+        'Workspace package' => 'Workspace packages',
+        'Workspace file' => 'Workspace files',
+        'Build context' => 'Build context',
+        'Dockerfile' => 'Dockerfile',
+        'Compose file' => 'Compose files',
+        'Symlink target' => 'Symlink targets',
+    ];
+
+    /**
+     * Groups the trigger paths by where they come from, with excluded paths last.
+     *
+     * @param  list<array{path: string, source: ?string, excluded: bool}>  $lines
+     * @return list<array{label: string, paths: list<string>}>
+     */
+    private static function pathGroups(array $lines): array
+    {
+        $groups = [];
+        foreach ($lines as $line) {
+            $label = $line['excluded'] ? 'Ignored' : (self::GROUP_LABELS[$line['source']] ?? $line['source'] ?? 'Paths');
+            $groups[$label][] = $line['path'];
+        }
+        $order = [...array_values(self::GROUP_LABELS), 'Paths', 'Ignored'];
+        $rank = fn (string $label): int => ($index = array_search($label, $order, true)) === false ? count(self::GROUP_LABELS) : $index;
+        uksort($groups, fn (string $a, string $b): int => $rank($a) <=> $rank($b));
+
+        return array_map(fn (string $label, array $paths): array => ['label' => $label, 'paths' => $paths], array_keys($groups), array_values($groups));
     }
 
     /**

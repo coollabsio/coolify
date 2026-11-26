@@ -284,19 +284,6 @@
                                             </div>
                                         @endif
                                 </div>
-                                @if ($this->application->supportsWatchPaths())
-                                    <div class="pt-4">
-                                        <x-forms.textarea
-                                            helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
-                                            placeholder="services/api/**" id="watchPaths" label="Watch paths"
-                                            x-bind:disabled="shouldDisable()" />
-                                    </div>
-                                @endif
-                                @if ($this->application->supportsWatchPaths() || $this->application->is_public_repository())
-                                    <div class="pt-4">
-                                        <livewire:project.application.deploy-triggers :application="$application" wire:key="deploy-triggers-{{ $application->uuid }}" />
-                                    </div>
-                                @endif
                             </div>
                         @else
                             <x-forms.repository-paths class="lg:grid-cols-2" base="baseDirectory"
@@ -312,19 +299,6 @@
                                     @endif
                                 @endif
                             </x-forms.repository-paths>
-                            @if ($this->application->supportsWatchPaths())
-                                <div class="pb-4">
-                                    <x-forms.textarea
-                                        helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
-                                        placeholder="src/pages/**" id="watchPaths" label="Watch paths"
-                                        x-bind:disabled="!canUpdate" />
-                                </div>
-                            @endif
-                            @if ($this->application->supportsWatchPaths() || $this->application->is_public_repository())
-                                <div class="pb-4">
-                                    <livewire:project.application.deploy-triggers :application="$application" wire:key="deploy-triggers-{{ $application->uuid }}" />
-                                </div>
-                            @endif
                             @if ($application->could_set_build_commands() && ($buildPack === 'nixpacks' || $buildPack === 'railpack'))
                                 <div class="grid gap-4 lg:grid-cols-3">
                                     <x-forms.input helper="If you modify this, you probably need to have a {{ $buildPack === 'railpack' ? 'railpack.json' : 'nixpacks.toml' }}"
@@ -364,6 +338,20 @@
                     </div>
                 @endif
             </div>
+            @if (! $application->is_archive_source && $application->build_pack !== 'dockerimage' && ($this->application->supportsWatchPaths() || $this->application->is_public_repository()))
+                <x-application.settings-subsection id="deploy-triggers-section" title="Deploy triggers"
+                    helper="Which Git pushes deploy this application.">
+                    <livewire:project.application.deploy-triggers :application="$application" wire:key="deploy-triggers-{{ $application->uuid }}" />
+                    @if ($this->application->supportsWatchPaths())
+                        <div class="pt-4">
+                            <x-forms.textarea
+                                helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins. Set watch paths to replace smart deploy triggers."
+                                placeholder="{{ $buildPack === 'dockercompose' ? 'services/api/**' : 'src/pages/**' }}" id="watchPaths" label="Watch paths"
+                                x-bind:disabled="{{ $buildPack === 'dockercompose' ? 'shouldDisable()' : '!canUpdate' }}" />
+                        </div>
+                    @endif
+                </x-application.settings-subsection>
+            @endif
             @if ($isStatic || $buildPack === 'static')
                 <div class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
                     <div class="mb-1.5 flex items-center justify-between gap-3">
