@@ -4,9 +4,11 @@
 
     @param string $uuid JS expression that resolves to the server uuid
 --}}
-<div class="relative z-10 flex min-w-0 items-center gap-1" x-on:click.prevent.stop="">
+<div class="relative z-10 flex min-w-0 items-center gap-1" x-on:click.prevent.stop=""
+    x-on:mousedown.stop="" x-on:keydown.enter.stop="">
     <span class="min-w-0 truncate font-mono text-[11px] text-neutral-500 dark:text-fg-dim"
         :class="{ 'tracking-[0.15em]': !isAddressRevealed({{ $uuid }}) }"
+        :title="isAddressRevealed({{ $uuid }}) ? revealedAddresses[{{ $uuid }}] : null"
         x-text="isAddressRevealed({{ $uuid }}) ? (revealedAddresses[{{ $uuid }}] ?? '-') : '{{ str_repeat('•', 10) }}'"></span>
     <button type="button" x-on:click="toggleAddress({{ $uuid }})" class="icon-button size-6 shrink-0"
         :aria-pressed="isAddressRevealed({{ $uuid }}) ? 'true' : 'false'"
