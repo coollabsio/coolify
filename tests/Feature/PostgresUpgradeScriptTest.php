@@ -49,9 +49,6 @@ it('detects the current Coolify image tag from the running container image', fun
     expect($exitCode)->toBe(0)
         ->and($output)->toBe($expectedTag);
 })->with([
-    'nightly standard registry image' => ['other/nightly/upgrade-postgres.sh', 'ghcr.io/coollabsio/coolify:4.0.0-beta.420', '4.0.0-beta.420'],
-    'nightly registry with port' => ['other/nightly/upgrade-postgres.sh', 'registry.example.com:5000/coollabsio/coolify:4.0.1', '4.0.1'],
-    'nightly digest suffix' => ['other/nightly/upgrade-postgres.sh', 'ghcr.io/coollabsio/coolify:4.0.2@sha256:abcdef', '4.0.2'],
     'scripts standard registry image' => ['scripts/upgrade-postgres.sh', 'ghcr.io/coollabsio/coolify:4.0.0-beta.420', '4.0.0-beta.420'],
     'scripts registry with port' => ['scripts/upgrade-postgres.sh', 'registry.example.com:5000/coollabsio/coolify:4.0.1', '4.0.1'],
     'scripts digest suffix' => ['scripts/upgrade-postgres.sh', 'ghcr.io/coollabsio/coolify:4.0.2@sha256:abcdef', '4.0.2'],
@@ -66,6 +63,5 @@ it('passes the preserved Coolify image tag to docker compose when starting the s
         ->and($output)->toBe('')
         ->and($latestImage)->toBe('4.0.0-beta.420');
 })->with([
-    'nightly script' => 'other/nightly/upgrade-postgres.sh',
     'release script' => 'scripts/upgrade-postgres.sh',
 ]);

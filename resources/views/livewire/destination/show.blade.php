@@ -17,26 +17,23 @@
             @include('livewire.destination.sidebar', ['destination' => $destination])
 
             <div class="min-w-0">
+                @if ($destination->getMorphClass() !== 'App\Models\StandaloneDocker')
+                    <x-callout type="warning" title="Docker Swarm support is deprecated" class="mb-6">
+                        {{ config('deprecations.swarm') }}
+                    </x-callout>
+                @endif
+
                 @if (request()->routeIs('destination.danger'))
                     <div class="application-settings-form">
                         <x-application.settings-section id="destination-danger-section" title="Danger zone"
                             helper="Destructive actions for this destination cannot be undone.">
-                            <div
-                                class="rounded-lg border border-red-300 bg-red-50 p-4 ring-1 ring-inset ring-red-200/60 dark:border-error/30 dark:bg-error/[0.08] dark:ring-error/10">
-                                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                                    <div class="min-w-0">
-                                        <div class="flex flex-wrap items-center gap-2">
-                                            <h4 class="text-sm font-semibold text-red-700 dark:text-error">Delete destination</h4>
-                                            <x-status-badge status="Permanent" type="error" />
-                                        </div>
-                                        <p class="mt-2 max-w-2xl text-[13px] leading-5 text-neutral-600 dark:text-fg-dim">
-                                            Permanently delete <strong class="font-semibold text-black dark:text-fg">{{ $destination->name }}</strong>
-                                            from Coolify. The Docker network is also removed from the server.
-                                        </p>
-                                        <p class="mt-2 text-xs text-neutral-500 dark:text-fg-dim">
-                                            Delete or move every attached resource before deleting this destination.
-                                        </p>
-                                    </div>
+                            <x-danger-zone title="Delete destination">
+                                <p>
+                                    Permanently delete <strong class="font-semibold">{{ $destination->name }}</strong>
+                                    from Coolify. The Docker network is also removed from the server.
+                                </p>
+                                <p>Delete or move every attached resource before deleting this destination.</p>
+                                <x-slot:action>
                                     @if ($network !== 'coolify')
                                         <x-modal-confirmation title="Confirm Destination Deletion?"
                                             buttonTitle="Delete destination" isErrorButton submitAction="delete"
@@ -51,8 +48,8 @@
                                             Delete destination
                                         </x-forms.button>
                                     @endif
-                                </div>
-                            </div>
+                                </x-slot:action>
+                            </x-danger-zone>
                         </x-application.settings-section>
                     </div>
                 @else

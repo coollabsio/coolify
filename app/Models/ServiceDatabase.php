@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\HasImageScans;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ServiceDatabase extends BaseModel
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasImageScans, SoftDeletes;
 
     protected $fillable = [
         'service_id',
@@ -34,6 +35,7 @@ class ServiceDatabase extends BaseModel
 
     protected $casts = [
         'exclude_from_status' => 'boolean',
+        'is_removed_from_compose' => 'boolean',
         'is_public' => 'boolean',
         'is_log_drain_enabled' => 'boolean',
         'is_include_timestamps' => 'boolean',
@@ -84,7 +86,7 @@ class ServiceDatabase extends BaseModel
     public function restart()
     {
         $container_id = $this->name.'-'.$this->service->uuid;
-        remote_process(["docker restart {$container_id}"], $this->service->server);
+        remote_process(['docker restart '.escapeshellarg($container_id)], $this->service->server);
     }
 
     public function isRunning()
@@ -151,7 +153,7 @@ class ServiceDatabase extends BaseModel
             $realIp = base_ip();
         }
 
-        return "{$realIp}:{$port}";
+        return formatHostForUrl((string) $realIp).":{$port}";
     }
 
     public function team()
@@ -167,6 +169,11 @@ class ServiceDatabase extends BaseModel
     public function service()
     {
         return $this->belongsTo(Service::class);
+    }
+
+    public function link(): ?string
+    {
+        return $this->service?->link();
     }
 
     public function persistentStorages()

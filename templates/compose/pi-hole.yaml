@@ -7,7 +7,7 @@
 
 services:
   pihole:
-    image: pihole/pihole:latest
+    image: pihole/pihole:2026.11.0
     ports:
       # DNS Ports
       - "53:53/tcp"

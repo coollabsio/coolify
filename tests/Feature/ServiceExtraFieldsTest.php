@@ -44,6 +44,28 @@ it('only adds Grafana extra fields for Grafana server images', function (string 
     'loki' => ['grafana/loki:latest', false],
     'promtail' => ['grafana/promtail:latest', false],
     'tempo' => ['grafana/tempo:latest', false],
+    'registry.example.com grafana' => ['registry.example.com/grafana/grafana:latest', true],
+    'registry.example.com grafana-oss' => ['registry.example.com/grafana/grafana-oss:latest', true],
+    'registry.example.com grafana-enterprise' => ['registry.example.com/grafana/grafana-enterprise:latest', true],
+    'registry.example.com loki' => ['registry.example.com/grafana/loki:latest', false],
+    'registry.example.com promtail' => ['registry.example.com/grafana/promtail:latest', false],
+    'registry.example.com tempo' => ['registry.example.com/grafana/tempo:latest', false],
+    'registry.example.com:5000 grafana' => ['registry.example.com:5000/grafana/grafana:latest', true],
+    'registry.example.com:5000 grafana-oss' => ['registry.example.com:5000/grafana/grafana-oss:latest', true],
+    'registry.example.com:5000 grafana-enterprise' => ['registry.example.com:5000/grafana/grafana-enterprise:latest', true],
+    'registry.example.com:5000 loki' => ['registry.example.com:5000/grafana/loki:latest', false],
+    'registry.example.com:5000 promtail' => ['registry.example.com:5000/grafana/promtail:latest', false],
+    'registry.example.com:5000 tempo' => ['registry.example.com:5000/grafana/tempo:latest', false],
+    'localhost registry' => ['localhost/grafana/grafana:latest', true],
+    'unrelated namespace' => ['other/grafana/grafana:latest', false],
+    'localhost as registry namespace' => ['registry.example.com/localhost/grafana/grafana:latest', false],
+    'nested registry namespace' => ['registry.example.com/team/grafana/grafana:latest', false],
+    'nested registry namespace oss' => ['registry.example.com:5000/team/grafana/grafana-oss:latest', false],
+    'nested registry namespace enterprise' => ['registry.example.com/team/grafana/grafana-enterprise:latest', false],
+    'similar repository name' => ['grafana/grafana-custom:latest', false],
+    'registry port without tag' => ['registry.example.com:5000/grafana/grafana', true],
+    'digest' => ['grafana/grafana@sha256:'.str_repeat('a', 64), true],
+    'registry port with digest' => ['registry.example.com:5000/grafana/grafana@sha256:'.str_repeat('a', 64), true],
 ]);
 
 it('exposes Jean Server authentication and access settings', function () {
@@ -64,11 +86,14 @@ it('exposes Jean Server authentication and access settings', function () {
                 'rules' => 'required',
                 'isPassword' => true,
                 'sortOrder' => 1,
+                'customHelper' => 'Token required to access Jean Server. Variable name: SERVICE_PASSWORD_64_JEAN',
             ],
             'Allowed Origins' => [
                 'key' => 'JEAN_ALLOWED_ORIGINS',
                 'value' => 'https://jean.example.com',
+                'rules' => 'nullable|string',
                 'sortOrder' => 2,
+                'customHelper' => 'Comma-separated additional browser origins. Same-origin access is always allowed. Variable name: JEAN_ALLOWED_ORIGINS',
             ],
         ]);
 });

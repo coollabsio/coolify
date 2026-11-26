@@ -10,6 +10,12 @@
         <x-server.sidebar :server="$server" activeMenu="destinations" />
 
         <div class="application-settings-form flex w-full flex-col gap-6">
+            @if ($server->isSwarm())
+                <x-callout type="warning" title="Docker Swarm support is deprecated">
+                    {{ config('deprecations.swarm') }}
+                </x-callout>
+            @endif
+
             @if ($server->isFunctional())
                 <x-application.settings-section id="server-destinations-section" title="Destinations"
                     helper="Docker networks used to isolate and connect resources on this server." flush>
@@ -65,7 +71,7 @@
                                     <p class="mt-0.5 text-xs text-neutral-500 dark:text-fg-dim">Docker network</p>
                                 </div>
                                 <x-forms.button canGate="update" :canResource="$server"
-                                    wire:click="add('{{ data_get($network, 'Name') }}')">
+                                    wire:click="add({{ Js::from(data_get($network, 'Name')) }})">
                                     Add destination
                                 </x-forms.button>
                             </div>

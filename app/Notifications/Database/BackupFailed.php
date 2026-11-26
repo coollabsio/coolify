@@ -2,24 +2,44 @@
 
 namespace App\Notifications\Database;
 
+use App\Contracts\ThrottledNotification;
+use App\Enums\BackupTrigger;
+use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class BackupFailed extends CustomEmailNotification
+/**
+ * Sent on the first failure, then at most once a day until a run of the backup succeeds again.
+ */
+class BackupFailed extends CustomEmailNotification implements ThrottledNotification
 {
     public string $name;
 
     public string $frequency;
 
-    public function __construct(ScheduledDatabaseBackup $backup, public $database, public $output, public $database_name)
+    public BackupTrigger $trigger = BackupTrigger::Scheduled;
+
+    public function __construct(public ScheduledDatabaseBackup $backup, public $database, public $output, public $database_name, BackupTrigger $trigger = BackupTrigger::Scheduled)
     {
         $this->onQueue('high');
+        $this->trigger = $trigger;
         $this->name = $database->name;
         $this->frequency = $backup->frequency;
+    }
+
+    public function throttleSubject(): ?Model
+    {
+        return $this->backup;
+    }
+
+    public function throttleIntervalMinutes(): int
+    {
+        return NotificationThrottle::FAILURE_REMINDER_INTERVAL_MINUTES;
     }
 
     public function via(object $notifiable): array
@@ -35,7 +55,9 @@ class BackupFailed extends CustomEmailNotification
             'name' => $this->name,
             'database_name' => $this->database_name,
             'frequency' => $this->frequency,
+            'trigger' => $this->trigger->label(),
             'output' => $this->output,
+            'reminder' => NotificationThrottle::FAILURE_REMINDER_TEXT,
         ]);
 
         return $mail;
@@ -51,6 +73,7 @@ class BackupFailed extends CustomEmailNotification
         );
 
         $message->addField('Frequency', $this->frequency, true);
+        $message->addField('Trigger', $this->trigger->label(), true);
         $message->addField('Output', $this->output);
 
         return $message;
@@ -58,7 +81,7 @@ class BackupFailed extends CustomEmailNotification
 
     public function toTelegram(): array
     {
-        $message = "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was FAILED.\n\nReason:\n{$this->output}";
+        $message = "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was FAILED.\nTrigger: {$this->trigger->label()}\n\nReason:\n{$this->output}";
 
         return [
             'message' => $message,
@@ -70,7 +93,7 @@ class BackupFailed extends CustomEmailNotification
         return new PushoverMessage(
             title: 'Database backup failed',
             level: 'error',
-            message: "Database backup for {$this->name} (db:{$this->database_name}) was FAILED<br/><br/><b>Frequency:</b> {$this->frequency} .<br/><b>Reason:</b> {$this->output}",
+            message: "Database backup for {$this->name} (db:{$this->database_name}) was FAILED<br/><br/><b>Frequency:</b> {$this->frequency}.<br/><b>Trigger:</b> {$this->trigger->label()}<br/><b>Reason:</b> {$this->output}",
         );
     }
 
@@ -80,6 +103,7 @@ class BackupFailed extends CustomEmailNotification
         $description = "Database backup for {$this->name} (db:{$this->database_name}) has FAILED.";
 
         $description .= "\n\n*Frequency:* {$this->frequency}";
+        $description .= "\n\n*Trigger:* {$this->trigger->label()}";
         $description .= "\n\n*Error Output:* {$this->output}";
 
         return new SlackMessage(
@@ -91,7 +115,7 @@ class BackupFailed extends CustomEmailNotification
 
     public function toWebhook(): array
     {
-        $url = base_url().'/project/'.data_get($this->database, 'environment.project.uuid').'/environment/'.data_get($this->database, 'environment.uuid').'/database/'.$this->database->uuid;
+        $url = $this->database->link() ?? base_url();
 
         return [
             'success' => false,
@@ -101,6 +125,7 @@ class BackupFailed extends CustomEmailNotification
             'database_uuid' => $this->database->uuid,
             'database_type' => $this->database_name,
             'frequency' => $this->frequency,
+            'trigger' => $this->trigger->value,
             'error_output' => $this->output,
             'url' => $url,
         ];

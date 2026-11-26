@@ -1,0 +1,17 @@
+{{- $eol := dict }}
+{{- range .AlertsByPackage }}{{- range .Alerts }}{{- if and (eq .Type "distro-eol") (not $eol) }}{{- $eol = dict "name" .Metadata.Name "version" .Metadata.Version }}{{- end }}{{- end }}{{- end }}
+{{- if $eol }}{{ dict "eol" $eol | toJson }}{{ else }}{"eol":null}{{ end }}
+{{- range .Matches }}
+{{- $sugg := "" }}{{- $mt := "" }}{{- range .MatchDetails }}{{- if not $mt }}{{- $mt = .Type }}{{- end }}{{- if and (not $sugg) .Fix }}{{- if .Fix.SuggestedVersion }}{{- $sugg = .Fix.SuggestedVersion }}{{- end }}{{- end }}{{- end }}
+{{- $rel := list }}{{- $rdesc := "" }}{{- $rcvss := list }}
+{{- range .RelatedVulnerabilities }}
+{{- $rel = append $rel .ID }}
+{{- if not $rdesc }}{{- $rdesc = .Description }}{{- end }}
+{{- if not $rcvss }}{{- range .Cvss }}{{- $rcvss = append $rcvss (dict "source" .Source "version" .Version "score" .Metrics.BaseScore) }}{{- end }}{{- end }}
+{{- end }}
+{{- $cvss := list }}{{- range .Vulnerability.Cvss }}{{- $cvss = append $cvss (dict "source" .Source "version" .Version "score" .Metrics.BaseScore) }}{{- end }}
+{{- $m := dict "id" .Vulnerability.ID "rel" $rel "sev" .Vulnerability.Severity "pkg" .Artifact.Name "ver" .Artifact.Version "type" .Artifact.Type "art" .Artifact.ID "fix" .Vulnerability.Fix.State "fixv" .Vulnerability.Fix.Versions "kev" (ne (len .Vulnerability.KnownExploited) 0) "risk" .Vulnerability.Risk "desc" (.Vulnerability.Description | trunc 400) "rdesc" ($rdesc | trunc 400) "cvss" $cvss "rcvss" $rcvss "ns" .Vulnerability.Namespace "mt" $mt }}
+{{- if $sugg }}{{- $_ := set $m "sugg" $sugg }}{{- end }}
+{{- if .Vulnerability.EPSS }}{{- $_ := set $m "epss" (first .Vulnerability.EPSS).EPSS }}{{- end }}
+{{ toJson $m }}
+{{- end }}

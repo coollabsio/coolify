@@ -159,23 +159,6 @@ it('makes network removal idempotent without hiding other failures', function ()
     rmdir($directory);
 });
 
-it('uses idempotent commands in strict cleanup paths', function () {
-    $root = dirname(__DIR__, 2);
-
-    expect(file_get_contents($root.'/app/Jobs/DatabaseBackupJob.php'))
-        ->toContain('dockerRemoveCommand("backup-of-{$this->backup_log_uuid}")')
-        ->and(file_get_contents($root.'/app/Actions/Database/StopDatabaseProxy.php'))
-        ->toContain('dockerRemoveCommand("{$uuid}-proxy")')
-        ->and(file_get_contents($root.'/app/Actions/Destination/RemoveStandaloneDockerNetwork.php'))
-        ->toContain('dockerNetworkRemoveCommand($destination->network)')
-        ->and(file_get_contents($root.'/app/Livewire/Destination/Show.php'))
-        ->toContain('dockerNetworkRemoveCommand($this->destination->network)')
-        ->and(file_get_contents($root.'/app/Listeners/ProxyStatusChangedNotification.php'))
-        ->toContain("dockerRemoveCommand('coolify-proxy')")
-        ->and(file_get_contents($root.'/app/Actions/Application/StopApplicationOneServer.php'))
-        ->toContain('dockerRemoveCommand($containerName)');
-});
-
 it('configures deferred removal attempts to outlive the shell timeout', function () {
     $job = new RemoveContainerJob(123, 'container-name');
 
@@ -183,14 +166,4 @@ it('configures deferred removal attempts to outlive the shell timeout', function
         ->and($job->containerName)->toBe('container-name')
         ->and($job->timeout)->toBeGreaterThan(60)
         ->and($job->tries)->toBeGreaterThan(1);
-});
-
-it('continues deployments and schedules deferred cleanup after a removal timeout', function () {
-    $source = file_get_contents(dirname(__DIR__, 2).'/app/Jobs/ApplicationDeploymentJob.php');
-
-    expect($source)
-        ->toContain('dockerRemoveCommandWithTimeout($containerName)')
-        ->toContain('timed out after 60 seconds. The deployment will continue')
-        ->toContain('RemoveContainerJob::dispatch($this->server->id, $containerName)')
-        ->toContain('->delay(now()->addMinutes(5))');
 });

@@ -7,7 +7,7 @@
 
 services:
   nextcloud:
-    image: lscr.io/linuxserver/nextcloud:latest
+    image: lscr.io/linuxserver/nextcloud:35.0.3
     environment:
       - SERVICE_URL_NEXTCLOUD_80
       - PUID=1000
@@ -34,7 +34,7 @@ services:
       retries: 15
 
   nextcloud-db:
-    image: mariadb:11
+    image: mariadb:12
     volumes:
       - nextcloud-mariadb-data:/var/lib/mysql
     environment:

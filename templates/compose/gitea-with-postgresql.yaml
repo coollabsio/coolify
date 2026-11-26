@@ -6,7 +6,7 @@
 
 services:
   gitea:
-    image: gitea/gitea:latest
+    image: gitea/gitea:28.4.0
     environment:
       - SERVICE_URL_GITEA_3000
       - USER_UID=1000
@@ -32,9 +32,9 @@ services:
       retries: 15
 
   postgresql:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     volumes:
-      - gitea-postgresql-data:/var/lib/postgresql/data
+      - gitea-postgresql-data:/var/lib/postgresql
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}

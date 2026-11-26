@@ -1,17 +1,27 @@
 # Versions
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
-ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine
+ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v5.1.5
 # https://github.com/cloudflare/cloudflared/releases
-ARG CLOUDFLARED_VERSION=2026.7.3
+ARG CLOUDFLARED_VERSION=2026.11.1
 # https://www.postgresql.org/support/versioning/
 # Note: We are using version 18 of the postgres client (while still using postgres 15 for the postgres server) as version 15 has been removed from Alpine 3.23+ https://pkgs.alpinelinux.org/packages?name=postgresql*-client&branch=v3.23&repo=&arch=x86_64&origin=&flagged=&maintainer=
 ARG POSTGRES_VERSION=18
 # https://nginx.org/en/linux_packages.html
-ARG NGINX_VERSION=1.31.2-r1
+ARG NGINX_VERSION=1.31.9-r1
+# https://nodejs.org/en/about/previous-releases
+ARG NODE_VERSION=24.22.3
+# https://pecl.php.net/package/uv
+ARG PHP_UV_VERSION=0.3.1
 
 # Add user/group
 ARG USER_ID=9999
 ARG GROUP_ID=9999
+
+# Set by the build workflow
+ARG COOLIFY_VERSION
+ARG SOURCE_DATE_EPOCH
+ARG CREATED
+ARG GIT_SHA
 
 # =================================================================
 # Stage 1: Composer dependencies
@@ -21,6 +31,8 @@ FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS base
 USER root
 
 # Install patched Nginx from the official nginx.org Alpine repository
+# nginx.org no longer serves this key for download; it still signs the Alpine packages.
+COPY docker/nginx/nginx_signing.rsa.pub /etc/apk/keys/nginx_signing.rsa.pub
 ARG NGINX_VERSION
 RUN set -eux; \
     apk add --no-cache ca-certificates curl; \
@@ -28,7 +40,6 @@ RUN set -eux; \
     NGINX_REPOSITORY="https://nginx.org/packages/mainline/alpine/v${NGINX_ALPINE_VERSION}/main"; \
     sed -i 's|http://nginx.org/packages|https://nginx.org/packages|g' /etc/apk/repositories; \
     grep -qxF "@nginx ${NGINX_REPOSITORY}" /etc/apk/repositories || echo "@nginx ${NGINX_REPOSITORY}" >> /etc/apk/repositories; \
-    curl -fsSL https://nginx.org/keys/nginx_signing.rsa.pub -o /etc/apk/keys/nginx_signing.rsa.pub; \
     apk add --no-cache --upgrade "nginx@nginx=${NGINX_VERSION}"; \
     rm -f /etc/nginx/nginx.conf /etc/nginx/conf.d/default.conf; \
     nginx -v
@@ -46,10 +57,12 @@ RUN --mount=type=cache,target=/tmp/cache \
 
 USER www-data
 
+FROM node:${NODE_VERSION}-alpine3.24 AS nodejs
+
 # =================================================================
 # Stage 2: Frontend assets compilation
 # =================================================================
-FROM node:24-alpine AS static-assets
+FROM nodejs AS static-assets
 
 WORKDIR /app
 COPY package*.json vite.config.js postcss.config.cjs ./
@@ -59,9 +72,25 @@ COPY . .
 RUN npm run build
 
 # =================================================================
-# Stage 3: Get MinIO client
+# Stage 3: Terminal dependencies (match the production Node.js ABI and libc)
 # =================================================================
-FROM quay.io/minio/aistor/mc:RELEASE.2026-09-06T02-44-40Z AS minio-client
+FROM serversideup/php:${SERVERSIDEUP_PHP_VERSION} AS terminal-dependencies
+
+USER root
+
+RUN apk upgrade && \
+    apk add --no-cache make g++ python3
+COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
+COPY --from=nodejs /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
+COPY docker/coolify-terminal/package*.json /terminal/
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefix /terminal && \
+    npm rebuild node-pty --prefix /terminal --update-binary && \
+    rm -rf /terminal/node_modules/node-pty/prebuilds/darwin-* \
+        /terminal/node_modules/node-pty/prebuilds/win32-*
+COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
+COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
 
 # =================================================================
 # Final Stage: Production image
@@ -74,6 +103,7 @@ ARG TARGETPLATFORM
 ARG POSTGRES_VERSION
 ARG CLOUDFLARED_VERSION
 ARG NGINX_VERSION
+ARG PHP_UV_VERSION
 ARG COOLIFY_VERSION
 ARG CI=true
 
@@ -84,13 +114,14 @@ WORKDIR /var/www/html
 USER root
 
 # Install patched Nginx from the official nginx.org Alpine repository
+# nginx.org no longer serves this key for download; it still signs the Alpine packages.
+COPY docker/nginx/nginx_signing.rsa.pub /etc/apk/keys/nginx_signing.rsa.pub
 RUN set -eux; \
     apk add --no-cache ca-certificates curl; \
     NGINX_ALPINE_VERSION="$(egrep -o '^[0-9]+\.[0-9]+' /etc/alpine-release)"; \
     NGINX_REPOSITORY="https://nginx.org/packages/mainline/alpine/v${NGINX_ALPINE_VERSION}/main"; \
     sed -i 's|http://nginx.org/packages|https://nginx.org/packages|g' /etc/apk/repositories; \
     grep -qxF "@nginx ${NGINX_REPOSITORY}" /etc/apk/repositories || echo "@nginx ${NGINX_REPOSITORY}" >> /etc/apk/repositories; \
-    curl -fsSL https://nginx.org/keys/nginx_signing.rsa.pub -o /etc/apk/keys/nginx_signing.rsa.pub; \
     apk add --no-cache --upgrade "nginx@nginx=${NGINX_VERSION}"; \
     rm -f /etc/nginx/nginx.conf /etc/nginx/conf.d/default.conf; \
     nginx -v
@@ -108,17 +139,23 @@ RUN --mount=type=cache,target=/var/cache/apk \
     apk upgrade && \
     apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
+    libstdc++ \
     openssh-client \
     git \
     git-lfs \
     jq \
     lsof \
+    procps \
     vim
+
+# Install PHP extensions
+# uv: Reverb uses an ext-uv event loop instead of stream_select(), which fails at 1024 open files (FD_SETSIZE)
+RUN install-php-extensions uv-${PHP_UV_VERSION}
 
 # Configure shell aliases
 RUN echo "alias ll='ls -al'" >> /etc/profile && \
     echo "alias a='php artisan'" >> /etc/profile && \
-    echo "alias logs='tail -f storage/logs/laravel.log'" >> /etc/profile
+    echo "alias logs='tail -F storage/logs/laravel-\$(date -u +%F).log'" >> /etc/profile
 
 # Install Cloudflared based on architecture
 RUN mkdir -p /usr/local/bin && \
@@ -131,7 +168,14 @@ RUN mkdir -p /usr/local/bin && \
 
 # Configure PHP
 COPY docker/production/etc/php/conf.d/zzz-custom-php.ini /usr/local/etc/php/conf.d/zzz-custom-php.ini
+COPY docker/production/etc/php-fpm.d/zzzz-coolify-listen.conf /usr/local/etc/php-fpm.d/zzzz-coolify-listen.conf
 ENV PHP_OPCACHE_ENABLE=1
+# v5 defaults this to 0. Keep 1: app:init rebuilds the Laravel caches while php-fpm already runs.
+ENV PHP_OPCACHE_VALIDATE_TIMESTAMPS=1
+# v5 defaults to 256 MB with 32 MB interned strings. Every PHP CLI process has its own cache, so keep it small.
+ENV PHP_OPCACHE_MEMORY_CONSUMPTION=128
+ENV PHP_OPCACHE_INTERNED_STRINGS_BUFFER=16
+RUN install -d -m 700 -o www-data -g www-data /var/www/opcache
 
 # Configure entrypoint
 COPY --chmod=755 docker/production/entrypoint.d/ /etc/entrypoint.d
@@ -152,24 +196,59 @@ COPY --chown=www-data:www-data routes ./routes
 COPY --chown=www-data:www-data storage ./storage
 COPY --chown=www-data:www-data templates ./templates
 COPY --chown=www-data:www-data resources/views ./resources/views
+COPY --chown=www-data:www-data resources/image-scan ./resources/image-scan
 COPY --chown=www-data:www-data artisan artisan
 COPY --chown=www-data:www-data openapi.yaml ./openapi.yaml
 COPY --chown=www-data:www-data changelogs/ ./changelogs/
+COPY --chown=www-data:www-data release.json upstream.json ./
 
 RUN composer dump-autoload
 
+# Install terminal WebSocket server dependencies
+COPY --from=nodejs /usr/local/bin/node /usr/local/bin/node
+COPY --from=terminal-dependencies --chown=www-data:www-data /terminal /terminal
+
+# Configure the Nginx site of the base image
+ENV NGINX_CLIENT_MAX_BODY_SIZE=2048M
+ENV NGINX_FASTCGI_BUFFERS="16 16k"
+ENV NGINX_FASTCGI_BUFFER_SIZE=32k
+ENV TRUSTED_PROXY=off
+
 # Configure Nginx and S6 overlay
 COPY docker/production/etc/nginx/conf.d/custom.conf /etc/nginx/conf.d/custom.conf
-COPY docker/production/etc/nginx/site-opts.d/http.conf /etc/nginx/site-opts.d/http.conf
+COPY docker/production/etc/nginx/server-opts.d/coolify.conf /etc/nginx/server-opts.d/coolify.conf
+# Drop HSTS, which would force HTTPS on every subdomain of the dashboard domain, and the
+# year-long caching of static files, which keeps files without a hash in their name stale after an upgrade
+RUN sed -i '/Strict-Transport-Security/d' /etc/nginx/server-opts.d/security.conf && \
+    rm /etc/nginx/server-opts.d/performance.conf
 COPY --chmod=755 docker/production/etc/s6-overlay/ /etc/s6-overlay/
 
 RUN mkdir -p /etc/nginx/conf.d && \
     chown -R www-data:www-data /etc/nginx && \
     chmod -R 755 /etc/nginx
 
-# Install MinIO client
-COPY --from=minio-client /usr/bin/mc /usr/bin/mc
-RUN chmod +x /usr/bin/mc
+ARG SERVERSIDEUP_PHP_VERSION
+ARG NODE_VERSION
+ARG CREATED
+ARG GIT_SHA
+
+LABEL org.opencontainers.image.title="Coolify" \
+    org.opencontainers.image.description="An open-source, self-hostable PaaS alternative to Vercel, Heroku & Netlify that lets you easily deploy static sites, databases, full-stack applications and 360+ one-click services on your own servers." \
+    org.opencontainers.image.version="${COOLIFY_VERSION}" \
+    org.opencontainers.image.created="${CREATED}" \
+    org.opencontainers.image.revision="${GIT_SHA}" \
+    org.opencontainers.image.licenses="Apache-2.0" \
+    org.opencontainers.image.authors="coollabsio" \
+    org.opencontainers.image.vendor="coollabsio" \
+    org.opencontainers.image.url="https://coolify.io" \
+    org.opencontainers.image.source="https://github.com/coollabsio/coolify" \
+    org.opencontainers.image.documentation="https://coolify.io/docs" \
+    org.opencontainers.image.base.name="docker.io/serversideup/php:${SERVERSIDEUP_PHP_VERSION}" \
+    io.coolify.nginx.version="${NGINX_VERSION}" \
+    io.coolify.node.version="${NODE_VERSION}" \
+    io.coolify.cloudflared.version="${CLOUDFLARED_VERSION}" \
+    io.coolify.postgresql-client.version="${POSTGRES_VERSION}" \
+    io.coolify.php-uv.version="${PHP_UV_VERSION}"
 
 # Switch to non-root user
 USER www-data

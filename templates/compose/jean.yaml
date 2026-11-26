@@ -7,7 +7,7 @@
 
 services:
   jean:
-    image: 'ghcr.io/coollabsio/jean-server:${JEAN_VERSION:-latest}'
+    image: 'ghcr.io/coollabsio/jean-server:${JEAN_VERSION:-v1.0.16}'
     environment:
       - SERVICE_URL_JEAN_3456
       - JEAN_HEADLESS=${JEAN_HEADLESS:-1}

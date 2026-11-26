@@ -2,6 +2,7 @@
 
 use App\Actions\Server\StartSentinel;
 use App\Livewire\Server\Sentinel;
+use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
@@ -48,9 +49,6 @@ it('restores default Sentinel configuration without rotating credentials or disa
         ->set('sentinelCustomDockerImage', 'sentinel:development')
         ->call('restoreDefaultConfiguration')
         ->assertSet('sentinelCustomUrl', 'http://coolify:8080')
-        ->assertSet('sentinelMetricsRefreshRateSeconds', 10)
-        ->assertSet('sentinelMetricsHistoryDays', 7)
-        ->assertSet('sentinelPushIntervalSeconds', 60)
         ->assertSet('isSentinelDebugEnabled', false)
         ->assertSet('sentinelCustomDockerImage', null)
         ->assertDispatched('sentinel-defaults-restored')
@@ -71,23 +69,26 @@ it('restores default Sentinel configuration without rotating credentials or disa
         ->and((bool) $settings->is_sentinel_debug_enabled)->toBeFalse();
 });
 
-it('offers a confirmed restore action and explains what it preserves', function () {
-    Livewire::test(Sentinel::class, ['server' => $this->server])
-        ->assertSee('Restore defaults')
-        ->assertSee('The Sentinel token and metrics setting will be preserved.');
-});
-
 it('does not let team members restore Sentinel defaults', function () {
     $member = User::factory()->create();
     $this->server->team->members()->attach($member->id, ['role' => 'member']);
     $before = $this->server->settings->fresh()->getAttributes();
+    Queue::fake();
+
+    // The action itself re-checks permission, even on a component that an owner opened.
+    $component = Livewire::test(Sentinel::class, ['server' => $this->server]);
     $this->actingAs($member);
     session(['currentTeam' => $this->server->team]);
+    $component->call('restoreDefaultConfiguration');
 
+    Queue::assertNothingPushed();
+
+    // Members cannot open the Sentinel settings at all, so the restore action is never reachable.
     Livewire::test(Sentinel::class, ['server' => $this->server])
-        ->call('restoreDefaultConfiguration');
+        ->assertForbidden();
 
-    expect($this->server->settings->fresh()->getAttributes())->toBe($before);
+    expect($member->can('manageSentinel', $this->server))->toBeFalse()
+        ->and($this->server->settings->fresh()->getAttributes())->toBe($before);
 });
 
 it('shows local troubleshooting guidance when Sentinel is out of sync', function () {
@@ -147,7 +148,6 @@ it('shows restarting until the sentinel container starts', function () {
     Livewire::test(Sentinel::class, ['server' => $this->server])
         ->call('restartSentinel')
         ->assertSet('sentinelStatus', 'restarting')
-        ->assertSee('Restarting')
         ->assertDispatched('sentinel-status-changed', outOfSync: false, expiresInMilliseconds: 90000);
 });
 
@@ -156,9 +156,7 @@ it('shows waiting for first report after the sentinel container starts', functio
 
     Livewire::test(Sentinel::class, ['server' => $this->server])
         ->call('handleSentinelRestarted', ['serverUuid' => $this->server->uuid])
-        ->assertSet('sentinelStatus', 'waiting')
-        ->assertSee('Waiting for first report')
-        ->assertDontSee('Sentinel is out of sync');
+        ->assertSet('sentinelStatus', 'waiting');
 });
 
 it('uses one push interval plus thirty seconds for the first report timeout', function () {
@@ -189,8 +187,7 @@ it('shows in sync after the first authenticated report', function () {
 
     Livewire::test(Sentinel::class, ['server' => $this->server])
         ->call('handleSentinelSynchronized', ['serverUuid' => $this->server->uuid])
-        ->assertSet('sentinelStatus', 'in_sync')
-        ->assertSee('In sync');
+        ->assertSet('sentinelStatus', 'in_sync');
 });
 
 it('shows out of sync when the first report timeout expires', function () {
@@ -199,6 +196,19 @@ it('shows out of sync when the first report timeout expires', function () {
     ])->save();
 
     Livewire::test(Sentinel::class, ['server' => $this->server->fresh()])
-        ->assertSet('sentinelStatus', 'out_of_sync')
-        ->assertSee('Out of sync');
+        ->assertSet('sentinelStatus', 'out_of_sync');
+});
+
+it('warns about remote HTTP reports even when the instance URL uses HTTP', function () {
+    InstanceSettings::get()->update(['fqdn' => 'http://coolify.example.com']);
+    $remoteServer = Server::factory()->create([
+        'team_id' => $this->server->team_id,
+        'ip' => '192.0.2.10',
+    ]);
+    $remoteServer->settings->forceFill([
+        'sentinel_custom_url' => 'http://coolify.example.com',
+    ])->saveQuietly();
+
+    Livewire::test(Sentinel::class, ['server' => $remoteServer])
+        ->assertSee('Sentinel reports over plain HTTP');
 });

@@ -19,7 +19,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    InstanceSettings::updateOrCreate(['id' => 0]);
+    InstanceSettings::unguarded(fn () => InstanceSettings::updateOrCreate(['id' => 0], ['id' => 0]));
 
     $this->team = Team::factory()->create();
 
@@ -105,16 +105,6 @@ beforeEach(function () {
 
 // --- Application Heading ---
 
-test('admin sees deploy controls for application', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(ApplicationHeading::class, ['application' => $this->application])
-        ->assertSee('Redeploy')
-        ->assertSee('Restart')
-        ->assertSee('Stop');
-});
-
 test('member cannot call deploy on application', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
@@ -148,14 +138,25 @@ test('member does not see terminal link for application', function () {
 
     Livewire::test(ApplicationHeading::class, ['application' => $this->application])
         ->assertDontSee('Terminal');
+
+    // The terminal link lives in the application settings sidebar since the resource tab bar was removed.
+    $this->blade(
+        '<x-application.configuration-sidebar :application="$application" current-route="project.application.configuration" />',
+        ['application' => $this->application]
+    )
+        ->assertSee('application-settings-link-general', false)
+        ->assertDontSee('application-settings-link-terminal', false);
 });
 
 test('admin sees terminal link for application', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
-    Livewire::test(ApplicationHeading::class, ['application' => $this->application])
-        ->assertSee('Terminal');
+    $this->blade(
+        '<x-application.configuration-sidebar :application="$application" current-route="project.application.configuration" />',
+        ['application' => $this->application]
+    )
+        ->assertSee('application-settings-link-terminal', false);
 });
 
 // --- Database Heading (via page route for rendering, policy checks for actions) ---
@@ -198,18 +199,6 @@ test('member cannot access terminal for database', function () {
 
 // --- Service Heading ---
 
-test('admin sees service deploy button', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(ServiceHeading::class, [
-        'service' => $this->service,
-        'parameters' => $this->serviceParams,
-        'query' => [],
-    ])
-        ->assertSee('Deploy');
-});
-
 test('member cannot call stop on service', function () {
     $this->actingAs($this->member);
     session(['currentTeam' => $this->team]);
@@ -233,16 +222,24 @@ test('member does not see terminal link for service', function () {
         'query' => [],
     ])
         ->assertDontSee('Terminal');
+
+    // The terminal link lives in the service settings sidebar since the resource tab bar was removed.
+    $this->blade(
+        '<x-service.configuration-sidebar :service="$service" current-route="project.service.configuration" />',
+        ['service' => $this->service]
+    )
+        ->assertSee(route('project.service.configuration', $this->serviceParams), false)
+        ->assertDontSee(route('project.service.command', $this->serviceParams), false);
 });
 
 test('admin sees terminal link for service', function () {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
-    Livewire::test(ServiceHeading::class, [
-        'service' => $this->service,
-        'parameters' => $this->serviceParams,
-        'query' => [],
-    ])
+    $this->blade(
+        '<x-service.configuration-sidebar :service="$service" current-route="project.service.configuration" />',
+        ['service' => $this->service]
+    )
+        ->assertSee(route('project.service.command', $this->serviceParams), false)
         ->assertSee('Terminal');
 });

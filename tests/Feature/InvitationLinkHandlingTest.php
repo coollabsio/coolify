@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Controller;
 use App\Http\Middleware\CheckForcePasswordReset;
 use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Models\InstanceSettings;
@@ -279,15 +278,20 @@ it('rejects a malformed magic link token', function () {
     $this->assertGuest();
 });
 
-it('declares the magic link method contracts', function () {
-    $linkReturnType = (new ReflectionMethod(Controller::class, 'link'))->getReturnType();
-    $acceptLinkReturnType = (new ReflectionMethod(Controller::class, 'acceptLink'))->getReturnType();
-    $credentialsMethod = new ReflectionMethod(Controller::class, 'magicLinkCredentials');
-    $isValidReturnType = (new ReflectionMethod(TeamInvitation::class, 'isValid'))->getReturnType();
+it('lets a user who must reset the password log out from the reset page', function () {
+    [, $user] = createInvitationLinkFixture();
+    $this->withMiddleware(CheckForcePasswordReset::class);
 
-    expect((string) $linkReturnType)->toContain('Illuminate\\Contracts\\View\\View')
-        ->and((string) $linkReturnType)->toContain('Illuminate\\Http\\RedirectResponse')
-        ->and((string) $acceptLinkReturnType)->toBe('Illuminate\\Http\\RedirectResponse')
-        ->and($credentialsMethod->getDocComment())->toContain('@return array{0: User, 1: TeamInvitation}|null')
-        ->and((string) $isValidReturnType)->toBe('bool');
+    $this->actingAs($user)
+        ->get('/dashboard')
+        ->assertRedirect(route('auth.force-password-reset'));
+
+    $this->get(route('auth.force-password-reset'))
+        ->assertSuccessful()
+        ->assertSee('action="'.url('/logout').'"', false);
+
+    $this->post('/logout')->assertRedirect();
+    $this->assertGuest();
+
+    $this->get(route('login'))->assertSuccessful();
 });

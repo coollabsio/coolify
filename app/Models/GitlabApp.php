@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Traits\Auditable;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Facades\Crypt;
 
 class GitlabApp extends BaseModel
 {
+    use Auditable;
+
     protected $fillable = [
         'name',
         'organization',
@@ -48,6 +51,7 @@ class GitlabApp extends BaseModel
             'access_token' => 'encrypted',
             'refresh_token' => 'encrypted',
             'client_secret' => 'encrypted',
+            'app_secret' => 'encrypted',
             'is_system_wide' => 'boolean',
             'is_public' => 'boolean',
         ];

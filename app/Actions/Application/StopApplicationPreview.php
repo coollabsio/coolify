@@ -3,6 +3,7 @@
 namespace App\Actions\Application;
 
 use App\Events\ServiceStatusChanged;
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Models\ApplicationPreview;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -14,12 +15,14 @@ class StopApplicationPreview
     {
         $application = $preview->application;
         $server = $application->destination->server;
-        $containers = getCurrentApplicationContainerStatus($server, $application->id, $preview->pull_request_id);
+        NotifyResourceStoppedJob::expectStop($preview, $application->settings->stopGracePeriodSeconds());
+        $containers = getCurrentApplicationContainerStatus($server, $application, $preview->pull_request_id);
 
         foreach ($containers->pluck('Names') as $containerName) {
-            $commands = [dockerStopCommand($application->settings->stopGracePeriodSeconds(), $containerName, $server)];
+            $escapedContainerName = escapeshellarg($containerName);
+            $commands = [dockerStopCommand($application->settings->stopGracePeriodSeconds(), $escapedContainerName, $server)];
             if ($removeContainer) {
-                $commands[] = "docker rm -f $containerName";
+                $commands[] = "docker rm -f {$escapedContainerName}";
             }
             instant_remote_process($commands, $server, false);
         }

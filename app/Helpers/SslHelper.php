@@ -35,7 +35,8 @@ class SslHelper
         try {
             $privateKey = openssl_pkey_new([
                 'private_key_type' => OPENSSL_KEYTYPE_EC,
-                'curve_name' => 'secp521r1',
+                // Electron clients such as MongoDB Compass (BoringSSL) cannot use a P-521 server key.
+                'curve_name' => $isCaCertificate ? 'secp521r1' : 'prime256v1',
             ]);
 
             if ($privateKey === false) {
@@ -191,35 +192,38 @@ class SslHelper
                     });
 
                 if ($isPemKeyFileRequired) {
-                    $model->fileStorages()->create([
+                    $fileStorage = $model->fileStorages()->make([
                         'fs_path' => $configurationDir.'/ssl/server.pem',
                         'mount_path' => $mountPath.'/server.pem',
                         'content' => $certificateStr."\n".$privateKeyStr,
                         'is_directory' => false,
-                        'chmod' => '600',
                         'resource_type' => $resourceType,
                         'resource_id' => $resourceId,
                     ]);
+                    $fileStorage->chmod = '600';
+                    $fileStorage->save();
                 } else {
-                    $model->fileStorages()->create([
+                    $fileStorage = $model->fileStorages()->make([
                         'fs_path' => $configurationDir.'/ssl/server.crt',
                         'mount_path' => $mountPath.'/server.crt',
                         'content' => $certificateStr,
                         'is_directory' => false,
-                        'chmod' => '644',
                         'resource_type' => $resourceType,
                         'resource_id' => $resourceId,
                     ]);
+                    $fileStorage->chmod = '644';
+                    $fileStorage->save();
 
-                    $model->fileStorages()->create([
+                    $fileStorage = $model->fileStorages()->make([
                         'fs_path' => $configurationDir.'/ssl/server.key',
                         'mount_path' => $mountPath.'/server.key',
                         'content' => $privateKeyStr,
                         'is_directory' => false,
-                        'chmod' => '600',
                         'resource_type' => $resourceType,
                         'resource_id' => $resourceId,
                     ]);
+                    $fileStorage->chmod = '600';
+                    $fileStorage->save();
                 }
             }
 
@@ -229,5 +233,30 @@ class SslHelper
         } finally {
             fclose($tempConfig);
         }
+    }
+
+    /**
+     * Commands that write the CA certificate to the shared CA file on the server.
+     *
+     * The file is rewritten in place: containers bind-mount it, and a deleted or replaced file
+     * leaves them with the old inode, which they cannot read (#6081). Only a directory that
+     * Docker created at this path for a missing mount source is removed.
+     *
+     * @return array<int, string>
+     */
+    public static function caCertificateFileCommands(string $certificate): array
+    {
+        $caCertDirectory = config('constants.coolify.base_config_path').'/ssl';
+        $caCertFile = "$caCertDirectory/coolify-ca.crt";
+        $base64Cert = base64_encode($certificate);
+
+        return [
+            "mkdir -p $caCertDirectory",
+            "chown 9999:root $caCertDirectory",
+            "chmod 700 $caCertDirectory",
+            "find $caCertDirectory -mindepth 1 -maxdepth 1 -name coolify-ca.crt -type d -exec rm -rf {} +",
+            "echo '{$base64Cert}' | base64 -d | tee $caCertFile > /dev/null",
+            "chmod 644 $caCertFile",
+        ];
     }
 }

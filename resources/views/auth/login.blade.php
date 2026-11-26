@@ -22,14 +22,16 @@
             <form action="/login" method="POST" class="flex flex-col gap-4">
                 @csrf
                 @env('local')
-                    <x-forms.input value="test@example.com" type="email" autocomplete="email" name="email" required
+                    <x-forms.input value="test@example.com" type="email"
+                        autocomplete="{{ $passkeys_available ? 'email webauthn' : 'email' }}" name="email" required
                         autofocus label="{{ __('input.email') }}" />
-                    <x-forms.input value="password" type="password" autocomplete="current-password" name="password"
+                    <x-forms.input value="password" type="password" :copyable="false" autocomplete="current-password" name="password"
                         required label="{{ __('input.password') }}" />
                 @else
-                    <x-forms.input type="email" name="email" autocomplete="email" required autofocus
+                    <x-forms.input type="email" name="email"
+                        autocomplete="{{ $passkeys_available ? 'email webauthn' : 'email' }}" required autofocus
                         label="{{ __('input.email') }}" />
-                    <x-forms.input type="password" name="password" autocomplete="current-password" required
+                    <x-forms.input type="password" :copyable="false" name="password" autocomplete="current-password" required
                         label="{{ __('input.password') }}" />
                 @endenv
 
@@ -78,13 +80,21 @@
                 </x-forms.button>
             </form>
 
+            @if ($passkeys_available)
+                <x-auth.passkey-verify autofill />
+            @endif
+
             @if ($enabled_oauth_providers->isNotEmpty())
                 <div class="auth-divider"><span>Or continue with</span></div>
-                <div class="grid gap-2 sm:grid-cols-2">
+                <div class="flex flex-col gap-2">
                     @foreach ($enabled_oauth_providers as $provider_setting)
                         <x-forms.button class="w-full justify-center" type="button"
                             onclick="document.location.href='/auth/{{ $provider_setting->provider }}/redirect'">
-                            {{ __("auth.login.$provider_setting->provider") }}
+                            @if ($provider_setting->provider !== 'oidc')
+                                <img class="size-5 shrink-0 dark:invert"
+                                    src="{{ asset('svgs/'.$provider_setting->provider.'.svg') }}" alt="" aria-hidden="true">
+                            @endif
+                            {{ $provider_setting->loginLabel() }}
                         </x-forms.button>
                     @endforeach
                 </div>
@@ -95,6 +105,8 @@
             @if ($is_registration_enabled)
                 <span>New to Coolify?</span>
                 <a href="/register" class="auth-text-link">{{ __('auth.register_now') }}</a>
+            @elseif ($can_register_with_oauth)
+                <span>{{ __('auth.register_with_oauth') }}</span>
             @else
                 <span>{{ __('auth.registration_disabled') }}</span>
             @endif

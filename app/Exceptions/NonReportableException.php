@@ -5,7 +5,7 @@ namespace App\Exceptions;
 use Exception;
 
 /**
- * Exception that should not be reported to Sentry or other error tracking services.
+ * Exception that should not be reported to error tracking services.
  * Use this for known, expected errors that don't require external tracking.
  */
 class NonReportableException extends Exception

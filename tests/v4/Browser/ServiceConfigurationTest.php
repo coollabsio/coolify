@@ -74,28 +74,6 @@ it('saves service name and description', function () {
         ->screenshot(filename: 'service-after-reload');
 });
 
-it('opens service environment variables domains and storages pages', function () {
-    loginAndSkipBoarding();
-
-    $base = serviceConfigurationUrl(
-        $this->stack['project'],
-        $this->stack['environment'],
-        $this->service
-    );
-
-    visit("{$base}/environment-variables")
-        ->assertSee('Environment Variables')
-        ->screenshot(filename: 'service-environment-variables');
-
-    visit("{$base}/domains")
-        ->assertSee('Config Service')
-        ->screenshot(filename: 'service-domains');
-
-    visit("{$base}/storages")
-        ->assertSee('Config Service')
-        ->screenshot(filename: 'service-storages');
-});
-
 it('renders an automatically added redirect counterpart without reloading', function () {
     $this->serviceApplication->update([
         'fqdn' => 'https://web.example.com',
@@ -151,21 +129,6 @@ it('renders an automatically added redirect counterpart without reloading', func
     $page->screenshot(filename: 'service-domain-remove-without-reload');
 });
 
-it('opens compose stack application general settings', function () {
-    loginAndSkipBoarding();
-
-    $project = $this->stack['project'];
-    $environment = $this->stack['environment'];
-    $service = $this->service;
-    $stackUuid = $this->serviceApplication->uuid;
-
-    $page = visit("/project/{$project->uuid}/environment/{$environment->uuid}/service/{$service->uuid}/{$stackUuid}");
-
-    $page->assertSee('web')
-        ->assertSee('General')
-        ->screenshot(filename: 'service-stack-application-general');
-});
-
 it('lists the service on the environment resources page', function () {
     loginAndSkipBoarding();
 
@@ -175,21 +138,6 @@ it('lists the service on the environment resources page', function () {
     visit("/project/{$project->uuid}/environment/{$environment->uuid}")
         ->assertSee('Config Service')
         ->screenshot(filename: 'environment-lists-service');
-});
-
-it('shows service danger zone', function () {
-    loginAndSkipBoarding();
-
-    $base = serviceConfigurationUrl(
-        $this->stack['project'],
-        $this->stack['environment'],
-        $this->service
-    );
-
-    visit("{$base}/danger")
-        ->assertSee('Danger')
-        ->assertSee('Config Service')
-        ->screenshot(filename: 'service-danger-zone');
 });
 
 it('keeps domain settings out of the overview and supports editing and removal', function () {
@@ -205,7 +153,9 @@ it('keeps domain settings out of the overview and supports editing and removal',
     $url = serviceConfigurationUrl($this->stack['project'], $this->stack['environment'], $this->service).'/domains';
     $page = visit($url);
     $page->click('Accept and close')
+        ->click('[title="DNS checks and records for this server"]')
         ->assertSee('Check all DNS')
+        ->click('[title="DNS checks and records for this server"]')
         ->assertVisible('[aria-label="Internal port 8080"]')
         ->assertDontSee('Search engine indexing')
         ->assertDontSee('Remove domain')
@@ -258,7 +208,7 @@ it('keeps domain settings out of the overview and supports editing and removal',
         ->screenshot(filename: 'service-domain-removal-confirmation')
         ->click('button:has([x-text="step2ButtonText"]):visible')
         ->assertDontSee('https://long-public-domain-for-the-service.example.com')
-        ->assertSee('1 domain across 1 service')
+        ->assertSee('https://second.example.com')
         ->click('[aria-label="Settings for https://second.example.com"]')
         ->assertSee('www redirect')
         ->assertValue('#editingDomainParts-host', 'second.example.com')

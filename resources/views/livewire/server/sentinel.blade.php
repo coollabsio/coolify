@@ -19,7 +19,7 @@
              `$wire.set('sentinelCustomDockerImage', …)` (and similar) briefly
              flashes this bar on every page open. --}}
         <x-unsaved-bar action="submit"
-            targets="sentinelCustomUrl,sentinelToken,sentinelMetricsRefreshRateSeconds,sentinelMetricsHistoryDays,sentinelPushIntervalSeconds" />
+            targets="sentinelCustomUrl,sentinelToken" />
 
         <x-application.settings-section id="server-sentinel-overview-section" title="Sentinel"
             helper="Monitor server and container health while collecting historical metrics.">
@@ -38,6 +38,9 @@
                 <x-callout type="warning" title="Sentinel is out of sync">
                     <div class="space-y-3">
                         <p>Sentinel has not reported within the expected interval. Check these items before syncing again:</p>
+                        @if ($sentinelPushProblem = $server->sentinelPushProblem())
+                            <p><span class="font-medium">Last error:</span> <code class="break-all">{{ $sentinelPushProblem }}</code></p>
+                        @endif
                         <ul class="list-disc space-y-1 pl-4">
                             <li>Confirm that the <code>coolify-sentinel</code> container is running.</li>
                             <li>
@@ -101,28 +104,21 @@
                         </x-forms.button>
                     </div>
                 </x-slot:actions>
-                <div class="grid gap-4 lg:grid-cols-2">
-                    <x-forms.input canGate="update" :canResource="$server" id="sentinelCustomUrl"
-                        required label="Coolify URL"
-                        helper="Public URL used by Sentinel to reach this Coolify instance." />
-                    <x-forms.input canGate="update" :canResource="$server" type="password"
-                        id="sentinelToken" label="Sentinel token" required
-                        helper="Authentication token used by Sentinel." />
-                </div>
-            </x-application.settings-section>
-
-            <x-application.settings-section id="server-sentinel-metrics-section" title="Metrics collection"
-                helper="Control collection frequency, retention, and the push interval.">
-                <div class="grid gap-4 lg:grid-cols-3">
-                    <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
-                        id="sentinelMetricsRefreshRateSeconds" label="Collection rate" required
-                        helper="Seconds between metric samples." />
-                    <x-forms.input canGate="update" :canResource="$server" type="number" min="1"
-                        id="sentinelMetricsHistoryDays" label="History retention" required
-                        helper="Days of CPU and memory history to retain." />
-                    <x-forms.input canGate="update" :canResource="$server" type="number" min="10"
-                        id="sentinelPushIntervalSeconds" label="Push interval" required
-                        helper="Seconds between health reports sent to Coolify." />
+                <div class="flex flex-col gap-4">
+                    @if ($this->isPushUrlInsecure())
+                        <x-callout type="warning" title="Sentinel reports over plain HTTP">
+                            Sentinel sends its token with every report. Over HTTP, the token and the server data are not
+                            encrypted on the network. Set an HTTPS Coolify URL.
+                        </x-callout>
+                    @endif
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <x-forms.input canGate="update" :canResource="$server" id="sentinelCustomUrl"
+                            required label="Coolify URL"
+                            helper="Public URL used by Sentinel to reach this Coolify instance." />
+                        <x-forms.input canGate="update" :canResource="$server" type="password"
+                            id="sentinelToken" label="Sentinel token" required
+                            helper="Authentication token used by Sentinel." />
+                    </div>
                 </div>
             </x-application.settings-section>
 
@@ -138,9 +134,10 @@
                             ]" />
                         <div x-data="{
                             customImage: localStorage.getItem('sentinel_custom_docker_image_{{ $server->uuid }}') || '',
-                            saveCustomImage() {
+                            async applyCustomImage() {
                                 localStorage.setItem('sentinel_custom_docker_image_{{ $server->uuid }}', this.customImage);
-                                $wire.set('sentinelCustomDockerImage', this.customImage || null);
+                                await $wire.set('sentinelCustomDockerImage', this.customImage || null);
+                                await $wire.restartSentinel();
                             }
                         }"
                             @sentinel-defaults-restored.window="localStorage.removeItem('sentinel_custom_docker_image_{{ $server->uuid }}'); customImage = ''"
@@ -148,10 +145,17 @@
                                  $wire.set('', null→'') on every open marks the component dirty and
                                  flashes the unsaved bar until the round-trip completes. --}}
                             x-init="if (customImage) { $wire.set('sentinelCustomDockerImage', customImage) }">
-                            <x-forms.input canGate="update" :canResource="$server" x-model="customImage"
-                                @input.debounce.500ms="saveCustomImage()"
-                                placeholder="sentinel:latest" label="Custom Docker image"
-                                helper="Leave empty to use the default Sentinel image." />
+                            <div class="flex items-end gap-2">
+                                <div class="min-w-0 flex-1">
+                                    <x-forms.input canGate="update" :canResource="$server" x-model="customImage"
+                                        placeholder="sentinel:latest" label="Custom Docker image"
+                                        helper="Leave empty to use the default Sentinel image." />
+                                </div>
+                                <x-forms.button canGate="update" :canResource="$server"
+                                    x-on:click="applyCustomImage()">
+                                    Apply and restart
+                                </x-forms.button>
+                            </div>
                         </div>
                     </div>
                 </x-application.settings-section>
