@@ -4,10 +4,11 @@
 # tags: repository, manager, open source, docker, docker, registry, container
 # logo: svgs/nexus.png
 # port: 8081
+# outdated: true
 
 services:
   nexus:
-    image: sonatypecommunity/nexus3
+    image: sonatypecommunity/nexus3:3.77.2
     environment:
       - SERVICE_URL_NEXUS_8081
       - NEXUS_SECURITY_RANDOMPASSWORD=false

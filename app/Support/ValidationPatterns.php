@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Validation\ValidationException;
+
 /**
  * Shared validation patterns for consistent use across the application
  */
@@ -37,9 +39,11 @@ class ValidationPatterns
 
     /**
      * Pattern for SSH usernames.
-     * Allows alphanumeric characters, dots, hyphens, and underscores.
+     * Allows alphanumeric characters, dots, hyphens, and underscores. The first character must not be
+     * a hyphen, so ssh and scp cannot read the user as an option.
+     * The terminal server uses the same rule (docker/coolify-terminal/terminal-utils.js).
      */
-    public const SERVER_USERNAME_PATTERN = '/^[a-zA-Z0-9._-]+$/';
+    public const SERVER_USERNAME_PATTERN = '/^[a-zA-Z0-9_.][a-zA-Z0-9._-]*$/';
 
     /**
      * Pattern for removing characters not allowed in SSH usernames.
@@ -84,7 +88,7 @@ class ValidationPatterns
      * Pattern for Docker container names
      * Must start with alphanumeric, followed by alphanumeric, dots, hyphens, or underscores
      */
-    public const CONTAINER_NAME_PATTERN = '/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/';
+    public const CONTAINER_NAME_PATTERN = '/\A[a-zA-Z0-9][a-zA-Z0-9._-]*\z/';
 
     /**
      * Pattern for Docker network names
@@ -96,11 +100,11 @@ class ValidationPatterns
     /**
      * Pattern for S3 bucket names.
      *
-     * Bucket names must be 3-63 lowercase characters, start and end with a
-     * letter or digit, and contain only lowercase letters, digits, dots, and
-     * hyphens. Additional semantic checks live in isValidS3BucketName().
+     * Bucket names must be 3-63 characters, start and end with a letter or
+     * digit, and contain only letters, digits, dots, and hyphens. Uppercase
+     * letters remain supported for legacy and S3-compatible buckets.
      */
-    public const S3_BUCKET_NAME_PATTERN = '/\A(?=.{3,63}\z)[a-z0-9][a-z0-9.-]*[a-z0-9]\z/';
+    public const S3_BUCKET_NAME_PATTERN = '/\A(?=.{3,63}\z)[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]\z/';
 
     /**
      * Pattern for Docker-compatible environment variable keys.
@@ -137,18 +141,30 @@ class ValidationPatterns
      * Pattern for Docker image repository names without a tag.
      *
      * Allows an optional registry host/port followed by lowercase repository
-     * path components. A trailing @sha256 marker is accepted for existing
+     * path components. A bracketed IPv6 registry host ([2a01:4f8::1]:5000) may
+     * only hold hex digits, ':' and '.'. A trailing @sha256 marker is accepted for existing
      * digest-based dockerimage records that store the digest hash separately.
      */
-    public const DOCKER_IMAGE_NAME_PATTERN = '/\A(?=.{1,255}\z)(?:(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]+)?\/)?[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:\/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*)(?:@sha256)?\z/';
+    public const DOCKER_IMAGE_NAME_PATTERN = '/\A(?=.{1,255}\z)(?:(?:(?:[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?|\[[0-9a-f:.]+\])(?::[0-9]+)?\/)?[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:\/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*)(?:@sha256)?\z/';
 
     /**
-     * Pattern for Docker image tags.
+     * Pattern for literal Docker image tags.
      *
      * Docker tags may contain letters, digits, underscores, dots, and hyphens,
      * must start with an alphanumeric/underscore, and are limited to 128 chars.
      */
-    public const DOCKER_IMAGE_TAG_PATTERN = '/\A[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\z/';
+    public const DOCKER_IMAGE_LITERAL_TAG_PATTERN = '/\A[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}\z/';
+
+    /**
+     * Pattern for Docker image tags of applications.
+     *
+     * Same as DOCKER_IMAGE_LITERAL_TAG_PATTERN, but
+     * $VAR, ${VAR}, ${VAR:-default} and ${VAR-default} references are also allowed,
+     * because Docker Compose fills them in from the application's environment
+     * variables at deploy time. A default may only hold tag characters. Other
+     * expansions ($(...), ${VAR:?...}, nested references, $1, $$) are rejected.
+     */
+    public const DOCKER_IMAGE_TAG_PATTERN = '/\A(?=.{1,128}\z)(?:[A-Za-z0-9_]|\$(?:[A-Za-z_][A-Za-z0-9_]*+|\{[A-Za-z_][A-Za-z0-9_]*+(?::?-[A-Za-z0-9_.-]*+)?\}))(?:[A-Za-z0-9_.-]|\$(?:[A-Za-z_][A-Za-z0-9_]*+|\{[A-Za-z_][A-Za-z0-9_]*+(?::?-[A-Za-z0-9_.-]*+)?\}))*\z/';
 
     /**
      * Normalize environment variable keys before validation and storage.
@@ -265,6 +281,18 @@ class ValidationPatterns
     }
 
     /**
+     * Rejects an environment variable value with a NUL byte. A container cannot start with one.
+     *
+     * @throws ValidationException
+     */
+    public static function rejectNulByteInEnvironmentVariableValue(?string $value): void
+    {
+        if ($value !== null && str_contains($value, "\0")) {
+            throw ValidationException::withMessages(['value' => 'The value cannot contain a NUL character.']);
+        }
+    }
+
+    /**
      * Get validation rules for Docker image repository names without tags.
      */
     public static function dockerImageNameRules(bool $required = false, int $maxLength = 255): array
@@ -311,7 +339,7 @@ class ValidationPatterns
     {
         return [
             "{$nameField}.regex" => 'The Docker registry image name must be a valid image repository without a tag and may not contain shell metacharacters.',
-            "{$tagField}.regex" => 'The Docker registry image tag must be a valid Docker tag and may not contain shell metacharacters.',
+            "{$tagField}.regex" => 'The Docker registry image tag must be a valid Docker tag or a $VARIABLE reference and may not contain shell metacharacters.',
         ];
     }
 
@@ -328,15 +356,36 @@ class ValidationPatterns
     }
 
     /**
-     * Check if a string is a valid Docker image tag.
+     * Check if a string is a safe health check host: a hostname or IPv4 address, or an IPv6 address
+     * with or without brackets (::1, [::1]).
      */
-    public static function isValidDockerImageTag(?string $value): bool
+    public static function isValidHealthCheckHost(?string $value): bool
+    {
+        if (! is_string($value)) {
+            return false;
+        }
+
+        if (preg_match('/^[a-zA-Z0-9.\-_]+$/', $value) === 1) {
+            return true;
+        }
+
+        return preg_match('/^(?:\[[0-9a-fA-F:.]+\]|[0-9a-fA-F:.]+)$/', $value) === 1
+            && filter_var(trim($value, '[]'), FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false;
+    }
+
+    /**
+     * Check if a string is a valid Docker image tag.
+     *
+     * Set $allowVariables to false where Docker Compose does not fill in the tag,
+     * for example for images that Coolify runs with docker run.
+     */
+    public static function isValidDockerImageTag(?string $value, bool $allowVariables = true): bool
     {
         if (blank($value)) {
             return true;
         }
 
-        return preg_match(self::DOCKER_IMAGE_TAG_PATTERN, $value) === 1;
+        return preg_match($allowVariables ? self::DOCKER_IMAGE_TAG_PATTERN : self::DOCKER_IMAGE_LITERAL_TAG_PATTERN, $value) === 1;
     }
 
     /**
@@ -455,14 +504,16 @@ class ValidationPatterns
 
     /**
      * Get validation rules for name fields
+     *
+     * Set $nullable to false for optional fields that may be left out but not set to null.
      */
-    public static function nameRules(bool $required = true, int $minLength = 3, int $maxLength = 255): array
+    public static function nameRules(bool $required = true, int $minLength = 3, int $maxLength = 255, bool $nullable = true): array
     {
         $rules = [];
 
         if ($required) {
             $rules[] = 'required';
-        } else {
+        } elseif ($nullable) {
             $rules[] = 'nullable';
         }
 
@@ -541,6 +592,17 @@ class ValidationPatterns
     public static function directoryPathRules(int $maxLength = 255): array
     {
         return ['nullable', 'string', 'max:'.$maxLength, 'regex:'.self::DIRECTORY_PATH_PATTERN];
+    }
+
+    /**
+     * Normalize a typed directory path to the form that DIRECTORY_PATH_PATTERN expects:
+     * "apps/web/" becomes "/apps/web", and an empty value becomes "/".
+     */
+    public static function normalizeDirectoryPath(?string $path): string
+    {
+        $path = trim(trim((string) $path), '/');
+
+        return '/'.$path;
     }
 
     /**

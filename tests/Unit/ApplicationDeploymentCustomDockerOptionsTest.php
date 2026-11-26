@@ -22,7 +22,7 @@ class TestableCustomDockerOptionsDeploymentJob extends ApplicationDeploymentJob
     public function execute_remote_command(...$commands): void {}
 }
 
-function generateComposeServiceWithCustomDockerOptions(string $customDockerOptions): array
+function generateComposeServiceWithCustomDockerOptions(string $customDockerOptions, ?Closure $expectOnQueue = null): array
 {
     $team = Team::create([
         'name' => 'Custom Docker Options Team',
@@ -52,6 +52,9 @@ function generateComposeServiceWithCustomDockerOptions(string $customDockerOptio
     $queue = Mockery::mock(ApplicationDeploymentQueue::class)->makePartial();
     $queue->status = 'queued';
     $queue->shouldReceive('refresh')->once()->andReturnSelf();
+    if ($expectOnQueue) {
+        $expectOnQueue($queue);
+    }
 
     $application = $application->fresh();
     $job = new TestableCustomDockerOptionsDeploymentJob;
@@ -95,4 +98,20 @@ it('preserves custom network aliases when a static IP is configured', function (
         ->toHaveKey('ipv6_address', '2001:db8::25')
         ->toHaveKey('aliases')
         ->and($network['aliases'])->toContain('custom-alias');
+});
+
+it('warns in the deployment log about unsupported custom docker options', function () {
+    $service = generateComposeServiceWithCustomDockerOptions('--network=host -e FOO=bar --init', function ($queue) {
+        $queue->shouldReceive('addLogEntry')
+            ->once()
+            ->with('Warning: These custom Docker options are not supported and were not applied: --network, -e. See https://coolify.io/docs/applications/builds/custom-docker-options for the supported options.', 'stderr');
+    });
+
+    expect($service)->toHaveKey('init', true);
+});
+
+it('does not warn when all custom docker options are supported', function () {
+    generateComposeServiceWithCustomDockerOptions('--init --read-only --tmpfs /tmp', function ($queue) {
+        $queue->shouldNotReceive('addLogEntry');
+    });
 });

@@ -5,6 +5,7 @@ use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Team;
 use App\Models\User;
+use App\Rules\SafeExternalUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -12,6 +13,11 @@ use Illuminate\Support\Facades\Http;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Http::macro('GitSource', fn (string $url) => Http::withOptions(SafeExternalUrl::httpClientOptions(
+        $url,
+        resolver: fn (string $host): array => ['93.184.216.34'],
+    )));
+
     InstanceSettings::unguarded(fn () => InstanceSettings::query()->create(['id' => 0]));
 
     $this->team = Team::factory()->create();
@@ -44,7 +50,7 @@ function authenticateGithubSetupCallbackTest(object $test): void
     session(['currentTeam' => $test->team]);
 }
 
-function fakeGithubManifestConversion(string $apiUrl = 'https://api.github.com'): void
+function fakeGithubManifestConversion(string $apiUrl = 'https://api.github.com', ?array $owner = null): void
 {
     $key = openssl_pkey_new([
         'private_key_bits' => 2048,
@@ -61,6 +67,7 @@ function fakeGithubManifestConversion(string $apiUrl = 'https://api.github.com')
             'client_secret' => 'new-client-secret',
             'pem' => $privateKey,
             'webhook_secret' => 'new-webhook-secret',
+            'owner' => $owner,
         ]),
     ]);
 }
@@ -90,9 +97,6 @@ function fakeGithubInstallationVerification(int $appId, string $apiUrl = 'https:
 {
     Http::preventStrayRequests();
     Http::fake([
-        "{$apiUrl}/zen" => Http::response('Keep it logically awesome.', 200, [
-            'Date' => now()->toRfc7231String(),
-        ]),
         "{$apiUrl}/app/installations/*" => Http::response([
             'id' => 555,
             'app_id' => $appId,
@@ -104,9 +108,6 @@ function fakeGithubInstallationVerificationFailure(): void
 {
     Http::preventStrayRequests();
     Http::fake([
-        'https://api.github.com/zen' => Http::response('Keep it logically awesome.', 200, [
-            'Date' => now()->toRfc7231String(),
-        ]),
         'https://api.github.com/app/installations/*' => Http::response(['message' => 'Not Found'], 404),
     ]);
 }
@@ -181,6 +182,35 @@ it('configures an unbound github app with a valid one-time manifest state', func
         ->and($this->githubApp->client_id)->toBe('new-client-id')
         ->and($this->githubApp->webhook_secret)->toBe('new-webhook-secret')
         ->and($this->githubApp->private_key_id)->not->toBeNull();
+});
+
+it('warns and clears the organization when github registers the app on the personal account', function () {
+    authenticateGithubSetupCallbackTest($this);
+    $this->githubApp->forceFill(['organization' => 'acme-org'])->save();
+    fakeGithubManifestConversion(owner: ['login' => 'octocat', 'type' => 'User']);
+    cacheGithubAppSetupState('valid-state', 'manifest', $this->githubApp);
+
+    $this->get('/webhooks/source/github/redirect?state=valid-state&code=real-code')
+        ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]))
+        ->assertSessionHas('error', fn (string $message) => str_contains($message, 'personal account octocat')
+            && str_contains($message, 'acme-org'));
+
+    $this->githubApp->refresh();
+    expect($this->githubApp->organization)->toBeNull()
+        ->and($this->githubApp->app_id)->toBe(987654);
+});
+
+it('keeps the organization that owns the registered github app', function () {
+    authenticateGithubSetupCallbackTest($this);
+    $this->githubApp->forceFill(['organization' => 'ACME-ORG'])->save();
+    fakeGithubManifestConversion(owner: ['login' => 'acme-org', 'type' => 'Organization']);
+    cacheGithubAppSetupState('valid-state', 'manifest', $this->githubApp);
+
+    $this->get('/webhooks/source/github/redirect?state=valid-state&code=real-code')
+        ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]))
+        ->assertSessionMissing('error');
+
+    expect($this->githubApp->refresh()->organization)->toBe('acme-org');
 });
 
 it('converts ghe dot com app manifests through the data residency api host', function () {
@@ -361,7 +391,6 @@ it('verifies ghe dot com installations through the data residency api host', fun
     $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=123456')
         ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]));
 
-    Http::assertSent(fn ($request) => $request->url() === 'https://api.octocorp.ghe.com/zen');
     Http::assertSent(fn ($request) => $request->url() === 'https://api.octocorp.ghe.com/app/installations/123456');
 });
 
@@ -385,12 +414,159 @@ it('allows reinstalling an already configured github app installation id', funct
     authenticateGithubSetupCallbackTest($this);
     configureGithubAppCredentials($this->githubApp);
     $this->githubApp->forceFill(['installation_id' => 111111])->save();
-    fakeGithubInstallationVerification($this->githubApp->app_id);
+    fakeGithubInstallations($this->githubApp->app_id, [
+        111111 => ['id' => 1, 'login' => 'acme-org'],
+        222222 => ['id' => 1, 'login' => 'acme-org'],
+    ]);
     cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
 
     $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=222222')
         ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]));
 
     $this->githubApp->refresh();
-    expect($this->githubApp->installation_id)->toBe(222222);
+    expect($this->githubApp->installation_id)->toBe(222222)
+        ->and(GithubApp::count())->toBe(1);
+});
+
+/**
+ * @param  array<int|string, array{id: int, login: string}|null>  $installations  Installation ID => account, or null when GitHub no longer knows the installation.
+ */
+function fakeGithubInstallations(int $appId, array $installations): void
+{
+    Http::preventStrayRequests();
+    Http::fake(collect($installations)->mapWithKeys(fn (?array $account, int|string $installationId) => [
+        "https://api.github.com/app/installations/{$installationId}" => $account === null
+            ? Http::response(['message' => 'Not Found'], 404)
+            : Http::response([
+                'id' => (int) $installationId,
+                'app_id' => $appId,
+                'account' => $account,
+                'permissions' => ['contents' => 'read', 'deployments' => 'write'],
+            ], 200),
+    ])->all());
+}
+
+it('adds a source for an installation on another account and keeps the current installation', function () {
+    authenticateGithubSetupCallbackTest($this);
+    configureGithubAppCredentials($this->githubApp);
+    $this->githubApp->forceFill([
+        'installation_id' => 111111,
+        'installation_account' => 'personal-user',
+        'organization' => 'app-owner',
+        'runner_group_id' => 7,
+        'client_secret' => 'client-secret',
+        'webhook_secret' => 'webhook-secret',
+    ])->save();
+    fakeGithubInstallations($this->githubApp->app_id, [
+        111111 => ['id' => 1, 'login' => 'personal-user'],
+        222222 => ['id' => 2, 'login' => 'acme-org'],
+    ]);
+    cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
+
+    $response = $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=222222');
+
+    $newSource = GithubApp::where('installation_id', 222222)->sole();
+    $response->assertRedirect(route('source.github.show', ['github_app_uuid' => $newSource->uuid]))
+        ->assertSessionHas('success');
+
+    expect($this->githubApp->refresh()->installation_id)->toBe(111111)
+        ->and($newSource->uuid)->not->toBe($this->githubApp->uuid)
+        ->and($newSource->only(['team_id', 'name', 'organization', 'api_url', 'html_url', 'app_id', 'private_key_id', 'client_secret', 'webhook_secret', 'is_system_wide']))
+        ->toBe($this->githubApp->only(['team_id', 'name', 'organization', 'api_url', 'html_url', 'app_id', 'private_key_id', 'client_secret', 'webhook_secret', 'is_system_wide']))
+        ->and($newSource->installation_account)->toBe('acme-org')
+        ->and($newSource->accountName())->toBe('acme-org')
+        ->and($newSource->deployments)->toBe('write')
+        ->and($newSource->runner_group_id)->toBeNull();
+});
+
+it('reuses the source of an installation that was added before', function () {
+    authenticateGithubSetupCallbackTest($this);
+    configureGithubAppCredentials($this->githubApp);
+    $this->githubApp->forceFill(['installation_id' => 111111])->save();
+    $existing = $this->githubApp->replicate(['uuid']);
+    $existing->installation_id = 222222;
+    $existing->save();
+    fakeGithubInstallations($this->githubApp->app_id, [
+        111111 => ['id' => 1, 'login' => 'personal-user'],
+        222222 => ['id' => 2, 'login' => 'acme-org'],
+    ]);
+    cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
+
+    $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=222222')
+        ->assertRedirect(route('source.github.show', ['github_app_uuid' => $existing->uuid]));
+
+    expect(GithubApp::where('app_id', $this->githubApp->app_id)->count())->toBe(2)
+        ->and($existing->refresh()->installation_account)->toBe('acme-org')
+        ->and($this->githubApp->refresh()->installation_id)->toBe(111111);
+});
+
+it('replaces an installation that was removed at github', function () {
+    authenticateGithubSetupCallbackTest($this);
+    configureGithubAppCredentials($this->githubApp);
+    $this->githubApp->forceFill(['installation_id' => 111111])->save();
+    fakeGithubInstallations($this->githubApp->app_id, [
+        111111 => null,
+        222222 => ['id' => 2, 'login' => 'acme-org'],
+    ]);
+    cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
+
+    $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=222222')
+        ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]));
+
+    expect($this->githubApp->refresh()->installation_id)->toBe(222222)
+        ->and($this->githubApp->installation_account)->toBe('acme-org')
+        ->and(GithubApp::count())->toBe(1);
+});
+
+it('redirects to the github app with the reason when github does not confirm the installation', function () {
+    authenticateGithubSetupCallbackTest($this);
+    configureGithubAppCredentials($this->githubApp);
+    fakeGithubInstallationVerificationFailure();
+    cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
+
+    $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=999999')
+        ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]))
+        ->assertSessionHas('error', fn (string $error) => str_contains($error, 'HTTP 404: Not Found'));
+
+    $this->githubApp->refresh();
+    expect($this->githubApp->installation_id)->toBeNull();
+});
+
+it('redirects to the github app with the reason when the server clock is out of sync with github', function () {
+    authenticateGithubSetupCallbackTest($this);
+    configureGithubAppCredentials($this->githubApp);
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://api.github.com/app/installations/*' => Http::response(
+            ['message' => "'Issued at' claim ('iat') must be an Integer representing a time in the past"],
+            401,
+            ['Date' => now()->addMinutes(5)->toRfc7231String()],
+        ),
+    ]);
+    cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
+
+    $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=123456')
+        ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]))
+        ->assertSessionHas('error', fn (string $error) => str_contains($error, 'System time is out of sync with GitHub API time'));
+
+    $this->githubApp->refresh();
+    expect($this->githubApp->installation_id)->toBeNull();
+});
+
+it('completes the github app installation after the user switched to another of their teams', function () {
+    authenticateGithubSetupCallbackTest($this);
+    configureGithubAppCredentials($this->githubApp);
+    fakeGithubInstallationVerification($this->githubApp->app_id);
+    cacheGithubAppSetupState('valid-install-state', 'install', $this->githubApp);
+
+    $otherTeam = Team::factory()->create();
+    $otherTeam->members()->attach($this->user->id, ['role' => 'owner']);
+    session(['currentTeam' => $otherTeam]);
+
+    $this->get('/webhooks/source/github/install?state=valid-install-state&setup_action=install&installation_id=123456')
+        ->assertRedirect(route('source.github.show', ['github_app_uuid' => $this->githubApp->uuid]));
+
+    $this->githubApp->refresh();
+    expect($this->githubApp->installation_id)->toBe(123456)
+        ->and(data_get(session('currentTeam'), 'id'))->toBe($this->team->id);
 });

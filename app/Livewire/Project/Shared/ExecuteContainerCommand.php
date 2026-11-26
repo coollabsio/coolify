@@ -8,6 +8,7 @@ use App\Models\Service;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -17,6 +18,7 @@ class ExecuteContainerCommand extends Component
 
     public $selected_container = 'default';
 
+    #[Locked]
     public Collection $containers;
 
     public $parameters;
@@ -30,6 +32,13 @@ class ExecuteContainerCommand extends Component
     public bool $isConnecting = false;
 
     public bool $containersLoaded = false;
+
+    /**
+     * Container picker entries. Alpine reads them through entangle, because containers load after the first render.
+     *
+     * @var list<array{value: string, label: string}>
+     */
+    public array $containerOptions = [];
 
     protected $rules = [
         'server' => 'required',
@@ -69,9 +78,6 @@ class ExecuteContainerCommand extends Component
             $this->type = 'service';
             $this->resource = Service::ownedByCurrentTeam()->where('uuid', $this->parameters['service_uuid'])->firstOrFail();
             $this->authorize('view', $this->resource);
-            if (! $this->resource->isRunning()) {
-                $this->containersLoaded = true;
-            }
             if ($this->resource->server->isFunctional()) {
                 $this->servers = $this->servers->push($this->resource->server);
             }
@@ -100,7 +106,7 @@ class ExecuteContainerCommand extends Component
                         ],
                     ]);
                 } else {
-                    $containers = getCurrentApplicationContainerStatus($server, $this->resource->id, includePullrequests: true);
+                    $containers = getCurrentApplicationContainerStatus($server, $this->resource, includePullrequests: true);
                 }
                 foreach ($containers as $container) {
                     // if container state is running
@@ -133,7 +139,7 @@ class ExecuteContainerCommand extends Component
                     }
                 });
                 $this->resource->databases()->get()->each(function ($database) {
-                    if ($database->isRunning()) {
+                    if ($database->isRunning() && $this->resource->server->isTerminalEnabled()) {
                         $this->containers->push([
                             'server' => $this->resource->server,
                             'container' => [
@@ -149,13 +155,25 @@ class ExecuteContainerCommand extends Component
         $this->containers = $this->containers->sortBy(function ($container) {
             return data_get($container, 'container.Names');
         });
+        $this->containerOptions = $this->containers->map(fn (array $container) => [
+            'value' => $this->containerTarget($container),
+            'label' => data_get($container, 'container.Names').' · '.data_get($container, 'server.name'),
+        ])->values()->all();
 
         if ($this->containers->count() === 1) {
-            $this->selected_container = data_get($this->containers->first(), 'container.Names');
+            $this->selected_container = $this->containerTarget($this->containers->first());
             $this->connectToContainer();
+        } elseif ($this->containers->count() > 1) {
+            // The terminal was rendered with auto-start before the containers were known.
+            $this->dispatch(Terminal::AUTO_START_CANCELLED_EVENT)->to(Terminal::class);
         }
 
         $this->containersLoaded = true;
+    }
+
+    private function containerTarget(array $container): string
+    {
+        return data_get($container, 'server.uuid').':'.data_get($container, 'container.Names');
     }
 
     public function updatedSelectedContainer()
@@ -185,7 +203,7 @@ class ExecuteContainerCommand extends Component
             // Dispatch a frontend event to ensure terminal gets focus after connection
             $this->dispatch('terminal-should-focus');
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            $this->failTerminalSession(Terminal::sessionFailureMessage($e));
         } finally {
             $this->isConnecting = false;
         }
@@ -195,19 +213,19 @@ class ExecuteContainerCommand extends Component
     public function connectToContainer()
     {
         if ($this->selected_container === 'default') {
-            $this->dispatch('error', 'Please select a container.');
+            $this->failTerminalSession('Please select a container.');
 
             return;
         }
         try {
             $this->authorize('canAccessTerminal');
             // Validate container name format
-            if (! ValidationPatterns::isValidContainerName($this->selected_container)) {
+            if (! ValidationPatterns::isValidContainerName(str($this->selected_container)->after(':')->value())) {
                 throw new \InvalidArgumentException('Invalid container name format');
             }
 
             // Verify container exists in our allowed list
-            $container = collect($this->containers)->firstWhere('container.Names', $this->selected_container);
+            $container = $this->containers->first(fn ($candidate) => $this->containerTarget($candidate) === $this->selected_container);
             if (is_null($container)) {
                 throw new \RuntimeException('Container not found.');
             }
@@ -246,10 +264,18 @@ class ExecuteContainerCommand extends Component
             // Dispatch a frontend event to ensure terminal gets focus after connection
             $this->dispatch('terminal-should-focus');
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            $this->failTerminalSession(Terminal::sessionFailureMessage($e));
         } finally {
             $this->isConnecting = false;
         }
+    }
+
+    /**
+     * Stop the terminal "connecting…" state and show why. The terminal also shows the toast.
+     */
+    private function failTerminalSession(string $message): void
+    {
+        $this->dispatch(Terminal::SESSION_FAILED_EVENT, message: $message)->to(Terminal::class);
     }
 
     public function render()

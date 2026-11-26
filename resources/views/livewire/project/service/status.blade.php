@@ -1,4 +1,4 @@
-<div wire:poll.10000ms="refreshStatus">
+<div wire:poll.10000ms="refreshStatus" class="flex items-center gap-1">
     @php($displayStatus = $selectedResource?->status ?? $service->status)
     <x-status-summary :status="$displayStatus" :title="$selectedResource ? 'Resource status' : 'Service status'"
         :container-name="$selectedResource ? 'Container' : 'Containers'" />

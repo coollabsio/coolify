@@ -7,7 +7,7 @@
 
 services:
   castopod:
-    image: castopod/castopod:1.15.4
+    image: castopod/castopod:1.15.6
     volumes:
       - castopod-media:/var/www/castopod/public/media
     environment:
@@ -38,7 +38,7 @@ services:
       redis:
         condition: service_healthy
   mariadb:
-    image: mariadb:11.2
+    image: mariadb:12.1
     volumes:
       - castopod-db:/var/lib/mysql
     environment:
@@ -53,7 +53,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7.2-alpine
+    image: redis:8.4-alpine
     command: --requirepass $SERVICE_PASSWORD_REDIS
     volumes:
       - castopod-cache:/data

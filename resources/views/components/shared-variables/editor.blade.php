@@ -5,6 +5,7 @@
     'title',
     'view',
     'variablesLabel',
+    'readOnlyKeys' => [],
 ])
 
 @php
@@ -16,6 +17,12 @@
             'scope' => mb_strtolower(str($type)->headline()),
         ])
         ->values();
+    $canvasUrl = match ($type) {
+        'team' => route('shared-variables.team.canvas'),
+        'project' => route('shared-variables.project.canvas', ['project_uuid' => $resource->uuid]),
+        'environment' => route('shared-variables.environment.canvas', ['project_uuid' => $resource->project->uuid, 'environment_uuid' => $resource->uuid]),
+        'server' => route('shared-variables.server.canvas', ['server_uuid' => $resource->uuid]),
+    };
 @endphp
 
 <x-shared-variables.layout>
@@ -37,6 +44,8 @@
                 <span class="max-sm:hidden">{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</span>
                 <span class="sm:hidden">{{ $view === 'normal' ? 'Developer' : 'Normal' }}</span>
             </x-forms.button>
+            <x-canvas-view-toggle :views="['list' => ['List view', 'unordered-list']]" :list-url="url()->current()"
+                :canvas-url="$canvasUrl" />
         </x-slot:actions>
         @if ($view === 'normal')
             <div
@@ -105,15 +114,32 @@
                     <div class="data-table-header env-table-grid-shared order-[-1]">
                         <span>Name</span>
                         <span>Scope</span>
-                        <span>Comment</span>
+                        <span>{{ count($readOnlyKeys) ? 'Value / comment' : 'Comment' }}</span>
                         <span class="text-center">Multiline</span>
-                        <span></span>
+                        <span class="text-right">Actions</span>
                     </div>
                     @foreach ($variables as $env)
-                        <livewire:project.shared.environment-variable.show
-                            wire:key="shared-variable-{{ $type }}-{{ $env->id }}" :env="$env"
-                            :type="$type" :tableAlphabeticalOrder="$alphabeticalPositions[$env->id]"
-                            :tableCreationOrder="$loop->index" />
+                        @if (in_array($env->key, $readOnlyKeys))
+                            <div wire:key="shared-variable-{{ $type }}-{{ $env->id }}" class="env-table-item"
+                                :style="`order: ${sharedSort === 'alphabetical' ? {{ $alphabeticalPositions[$env->id] }} : {{ $loop->index }}}`"
+                                x-show="@js(mb_strtolower($env->key . ' ' . ($env->comment ?? '') . ' ' . $type)).includes(sharedSearch.trim().toLowerCase())">
+                                <div class="data-table-row env-table-grid-shared">
+                                    <div class="min-w-0">
+                                        <div class="env-key-label truncate font-mono text-[13px]" title="{{ $env->key }}">{{ $env->key }}</div>
+                                        <div class="text-[11px] text-neutral-500 dark:text-fg-dim">Built-in · Read-only</div>
+                                    </div>
+                                    <span class="env-type-desktop text-[13px] text-neutral-500 dark:text-fg-dim">{{ str($type)->headline() }}</span>
+                                    <span class="min-w-0 truncate font-mono text-[13px]" title="{{ $env->value }}">{{ $env->value }}</span>
+                                    <span class="data-table-cell-dash">-</span>
+                                    <span class="justify-self-end text-neutral-400 dark:text-fg-faint" title="Built-in variable, managed by Coolify"><x-reicon name="keys" class="size-3.5" /></span>
+                                </div>
+                            </div>
+                        @else
+                            <livewire:project.shared.environment-variable.show
+                                wire:key="shared-variable-{{ $type }}-{{ $env->id }}" :env="$env"
+                                :type="$type" :tableAlphabeticalOrder="$alphabeticalPositions[$env->id]"
+                                :tableCreationOrder="$loop->index" />
+                        @endif
                     @endforeach
                     <div
                         class="order-[9999] flex min-h-11 items-center border-t border-neutral-200 px-4 text-[11px] text-neutral-500 dark:border-white/[0.08] dark:text-fg-faint">
@@ -122,8 +148,20 @@
                 </div>
             @endif
         @else
-            <form wire:submit="submit" class="p-4">
+            @if ($variables->whereIn('key', $readOnlyKeys)->isNotEmpty())
+                <div class="border-b border-neutral-200 p-4 dark:border-white/[0.08]">
+                    <div class="mb-2 text-[12px] text-neutral-500 dark:text-fg-dim">Built-in · Read-only</div>
+                    @foreach ($variables->whereIn('key', $readOnlyKeys)->sortBy('key') as $env)
+                        <div class="break-all font-mono text-[13px]">{{ $env->key }}={{ $env->value }}</div>
+                    @endforeach
+                </div>
+            @endif
+            <form wire:submit="submit" class="flex flex-col gap-4 p-4">
                 <x-unsaved-bar action="submit" />
+                <x-callout type="info" title="Note">
+                    To make a variable literal, put <code class="font-mono"># coolify: literal</code> directly above
+                    its line. Without this line, the flag does not change.
+                </x-callout>
                 <x-forms.textarea canGate="update" :canResource="$resource" rows="20"
                     class="whitespace-pre-wrap" id="variables" wire:model="variables" monospace
                     :label="$variablesLabel" />

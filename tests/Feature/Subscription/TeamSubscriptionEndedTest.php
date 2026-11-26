@@ -1,19 +1,25 @@
 <?php
 
+use App\Models\Server;
 use App\Models\Subscription;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('subscriptionEnded does not throw when team has no subscription', function () {
+test('subscriptionEnded keeps servers usable until no row of the team pays', function () {
+    Server::flushIdentityMap();
     $team = Team::factory()->create();
+    $paying = Subscription::create(['team_id' => $team->id, 'stripe_subscription_id' => 'sub_paying', 'stripe_invoice_paid' => true]);
+    $ending = Subscription::create(['team_id' => $team->id, 'stripe_subscription_id' => 'sub_ending', 'stripe_invoice_paid' => true]);
+    $server = Server::factory()->create(['team_id' => $team->id]);
+    $server->settings()->update(['is_usable' => true]);
 
-    // Should return early without error — no NPE
-    $team->subscriptionEnded();
+    $team->subscriptionEnded($ending);
+    expect($server->settings()->first()->is_usable)->toBeTruthy();
 
-    // If we reach here, no exception was thrown
-    expect(true)->toBeTrue();
+    $team->subscriptionEnded($paying);
+    expect($server->settings()->first()->is_usable)->toBeFalsy();
 });
 
 test('subscriptionEnded updates the exact subscription when duplicate rows exist', function () {

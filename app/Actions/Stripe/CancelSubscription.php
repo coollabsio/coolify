@@ -5,8 +5,10 @@ namespace App\Actions\Stripe;
 use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Stripe\ErrorObject;
 use Stripe\Exception\InvalidRequestException;
 use Stripe\StripeClient;
+use Stripe\Subscription as StripeSubscription;
 
 class CancelSubscription
 {
@@ -166,45 +168,52 @@ class CancelSubscription
 
         // Call the team's subscription ended method to handle cleanup
         if ($subscription->team) {
-            $subscription->team->subscriptionEnded();
+            $subscription->team->subscriptionEnded($subscription);
         }
 
         \Log::info("Cancelled Stripe subscription: {$subscriptionId} for team: {$subscription->team->name}");
     }
 
     /**
-     * Cancel a single subscription by ID (helper method for external use)
+     * Cancel a subscription immediately and end its local row. A subscription that Stripe already
+     * ended or no longer has counts as cancelled, so a lapsed owner can still delete the account.
      */
     public static function cancelById(string $subscriptionId): bool
     {
+        if (! isCloud()) {
+            return false;
+        }
+
         try {
-            if (! isCloud()) {
-                return false;
-            }
-
             $stripe = app(StripeClient::class);
-            $stripe->subscriptions->cancel($subscriptionId, []);
-
-            // Update local record if exists
-            $subscription = Subscription::where('stripe_subscription_id', $subscriptionId)->first();
-            if ($subscription) {
-                $subscription->update([
-                    'stripe_cancel_at_period_end' => false,
-                    'stripe_invoice_paid' => false,
-                    'stripe_trial_already_ended' => false,
-                    'stripe_past_due' => false,
-                ]);
-
-                if ($subscription->team) {
-                    $subscription->team->subscriptionEnded();
-                }
+            if (! self::endedAtStripe($stripe, $subscriptionId)) {
+                $stripe->subscriptions->cancel($subscriptionId, []);
             }
-
-            return true;
         } catch (\Exception $e) {
             \Log::error("Failed to cancel subscription {$subscriptionId}: ".$e->getMessage());
 
             return false;
         }
+
+        Subscription::where('stripe_subscription_id', $subscriptionId)
+            ->get()
+            ->each(fn (Subscription $subscription) => $subscription->team?->subscriptionEnded($subscription));
+
+        return true;
+    }
+
+    private static function endedAtStripe(StripeClient $stripe, string $subscriptionId): bool
+    {
+        try {
+            $status = $stripe->subscriptions->retrieve($subscriptionId)->status;
+        } catch (InvalidRequestException $e) {
+            if ($e->getStripeCode() === ErrorObject::CODE_RESOURCE_MISSING) {
+                return true;
+            }
+
+            throw $e;
+        }
+
+        return in_array($status, [StripeSubscription::STATUS_CANCELED, StripeSubscription::STATUS_INCOMPLETE_EXPIRED], true);
     }
 }

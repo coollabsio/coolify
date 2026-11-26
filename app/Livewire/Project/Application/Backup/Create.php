@@ -25,6 +25,8 @@ class Create extends Component
 
     public string $frequency = 'daily';
 
+    public ?string $existingBackupUrl = null;
+
     public Collection $targets;
 
     protected function rules(): array
@@ -111,14 +113,26 @@ class Create extends Component
         }
 
         try {
-            $backup = $target->scheduledBackups()->updateOrCreate(
-                [],
-                [
-                    'team_id' => currentTeam()->id,
-                    'frequency' => $this->frequency,
-                    'enabled' => true,
-                ],
-            );
+            $backup = $target->scheduledBackups()->firstOrNew();
+            $backup->fill([
+                'team_id' => $this->application->environment->project->team_id,
+                'frequency' => $this->frequency,
+                'enabled' => true,
+            ]);
+            $changedFields = auditChangedFields($backup);
+            $backup->save();
+            if ($backup->wasRecentlyCreated || $changedFields !== []) {
+                auditLog('ui.volume_backup.schedule_set', [
+                    'team_id' => $backup->team_id,
+                    'resource_type' => 'application',
+                    'resource_uuid' => $this->application->uuid,
+                    'resource_name' => $this->application->name,
+                    'storage_uuid' => $target->uuid,
+                    'backup_uuid' => $backup->uuid,
+                    'created' => $backup->wasRecentlyCreated,
+                    ...($backup->wasRecentlyCreated ? [] : ['changed_fields' => $changedFields]),
+                ]);
+            }
 
             $this->dispatch('success', $backup->wasRecentlyCreated ? 'Scheduled storage backup created.' : 'Scheduled storage backup updated.');
             redirectRoute($this, 'project.application.backup.show', [
@@ -139,14 +153,16 @@ class Create extends Component
 
     private function loadSelectedBackup(): void
     {
-        $target = $this->selectedTarget();
-        if (! $target) {
-            return;
-        }
-
-        $backup = $target->scheduledBackups()->first();
+        $backup = $this->selectedTarget()?->scheduledBackups()->first();
+        $this->existingBackupUrl = null;
         if ($backup) {
             $this->frequency = $backup->frequency;
+            $this->existingBackupUrl = route('project.application.backup.show', [
+                'project_uuid' => $this->application->project()->uuid,
+                'environment_uuid' => $this->application->environment->uuid,
+                'application_uuid' => $this->application->uuid,
+                'backup_uuid' => $backup->uuid,
+            ]);
         }
     }
 

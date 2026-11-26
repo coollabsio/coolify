@@ -18,6 +18,7 @@ it('accepts valid s3 bucket names', function (string $bucket) {
 })->with([
     'short' => ['abc'],
     'simple' => ['coolify-backups'],
+    'legacy uppercase' => ['CoolifyBackups'],
     'dots' => ['coolify.backups'],
     'digits' => ['backup-123'],
     'max length' => [str_repeat('a', 63)],
@@ -28,7 +29,6 @@ it('rejects invalid s3 bucket names and injection payloads', function (string $b
 })->with([
     'too short' => ['ab'],
     'too long' => [str_repeat('a', 64)],
-    'uppercase' => ['CoolifyBackups'],
     'underscore' => ['coolify_backups'],
     'leading hyphen' => ['-coolify-backups'],
     'trailing hyphen' => ['coolify-backups-'],

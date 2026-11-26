@@ -7,7 +7,7 @@
 
 services:
   nexus:
-    image: sonatype/nexus3
+    image: sonatype/nexus3:3.98.1
     platform: linux/amd64
     environment:
       - SERVICE_URL_NEXUS_8081

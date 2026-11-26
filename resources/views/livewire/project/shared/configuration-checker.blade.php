@@ -18,7 +18,7 @@
                 <span>
                     {{ implode(', ', $missingRequiredEnvironmentVariableNames) }} must be set before this service can be deployed.
                     <a href="{{ $environmentVariablesUrl }}" {{ wireNavigate() }}
-                        class="ml-0.5 inline-flex items-center gap-0.5 font-semibold text-coollabs transition-colors hover:text-coollabs-100 dark:text-warning dark:hover:text-warning/80">
+                        class="ml-0.5 inline-flex items-center gap-0.5 font-semibold text-coollabs transition-colors hover:text-coollabs-100 dark:text-brand-light dark:hover:text-brand-light/80">
                         Open environment variables
                         <x-reicon name="arrow-right" class="size-2.5" />
                     </a>
@@ -32,19 +32,21 @@
             $currentConfigurationHash = $resource instanceof \App\Models\Application
                 ? $resource->deploymentConfigurationHash()
                 : md5((string) $resource->config_hash);
+            $canRestart = $resource instanceof \App\Models\Application && (auth()->user()?->can('deploy', $resource) ?? false);
+            $buildReasons = collect(data_get($configurationDiff, 'build_reasons', []));
         @endphp
         <div wire:key="configuration-warning-{{ $currentConfigurationHash }}"
             x-data="{ configurationDiffModalOpen: false, expandedRows: {} }"
             @open-configuration-diff.window="configurationDiffModalOpen = true">
             @teleport('#configuration-warning-hud-slot')
                 <div>
-                    <x-configuration-warning :diff="$configurationDiff" />
+                    <x-configuration-warning :diff="$configurationDiff" :can-restart="$canRestart" />
                 </div>
             @endteleport
 
             @teleport('#configuration-warning-hud-slot-mobile')
                 <div>
-                    <x-configuration-warning :diff="$configurationDiff" />
+                    <x-configuration-warning :diff="$configurationDiff" :can-restart="$canRestart" />
                 </div>
             @endteleport
 
@@ -85,12 +87,20 @@
                                             <p class="text-xs font-semibold text-neutral-900 dark:text-fg">
                                                 {{ data_get($configurationDiff, 'count') }}
                                                 {{ data_get($configurationDiff, 'count') === 1 ? 'change' : 'changes' }}
-                                                · Deploy again to apply
+                                                · {{ data_get($configurationDiff, 'requires_build') ? 'Deploy again to build and apply' : 'Restart to apply, no build is necessary' }}
                                             </p>
+                                            @if (data_get($configurationDiff, 'requires_build') && $buildReasons->isNotEmpty())
+                                                <p class="mt-0.5 text-[11px] text-neutral-600 dark:text-fg-dim">
+                                                    A rebuild is necessary because the changes marked
+                                                    <span class="font-semibold">Rebuild</span> change the image:
+                                                    {{ $buildReasons->take(3)->implode(', ') }}{{ $buildReasons->count() > 3 ? ' and ' . ($buildReasons->count() - 3) . ' more' : '' }}.
+                                                    Changes marked <span class="font-semibold">Restart</span> need only a new container.
+                                                </p>
+                                            @endif
                                         </div>
                                     </div>
                                     <x-status-badge
-                                        :status="data_get($configurationDiff, 'requires_build') ? 'Rebuild required' : 'Redeploy required'"
+                                        :status="data_get($configurationDiff, 'requires_build') ? 'Rebuild required' : 'Restart required'"
                                         type="warning" />
                                 </div>
                                 <x-deployment.configuration-diff :diff="$configurationDiff" compact />

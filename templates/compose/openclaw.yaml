@@ -7,7 +7,7 @@
 
 services:
   openclaw:
-    image: "coollabsio/openclaw:2026.2.6"
+    image: "coollabsio/openclaw:2026.11.3"
     environment:
       - SERVICE_FQDN_OPENCLAW_8080
       - AUTH_USERNAME=$SERVICE_USER_OPENCLAW
@@ -71,7 +71,7 @@ services:
       timeout: 10s
       retries: 5
   browser:
-    image: "coollabsio/openclaw-browser:latest"
+    image: "coollabsio/openclaw-browser:0.3.0"
     environment:
       - PUID=1000
       - PGID=1000

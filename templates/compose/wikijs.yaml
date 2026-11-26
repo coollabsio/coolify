@@ -1,28 +1,35 @@
-# documentation: https://docs.requarks.io
+# documentation: https://docs.js.wiki
 # slogan: The most powerful and extensible open source Wiki software.
 # category: cms
 # tags: wiki, collaboration, documentation
 # logo: svgs/wikijs.svg
-# port: 80
+# port: 3000
 
+# Wiki.js 3 cannot upgrade a Wiki.js 2.x database in place. To migrate, export a .wkbackup package from 2.x and import it in a new 3.x instance: https://docs.js.wiki/setup/upgrade
 services:
   wikijs:
-    image: ghcr.io/requarks/wiki:2
+    image: ghcr.io/requarks/wiki:3
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
       - SERVICE_URL_WIKIJS_3000
-      - DB_TYPE=postgres
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      - ADMIN_PASS=${SERVICE_PASSWORD_ADMIN}
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=${SERVICE_USER_POSTGRES}
       - DB_PASS=${SERVICE_PASSWORD_POSTGRES}
       - DB_NAME=${POSTGRESQL_DATABASE:-wiki-db}
     healthcheck:
-      test: curl --fail http://localhost:3000 || exit 1
+      test: ["CMD-SHELL", "curl --fail http://localhost:3000 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       - POSTGRES_DB=${POSTGRESQL_DATABASE:-wiki-db}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
@@ -35,4 +42,4 @@ services:
     logging:
       driver: none
     volumes:
-      - wikijs-postgresql-data:/var/lib/postgresql/data
+      - wikijs-postgresql-data:/var/lib/postgresql

@@ -25,8 +25,8 @@
                 'failed' => 'Failed',
                 default => ucfirst($executionStatus),
             };
-            $server = data_get($task, 'application.destination.server')
-                ?? data_get($task, 'service.destination.server');
+            $server = data_get($this->task, 'application.destination.server')
+                ?? data_get($this->task, 'service.destination.server');
         @endphp
         <div class="border-b border-neutral-200 last:border-b-0 dark:border-white/[0.07]"
             wire:key="task-execution-{{ data_get($execution, 'id') }}">
@@ -71,7 +71,7 @@
                                     Load all
                                 </x-forms.button>
                             @endif
-                            @if (strlen($execution->message) > 0)
+                            @if (strlen($execution->message) > 0 && $this->canReadOutput())
                                 <x-forms.button wire:click.prevent="downloadLogs({{ data_get($execution, 'id') }})">
                                     Download logs
                                 </x-forms.button>

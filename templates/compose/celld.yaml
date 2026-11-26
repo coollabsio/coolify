@@ -7,7 +7,7 @@
 
 services:
   celld:
-    image: 'ghcr.io/denoland/celld:${CELLD_VERSION:-latest}'
+    image: 'ghcr.io/denoland/celld:${CELLD_VERSION:-v0.6.3}'
     environment:
       - SERVICE_URL_CELLD_8080
       - CELLD_BUCKET=${CELLD_BUCKET:?}
@@ -17,7 +17,8 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:?}
       - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
       - CELLD_ADDR=0.0.0.0:8080
-      - CELLD_ADVERTISE=celld:8080
+      - CELLD_INTERNAL_ADDR=0.0.0.0:8081
+      - CELLD_ADVERTISE=celld:8081
       - CELLD_WATCH=/var/lib/celld/state
       - RUST_LOG=${RUST_LOG:-info}
     volumes:

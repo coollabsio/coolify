@@ -10,7 +10,11 @@ use Illuminate\Support\Facades\Http;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
+#[IsOpenWorld]
 class ListGithubBranches extends Tool
 {
     protected string $name = 'list_github_branches';
@@ -95,6 +99,11 @@ class ListGithubBranches extends Tool
                     ->get("/repos/{$owner}/{$repo}/branches", ['per_page' => 100, 'page' => $page]);
 
                 if ($response->failed()) {
+                    $rateLimitMessage = githubRateLimitMessage($response);
+                    if ($rateLimitMessage !== null) {
+                        return $this->mcpError($request, $rateLimitMessage, ['resource_uuid' => $appUuid]);
+                    }
+
                     $status = $response->status();
                     $hint = match (true) {
                         $status === 401, $status === 403 => 'GitHub app credentials/installation invalid or missing permissions.',

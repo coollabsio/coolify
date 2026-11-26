@@ -5,24 +5,28 @@
                 [
                     'name' => 'GitHub',
                     'url' => $githubManualWebhook,
+                    'key' => 'github',
                     'secret' => 'githubManualWebhookSecret',
                     'description' => 'Accepts JSON or form-urlencoded webhook payloads.',
                 ],
                 [
                     'name' => 'GitLab',
                     'url' => $gitlabManualWebhook,
+                    'key' => 'gitlab',
                     'secret' => 'gitlabManualWebhookSecret',
                     'description' => 'Use the same secret when configuring the webhook in GitLab.',
                 ],
                 [
                     'name' => 'Bitbucket',
                     'url' => $bitbucketManualWebhook,
+                    'key' => 'bitbucket',
                     'secret' => 'bitbucketManualWebhookSecret',
                     'description' => 'Use the same secret when configuring the webhook in Bitbucket.',
                 ],
                 [
                     'name' => 'Gitea',
                     'url' => $giteaManualWebhook,
+                    'key' => 'gitea',
                     'secret' => 'giteaManualWebhookSecret',
                     'description' => 'Use the same secret when configuring the webhook in Gitea.',
                 ],
@@ -39,12 +43,15 @@
                         <x-external-link />
                     </a>
                 </x-slot:actions>
-                <x-forms.copy-button label="Deploy webhook URL" :text="$deploywebhook ?? ''" />
+                <x-api-disabled-callout class="mb-4"
+                    message="Enable API access before external services can call the deploy webhook." />
+                <x-forms.copy-input label="Deploy webhook URL" :text="$deploywebhook ?? ''" />
             </x-application.settings-section>
 
-            @if ($githubManualWebhook && $gitlabManualWebhook)
+            @if ($resource->git_based() && $githubManualWebhook && $gitlabManualWebhook)
                 <form wire:submit.prevent="submit" class="application-settings-form flex flex-col">
-                    <x-unsaved-bar action="submit" />
+                    <x-unsaved-bar action="submit"
+                        dirty="Object.entries($wire.savedSecrets).some(([property, saved]) => ($wire[property] ?? '') !== (saved ?? ''))" />
                     <x-application.settings-section id="manual-git-webhooks-section" title="Manual Git webhooks"
                         helper="Configure these endpoints when the repository is not connected through an official Git App." flush>
                         <x-slot:actions>
@@ -70,12 +77,19 @@
                                         </p>
                                     </div>
                                     <div class="grid gap-4 md:grid-cols-2">
-                                        <x-forms.copy-button label="Webhook URL" :text="$provider['url'] ?? ''" />
+                                        <x-forms.copy-input label="Webhook URL" :text="$provider['url'] ?? ''" />
                                         @can('update', $resource)
-                                            <x-forms.input type="password" :id="$provider['secret']"
-                                                label="Webhook secret"
-                                                helper="Must exactly match the secret configured in {{ $provider['name'] }}."
-                                                autocomplete="new-password" />
+                                            <div class="flex items-end gap-2">
+                                                <x-forms.input type="password" :id="$provider['secret']"
+                                                    label="Webhook secret"
+                                                    helper="Must exactly match the secret configured in {{ $provider['name'] }}. New secrets need at least 16 characters. Leave empty to disable this webhook."
+                                                    autocomplete="new-password" copyable />
+                                                <x-forms.button type="button"
+                                                    wire:click="generateSecret('{{ $provider['key'] }}')"
+                                                    aria-label="Generate {{ $provider['name'] }} webhook secret">
+                                                    Generate
+                                                </x-forms.button>
+                                            </div>
                                         @else
                                             <x-forms.input disabled label="Webhook secret"
                                                 value="Hidden (only administrators can view)" />
@@ -86,6 +100,37 @@
                         </div>
                     </x-application.settings-section>
                 </form>
+            @elseif ($gitlabAppWebhook)
+                <x-application.settings-section id="manual-git-webhooks-section" title="Manual Git webhooks"
+                    helper="GitLab Apps cannot register repository webhooks, so add this webhook to the GitLab project yourself." flush>
+                    <x-slot:actions>
+                        @can('view', $resource->source)
+                            <a class="button" href="{{ route('source.gitlab.show', ['gitlab_app_uuid' => $resource->source->uuid]) }}"
+                                {{ wireNavigate() }}>
+                                Source settings
+                            </a>
+                        @endcan
+                        @if (filled($resource?->gitWebhook))
+                            <a class="button" href="{{ $resource->gitWebhook }}" target="_blank"
+                                rel="noopener noreferrer">
+                                Repository settings
+                                <x-external-link />
+                            </a>
+                        @endif
+                    </x-slot:actions>
+
+                    <section class="px-4 py-5">
+                        <div class="mb-4">
+                            <h4 class="text-sm font-semibold text-black dark:text-fg">GitLab</h4>
+                            <p class="mt-1 text-[13px] leading-5 text-neutral-500 dark:text-fg-dim">
+                                Add this URL in the GitLab project under Settings → Webhooks. Set the Secret token to
+                                the Webhook secret token from the source settings, and enable Push events and Merge
+                                request events.
+                            </p>
+                        </div>
+                        <x-forms.copy-input label="Webhook URL" :text="$gitlabAppWebhook" />
+                    </section>
+                </x-application.settings-section>
             @else
                 <x-application.settings-section id="manual-git-webhooks-section" title="Manual Git webhooks"
                     helper="Manual repository webhooks are only required when a repository is not connected through an official Git App.">
@@ -106,7 +151,9 @@
                         <x-external-link />
                     </a>
                 </x-slot:actions>
-                <x-forms.copy-button label="Deploy webhook URL" :text="$deploywebhook ?? ''" />
+                <x-api-disabled-callout class="mb-4"
+                    message="Enable API access before external services can call the deploy webhook." />
+                <x-forms.copy-input label="Deploy webhook URL" :text="$deploywebhook ?? ''" />
             </x-application.settings-section>
         </div>
     @endif

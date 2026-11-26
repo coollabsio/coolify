@@ -1,0 +1,155 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+    createTimestampFormatter,
+    filterLogLines,
+    getLogLevel,
+    highlightSegments,
+    isFindShortcut,
+    lastTimestamp,
+    newLinesSince,
+    parseLogLines,
+    prefersTextView,
+    isExpandableLog,
+} from './runtime-logs.js';
+
+const idGenerator = () => {
+    let id = 0;
+    return () => ++id;
+};
+
+test('text view is the default unless it was turned off', () => {
+    assert.equal(prefersTextView(null), true);
+    assert.equal(prefersTextView('true'), true);
+    assert.equal(prefersTextView('false'), false);
+});
+
+test('parses docker timestamped lines and skips blank lines', () => {
+    const lines = parseLogLines(
+        '2026-09-28T10:00:00.123456789Z Server started\n\n2026-09-28T10:00:01Z ERROR failed to connect\nplain line',
+        idGenerator(),
+    );
+
+    assert.deepEqual(lines.map(({ id, ts, text, level }) => ({ id, ts, text, level })), [
+        { id: 1, ts: '2026-09-28T10:00:00.123456789Z', text: 'Server started', level: 'info' },
+        { id: 2, ts: '2026-09-28T10:00:01Z', text: 'ERROR failed to connect', level: 'error' },
+        { id: 3, ts: '', text: 'plain line', level: 'info' },
+    ]);
+    assert.ok(Object.isFrozen(lines[0]));
+});
+
+test('detects log levels by keyword', () => {
+    assert.equal(getLogLevel('fatal: boom'), 'error');
+    assert.equal(getLogLevel('warning: disk'), 'warning');
+    assert.equal(getLogLevel('trace id=1'), 'debug');
+    assert.equal(getLogLevel('ready'), 'info');
+    assert.equal(getLogLevel('time=2026-10-30t16:35:49z level=debug msg="read failed" err=eof'), 'debug');
+    assert.equal(getLogLevel('{"level":"info","msg":"conn closed","err":"eof"}'), 'info');
+    assert.equal(getLogLevel('level=error msg="db down"'), 'error');
+    assert.equal(getLogLevel('{"level":50,"msg":"failed"}'), 'error');
+    assert.equal(getLogLevel('2026-10-29t03:17:00.849341z  info logs: pruned 840 requests, 0 error events'), 'info');
+    assert.equal(getLogLevel('2026/10/30 16:35:49 [debug] read failed'), 'debug');
+    assert.equal(getLogLevel('warn: retry failed'), 'warning');
+    assert.equal(getLogLevel('connection failed'), 'error');
+});
+
+test('filters by level and case-insensitive query', () => {
+    const lines = parseLogLines('ERROR Database down\nINFO Database up\nwarn cache miss', idGenerator());
+
+    assert.deepEqual(filterLogLines(lines, { error: true, warning: true, debug: true, info: true }, 'DATABASE').map((l) => l.text), [
+        'ERROR Database down',
+        'INFO Database up',
+    ]);
+    assert.deepEqual(filterLogLines(lines, { error: false, warning: true, debug: true, info: true }, '').map((l) => l.text), [
+        'INFO Database up',
+        'warn cache miss',
+    ]);
+});
+
+test('drops lines that a --since request returns again', () => {
+    const nextId = idGenerator();
+    const existing = parseLogLines(
+        '2026-09-28T10:00:00Z first\n2026-09-28T10:00:01Z same-second a\n2026-09-28T10:00:01Z same-second b',
+        nextId,
+    );
+    const incoming = parseLogLines(
+        '2026-09-28T10:00:01Z same-second a\n2026-09-28T10:00:01Z same-second b\n2026-09-28T10:00:01Z same-second c\n2026-09-28T10:00:02Z next',
+        nextId,
+    );
+
+    assert.equal(lastTimestamp(existing), '2026-09-28T10:00:01Z');
+    assert.deepEqual(newLinesSince(existing, incoming).map((l) => l.text), ['same-second c', 'next']);
+});
+
+test('keeps repeated identical lines that are new at the boundary', () => {
+    const nextId = idGenerator();
+    const existing = parseLogLines('2026-09-28T10:00:01Z ping', nextId);
+    const incoming = parseLogLines('2026-09-28T10:00:01Z ping\n2026-09-28T10:00:01Z ping', nextId);
+
+    assert.deepEqual(newLinesSince(existing, incoming).map((l) => l.text), ['ping']);
+});
+
+test('splits text into highlight segments without markup', () => {
+    assert.deepEqual(highlightSegments('<b>Error</b> error', 'error'), [
+        { text: '<b>', match: false },
+        { text: 'Error', match: true },
+        { text: '</b> ', match: false },
+        { text: 'error', match: true },
+    ]);
+    assert.deepEqual(highlightSegments('plain', '  '), [{ text: 'plain', match: false }]);
+});
+
+test('formats timestamps in the server timezone and falls back to UTC', () => {
+    assert.equal(createTimestampFormatter('Europe/Budapest')('2025-12-04T11:48:39.136764033Z'), '2025-Dec-04 12:48:39');
+    assert.equal(createTimestampFormatter('Not/AZone')('2025-12-04T11:48:39Z'), '2025-Dec-04 11:48:39');
+});
+
+test('reads a source tag and searches it without changing the level', () => {
+    const lines = parseLogLines(
+        'Frankfurt\t2026-09-28T10:00:01Z hello from frankfurt\nHelsinki\t2026-09-28T10:00:02Z ERROR failed there\nplain line',
+        idGenerator(),
+    );
+
+    assert.deepEqual(lines.map(({ source, ts, text, level }) => ({ source, ts, text, level })), [
+        { source: 'Frankfurt', ts: '2026-09-28T10:00:01Z', text: 'hello from frankfurt', level: 'info' },
+        { source: 'Helsinki', ts: '2026-09-28T10:00:02Z', text: 'ERROR failed there', level: 'error' },
+        { source: '', ts: '', text: 'plain line', level: 'info' },
+    ]);
+    assert.deepEqual(
+        filterLogLines(lines, { error: true, warning: true, debug: true, info: true }, 'helsinki').map((line) => line.source),
+        ['Helsinki'],
+    );
+});
+
+test('drops repeated lines per source and keeps timestamp order', () => {
+    const nextId = idGenerator();
+    const existing = parseLogLines(
+        'Frankfurt\t2026-09-28T10:00:01Z same\nHelsinki\t2026-09-28T10:00:01Z same',
+        nextId,
+    );
+    const incoming = parseLogLines(
+        'Frankfurt\t2026-09-28T10:00:01Z same\nHelsinki\t2026-09-28T10:00:02Z next\nFrankfurt\t2026-09-28T10:00:03Z later',
+        nextId,
+    );
+
+    assert.deepEqual(newLinesSince(existing, incoming).map((line) => [line.source, line.text]), [
+        ['Helsinki', 'next'],
+        ['Frankfurt', 'later'],
+    ]);
+});
+
+test('detects Ctrl+F and Cmd+F only', () => {
+    assert.equal(isFindShortcut({ ctrlKey: true, key: 'f' }), true);
+    assert.equal(isFindShortcut({ metaKey: true, key: 'F' }), true);
+    assert.equal(isFindShortcut({ key: 'f' }), false);
+    assert.equal(isFindShortcut({ ctrlKey: true, shiftKey: true, key: 'F' }), false);
+    assert.equal(isFindShortcut({ ctrlKey: true, altKey: true, key: 'f' }), false);
+    assert.equal(isFindShortcut({ ctrlKey: true, key: 'g' }), false);
+});
+
+test('a row expands only when the detail shows more than the row', () => {
+    assert.equal(isExpandableLog('JOB      QUEUE', false), false);
+    assert.equal(isExpandableLog('{ broken json', false), false);
+    assert.equal(isExpandableLog('a very long line', true), true);
+    assert.equal(isExpandableLog('{"level":"info","id":1}', false), true);
+});

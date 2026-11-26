@@ -2,8 +2,10 @@
 
 use App\Jobs\ServerLimitCheckJob;
 use App\Jobs\StripeProcessJob;
+use App\Jobs\SubscriptionCheckoutReminderJob;
 use App\Jobs\SubscriptionInvoiceFailedJob;
 use App\Jobs\VerifyStripeSubscriptionStatusJob;
+use App\Models\Server;
 use App\Models\Subscription;
 use App\Models\Team;
 use App\Models\User;
@@ -11,6 +13,14 @@ use App\Notifications\Internal\GeneralNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+use Stripe\Customer;
+use Stripe\Event;
+use Stripe\PaymentIntent;
+use Stripe\Service\CustomerService;
+use Stripe\Service\PaymentIntentService;
+use Stripe\Service\RefundService;
+use Stripe\Service\SubscriptionService;
+use Stripe\StripeClient;
 
 uses(RefreshDatabase::class);
 
@@ -55,8 +65,12 @@ describe('customer.subscription.created does not fall through to updated', funct
         expect($subscription->stripe_invoice_paid)->toBeFalsy();
     });
 
-    test('created event updates existing subscription instead of duplicating', function () {
+    test('created event cannot overwrite a different recorded subscription', function () {
         Queue::fake();
+
+        $rootTeam = Team::factory()->create(['id' => 0]);
+        $rootTeam->discordNotificationSettings()->update(['discord_enabled' => true]);
+        Notification::fake();
 
         Subscription::create([
             'team_id' => $this->team->id,
@@ -84,8 +98,46 @@ describe('customer.subscription.created does not fall through to updated', funct
 
         expect(Subscription::where('team_id', $this->team->id)->count())->toBe(1);
         $subscription = Subscription::where('team_id', $this->team->id)->first();
-        expect($subscription->stripe_subscription_id)->toBe('sub_new_123');
-        expect($subscription->stripe_customer_id)->toBe('cus_new_123');
+        expect($subscription->stripe_subscription_id)->toBe('sub_old');
+        expect($subscription->stripe_customer_id)->toBe('cus_old');
+        expect($subscription->stripe_invoice_paid)->toBeTruthy();
+
+        Notification::assertSentTo($rootTeam, GeneralNotification::class, function (GeneralNotification $notification) {
+            return str_contains($notification->message, 'StripeProcessJob error:')
+                && str_contains($notification->message, 'cus_old')
+                && str_contains($notification->message, 'cus_new_123');
+        });
+    });
+
+    test('created event rejects a pending record with a different stripe customer id', function () {
+        Queue::fake();
+
+        $rootTeam = Team::factory()->create(['id' => 0]);
+        $rootTeam->discordNotificationSettings()->update(['discord_enabled' => true]);
+        Notification::fake();
+
+        Subscription::create([
+            'team_id' => $this->team->id,
+            'stripe_customer_id' => 'cus_pending',
+            'stripe_invoice_paid' => false,
+        ]);
+
+        (new StripeProcessJob(['type' => 'customer.subscription.created', 'data' => ['object' => [
+            'id' => 'sub_other',
+            'customer' => 'cus_other',
+            'metadata' => ['team_id' => $this->team->id, 'user_id' => $this->user->id],
+        ]]]))->handle();
+
+        $subscription = $this->team->subscription()->first();
+        expect($subscription->stripe_subscription_id)->toBeNull()
+            ->and($subscription->stripe_customer_id)->toBe('cus_pending')
+            ->and($subscription->stripe_invoice_paid)->toBeFalsy();
+
+        Notification::assertSentTo($rootTeam, GeneralNotification::class, function (GeneralNotification $notification) {
+            return str_contains($notification->message, 'StripeProcessJob error:')
+                && str_contains($notification->message, 'cus_pending')
+                && str_contains($notification->message, 'cus_other');
+        });
     });
 });
 
@@ -337,4 +389,247 @@ describe('missing subscription Stripe webhooks are ignored', function () {
             ],
         ]],
     ]);
+});
+
+test('late repeated subscription created events preserve confirmed payment', function () {
+    Queue::fake();
+    $completed = ['type' => 'checkout.session.completed', 'data' => ['object' => [
+        'client_reference_id' => $this->user->id.':'.$this->team->id,
+        'subscription' => 'sub_paid', 'customer' => 'cus_paid',
+    ]]];
+    (new StripeProcessJob($completed))->handle();
+    $created = ['type' => 'customer.subscription.created', 'data' => ['object' => [
+        'id' => 'sub_paid', 'customer' => 'cus_paid',
+        'metadata' => ['team_id' => $this->team->id, 'user_id' => $this->user->id],
+    ]]];
+    foreach (range(1, 2) as $attempt) {
+        (new StripeProcessJob($created))->handle();
+        expect($this->team->subscription()->first()->stripe_invoice_paid)->toBeTruthy();
+    }
+    expect($this->team->subscription()->count())->toBe(1);
+});
+
+test('created event fills a pending customer record without granting access', function () {
+    Queue::fake();
+    Subscription::create(['team_id' => $this->team->id, 'stripe_customer_id' => 'cus_pending', 'stripe_invoice_paid' => false]);
+    (new StripeProcessJob(['type' => 'customer.subscription.created', 'data' => ['object' => [
+        'id' => 'sub_pending', 'customer' => 'cus_pending',
+        'metadata' => ['team_id' => $this->team->id, 'user_id' => $this->user->id],
+    ]]]))->handle();
+    expect($this->team->subscription()->first()->stripe_subscription_id)->toBe('sub_pending')
+        ->and($this->team->subscription()->first()->stripe_invoice_paid)->toBeFalsy();
+});
+
+test('customer.subscription.deleted ends only the deleted row of a team with duplicate rows', function () {
+    Server::flushIdentityMap();
+    $active = Subscription::create([
+        'team_id' => $this->team->id,
+        'stripe_customer_id' => 'cus_dup',
+        'stripe_subscription_id' => 'sub_active',
+        'stripe_invoice_paid' => true,
+    ]);
+    $deleted = Subscription::create([
+        'team_id' => $this->team->id,
+        'stripe_customer_id' => 'cus_dup',
+        'stripe_subscription_id' => 'sub_deleted',
+        'stripe_invoice_paid' => true,
+    ]);
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->settings()->update(['is_usable' => true, 'is_reachable' => true]);
+
+    (new StripeProcessJob(['type' => 'customer.subscription.deleted', 'data' => ['object' => [
+        'customer' => 'cus_dup',
+        'id' => 'sub_deleted',
+    ]]]))->handle();
+
+    expect($active->fresh()->stripe_subscription_id)->toBe('sub_active')
+        ->and($active->fresh()->stripe_invoice_paid)->toBeTruthy()
+        ->and($active->fresh()->ended_at)->toBeNull()
+        ->and($deleted->fresh()->stripe_subscription_id)->toBeNull()
+        ->and($deleted->fresh()->ended_at)->not->toBeNull()
+        ->and($server->settings()->first()->is_usable)->toBeTruthy()
+        ->and($server->settings()->first()->is_reachable)->toBeTruthy();
+});
+
+test('an early fraud warning refunds and cancels every subscription of the email', function () {
+    Server::flushIdentityMap();
+    $endedRow = Subscription::create([
+        'team_id' => Team::factory()->create()->id,
+        'stripe_customer_id' => 'cus_fraud',
+        'stripe_subscription_id' => null,
+        'stripe_invoice_paid' => false,
+    ]);
+    $subscription = Subscription::create([
+        'team_id' => $this->team->id,
+        'stripe_customer_id' => 'cus_fraud',
+        'stripe_subscription_id' => 'sub_fraud',
+        'stripe_invoice_paid' => true,
+    ]);
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $server->settings()->update(['is_usable' => true]);
+    $lookup = fakeOpenStripeSubscriptions([['id' => 'sub_fraud', 'status' => 'active'], ['id' => 'sub_other_customer', 'status' => 'active']]);
+
+    $stripe = Mockery::mock(StripeClient::class);
+    $stripe->refunds = Mockery::mock(RefundService::class);
+    $stripe->refunds->shouldReceive('create')->once()->with(['charge' => 'ch_fraud']);
+    $stripe->paymentIntents = Mockery::mock(PaymentIntentService::class);
+    $stripe->paymentIntents->shouldReceive('retrieve')->with('pi_fraud', [])->andReturn(PaymentIntent::constructFrom(['id' => 'pi_fraud', 'customer' => 'cus_fraud']));
+    $stripe->customers = Mockery::mock(CustomerService::class);
+    $stripe->customers->shouldReceive('retrieve')->with('cus_fraud')->andReturn(Customer::constructFrom(['id' => 'cus_fraud', 'email' => 'fraud@example.com']));
+    $stripe->subscriptions = Mockery::mock(SubscriptionService::class);
+    $stripe->subscriptions->shouldReceive('retrieve')->andReturnUsing(fn (string $id) => Stripe\Subscription::constructFrom(['id' => $id, 'status' => 'active']));
+    $stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_fraud', []);
+    $stripe->subscriptions->shouldReceive('cancel')->once()->with('sub_other_customer', []);
+    app()->instance(StripeClient::class, $stripe);
+
+    (new StripeProcessJob(['type' => 'radar.early_fraud_warning.created', 'data' => ['object' => [
+        'id' => 'issfr_1',
+        'charge' => 'ch_fraud',
+        'payment_intent' => 'pi_fraud',
+    ]]]))->handle();
+
+    $lookup->shouldHaveReceived('handle')->with(['fraud@example.com'], ['cus_fraud']);
+    expect($subscription->fresh()->stripe_subscription_id)->toBeNull()
+        ->and($subscription->fresh()->stripe_invoice_paid)->toBeFalsy()
+        ->and($subscription->fresh()->ended_at)->not->toBeNull()
+        ->and($endedRow->fresh()->stripe_subscription_id)->toBeNull()
+        ->and($server->settings()->first()->is_usable)->toBeFalsy();
+});
+
+describe('checkout.session.expired', function () {
+    beforeEach(function () {
+        Queue::fake([SubscriptionCheckoutReminderJob::class]);
+        Subscription::create([
+            'team_id' => $this->team->id,
+            'stripe_customer_id' => 'cus_TestExpiredCheckout',
+            'stripe_invoice_paid' => false,
+        ]);
+    });
+
+    function expiredCheckoutEvent(string $clientReferenceId, ?string $recoveryUrl = 'https://buy.stripe.com/r/test_recoveryabc123'): Event
+    {
+        $payload = json_decode(file_get_contents(base_path('tests/Fixtures/stripe/checkout.session.expired.json')), true);
+        $payload['data']['object']['client_reference_id'] = $clientReferenceId;
+        if ($recoveryUrl === null) {
+            $payload['data']['object']['after_expiration'] = null;
+        }
+
+        return Event::constructFrom($payload);
+    }
+
+    test('queues one reminder with the recovery url to the user who started checkout', function () {
+        (new StripeProcessJob(expiredCheckoutEvent("{$this->user->id}:{$this->team->id}")))->handle();
+
+        Queue::assertPushed(SubscriptionCheckoutReminderJob::class, 1);
+        Queue::assertPushed(SubscriptionCheckoutReminderJob::class, fn ($job) => $job->user->is($this->user)
+            && $job->checkoutUrl === 'https://buy.stripe.com/r/test_recoveryabc123');
+        expect($this->team->subscription()->first()->stripe_checkout_reminder_sent_at)->not->toBeNull();
+    });
+
+    test('falls back to the subscription page without a recovery url', function () {
+        (new StripeProcessJob(expiredCheckoutEvent("{$this->user->id}:{$this->team->id}", null)))->handle();
+
+        Queue::assertPushed(SubscriptionCheckoutReminderJob::class, fn ($job) => $job->checkoutUrl === route('subscription.index'));
+    });
+
+    test('does not remind a team that is already subscribed', function () {
+        $this->team->subscription()->update(['stripe_invoice_paid' => true]);
+
+        (new StripeProcessJob(expiredCheckoutEvent("{$this->user->id}:{$this->team->id}")))->handle();
+
+        Queue::assertNotPushed(SubscriptionCheckoutReminderJob::class);
+    });
+
+    test('sends at most one reminder per team in 7 days', function () {
+        $event = expiredCheckoutEvent("{$this->user->id}:{$this->team->id}");
+
+        (new StripeProcessJob($event))->handle();
+        $this->travel(6)->days();
+        (new StripeProcessJob($event))->handle();
+        Queue::assertPushed(SubscriptionCheckoutReminderJob::class, 1);
+
+        $this->travel(2)->days();
+        (new StripeProcessJob($event))->handle();
+        Queue::assertPushed(SubscriptionCheckoutReminderJob::class, 2);
+    });
+
+    test('ignores unknown or unauthorized client reference ids', function (string $clientReferenceId) {
+        (new StripeProcessJob(expiredCheckoutEvent($clientReferenceId)))->handle();
+
+        Queue::assertNotPushed(SubscriptionCheckoutReminderJob::class);
+    })->with([
+        'unknown team' => fn () => "{$this->user->id}:999999",
+        'user not in team' => fn () => "999999:{$this->team->id}",
+        'member role' => function () {
+            $member = User::factory()->create();
+            $this->team->members()->attach($member->id, ['role' => 'member']);
+
+            return "{$member->id}:{$this->team->id}";
+        },
+    ]);
+
+    test('does nothing on self-hosted instances', function () {
+        config()->set('constants.coolify.self_hosted', true);
+
+        (new StripeProcessJob(expiredCheckoutEvent("{$this->user->id}:{$this->team->id}")))->handle();
+
+        Queue::assertNotPushed(SubscriptionCheckoutReminderJob::class);
+        expect($this->team->subscription()->first()->stripe_checkout_reminder_sent_at)->toBeNull();
+    });
+});
+
+describe('paid rows without a Stripe subscription ID', function () {
+    beforeEach(function () {
+        $this->unlinked = Subscription::create([
+            'team_id' => $this->team->id,
+            'stripe_customer_id' => 'cus_unlinked',
+            'stripe_subscription_id' => null,
+            'stripe_invoice_paid' => true,
+        ]);
+
+        $this->stripeSubscriptions = Mockery::mock(SubscriptionService::class);
+        $stripe = Mockery::mock(StripeClient::class);
+        $stripe->subscriptions = $this->stripeSubscriptions;
+        $this->instance(StripeClient::class, $stripe);
+    });
+
+    test('a deleted event of the customer ends the row', function () {
+        $this->stripeSubscriptions->shouldReceive('all')->andReturn((object) ['data' => [
+            (object) ['id' => 'sub_canceled', 'status' => 'canceled'],
+        ]]);
+        $this->stripeSubscriptions->shouldReceive('retrieve')->with('sub_canceled')->andReturn((object) [
+            'status' => 'canceled',
+            'cancel_at_period_end' => false,
+        ]);
+
+        (new StripeProcessJob(['type' => 'customer.subscription.deleted', 'data' => ['object' => [
+            'customer' => 'cus_unlinked',
+            'id' => 'sub_canceled',
+        ]]]))->handle();
+
+        expect($this->unlinked->fresh()->stripe_invoice_paid)->toBeFalsy()
+            ->and($this->unlinked->fresh()->stripe_subscription_id)->toBeNull();
+    });
+
+    test('an updated event of the customer links the active subscription', function () {
+        $this->stripeSubscriptions->shouldReceive('all')->andReturn((object) ['data' => [
+            (object) ['id' => 'sub_old', 'status' => 'canceled'],
+            (object) ['id' => 'sub_live', 'status' => 'active'],
+        ]]);
+        $this->stripeSubscriptions->shouldReceive('retrieve')->with('sub_live')->andReturn((object) [
+            'status' => 'active',
+            'cancel_at_period_end' => false,
+        ]);
+
+        (new StripeProcessJob(['type' => 'customer.subscription.updated', 'data' => ['object' => [
+            'id' => 'sub_live',
+            'customer' => 'cus_unlinked',
+            'status' => 'active',
+            'cancel_at_period_end' => false,
+            'items' => ['data' => [['plan' => ['id' => 'price_monthly'], 'price' => ['lookup_key' => 'monthly']]]],
+        ]]]))->handle();
+
+        expect($this->unlinked->fresh()->stripe_subscription_id)->toBe('sub_live')
+            ->and($this->unlinked->fresh()->stripe_invoice_paid)->toBeTruthy();
+    });
 });

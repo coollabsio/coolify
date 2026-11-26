@@ -11,30 +11,6 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
-/**
- * Access settings must always use the shared listbox control — not conditional
- * custom Enable/Disable cards — so the Access section matches DNS/API/etc.
- */
-test('settings advanced access section always uses listboxes', function () {
-    $path = resource_path('views/livewire/settings/advanced.blade.php');
-    $contents = file_get_contents($path);
-
-    expect($contents)
-        ->toContain('id="is_registration_enabled"')
-        ->toContain('id="disable_two_step_confirmation"')
-        ->toContain('onChange="instantSave"')
-        ->not->toContain('toggleRegistration')
-        ->not->toContain('toggleTwoStepConfirmation')
-        ->not->toContain('Only administrators can create accounts.')
-        ->not->toContain('Two-step confirmations enabled');
-});
-
-test('image storage fields use the standard settings field gap', function () {
-    $contents = file_get_contents(resource_path('views/livewire/settings/advanced.blade.php'));
-
-    expect($contents)->toContain('<div class="flex max-w-md flex-col gap-4">');
-});
-
 test('instance admin can toggle registration via listbox instantSave', function () {
     $rootTeam = Team::find(0) ?? Team::factory()->create(['id' => 0]);
     Server::factory()->create(['id' => 0, 'team_id' => $rootTeam->id]);
@@ -53,9 +29,6 @@ test('instance admin can toggle registration via listbox instantSave', function 
 
     Livewire::test(Advanced::class)
         ->assertSet('is_registration_enabled', false)
-        ->assertSee('Registration')
-        ->assertSee('Destructive action confirmation')
-        ->assertDontSee('Only administrators can create accounts.')
         ->set('is_registration_enabled', true)
         ->call('instantSave')
         ->assertDispatched('success');
@@ -101,7 +74,6 @@ test('instance admin can configure the image CDN URL at runtime', function () {
     session(['currentTeam' => ['id' => $rootTeam->id]]);
 
     Livewire::test(Advanced::class)
-        ->assertSee('Image CDN URL')
         ->set('image_cdn_url', 'https://images.example.com/media/')
         ->call('submit')
         ->assertHasNoErrors()

@@ -1,3 +1,4 @@
+# ignore: true
 # documentation: https://starterhelp.orangehrm.com/hc/en-us
 # slogan: OrangeHRM open source HR management software.
 # category: productivity
@@ -7,7 +8,7 @@
 
 services:
   orangehrm:
-    image: orangehrm/orangehrm:latest
+    image: orangehrm/orangehrm:5.9
     platform: linux/amd64
     environment:
       - SERVICE_URL_ORANGEHRM_80
