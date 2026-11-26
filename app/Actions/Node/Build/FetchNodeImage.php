@@ -123,12 +123,16 @@ class FetchNodeImage
                 $started = microtime(true);
                 $copy = $this->fetchFrom($source, $target, $image, $deadline, $attempt);
                 $copy = ['seconds' => round(microtime(true) - $started, 1), ...$copy];
-                rescue(fn () => TransitionOperation::run($attempt, NodeOperationStatus::SUCCEEDED, result: ['source' => $source->name, ...$copy]), report: false);
+                rescue(function () use ($attempt, $source, $copy): void {
+                    // A running operation ends through `verifying`: the target checked the image ID.
+                    TransitionOperation::run($attempt, NodeOperationStatus::VERIFYING);
+                    TransitionOperation::run($attempt, NodeOperationStatus::SUCCEEDED, result: ['source' => $source->name, ...$copy]);
+                });
 
                 return ['source' => $source, ...$copy];
             } catch (Throwable $exception) {
                 $errors[] = "{$source->name}: ".mb_substr($exception->getMessage(), 0, 500);
-                rescue(fn () => TransitionOperation::run($attempt, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000)), report: false);
+                rescue(fn () => TransitionOperation::run($attempt, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000)));
             }
         }
 
