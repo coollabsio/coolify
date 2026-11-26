@@ -7,7 +7,7 @@
 <div class="relative z-10 flex min-w-0 items-center gap-1" x-on:click.prevent.stop=""
     x-on:mousedown.stop="" x-on:keydown.enter.stop="">
     <button type="button" x-on:click="toggleAddress({{ $uuid }})"
-        class="min-w-0 cursor-pointer truncate rounded font-mono text-[12px] leading-6 text-neutral-500 transition-colors hover:text-black dark:text-fg-dim dark:hover:text-fg"
+        class="min-w-0 cursor-pointer truncate rounded text-[12px] leading-6 text-neutral-500 transition-colors hover:text-black dark:text-fg-dim dark:hover:text-fg"
         :class="{ 'tracking-[0.15em]': !isAddressRevealed({{ $uuid }}) }"
         :aria-pressed="isAddressRevealed({{ $uuid }}) ? 'true' : 'false'"
         :title="isAddressRevealed({{ $uuid }}) ? 'Hide ' + (revealedAddresses[{{ $uuid }}] ?? 'address') : 'Show address'"
