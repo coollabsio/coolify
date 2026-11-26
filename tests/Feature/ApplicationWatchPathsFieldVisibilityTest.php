@@ -82,7 +82,7 @@ it('shows the watch paths field for private GitHub App applications', function (
         ->assertSee('Watch paths');
 });
 
-it('hides the watch paths field for public repository applications', function () {
+it('shows the watch paths field for public repository applications, which receive manual webhooks', function () {
     $githubApp = watchPathsTestGithubApp(isPublic: true);
     $application = watchPathsTestApplication([
         'source_id' => $githubApp->id,
@@ -90,7 +90,7 @@ it('hides the watch paths field for public repository applications', function ()
     ]);
 
     Livewire::test(General::class, ['application' => $application->fresh()])
-        ->assertDontSee('Watch paths');
+        ->assertSee('Watch paths');
 });
 
 it('hides the watch paths field for applications without a Git repository', function () {

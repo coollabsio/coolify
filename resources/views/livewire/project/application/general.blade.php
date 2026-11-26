@@ -338,18 +338,16 @@
                     </div>
                 @endif
             </div>
-            @if (! $application->is_archive_source && $application->build_pack !== 'dockerimage' && ($this->application->supportsWatchPaths() || $this->application->is_public_repository()))
+            @if (! $application->is_archive_source && $application->build_pack !== 'dockerimage' && $this->application->supportsWatchPaths())
                 <x-application.settings-subsection id="deploy-triggers-section" title="Deploy triggers"
                     helper="Which Git pushes deploy this application.">
                     <livewire:project.application.deploy-triggers :application="$application" wire:key="deploy-triggers-{{ $application->uuid }}" />
-                    @if ($this->application->supportsWatchPaths())
-                        <div class="pt-4">
-                            <x-forms.textarea
-                                helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins. Set watch paths to replace smart deploy triggers."
-                                placeholder="{{ $buildPack === 'dockercompose' ? 'services/api/**' : 'src/pages/**' }}" id="watchPaths" label="Watch paths"
-                                x-bind:disabled="{{ $buildPack === 'dockercompose' ? 'shouldDisable()' : '!canUpdate' }}" />
-                        </div>
-                    @endif
+                    <div class="pt-4">
+                        <x-forms.textarea
+                            helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins. Set watch paths to replace smart deploy triggers."
+                            placeholder="{{ $buildPack === 'dockercompose' ? 'services/api/**' : 'src/pages/**' }}" id="watchPaths" label="Watch paths"
+                            x-bind:disabled="{{ $buildPack === 'dockercompose' ? 'shouldDisable()' : '!canUpdate' }}" />
+                    </div>
                 </x-application.settings-subsection>
             @endif
             @if ($isStatic || $buildPack === 'static')
