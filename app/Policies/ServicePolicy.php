@@ -2,8 +2,12 @@
 
 namespace App\Policies;
 
+use App\Enums\AccessLevel;
+use App\Models\Environment;
 use App\Models\Service;
 use App\Models\User;
+use App\Services\ProjectConfig\ManagedResources;
+use Illuminate\Auth\Access\Response;
 
 class ServicePolicy
 {
@@ -20,27 +24,27 @@ class ServicePolicy
      */
     public function view(User $user, Service $service): bool
     {
-        $teamId = $this->getTeamId($service);
-
-        return $teamId !== null && $user->teams->contains('id', $teamId);
+        return $user->canAccess(AccessLevel::Read, $service);
     }
 
     /**
-     * Determine whether the user can create models.
+     * Determine whether the user can create models, in the environment when one is given.
      */
-    public function create(User $user): bool
+    public function create(User $user, ?Environment $environment = null): bool
     {
-        return $user->isAdmin();
+        return app(ResourceCreatePolicy::class)->createAny($user, $environment);
     }
 
     /**
      * Determine whether the user can update the model.
      */
-    public function update(User $user, Service $service): bool
+    public function update(User $user, Service $service): Response
     {
-        $teamId = $this->getTeamId($service);
+        if (ManagedResources::isManaged($service)) {
+            return Response::deny(ManagedResources::denyReason($service));
+        }
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $user->canAccess(AccessLevel::Write, $service) ? Response::allow() : Response::deny();
     }
 
     /**
@@ -48,9 +52,7 @@ class ServicePolicy
      */
     public function delete(User $user, Service $service): bool
     {
-        $teamId = $this->getTeamId($service);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $user->canAccess(AccessLevel::Delete, $service);
     }
 
     /**
@@ -74,9 +76,15 @@ class ServicePolicy
      */
     public function stop(User $user, Service $service): bool
     {
-        $teamId = $this->getTeamId($service);
+        return $user->canAccess(AccessLevel::Deploy, $service);
+    }
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+    /**
+     * Determine whether the user can read secret values, such as environment variable values.
+     */
+    public function viewSensitive(User $user, Service $service): bool
+    {
+        return $user->canAccess(AccessLevel::ReadSensitive, $service);
     }
 
     /**
@@ -84,9 +92,16 @@ class ServicePolicy
      */
     public function manageEnvironment(User $user, Service $service): bool
     {
-        $teamId = $this->getTeamId($service);
+        return $user->canAccess(AccessLevel::Write, $service);
+    }
 
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+    /**
+     * Determine whether the user can schedule, run, and download storage and database backups. The read-only lock of
+     * coolify.json does not apply. When the file has `storage_backups`, its next apply replaces the schedules edited in the dashboard.
+     */
+    public function manageBackups(User $user, Service $service): bool
+    {
+        return $user->canAccess(AccessLevel::Write, $service);
     }
 
     /**
@@ -94,9 +109,7 @@ class ServicePolicy
      */
     public function uploadBackup(User $user, Service $service): bool
     {
-        $teamId = $this->getTeamId($service);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
+        return $user->canAccess(AccessLevel::Write, $service);
     }
 
     /**
@@ -104,23 +117,6 @@ class ServicePolicy
      */
     public function deploy(User $user, Service $service): bool
     {
-        $teamId = $this->getTeamId($service);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
-    }
-
-    /**
-     * Determine whether the user can access the terminal.
-     */
-    public function accessTerminal(User $user, Service $service): bool
-    {
-        $teamId = $this->getTeamId($service);
-
-        return $teamId !== null && $user->isAdminOfTeam($teamId);
-    }
-
-    private function getTeamId(Service $service): ?int
-    {
-        return $service->team()?->id;
+        return $user->canAccess(AccessLevel::Deploy, $service);
     }
 }

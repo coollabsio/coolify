@@ -48,7 +48,7 @@ class Configuration extends Component
         $this->environment = $environment;
         $this->application = $application;
 
-        if ($this->application->build_pack === 'dockercompose' && $this->currentRoute === 'project.application.healthcheck') {
+        if (! $application->hasConfigurationPage((string) $this->currentRoute) || ($application->build_pack === 'dockercompose' && $this->currentRoute === 'project.application.healthcheck')) {
             return redirect()->route('project.application.configuration', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid, 'application_uuid' => $application->uuid]);
         }
     }

@@ -1,7 +1,6 @@
 <?php
 
 use App\Livewire\Team\Invitations;
-use App\Livewire\Team\InviteLink;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\TeamInvitation;
@@ -20,52 +19,6 @@ beforeEach(function () {
 
     $this->actingAs($this->owner);
     session(['currentTeam' => $this->team]);
-});
-
-it('shows generate link with loading state targeting viaLink', function () {
-    $view = file_get_contents(resource_path('views/livewire/team/invite-link.blade.php'));
-
-    expect($view)
-        ->toContain('wire:submit="viaLink"')
-        ->toContain('wire:target="viaLink"')
-        ->toContain('<x-forms.button type="submit" wire:target="viaLink"')
-        ->toContain('Generate link');
-
-    Livewire::test(InviteLink::class)
-        ->assertSee('Generate link')
-        ->assertSeeHtml('wire:target="viaLink"')
-        ->assertSeeHtml('wire:loading.attr="disabled"')
-        ->assertSeeHtml('wire:loading.class="is-loading"');
-});
-
-it('renders a real copy button for pending invitation links', function () {
-    $invitation = TeamInvitation::create([
-        'team_id' => $this->team->id,
-        'uuid' => 'test-invitation-uuid-123456789012',
-        'email' => 'invitee@example.com',
-        'role' => 'member',
-        'link' => 'http://example.test/invitations/test-invitation-uuid-123456789012',
-        'via' => 'link',
-    ]);
-
-    $view = file_get_contents(resource_path('views/livewire/team/invitations.blade.php'));
-
-    expect($view)
-        ->toContain('<x-copy-button :value="$invite->link" label="Copy invitation link" />');
-
-    Livewire::test(Invitations::class, [
-        'invitations' => TeamInvitation::ownedByCurrentTeam()->get(),
-    ])
-        ->assertSee($invitation->link)
-        ->assertSeeHtml('aria-label="Copy invitation link"')
-        ->assertSeeHtml('x-data="copyButton"')
-        ->assertSeeHtml('type="button"');
-});
-
-it('keeps clipboard logic in the shared copy button instead of a global helper', function () {
-    $layout = file_get_contents(resource_path('views/layouts/base.blade.php'));
-
-    expect($layout)->not->toContain('copyToClipboard');
 });
 
 it('preserves a provisional user when revoking their invitation fails', function () {
@@ -95,4 +48,33 @@ it('preserves a provisional user when revoking their invitation fails', function
 
     $this->assertDatabaseHas('users', ['id' => $provisionalUser->id]);
     $this->assertDatabaseHas('team_invitations', ['id' => $invitation->id]);
+});
+
+it('sorts pending invitations by the chosen column and ignores unknown sort values', function () {
+    $invite = fn (string $email, string $role, string $via) => TeamInvitation::create([
+        'team_id' => $this->team->id,
+        'uuid' => $email,
+        'email' => $email,
+        'role' => $role,
+        'link' => "http://example.test/invitations/{$email}",
+        'via' => $via,
+    ]);
+    $invitations = collect([
+        $invite('carol@example.com', 'member', 'email'),
+        $invite('alice@example.com', 'owner', 'link'),
+        $invite('bob@example.com', 'admin', 'email'),
+    ]);
+
+    Livewire::test(Invitations::class, ['invitations' => $invitations])
+        ->assertSeeInOrder(['carol@example.com', 'alice@example.com', 'bob@example.com'])
+        ->call('setSort', 'email-asc')
+        ->assertSeeInOrder(['alice@example.com', 'bob@example.com', 'carol@example.com'])
+        ->call('setSort', 'role-desc')
+        ->assertSeeInOrder(['alice@example.com', 'bob@example.com', 'carol@example.com'])
+        ->call('setSort', 'role-asc')
+        ->assertSeeInOrder(['carol@example.com', 'bob@example.com', 'alice@example.com'])
+        ->call('setSort', 'via-desc')
+        ->assertSeeInOrder(['alice@example.com', 'bob@example.com', 'carol@example.com'])
+        ->call('setSort', 'link-asc')
+        ->assertSet('sort', 'via-desc');
 });

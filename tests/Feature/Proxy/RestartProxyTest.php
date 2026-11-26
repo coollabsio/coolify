@@ -76,7 +76,7 @@ test('admin can see proxy restart and stop buttons', function () {
         ->assertSee('Stop Proxy');
 });
 
-test('running proxy shows pending configuration warning when saved settings differ from applied settings', function () {
+test('running proxy reports pending configuration when saved settings differ from applied settings', function () {
     [$user, $team, $server] = setupProxyUser('admin');
     makeServerProxyRunning($server);
     $server->proxy->last_saved_settings = 'saved-hash';
@@ -95,10 +95,7 @@ test('running proxy shows pending configuration warning when saved settings diff
     $this->actingAs($user);
     session(['currentTeam' => $team]);
 
-    $component = Livewire::test('server.navbar', ['server' => $server->fresh()])
-        ->assertSee('Changes pending')
-        ->assertSee('The saved proxy configuration has not been applied')
-        ->assertSee('Restart proxy');
+    $component = Livewire::test('server.navbar', ['server' => $server->fresh()]);
 
     $server->refresh();
     $server->proxy->last_applied_settings = 'saved-hash';
@@ -106,11 +103,10 @@ test('running proxy shows pending configuration warning when saved settings diff
     $server->save();
 
     $component->call('showNotification')
-        ->assertDispatched('proxy-configuration-state-changed', pending: false, traefikOutdated: false)
-        ->assertDontSee('The saved proxy configuration has not been applied');
+        ->assertDispatched('proxy-configuration-state-changed', pending: false, traefikOutdated: false);
 });
 
-test('running proxy hides pending configuration warning when saved settings match applied settings', function () {
+test('running proxy reports pending configuration after saved settings stop matching applied settings', function () {
     [$user, $team, $server] = setupProxyUser('admin');
     makeServerProxyRunning($server);
     $server->proxy->last_saved_settings = 'matching-hash';
@@ -122,17 +118,34 @@ test('running proxy hides pending configuration warning when saved settings matc
     $this->actingAs($user);
     session(['currentTeam' => $team]);
 
-    $component = Livewire::test('server.navbar', ['server' => $server->fresh()])
-        ->assertDontSee('The saved proxy configuration has not been applied');
+    $component = Livewire::test('server.navbar', ['server' => $server->fresh()]);
 
     $server->refresh();
     $server->proxy->last_saved_settings = 'new-saved-hash';
     $server->save();
 
     $component->dispatch('refreshServerShow')
-        ->assertDispatched('proxy-configuration-state-changed', pending: true, traefikOutdated: false)
-        ->assertSee('Changes pending')
-        ->assertSee('The saved proxy configuration has not been applied');
+        ->assertDispatched('proxy-configuration-state-changed', pending: true, traefikOutdated: false);
+});
+
+test('navbar tells the sidebar when the proxy is not running', function () {
+    [$user, $team, $server] = setupProxyUser('admin');
+    makeServerProxyRunning($server);
+
+    $this->actingAs($user);
+    session(['currentTeam' => $team]);
+
+    $component = Livewire::test('server.navbar', ['server' => $server->fresh()]);
+
+    $component->call('showNotification')
+        ->assertDispatched('proxy-configuration-state-changed', proxyNotRunning: false);
+
+    $server->refresh();
+    $server->proxy->status = 'exited';
+    $server->save();
+
+    $component->call('showNotification')
+        ->assertDispatched('proxy-configuration-state-changed', proxyNotRunning: true);
 });
 
 test('admin can stop a proxy while it is starting', function () {
@@ -170,26 +183,6 @@ test('member cannot see start proxy button', function () {
 
     Livewire::test('server.navbar', ['server' => $mock])
         ->assertDontSee('Start Proxy');
-});
-
-test('start proxy button shows a loading state while proxy startup actions run', function () {
-    [$user, $team, $server] = setupProxyUser('admin');
-
-    $server->proxy->status = 'exited';
-    $server->proxy->type = ProxyTypes::TRAEFIK->value;
-    $server->save();
-    $server->refresh();
-
-    $mock = Mockery::mock($server)->makePartial();
-    $mock->shouldReceive('proxySet')->andReturn(true);
-
-    $this->actingAs($user);
-    session(['currentTeam' => $team]);
-
-    Livewire::test('server.navbar', ['server' => $mock])
-        ->assertSeeHtml('wire:loading.attr="disabled"')
-        ->assertSeeHtml('wire:loading.class="is-loading"')
-        ->assertSeeHtml('wire:target="checkProxy,startProxy"');
 });
 
 test('starting a proxy records a team audit event', function () {

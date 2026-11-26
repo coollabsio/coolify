@@ -7,7 +7,7 @@
 
 services:
   privatebin:
-    image: privatebin/nginx-fpm-alpine
+    image: privatebin/nginx-fpm-alpine:2.1.1
     environment:
       - SERVICE_URL_PRIVATEBIN_8080
     volumes:

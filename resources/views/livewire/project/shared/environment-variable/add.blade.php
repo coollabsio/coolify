@@ -25,7 +25,7 @@
         @if (!$shared)
             <div x-cloak x-show="!isMultiline" wire:key="env-value-tip"
                 class="mt-1.5 text-xs text-neutral-500 dark:text-fg-faint">
-                Tip: Type <span class="font-mono text-coollabs dark:text-warning">{{ '{{' }}</span> to reference a
+                Tip: Type <span class="font-mono text-coollabs dark:text-brand-light">{{ '{{' }}</span> to reference a
                 shared environment variable
             </div>
         @endif
@@ -43,14 +43,21 @@
             ]"
                 helper="Literal means $VARIABLES in the value is kept as the actual characters '$VARIABLES' instead of being resolved from another variable. Useful when your value contains a $ sign." />
             <x-forms.listbox id="is_buildtime" label="Build time" :options="[
-                ['value' => true, 'label' => 'Available during build'],
+                ['value' => true, 'label' => 'Available during build (a change needs a rebuild)'],
                 ['value' => false, 'label' => 'Not available during build'],
             ]"
-                helper="Make this variable available during the Docker build process. Useful for build secrets and dependencies." />
+                helper="Make this variable available during the Docker build process. Useful for build secrets and dependencies.<br><br>A change to a build-time variable needs a new build, because the variable can change the image. A restart cannot apply it. Select <b>Not available during build</b> when only the running application reads the variable. Then a restart applies a change." />
             <x-forms.listbox id="is_runtime" label="Runtime" :options="[
                 ['value' => true, 'label' => 'Available in the container'],
                 ['value' => false, 'label' => 'Not available in the container'],
             ]" helper="Make this variable available in the running container at runtime." />
+            @if ($canLeavePreviewValueEmpty)
+                <x-forms.listbox id="copy_value_to_preview" label="Preview value" :options="[
+                    ['value' => true, 'label' => 'Copy production value'],
+                    ['value' => false, 'label' => 'Leave empty'],
+                ]"
+                    helper="Coolify also adds this variable to Preview Deployments. Copy production value gives the preview the same value. Leave empty adds only the name, so previews do not get this production value and you can give them their own value." />
+            @endif
         @endif
     </div>
 

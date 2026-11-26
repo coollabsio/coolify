@@ -9,11 +9,11 @@ use App\Models\EmailNotificationSettings;
 use App\Models\EnvironmentVariable;
 use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
+use App\Models\NtfyNotificationSettings;
 use App\Models\OauthSetting;
 use App\Models\PrivateKey;
 use App\Models\PushoverNotificationSettings;
 use App\Models\S3Storage;
-use App\Models\Server;
 use App\Models\ServerSetting;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
@@ -21,6 +21,7 @@ use App\Models\SlackNotificationSettings;
 use App\Models\SslCertificate;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -37,19 +38,7 @@ describe('Sensitive model fields are hidden by default', function () {
         expect($hidden)->toContain(
             'sentinel_token',
             'sentinel_custom_url',
-            'logdrain_newrelic_license_key',
-            'logdrain_axiom_api_key',
-            'logdrain_custom_config',
-            'logdrain_custom_config_parser',
-        );
-    });
-
-    test('Server hides logdrain api keys', function () {
-        $hidden = (new Server)->getHidden();
-
-        expect($hidden)->toContain(
-            'logdrain_axiom_api_key',
-            'logdrain_newrelic_license_key',
+            'logdrain_config',
         );
     });
 
@@ -176,6 +165,12 @@ describe('Sensitive model fields are hidden by default', function () {
         expect($hidden)->toContain('pushover_user_key', 'pushover_api_token');
     });
 
+    test('NtfyNotificationSettings hides server, topic, and credentials', function () {
+        $hidden = (new NtfyNotificationSettings)->getHidden();
+
+        expect($hidden)->toContain('ntfy_url', 'ntfy_topic', 'ntfy_token', 'ntfy_username', 'ntfy_password');
+    });
+
     test('TelegramNotificationSettings hides bot, chat, and thread identifiers', function () {
         $hidden = (new TelegramNotificationSettings)->getHidden();
 
@@ -195,6 +190,7 @@ describe('Sensitive model fields are hidden by default', function () {
             'telegram_notifications_server_reachable_thread_id',
             'telegram_notifications_server_unreachable_thread_id',
             'telegram_notifications_server_patch_thread_id',
+            'telegram_notifications_server_auto_update_thread_id',
             'telegram_notifications_traefik_outdated_thread_id',
         );
     });
@@ -266,6 +262,17 @@ describe('Sensitive model fields are hidden by default', function () {
 
         expect($hidden)->toContain(
             'clickhouse_admin_password',
+            'internal_db_url',
+            'external_db_url',
+        );
+    });
+
+    test('StandaloneInfluxdb hides password, admin token, and db urls', function () {
+        $hidden = (new StandaloneInfluxdb)->getHidden();
+
+        expect($hidden)->toContain(
+            'influxdb_admin_password',
+            'influxdb_admin_token',
             'internal_db_url',
             'external_db_url',
         );

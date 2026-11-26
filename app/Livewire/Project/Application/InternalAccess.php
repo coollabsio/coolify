@@ -8,18 +8,27 @@ use Livewire\Component;
 
 class InternalAccess extends Component
 {
+    protected $listeners = [
+        'applicationNetworkingUpdated' => 'refreshApplicationNetworking',
+    ];
+
     public Application $application;
 
     public ?string $currentInternalHostname = null;
 
     public bool $currentInternalHostnameLoaded = false;
 
+    public function refreshApplicationNetworking(): void
+    {
+        $this->application->refresh();
+    }
+
     public function loadCurrentInternalHostname(): void
     {
         try {
             $containers = getCurrentApplicationContainerStatus(
                 $this->application->destination->server,
-                $this->application->id,
+                $this->application,
                 0
             );
             $currentContainer = $containers->first(

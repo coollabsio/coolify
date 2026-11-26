@@ -2,6 +2,7 @@
 
 use App\Actions\Database\StartRedis;
 use App\Exceptions\DeploymentException;
+use App\Exceptions\RemoteSecretException;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Livewire\Security\IntegrationTokens;
 use App\Models\Application;
@@ -16,12 +17,14 @@ use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use App\Models\StandaloneSqlite;
 use App\Models\Team;
 use App\Models\User;
 use App\Traits\HasSecretManager;
@@ -149,6 +152,26 @@ test('a doppler link fetches secrets with the stored token', function () {
         && str_contains($request->url(), 'project=proj'));
 });
 
+test('a link never fetches secrets with a token of another team', function () {
+    Http::fake();
+    $otherToken = IntegrationToken::query()->create([
+        'team_id' => Team::factory()->create()->id,
+        'provider' => 'doppler',
+        'name' => 'Other team Doppler',
+        'token' => 'dp.st.other',
+        'capabilities' => ['secrets'],
+    ]);
+    // For example a link saved before this check, or written by another code path.
+    $link = $this->application->secretManagerLink()->create([
+        'integration_token_id' => $otherToken->id,
+        'settings' => ['project' => 'proj', 'config' => 'prd'],
+    ]);
+
+    expect(fn () => $link->fetchSecrets())
+        ->toThrow(RuntimeException::class, 'The secret manager token does not belong to the team of this resource.');
+    Http::assertNothingSent();
+});
+
 test('a vault link uses the base url and namespace from the token metadata', function () {
     Http::fake([
         'https://example.com:8200/v1/kv/data/apps/web' => Http::response([
@@ -164,6 +187,25 @@ test('a vault link uses the base url and namespace from the token metadata', fun
     expect($link->fetchSecrets())->toBe(['KEY' => 'value']);
 
     Http::assertSent(fn ($request) => $request->hasHeader('X-Vault-Namespace', 'team-a'));
+});
+
+test('an infisical link uses the request timeout from the token metadata', function () {
+    $timeouts = [];
+    Http::fake(function ($request, array $options) use (&$timeouts) {
+        $timeouts[] = [$options['connect_timeout'], $options['timeout']];
+
+        return str_contains($request->url(), '/auth/universal-auth/login')
+            ? Http::response(['accessToken' => 'short-lived-token'])
+            : Http::response(['secrets' => [['secretKey' => 'KEY', 'secretValue' => 'value']]]);
+    });
+
+    $link = createSecretManagerLink('infisical',
+        ['project_id' => 'project-1', 'environment' => 'prod'],
+        ['base_url' => 'https://example.com', 'client_id' => 'client-id', 'timeout' => '30'],
+    );
+
+    expect($link->fetchSecrets())->toBe(['KEY' => 'value'])
+        ->and($timeouts)->toBe([[30, 30], [30, 30]]);
 });
 
 test('services resolve environment variables from their configured secret manager', function () {
@@ -241,9 +283,9 @@ test('redis remote credentials stay deployment-local and use raw values in the s
     expect($password->fresh()->value)->toBe('{{team.REDIS_PASSWORD}}')
         ->and($sharedPassword->fresh()->value)->toBe('{{vault.REDIS_PASSWORD}}')
         ->and($username->fresh()->value)->toBe('{{vault.REDIS_USERNAME}}')
-        ->and($environmentVariables)->toContain('REDIS_PASSWORD=p4$$word')
+        ->and($environmentVariables)->toContain('REDIS_PASSWORD=p4$$$$word')
         ->and($environmentVariables)->toContain('REDIS_USERNAME=remote-user')
-        ->and($startCommand)->toContain('--requirepass p4$$word');
+        ->and($startCommand)->toContain("--requirepass 'p4\$\$\$\$word'");
 });
 
 test('all deployable environment-variable resources support secret managers', function (string $resourceClass) {
@@ -259,9 +301,11 @@ test('all deployable environment-variable resources support secret managers', fu
     StandaloneKeydb::class,
     StandaloneDragonfly::class,
     StandaloneClickhouse::class,
+    StandaloneInfluxdb::class,
+    StandaloneSqlite::class,
 ]);
 
-test('an application has at most one secret manager source', function () {
+test('an application has at most one secret manager source of each name', function () {
     createSecretManagerLink('doppler');
 
     $secondToken = IntegrationToken::query()->create([
@@ -376,6 +420,38 @@ test('a missing secret key fails the deployment and names the variable', functio
         ->toThrow(DeploymentException::class, 'Missing secret keys: GONE_KEY (referenced by DB_PASSWORD).');
 });
 
+test('a missing secret key is a visible log line once and marks the failure as already logged', function () {
+    Http::fake([
+        'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response([
+            'OTHER' => 'value',
+        ]),
+    ]);
+
+    createSecretManagerLink('doppler');
+
+    $env = $this->application->environment_variables()->create([
+        'key' => 'DB_PASSWORD',
+        'value' => '{{vault.GONE_KEY}}',
+    ]);
+    $job = makeDeploymentJobForSecrets();
+
+    try {
+        resolveEnvOnJob($job, $env);
+        $this->fail('The deployment did not stop.');
+    } catch (DeploymentException $exception) {
+        expect($exception->isMessageAlreadyLogged())->toBeTrue();
+    }
+
+    $queue = (new ReflectionProperty($job, 'application_deployment_queue'))->getValue($job);
+    $visible = collect(json_decode($queue->refresh()->logs, true))
+        ->reject(fn (array $entry): bool => (bool) ($entry['hidden'] ?? false))
+        ->pluck('output');
+
+    expect($visible->filter(fn (string $line): bool => str_contains($line, 'Missing secret keys: GONE_KEY (referenced by DB_PASSWORD).')))
+        ->toHaveCount(1)
+        ->and($visible->implode("\n"))->toContain('Check the secret manager source of this application.');
+});
+
 test('a reference without a configured source fails the deployment', function () {
     Http::fake();
 
@@ -421,11 +497,28 @@ test('import creates reference variables for missing keys only', function () {
 
     $imported = $this->application->secretManagerLink->importMissingReferences();
 
-    expect($imported)->toBe(['NEW_KEY']);
+    expect($imported)->toBe(['imported' => ['NEW_KEY'], 'skipped' => []]);
 
     $created = $this->application->environment_variables()->where('key', 'NEW_KEY')->firstOrFail();
     expect($created->value)->toBe('{{vault.NEW_KEY}}')
         ->and($this->application->environment_variables()->where('key', 'EXISTING')->firstOrFail()->value)->toBe('local');
+});
+
+test('import skips remote names that are not valid variable keys and imports the rest', function () {
+    Http::fake([
+        'https://example.com:8200/v1/secret/data/apps/web' => Http::response([
+            'data' => ['data' => ['ZED' => 'z', 'db-password' => 'p', 'API_KEY' => 'a']],
+        ]),
+    ]);
+
+    $link = createSecretManagerLink('vault', ['mount' => 'secret', 'path' => 'apps/web'], ['base_url' => 'https://example.com:8200']);
+
+    $result = $link->importMissingReferences();
+
+    expect($result)->toBe(['imported' => ['API_KEY', 'ZED'], 'skipped' => ['db-password']])
+        ->and($this->application->environment_variables()->whereIn('key', ['API_KEY', 'ZED'])->pluck('value', 'key')->sortKeys()->all())
+        ->toBe(['API_KEY' => '{{vault.API_KEY}}', 'ZED' => '{{vault.ZED}}'])
+        ->and($this->application->environment_variables()->where('key', 'db-password')->exists())->toBeFalse();
 });
 
 test('secret references are not marked as shared variables', function () {
@@ -468,4 +561,130 @@ test('deleting an integration token is blocked while links exist', function () {
         ->assertDispatched('success');
 
     expect(IntegrationToken::query()->whereKey($link->integration_token_id)->exists())->toBeFalse();
+});
+
+function createNamedVaultSource(string $name, string $path): SecretManagerLink
+{
+    $token = IntegrationToken::query()->create([
+        'team_id' => test()->team->id,
+        'provider' => 'vault',
+        'name' => "Vault {$name}",
+        'token' => 'vault-token',
+        'capabilities' => ['secrets'],
+        'metadata' => ['base_url' => 'https://example.com:8200'],
+    ]);
+
+    return test()->application->secretManagerLinks()->create([
+        'name' => $name,
+        'integration_token_id' => $token->id,
+        'settings' => ['mount' => 'secret', 'path' => $path],
+    ]);
+}
+
+test('a deployment resolves references of the default and of named sources', function () {
+    Http::fake([
+        'https://api.doppler.com/v3/configs/config/secrets/download*' => Http::response(['TOKEN' => 'default-token']),
+        'https://example.com:8200/v1/secret/data/urls' => Http::response(['data' => ['data' => ['TOKEN' => 'urls-token', 'API_URL' => 'https://api.test']]]),
+    ]);
+    createSecretManagerLink('doppler');
+    createNamedVaultSource('urls', 'urls');
+
+    $env = $this->application->environment_variables()->create([
+        'key' => 'COMBINED',
+        'value' => '{{vault.TOKEN}}|{{vault.urls.TOKEN}}|{{vault.urls.API_URL}}',
+    ]);
+
+    expect(resolveEnvOnJob(makeDeploymentJobForSecrets(), $env))->toBe("'default-token|urls-token|https://api.test'");
+});
+
+test('a deployment fetches only the sources that variables reference', function () {
+    Http::fake([
+        'https://example.com:8200/v1/secret/data/urls' => Http::response(['data' => ['data' => ['API_URL' => 'https://api.test']]]),
+    ]);
+    createSecretManagerLink('doppler');
+    createNamedVaultSource('urls', 'urls');
+
+    $env = $this->application->environment_variables()->create(['key' => 'API_URL', 'value' => '{{vault.urls.API_URL}}']);
+
+    expect(resolveEnvOnJob(makeDeploymentJobForSecrets(), $env))->toBe("'https://api.test'");
+    Http::assertSentCount(1);
+});
+
+test('a reference to a source that the application does not have fails the deployment and names the source', function () {
+    Http::fake();
+    createSecretManagerLink('doppler');
+
+    $env = $this->application->environment_variables()->create(['key' => 'API_URL', 'value' => '{{vault.urls.API_URL}}']);
+
+    expect(fn () => resolveEnvOnJob(makeDeploymentJobForSecrets(), $env))
+        ->toThrow(DeploymentException::class, 'the secret manager source "urls"');
+
+    Http::assertNothingSent();
+});
+
+test('a missing key of a named source names the source in the error', function () {
+    Http::fake([
+        'https://example.com:8200/v1/secret/data/urls' => Http::response(['data' => ['data' => ['OTHER' => 'x']]]),
+    ]);
+    createNamedVaultSource('urls', 'urls');
+
+    $env = $this->application->environment_variables()->create(['key' => 'API_URL', 'value' => '{{vault.urls.API_URL}}']);
+
+    expect(fn () => resolveEnvOnJob(makeDeploymentJobForSecrets(), $env))
+        ->toThrow(DeploymentException::class, 'Missing secret keys: urls.API_URL');
+});
+
+test('a literal default reference fails closed when the application has only named sources', function () {
+    Http::fake();
+    createNamedVaultSource('urls', 'urls');
+
+    $env = $this->application->environment_variables()->create(['key' => 'LITERAL', 'value' => '{{vault.KEY}}', 'is_literal' => true]);
+
+    expect(fn () => resolveEnvOnJob(makeDeploymentJobForSecrets(), $env))
+        ->toThrow(DeploymentException::class, 'no secret manager source is configured');
+});
+
+test('services and databases resolve named sources and fail closed on an unknown source', function () {
+    Http::fake([
+        'https://example.com:8200/v1/secret/data/db' => Http::response(['data' => ['data' => ['PASSWORD' => 'named-db-password']]]),
+    ]);
+    $service = Service::factory()->create([
+        'environment_id' => $this->application->environment_id,
+        'destination_id' => $this->application->destination_id,
+        'destination_type' => $this->application->destination_type,
+    ]);
+    $token = IntegrationToken::query()->create([
+        'team_id' => $this->team->id,
+        'provider' => 'vault',
+        'name' => 'Vault db',
+        'token' => 'vault-token',
+        'capabilities' => ['secrets'],
+        'metadata' => ['base_url' => 'https://example.com:8200'],
+    ]);
+    $service->secretManagerLinks()->create(['name' => 'db', 'integration_token_id' => $token->id, 'settings' => ['mount' => 'secret', 'path' => 'db']]);
+    $named = $service->environment_variables()->create(['key' => 'DB_PASSWORD', 'value' => '{{vault.db.PASSWORD}}']);
+    $unknown = $service->environment_variables()->create(['key' => 'OTHER', 'value' => '{{vault.other.PASSWORD}}']);
+
+    expect($service->resolveSecretManagerEnvironmentVariable($named))->toBe('named-db-password')
+        ->and(fn () => $service->resolveSecretManagerEnvironmentVariable($unknown))
+        ->toThrow(RemoteSecretException::class, 'the secret manager source "other"');
+});
+
+test('import from a named source creates references to that source', function () {
+    Http::fake([
+        'https://example.com:8200/v1/secret/data/urls' => Http::response(['data' => ['data' => ['API_URL' => 'https://api.test']]]),
+    ]);
+    $link = createNamedVaultSource('urls', 'urls');
+
+    expect($link->importMissingReferences())->toBe(['imported' => ['API_URL'], 'skipped' => []])
+        ->and($this->application->environment_variables()->where('key', 'API_URL')->value('value'))->toBe('{{vault.urls.API_URL}}');
+});
+
+test('deleting a resource deletes all of its secret manager sources', function () {
+    createSecretManagerLink('doppler');
+    createNamedVaultSource('urls', 'urls');
+
+    $this->application->forceDelete();
+
+    expect(SecretManagerLink::query()->count())->toBe(0);
 });

@@ -1,3 +1,4 @@
+# ignore: true
 # documentation: https://github.com/rahulhaque/soketi-app-manager-filament
 # slogan: Manage soketi websocket server and apps with ease.
 # category: devtools
@@ -7,7 +8,7 @@
 
 services:
   soketi-app-manager:
-    image: ghcr.io/rahulhaque/soketi-app-manager-filament-alpine:latest
+    image: ghcr.io/rahulhaque/soketi-app-manager-filament-alpine:1.1.8
     environment:
       - SERVICE_FQDN_SOKETIAPPMANAGER_8080
       - AUTORUN_ENABLED=true

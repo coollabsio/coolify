@@ -8,7 +8,7 @@
 
 services:
   pingvinshare:
-    image: ghcr.io/stonith404/pingvin-share
+    image: ghcr.io/stonith404/pingvin-share:v1.13.0
     environment:
       - SERVICE_URL_PINGVINSHARE_3000
       - TRUST_PROXY=${TRUST_PROXY:-true}
@@ -29,5 +29,5 @@ services:
         condition: service_healthy
 
   clamav:
-    image: clamav/clamav
+    image: clamav/clamav:1.5.4
     platform: linux/amd64

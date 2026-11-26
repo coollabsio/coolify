@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Shared\Storages;
 
+use App\Livewire\Concerns\AuditsStorageChanges;
 use App\Livewire\Project\Service\Storage as StorageComponent;
 use App\Models\Application;
 use App\Models\LocalFileVolume;
@@ -15,6 +16,7 @@ use Livewire\Component;
 
 class All extends Component
 {
+    use AuditsStorageChanges;
     use AuthorizesRequests;
 
     public $resource;
@@ -22,7 +24,7 @@ class All extends Component
     /**
      * Editable form state keyed by storage id.
      *
-     * @var array<int|string, array{name: string, mountPath: string, hostPath: ?string, isPreviewSuffixEnabled: bool, isReadOnly: bool, canDeleteStale: bool}>
+     * @var array<int|string, array{name: string, mountPath: string, savedName: string, savedMountPath: string, isPreviewSuffixEnabled: bool, isReadOnly: bool, isShared: bool, isExternal: bool, canDeleteStale: bool, replacedExternalVolume: ?string, replacedHostPath: ?string, ignoresDriverOptions: bool, canDeleteToApplyDriverOptions: bool, usedByContainers: list<string>}>
      */
     public array $forms = [];
 
@@ -45,6 +47,13 @@ class All extends Component
 
     public bool $deleteDockerVolume = false;
 
+    /**
+     * Volume rename that waits for confirmation. A new name mounts another Docker volume, and the data stays in the old one.
+     *
+     * @var array{storageId: int, from: string, to: string}|null
+     */
+    public ?array $pendingRename = null;
+
     protected $listeners = ['refreshVolumeList' => 'refreshList', 'refreshVolumeBackups' => 'refreshList'];
 
     public function mount(): void
@@ -65,9 +74,10 @@ class All extends Component
 
     public function refreshList(): void
     {
+        $this->authorize('view', $this->resource);
         $this->resource->refresh();
         $this->resource->unsetRelation('persistentStorages');
-        $this->resource->load(['persistentStorages' => fn ($query) => $query->orderBy('id')]);
+        $this->resource->load(['persistentStorages' => fn ($query) => $query->with('standaloneSqlite')->orderBy('id')]);
 
         foreach ($this->resource->persistentStorages as $storage) {
             $storage->setRelation('resource', $this->resource);
@@ -77,40 +87,104 @@ class All extends Component
             $this->resource->loadMissing('environment.project');
         }
 
+        $this->pendingRename = null;
         $this->rebuildForms();
+        $this->rebuildStaleVolumeContainers();
         $this->rebuildVolumeBackupMeta();
     }
 
-    public function submit(int $storageId): void
+    /**
+     * Saves the name and mount path of one storage, or of every storage with unsaved changes when
+     * no storage is given (the unsaved changes bar). A rename stops the save until the user confirms it.
+     */
+    public function submit(?int $storageId = null, bool $renameConfirmed = false): void
     {
         $this->authorize('update', $this->resource);
+
+        $storageIds = $storageId !== null ? [$storageId] : $this->changedStorageIds();
+        foreach ($storageIds as $id) {
+            if (! $this->saveStorage($id, $renameConfirmed)) {
+                return;
+            }
+        }
+
+        if ($storageIds !== []) {
+            $this->dispatch('success', 'Storage updated successfully');
+        }
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function changedStorageIds(): array
+    {
+        return $this->resource->persistentStorages
+            ->filter(fn (LocalPersistentVolume $storage): bool => isset($this->forms[$storage->id])
+                && ! $this->forms[$storage->id]['isReadOnly']
+                && ($this->forms[$storage->id]['name'] !== $storage->name
+                    || $this->forms[$storage->id]['mountPath'] !== $storage->mount_path))
+            ->pluck('id')
+            ->all();
+    }
+
+    /**
+     * Returns false when the storage is not saved: it is read-only, or a rename waits for confirmation.
+     */
+    private function saveStorage(int $storageId, bool $renameConfirmed): bool
+    {
         $this->validateStorage($storageId);
 
         $storage = $this->findStorageOrFail($storageId);
         if ($storage->shouldBeReadOnlyInUI()) {
             $this->dispatch('error', 'This volume is read-only.');
 
-            return;
+            return false;
         }
 
         $form = $this->forms[$storageId];
-        $storage->name = $form['name'];
+        $isRename = ! $storage->is_external && ! $storage->isSharedWithAnotherResource() && $form['name'] !== $storage->name;
+        $rename = ['storageId' => $storageId, 'from' => $storage->name, 'to' => $form['name']];
+        if ($isRename && ! ($renameConfirmed && $this->pendingRename === $rename)) {
+            $this->pendingRename = $rename;
+
+            return false;
+        }
+        $this->pendingRename = null;
+
+        if ($isRename) {
+            $storage->name = $form['name'];
+        }
         $storage->mount_path = $form['mountPath'];
-        $storage->host_path = $form['hostPath'] ?: null;
-        $storage->is_preview_suffix_enabled = (bool) $form['isPreviewSuffixEnabled'];
+        $changedFields = auditChangedFields($storage);
         $storage->save();
 
-        $this->dispatch('success', 'Storage updated successfully');
+        if ($changedFields !== []) {
+            $this->auditStorageChange($this->resource, 'updated', $storage, ['changed_fields' => $changedFields]);
+        }
+        $this->forms[$storageId]['name'] = $storage->name;
+        $this->forms[$storageId]['savedName'] = $storage->name;
+        $this->forms[$storageId]['savedMountPath'] = $storage->mount_path;
+
+        return true;
     }
 
+    public function cancelRename(int $storageId): void
+    {
+        $this->authorize('view', $this->resource);
+        $storage = $this->findStorageOrFail($storageId);
+        $this->forms[$storageId]['name'] = $storage->name;
+        $this->pendingRename = null;
+    }
+
+    /**
+     * Saves only the PR suffix setting, so that unsaved name or mount path edits stay unsaved.
+     */
     public function instantSave(int $storageId): void
     {
-        $this->submit($storageId);
-    }
-
-    public function clearHostPath(int $storageId): void
-    {
         $this->authorize('update', $this->resource);
+        $this->validate([
+            "forms.{$storageId}.isPreviewSuffixEnabled" => 'required|boolean',
+        ]);
 
         $storage = $this->findStorageOrFail($storageId);
         if ($storage->shouldBeReadOnlyInUI()) {
@@ -119,12 +193,15 @@ class All extends Component
             return;
         }
 
-        $storage->host_path = null;
+        $storage->is_preview_suffix_enabled = (bool) $this->forms[$storageId]['isPreviewSuffixEnabled'];
+        $changedFields = auditChangedFields($storage);
         $storage->save();
-        $this->forms[$storageId]['hostPath'] = null;
 
-        $this->dispatch('configurationChanged');
-        $this->dispatch('success', 'Source path removed. Use a directory mount for host directory bindings.');
+        if ($changedFields !== []) {
+            $this->auditStorageChange($this->resource, 'updated', $storage, ['changed_fields' => $changedFields]);
+        }
+
+        $this->dispatch('success', 'Storage updated successfully');
     }
 
     /**
@@ -144,7 +221,7 @@ class All extends Component
 
     public function delete(int $storageId, $password = '', $selectedActions = [])
     {
-        $this->authorize('update', $this->resource);
+        $this->authorize('delete', $this->resource);
 
         if (! verifyPasswordConfirmation($password, $this)) {
             return 'The provided password is incorrect.';
@@ -152,7 +229,13 @@ class All extends Component
 
         $storage = $this->findStorageOrFail($storageId);
 
-        if ($this->isComposeOrService && $storage->isDeclaredInCompose()) {
+        if ($storage->isSharedWithAnotherResource()) {
+            $this->dispatch('error', 'This volume is connected to a SQLite database. Unlink it on the SQLite database page.');
+
+            return false;
+        }
+
+        if ($this->isComposeOrService && $storage->isDeclaredInCompose() && ! $storage->ignoresComposeDriverOptionsOfDeclaration()) {
             $this->dispatch('error', 'This volume is managed by the current Docker Compose file.');
 
             return false;
@@ -164,7 +247,7 @@ class All extends Component
             return false;
         }
 
-        $this->deleteDockerVolume = in_array('deleteDockerVolume', $selectedActions, true);
+        $this->deleteDockerVolume = ! $storage->is_external && in_array('deleteDockerVolume', $selectedActions, true);
         if ($this->deleteDockerVolume) {
             $server = $this->resource instanceof Application
                 ? $this->resource->destination->server
@@ -182,6 +265,9 @@ class All extends Component
         }
 
         $storage->delete();
+        $this->auditStorageChange($this->resource, 'deleted', $storage, [
+            'docker_volume_deleted' => $this->deleteDockerVolume,
+        ]);
         $this->refreshList();
         $this->dispatch('storageCountsChanged')->to(StorageComponent::class);
         $this->dispatch('configurationChanged');
@@ -209,18 +295,63 @@ class All extends Component
     {
         $forms = [];
         foreach ($this->resource->persistentStorages->sortBy('id') as $storage) {
+            $ignoresDriverOptions = $this->isComposeOrService && $storage->ignoresComposeDriverOptionsOfDeclaration();
             $forms[$storage->id] = [
                 'name' => $storage->name,
                 'mountPath' => $storage->mount_path,
-                'hostPath' => $storage->host_path,
+                'savedName' => $storage->name,
+                'savedMountPath' => $storage->mount_path,
                 'isPreviewSuffixEnabled' => (bool) ($storage->is_preview_suffix_enabled ?? true),
                 'isReadOnly' => $storage->shouldBeReadOnlyInUI() || ! $this->canUpdate,
+                'isShared' => $storage->isSharedWithAnotherResource(),
+                'isExternal' => $storage->is_external,
                 'canDeleteStale' => $this->canUpdate
                     && ($storage->isServiceResource() || $storage->isDockerComposeResource())
+                    && ! $ignoresDriverOptions
                     && ! $storage->isDeclaredInCompose(),
+                'canDeleteToApplyDriverOptions' => $this->canUpdate && $ignoresDriverOptions,
+                'replacedExternalVolume' => $this->isComposeOrService ? $storage->replacedExternalComposeVolume() : null,
+                'replacedHostPath' => $this->isComposeOrService ? $storage->replacedComposeHostPath() : null,
+                'ignoresDriverOptions' => $ignoresDriverOptions,
+                'usedByContainers' => [],
             ];
         }
         $this->forms = $forms;
+    }
+
+    /**
+     * Finds the containers that still use a stale volume. Docker Compose can keep such a volume
+     * in a container after the line was removed from the Compose file. After the entry is
+     * deleted, the next deployment starts that container without the data (#6875).
+     */
+    private function rebuildStaleVolumeContainers(): void
+    {
+        $staleNames = collect($this->forms)->filter(fn (array $form) => $form['canDeleteStale'])->pluck('name');
+        if ($staleNames->isEmpty()) {
+            return;
+        }
+        $server = $this->resource instanceof Application
+            ? $this->resource->destination->server
+            : $this->resource->service->server;
+        try {
+            $output = (string) instant_remote_process([remoteCommandWithTimeout("docker ps -a --no-trunc --format '{{.Names}} {{.Mounts}}'", 30)], $server, false, timeout: 45, maxAttempts: 1);
+        } catch (\Throwable) {
+            return;
+        }
+        $containers = collect(preg_split('/\R/', trim($output)))->filter()->mapWithKeys(function (string $line) {
+            [$name, $mounts] = array_pad(explode(' ', $line, 2), 2, '');
+
+            return [$name => explode(',', $mounts)];
+        });
+        foreach ($this->forms as $id => $form) {
+            if ($form['canDeleteStale']) {
+                $this->forms[$id]['usedByContainers'] = $containers
+                    ->filter(fn (array $mounts) => in_array($form['name'], $mounts, true))
+                    ->keys()
+                    ->values()
+                    ->all();
+            }
+        }
     }
 
     private function rebuildVolumeBackupMeta(): void
@@ -301,18 +432,15 @@ class All extends Component
         $this->validate([
             "forms.{$storageId}.name" => ValidationPatterns::volumeNameRules(),
             "forms.{$storageId}.mountPath" => ['required', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
-            "forms.{$storageId}.hostPath" => ['nullable', 'string', 'regex:'.ValidationPatterns::DIRECTORY_PATH_PATTERN],
             "forms.{$storageId}.isPreviewSuffixEnabled" => 'required|boolean',
         ], array_merge(
             ValidationPatterns::volumeNameMessages(),
             [
                 "forms.{$storageId}.mountPath.regex" => 'Mount path must start with / and only contain safe path characters.',
-                "forms.{$storageId}.hostPath.regex" => 'Host path must start with / and only contain safe path characters.',
             ]
         ), [
             "forms.{$storageId}.name" => 'name',
             "forms.{$storageId}.mountPath" => 'mount',
-            "forms.{$storageId}.hostPath" => 'host',
         ]);
     }
 

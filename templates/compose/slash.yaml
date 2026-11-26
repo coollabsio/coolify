@@ -3,10 +3,11 @@
 # category: productivity
 # tags: links, shortener, sharing, url, short, link, sharing
 # port: 5231
+# outdated: true
 
 services:
   slash:
-    image: yourselfhosted/slash
+    image: yourselfhosted/slash:0.5.3
     environment:
       - SERVICE_URL_SLASH_5231
     volumes:

@@ -17,7 +17,9 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
@@ -35,7 +37,7 @@ beforeEach(function () {
     $keyId = DB::table('private_keys')->insertGetId([
         'uuid' => (string) Str::uuid(),
         'name' => 'Test Key',
-        'private_key' => 'test-key',
+        'private_key' => Crypt::encryptString('test-key'),
         'team_id' => $this->team->id,
         'created_at' => now(),
         'updated_at' => now(),
@@ -45,6 +47,7 @@ beforeEach(function () {
         'team_id' => $this->team->id,
         'private_key_id' => $keyId,
     ]);
+    Process::fake(fn () => Process::result(output: 'OK'));
 
     StandaloneDocker::withoutEvents(function () {
         $this->destination = StandaloneDocker::firstOrCreate(
@@ -84,14 +87,80 @@ test('livewire file storage rejects parent segments and does not create a local 
     expect(LocalFileVolume::query()->count())->toBe(0);
 });
 
-test('file mount modal shows the calculated host file path above the destination input', function () {
+test('livewire directory storage accepts a server absolute path for an administrator', function () {
     Livewire::test(Storage::class, ['resource' => $this->application])
-        ->assertSeeText('Create a managed file on the host and mount it inside the container.')
-        ->assertSeeText('Host file path')
+        ->set('file_storage_directory_source', '/root/.ssh')
+        ->set('file_storage_directory_destination', '/data')
+        ->call('submitFileStorageDirectory')
+        ->assertDispatched('success');
+
+    expect(LocalFileVolume::query()->sole()->fs_path)->toBe('/root/.ssh');
+});
+
+test('livewire directory storage accepts a path inside the application root', function () {
+    $source = application_configuration_dir().'/'.$this->application->uuid.'/data/new';
+
+    $component = Livewire::test(Storage::class, ['resource' => $this->application])
+        ->set('file_storage_directory_source', $source)
+        ->set('file_storage_directory_destination', '/data')
+        ->call('submitFileStorageDirectory');
+    $component->assertDispatched('success');
+
+    expect(LocalFileVolume::query()->sole()->fs_path)->toBe($source);
+});
+
+test('livewire directory storage rejects a remote symlink escape without side effects', function () {
+    Process::fake(fn () => Process::result(output: 'NOK'));
+
+    Livewire::test(Storage::class, ['resource' => $this->application])
+        ->set('file_storage_directory_source', $this->application->workdir().'/linked/outside')
+        ->set('file_storage_directory_destination', '/data')
+        ->call('submitFileStorageDirectory')
+        ->assertDispatched('error');
+
+    expect(LocalFileVolume::query()->count())->toBe(0);
+    Bus::assertNotDispatched(ServerStorageSaveJob::class);
+});
+
+test('normal team members cannot create directory storage', function () {
+    $member = User::factory()->create();
+    $member->teams()->attach($this->team, ['role' => 'member']);
+    $this->actingAs($member);
+    session(['currentTeam' => $this->team]);
+
+    Livewire::test(Storage::class, ['resource' => $this->application])
+        ->set('file_storage_directory_source', application_configuration_dir().'/'.$this->application->uuid.'/data')
+        ->set('file_storage_directory_destination', '/data')
+        ->call('submitFileStorageDirectory')
+        ->assertDispatched('error');
+
+    expect(LocalFileVolume::query()->count())->toBe(0);
+});
+
+test('an administrator cannot create storage on a cross-team resource', function () {
+    $otherTeam = Team::factory()->create();
+    $otherProject = Project::factory()->create(['team_id' => $otherTeam->id]);
+    $otherEnvironment = Environment::factory()->create(['project_id' => $otherProject->id]);
+    $otherApplication = Application::factory()->create([
+        'environment_id' => $otherEnvironment->id,
+        'destination_id' => $this->destination->id,
+        'destination_type' => $this->destination->getMorphClass(),
+    ]);
+
+    Livewire::test(Storage::class, ['resource' => $otherApplication])
+        ->set('file_storage_directory_source', application_configuration_dir().'/'.$otherApplication->uuid.'/data')
+        ->set('file_storage_directory_destination', '/data')
+        ->call('submitFileStorageDirectory')
+        ->assertDispatched('error');
+
+    expect(LocalFileVolume::query()->count())->toBe(0);
+});
+
+test('file mount modal shows the calculated host file path', function () {
+    Livewire::test(Storage::class, ['resource' => $this->application])
         ->assertSeeText($this->application->workdir().'/')
         ->set('file_storage_path', '/etc/nginx/nginx.conf')
-        ->assertSeeText($this->application->workdir().'/etc/nginx/nginx.conf')
-        ->assertDontSeeText('Actual file mounted from the host system to the container.');
+        ->assertSeeText($this->application->workdir().'/etc/nginx/nginx.conf');
 });
 
 test('livewire file storage stores safe file mounts under the application configuration root', function () {

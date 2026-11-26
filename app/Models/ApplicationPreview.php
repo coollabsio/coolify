@@ -5,13 +5,20 @@ namespace App\Models;
 use App\Support\DomainPortOverrides;
 use App\Support\ValidationPatterns;
 use App\Traits\HasRestartLimit;
+use App\Traits\ReleasesManagedDnsRecords;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use RuntimeException;
 use Spatie\Url\Url;
+use Throwable;
 
 class ApplicationPreview extends BaseModel
 {
-    use HasRestartLimit, SoftDeletes;
+    use HasRestartLimit, ReleasesManagedDnsRecords, SoftDeletes;
+
+    protected $attributes = [
+        'max_restart_count' => 0,
+    ];
 
     protected $fillable = [
         'uuid',
@@ -27,6 +34,7 @@ class ApplicationPreview extends BaseModel
         'last_online_at',
         'domain_dns_statuses',
         'domain_port_overrides',
+        'keeps_production_values',
     ];
 
     protected $hidden = [
@@ -37,7 +45,22 @@ class ApplicationPreview extends BaseModel
         'pull_request_id' => 'integer',
         'domain_dns_statuses' => 'array',
         'domain_port_overrides' => 'array',
+        'is_fork_pull_request' => 'boolean',
+        'approved_at' => 'datetime',
+        'keeps_production_values' => 'boolean',
+        'is_same_repository' => 'boolean',
     ];
+
+    /**
+     * Records whether the branch of the pull request is in the repository of the application. Only then
+     * does the preview deploy the Compose file of its pull request (ApplicationDeploymentJob::usesPullRequestComposeFile()).
+     */
+    public function recordSameRepository(bool $isSameRepository): void
+    {
+        if ($this->is_same_repository !== $isSameRepository) {
+            $this->forceFill(['is_same_repository' => $isSameRepository])->save();
+        }
+    }
 
     protected static function booted(): void
     {
@@ -46,26 +69,15 @@ class ApplicationPreview extends BaseModel
             $application = $preview->application;
 
             if (data_get($preview, 'application.build_pack') === 'dockercompose') {
-                // Docker Compose volume and network cleanup
                 $composeFile = $application->parse(pull_request_id: $preview->pull_request_id);
-                $volumes = data_get($composeFile, 'volumes');
-                $networks = data_get($composeFile, 'networks');
-                $networkKeys = collect($networks)->keys();
-                $volumeKeys = collect($volumes)->keys();
-                $volumeKeys->each(function ($key) use ($server) {
-                    if (! preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $key)) {
-                        return;
-                    }
-                    instant_remote_process(['docker volume rm -f '.escapeshellarg($key)], $server, false);
-                });
-                $networkKeys->each(function ($key) use ($server) {
-                    if (! preg_match(ValidationPatterns::DOCKER_NETWORK_PATTERN, $key)) {
-                        return;
-                    }
-                    $k = escapeshellarg($key);
-                    instant_remote_process(["docker network disconnect {$k} coolify-proxy"], $server, false);
-                    instant_remote_process(["docker network rm {$k}"], $server, false);
-                });
+                $volumeNames = $preview->generatedComposeVolumeNames($application, collect(data_get($composeFile, 'volumes', [])));
+                foreach ($volumeNames as $volumeName) {
+                    // Docker does not remove a volume that a container still uses, also with -f.
+                    instant_remote_process(['docker volume rm -f '.escapeshellarg($volumeName)], $server, false);
+                }
+                // The compose parser stores preview volumes on the application, not on the preview
+                $application->persistentStorages()->whereIn('name', $volumeNames)->delete();
+                $preview->removeComposePreviewNetwork($application, $server);
             } else {
                 // Regular application volume cleanup
                 $persistentStorages = $application->persistentStorages()
@@ -103,9 +115,188 @@ class ApplicationPreview extends BaseModel
         });
     }
 
+    /**
+     * Names of the Docker Compose volumes that Coolify generated for this preview. The parser names
+     * them "{uuid}_{volume}-pr-{id}" ("{uuid}-{volume}-pr-{id}" before parser version 3). Volumes
+     * named in the Compose file (external, shared, or of the main application) are not included.
+     *
+     * @param  Collection<array-key, mixed>  $volumes  top-level volumes of the parsed preview Compose file
+     * @return list<string>
+     */
+    private function generatedComposeVolumeNames(Application $application, Collection $volumes): array
+    {
+        $prefix = $application->uuid.((int) $application->compose_parsing_version >= 3 ? '_' : '-');
+        $suffix = addPreviewDeploymentSuffix('', $this->pull_request_id);
+
+        return $volumes
+            ->map(function (mixed $volume, int|string $key) use ($prefix, $suffix): ?string {
+                $key = (string) $key;
+                if (isComposeExternalVolume($volume)) {
+                    return null;
+                }
+                if (data_get($volume, 'name', $key) !== $key) {
+                    return null;
+                }
+                if (strlen($key) <= strlen($prefix.$suffix)
+                    || ! str_starts_with($key, $prefix)
+                    || ! str_ends_with($key, $suffix)
+                    || ! preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $key)) {
+                    return null;
+                }
+
+                return $key;
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Removes the network that the deployment created for this preview ("{uuid}-{id}"). Networks
+     * named in the Compose file (such as coolify or an external proxy network) are never removed.
+     * The network stays when a container other than coolify-proxy still uses it.
+     */
+    private function removeComposePreviewNetwork(Application $application, Server $server): void
+    {
+        $network = "{$application->uuid}-{$this->pull_request_id}";
+        if (! isUsableDockerNetworkName($network) || $network === $application->destination?->network) {
+            return;
+        }
+
+        $quotedNetwork = escapeshellarg($network);
+        try {
+            $output = instant_remote_process(["docker network inspect --format '{{json .Containers}}' {$quotedNetwork}"], $server);
+        } catch (Throwable) {
+            // The network does not exist or its state is not known.
+            return;
+        }
+
+        $containers = json_decode($output ?? '{}', true);
+        if (! is_array($containers)) {
+            return;
+        }
+        $otherContainers = collect($containers)
+            ->map(fn (mixed $container): mixed => data_get($container, 'Name'))
+            ->reject(fn (mixed $name): bool => $name === 'coolify-proxy');
+        if ($otherContainers->isNotEmpty()) {
+            return;
+        }
+
+        instant_remote_process(["docker network disconnect {$quotedNetwork} coolify-proxy"], $server, false);
+        instant_remote_process(["docker network rm {$quotedNetwork}"], $server, false);
+    }
+
     public static function findPreviewByApplicationAndPullId(int $application_id, int $pull_request_id)
     {
         return self::where('application_id', $application_id)->where('pull_request_id', $pull_request_id)->firstOrFail();
+    }
+
+    /**
+     * Store if the pull request comes from a fork. Each webhook event of the pull request sets it.
+     *
+     * The webhook also reports the head commit. A pending approval of an older commit becomes
+     * invalid at once, so that an admin cannot approve it before the new deployment runs. An
+     * unknown head (null or `HEAD`) also clears it; the deployment job records it again.
+     */
+    public function markForkPullRequest(bool $isFork, ?string $headCommit): void
+    {
+        if ($this->is_fork_pull_request !== $isFork) {
+            $this->forceFill(['is_fork_pull_request' => $isFork])->save();
+        }
+
+        $headCommit = strtolower((string) $headCommit);
+        $cleared = static::query()
+            ->whereKey($this->getKey())
+            ->whereNotNull('pending_approval_commit')
+            ->where('pending_approval_commit', '!=', $headCommit)
+            ->update(['pending_approval_commit' => null]);
+        if ($cleared > 0) {
+            $this->pending_approval_commit = null;
+            $this->syncOriginalAttribute('pending_approval_commit');
+        }
+    }
+
+    /**
+     * A fork pull request runs code that the repository owner did not review. Each of its commits
+     * waits for an admin, unless the admin turned on public previews without approval. A pull
+     * request with an unknown origin (null) counts as a fork.
+     */
+    public function forkCommitNeedsApproval(string $commit): bool
+    {
+        if ($this->is_fork_pull_request === false || ! $this->forkApprovalIsRequired()) {
+            return false;
+        }
+
+        return blank($this->approved_commit) || ! hash_equals($this->approved_commit, $commit);
+    }
+
+    /**
+     * Approval is off only when the admin turned on public previews without approval.
+     */
+    public function forkApprovalIsRequired(): bool
+    {
+        $settings = $this->application?->settings;
+
+        return ! ($settings?->is_pr_deployments_public_enabled && ! $settings->is_pr_deployments_public_approval_required);
+    }
+
+    /**
+     * A saved pending commit blocks the deployment only while approval is required.
+     */
+    public function isWaitingForApproval(): bool
+    {
+        return filled($this->pending_approval_commit) && $this->forkApprovalIsRequired();
+    }
+
+    public function markWaitingForApproval(string $commit): void
+    {
+        $this->forceFill(['pending_approval_commit' => $commit])->save();
+    }
+
+    public function approveCommit(string $commit): void
+    {
+        $this->forceFill([
+            'approved_commit' => $commit,
+            'approved_at' => now(),
+            'pending_approval_commit' => null,
+        ])->save();
+    }
+
+    /**
+     * Link to the pending commit inside the pull request, so that a reviewer sees the commit
+     * that an approval deploys, also when the pull request got newer commits. Falls back to
+     * the pull request link for providers without a known commit link (Bitbucket).
+     */
+    public function pendingApprovalCommitUrl(): ?string
+    {
+        $url = rtrim((string) $this->pull_request_html_url, '/');
+        $commit = (string) $this->pending_approval_commit;
+        if ($url === '' || ! preg_match('/^[0-9a-f]{40}([0-9a-f]{24})?$/i', $commit)) {
+            return $url === '' ? null : $url;
+        }
+
+        if (preg_match('#/-/merge_requests/\d+$#', $url)) {
+            return "{$url}/diffs?commit_id={$commit}";
+        }
+
+        if (preg_match('#/(pull|pulls)/\d+$#', $url)) {
+            return "{$url}/commits/{$commit}";
+        }
+
+        return $url;
+    }
+
+    /**
+     * @return 'waiting_for_approval'|'approved'|null
+     */
+    public function approvalStatus(): ?string
+    {
+        if ($this->isWaitingForApproval()) {
+            return 'waiting_for_approval';
+        }
+
+        return filled($this->approved_commit) ? 'approved' : null;
     }
 
     public function isRunning()
@@ -128,8 +319,23 @@ class ApplicationPreview extends BaseModel
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
 
-    public function generate_preview_fqdn(bool $generateWithoutApplicationDomain = false)
+    /**
+     * Set the preview domains from the preview URL template.
+     *
+     * With $keepExistingDomains, domains already stored on the preview (for example custom
+     * domains set in the UI) are kept, and only an empty preview gets generated domains.
+     */
+    public function generate_preview_fqdn(bool $generateWithoutApplicationDomain = false, bool $keepExistingDomains = false)
     {
+        if ($keepExistingDomains && filled($this->fqdn)) {
+            $normalized = DomainPortOverrides::normalize($this->fqdn, $this->domain_port_overrides);
+            $this->fqdn = $normalized['fqdn'];
+            $this->domain_port_overrides = $normalized['overrides'];
+            $this->save();
+
+            return $this;
+        }
+
         $applicationFqdn = $this->application->fqdn;
         if (! $applicationFqdn && $generateWithoutApplicationDomain) {
             $applicationFqdn = generateUrl(
@@ -153,7 +359,13 @@ class ApplicationPreview extends BaseModel
         return $this;
     }
 
-    public function generate_preview_fqdn_compose(bool $generateWithoutApplicationDomain = false)
+    /**
+     * Set the preview domain of every compose service from the preview URL template.
+     *
+     * With $keepExistingDomains, a service that already has domains on the preview keeps them,
+     * and only services without a preview domain get generated domains.
+     */
+    public function generate_preview_fqdn_compose(bool $generateWithoutApplicationDomain = false, bool $keepExistingDomains = false)
     {
         $applicationDomains = json_decode($this->application->docker_compose_domains ?: '[]', true) ?: [];
         $previewDomains = json_decode(data_get($this, 'docker_compose_domains') ?: '[]', true) ?: [];
@@ -194,6 +406,21 @@ class ApplicationPreview extends BaseModel
         $docker_compose_domains = [];
         $previewPortOverrides = [];
         foreach ($serviceNames as $service_name) {
+            $existingPreviewDomains = $keepExistingDomains
+                ? DomainPortOverrides::normalize(getComposeServiceDomainString($previewDomains, $service_name), $this->domain_port_overrides)
+                : ['fqdn' => null, 'overrides' => null];
+            if (filled($existingPreviewDomains['fqdn'])) {
+                $docker_compose_domains = putComposeServiceDomain(
+                    $docker_compose_domains,
+                    $service_name,
+                    $existingPreviewDomains['fqdn'],
+                    $serviceNames,
+                );
+                $previewPortOverrides = array_merge($previewPortOverrides, $existingPreviewDomains['overrides'] ?? []);
+
+                continue;
+            }
+
             $domain_string = getComposeServiceDomainString($applicationDomains, $service_name);
 
             if (empty($domain_string)) {
@@ -272,6 +499,10 @@ class ApplicationPreview extends BaseModel
         $previewFqdn = str_replace('{{random}}', $random, $template);
         $previewFqdn = str_replace('{{domain}}', $host, $previewFqdn);
         $previewFqdn = str_replace('{{pr_id}}', (string) $this->pull_request_id, $previewFqdn);
+        if (preg_match('#^(https?)://(.*)$#i', $previewFqdn, $matches)) {
+            $schema = strtolower($matches[1]);
+            $previewFqdn = $matches[2];
+        }
         $previewUrl = "{$schema}://{$previewFqdn}{$path}";
         $sourceCanonical = DomainPortOverrides::withoutPort($sourceDomain);
         $port = $url->getPort() ?? ($this->application->domain_port_overrides[$sourceCanonical] ?? null);
@@ -283,7 +514,7 @@ class ApplicationPreview extends BaseModel
     }
 
     /**
-     * Original compose service names for this preview (PR suffix stripped), excluding database images.
+     * Compose service names for this preview (the PR suffix of the legacy parser stripped), excluding database images.
      *
      * @return list<string>
      */
@@ -301,9 +532,9 @@ class ApplicationPreview extends BaseModel
                 continue;
             }
 
-            $names[] = str((string) $serviceName)
-                ->replaceLast('-pr-'.$this->pull_request_id, '')
-                ->toString();
+            $names[] = $this->application->renamesPreviewComposeServices()
+                ? str((string) $serviceName)->replaceLast('-pr-'.$this->pull_request_id, '')->toString()
+                : (string) $serviceName;
         }
 
         return array_values(array_unique($names));

@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\PersonalAccessToken;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -21,7 +22,7 @@ class ApiTokenExpiringNotification extends CustomEmailNotification
         $this->onQueue('high');
         $this->tokenName = $token->name;
         $this->expiresAt = $token->expires_at?->format('Y-m-d H:i:s') ?? '';
-        $this->manageUrl = route('security.api-tokens');
+        $this->manageUrl = base_url().'/security/api-tokens';
     }
 
     public function via(object $notifiable): array
@@ -32,7 +33,7 @@ class ApiTokenExpiringNotification extends CustomEmailNotification
     public function toMail(): MailMessage
     {
         $mail = new MailMessage;
-        $mail->subject("Coolify: API token '{$this->tokenName}' expires in 24 hours");
+        $mail->subject("Coolify: API token '{$this->tokenName}' expires on {$this->expiresAt}");
         $mail->view('emails.api-token-expiring', [
             'tokenName' => $this->tokenName,
             'expiresAt' => $this->expiresAt,
@@ -50,7 +51,7 @@ class ApiTokenExpiringNotification extends CustomEmailNotification
             color: DiscordMessage::warningColor(),
         );
 
-        $message->addField('Manage tokens', "[Open Security settings]({$this->manageUrl})");
+        $message->addField('Manage tokens', "[Open API Tokens]({$this->manageUrl})");
 
         return $message;
     }
@@ -88,6 +89,21 @@ class ApiTokenExpiringNotification extends CustomEmailNotification
         );
     }
 
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
+            title: 'API token expiring soon',
+            level: 'warning',
+            message: "API token {$this->tokenName} expires on {$this->expiresAt}.\n\nAction Required: Rotate this token before it expires to avoid API outages.",
+            buttons: [
+                [
+                    'text' => 'Manage API tokens',
+                    'url' => $this->manageUrl,
+                ],
+            ],
+        );
+    }
+
     public function toSlack(): SlackMessage
     {
         $description = "API token *{$this->tokenName}* expires on {$this->expiresAt}.\n\n";
@@ -99,5 +115,17 @@ class ApiTokenExpiringNotification extends CustomEmailNotification
             description: $description,
             color: SlackMessage::warningColor(),
         );
+    }
+
+    public function toWebhook(): array
+    {
+        return [
+            'success' => false,
+            'message' => "API token '{$this->tokenName}' expires on {$this->expiresAt}. Rotate this token before it expires to avoid API outages.",
+            'event' => 'api_token_expiring',
+            'token_name' => $this->tokenName,
+            'expires_at' => $this->expiresAt,
+            'url' => $this->manageUrl,
+        ];
     }
 }

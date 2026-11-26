@@ -11,20 +11,26 @@
                 description="Send team notifications to a Discord channel through an incoming webhook.">
                 <x-slot:actions>
                     <x-notification.channel-actions :enabled="$discordEnabled" enabledProperty="discordEnabled"
-                        toggleMethod="instantSaveDiscordEnabled" :canUpdate="auth()->user()->can('update', $settings)" />
+                        toggleMethod="instantSaveDiscordEnabled" :canUpdate="auth()->user()->can('update', $settings)"
+                        :canResource="$settings" />
                 </x-slot:actions>
 
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.listbox canGate="update" :canResource="$settings" id="discordPingEnabled" label="Critical event mention"
-                        helper="Mention @here when a critical event occurs."
+                        helper="Mention people in Discord when a critical event occurs."
                         onChange="instantSaveDiscordPingEnabled"
                         :disabled="!auth()->user()->can('update', $settings)" :options="[
-                            ['value' => true, 'label' => 'Mention @here'],
+                            ['value' => true, 'label' => 'Mention'],
                             ['value' => false, 'label' => 'Do not mention'],
                         ]" />
+                    @if ($discordPingEnabled)
+                        <x-forms.input canGate="update" :canResource="$settings" id="discordPingText" label="Mention text"
+                            placeholder="@here"
+                            helper="Text sent with critical events. Leave empty to use @here.<br><br>Examples: @everyone, &lt;@USER_ID&gt; (user), &lt;@&amp;ROLE_ID&gt; (role). You can add more mentions and text." />
+                    @endif
                     <div class="lg:col-span-2">
                         @can('update', $settings)
-                            <x-forms.input type="password" required id="discordWebhookUrl" label="Webhook URL"
+                            <x-forms.input type="password" :required="$discordEnabled" id="discordWebhookUrl" label="Webhook URL"
                                 helper="Create an incoming webhook in your Discord server settings." />
                         @else
                             <x-forms.input disabled label="Webhook URL" value="Hidden (only admins can view)" />

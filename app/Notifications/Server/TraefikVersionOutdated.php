@@ -4,6 +4,7 @@ namespace App\Notifications\Server;
 
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -188,6 +189,49 @@ class TraefikVersionOutdated extends CustomEmailNotification
             title: 'Traefik proxy outdated',
             level: 'warning',
             message: $message,
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        $count = $this->servers->count();
+        $hasUpgrades = $this->servers->contains(fn ($s) => ($s->outdatedInfo['type'] ?? 'patch_update') === 'minor_upgrade' ||
+            isset($s->outdatedInfo['newer_branch_target'])
+        );
+
+        $message = "Traefik proxy outdated on {$count} server(s)!\n";
+        $message .= "Affected servers:\n";
+
+        foreach ($this->servers as $server) {
+            $info = $server->outdatedInfo ?? [];
+            $current = $this->formatVersion($info['current'] ?? 'unknown');
+            $latest = $this->formatVersion($info['latest'] ?? 'unknown');
+            $upgradeTarget = $this->getUpgradeTarget($info);
+            $isPatch = ($info['type'] ?? 'patch_update') === 'patch_update';
+            $hasNewerBranch = isset($info['newer_branch_target']);
+
+            if ($isPatch && $hasNewerBranch) {
+                $newerBranchTarget = $info['newer_branch_target'];
+                $newerBranchLatest = $this->formatVersion($info['newer_branch_latest']);
+                $message .= "- {$server->name}: {$current} -> {$upgradeTarget} (patch update available)\n";
+                $message .= "  Also: {$newerBranchTarget} (latest: {$newerBranchLatest}) - new minor version\n";
+            } elseif ($isPatch) {
+                $message .= "- {$server->name}: {$current} -> {$upgradeTarget} (patch update available)\n";
+            } else {
+                $message .= "- {$server->name}: {$current} (latest patch: {$latest}) -> {$upgradeTarget} (new minor version available)\n";
+            }
+        }
+
+        $message .= "\nIt is recommended to test before switching the production version.";
+
+        if ($hasUpgrades) {
+            $message .= "\n\nFor minor version upgrades: Read the Traefik changelog before upgrading.";
+        }
+
+        return new NtfyMessage(
+            title: 'Traefik proxy outdated',
+            message: $message,
+            level: 'warning',
         );
     }
 

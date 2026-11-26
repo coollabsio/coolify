@@ -109,13 +109,6 @@ describe('Storage/Resources team-scoped backup access', function () {
         Livewire::test(StorageResources::class, ['storage' => $this->storageA])
             ->assertSee('minio-volume-data')
             ->assertSee('Volume')
-            ->assertSeeHtml('class="listbox-trigger"')
-            ->assertSeeHtml('x-teleport="body"')
-            ->assertSeeHtml('requestAnimationFrame')
-            ->assertSeeHtml('-panel"')
-            ->assertSeeHtml("visibility: positioned ? 'visible' : 'hidden'")
-            ->assertSeeHtml('positionPanel($el)')
-            ->assertSeeHtml('class="flex items-center"')
             ->set("selectedVolumeStorages.{$backup->id}", $destination->id)
             ->call('moveVolumeBackup', $backup->id);
 

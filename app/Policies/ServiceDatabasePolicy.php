@@ -69,7 +69,7 @@ class ServiceDatabasePolicy
      */
     public function manageBackups(User $user, ServiceDatabase $serviceDatabase): bool
     {
-        return Gate::allows('update', $serviceDatabase->service);
+        return Gate::allows('manageBackups', $serviceDatabase->service);
     }
 
     /**

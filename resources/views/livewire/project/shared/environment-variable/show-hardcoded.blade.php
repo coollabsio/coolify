@@ -1,6 +1,9 @@
 <div class="env-table-item"
     x-show="typeof envFilter === 'undefined' || envFilter === 'all' || envFilter === '{{ $isPreview ? 'preview' : 'production' }}'">
-    <div class="data-table-row env-table-grid {{ $showEnvironmentType ? '' : 'env-table-grid-no-type' }}">
+    <div class="data-table-row env-table-grid {{ $showEnvironmentType ? '' : 'env-table-grid-no-type' }} {{ $selectable ? 'env-table-grid-selectable' : '' }}">
+        @if ($selectable)
+            <span></span>
+        @endif
         <div class="flex min-w-0 items-center gap-2">
             <button type="button" data-env-name-trigger
                 class="env-key-label min-w-0 truncate text-left font-mono text-[13px] text-black dark:text-fg"
@@ -12,7 +15,7 @@
                 <x-helper :helper="e($comment)" />
             @endif
             @if ($serviceName)
-                <span class="table-badge shrink-0">{{ $serviceName }}</span>
+                <span class="table-badge shrink-0" title="{{ $composeType === 'derived' ? 'Derived in Compose' : 'Defined in Compose' }} for {{ $serviceName }}">{{ $serviceName }}</span>
             @endif
         </div>
         <span class="env-managed-desktop data-table-cell-check">
@@ -28,8 +31,8 @@
         <span class="data-table-cell-dash">-</span>
         <span class="data-table-cell-dash">-</span>
         <span class="data-table-cell-dash">-</span>
-        <div class="flex items-center gap-0.5 justify-self-end">
-            @unless (auth()->user()?->isMember() ?? true)
+        <div class="flex items-center justify-end gap-0.5 justify-self-end">
+            @unless ($isValueHidden)
                 <x-copy-button resolve="$wire.copyValue()" label="Copy value" />
             @endunless
             <x-modal-input title="Environment variable details" :closeOutside="false">
@@ -41,12 +44,31 @@
                 </x-slot:content>
                 <div class="flex w-full flex-col gap-4">
                     <x-forms.input label="Name" :value="$key" readonly />
-                    <x-forms.input label="Value" :value="$value ?? ''" readonly />
+                    @if ($isValueHidden)
+                        <div class="w-full">
+                            <label class="mb-1 flex items-center gap-1 text-sm font-medium">Value</label>
+                            <input disabled type="text" value="Hidden (only admins can view)"
+                                class="input w-full italic !text-neutral-500 dark:!text-neutral-500" />
+                        </div>
+                    @else
+                        <x-forms.input label="Value" :value="$value ?? ''" readonly />
+                    @endif
                     @if (filled($comment))
                         <x-forms.input label="Comment" :value="$comment" readonly />
                     @endif
-                    <x-callout type="info" title="Managed by Docker Compose">
-                        Update this value in the Compose file.
+                    <x-callout type="info" :title="$composeType === 'derived' ? 'Derived in Compose' : 'Defined in Compose'">
+                        @if ($composeType === 'derived')
+                            This value is derived from
+                            @foreach ($references as $reference)
+                                <button type="button" data-compose-reference
+                                    class="font-mono underline underline-offset-2"
+                                    @click="$dispatch('focus-compose-environment-variable', { key: @js($reference) }); modalOpen = false">
+                                    {{ $reference }}</button>{{ $loop->last ? '' : ',' }}
+                            @endforeach.
+                            Edit those variables or update the Compose file.
+                        @else
+                            This value is defined directly in Docker Compose. Update it in the Compose file.
+                        @endif
                     </x-callout>
                 </div>
             </x-modal-input>

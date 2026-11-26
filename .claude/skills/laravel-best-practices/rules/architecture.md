@@ -1,15 +1,15 @@
 # Architecture Best Practices
 
-## Single-Purpose Action Classes
+## Extract Focused Business Operations
 
-Extract discrete business operations into invokable Action classes.
+Extract a discrete business operation into an action class when doing so makes the operation easier to reuse or test. An action class has no special meaning to Laravel; follow the project's naming and invocation conventions.
 
 ```php
 class CreateOrderAction
 {
     public function __construct(private InventoryService $inventory) {}
 
-    public function execute(array $data): Order
+    public function handle(array $data): Order
     {
         $order = Order::create($data);
         $this->inventory->reserve($order);
@@ -19,11 +19,12 @@ class CreateOrderAction
 }
 ```
 
-## Use Dependency Injection
+## Inject Required Dependencies
 
-Always use constructor injection. Avoid `app()` or `resolve()` inside classes.
+Prefer constructor injection for dependencies required throughout an object's lifetime. Method injection is appropriate for dependencies needed by one controller action, listener, job handler, or other container-invoked method. Avoid `app()` and `resolve()` when normal injection can make a dependency explicit.
 
-Incorrect:
+Hidden dependency:
+
 ```php
 class OrderController extends Controller
 {
@@ -36,24 +37,24 @@ class OrderController extends Controller
 }
 ```
 
-Correct:
+Injected dependency:
+
 ```php
 class OrderController extends Controller
 {
-    public function __construct(private OrderService $service) {}
-
-    public function store(StoreOrderRequest $request)
+    public function store(StoreOrderRequest $request, OrderService $service)
     {
-        return $this->service->create($request->validated());
+        return $service->create($request->validated());
     }
 }
 ```
 
-## Code to Interfaces
+## Depend on Contracts at Boundaries
 
-Depend on contracts at system boundaries (payment gateways, notification channels, external APIs) for testability and swappability.
+Depend on contracts at system boundaries, such as payment gateways, notification channels, and external services, when testability or interchangeable implementations justify the abstraction.
 
-Incorrect (concrete dependency):
+Concrete boundary dependency:
+
 ```php
 class OrderService
 {
@@ -61,7 +62,8 @@ class OrderService
 }
 ```
 
-Correct (interface dependency):
+Contract boundary dependency:
+
 ```php
 interface PaymentGateway
 {
@@ -80,86 +82,99 @@ Bind in a service provider:
 $this->app->bind(PaymentGateway::class, StripeGateway::class);
 ```
 
-## Default Sort by Descending
+## Specify a Deterministic Sort Order
 
-When no explicit order is specified, sort by `id` or `created_at` descending. Without an explicit `ORDER BY`, row order is undefined.
+Without an explicit `ORDER BY`, row order is undefined. Choose an order that matches the feature, and add a unique tie-breaker when stable pagination matters.
 
-Incorrect:
+Unspecified order:
+
 ```php
 $posts = Post::paginate();
 ```
 
-Correct:
+Newest first with a stable tie-breaker:
+
 ```php
-$posts = Post::latest()->paginate();
+$posts = Post::query()
+    ->orderByDesc('created_at')
+    ->orderByDesc('id')
+    ->paginate();
 ```
 
 ## Use Atomic Locks for Race Conditions
 
-Prevent race conditions with `Cache::lock()` or `lockForUpdate()`.
+Use a lock when concurrent execution must be serialized. `Cache::lock()` provides an atomic lock when the configured cache store supports locks. `lockForUpdate()` locks selected database rows and must run inside a database transaction. These mechanisms solve different coordination problems.
 
 ```php
 Cache::lock('order-processing-'.$order->id, 10)->block(5, function () use ($order) {
     $order->process();
 });
 
-// Or at query level
-$product = Product::where('id', $id)->lockForUpdate()->first();
+// Or at query level, inside a transaction
+DB::transaction(function () use ($id) {
+    $product = Product::where('id', $id)->lockForUpdate()->first();
+
+    // Read and update the product while the database lock is held.
+});
 ```
 
 ## Use `mb_*` String Functions
 
-When no Laravel helper exists, prefer `mb_strlen`, `mb_strtolower`, etc. for UTF-8 safety. Standard PHP string functions count bytes, not characters.
+When no Laravel helper exists, prefer multibyte-aware functions such as `mb_strlen()` and `mb_strtolower()` for UTF-8 text. For example, `strlen()` counts bytes, while `strtolower()` is not multibyte-aware.
 
 Incorrect:
+
 ```php
-strlen('José');          // 5 (bytes, not characters)
-strtolower('MÜNCHEN');  // 'mÜnchen' — fails on multibyte
+strlen('José');          // 5 bytes, not 4 characters
+strtolower('MÜNCHEN');  // Does not lowercase Ü
 ```
 
 Correct:
+
 ```php
-mb_strlen('José');             // 4 (characters)
-mb_strtolower('MÜNCHEN');     // 'münchen'
+mb_strlen('José');         // 4 characters
+mb_strtolower('MÜNCHEN'); // 'münchen'
 
 // Prefer Laravel's Str helpers when available
-Str::length('José');          // 4
-Str::lower('MÜNCHEN');        // 'münchen'
+Str::length('José');       // 4
+Str::lower('MÜNCHEN');     // 'münchen'
 ```
 
 ## Use `defer()` for Post-Response Work
 
-For lightweight tasks that don't need to survive a crash (logging, analytics, cleanup), use `defer()` instead of dispatching a job. The callback runs after the HTTP response is sent — no queue overhead.
+For lightweight work that does not need retries or crash durability, consider `defer()` instead of dispatching a job. During an HTTP request, the callback normally runs after the response has been sent but remains in the same PHP process.
 
-Incorrect (job overhead for trivial work):
+Queued and durable:
+
 ```php
 dispatch(new LogPageView($page));
 ```
 
-Correct (runs after response, same process):
+Deferred in the current process:
+
 ```php
 defer(fn () => PageView::create(['page_id' => $page->id, 'user_id' => auth()->id()]));
 ```
 
-Use jobs when the work must survive process crashes or needs retry logic. Use `defer()` for fire-and-forget work.
+Use a queued job when the work needs retries, queue controls, or durability across process failures.
 
 ## Use `Context` for Request-Scoped Data
 
-The `Context` facade passes data through the entire request lifecycle — middleware, controllers, jobs, logs — without passing arguments manually.
+The `Context` facade makes contextual data available across the current execution lifecycle without manually passing arguments through every layer.
 
 ```php
 // In middleware
 Context::add('tenant_id', $request->header('X-Tenant-ID'));
 
-// Anywhere later — controllers, jobs, log context
+// Later in the same execution lifecycle
 $tenantId = Context::get('tenant_id');
 ```
 
-Context data automatically propagates to queued jobs and is included in log entries. Use `Context::addHidden()` for sensitive data that should be available in queued jobs but excluded from log context. If data must not leave the current process, do not store it in `Context`.
+Visible context is added to log context, and both visible and hidden context are captured and restored for queued jobs. Use `Context::addHidden()` for data that should propagate to queued jobs without appearing in logs. Do not place secrets in context unless that propagation is intended.
 
 ## Use `Concurrency::run()` for Parallel Execution
 
-Run independent operations in parallel using child processes — no async libraries needed.
+Run independent operations concurrently through Laravel's configured concurrency driver.
 
 ```php
 use Illuminate\Support\Facades\Concurrency;
@@ -170,13 +185,14 @@ use Illuminate\Support\Facades\Concurrency;
 ]);
 ```
 
-Each closure runs in a separate process with full Laravel access. Use for independent database queries, API calls, or computations that would otherwise run sequentially.
+With a process-based driver, each closure runs in a separate PHP process that boots the application. Use concurrency when independent database queries, HTTP client calls, or computations benefit enough to offset process and serialization overhead. The `sync` driver executes closures sequentially and is useful primarily during testing.
 
-## Convention Over Configuration
+## Follow Framework Conventions
 
-Follow Laravel conventions. Don't override defaults unnecessarily.
+Follow Laravel conventions unless the domain or an existing schema requires an override.
 
-Incorrect:
+Customized schema:
+
 ```php
 class Customer extends Model
 {
@@ -190,7 +206,8 @@ class Customer extends Model
 }
 ```
 
-Correct:
+Conventional schema:
+
 ```php
 class Customer extends Model
 {

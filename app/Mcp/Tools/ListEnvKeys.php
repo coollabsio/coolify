@@ -9,7 +9,9 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
+#[IsReadOnly]
 class ListEnvKeys extends Tool
 {
     protected string $name = 'list_env_keys';
@@ -66,6 +68,7 @@ class ListEnvKeys extends Tool
                 'is_buildtime' => (bool) ($env->is_buildtime ?? true),
                 'is_shown_once' => (bool) ($env->is_shown_once ?? false),
                 'comment' => $env->comment,
+                'compose_services' => $env->compose_services ?? null,
             ])
             ->values()
             ->all();

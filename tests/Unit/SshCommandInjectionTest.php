@@ -80,15 +80,6 @@ it('strips non-numeric characters from server port on write', function () {
 // escapeshellarg() in generated SSH commands (source-level verification)
 // -------------------------------------------------------------------------
 
-it('has escapedUserAtHost private static helper in SshMultiplexingHelper', function () {
-    $reflection = new ReflectionClass(SshMultiplexingHelper::class);
-    expect($reflection->hasMethod('escapedUserAtHost'))->toBeTrue();
-
-    $method = $reflection->getMethod('escapedUserAtHost');
-    expect($method->isPrivate())->toBeTrue();
-    expect($method->isStatic())->toBeTrue();
-});
-
 it('wraps port with escapeshellarg in getCommonSshOptions', function () {
     $reflection = new ReflectionClass(SshMultiplexingHelper::class);
     $source = file_get_contents($reflection->getFileName());

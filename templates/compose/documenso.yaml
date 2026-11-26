@@ -7,7 +7,7 @@
 
 services:
   documenso:
-    image: documenso/documenso:v1.12.10 # Released at Oct 9, 2025
+    image: documenso/documenso:v2.22.0 # Released at Nov 13, 2026
     depends_on:
       database:
         condition: service_healthy

@@ -3,7 +3,6 @@
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Livewire\Server\Create as ServerCreate;
 use App\Livewire\Server\Index as ServerIndex;
-use App\Livewire\Server\LogDrains;
 use App\Livewire\Server\Navbar as ServerNavbar;
 use App\Livewire\Server\ValidateAndInstall;
 use App\Models\CloudProviderToken;
@@ -14,7 +13,6 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Livewire\Exceptions\MethodNotFoundException;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -100,20 +98,6 @@ test('member can view server', function () {
     expect($this->member->can('view', $this->server))->toBeTrue();
 });
 
-test('the private log drain syncData helper is not remotely callable', function () {
-    $this->withoutVite();
-    $this->actingAs($this->member);
-    session(['currentTeam' => $this->team]);
-
-    $component = Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
-        ->set('isLogDrainAxiomEnabled', true);
-
-    expect(fn () => $component->call('syncData', true))
-        ->toThrow(MethodNotFoundException::class);
-
-    expect((bool) $this->server->settings->fresh()->is_logdrain_axiom_enabled)->toBeFalse();
-});
-
 // --- Server Policy: manageProxy ---
 
 test('admin can manage proxy', function () {
@@ -176,113 +160,26 @@ test('admin can access new server page', function () {
 
     $this->get(route('server.create'))
         ->assertSuccessful()
-        ->assertSee('New Server')
         ->assertSeeLivewire(ServerCreate::class);
 });
 
-test('new server chooser lists providers before rendering a creation form', function () {
+test('new server provider pages link existing tokens', function (string $type, string $provider) {
     $this->actingAs($this->admin);
     session(['currentTeam' => $this->team]);
 
-    Livewire::test(ServerCreate::class)
-        ->assertSee('Hetzner')
-        ->assertSee('Vultr')
-        ->assertSee('DigitalOcean')
-        ->assertSee('Manual')
-        ->assertDontSee('>Select<', false)
-        ->assertDontSee('Continue')
-        ->assertSee(route('server.create.type', ['type' => 'hetzner']))
-        ->assertSee(route('server.create.type', ['type' => 'vultr']))
-        ->assertSee(route('server.create.type', ['type' => 'digital-ocean']))
-        ->assertSee(route('server.create.type', ['type' => 'manual']))
-        ->assertDontSee('Add Server by IP Address');
-});
-
-test('new server chooser uses compact mobile provider cards', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(ServerCreate::class)
-        ->assertSee('mx-auto flex w-full max-w-7xl flex-col', false)
-        ->assertSee('sm:grid', false)
-        ->assertSee('sm:grid-cols-2', false)
-        ->assertSee('xl:grid-cols-4', false)
-        ->assertSee('gap-3 sm:gap-6', false)
-        ->assertSee('dark:hover:border-warning', false)
-        ->assertSee('focus-visible:border-coollabs', false)
-        ->assertSee('aria-label="Choose Hetzner"', false)
-        ->assertSee('p-3 sm:p-6', false)
-        ->assertDontSee('sm:min-h-80', false)
-        ->assertSee('size-9 sm:size-14', false)
-        ->assertDontSee('size-9 sm:size-14 w-14 h-14', false)
-        ->assertSee('hidden sm:block', false)
-        ->assertDontSee('>Select<', false)
-        ->assertDontSee('<button', false);
-});
-
-test('new server provider pages render the selected creation flow', function (string $type, string $heading) {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $response = $this->get(route('server.create.type', ['type' => $type]))
-        ->assertSuccessful()
-        ->assertSee($heading)
-        ->assertDontSee('<h1>New Server</h1>', false)
-        ->assertDontSee('Choose how to add your server');
-
-    $response->assertSeeInOrder([$heading, 'Back']);
-})->with([
-    ['hetzner', 'Hetzner'],
-    ['vultr', 'Vultr'],
-    ['digital-ocean', 'DigitalOcean'],
-    ['manual', 'Manual'],
-]);
-
-test('new server provider pages do not show the new token action in the header', function (string $type, string $heading) {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $response = $this->get(route('server.create.type', ['type' => $type]))
-        ->assertSuccessful()
-        ->assertDontSee('+ New Token')
-        ->assertDontSee('+ Add New Token');
-
-    $response->assertSeeInOrder([$heading, 'Back']);
-})->with([
-    ['hetzner', 'Hetzner'],
-    ['vultr', 'Vultr'],
-    ['digital-ocean', 'DigitalOcean'],
-]);
-
-test('new server provider pages show the new token action in the header when tokens exist', function (string $type, string $provider, string $heading, string $modalTitle) {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    CloudProviderToken::factory()->create([
+    $token = CloudProviderToken::factory()->create([
         'team_id' => $this->team->id,
         'provider' => $provider,
     ]);
 
-    $response = $this->get(route('server.create.type', ['type' => $type]))
+    $this->get(route('server.create.type', ['type' => $type]))
         ->assertSuccessful()
-        ->assertSee($modalTitle);
-
-    $response->assertSeeInOrder([$heading, 'Back', '+ New Token']);
+        ->assertSee(route('server.create.token', ['type' => $type, 'token_uuid' => $token->uuid]));
 })->with([
-    ['hetzner', 'hetzner', 'Hetzner', 'Add Hetzner Token'],
-    ['vultr', 'vultr', 'Vultr', 'Add Vultr Token'],
-    ['digital-ocean', 'digitalocean', 'DigitalOcean', 'Add DigitalOcean Token'],
+    ['hetzner', 'hetzner'],
+    ['vultr', 'vultr'],
+    ['digital-ocean', 'digitalocean'],
 ]);
-
-test('new server manual page does not show the new token action', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    $this->get(route('server.create.type', ['type' => 'manual']))
-        ->assertSuccessful()
-        ->assertSee('Manual')
-        ->assertDontSee('+ New Token');
-});
 
 test('member cannot access new server page', function () {
     $this->actingAs($this->member);

@@ -27,7 +27,7 @@ class Slack extends Component
     #[Validate(['boolean'])]
     public bool $slackEnabled = false;
 
-    #[Validate(['nullable', new SafeWebhookUrl])]
+    #[Validate(['required_if:slackEnabled,true', 'nullable', new SafeWebhookUrl])]
     public ?string $slackWebhookUrl = null;
 
     #[Validate(['boolean'])]
@@ -73,7 +73,13 @@ class Slack extends Component
     public bool $serverPatchSlackNotifications = false;
 
     #[Validate(['boolean'])]
+    public bool $serverAutoUpdateSlackNotifications = true;
+
+    #[Validate(['boolean'])]
     public bool $traefikOutdatedSlackNotifications = true;
+
+    #[Validate(['boolean'])]
+    public bool $imageVulnerabilitiesSlackNotifications = false;
 
     public function mount()
     {
@@ -108,9 +114,13 @@ class Slack extends Component
             $this->settings->server_reachable_slack_notifications = $this->serverReachableSlackNotifications;
             $this->settings->server_unreachable_slack_notifications = $this->serverUnreachableSlackNotifications;
             $this->settings->server_patch_slack_notifications = $this->serverPatchSlackNotifications;
+            $this->settings->server_auto_update_slack_notifications = $this->serverAutoUpdateSlackNotifications;
             $this->settings->traefik_outdated_slack_notifications = $this->traefikOutdatedSlackNotifications;
+            $this->settings->image_vulnerabilities_slack_notifications = $this->imageVulnerabilitiesSlackNotifications;
 
+            $changedFields = array_keys($this->settings->getDirty());
             $this->settings->save();
+            $this->auditNotificationSettings($changedFields);
             refreshSession();
         } else {
             $this->slackEnabled = $this->settings->slack_enabled;
@@ -132,7 +142,9 @@ class Slack extends Component
             $this->serverReachableSlackNotifications = $this->settings->server_reachable_slack_notifications;
             $this->serverUnreachableSlackNotifications = $this->settings->server_unreachable_slack_notifications;
             $this->serverPatchSlackNotifications = $this->settings->server_patch_slack_notifications;
+            $this->serverAutoUpdateSlackNotifications = $this->settings->server_auto_update_slack_notifications;
             $this->traefikOutdatedSlackNotifications = $this->settings->traefik_outdated_slack_notifications;
+            $this->imageVulnerabilitiesSlackNotifications = $this->settings->image_vulnerabilities_slack_notifications;
         }
     }
 
@@ -146,7 +158,7 @@ class Slack extends Component
             ]);
             $this->saveModel();
         } catch (\Throwable $e) {
-            $this->slackEnabled = false;
+            $this->slackEnabled = (bool) $this->settings->refresh()->slack_enabled;
 
             return handleError($e, $this);
         } finally {
@@ -227,5 +239,12 @@ class Slack extends Component
     public function render()
     {
         return view('livewire.notifications.slack');
+    }
+
+    private function auditNotificationSettings(array $changedFields): void
+    {
+        if ($changedFields !== []) {
+            auditLog('ui.notifications.slack.updated', ['team_id' => $this->team->id, 'changed_fields' => $changedFields]);
+        }
     }
 }

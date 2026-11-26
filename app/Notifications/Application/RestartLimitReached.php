@@ -2,10 +2,14 @@
 
 namespace App\Notifications\Application;
 
+use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\BaseModel;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -49,14 +53,19 @@ class RestartLimitReached extends CustomEmailNotification
         if (str($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = str($this->fqdn)->explode(',')->first();
         }
-        $service = data_get($resource, 'service');
-        $this->resource_url = match (true) {
-            method_exists($this->resource, 'link') => $this->resource->link(),
-            $resource instanceof ApplicationPreview => $resource->application->link(),
-            is_object($service) && method_exists($service, 'link') => $service->link(),
-            default => null,
+        $this->resource_url = $this->resolveResourceUrl($resource);
+    }
+
+    private function resolveResourceUrl(BaseModel $resource): string
+    {
+        [$type, $uuid] = match (true) {
+            $resource instanceof Application => ['application', $resource->uuid],
+            $resource instanceof ApplicationPreview => ['application', $resource->application->uuid],
+            $resource instanceof ServiceApplication, $resource instanceof ServiceDatabase => ['service', $resource->service->uuid],
+            default => ['database', $resource->uuid],
         };
-        $this->resource_url ??= base_url()."/project/{$this->project_uuid}/environment/{$this->environment_uuid}";
+
+        return base_url()."/project/{$this->project_uuid}/environment/{$this->environment_uuid}/{$type}/{$uuid}";
     }
 
     public function via(object $notifiable): array
@@ -112,6 +121,21 @@ class RestartLimitReached extends CustomEmailNotification
             title: 'Restart limit reached',
             level: 'error',
             message: $message,
+            buttons: [
+                [
+                    'text' => 'Open Resource in Coolify',
+                    'url' => $this->resource_url,
+                ],
+            ],
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
+            title: 'Restart limit reached',
+            level: 'error',
+            message: "{$this->resource_name} has been stopped after {$this->restart_count} restarts (limit: {$this->max_restart_count}).",
             buttons: [
                 [
                     'text' => 'Open Resource in Coolify',

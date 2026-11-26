@@ -3,6 +3,9 @@
 namespace App\Livewire\Server\New;
 
 use App\Enums\ProxyTypes;
+use App\Exceptions\CloudProviderApiException;
+use App\Jobs\ValidateNewCloudServerJob;
+use App\Livewire\Server\New\Concerns\SetsImageScanning;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
 use App\Models\PrivateKey;
@@ -12,15 +15,17 @@ use App\Rules\ValidCloudInitYaml;
 use App\Rules\ValidHostname;
 use App\Services\HetznerService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class ByHetzner extends Component
 {
     use AuthorizesRequests;
+    use SetsImageScanning;
 
     // Step tracking
     public int $current_step = 1;
@@ -180,7 +185,7 @@ class ByHetzner extends Component
     protected function rules(): array
     {
         $rules = [
-            'selected_token_id' => 'required|integer|exists:cloud_provider_tokens,id',
+            'selected_token_id' => ['required', 'integer', Rule::exists('cloud_provider_tokens', 'id')->where('team_id', currentTeam()->id)],
         ];
 
         if ($this->current_step === 2) {
@@ -203,7 +208,7 @@ class ByHetzner extends Component
                 'cloud_init_script' => ['nullable', 'string', new ValidCloudInitYaml],
                 'save_cloud_init_script' => 'boolean',
                 'cloud_init_script_name' => 'nullable|string|max:255',
-                'selected_cloud_init_script_id' => 'nullable|integer|exists:cloud_init_scripts,id',
+                'selected_cloud_init_script_id' => ['nullable', 'integer', Rule::exists('cloud_init_scripts', 'id')->where('team_id', currentTeam()->id)],
             ]);
         }
 
@@ -269,7 +274,7 @@ class ByHetzner extends Component
     {
         // Validate step 1 - just need a token selected
         $this->validate([
-            'selected_token_id' => 'required|integer|exists:cloud_provider_tokens,id',
+            'selected_token_id' => ['required', 'integer', Rule::exists('cloud_provider_tokens', 'id')->where('team_id', currentTeam()->id)],
         ]);
 
         try {
@@ -322,7 +327,7 @@ class ByHetzner extends Component
             $hetznerService = new HetznerService($token);
 
             $this->locations = $hetznerService->getLocations();
-            $this->serverTypes = $hetznerService->getServerTypes();
+            $this->serverTypes = $hetznerService->getServerTypes(includeOutOfStock: true);
 
             // Get images and sort by name
             $images = $hetznerService->getImages();
@@ -357,20 +362,11 @@ class ByHetzner extends Component
             $this->loading_data = false;
         } catch (\Throwable $e) {
             $this->loading_data = false;
-            $this->provider_data_error = $this->providerDataErrorMessage('Hetzner', $e, 'error.message');
+            $this->provider_data_error = $e instanceof CloudProviderApiException
+                ? $e->getMessage()
+                : 'Hetzner API error: '.$e->getMessage();
             $this->dispatch('error', $this->provider_data_error);
         }
-    }
-
-    private function providerDataErrorMessage(string $providerName, \Throwable $e, string $jsonMessageKey): string
-    {
-        $details = $e->getMessage();
-
-        if ($e instanceof RequestException && $e->response) {
-            $details = data_get($e->response->json(), $jsonMessageKey) ?: $e->response->body() ?: $details;
-        }
-
-        return "{$providerName} API error: {$details}";
     }
 
     private function getCpuVendorInfo(array $serverType): ?string
@@ -393,7 +389,7 @@ class ByHetzner extends Component
     public function getAvailableServerTypesProperty()
     {
         if (! $this->selected_location) {
-            return $this->serverTypes;
+            return [];
         }
 
         $filtered = collect($this->serverTypes)
@@ -408,13 +404,22 @@ class ByHetzner extends Component
             })
             ->map(function ($serverType) {
                 $serverType['cpu_vendor_info'] = $this->getCpuVendorInfo($serverType);
+                $serverType['out_of_stock'] = $this->isServerTypeOutOfStock($serverType);
 
                 return $serverType;
             })
+            ->sortBy('out_of_stock')
             ->values()
             ->toArray();
 
         return $filtered;
+    }
+
+    private function isServerTypeOutOfStock(array $serverType): bool
+    {
+        $typeLocation = collect($serverType['locations'] ?? [])->firstWhere('name', $this->selected_location);
+
+        return ($typeLocation['available'] ?? true) === false;
     }
 
     public function getAvailableImagesProperty()
@@ -678,6 +683,13 @@ class ByHetzner extends Component
     {
         $this->validate();
 
+        $selectedServerType = collect($this->serverTypes)->firstWhere('name', $this->selected_server_type);
+        if ($selectedServerType && $this->isServerTypeOutOfStock($selectedServerType)) {
+            $this->addError('selected_server_type', 'This server type is out of stock in the selected location. Select a different server type or location.');
+
+            return null;
+        }
+
         if (! $this->enable_ipv4 && ! $this->enable_ipv6) {
             $this->addError('enable_ipv4', 'Enable at least one public IP protocol.');
             $this->addError('enable_ipv6', 'Enable at least one public IP protocol.');
@@ -696,10 +708,16 @@ class ByHetzner extends Component
             if ($this->save_cloud_init_script && ! empty($this->cloud_init_script) && ! empty($this->cloud_init_script_name)) {
                 $this->authorize('create', CloudInitScript::class);
 
-                CloudInitScript::create([
+                $cloudInitScript = CloudInitScript::create([
                     'team_id' => currentTeam()->id,
                     'name' => $this->cloud_init_script_name,
                     'script' => $this->cloud_init_script,
+                ]);
+
+                auditLog('ui.cloud_init_script.created', [
+                    'team_id' => currentTeam()->id,
+                    'cloud_init_script_id' => $cloudInitScript->id,
+                    'cloud_init_script_name' => $cloudInitScript->name,
                 ]);
             }
 
@@ -714,13 +732,13 @@ class ByHetzner extends Component
             if ($this->enable_ipv4 && isset($hetznerServer['public_net']['ipv4']['ip'])) {
                 $ipAddress = $hetznerServer['public_net']['ipv4']['ip'];
             } elseif ($this->enable_ipv6 && isset($hetznerServer['public_net']['ipv6']['ip'])) {
-                $ipAddress = $hetznerServer['public_net']['ipv6']['ip'];
+                $ipAddress = hetznerServerIpv6($hetznerServer['public_net']['ipv6']['ip']);
             }
 
             // Create server in Coolify database immediately so the Hetzner
             // server is always tracked, even when no IP is assigned yet —
             // the server page polling backfills the placeholder IP later.
-            $server = Server::create([
+            $server = Team::createServerWithinLimit(currentTeam()->id, [
                 'name' => $this->server_name,
                 'ip' => $ipAddress ?? Server::PLACEHOLDER_IP,
                 'user' => 'root',
@@ -735,6 +753,7 @@ class ByHetzner extends Component
             $server->proxy->set('status', 'exited');
             $server->proxy->set('type', ProxyTypes::TRAEFIK->value);
             $server->save();
+            $this->applyImageScanning($server);
 
             if ($this->enable_backups) {
                 try {
@@ -743,6 +762,8 @@ class ByHetzner extends Component
                     report($e);
                 }
             }
+
+            ValidateNewCloudServerJob::dispatch($server);
 
             if ($this->from_onboarding) {
                 // Complete the boarding when server is successfully created via Hetzner
@@ -755,8 +776,32 @@ class ByHetzner extends Component
             }
 
             return redirectRoute($this, 'server.show', [$server->uuid]);
+        } catch (ValidationException $e) {
+            if (! isset($e->errors()['server'])) {
+                throw $e;
+            }
+            $this->deleteUntrackedHetznerServer($hetznerService ?? null, $hetznerServer['id'] ?? null);
+
+            return $this->dispatch('error', 'You have reached the server limit for your subscription.');
         } catch (\Throwable $e) {
+            if (! isset($server)) {
+                $this->deleteUntrackedHetznerServer($hetznerService ?? null, $hetznerServer['id'] ?? null);
+            }
+
             return handleError($e, $this);
+        }
+    }
+
+    private function deleteUntrackedHetznerServer(?HetznerService $hetznerService, ?int $hetznerServerId): void
+    {
+        if (! $hetznerService || ! $hetznerServerId) {
+            return;
+        }
+
+        try {
+            $hetznerService->deleteServer($hetznerServerId);
+        } catch (\Throwable $e) {
+            report($e);
         }
     }
 

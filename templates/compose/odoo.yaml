@@ -7,7 +7,8 @@
 
 services:
   odoo:
-    image: odoo:18
+    image: odoo:20
+    command: --proxy-mode
     environment:
       - SERVICE_URL_ODOO_8069
       - HOST=postgresql

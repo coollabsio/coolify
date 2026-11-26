@@ -8,6 +8,7 @@
                     description: options.description ?? '',
                     position: options.position ?? 'bottom-right',
                     html: options.html ?? '',
+                    persistent: options.persistent ?? false,
                 },
             }));
         } catch (error) {
@@ -29,14 +30,19 @@
                     type: event.detail.type,
                     html: event.detail.html ? window.sanitizeHTML(event.detail.html) : '',
                     timeout: null,
+                    persistent: event.detail.persistent === true,
                     copied: false,
                     copiedTimeout: null,
                 };
 
                 this.toasts.unshift(toast);
                 if (this.toasts.length > 4) {
-                    const removed = this.toasts.pop();
-                    clearTimeout(removed?.timeout);
+                    const index = this.toasts.findLastIndex(item => !item.persistent);
+                    if (index !== -1) {
+                        const [removed] = this.toasts.splice(index, 1);
+                        clearTimeout(removed.timeout);
+                        clearTimeout(removed.copiedTimeout);
+                    }
                 }
 
                 this.$nextTick(() => {
@@ -49,6 +55,7 @@
             },
             scheduleToast(toast, delay = 2000) {
                 clearTimeout(toast.timeout);
+                if (toast.persistent) return;
                 toast.timeout = setTimeout(() => this.removeToast(toast.id), delay);
             },
             pauseToast(toast) {
@@ -94,17 +101,16 @@
                     x-transition:enter-end="translate-y-0 opacity-100"
                     x-transition:leave="transition ease-in duration-150"
                     x-transition:leave-start="translate-y-0 opacity-100"
-                    x-transition:leave-end="-translate-y-1 opacity-0"
+                    x-transition:leave-end="translate-y-1 opacity-0"
                     @mouseenter="pauseToast(toast)" @mouseleave="resumeToast(toast)"
-                    class="relative flex w-full items-start rounded-lg group"
-                    style="background: var(--coollabs-elevated); box-shadow: 0 0 0 1px var(--coollabs-line), var(--shadow-modal);"
+                    class="surface-popover toast-card relative flex w-full items-start rounded-lg group"
                     :class="{ 'p-3.5 pr-20': !toast.html, 'p-0': toast.html }">
                     <template x-if="!toast.html">
                         <div class="flex min-w-0 items-start gap-3">
-                            <div class="flex size-8 shrink-0 items-center justify-center rounded-lg"
+                            <div class="toast-icon flex size-8 shrink-0 items-center justify-center rounded-lg"
                                 :class="{
                                     'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400': toast.type === 'success',
-                                    'bg-coollabs/10 text-coollabs dark:bg-warning/10 dark:text-warning': toast.type === 'info',
+                                    'bg-coollabs/10 text-coollabs dark:bg-brand/15 dark:text-brand-light': toast.type === 'info',
                                     'bg-amber-100 text-amber-700 dark:bg-warning/10 dark:text-warning': toast.type === 'warning',
                                     'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400': toast.type === 'danger',
                                     'bg-neutral-100 text-neutral-600 dark:bg-white/[0.06] dark:text-fg-dim': toast.type === 'default',

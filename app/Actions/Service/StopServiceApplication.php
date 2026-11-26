@@ -3,6 +3,7 @@
 namespace App\Actions\Service;
 
 use App\Events\ServiceStatusChanged;
+use App\Jobs\NotifyResourceStoppedJob;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -18,19 +19,17 @@ class StopServiceApplication
         $service = $serviceApplication->service;
         $server = $service->destination->server;
         $containerName = escapeshellarg($serviceApplication->name.'-'.$service->uuid);
+        NotifyResourceStoppedJob::expectStop($serviceApplication);
 
         if ($removeContainer) {
             $commands = ["docker rm -f {$containerName}"];
         } else {
-            $commands = [
-                "docker update --restart=no {$containerName}",
-                "docker stop {$containerName}",
-            ];
+            $commands = ["docker stop {$containerName}"];
         }
         instant_remote_process($commands, $server, throwError: ! $removeContainer);
 
         $serviceApplication->update(['status' => 'exited']);
-        if ($resetRestartCount) {
+        if ($resetRestartCount && $serviceApplication instanceof ServiceApplication) {
             $serviceApplication->resetRestartLimit();
         }
         ServiceStatusChanged::dispatch($service->environment->project->team->id);

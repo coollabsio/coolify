@@ -7,7 +7,7 @@
 
 services:
   portainer:
-    image: portainer/portainer-ce:alpine
+    image: portainer/portainer-ce:2.45.3-alpine
     environment:
       - SERVICE_URL_PORTAINER_9000
     volumes:

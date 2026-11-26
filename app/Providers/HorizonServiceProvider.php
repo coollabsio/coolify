@@ -45,8 +45,8 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
                     return;
                 }
                 $deploymentQueueId = explode(':', $deploymentQueueId)[1];
-                $deploymentQueue = ApplicationDeploymentQueue::find($deploymentQueueId);
-                $deploymentQueue->update([
+                // The deployment can be deleted while its job waits in Redis. A throw here kills the worker in pop().
+                ApplicationDeploymentQueue::query()->whereKey($deploymentQueueId)->update([
                     'horizon_job_id' => $id,
                 ]);
             }

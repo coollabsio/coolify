@@ -7,7 +7,7 @@
 
 services:
   lowcoder:
-    image: lowcoderorg/lowcoder-ce
+    image: lowcoderorg/lowcoder-ce:3.0.0
     environment:
       - SERVICE_URL_LOWCODER_3000
       - LOWCODER_EMAIL_SIGNUP_ENABLED=${LOWCODER_EMAIL_SIGNUP_ENABLED:-true}

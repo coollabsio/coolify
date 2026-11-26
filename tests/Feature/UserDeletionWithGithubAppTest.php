@@ -35,7 +35,7 @@ it('deletes a user whose team has a github app with applications', function () {
         'team_id' => $targetTeam->id,
         'private_key_id' => $privateKey->id,
     ]);
-    $destination = StandaloneDocker::factory()->create(['server_id' => $server->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
 
     // Create a project and environment
     $project = Project::factory()->create(['team_id' => $targetTeam->id]);
@@ -90,13 +90,17 @@ it('does not delete system-wide github apps when deleting a different team', fun
     $targetUser = User::factory()->create();
     $targetTeam = $targetUser->teams()->first();
 
-    // Create an application on the target team that uses the system-wide GitHub App
-    $privateKey = PrivateKey::factory()->create(['team_id' => $targetTeam->id]);
+    // Create an application on the target team that uses the system-wide GitHub App.
+    // Use a distinct key: the factory key's fingerprint already exists in the current (root) team.
+    $privateKey = PrivateKey::factory()->create([
+        'team_id' => $targetTeam->id,
+        'private_key' => PrivateKey::generateNewKeyPair('ed25519')['private_key'],
+    ]);
     $server = Server::factory()->create([
         'team_id' => $targetTeam->id,
         'private_key_id' => $privateKey->id,
     ]);
-    $destination = StandaloneDocker::factory()->create(['server_id' => $server->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
     $project = Project::factory()->create(['team_id' => $targetTeam->id]);
     $environment = Environment::factory()->create(['project_id' => $project->id]);
 
@@ -140,7 +144,7 @@ it('transfers instance-wide github app to root team when owning user is deleted'
         'team_id' => $this->rootTeam->id,
         'private_key_id' => $rootPrivateKey->id,
     ]);
-    $rootDestination = StandaloneDocker::factory()->create(['server_id' => $rootServer->id]);
+    $rootDestination = StandaloneDocker::where('server_id', $rootServer->id)->firstOrFail();
     $rootProject = Project::factory()->create(['team_id' => $this->rootTeam->id]);
     $rootEnvironment = Environment::factory()->create(['project_id' => $rootProject->id]);
 
@@ -191,7 +195,7 @@ it('transfers instance-wide github app to root team when team is deleted directl
         'team_id' => $this->rootTeam->id,
         'private_key_id' => $rootPrivateKey->id,
     ]);
-    $rootDestination = StandaloneDocker::factory()->create(['server_id' => $rootServer->id]);
+    $rootDestination = StandaloneDocker::where('server_id', $rootServer->id)->firstOrFail();
     $rootProject = Project::factory()->create(['team_id' => $this->rootTeam->id]);
     $rootEnvironment = Environment::factory()->create(['project_id' => $rootProject->id]);
 

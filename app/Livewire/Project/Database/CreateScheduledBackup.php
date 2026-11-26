@@ -69,7 +69,7 @@ class CreateScheduledBackup extends Component
                 's3_storage_id' => null,
                 'database_id' => $database->id,
                 'database_type' => $database->getMorphClass(),
-                'team_id' => currentTeam()->id,
+                'team_id' => $database->team()->id,
             ];
 
             if ($database->type() === 'standalone-postgresql') {
@@ -80,24 +80,39 @@ class CreateScheduledBackup extends Component
                 $payload['databases_to_backup'] = $database->mariadb_database;
             } elseif ($database->type() === 'standalone-clickhouse') {
                 $payload['databases_to_backup'] = $database->clickhouse_db;
+            } elseif ($database->type() === 'standalone-influxdb') {
+                $payload['databases_to_backup'] = $database->influxdb_bucket;
+            }
+
+            // Odoo keeps its data in databases that the user creates in Odoo, so the database
+            // that the container env names (POSTGRES_DB=postgres) stays empty.
+            if ($database instanceof ServiceDatabase && $database->service?->service_type === 'odoo') {
+                $payload['dump_all'] = true;
             }
 
             $databaseBackup = ScheduledDatabaseBackup::create($payload);
+            auditLog('ui.database.backup_schedule_created', [
+                'team_id' => $database->team()?->id,
+                'database_uuid' => $database->uuid,
+                'database_name' => $database->name,
+                'backup_uuid' => $databaseBackup->uuid,
+                'frequency' => $databaseBackup->frequency,
+                'save_s3' => (bool) $databaseBackup->save_s3,
+            ]);
             if ($database->getMorphClass() === ServiceDatabase::class) {
                 $service = $database->service;
-                $this->redirectRoute('project.service.database.backup.show', [
+                $this->redirectRoute('project.service.volume-backups.index', [
                     'project_uuid' => $service->project()->uuid,
                     'environment_uuid' => $service->environment->uuid,
                     'service_uuid' => $service->uuid,
-                    'stack_service_uuid' => $database->uuid,
                     'backup_uuid' => $databaseBackup->uuid,
                 ], navigate: true);
             } else {
-                $this->redirectRoute('project.database.backup.execution', [
+                $this->redirectRoute('project.database.backup.index', [
                     'project_uuid' => $database->project()->uuid,
                     'environment_uuid' => $database->environment->uuid,
                     'database_uuid' => $database->uuid,
-                    'backup_uuid' => $databaseBackup->uuid,
+                    'schedule' => $databaseBackup->uuid,
                 ], navigate: true);
             }
         } catch (\Throwable $e) {

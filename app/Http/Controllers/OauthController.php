@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\OauthLoginException;
 use App\Models\OauthSetting;
 use App\Services\Auth\OauthLoginService;
 use Illuminate\Support\Facades\Log;
@@ -22,13 +23,21 @@ class OauthController extends Controller
         try {
             $oauthSetting = $this->enabledProvider($provider);
             $oauthUser = get_socialite_provider($oauthSetting->provider)->user();
-            $oauthLoginService->login($oauthSetting->provider, $oauthUser, $oauthSetting);
+            $user = $oauthLoginService->login($oauthSetting->provider, $oauthUser, $oauthSetting);
+
+            if ($oauthLoginService->requiresTwoFactorChallenge($user)) {
+                return redirect()->route('two-factor.login');
+            }
 
             return redirect('/');
         } catch (\Exception $e) {
             $this->logCallbackFailure($provider, $e);
 
-            $errorCode = $e instanceof HttpException ? 'auth.failed' : 'auth.failed.callback';
+            $errorCode = match (true) {
+                $e instanceof OauthLoginException => $e->userMessageKey,
+                $e instanceof HttpException => 'auth.failed.oauth',
+                default => 'auth.failed.callback',
+            };
 
             return redirect()->route('login')->withErrors([__($errorCode)]);
         }
@@ -36,6 +45,11 @@ class OauthController extends Controller
 
     private function logCallbackFailure(string $provider, \Throwable $exception): void
     {
+        auditLog('auth.oauth.callback_failed', [
+            'provider' => $provider,
+            'exception_class' => $exception::class,
+            'reason' => $exception instanceof HttpException ? 'access_denied' : 'callback_error',
+        ], 'warning');
         Log::error('OAuth callback failed.', [
             'provider' => $provider,
             'exception_class' => $exception::class,
