@@ -7,7 +7,7 @@
 
 services:
   jupyter-notebook-python:
-    image: quay.io/jupyter/base-notebook:latest
+    image: quay.io/jupyter/base-notebook:2026-11-16
     environment:
       - SERVICE_URL_JUPYTER_8888
     volumes:

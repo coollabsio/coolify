@@ -8,7 +8,7 @@ uses(RefreshDatabase::class);
 it('keeps the update badge inside the sidebar brand area', function (string $version) {
     config()->set('constants.coolify.version', $version);
     seedBrowserResourceStack(['instanceSettings' => ['new_version_available' => true]]);
-    Cache::put('coolify:versions:all', ['coolify' => ['v4' => ['version' => '9.9.9']]], 3600);
+    Cache::put('coolify:versions', ['coolify' => ['version' => '9.9.9']], 3600);
 
     $page = visit('/login')
         ->fill('email', 'test@example.com')

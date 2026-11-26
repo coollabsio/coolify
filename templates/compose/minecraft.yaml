@@ -7,7 +7,7 @@
 
 services:
   mc:
-    image: itzg/minecraft-server
+    image: itzg/minecraft-server:2026.11.0
     ports:
       - ${PORT}:25565
     environment:

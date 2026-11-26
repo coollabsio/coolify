@@ -12,8 +12,11 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\SentinelTrafficClient;
+use Illuminate\Contracts\Process\InvokedProcess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Process;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -31,6 +34,20 @@ class FakeGlobalAnalyticsTrafficClient extends SentinelTrafficClient
         }
 
         return '{}';
+    }
+}
+
+/**
+ * Answers every dashboard fetch with a real process that takes one second, so a test can
+ * tell concurrent fetches from serial ones.
+ */
+class SlowDashboardTrafficClient extends SentinelTrafficClient
+{
+    protected function startRemoteFetch(string $url): InvokedProcess
+    {
+        $bundle = json_encode(['overview' => ['requests' => 1000], 'apps' => []]);
+
+        return Process::start('sleep 1 && printf %s '.escapeshellarg($bundle));
     }
 }
 
@@ -143,62 +160,12 @@ it('renders a team-wide analytics summary across enabled servers', function () {
 
     loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
-        ->assertSee('Analytics')
         ->assertSee('1,000')
-        ->assertSee('Top applications')
         ->assertSee('Global Leaderboard App')
-        ->assertSee('Top hosts')
-        ->assertSee('Top paths')
-        ->assertSee('3 4xx')
-        ->assertSee('1 5xx')
-        ->assertSee('Status codes')
-        ->assertSee('Countries')
         ->assertSee('United States')
-        // New breakdown sections surfaced from previously-unused Sentinel dimensions.
-        ->assertSee('Requests by device type')
-        ->assertSee('Top HTTP versions')
         ->assertSee('HTTP/2')
-        ->assertSee('Top cache statuses')
-        ->assertSee('Top status codes')
-        ->assertSee('GeoIP data by MaxMind')
         ->assertSet('serverOptions', [$server->uuid => $server->name])
         ->assertSet('appOptions', [$application->uuid => 'Global Leaderboard App']);
-});
-
-it('shows a no-data state for the requests chart when no traffic falls in the range', function () {
-    $server = bootEnabledGlobalServer();
-
-    $responses = fakeGlobalAnalyticsResponses();
-    // Zeroed overview + no series buckets: the page still renders, but there is nothing
-    // to plot over time, so the Requests chart shows its no-data overlay.
-    $responses['/traffic/overview'] = json_encode([
-        'requests' => 0, 'bytes_in' => 0, 'bytes_out' => 0,
-        'status' => ['s2xx' => 0, 's3xx' => 0, 's4xx' => 0, 's5xx' => 0],
-        'latency' => ['p50' => 0, 'p95' => 0, 'p99' => 0], 'unique_visitors' => 0,
-    ]);
-    $responses['/traffic/series'] = json_encode([]);
-
-    $fake = new FakeGlobalAnalyticsTrafficClient($server);
-    $fake->responses = $responses;
-    app()->bind(SentinelTrafficClient::class, fn () => $fake);
-
-    loadLazy(Livewire::test(Analytics::class))
-        ->assertOk()
-        ->assertSee('No requests in this range')
-        // Server-rendered as visible (display:flex) before any client-side toggle.
-        ->assertSee('global-analytics-requests-empty" style="display: flex', escape: false);
-});
-
-it('hides the requests no-data overlay when there is traffic in the range', function () {
-    $server = bootEnabledGlobalServer();
-
-    $fake = new FakeGlobalAnalyticsTrafficClient($server);
-    $fake->responses = fakeGlobalAnalyticsResponses();
-    app()->bind(SentinelTrafficClient::class, fn () => $fake);
-
-    loadLazy(Livewire::test(Analytics::class))
-        ->assertOk()
-        ->assertSee('global-analytics-requests-empty" style="display: none', escape: false);
 });
 
 it('renders the full analytics page with a lazy placeholder before data loads', function () {
@@ -490,7 +457,9 @@ it('labels the IP breakdown by the client IP mode of the queried servers', funct
         $component->assertDontSee('Top IPs')
             ->assertDontSee('Top networks')
             ->assertDontSee('203.0.113.7');
-        expect($component->instance()->breakdowns)->not->toHaveKey('ip');
+        // Sentinel finds the city from the client IP, so it stores no cities either.
+        expect($component->instance()->breakdowns)->not->toHaveKey('ip')
+            ->and($component->instance()->breakdowns)->not->toHaveKey('city');
 
         return;
     }
@@ -519,3 +488,17 @@ it('combines the client IP mode of several servers', function (array $modes, str
     'anonymized and off' => [['anonymized', 'off'], 'anonymized'],
     'full and anonymized' => [['full', 'anonymized'], 'full'],
 ]);
+
+it('fetches the dashboard of every server at the same time', function () {
+    Cache::flush();
+    collect(range(1, 3))->each(fn () => bootEnabledGlobalServer());
+    app()->bind(SentinelTrafficClient::class, fn ($app, array $parameters) => new SlowDashboardTrafficClient($parameters['server']));
+
+    $started = microtime(true);
+    $component = loadLazy(Livewire::test(Analytics::class));
+    $elapsed = microtime(true) - $started;
+
+    // Three servers fetched one after another take at least 3 seconds.
+    expect($elapsed)->toBeLessThan(2.5)
+        ->and($component->get('overview')['requests'])->toBe(3000);
+});

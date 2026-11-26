@@ -42,7 +42,7 @@ beforeEach(function () {
     $this->server->settings->update(['is_reachable' => true, 'is_usable' => true, 'force_disabled' => false]);
     $this->server->refresh();
 
-    $this->writeToken = serverRegistriesApiToken($this->user, $this->team, ['read', 'write', 'deploy']);
+    $this->writeToken = serverRegistriesApiToken($this->user, $this->team, ['read', 'write', 'deploy', 'delete']);
     $this->sensitiveToken = serverRegistriesApiToken($this->user, $this->team, ['read', 'read:sensitive']);
 });
 
@@ -75,7 +75,7 @@ function serverRegistriesApiHeaders(string $bearerToken): array
 function fakeServerRegistriesSsh(array &$commands, string $config = '', string $error = ''): void
 {
     Process::fake(function ($process) use (&$commands, $config, $error) {
-        $command = is_array($process->command) ? implode(' ', $process->command) : $process->command;
+        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
         $commands[] = $command;
 
         if (str_contains($command, '.docker/config.json')) {

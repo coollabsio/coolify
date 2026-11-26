@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use OpenApi\Attributes as OA;
+use Throwable;
 
 class OtherController extends Controller
 {
@@ -48,62 +49,6 @@ class OtherController extends Controller
     public function version(Request $request)
     {
         return response(config('constants.coolify.version'));
-    }
-
-    #[OA\Post(
-        summary: 'Enable API',
-        description: 'Enable API (only with root permissions).',
-        path: '/enable',
-        operationId: 'enable-api',
-        security: [
-            ['bearerAuth' => []],
-        ],
-        responses: [
-            new OA\Response(
-                response: 200,
-                description: 'Enable API.',
-                content: new OA\JsonContent(
-                    type: 'object',
-                    properties: [
-                        new OA\Property(property: 'message', type: 'string', example: 'API enabled.'),
-                    ]
-                )),
-            new OA\Response(
-                response: 403,
-                description: 'You are not allowed to enable the API.',
-                content: new OA\JsonContent(
-                    type: 'object',
-                    properties: [
-                        new OA\Property(property: 'message', type: 'string', example: 'You are not allowed to enable the API.'),
-                    ]
-                )),
-            new OA\Response(
-                response: 401,
-                ref: '#/components/responses/401',
-            ),
-            new OA\Response(
-                response: 400,
-                ref: '#/components/responses/400',
-            ),
-        ]
-    )]
-    public function enable_api(Request $request)
-    {
-        $teamId = getTeamIdFromToken();
-        if (is_null($teamId)) {
-            return invalidTokenResponse();
-        }
-        if ($teamId !== '0') {
-            auditLog('api.instance.enable_denied', ['team_id' => $teamId], 'warning');
-
-            return response()->json(['message' => 'You are not allowed to enable the API.'], 403);
-        }
-        $settings = instanceSettings();
-        $settings->update(['is_api_enabled' => true]);
-
-        auditLog('api.instance.enabled', ['team_id' => $teamId]);
-
-        return response()->json(['message' => 'API enabled.'], 200);
     }
 
     #[OA\Post(
@@ -149,7 +94,7 @@ class OtherController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        if ($teamId !== '0') {
+        if ($teamId !== '0' || ! $request->user()?->can('update', instanceSettings())) {
             auditLog('api.instance.disable_denied', ['team_id' => $teamId], 'warning');
 
             return response()->json(['message' => 'You are not allowed to disable the API.'], 403);
@@ -205,7 +150,7 @@ class OtherController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        if ($teamId !== '0') {
+        if ($teamId !== '0' || ! $request->user()?->can('update', instanceSettings())) {
             auditLog('api.mcp.enable_denied', ['team_id' => $teamId], 'warning');
 
             return response()->json(['message' => 'You are not allowed to enable the MCP server.'], 403);
@@ -261,7 +206,7 @@ class OtherController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        if ($teamId !== '0') {
+        if ($teamId !== '0' || ! $request->user()?->can('update', instanceSettings())) {
             auditLog('api.mcp.disable_denied', ['team_id' => $teamId], 'warning');
 
             return response()->json(['message' => 'You are not allowed to disable the MCP server.'], 403);
@@ -320,10 +265,40 @@ class OtherController extends Controller
                 response: 400,
                 ref: '#/components/responses/400',
             ),
+            new OA\Response(
+                response: 503,
+                description: 'Database migrations are not finished yet.',
+            ),
         ]
     )]
     public function healthcheck(Request $request)
     {
+        if ($this->hasPendingMigrations()) {
+            return response('Database migrations are running.', 503);
+        }
+
         return response('OK');
+    }
+
+    /**
+     * The web server starts before the migrations finish, so the upgrade page must not reload before they do.
+     */
+    private function hasPendingMigrations(): bool
+    {
+        if (! config('constants.migration.is_migration_enabled')) {
+            return false;
+        }
+
+        try {
+            $migrator = app('migrator');
+            if (! $migrator->repositoryExists()) {
+                return true;
+            }
+            $files = $migrator->getMigrationFiles(array_merge($migrator->paths(), [database_path('migrations')]));
+
+            return array_diff(array_keys($files), $migrator->getRepository()->getRan()) !== [];
+        } catch (Throwable) {
+            return false;
+        }
     }
 }

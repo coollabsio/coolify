@@ -116,13 +116,10 @@ class Index extends Component
             }
 
             // For self-hosted, check if email is enabled
-            if (! isCloud()) {
-                $settings = instanceSettings();
-                if (! $settings->smtp_enabled && ! $settings->resend_enabled) {
-                    $this->dispatch('error', 'Email functionality is not configured. Please contact your administrator.');
+            if (! isCloud() && ! is_transactional_emails_enabled()) {
+                $this->dispatch('error', 'Email functionality is not configured. Please contact your administrator.');
 
-                    return;
-                }
+                return;
             }
 
             $this->validate([
@@ -151,7 +148,7 @@ class Index extends Component
                 }
 
                 // Additional rate limit by IP address (5 requests per hour)
-                $ipKey = 'email-change:ip:'.request()->ip();
+                $ipKey = 'email-change:ip:'.client_ip(request());
                 if (! RateLimiter::attempt($ipKey, 5, function () {}, 3600)) {
                     $this->dispatch('error', 'Too many requests from your IP address. Please try again later.');
 
@@ -391,9 +388,11 @@ class Index extends Component
 
     public function render()
     {
+        $deleteUserAccount = app(DeleteUserAccount::class);
+
         return view('livewire.profile.index', [
-            'accountDeletionBlockers' => app(DeleteUserAccount::class)->blockers(Auth::user()),
-            'accountDeletionActions' => app(DeleteUserAccount::class)->confirmationActions(Auth::user()),
+            'accountDeletionBlockers' => $deleteUserAccount->blockers(Auth::user()),
+            'accountDeletionActions' => $deleteUserAccount->confirmationActions(Auth::user()),
         ]);
     }
 }

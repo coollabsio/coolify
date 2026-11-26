@@ -140,7 +140,8 @@ test('records an accepted team invitation', function () {
         ->and($event->actor_id)->toBe($this->user->id)
         ->and($event->resource_uuid)->toBe('account-audit-invitation')
         ->and(data_get($event->metadata, 'role'))->toBe('admin')
-        ->and(data_get($event->metadata, 'member_email'))->toBe($this->user->email)
+        ->and(data_get($event->metadata, 'member_id'))->toBe($this->user->id)
+        ->and($event->metadata)->not->toHaveKeys(['member_email', 'actor_email'])
         ->and(data_get($event->metadata, 'already_member'))->toBeFalse();
 });
 
@@ -195,7 +196,53 @@ test('records a user deleted by an instance admin', function () {
         ->and($event->team_id)->toBe($this->team->id)
         ->and($event->actor_id)->toBe($this->user->id)
         ->and(data_get($event->metadata, 'deleted_user_id'))->toBe($deletedUser->id)
-        ->and(data_get($event->metadata, 'deleted_user_email'))->toBe('deleted-user@example.com');
+        ->and(accountAuditSerialized($event))->not->toContain('deleted-user@example.com');
+});
+
+test('deleting a user removes their personal data from earlier audit events', function () {
+    $rootTeam = Team::factory()->create(['id' => 0]);
+    $rootTeam->members()->attach($this->user->id, ['role' => 'admin']);
+    $deletedUser = User::factory()->create(['name' => 'Jane Doe', 'email' => 'jane@example.com']);
+    $ownEvent = AuditEvent::factory()->create([
+        'event' => 'auth.user.login',
+        'actor_type' => 'user',
+        'actor_id' => $deletedUser->id,
+        'actor_name' => 'Jane Doe',
+        'actor_email' => 'jane@example.com',
+        'resource_type' => 'user',
+        'resource_name' => 'Jane Doe',
+        'description' => 'Jane Doe Login',
+        'metadata' => ['user_name' => 'Jane Doe'],
+        'ip_address' => '203.0.113.7',
+        'user_agent' => 'Jane Browser',
+    ]);
+    $aboutEvent = AuditEvent::factory()->create([
+        'event' => 'ui.team_member.removed',
+        'actor_type' => 'user',
+        'actor_id' => $this->user->id,
+        'actor_email' => $this->user->email,
+        'metadata' => ['member_id' => $deletedUser->id, 'member_name' => 'Jane Doe', 'member_email' => 'JANE@example.com'],
+    ]);
+    $unrelatedEvent = AuditEvent::factory()->create([
+        'event' => 'ui.team_member.removed',
+        'metadata' => ['member_id' => $deletedUser->id + 1000, 'member_name' => 'Jane Doe'],
+    ]);
+
+    Livewire::test(AdminView::class)
+        ->call('delete', $deletedUser->id, 'password')
+        ->assertReturned(true);
+
+    $ownEvent->refresh();
+    $aboutEvent->refresh();
+
+    expect(accountAuditSerialized($ownEvent))->not->toContain('Jane Doe')
+        ->not->toContain('jane@example.com')
+        ->not->toContain('203.0.113.7')
+        ->not->toContain('Jane Browser')
+        ->and($ownEvent->description)->toBe('[deleted user] Login')
+        ->and($aboutEvent->metadata)->toBe(['member_id' => $deletedUser->id, 'member_name' => '[deleted user]', 'member_email' => '[deleted user]'])
+        ->and($aboutEvent->actor_email)->toBe($this->user->email)
+        ->and($unrelatedEvent->refresh()->metadata['member_name'])->toBe('Jane Doe');
 });
 
 test('does not record a user deletion when the password is wrong', function () {
@@ -229,7 +276,7 @@ test('records impersonation with the impersonating root user as actor', function
     expect($event->actor_id)->toBe(0)
         ->and($event->team_id)->toBe(0)
         ->and(data_get($event->metadata, 'target_user_id'))->toBe($targetUser->id)
-        ->and(data_get($event->metadata, 'target_user_email'))->toBe('impersonated@example.com');
+        ->and(accountAuditSerialized($event))->not->toContain('impersonated@example.com');
 });
 
 test('records an oauth identity linked to an existing user', function () {

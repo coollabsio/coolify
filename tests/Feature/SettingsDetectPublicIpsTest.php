@@ -25,8 +25,8 @@ beforeEach(function () {
     session(['currentTeam' => $this->rootTeam]);
 
     Process::fake([
-        'curl -4s https://ifconfig.io' => "203.0.113.1\n",
-        'curl -6s https://ifconfig.io' => "2001:db8::1\n",
+        'curl -4s --max-time 10 https://ifconfig.io' => "203.0.113.1\n",
+        'curl -6s --max-time 10 https://ifconfig.io' => "2001:db8::1\n",
     ]);
 });
 
@@ -44,8 +44,8 @@ it('saves the detected public IPs and shows them in the fields', function () {
 
 it('keeps the current value of an address family that cannot be detected', function () {
     Process::fake([
-        'curl -4s https://ifconfig.io' => "203.0.113.1\n",
-        'curl -6s https://ifconfig.io' => '',
+        'curl -4s --max-time 10 https://ifconfig.io' => "203.0.113.1\n",
+        'curl -6s --max-time 10 https://ifconfig.io' => '',
     ]);
 
     Livewire::test(SettingsIndex::class)
@@ -58,8 +58,8 @@ it('keeps the current value of an address family that cannot be detected', funct
 
 it('shows an error when no address can be detected', function () {
     Process::fake([
-        'curl -4s https://ifconfig.io' => '',
-        'curl -6s https://ifconfig.io' => '',
+        'curl -4s --max-time 10 https://ifconfig.io' => '',
+        'curl -6s --max-time 10 https://ifconfig.io' => '',
     ]);
 
     Livewire::test(SettingsIndex::class)

@@ -24,16 +24,26 @@ const THEMES = {
 };
 
 /**
- * Turn country-breakdown rows into cobe markers. Marker size scales with the
- * square root of request volume so a single dominant country doesn't dwarf the rest.
+ * Turn marker rows into cobe markers. A row is placed at its own `lat`/`lon`
+ * (a city) or at the centroid of its ISO-A2 `code` (a country). Marker size
+ * scales with the square root of request volume so one dominant place doesn't
+ * dwarf the rest. City markers are smaller, because cities are close together.
  *
- * @param {Array<{code: string, requests: number}>} data
+ * @param {Array<{code?: string, lat?: number, lon?: number, requests: number}>} data
  * @returns {Array<{location: [number, number], size: number}>}
  */
 function buildMarkers(data) {
     const rows = (data || [])
-        .map((r) => ({ code: String(r.code || '').toUpperCase(), requests: Number(r.requests || 0) }))
-        .filter((r) => r.requests > 0 && CENTROIDS[r.code]);
+        .map((r) => {
+            const city = Number.isFinite(r.lat) && Number.isFinite(r.lon);
+
+            return {
+                city,
+                location: city ? [r.lat, r.lon] : CENTROIDS[String(r.code || '').toUpperCase()],
+                requests: Number(r.requests || 0),
+            };
+        })
+        .filter((r) => r.requests > 0 && r.location);
 
     if (rows.length === 0) {
         return [];
@@ -41,13 +51,28 @@ function buildMarkers(data) {
 
     const max = Math.max(...rows.map((r) => r.requests));
 
-    return rows.map((r) => ({
-        location: CENTROIDS[r.code],
-        size: Math.max(0.03, Math.min(0.11, Math.sqrt(r.requests / max) * 0.11)),
-    }));
+    return rows.map((r) => {
+        const [min, cap] = r.city ? [0.02, 0.07] : [0.03, 0.11];
+
+        return {
+            location: r.location,
+            size: Math.max(min, Math.min(cap, Math.sqrt(r.requests / max) * cap)),
+        };
+    });
 }
 
 const TWO_PI = Math.PI * 2;
+
+const SPIN_SPEED = 0.15; // rad/s
+// Ambient spin is drawn at 30fps. A little under two 60Hz frames, so timestamp
+// jitter does not skip to the third frame.
+const SPIN_FRAME_MS = 1000 / 30 - 4;
+const SETTLE_EPSILON = 0.0005;
+
+// Signed shortest angular distance from `current` to `target`.
+function angleDelta(current, target) {
+    return ((target - current + Math.PI) % TWO_PI + TWO_PI) % TWO_PI - Math.PI;
+}
 
 // cobe orientation for a lat/lng so the point faces the viewer (cobe's own
 // focus example formula). Returns [phi, theta].
@@ -58,23 +83,21 @@ function locationToAngles(lat, lng) {
 // Shortest-path angular interpolation, so easing across the 0/2π seam never
 // spins the long way around.
 function lerpAngle(current, target, t) {
-    let delta = ((target - current + Math.PI) % TWO_PI + TWO_PI) % TWO_PI - Math.PI;
-
-    return current + delta * t;
+    return current + angleDelta(current, target) * t;
 }
 
 /**
  * Mount an interactive, drag-to-rotate dotted globe onto a canvas. Returns a
- * controller with `update(data, dark)`, `focus(code)`, `resume()` and
+ * controller with `update(data, dark)`, `focus(target)`, `resume()` and
  * `destroy()`. The globe auto-rotates, pauses while grabbed or while a country
  * is hover-focused, and eases smoothly toward whatever it's pointed at.
  *
  * cobe v2 has no internal render loop or `onRender` callback: createGlobe draws
  * a single frame and returns `{ update, destroy }`. We drive our own rAF loop,
- * calling `globe.update({...})` each frame for rotation and to swap markers/theme.
+ * which draws only while something moves and stops when the canvas is off-screen.
  *
  * @param {HTMLCanvasElement} canvas
- * @param {Array<{code: string, requests: number}>} data
+ * @param {Array<{code?: string, lat?: number, lon?: number, requests: number}>} data
  * @param {boolean} dark
  */
 function mountTrafficGlobe(canvas, data, dark) {
@@ -82,6 +105,9 @@ function mountTrafficGlobe(canvas, data, dark) {
     let width = 0;
     let destroyed = false;
     let rafId = 0;
+    let lastDraw = 0;
+    let dirty = true;
+    let visible = true;
     let markers = buildMarkers(data);
 
     // Ambient spin is decorative; honor reduced-motion by not auto-rotating
@@ -103,6 +129,7 @@ function mountTrafficGlobe(canvas, data, dark) {
         dragStartPhi = targetPhi;
         autoRotate = false;
         canvas.style.cursor = 'grabbing';
+        wake();
     };
     const onPointerUp = () => {
         if (dragging === null) {
@@ -111,10 +138,12 @@ function mountTrafficGlobe(canvas, data, dark) {
         dragging = null;
         autoRotate = ! prefersReduced;
         canvas.style.cursor = 'grab';
+        wake();
     };
     const onPointerMove = (e) => {
         if (dragging !== null) {
             targetPhi = dragStartPhi + (e.clientX - dragging) / 150;
+            wake();
         }
     };
 
@@ -127,7 +156,7 @@ function mountTrafficGlobe(canvas, data, dark) {
         const theme = isDark ? THEMES.dark : THEMES.light;
 
         globe = createGlobe(canvas, {
-            devicePixelRatio: 2,
+            devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
             width: width,
             height: width,
             phi: currentPhi,
@@ -144,20 +173,45 @@ function mountTrafficGlobe(canvas, data, dark) {
         });
     };
 
-    // Self-driven animation loop (cobe v2 draws only when we call update()).
-    const tick = () => {
-        if (destroyed) {
+    const schedule = () => {
+        if (! rafId && ! destroyed && globe && visible) {
+            rafId = requestAnimationFrame(tick);
+        }
+    };
+
+    // Request a draw; a no-op while one is already queued.
+    function wake() {
+        dirty = true;
+        schedule();
+    }
+
+    // Draws only while the globe spins or eases toward a target, then goes idle.
+    const tick = (now) => {
+        rafId = 0;
+        if (destroyed || ! globe || width === 0) {
             return;
         }
-        if (globe && width > 0) {
-            if (autoRotate && dragging === null) {
-                targetPhi += 0.0025;
-            }
-            currentPhi = lerpAngle(currentPhi, targetPhi, 0.12);
-            currentTheta += (targetTheta - currentTheta) * 0.12;
-            globe.update({ phi: currentPhi, theta: currentTheta, width: width, height: width, markers });
+        const spinning = autoRotate && dragging === null;
+        const elapsed = now - lastDraw;
+        if (spinning && ! dirty && elapsed < SPIN_FRAME_MS) {
+            schedule();
+
+            return;
         }
-        rafId = requestAnimationFrame(tick);
+        if (spinning) {
+            targetPhi += (SPIN_SPEED * Math.min(elapsed, 100)) / 1000;
+        }
+        currentPhi = lerpAngle(currentPhi, targetPhi, 0.12);
+        currentTheta += (targetTheta - currentTheta) * 0.12;
+        globe.update({ phi: currentPhi, theta: currentTheta, width: width, height: width, markers });
+        lastDraw = now;
+        dirty = false;
+
+        const settled = Math.abs(angleDelta(currentPhi, targetPhi)) < SETTLE_EPSILON
+            && Math.abs(targetTheta - currentTheta) < SETTLE_EPSILON;
+        if (spinning || ! settled) {
+            schedule();
+        }
     };
 
     // cobe needs a non-zero canvas width at creation; inside a freshly-rendered
@@ -170,17 +224,26 @@ function mountTrafficGlobe(canvas, data, dark) {
         }
         width = next;
         create(dark);
-        rafId = requestAnimationFrame(tick);
+        wake();
     };
 
     const resizeObserver = new ResizeObserver(() => {
         if (globe) {
             width = canvas.offsetWidth || width;
+            wake();
         } else {
             ensure();
         }
     });
     resizeObserver.observe(canvas);
+
+    const intersectionObserver = new IntersectionObserver((entries) => {
+        visible = entries[entries.length - 1].isIntersecting;
+        if (visible) {
+            wake();
+        }
+    });
+    intersectionObserver.observe(canvas);
     requestAnimationFrame(ensure);
 
     return {
@@ -203,19 +266,22 @@ function mountTrafficGlobe(canvas, data, dark) {
                 });
             }
         },
-        focus(code) {
-            const c = CENTROIDS[String(code || '').toUpperCase()];
-            if (!c) {
+        // `target` is an ISO-A2 code or a [lat, lon] pair.
+        focus(target) {
+            const c = Array.isArray(target) ? target : CENTROIDS[String(target || '').toUpperCase()];
+            if (!c || !Number.isFinite(c[0]) || !Number.isFinite(c[1])) {
                 return;
             }
             const [phi, theta] = locationToAngles(c[0], c[1]);
             targetPhi = phi;
             targetTheta = theta;
             autoRotate = false;
+            wake();
         },
         resume() {
             if (dragging === null) {
                 autoRotate = ! prefersReduced;
+                wake();
             }
         },
         destroy() {
@@ -225,6 +291,7 @@ function mountTrafficGlobe(canvas, data, dark) {
                 rafId = 0;
             }
             resizeObserver.disconnect();
+            intersectionObserver.disconnect();
             canvas.removeEventListener('pointerdown', onPointerDown);
             window.removeEventListener('pointerup', onPointerUp);
             window.removeEventListener('pointermove', onPointerMove);

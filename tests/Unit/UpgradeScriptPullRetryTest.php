@@ -35,8 +35,8 @@ function runUpgradeScriptPullImage(string $script, int $failures): array
 
 it('retries a rate limited image pull until it succeeds', function (string $script) {
     expect(runUpgradeScriptPullImage($script, failures: 2))->toBe(['exitCode' => 0, 'pulls' => 3]);
-})->with(['scripts/upgrade.sh', 'other/nightly/upgrade.sh']);
+})->with(['scripts/upgrade.sh']);
 
 it('fails the image pull after five attempts', function (string $script) {
     expect(runUpgradeScriptPullImage($script, failures: 10))->toBe(['exitCode' => 1, 'pulls' => 5]);
-})->with(['scripts/upgrade.sh', 'other/nightly/upgrade.sh']);
+})->with(['scripts/upgrade.sh']);

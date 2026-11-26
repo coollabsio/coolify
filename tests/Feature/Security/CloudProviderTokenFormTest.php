@@ -55,12 +55,31 @@ test('adding a digitalocean token from a modal closes the modal and refreshes di
             && data_get($dispatch, 'to') === 'security.cloud-provider-tokens'))->toBeTrue();
 });
 
-test('security cloud token form lets users choose every supported provider', function () {
-    Livewire::test(CloudProviderTokenForm::class)
-        ->assertSee('Provider')
-        ->assertSee('Hetzner')
-        ->assertSee('DigitalOcean')
-        ->assertSee('Vultr');
+test('adding a hostinger token from a modal validates and refreshes hostinger token selectors', function () {
+    Http::fake([
+        'https://developers.hostinger.com/api/vps/v1/virtual-machines' => Http::response([], 200),
+    ]);
+
+    $component = Livewire::test(CloudProviderTokenForm::class, [
+        'modal_mode' => true,
+        'provider' => 'hostinger',
+    ])
+        ->set('name', 'Production Hostinger')
+        ->set('token', 'hostinger-token')
+        ->call('addToken')
+        ->assertHasNoErrors()
+        ->assertDispatched('close-modal');
+
+    $dispatches = collect(data_get($component->effects, 'dispatches', []));
+
+    expect($dispatches->contains(fn (array $dispatch) => $dispatch['name'] === 'tokenAdded.hostinger'
+        && data_get($dispatch, 'to') === 'server.new.by-hostinger'))->toBeTrue();
+
+    $this->assertDatabaseHas('cloud_provider_tokens', [
+        'team_id' => $this->team->id,
+        'provider' => 'hostinger',
+        'name' => 'Production Hostinger',
+    ]);
 });
 
 test('adding a cloud provider token stores an optional description', function () {

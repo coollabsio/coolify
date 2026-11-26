@@ -8,7 +8,7 @@
 
 services:
   weaviate:
-    image: "cr.weaviate.io/semitechnologies/weaviate:1.26.4"
+    image: "cr.weaviate.io/semitechnologies/weaviate:1.40.5"
     volumes:
       - "weaviate-data:/var/lib/weaviate"
     command:
@@ -31,7 +31,6 @@ services:
       - AUTHENTICATION_APIKEY_ENABLED=${AUTHENTICATION_APIKEY_ENABLED:-true}
       - AUTHENTICATION_APIKEY_ALLOWED_KEYS=${SERVICE_PASSWORD_APIKEYS}
       - PERSISTENCE_DATA_PATH=/var/lib/weaviate
-      - DEFAULT_VECTORIZER_MODULE=${DEFAULT_VECTORIZER_MODULE:-none}
       - ENABLE_MODULES=${ENABLE_MODULES:-text2vec-openai,generative-openai,qna-openai}
       - CLUSTER_HOSTNAME=${CLUSTER_HOSTNAME:-node1}
     healthcheck:

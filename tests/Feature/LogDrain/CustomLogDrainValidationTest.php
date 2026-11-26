@@ -24,7 +24,7 @@ const SAFE_CUSTOM_LOG_DRAIN_CONFIG = <<<'CONF'
 [FILTER]
     Name grep
     Match *
-    Exclude log 127.0.0.1
+    Exclude log ^127\.0\.0\.1\s
 [OUTPUT]
     Name  http
     Match *
@@ -97,6 +97,14 @@ describe('ValidFluentBitConfig rule', function () {
         'plugins_file key' => "[SERVICE]\n    Plugins_File /parsers.conf\n",
         'malformed section header' => "[FILTER] x\n    Name lua\n",
         'key outside a section' => "Name lua\n",
+    ]);
+
+    test('rejects a config without the forward input that receives the container logs', function (string $config) {
+        expect((new ValidFluentBitConfig)->check($config))->toContain('Name forward');
+    })->with([
+        'output only' => "[SERVICE]\n    Flush 1\n[OUTPUT]\n    Name  http\n    Match *\n",
+        'other input only' => "[INPUT]\n    Name dummy\n[OUTPUT]\n    Name stdout\n    Match *\n",
+        'forward named outside an input' => "[INPUT]\n    Name dummy\n[OUTPUT]\n    Name forward\n    Match *\n",
     ]);
 
     test('rejects parser files that are not parser declarations', function (string $parsers) {
@@ -199,4 +207,17 @@ test('the UI does not enable an unsupported custom log drain', function () {
         ->assertSet('isLogDrainCustomEnabled', false);
 
     expect((bool) $this->server->settings->fresh()->is_logdrain_custom_enabled)->toBeFalse();
+});
+
+test('the UI saves a cleared custom config while the custom log drain is disabled', function () {
+    $this->actingAs($this->user);
+    $this->server->settings->update(['logdrain_custom_config' => SAFE_CUSTOM_LOG_DRAIN_CONFIG]);
+
+    Livewire::test(LogDrains::class, ['server_uuid' => $this->server->uuid])
+        ->set('logDrainCustomConfig', '')
+        ->call('submit')
+        ->assertHasNoErrors()
+        ->assertDispatched('success');
+
+    expect($this->server->settings->fresh()->logdrain_custom_config)->toBeEmpty();
 });

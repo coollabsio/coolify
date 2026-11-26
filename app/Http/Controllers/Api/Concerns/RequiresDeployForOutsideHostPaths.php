@@ -24,15 +24,18 @@ trait RequiresDeployForOutsideHostPaths
         return $this->deployAbilityForbiddenResponse($request, 'A mount outside the resource directory needs a token with the deploy permission.');
     }
 
-    private function outsideContentChangeForbiddenResponse(Request $request, LocalFileVolume|LocalPersistentVolume $storage): ?JsonResponse
+    /**
+     * Coolify writes changed file content on the server immediately, also inside the resource directory.
+     */
+    private function contentChangeForbiddenResponse(Request $request, LocalFileVolume|LocalPersistentVolume $storage): ?JsonResponse
     {
-        if (! $storage instanceof LocalFileVolume || $storage->is_directory || ! $request->has('content')) {
+        if (! $storage instanceof LocalFileVolume || $storage->is_directory || $storage->is_host_file || ! $request->has('content')) {
             return null;
         }
         if ((string) $request->input('content') === (string) $storage->content) {
             return null;
         }
 
-        return $this->outsideHostPathForbiddenResponse($request, $storage);
+        return $this->deployAbilityForbiddenResponse($request, 'Coolify writes the file content on the server immediately, so it needs a token with the deploy permission.');
     }
 }

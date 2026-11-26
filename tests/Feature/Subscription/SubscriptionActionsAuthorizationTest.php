@@ -30,6 +30,7 @@ beforeEach(function () {
 
         throw new RuntimeException('Stripe must not be called.');
     });
+    fakeOpenStripeSubscriptions();
 
     $this->user = User::factory()->create();
 

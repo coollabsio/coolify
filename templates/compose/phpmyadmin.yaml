@@ -7,7 +7,7 @@
 
 services:
   phpmyadmin:
-    image: lscr.io/linuxserver/phpmyadmin:latest
+    image: lscr.io/linuxserver/phpmyadmin:5.2.3
     environment:
       - SERVICE_URL_PHPMYADMIN
       - PUID=1000

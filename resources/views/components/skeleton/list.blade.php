@@ -1,5 +1,6 @@
 @props([
     'rows' => 4,
+    'buttons' => 1,
     'label' => 'Loading',
 ])
 
@@ -8,7 +9,7 @@
     $widths = ['w-2/5', 'w-1/3', 'w-1/2', 'w-1/4'];
 @endphp
 
-{{-- List rows with a leading icon tile, a title, a meta line, and a trailing button. --}}
+{{-- List rows with a leading icon tile, a title, a meta line, and trailing buttons. --}}
 <div role="status" {{ $attributes->class(['flex flex-col']) }}>
     <span class="sr-only">{{ $label }}</span>
     @for ($i = 0; $i < (int) $rows; $i++)
@@ -19,7 +20,9 @@
                 <x-skeleton class="h-3 {{ $widths[$i % count($widths)] }} rounded-full" />
                 <x-skeleton class="h-2.5 w-32 rounded-full" />
             </div>
-            <x-skeleton class="hidden h-8 w-24 shrink-0 rounded-lg sm:block" />
+            @for ($b = 0; $b < (int) $buttons; $b++)
+                <x-skeleton class="hidden h-8 w-24 shrink-0 rounded-lg sm:block" />
+            @endfor
         </div>
     @endfor
 </div>

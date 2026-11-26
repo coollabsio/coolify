@@ -4,10 +4,11 @@
 # tags: analytics,bi,dashboard,database,sql,unofficial
 # logo: svgs/superset.svg
 # port: 8088
+# outdated: true
 
 services:
   superset:
-    image: amancevice/superset:6.0.0
+    image: amancevice/superset:6.1.0
     environment:
       - SERVICE_URL_SUPERSET_8088
       - SECRET_KEY=${SERVICE_BASE64_64_SUPERSETSECRETKEY}

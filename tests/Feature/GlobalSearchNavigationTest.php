@@ -51,6 +51,7 @@ it('lists every instance settings page for the root team', function () {
         route('settings.backup'),
         route('settings.email'),
         route('settings.oauth'),
+        route('settings.image-scanning'),
     );
 });
 
@@ -74,6 +75,7 @@ it('lists team, security, notification and profile pages for a team owner', func
         route('notifications.pushover'),
         route('notifications.webhook'),
         route('profile.appearance'),
+        route('team.image-scanning'),
         ...adminOnlyNavigationLinks(),
     );
 });
@@ -90,4 +92,21 @@ it('does not leak admin-only pages to a member through the team search cache', f
 
     expect(globalSearchNavigationLinks($team))->toContain(...adminOnlyNavigationLinks());
     expect(globalSearchNavigationLinks($team, 'member'))->not->toContain(...adminOnlyNavigationLinks());
+});
+
+it('opens the deploy canvas from the new canvas quick action', function () {
+    $user = User::factory()->create();
+    $team = Team::factory()->create();
+    $user->teams()->attach($team, ['role' => 'owner']);
+    $this->actingAs($user);
+    session(['currentTeam' => $team]);
+
+    $component = Livewire::test(GlobalSearch::class)->call('openSearchModal');
+
+    expect(collect($component->get('creatableItems'))->firstWhere('type', 'canvas'))
+        ->toMatchArray(['name' => 'Canvas', 'category' => 'Quick Actions', 'route' => 'deploy-canvas']);
+
+    $component->call('navigateToResource', 'canvas')
+        ->assertDispatched('closeSearchModal')
+        ->assertRedirect(route('deploy-canvas'));
 });

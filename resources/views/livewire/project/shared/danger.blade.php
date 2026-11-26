@@ -17,6 +17,23 @@
     @endif
     <x-application.settings-section id="danger-zone-section" title="Danger zone"
         helper="Destructive resource actions cannot be undone.">
+        @if (in_array($resource?->type(), ['standalone-redis', 'standalone-keydb', 'standalone-dragonfly']))
+            <x-danger-zone title="Flush all data" class="mb-4">
+                <p>
+                    Permanently remove every key from
+                    <strong class="font-semibold text-black dark:text-fg">{{ $resourceName }}</strong>.
+                    The database keeps running.
+                </p>
+                <x-slot:action>
+                    <x-modal-confirmation title="Flush all data?" buttonTitle="Flush all data" isErrorButton
+                        submitAction="flush" :actions="['Permanently remove every key from every logical database.']"
+                        confirmationText="{{ $resourceName }}"
+                        confirmationLabel="Enter the database name to confirm flushing all data"
+                        shortConfirmationLabel="Database name" :disabled="auth()->user()->cannot('manage', $resource)"
+                        disabledTooltip="You do not have permission to flush this database." />
+                </x-slot:action>
+            </x-danger-zone>
+        @endif
         <x-danger-zone title="Delete {{ $resourceLabel }}">
                     <p>
                         Permanently delete
@@ -37,19 +54,6 @@
                             confirmationText="{{ $resourceName }}"
                             confirmationLabel="Enter the resource name to confirm permanent deletion"
                             shortConfirmationLabel="Resource name" />
-                        @if ($resource instanceof \App\Models\Service)
-                            <x-modal-confirmation title="Remove service from Coolify only?"
-                                buttonTitle="Remove from Coolify only"
-                                isErrorButton submitAction="deleteFromCoolifyOnly"
-                                :actions="[
-                                    'Permanently remove this service from Coolify.',
-                                    'Leave all containers, volumes, networks, and configuration files on the server.',
-                                ]"
-                                warningMessage="Coolify will no longer track or manage the Docker resources for this service. Use this only when normal cleanup cannot complete."
-                                confirmationText="{{ $resourceName }}"
-                                confirmationLabel="Enter the resource name to confirm metadata-only deletion"
-                                shortConfirmationLabel="Resource name" />
-                        @endif
                     @else
                         <x-forms.button isError disabled tooltip="You do not have permission to delete this resource.">
                             Delete {{ $resourceLabel }}

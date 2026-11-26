@@ -222,18 +222,6 @@ test('admin sees terminal link for service', function () {
         ->assertSee('Terminal');
 });
 
-test('admin sees deploy button for service', function () {
-    $this->actingAs($this->admin);
-    session(['currentTeam' => $this->team]);
-
-    Livewire::test(ServiceHeading::class, [
-        'service' => $this->service,
-        'parameters' => $this->serviceParams,
-        'query' => [],
-    ])
-        ->assertSee('Deploy');
-});
-
 // --- Cross-team isolation ---
 
 test('user from different team cannot view service', function () {

@@ -53,7 +53,7 @@ beforeEach(function () {
 
     $this->remoteLines = [];
     Process::fake(function ($process) {
-        $command = $process->command;
+        $command = remoteProcessScript($process);
         if (str_contains($command, ' scp ') && preg_match("~'([^']+)' \\S+:'([^']+)'$~", $command, $matches)) {
             copy($matches[1], $matches[2]);
 
@@ -104,7 +104,7 @@ function filePermissions(string $path): string
 }
 
 it('backs up acme.json before a certificate is deleted', function () {
-    DeleteTraefikCertificate::run($this->server, GetTraefikCertificates::run($this->server)[0]['id']);
+    DeleteTraefikCertificate::run($this->server, [GetTraefikCertificates::run($this->server)[0]['id']]);
 
     $backups = acmeBackupFiles($this->proxyDirectory);
     expect($backups)->toHaveCount(1)

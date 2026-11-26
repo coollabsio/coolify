@@ -200,7 +200,10 @@ class LocalPersistentVolume extends BaseModel
 
             foreach ($services as $service) {
                 foreach (data_get($service, 'volumes', []) as $volume) {
-                    $parsedVolume = is_array($volume) ? $volume : parseDockerVolumeString($volume);
+                    // A source that resolves to a host path is a bind, so it is not this volume.
+                    $parsedVolume = is_array($volume) ? $volume : parseDockerVolumeString($volume, str_contains($volume, '${')
+                        ? $volumeSourceVariables ??= composeVolumeSourceVariables($resource instanceof Application ? $resource : $resource->service)
+                        : null);
                     $source = data_get($parsedVolume, 'source');
                     $target = data_get($parsedVolume, 'target');
                     if ($source && isComposeExternalVolume($topLevelVolumes->get((string) $source))) {
@@ -211,7 +214,8 @@ class LocalPersistentVolume extends BaseModel
                     $resourceUuid = $resource instanceof Application ? $resource->uuid : data_get($resource, 'service.uuid');
                     $generatedName = $source ? $resourceUuid.'_'.Str::slug($source, '-') : null;
 
-                    if ($generatedName === $this->name && $target && str($target)->start('/')->value() === $this->mount_path) {
+                    if ($generatedName && $target && str($target)->start('/')->value() === $this->mount_path
+                        && ($generatedName === $this->name || $this->isVolumeOfOpenPreview($resource, $generatedName))) {
                         return true;
                     }
                 }
@@ -220,6 +224,62 @@ class LocalPersistentVolume extends BaseModel
             return false;
         } catch (\Throwable) {
             return true;
+        }
+    }
+
+    /**
+     * Whether this storage entry is the preview copy ("{volume}-pr-{id}") of the given volume for a
+     * preview that still exists. The preview cleanup removes the entry when the preview is closed.
+     */
+    private function isVolumeOfOpenPreview(mixed $resource, string $generatedName): bool
+    {
+        if (! $resource instanceof Application
+            || preg_match('/^'.preg_quote($generatedName, '/').'-pr-(\d+)$/', $this->name, $matches) !== 1) {
+            return false;
+        }
+
+        return $resource->previews()->where('pull_request_id', (int) $matches[1])->exists();
+    }
+
+    /**
+     * The host path that a variable of the Compose file now gives this volume, or null. v4.7.6 and older
+     * made a short-syntax volume such as `${DATA}/config:/config` a named volume, also when the resource
+     * set DATA. While this storage entry exists, the parsers keep the volume so that the resource keeps
+     * its data (see keepSavedComposeNamedVolume()).
+     */
+    public function replacedComposeHostPath(): ?string
+    {
+        try {
+            $resource = $this->resource;
+            if (! $resource) {
+                return null;
+            }
+
+            $parent = $resource instanceof Application ? $resource : $resource->service;
+            if (! $parent || blank($parent->docker_compose_raw)) {
+                return null;
+            }
+
+            $services = data_get(parseDockerComposeYaml($parent->docker_compose_raw), 'services', []);
+            if ($this->isServiceResource()) {
+                $services = array_intersect_key($services, [$resource->name => true]);
+            }
+
+            foreach ($services as $service) {
+                foreach (data_get($service, 'volumes', []) as $volume) {
+                    if (! is_string($volume) || composeShortVolumeSavedName($volume, $parent->uuid) !== $this->name) {
+                        continue;
+                    }
+                    $hostPath = composeShortVolumeVariableHostPath($volume, composeVolumeSourceVariables($parent));
+                    if ($hostPath !== null) {
+                        return $hostPath;
+                    }
+                }
+            }
+
+            return null;
+        } catch (\Throwable) {
+            return null;
         }
     }
 

@@ -37,6 +37,7 @@ beforeEach(function () {
 
     $this->sqlite = StandaloneSqlite::create([
         'name' => 'app-sqlite',
+        'image' => 'peakimages/sqlite:3.54.1-v0.2.0',
         'environment_id' => sqliteResourceTeamEnvironment($this->resourceTeam)->id,
         'destination_id' => $this->destination->id,
         'destination_type' => $this->destination->getMorphClass(),

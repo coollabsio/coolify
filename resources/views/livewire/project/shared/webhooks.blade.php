@@ -48,7 +48,7 @@
                 <x-forms.copy-input label="Deploy webhook URL" :text="$deploywebhook ?? ''" />
             </x-application.settings-section>
 
-            @if ($githubManualWebhook && $gitlabManualWebhook)
+            @if ($resource->git_based() && $githubManualWebhook && $gitlabManualWebhook)
                 <form wire:submit.prevent="submit" class="application-settings-form flex flex-col">
                     <x-unsaved-bar action="submit"
                         dirty="Object.entries($wire.savedSecrets).some(([property, saved]) => ($wire[property] ?? '') !== (saved ?? ''))" />

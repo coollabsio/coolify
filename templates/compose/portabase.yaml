@@ -6,7 +6,7 @@
 
 services:
   portabase:
-    image: portabase/portabase:1.28.1
+    image: portabase/portabase:1.36.2
     restart: always
     environment:
       - SERVICE_URL_PORTABASE_80

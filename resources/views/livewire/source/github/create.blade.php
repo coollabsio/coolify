@@ -1,4 +1,4 @@
-@can('createAnyResource')
+@can('create', \App\Models\GithubApp::class)
     <form wire:submit="createGitHubApp" class="flex w-full flex-col gap-4">
         <p class="text-[12px] leading-5 text-neutral-500 dark:text-fg-dim">
             Connect a GitHub App for private repositories, webhooks, and commit / pull request deployments.
@@ -8,8 +8,8 @@
             <x-forms.input id="name" label="Name" required />
             <x-forms.input id="organization" label="Organization" :required="$use_for_github_runners"
                 :helper="$use_for_github_runners
-                    ? 'GitHub Actions runners are registered at organization level.'
-                    : 'If empty, your GitHub user will be used. GitHub Actions runners need an organization.'"
+                    ? 'GitHub Actions runners are registered at organization level. Your GitHub user must be an owner or a GitHub App manager of the organization.'
+                    : 'If empty, your GitHub user will be used. For an organization, your GitHub user must be an owner or a GitHub App manager of it. GitHub Actions runners need an organization.'"
                 :placeholder="$use_for_github_runners ? 'GitHub organization, for example coollabsio' : 'Personal account when empty'" />
         </div>
 

@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\ServerCloudProviderStatusCheckJob;
+use App\Jobs\ValidateNewCloudServerJob;
 use App\Livewire\Server\New\ByHetzner;
 use App\Livewire\Server\New\ByIp;
 use App\Livewire\Server\Show;
@@ -11,6 +12,7 @@ use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
@@ -19,6 +21,8 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
+    Bus::fake([ValidateNewCloudServerJob::class]);
+
     Server::flushIdentityMap();
     Process::fake();
     config([
@@ -85,7 +89,7 @@ it('treats IPv6 notations as the same IP when adding a server', function () {
         ->set('ip', '2001:0DB8::1')
         ->set('private_key_id', $this->privateKey->id)
         ->call('submit')
-        ->assertDispatched('error', 'A server with this IP/Domain already exists.');
+        ->assertDispatched('error', 'A server with this IP/Domain and SSH port already exists.');
 
     expect(Server::query()->where('ip', '2001:db8::1')->count())->toBe(1);
 });

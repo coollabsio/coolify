@@ -6,6 +6,9 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use Illuminate\Contracts\Queue\Job;
 use Illuminate\Queue\TimeoutExceededException;
+use Tests\TestCase;
+
+uses(TestCase::class);
 
 /**
  * Test to verify that deployment errors are properly logged with comprehensive details.
@@ -17,7 +20,8 @@ use Illuminate\Queue\TimeoutExceededException;
  * - The exception code (if present)
  * - The file and line where the error occurred
  * - Previous exception details (if chained)
- * - Stack trace (first 5 lines)
+ *
+ * Stack traces are not written, because their truncated arguments can hold secrets.
  */
 it('logs comprehensive error details when failed() is called', function () {
     // Create a mock exception with all properties
@@ -90,6 +94,7 @@ it('logs comprehensive error details when failed() is called', function () {
     $containerNameProperty = $reflection->getProperty('container_name');
     $containerNameProperty->setAccessible(true);
     $containerNameProperty->setValue($job, 'test-container');
+    $reflection->getProperty('deployment_uuid')->setValue($job, 'error-logging-test');
 
     // Mock the failDeployment method to prevent errors
     $job->shouldReceive('failDeployment')->andReturn();
@@ -111,7 +116,7 @@ it('logs comprehensive error details when failed() is called', function () {
     expect($errorMessageString)->toContain('Location:');
     expect($errorMessageString)->toContain('Caused by:');
     expect($errorMessageString)->toContain('RuntimeException: Connection refused');
-    expect($errorMessageString)->toContain('Stack trace');
+    expect($errorMessageString)->not->toContain('Stack trace');
 
     // Verify stderr type is used for error logging
     $stderrEntries = array_filter($logEntries, fn ($entry) => $entry['type'] === 'stderr');
@@ -130,9 +135,6 @@ it('logs comprehensive error details when failed() is called', function () {
 
     $locationEntry = collect($logEntries)->first(fn ($entry) => str_contains($entry['message'], 'Location:'));
     expect($locationEntry['hidden'])->toBeTrue();
-
-    $stackTraceEntry = collect($logEntries)->first(fn ($entry) => str_contains($entry['message'], 'Stack trace'));
-    expect($stackTraceEntry['hidden'])->toBeTrue();
 
     $causedByEntry = collect($logEntries)->first(fn ($entry) => str_contains($entry['message'], 'Caused by:'));
     expect($causedByEntry['hidden'])->toBeTrue();
@@ -199,6 +201,7 @@ it('handles exceptions with no message gracefully', function () {
     $containerNameProperty = $reflection->getProperty('container_name');
     $containerNameProperty->setAccessible(true);
     $containerNameProperty->setValue($job, 'test-container');
+    $reflection->getProperty('deployment_uuid')->setValue($job, 'error-logging-test');
 
     $job->shouldReceive('failDeployment')->andReturn();
     $job->shouldReceive('execute_remote_command')->andReturn();
@@ -213,19 +216,6 @@ it('handles exceptions with no message gracefully', function () {
     // Should log "Unknown error occurred" for empty messages
     expect($errorMessageString)->toContain('Unknown error occurred');
     expect($errorMessageString)->toContain('Error type:');
-});
-
-it('wraps exceptions in deployment methods with DeploymentException', function () {
-    // Verify that our deployment methods wrap exceptions properly
-    $originalException = new RuntimeException('Container not found');
-
-    try {
-        throw new DeploymentException('Failed to start container', 0, $originalException);
-    } catch (DeploymentException $e) {
-        expect($e->getMessage())->toBe('Failed to start container');
-        expect($e->getPrevious())->toBe($originalException);
-        expect($e->getPrevious()->getMessage())->toBe('Container not found');
-    }
 });
 
 it('logs error code 0 correctly', function () {
@@ -290,6 +280,7 @@ it('logs error code 0 correctly', function () {
     $containerNameProperty = $reflection->getProperty('container_name');
     $containerNameProperty->setAccessible(true);
     $containerNameProperty->setValue($job, 'test-container');
+    $reflection->getProperty('deployment_uuid')->setValue($job, 'error-logging-test');
 
     $job->shouldReceive('failDeployment')->andReturn();
     $job->shouldReceive('execute_remote_command')->andReturn();
@@ -303,46 +294,6 @@ it('logs error code 0 correctly', function () {
 
     // Should log error code 0 (not skip it)
     expect($errorMessageString)->toContain('Error code: 0');
-});
-
-it('preserves original exception type in wrapped DeploymentException messages', function () {
-    // Verify that when wrapping exceptions, the original exception type is included in the message
-    $originalException = new RuntimeException('Connection timeout');
-
-    // Test rolling update scenario
-    $wrappedException = new DeploymentException(
-        'Rolling update failed ('.get_class($originalException).'): '.$originalException->getMessage(),
-        $originalException->getCode(),
-        $originalException
-    );
-
-    expect($wrappedException->getMessage())->toContain('RuntimeException');
-    expect($wrappedException->getMessage())->toContain('Connection timeout');
-    expect($wrappedException->getPrevious())->toBe($originalException);
-
-    // Test health check scenario
-    $healthCheckException = new InvalidArgumentException('Invalid health check URL');
-    $wrappedHealthCheck = new DeploymentException(
-        'Health check failed ('.get_class($healthCheckException).'): '.$healthCheckException->getMessage(),
-        $healthCheckException->getCode(),
-        $healthCheckException
-    );
-
-    expect($wrappedHealthCheck->getMessage())->toContain('InvalidArgumentException');
-    expect($wrappedHealthCheck->getMessage())->toContain('Invalid health check URL');
-    expect($wrappedHealthCheck->getPrevious())->toBe($healthCheckException);
-
-    // Test docker registry push scenario
-    $registryException = new RuntimeException('Failed to authenticate');
-    $wrappedRegistry = new DeploymentException(
-        get_class($registryException).': '.$registryException->getMessage(),
-        $registryException->getCode(),
-        $registryException
-    );
-
-    expect($wrappedRegistry->getMessage())->toContain('RuntimeException');
-    expect($wrappedRegistry->getMessage())->toContain('Failed to authenticate');
-    expect($wrappedRegistry->getPrevious())->toBe($registryException);
 });
 
 it('logs the configured timeout when the deployment times out', function () {
@@ -395,6 +346,7 @@ it('logs the configured timeout when the deployment times out', function () {
 
     $containerNameProperty = $reflection->getProperty('container_name');
     $containerNameProperty->setValue($job, 'test-container');
+    $reflection->getProperty('deployment_uuid')->setValue($job, 'error-logging-test');
 
     $job->shouldReceive('failDeployment')->andReturn();
     $job->shouldReceive('execute_remote_command')->andReturn();

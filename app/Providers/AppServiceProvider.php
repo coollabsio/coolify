@@ -5,13 +5,19 @@ namespace App\Providers;
 use App\Auth\Oidc\OidcDiscoveryService;
 use App\Auth\Oidc\OidcTokenValidator;
 use App\Auth\Oidc\Socialite\OidcProvider;
+use App\Http\Middleware\EnsureTeamWideAccess;
 use App\Models\PersonalAccessToken;
 use App\Models\Server;
 use App\Rules\SafeExternalUrl;
+use App\Services\Access\AccessResolver;
 use App\Support\AtomicFilesystem;
+use App\Support\RetryHttpConnectionFailures;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Console\ConfigCacheCommand;
 use Illuminate\Foundation\Console\RouteCacheCommand;
+use Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull;
+use Illuminate\Foundation\Http\Middleware\TrimStrings;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -21,12 +27,14 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Laravel\Sanctum\Sanctum;
 use Laravel\Socialite\Contracts\Factory as SocialiteFactory;
+use Livewire\Livewire;
 use Stripe\StripeClient;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        $this->app->scoped(AccessResolver::class);
         $this->app->bind(StripeClient::class, fn () => new StripeClient(config('subscription.stripe_api_key')));
 
         // Requests must never read a partly written cache file. See AtomicFilesystem.
@@ -40,10 +48,33 @@ class AppServiceProvider extends ServiceProvider
         $this->configureModels();
         $this->configurePasswords();
         $this->configureSanctumModel();
+        $this->configureHttpClient();
         $this->configureGitHubHttp();
         $this->configureGitLabHttp();
         $this->configureOidcSocialite();
         $this->configureQueue();
+        $this->configureServerTransferImport();
+        $this->configureLivewire();
+    }
+
+    /**
+     * Livewire updates skip route middleware. Run the team-wide access check again on each update,
+     * so a page that is already open stops working when an admin limits the member to some projects.
+     */
+    private function configureLivewire(): void
+    {
+        Livewire::addPersistentMiddleware([EnsureTeamWideAccess::class]);
+    }
+
+    /**
+     * A server transfer bundle carries stored values (files, variables, keys, compose files) that must
+     * arrive unchanged, so the import request skips the global trimming and empty-string conversion.
+     */
+    private function configureServerTransferImport(): void
+    {
+        $isImport = fn (Request $request): bool => $request->is('api/v1/servers/import');
+        TrimStrings::skipWhen($isImport);
+        ConvertEmptyStringsToNull::skipWhen($isImport);
     }
 
     /**
@@ -89,6 +120,9 @@ class AppServiceProvider extends ServiceProvider
     private function configureSanctumModel(): void
     {
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+        Sanctum::authenticateAccessTokensUsing(
+            fn (PersonalAccessToken $token, bool $isValid): bool => $isValid && ! $token->isPaused()
+        );
     }
 
     private function configureOidcSocialite(): void
@@ -107,6 +141,12 @@ class AppServiceProvider extends ServiceProvider
                 '',
             );
         });
+    }
+
+    private function configureHttpClient(): void
+    {
+        Http::globalOptions(['connect_timeout' => 10, 'timeout' => 30]);
+        Http::globalMiddleware(new RetryHttpConnectionFailures);
     }
 
     private function configureGitHubHttp(): void
@@ -139,6 +179,14 @@ class AppServiceProvider extends ServiceProvider
     private function configureGitLabHttp(): void
     {
         Http::macro('GitLab', function (string $api_url, ?string $access_token = null) {
+            $client = Http::GitSource($api_url)->withHeaders([
+                'Accept' => 'application/json',
+            ])->baseUrl($api_url);
+
+            return $access_token ? $client->withToken($access_token) : $client;
+        });
+
+        Http::macro('Gitea', function (string $api_url, ?string $access_token = null) {
             $client = Http::GitSource($api_url)->withHeaders([
                 'Accept' => 'application/json',
             ])->baseUrl($api_url);

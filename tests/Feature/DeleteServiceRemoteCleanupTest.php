@@ -60,8 +60,8 @@ beforeEach(function () {
 it('removes the other volumes, networks and the configuration directory when one volume is in use', function () {
     $commands = collect();
     Process::fake(function ($process) use ($commands) {
-        $commands->push($process->command);
-        if (str_contains($process->command, "docker volume rm -f '{$this->service->uuid}_web-data'")) {
+        $commands->push(remoteProcessScript($process));
+        if (str_contains(remoteProcessScript($process), "docker volume rm -f '{$this->service->uuid}_web-data'")) {
             return Process::result(errorOutput: "Error response from daemon: remove {$this->service->uuid}_web-data: volume is in use", exitCode: 1);
         }
 

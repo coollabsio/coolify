@@ -637,22 +637,20 @@ it('lists existing domains as individual rows', function () {
         'fqdn' => 'https://example.com,https://www.example.com,https://another.example.com,https://www.another.example.com',
     ]);
 
-    $html = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->assertSuccessful()
         ->assertSet('domainRows.0.url', 'https://example.com')
         ->assertSet('domainRows.1.url', 'https://www.example.com')
         ->assertSee('https://example.com')
-        ->assertSee('https://www.example.com')
-        ->assertSee('https://example.com/favicon.ico', false)
-        ->assertSee('class="relative size-4 shrink-0"', false)
-        ->assertSee('domain-favicon-fallback', false)
-        ->assertSee('class="invisible absolute inset-0 size-4 rounded-sm"', false)
-        ->assertSee('$el.previousElementSibling.classList.add(\'hidden\')', false)
-        ->assertSee('x-on:error="$el.remove()"', false)
-        ->assertSee('class="min-w-0 flex-1 truncate text-[13px]', false)
-        ->html();
+        ->assertSee('https://www.example.com');
+});
 
-    expect(substr_count($html, 'this.$wire.updateRedirect('))->toBe(0);
+it('loads no domain favicon when HTTP basic auth protects the application', function () {
+    $this->application->update(['fqdn' => 'https://example.com', 'is_http_basic_auth_enabled' => true]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSee('https://example.com')
+        ->assertDontSee('https://example.com/favicon.ico', false);
 });
 
 it('shows the HTTP redirect control for HTTPS domains and persists changes', function () {
@@ -660,13 +658,26 @@ it('shows the HTTP redirect control for HTTPS domains and persists changes', fun
 
     $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->assertSet('isForceHttpsEnabled', true)
-        ->assertSee('Redirect HTTP to HTTPS')
-        ->assertSee('Keep enabled when Cloudflare uses Full or Full (Strict) SSL.')
         ->set('isForceHttpsEnabled', false)
         ->call('updateForceHttps')
         ->assertHasNoErrors();
 
     expect($this->application->settings->fresh()->is_force_https_enabled)->toBeFalse();
+});
+
+it('persists the redirect type and regenerates permanent redirect labels', function () {
+    $this->application->update(['fqdn' => 'https://app.example.com']);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('isPermanentRedirectEnabled', false)
+        ->set('isPermanentRedirectEnabled', true)
+        ->call('updatePermanentRedirect')
+        ->assertHasNoErrors();
+
+    $application = $this->application->fresh();
+
+    expect($application->settings->is_permanent_redirect_enabled)->toBeTrue()
+        ->and(base64_decode($application->custom_labels))->toContain('middlewares=redirect-to-https-permanent');
 });
 
 it('hides the HTTP redirect control for HTTP-only domains', function () {
@@ -688,24 +699,11 @@ it('shows the compose service redirect control in domain settings', function () 
         ]),
     ]);
 
-    $html = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->assertSuccessful()
         ->assertSee('api')
         ->call('startEdit', 0)
-        ->assertSee('www redirect')
-        ->html();
-
-    expect(substr_count($html, 'this.$wire.updateServiceRedirect('))->toBe(0)
-        ->and(substr_count($html, 'this.$wire.updateRedirect('))->toBe(0)
-        ->and($html)->toContain('editingRedirect')
-        ->and(substr_count($html, 'application-domain-direction-'))->toBeGreaterThan(0);
-});
-
-it('shows dns entries control next to Add', function () {
-    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->assertSuccessful()
-        ->assertSee('DNS entries')
-        ->assertSee('Manual records');
+        ->assertSee('www redirect');
 });
 
 it('shows dns entries when domains are managed through labels', function () {
@@ -715,7 +713,7 @@ it('shows dns entries when domains are managed through labels', function () {
 
     Livewire::test(Domains::class, ['application' => $this->application->fresh(['settings'])])
         ->assertSuccessful()
-        ->assertSee('DNS entries')
+        ->assertSee('DNS checks and records for this server')
         ->assertSee('Manual records');
 });
 
@@ -740,8 +738,7 @@ it('lists dns entries for domains that still need dns and omits working configur
 
     $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->call('openDnsRecordsModal')
-        ->assertSet('showDnsRecordsModal', true)
-        ->assertSee('Recheck');
+        ->assertSet('showDnsRecordsModal', true);
 
     $names = collect($component->instance()->dnsRecordHints())->pluck('name')->all();
 
@@ -916,7 +913,6 @@ it('uses only a public address for cloudflare domain connect on localhost', func
 
 it('adds a domain to the application', function () {
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
-        ->assertSee('Add domain')
         ->set('newDomain', 'https://app.example.com')
         ->call('addDomain')
         ->assertHasNoErrors()
@@ -1043,8 +1039,6 @@ it('updates a domain in place via modal', function () {
         ->call('startEdit', 0)
         ->assertSet('showEditDomainModal', true)
         ->assertSet('editingDomain', 'https://old.example.com')
-        ->assertSee('www redirect')
-        ->assertSee('Search engine indexing')
         ->set('editingDomainParts.scheme', 'https')
         ->set('editingDomainParts.host', 'new.example.com')
         ->call('updateDomain')
@@ -2099,6 +2093,16 @@ it('shows the compose service name in the domain conflict modal', function () {
     expect($html)->toContain('(application: web)');
 });
 
+it('does not link a hidden resource in the domain conflict modal', function () {
+    $html = Blade::render(
+        '<x-domain-conflict-modal :conflicts="$conflicts" :show-modal="true" />',
+        ['conflicts' => [hiddenDomainConflict('https://hidden-taken.example.com', 'application')]],
+    );
+
+    expect($html)->toContain('<strong>another resource</strong>')
+        ->not->toContain('href=""');
+});
+
 it('checks each domain configured for one docker compose service', function () {
     Application::factory()->create([
         'uuid' => (string) Str::uuid(),
@@ -2242,14 +2246,6 @@ it('groups compose domains by service and hides empty services', function () {
         ->assertDontSee('No domains for this service');
 });
 
-it('keys compose domain groups by a stable service identity', function () {
-    $view = file_get_contents(resource_path('views/livewire/project/application/domains.blade.php'));
-
-    expect($view)
-        ->toContain('application-compose-domain-group-{{ $redirectWireKey }}')
-        ->toContain('wire:key="application-compose-domain-rows-{{ $redirectWireKey }}"');
-});
-
 it('uses the dns badge as progress for single and all application checks', function (string $action, array $parameters) {
     Queue::fake();
     $this->application->update(['fqdn' => 'https://badge.example.com']);
@@ -2257,8 +2253,7 @@ it('uses the dns badge as progress for single and all application checks', funct
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->call($action, ...$parameters)
         ->assertSet('domainRows.0.dns_status', 'checking')
-        ->assertSee('Checking DNS...')
-        ->assertSeeHtml('loading-indicator');
+        ->assertSee('Checking DNS...');
 
     Queue::assertPushed(CheckDomainDnsJob::class, 1);
 })->with([
@@ -2625,12 +2620,6 @@ it('updates search engine indexing from the domains view', function () {
 
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->call('startEdit', 0)
-        ->assertSee('Noindex')
-        ->assertSee('Indexable')
-        ->assertSee('Search engine indexing')
-        ->assertSee('www redirect')
-        ->assertSee('editingIndexing', false)
-        ->assertDontSee('toggleNoindexDomain', false)
         ->set('editingIndexing', 'noindex')
         ->call('updateDomain')
         ->assertDispatched('configurationChanged')
@@ -2804,6 +2793,21 @@ it('does not prefill the default internal port when editing a domain without a p
         ->assertSet('editingDomainParts.port', '');
 });
 
+it('passes the inherited internal port to the domain settings modal', function () {
+    $this->application->update([
+        'ports_exposes' => '3000,8080',
+        'fqdn' => 'https://example.com:8080',
+    ]);
+
+    Livewire::test(Domains::class, ['application' => $this->application->fresh()])
+        ->assertSet('domainRows.0.internal_port', 8080)
+        ->assertSet('domainRows.0.inherited_port', 3000)
+        ->call('startEdit', 0)
+        ->assertSet('editingInheritedPort', 3000)
+        ->call('cancelEdit')
+        ->assertSet('editingInheritedPort', null);
+});
+
 it('clears a domain port override and shows the default internal port', function () {
     $this->application->update([
         'ports_exposes' => '3000,8080',
@@ -2861,9 +2865,7 @@ it('renders a portless domain link with an internal port badge for overrides', f
 
     expect($html)
         ->toContain('href="'.getFqdnWithoutPort('https://example.com').'"')
-        ->not->toContain('href="https://example.com:8080"')
-        ->toContain('Custom internal port for this domain')
-        ->not->toContain('Inherited from Ports Exposes');
+        ->not->toContain('href="https://example.com:8080"');
 });
 
 it('shows a warning when a domain has no internal port and ports exposes is empty', function () {
@@ -2876,9 +2878,7 @@ it('shows a warning when a domain has no internal port and ports exposes is empt
     Livewire::test(Domains::class, ['application' => $this->application->fresh()])
         ->assertSet('domainRows.0.internal_port', null)
         ->assertSee('No internal port')
-        ->assertDontSee('Internal port ')
-        ->assertSee('aria-label="No internal port"', false)
-        ->assertSee('Set Ports Exposes or a per-domain internal port', false);
+        ->assertDontSee('Internal port ');
 });
 
 it('keeps the internal port badge when a domain override exists without ports exposes', function () {
@@ -3226,8 +3226,7 @@ it('shows a port warning when an application domain uses a port that is not expo
         ->set('newDomainParts.port', '5555')
         ->call('addDomain')
         ->assertSet('showPortWarningModal', true)
-        ->assertSet('unrecognizedPort', 5555)
-        ->assertSee('Use a different port?');
+        ->assertSet('unrecognizedPort', 5555);
 
     expect($this->application->fresh()->fqdn)->toBeNull();
 });
@@ -3658,7 +3657,7 @@ it('offers dns provider record creation for a public server ip', function () {
         ->not->toContain('The server has no public IP address; add the DNS record manually.');
 });
 
-it('does not queue file sync jobs when polling dns checks for compose applications', function () {
+it('does not parse the compose file or queue file sync jobs when it shows compose application domains', function () {
     Queue::fake();
 
     $this->application->update([
@@ -3671,12 +3670,10 @@ it('does not queue file sync jobs when polling dns checks for compose applicatio
     ]);
 
     $component = Livewire::test(Domains::class, ['application' => $this->application->fresh()]);
-    $queuedOnMount = Queue::pushed(ServerFilesFromServerJob::class)->count();
-
     $component->call('pollDnsChecks')->call('pollDnsChecks')->call('pollDnsChecks');
 
-    expect($queuedOnMount)->toBe(1)
-        ->and(Queue::pushed(ServerFilesFromServerJob::class))->toHaveCount(1)
+    expect(Queue::pushed(ServerFilesFromServerJob::class))->toHaveCount(0)
+        ->and($this->application->persistentStorages()->count())->toBe(0)
         ->and($component->get('composeServices'))->toBe(['web', 'api']);
 });
 

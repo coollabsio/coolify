@@ -9,7 +9,7 @@
             @if (data_get($application_deployment_queue, 'status') === 'queued')
                 <x-forms.button class="logs-viewer-deployment-btn" wire:click.prevent="force_start">Force start</x-forms.button>
             @endif
-            <x-forms.button isError class="logs-viewer-deployment-btn logs-viewer-cancel-btn" wire:click.prevent="cancel">Cancel deployment</x-forms.button>
+            <x-forms.button isError class="logs-viewer-deployment-btn logs-viewer-cancel-btn" wire:click.prevent="cancel"><span class="sm:hidden">Cancel</span><span class="hidden sm:inline">Cancel deployment</span></x-forms.button>
         </div>
     @endif
 </div>

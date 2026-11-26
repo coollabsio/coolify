@@ -1,0 +1,53 @@
+# documentation: https://docs.mcphub.app/
+# slogan: MCPHub is a unified hub for centrally managing and dynamically orchestrating multiple MCP servers.
+# category: ai
+# tags: ai,mcp,mcp-server,mcp-gateway,mcp-router,pgvector,postgresql
+# logo: svgs/mcphub.svg
+# port: 3000
+
+services:
+  mcphub:
+    image: samanhappy/mcphub:1.3.1
+    environment:
+      - SERVICE_URL_MCPHUB_3000
+      - NODE_ENV=production
+      - PORT=3000
+      - TRUST_PROXY=1
+      - INSTALL_BASE_URL=${SERVICE_URL_MCPHUB}
+      - DB_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/${POSTGRES_DB:-mcphub}
+      - ADMIN_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+      - JWT_SECRET=${SERVICE_PASSWORD_64_JWT}
+      - MCPHUB_CREDENTIAL_ENCRYPTION_KEY=${SERVICE_REALBASE64_32_CREDENTIALS}
+      - SMART_ROUTING_ENABLED=${SMART_ROUTING_ENABLED:-false}
+      - OPENAI_API_BASE_URL=${OPENAI_API_BASE_URL:-https://api.openai.com/v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+    volumes:
+      - mcphub-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - POSTGRES_DB=${POSTGRES_DB:-mcphub}
+    volumes:
+      - mcphub-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mcphub-data:
+  mcphub-postgres-data:

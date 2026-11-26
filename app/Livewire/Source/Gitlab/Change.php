@@ -143,7 +143,7 @@ class Change extends Component
             })->whereUuid($gitlab_app_uuid)->firstOrFail();
 
             $this->privateKeys = PrivateKey::ownedByCurrentTeamCached();
-            $this->applications = $this->gitlab_app->applications;
+            $this->applications = $this->gitlab_app->applications()->whereRelation('environment.project.team', 'id', currentTeam()->id)->get();
 
             $settings = instanceSettings();
 
@@ -282,6 +282,7 @@ class Change extends Component
             $this->syncData(true);
             $this->gitlab_app->save();
             $this->dispatch('success', 'GitLab App updated.');
+            $this->dispatch('name-changed', uuid: $this->gitlab_app->uuid, name: $this->gitlab_app->name);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

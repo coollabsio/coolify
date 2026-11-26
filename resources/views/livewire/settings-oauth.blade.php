@@ -13,8 +13,10 @@
                         <a href="#{{ $provider }}-oauth-section" class="menu-item min-h-8! py-1! text-[12px]!"
                             :class="{ 'menu-item-active': activeProvider === '{{ $provider }}' }"
                             @click.prevent="activeProvider = '{{ $provider }}'; history.replaceState(null, '', '#{{ $provider }}-oauth-section'); window.scrollToSettingsSection?.('{{ $provider }}-oauth-section')">
-                            <span class="menu-item-icon bg-current"
-                                style="mask: url('{{ asset('svgs/' . $provider . '.svg') }}') center / contain no-repeat; -webkit-mask: url('{{ asset('svgs/' . $provider . '.svg') }}') center / contain no-repeat;"></span>
+                            <span class="menu-item-icon shrink-0">
+                                <span class="block size-4 bg-current"
+                                    style="mask: url('{{ asset('svgs/' . $provider . '.svg') }}') center / contain no-repeat; -webkit-mask: url('{{ asset('svgs/' . $provider . '.svg') }}') center / contain no-repeat;"></span>
+                            </span>
                             <span class="menu-item-label">{{ $oauth_setting['label'] }}</span>
                         </a>
                     @endforeach

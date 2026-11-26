@@ -32,7 +32,7 @@ class InfrastructureOverviewResource extends Resource
             return Response::error('Invalid token.');
         }
 
-        $servers = Server::whereTeamId($teamId)
+        $servers = $this->visibleServers($request, $teamId)
             ->with('settings:id,server_id,is_reachable,is_usable')
             ->get()
             ->map(fn (Server $s) => [

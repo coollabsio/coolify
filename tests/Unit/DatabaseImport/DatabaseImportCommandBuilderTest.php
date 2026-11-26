@@ -9,10 +9,11 @@ use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Support\DatabaseImport\DatabaseImportCommandBuilder;
 
-function importResource(string $class, ?string $databaseType = null): object
+function importResource(string $class, ?string $databaseType = null, string $image = 'postgres:18-alpine'): object
 {
     $resource = Mockery::mock($class);
     $resource->shouldReceive('getMorphClass')->andReturn($class);
+    $resource->shouldReceive('getAttribute')->with('image')->andReturn($image);
     if ($class === ServiceDatabase::class) {
         $resource->shouldReceive('databaseType')->andReturn($databaseType);
     }
@@ -31,13 +32,13 @@ test('builds database-specific restore commands', function (string $class, ?stri
     expect($command)->toContain($needle)->toContain("'/tmp/restore file'");
 })->with([
     'postgresql' => [StandalonePostgresql::class, null, 'pg_restore'],
-    'mysql' => [StandaloneMysql::class, null, 'mysql -u $MYSQL_USER'],
-    'mariadb' => [StandaloneMariadb::class, null, 'mariadb -u $MARIADB_USER'],
+    'mysql' => [StandaloneMysql::class, null, 'mysql $client_safety -u $MYSQL_USER'],
+    'mariadb' => [StandaloneMariadb::class, null, 'mariadb $client_safety -u $MARIADB_USER'],
     'mongodb' => [StandaloneMongodb::class, null, 'mongorestore'],
     'sqlite' => [StandaloneSqlite::class, null, '.restore'],
     'service postgres' => [ServiceDatabase::class, 'postgresql', 'pg_restore'],
-    'service mysql' => [ServiceDatabase::class, 'mysql', 'mysql -u $MYSQL_USER'],
-    'service mariadb' => [ServiceDatabase::class, 'mariadb', 'mariadb -u $MARIADB_USER'],
+    'service mysql' => [ServiceDatabase::class, 'mysql', 'mysql $client_safety -u $MYSQL_USER'],
+    'service mariadb' => [ServiceDatabase::class, 'mariadb', 'mariadb $client_safety -u $MARIADB_USER'],
     'service mongo' => [ServiceDatabase::class, 'mongodb', 'mongorestore'],
 ]);
 
@@ -51,10 +52,10 @@ test('decompresses gzip backups for single-database mysql and mariadb restores',
         ->toContain('is_gzip() { [ "$(head -c 2 "$backup" | od -An -tx1 | tr -d \' \n\')" = 1f8b ]; }')
         ->toEndWith("stream | {$client}");
 })->with([
-    'mysql' => [StandaloneMysql::class, null, 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE'],
-    'mariadb' => [StandaloneMariadb::class, null, 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE'],
-    'service mysql' => [ServiceDatabase::class, 'mysql', 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE'],
-    'service mariadb' => [ServiceDatabase::class, 'mariadb', 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE'],
+    'mysql' => [StandaloneMysql::class, null, 'mysql $client_safety -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE'],
+    'mariadb' => [StandaloneMariadb::class, null, 'mariadb $client_safety -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE'],
+    'service mysql' => [ServiceDatabase::class, 'mysql', 'mysql $client_safety -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE'],
+    'service mariadb' => [ServiceDatabase::class, 'mariadb', 'mariadb $client_safety -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE'],
 ]);
 
 test('builds dump-all commands and postgres safety scan', function () {
@@ -75,7 +76,7 @@ test('builds dump-all commands and postgres safety scan', function () {
         ->toContain('unable to inspect custom archive')
         ->not->toContain('then exit 0')
         ->and($script)
-        ->toContain("tr '\\n\\r\\t'");
+        ->toContain("tr '\\n\\r' '~~'");
 });
 
 test('restores dump-all PostgreSQL custom archives with pg_restore from the decompressed stream', function () {
@@ -83,8 +84,8 @@ test('restores dump-all PostgreSQL custom archives with pg_restore from the deco
 
     // pg_restore cannot read gzip files, so it must receive the decompressed archive on stdin.
     expect($command)
-        ->toContain('stream | pg_restore -U ${POSTGRES_USER} -d "$db"')
-        ->toContain('stream | psql -U ${POSTGRES_USER} -d "$db"')
+        ->toContain('stream | pg_restore -U "$pg_user" -d "$db"')
+        ->toContain('stream | psql -U "$pg_user" -d "$db"')
         ->not->toContain("-d \"\$db\" '/tmp/backup.dump.gz'");
 });
 
@@ -100,15 +101,15 @@ test('dump-all mysql and mariadb commands use valid shell parameter expansions',
 
     $command = $builder->buildRestoreCommand(importResource($class), '/tmp/dump.sql.gz', true);
 
-    $rootPassword = '${'.$prefix.'_ROOT_PASSWORD}';
+    $rootLogin = '-u root ${root_password:+"-p$root_password"}';
     $database = '${'.$prefix.'_DATABASE:-default}';
 
     expect($command)
         ->toContain($binary)
         ->toStartWith("backup='/tmp/dump.sql.gz'\n")
-        ->toContain('-p'.$rootPassword)
+        ->toContain('root_password=${'.$prefix.'_ROOT_PASSWORD:-}')
         ->toContain('CREATE DATABASE IF NOT EXISTS \`'.$database.'\`')
-        ->and(substr_count($command, $rootPassword))->toBe(6)
+        ->and(substr_count($command, $rootLogin))->toBe(7)
         ->and(substr_count($command, $database))->toBe(2)
         ->and($command)->not->toContain('${{');
 })->with([
@@ -144,6 +145,17 @@ test('restores PostgreSQL archives without owners and privileges by default', fu
     expect($command)->toContain('pg_restore --exit-on-error --single-transaction --no-owner --no-acl');
 })->with(['keep existing objects' => [false], 'replace existing objects' => [true]]);
 
+test('restores into Supabase images over 127.0.0.1, because their socket refuses users other than postgres and supabase_admin', function (string $class, ?string $type) {
+    $supabase = (new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource($class, $type, 'supabase/postgres:15.8.1.085'), '/tmp/backup.dump', false);
+    $official = (new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource($class, $type), '/tmp/backup.dump', false);
+
+    expect($supabase)->toContain("export PGHOST='127.0.0.1'")
+        ->and($official)->not->toContain('PGHOST');
+})->with([
+    'standalone' => [StandalonePostgresql::class, null],
+    'service' => [ServiceDatabase::class, 'postgresql'],
+]);
+
 test('keeps PostgreSQL owners and privileges when requested', function () {
     $command = (new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource(StandalonePostgresql::class), '/tmp/backup.dump', false, false, keepOwners: true);
 
@@ -158,7 +170,7 @@ test('skips the system databases of MySQL and MariaDB all-databases backups by d
     expect($command)->toContain('command -v awk')
         ->toMatch('/stream \| \{?\s*awk /')
         ->toContain('"mysql"')->toContain('"sys"')->toContain('"performance_schema"')->toContain('"information_schema"')
-        ->toContain("| {$binary} -u root");
+        ->toContain("| {$binary} \$client_safety -u root");
 })->with([
     'mysql' => [StandaloneMysql::class, 'mysql'],
     'mariadb' => [StandaloneMariadb::class, 'mariadb'],
@@ -168,7 +180,7 @@ test('restores the system databases of MySQL and MariaDB all-databases backups w
     $command = (new DatabaseImportCommandBuilder)->buildRestoreCommand(importResource($class), '/tmp/backup.sql', true, restoreMysqlUsers: true);
 
     expect($command)->not->toContain('awk')
-        ->toContain("stream | {$binary} -u root");
+        ->toContain("stream | {$binary} \$client_safety -u root");
 })->with([
     'mysql' => [StandaloneMysql::class, 'mysql'],
     'mariadb' => [StandaloneMariadb::class, 'mariadb'],

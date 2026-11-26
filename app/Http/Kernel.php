@@ -4,6 +4,7 @@ namespace App\Http;
 
 use App\Http\Middleware\AddServerTimingHeaders;
 use App\Http\Middleware\ApiAbility;
+use App\Http\Middleware\ApiIpAllowed;
 use App\Http\Middleware\ApiSensitiveData;
 use App\Http\Middleware\Authenticate;
 use App\Http\Middleware\CanAccessTerminal;
@@ -14,11 +15,16 @@ use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\EnsureMcpEnabled;
 use App\Http\Middleware\EnsureTeamMcpEnabled;
+use App\Http\Middleware\EnsureTeamWideAccess;
 use App\Http\Middleware\EnsureTokenBelongsToCurrentTeamMember;
 use App\Http\Middleware\KeepConcurrentTeamSwitch;
+use App\Http\Middleware\PreventHtmlTransform;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\RequirePassword;
+use App\Http\Middleware\RequireTeamTwoFactor;
+use App\Http\Middleware\SwitchToResourceTeam;
+use App\Http\Middleware\ThrottleFailedApiRequests;
 use App\Http\Middleware\TrimStrings;
 use App\Http\Middleware\TrustProxies;
 use App\Http\Middleware\ValidateSignature;
@@ -55,6 +61,7 @@ class Kernel extends HttpKernel
         AddServerTimingHeaders::class,
         TrustProxies::class,
         HandleCors::class,
+        ThrottleFailedApiRequests::class,
         PreventRequestsDuringMaintenance::class,
         ValidatePostSize::class,
         TrimStrings::class,
@@ -78,8 +85,10 @@ class Kernel extends HttpKernel
             VerifyCsrfToken::class,
             SubstituteBindings::class,
             CheckForcePasswordReset::class,
+            SwitchToResourceTeam::class,
             DecideWhatToDoWithUser::class,
-
+            RequireTeamTwoFactor::class,
+            PreventHtmlTransform::class,
         ],
 
         'api' => [
@@ -115,7 +124,9 @@ class Kernel extends HttpKernel
         'can.create.resources' => CanCreateResources::class,
         'can.update.resource' => CanUpdateResource::class,
         'can.access.terminal' => CanAccessTerminal::class,
+        'access.team-wide' => EnsureTeamWideAccess::class,
         'mcp.enabled' => EnsureMcpEnabled::class,
+        'api.ip.allowed' => ApiIpAllowed::class,
         'mcp.team.enabled' => EnsureTeamMcpEnabled::class,
     ];
 }

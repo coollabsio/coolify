@@ -12,8 +12,9 @@ one fixed-size supervisor per queue. A busy queue cannot starve the others.
 | `default`     | `default`     | `HORIZON_DEFAULT_PROCESSES`     | 40               |
 | `maintenance` | `maintenance` | `HORIZON_MAINTENANCE_PROCESSES` | 60               |
 | `webhooks`    | `webhooks`    | `HORIZON_WEBHOOKS_PROCESSES`    | 10               |
+| `sentinel`    | `sentinel`    | `HORIZON_SENTINEL_PROCESSES`    | 20               |
 
-- Counts apply to **each node**. Two nodes with the defaults run 580 workers.
+- Counts apply to **each node**. Two nodes with the defaults run 620 workers.
 - `maintenance` runs Docker cleanups (scheduled, manual, and the cleanup
   that runs after a resource stops) and the weekly server patch checks.
   Remote prunes and package checks can be slow, so this pool limits how many
@@ -24,6 +25,9 @@ one fixed-size supervisor per queue. A busy queue cannot starve the others.
   server limit checks that follow subscription changes, so a full `high`
   queue cannot delay them. These jobs are short (60 s timeout or
   less). Self-hosted instances keep them on `high`.
+- `sentinel` processes Sentinel pushes (`PushServerUpdateJob`), so a burst
+  of pushes from many servers cannot take the workers of the other pools.
+  Self-hosted instances keep them on the default queue.
 - Each pool has `minProcesses = maxProcesses` and `balance = false`. Horizon
   does not scale them.
 - A value that is not a positive integer falls back to the default.
@@ -51,6 +55,7 @@ HORIZON_HIGH_PROCESSES=60
 HORIZON_DEFAULT_PROCESSES=40
 HORIZON_MAINTENANCE_PROCESSES=60
 HORIZON_WEBHOOKS_PROCESSES=10
+HORIZON_SENTINEL_PROCESSES=20
 # Worker timeout. Must stay above the longest job timeout (36000 s) and below
 # retry_after (86400 s). The config clamps it to 36600..85800.
 HORIZON_TIMEOUT=36600
@@ -114,13 +119,13 @@ Do these steps on one node at a time. Do not flush Redis or clear queues.
    docker exec coolify php artisan horizon:terminate
    ```
 
-5. Make sure the six supervisors are running on this node:
+5. Make sure the seven supervisors are running on this node:
 
    ```bash
    docker exec coolify php artisan horizon:supervisors
    ```
 
-6. Make sure the `maintenance` and `webhooks` queues drain (its depth goes down) and that
+6. Make sure the `maintenance`, `webhooks`, and `sentinel` queues drain (their depth goes down) and that
    `php artisan scheduled:diagnostics` shows no growing count of stale
    occurrences.
 7. Do the same steps on the next node.
@@ -132,10 +137,10 @@ jobs) stay on `high`, and the `high` pool still processes them.
 
 1. Deploy the previous image, or remove the `HORIZON_*_PROCESSES` overrides.
 2. Run `config:cache` and `horizon:terminate` on one node at a time.
-3. Jobs that wait on the `maintenance` or `webhooks` queue are not lost, but
+3. Jobs that wait on the `maintenance`, `webhooks`, or `sentinel` queue are not lost, but
    the old configuration has no pool for them. Keep one node with the new
-   configuration until both queues are empty, or start a temporary worker:
-   `php artisan queue:work redis --queue=maintenance,webhooks --tries=1 --timeout=600`.
+   configuration until these queues are empty, or start a temporary worker:
+   `php artisan queue:work redis --queue=maintenance,webhooks,sentinel --tries=1 --timeout=600`.
 4. Do not roll back the migration. The old code ignores the new columns.
 
 ## Metrics to collect before you change worker counts

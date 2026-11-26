@@ -3,14 +3,17 @@
 namespace App\Models;
 
 use App\Actions\User\RevokeUserTeamTokens;
+use App\Enums\AccessLevel;
 use App\Jobs\UpdateStripeCustomerEmailJob;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\TransactionalEmails\EmailChangeVerification;
 use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
+use App\Services\Access\AccessResolver;
 use App\Services\ChangelogService;
 use App\Traits\DeletesUserSessions;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -20,7 +23,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Str;
+use Laravel\Fortify\Contracts\PasskeyUser;
+use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\NewAccessToken;
@@ -41,9 +45,9 @@ use OpenApi\Attributes as OA;
         'marketing_emails' => ['type' => 'boolean', 'description' => 'The flag to receive marketing emails.'],
     ],
 )]
-class User extends Authenticatable implements SendsEmail
+class User extends Authenticatable implements PasskeyUser, SendsEmail
 {
-    use DeletesUserSessions, HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use DeletesUserSessions, HasApiTokens, HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
     protected $fillable = [
         'name',
@@ -66,10 +70,12 @@ class User extends Authenticatable implements SendsEmail
         'two_factor_recovery_codes',
         'two_factor_secret',
         'created_before_oauth_identities',
+        'created_by_invitation',
     ];
 
     protected $casts = [
         'created_before_oauth_identities' => 'boolean',
+        'created_by_invitation' => 'boolean',
         'current_team_id' => 'integer',
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',
@@ -169,7 +175,6 @@ class User extends Authenticatable implements SendsEmail
                             if ($found_other_member_who_is_not_owner) {
                                 $found_other_member_who_is_not_owner->pivot->role = 'owner';
                                 $found_other_member_who_is_not_owner->pivot->save();
-                                RevokeUserTeamTokens::forUserTeam($found_other_member_who_is_not_owner, $team->id);
                                 $team->members()->detach($user->id);
                             } else {
                                 static::finalizeTeamDeletion($user, $team);
@@ -183,6 +188,8 @@ class User extends Authenticatable implements SendsEmail
                 }
             });
         });
+
+        static::deleted(fn (User $user) => AuditEvent::anonymizeUser($user));
     }
 
     /**
@@ -215,19 +222,39 @@ class User extends Authenticatable implements SendsEmail
      */
     public function deleteIfNotVerifiedAndForcePasswordReset(): void
     {
-        if ($this->hasVerifiedEmail() || $this->force_password_reset !== true) {
-            return;
+        if ($this->isUnusedInvitedAccount()) {
+            $this->delete();
         }
+    }
 
-        if (TeamInvitation::whereEmail($this->email)->exists()) {
-            return;
-        }
+    /**
+     * Whether an invitation created this account and nobody uses it: the owner never set a password,
+     * it has no pending invitations, and it belongs to no team other than its own personal team.
+     */
+    public function isUnusedInvitedAccount(): bool
+    {
+        return $this->needsInitialInvitationLogin()
+            && ! TeamInvitation::whereEmail($this->email)->exists();
+    }
 
-        if ($this->belongsToNonPersonalTeam()) {
-            return;
-        }
+    /**
+     * Whether a new invitation from the team may carry a magic login link for this account.
+     * A pending invitation of another team keeps the only login, so the admin of a second team cannot sign in as the invitee.
+     */
+    public function canReceiveInvitationLoginFrom(int $teamId): bool
+    {
+        return $this->needsInitialInvitationLogin()
+            && TeamInvitation::whereEmail($this->email)
+                ->where('team_id', '!=', $teamId)
+                ->get()
+                ->every(fn (TeamInvitation $invitation) => $invitation->hasExpired());
+    }
 
-        $this->delete();
+    public function needsInitialInvitationLogin(): bool
+    {
+        return ! $this->hasVerifiedEmail()
+            && $this->force_password_reset === true
+            && ! $this->belongsToNonPersonalTeam();
     }
 
     /**
@@ -245,6 +272,18 @@ class User extends Authenticatable implements SendsEmail
 
     public function recreate_personal_team()
     {
+        // The root team always exists after install. Attach the root user to it again instead of
+        // inserting a second team with id 0.
+        if ($this->id === 0 && $rootTeam = Team::find(0)) {
+            if ($this->teams()->whereKey(0)->exists()) {
+                $this->teams()->updateExistingPivot(0, ['role' => 'owner']);
+            } else {
+                $this->teams()->attach(0, ['role' => 'owner']);
+            }
+
+            return $rootTeam;
+        }
+
         $team = [
             'name' => $this->name."'s Team",
             'personal_team' => true,
@@ -261,21 +300,16 @@ class User extends Authenticatable implements SendsEmail
         return $new_team;
     }
 
-    public function createToken(string $name, array $abilities = ['read'], ?DateTimeInterface $expiresAt = null)
+    public function createToken(string $name, array $abilities = ['read'], ?DateTimeInterface $expiresAt = null, ?int $teamId = null)
     {
-        $plainTextToken = sprintf(
-            '%s%s%s',
-            config('sanctum.token_prefix', ''),
-            $tokenEntropy = Str::random(40),
-            hash('crc32b', $tokenEntropy)
-        );
+        $plainTextToken = PersonalAccessToken::generateSecret();
 
         $token = $this->tokens()->create([
             'name' => $name,
             'token' => hash('sha256', $plainTextToken),
             'abilities' => $abilities,
             'expires_at' => $expiresAt,
-            'team_id' => session('currentTeam')->id,
+            'team_id' => $teamId ?? session('currentTeam')->id,
         ]);
 
         return new NewAccessToken($token, $token->getKey().'|'.$plainTextToken);
@@ -283,12 +317,17 @@ class User extends Authenticatable implements SendsEmail
 
     public function teams()
     {
-        return $this->belongsToMany(Team::class)->withPivot('role');
+        return $this->belongsToMany(Team::class)->withPivot('role', 'access');
     }
 
     public function changelogReads()
     {
         return $this->hasMany(UserChangelogRead::class);
+    }
+
+    public function stars(): HasMany
+    {
+        return $this->hasMany(Star::class);
     }
 
     public function getUnreadChangelogCount(): int
@@ -483,6 +522,14 @@ class User extends Authenticatable implements SendsEmail
     }
 
     /**
+     * Check the access grants of the user (and the API token of the request) on a project, environment, or resource.
+     */
+    public function canAccess(AccessLevel $level, Model $target): bool
+    {
+        return app(AccessResolver::class)->allows($this, $level, $target);
+    }
+
+    /**
      * Check if the user is an admin or owner of a specific team
      */
     public function isAdminOfTeam(int $teamId): bool
@@ -597,6 +644,18 @@ class User extends Authenticatable implements SendsEmail
     public function hasSsoIdentity(): bool
     {
         return $this->oauthIdentities()->exists();
+    }
+
+    /**
+     * Hex handle: iOS Safari corrupts raw binary handles (laravel/passkeys-server#41).
+     */
+    public function getPasskeyUserHandle(): string
+    {
+        return hash_hmac(
+            'sha256',
+            $this->getTable().'|'.$this->getKey(),
+            Config::string('passkeys.user_handle_secret'),
+        );
     }
 
     /**

@@ -7,7 +7,7 @@
 
 services:
   frontend:
-    image: penpotapp/frontend:2.11.1 # Released on 13 Nov 2025
+    image: penpotapp/frontend:2.19.1 # Released on 13 Nov 2025
     volumes:
       - penpot-assets:/opt/data/assets
     depends_on:
@@ -25,7 +25,7 @@ services:
       retries: 15
 
   penpot-backend:
-    image: penpotapp/backend:2.11.1 # Released on 13 Nov 2025
+    image: penpotapp/backend:2.19.1 # Released on 13 Nov 2025
     volumes:
       - penpot-assets:/opt/data/assets
     depends_on:
@@ -62,7 +62,7 @@ services:
       retries: 15
 
   penpot-exporter:
-    image: penpotapp/exporter:2.11.1 # Released on 13 Nov 2025
+    image: penpotapp/exporter:2.19.1 # Released on 13 Nov 2025
     environment:
       - PENPOT_PUBLIC_URI=$SERVICE_URL_FRONTEND_8080
       - 'PENPOT_REDIS_URI=redis://penpot-valkey/0'
@@ -73,7 +73,7 @@ services:
       retries: 15
 
   mailpit:
-    image: axllent/mailpit:v1.28 # Released on 26 Nov 2025
+    image: axllent/mailpit:v1.33 # Released on 26 Nov 2025
     environment:
       - SERVICE_URL_MAILPIT_8025
     healthcheck:

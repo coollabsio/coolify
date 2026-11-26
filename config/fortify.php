@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ConfigurePasskeys;
 use App\Providers\RouteServiceProvider;
 use Laravel\Fortify\Features;
 
@@ -89,7 +90,7 @@ return [
     |
     */
 
-    'middleware' => ['web'],
+    'middleware' => ['web', ConfigurePasskeys::class],
 
     /*
     |--------------------------------------------------------------------------
@@ -106,6 +107,7 @@ return [
         'login' => 'login',
         'two-factor' => 'two-factor',
         'forgot-password' => 'forgot-password',
+        'passkeys' => 'passkeys',
     ],
 
     /*
@@ -120,6 +122,22 @@ return [
     */
 
     'views' => true,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Passkeys
+    |--------------------------------------------------------------------------
+    |
+    | Defaults only. ConfigurePasskeys sets the relying party for each request.
+    |
+    */
+
+    'passkeys' => [
+        'relying_party_id' => parse_url(config('app.url'), PHP_URL_HOST),
+        'allowed_origins' => [config('app.url')],
+        'user_handle_secret' => env('PASSKEYS_USER_HANDLE_SECRET', config('app.key')),
+        'timeout' => 60000,
+    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -141,6 +159,9 @@ return [
             'confirm' => true,
             'confirmPassword' => true,
             // 'window' => 0,
+        ]),
+        Features::passkeys([
+            'confirmPassword' => true,
         ]),
     ],
 

@@ -4,7 +4,10 @@ namespace App\Notifications\Channels;
 
 use App\Exceptions\NonReportableException;
 use App\Models\EmailNotificationSettings;
+use App\Models\InstanceSettings;
 use App\Models\Team;
+use App\Rules\SafeSmtpHost;
+use App\Services\Security\SensitiveDataRedactor;
 use App\Support\SmtpTransportFactory;
 use Exception;
 use Illuminate\Notifications\Notification;
@@ -12,6 +15,7 @@ use Illuminate\Support\Facades\Log;
 use Resend;
 use Resend\Exceptions\ErrorException;
 use Resend\Exceptions\TransporterException;
+use RuntimeException;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Mime\Email;
@@ -40,6 +44,10 @@ class EmailChannel
             } else {
                 $settings = $notifiable->emailNotificationSettings;
             }
+
+            // Only the instance settings have a notification sender. A test email can ask for it explicitly.
+            $asNotification = $settings instanceof InstanceSettings
+                && (data_get($notification, 'usesNotificationSender') ?? ! $isTransactionalEmail);
 
             $isResendEnabled = $settings->resend_enabled;
             $isSmtpEnabled = $settings->smtp_enabled;
@@ -81,7 +89,7 @@ class EmailChannel
             if ($isResendEnabled) {
                 $resend = Resend::client($settings->resend_api_key);
                 $response = $resend->emails->send([
-                    'from' => mail_from_formatted($settings),
+                    'from' => mail_from_formatted($settings, $asNotification),
                     'to' => $recipients,
                     'subject' => $mailMessage->subject,
                     'html' => (string) $mailMessage->render(),
@@ -95,13 +103,36 @@ class EmailChannel
                     throw new ErrorException($error);
                 }
             } elseif ($isSmtpEnabled) {
+                // The team's own SMTP host: check it again and connect to the checked address.
+                $connectAddress = null;
+                if ($settings instanceof EmailNotificationSettings) {
+                    try {
+                        $connectAddress = SafeSmtpHost::connectionAddress((string) $settings->smtp_host);
+                    } catch (RuntimeException $e) {
+                        if ($isTestNotification) {
+                            throw NonReportableException::fromException($e);
+                        }
+
+                        // A blocked host fails on every send. A host that did not resolve can be a
+                        // temporary DNS failure, so the job is retried and nothing is counted.
+                        if ($e->getCode() === SafeSmtpHost::HOST_NOT_ALLOWED) {
+                            $settings->recordDeliveryFailure($e->getMessage());
+
+                            return;
+                        }
+
+                        throw $e;
+                    }
+                }
+
                 $transport = SmtpTransportFactory::fromSettings(
                     $settings,
-                    config('mail.mailers.smtp.local_domain')
+                    config('mail.mailers.smtp.local_domain'),
+                    $connectAddress,
                 );
                 $mailer = new Mailer($transport);
 
-                $email = mail_from_email(new Email, $settings)
+                $email = mail_from_email(new Email, $settings, $asNotification)
                     ->to(...$recipients)
                     ->subject($mailMessage->subject)
                     ->html((string) $mailMessage->render());
@@ -151,12 +182,12 @@ class EmailChannel
             send_internal_notification(sprintf(
                 "Resend Error\nStatus Code: %s\nMessage: %s\nNotification: %s\nEmail Settings:\n%s",
                 $statusCode,
-                $e->getErrorMessage(),
+                remove_iip($e->getErrorMessage()),
                 get_class($notification),
-                json_encode($emailSettings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+                json_encode(app(SensitiveDataRedactor::class)->redactValue($emailSettings), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
             ));
 
-            // Don't report expected errors (invalid keys, validation) to Sentry
+            // Don't report expected errors (invalid keys, validation) to error tracking
             if (in_array($statusCode, [403, 401, 400, 422], true)) {
                 throw NonReportableException::fromException(new Exception($userMessage, $e->getCode(), $e));
             }
@@ -172,12 +203,12 @@ class EmailChannel
 
             throw $e;
         } catch (TransporterException $e) {
-            send_internal_notification("Resend Transport Error: {$e->getMessage()}");
+            send_internal_notification('Resend Transport Error: '.remove_iip($e->getMessage()));
             throw new Exception('Unable to connect to Resend API. Please check your internet connection and try again.');
         } catch (\Throwable $e) {
             // Check if this is a Resend domain verification error on cloud instances
             if (isCloud() && str_contains($e->getMessage(), 'domain is not verified')) {
-                // Throw as NonReportableException so it won't go to Sentry
+                // Throw as NonReportableException so it won't go to error tracking
                 throw NonReportableException::fromException($e);
             }
             throw $e;

@@ -80,6 +80,16 @@ function backupHeaders(): array
 }
 
 describe('POST /api/v1/databases/{uuid}/backups', function () {
+    test('does not save to S3 when save_s3 is not sent', function () {
+        $this->withHeaders(backupHeaders())
+            ->postJson("/api/v1/databases/{$this->database->uuid}/backups", ['frequency' => 'daily'])
+            ->assertCreated();
+
+        $backup = ScheduledDatabaseBackup::firstOrFail();
+        expect((bool) $backup->save_s3)->toBeFalse()
+            ->and($backup->s3_storage_id)->toBeNull();
+    });
+
     test('rejects backup configurations for unsupported database types', function () {
         $database = StandaloneRedis::create([
             'uuid' => (string) Str::uuid(),

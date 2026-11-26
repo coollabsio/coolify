@@ -2,16 +2,20 @@
 
 namespace App\Notifications\VolumeBackup;
 
+use App\Contracts\ThrottledNotification;
+use App\Models\NotificationThrottle;
 use App\Models\ScheduledVolumeBackup;
-use App\Models\ServiceApplication;
-use App\Models\ServiceDatabase;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Messages\MailMessage;
 
-class BackupFailed extends CustomEmailNotification
+/**
+ * Sent on the first failure, then at most once a day until a run of the backup succeeds again.
+ */
+class BackupFailed extends CustomEmailNotification implements ThrottledNotification
 {
     public string $resourceName;
 
@@ -21,7 +25,7 @@ class BackupFailed extends CustomEmailNotification
 
     public ?string $url = null;
 
-    public function __construct(ScheduledVolumeBackup $backup, public string $output)
+    public function __construct(public ScheduledVolumeBackup $backup, public string $output)
     {
         $this->onQueue('high');
         $resource = $backup->targetResource();
@@ -29,10 +33,17 @@ class BackupFailed extends CustomEmailNotification
         $this->target = $backup->targetType().' '.$backup->targetName();
         $this->frequency = $backup->frequency;
 
-        $linkable = $resource instanceof ServiceApplication || $resource instanceof ServiceDatabase ? $resource->service : $resource;
-        if ($linkable && method_exists($linkable, 'link')) {
-            $this->url = $linkable->link();
-        }
+        $this->url = $backup->resourceUrl();
+    }
+
+    public function throttleSubject(): ?Model
+    {
+        return $this->backup;
+    }
+
+    public function throttleIntervalMinutes(): int
+    {
+        return NotificationThrottle::FAILURE_REMINDER_INTERVAL_MINUTES;
     }
 
     public function via(object $notifiable): array
@@ -54,6 +65,7 @@ class BackupFailed extends CustomEmailNotification
             'frequency' => $this->frequency,
             'output' => $this->output,
             'url' => $this->url,
+            'reminder' => NotificationThrottle::FAILURE_REMINDER_TEXT,
         ]);
 
         return $mail;

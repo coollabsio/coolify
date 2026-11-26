@@ -44,6 +44,12 @@ class Actions extends Component
 
     public bool $canDeleteAccount = false;
 
+    /** @var list<string> */
+    public array $deleteAccountBlockers = [];
+
+    /** @var list<string> */
+    public array $deleteAccountActions = [];
+
     public string $billingInterval = 'monthly';
 
     public ?string $nextBillingDate = null;
@@ -57,7 +63,12 @@ class Actions extends Component
         $this->server_limits = Team::serverLimit();
         $this->quantity = (int) $this->server_limits;
         $this->billingInterval = $team->subscription?->billingInterval() ?? 'monthly';
-        $this->canDeleteAccount = app(DeleteUserAccount::class)->blockers(Auth::user(), removeTeamResources: true) === [];
+        $deleteUserAccount = app(DeleteUserAccount::class);
+        $this->deleteAccountBlockers = $deleteUserAccount->blockers(Auth::user(), $team);
+        $this->canDeleteAccount = $this->deleteAccountBlockers === [];
+        $this->deleteAccountActions = $this->canDeleteAccount && isCloud()
+            ? $deleteUserAccount->confirmationActions(Auth::user(), $team)
+            : [];
     }
 
     public function loadPricePreview(int $quantity): void
@@ -152,7 +163,7 @@ class Actions extends Component
         }
 
         $deleteAccount = in_array('deleteAccount', $selectedActions, true);
-        if ($deleteAccount && ($blockers = app(DeleteUserAccount::class)->blockers(Auth::user(), removeTeamResources: true))) {
+        if ($deleteAccount && ($blockers = app(DeleteUserAccount::class)->blockers(Auth::user(), $team))) {
             return implode(' ', $blockers);
         }
 
@@ -164,7 +175,7 @@ class Actions extends Component
         }
 
         if ($deleteAccount) {
-            return $this->deleteAccountAfterCancellation();
+            return $this->deleteAccountAfterCancellation($team);
         }
 
         $this->dispatch('success', $refund ? 'Subscription refunded and cancelled successfully.' : 'Subscription cancelled successfully.');
@@ -247,7 +258,7 @@ class Actions extends Component
                 'stripe_comment' => 'Subscription cancelled immediately by user at '.now()->toDateTimeString(),
             ]);
 
-            $team->subscriptionEnded();
+            $team->subscriptionEnded($subscription);
 
             $this->auditSubscriptionChange('cancelled', ['cancel_at_period_end' => false]);
 
@@ -261,10 +272,10 @@ class Actions extends Component
         }
     }
 
-    private function deleteAccountAfterCancellation(): bool
+    private function deleteAccountAfterCancellation(Team $team): bool
     {
         try {
-            app(DeleteUserAccount::class)->handle(Auth::user(), removeTeamResources: true);
+            app(DeleteUserAccount::class)->handle(Auth::user(), $team);
         } catch (\Throwable $e) {
             report($e);
             $this->dispatch('error', 'Your subscription was cancelled, but your account could not be deleted. Delete it from your profile page or <a href="'.config('constants.urls.contact').'" target="_blank" class="underline">contact us</a>.');

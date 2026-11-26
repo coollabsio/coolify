@@ -84,8 +84,6 @@ class DatabaseBackups extends Component
                     ->get();
                 $this->backupParameters = [...$this->parameters, 'backup_uuid' => $this->backup->uuid];
                 $this->section = match (request()->route()?->getName()) {
-                    'project.service.database.backup.s3' => 's3',
-                    'project.service.database.backup.retention' => 'retention',
                     'project.service.database.backup.executions' => 'executions',
                     'project.service.database.backup.danger' => 'danger',
                     default => 'general',

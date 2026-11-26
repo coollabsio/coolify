@@ -97,3 +97,15 @@ it('keeps database credentials available to an owner', function (string $createD
         ->call('refresh')
         ->assertSet('dbUrl', $database->fresh()->internal_db_url);
 })->with('database-credential-components');
+
+it('hides the password fields for a member after the session switches to a team they own', function (string $createDatabase, string $generalClass, string $statusInfoClass, array $credentials) {
+    $database = createDatabaseWithCredential($createDatabase, $credentials);
+    $ownTeam = Team::factory()->create();
+    $ownTeam->members()->attach($this->member->id, ['role' => 'owner']);
+
+    $this->actingAs($this->member);
+    session(['currentTeam' => $ownTeam]);
+
+    Livewire::test($generalClass, ['database' => $database])->assertSet('isPasswordHiddenForMember', true);
+    Livewire::test($statusInfoClass, ['database' => $database])->assertSet('isPasswordHiddenForMember', true);
+})->with('database-credential-components');

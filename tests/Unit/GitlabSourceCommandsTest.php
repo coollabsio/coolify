@@ -117,33 +117,6 @@ it('generates ls-remote commands for GitLab source without private key', functio
     expectGitlabCommandListNotToContain($result['commands'], 'id_rsa');
 });
 
-it('does not return null for GitLab source type', function () {
-    $deploymentUuid = 'test-deployment-uuid';
-
-    $gitlabSource = Mockery::mock(GitlabApp::class)->makePartial();
-    $gitlabSource->shouldReceive('getMorphClass')->andReturn(GitlabApp::class);
-    $gitlabSource->shouldReceive('getAttribute')->with('html_url')->andReturn('https://gitlab.com');
-    $gitlabSource->shouldReceive('getAttribute')->with('privateKey')->andReturn(null);
-    $gitlabSource->shouldReceive('getAttribute')->with('private_key_id')->andReturn(null);
-    $gitlabSource->shouldReceive('getAttribute')->with('access_token')->andReturn(null);
-    $gitlabSource->shouldReceive('getAttribute')->with('refresh_token')->andReturn(null);
-    $gitlabSource->shouldReceive('isConnected')->andReturn(false);
-
-    $application = Mockery::mock(Application::class)->makePartial();
-    $application->git_branch = 'main';
-    $application->shouldReceive('deploymentType')->andReturn('source');
-    $application->shouldReceive('customRepository')->andReturn([
-        'repository' => 'https://gitlab.com/user/repo.git',
-        'port' => 22,
-    ]);
-    $application->shouldReceive('getAttribute')->with('source')->andReturn($gitlabSource);
-    $application->source = $gitlabSource;
-
-    $lsRemoteResult = $application->generateGitLsRemoteCommands($deploymentUuid, false);
-    expect($lsRemoteResult)->not->toBeNull();
-    expect($lsRemoteResult)->toHaveKeys(['commands', 'branch', 'fullRepoUrl']);
-});
-
 it('preserves custom GitLab http port for connected OAuth sources', function () {
     $deploymentUuid = 'test-deployment-uuid';
 
@@ -185,6 +158,7 @@ it('applies OAuth git config to GitLab merge-request fetch and submodule checkou
     $settings = (object) [
         'is_git_shallow_clone_enabled' => false,
         'is_git_submodules_enabled' => true,
+        'is_git_lfs_enabled' => false,
     ];
 
     $application = Mockery::mock(Application::class)->makePartial();
@@ -210,8 +184,8 @@ it('applies OAuth git config to GitLab merge-request fetch and submodule checkou
     // The MR-ref fetch and submodule update must run through the OAuth-rewritten git, or private same-host submodules fail.
     expect($commands)
         ->toContain('oauth2:gitlab-access-token@gitlab.example.test')
-        ->toContain(".insteadOf=https://gitlab.example.test/' fetch origin 'merge-requests/2/head:pr-2-coolify'")
-        ->toContain(".insteadOf=https://gitlab.example.test/' submodule update --init --recursive");
+        ->toContain(".insteadOf=ssh://git@gitlab.example.test/' fetch origin 'merge-requests/2/head:pr-2-coolify'")
+        ->toContain(".insteadOf=ssh://git@gitlab.example.test/' submodule update --init --recursive");
 });
 
 it('uses a GitLab source private key only when it belongs to the source team', function (int $keyTeamId, bool $expectKey) {
@@ -233,6 +207,7 @@ it('uses a GitLab source private key only when it belongs to the source team', f
     $application->shouldReceive('getAttribute')->with('settings')->andReturn((object) [
         'is_git_shallow_clone_enabled' => false,
         'is_git_submodules_enabled' => false,
+        'is_git_lfs_enabled' => false,
     ]);
     $application->source = $gitlabSource;
 

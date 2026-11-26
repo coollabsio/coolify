@@ -5,7 +5,9 @@ namespace App\Models;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasSafeStringAttribute;
+use App\Traits\ScopedByAccessGrants;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -23,7 +25,7 @@ use OpenApi\Attributes as OA;
 class Environment extends BaseModel
 {
     use Auditable, HasFactory;
-    use ClearsGlobalSearchCache;
+    use ClearsGlobalSearchCache, ScopedByAccessGrants;
     use HasSafeStringAttribute;
 
     protected $fillable = [
@@ -33,6 +35,18 @@ class Environment extends BaseModel
         'uuid',
     ];
 
+    /**
+     * Moving cards on the environment canvas is layout, not a change worth an audit event.
+     */
+    protected array $auditExclude = ['canvas_positions'];
+
+    protected function casts(): array
+    {
+        return [
+            'canvas_positions' => 'array',
+        ];
+    }
+
     protected static function booted()
     {
         static::deleting(function ($environment) {
@@ -41,6 +55,18 @@ class Environment extends BaseModel
                 $shared_variable->delete();
             }
         });
+    }
+
+    /**
+     * Sort order of environment names: production, staging, and development first, then the others by name.
+     * resources/js/environment-order.js has the same order for the canvases.
+     */
+    public static function compareNames(string $first, string $second): int
+    {
+        $order = ['production', 'staging', 'development'];
+        $rank = fn (string $name): int => ($index = array_search(strtolower($name), $order, true)) === false ? count($order) : $index;
+
+        return $rank($first) <=> $rank($second) ?: strnatcasecmp($first, $second);
     }
 
     public static function ownedByCurrentTeam()
@@ -146,6 +172,11 @@ class Environment extends BaseModel
     public function services()
     {
         return $this->hasMany(Service::class);
+    }
+
+    public function resourceLinks(): HasMany
+    {
+        return $this->hasMany(ResourceLink::class);
     }
 
     protected function customizeName($value)

@@ -1,6 +1,10 @@
 <?php
 
+use App\Models\EnvironmentVariable;
 use App\Models\Server;
+use Illuminate\Process\PendingProcess;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Once;
 use Livewire\Features\SupportTesting\Testable;
 use Tests\TestCase;
@@ -28,6 +32,8 @@ uses(TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser');
 
 require_once __DIR__.'/Support/BrowserTestHelpers.php';
 require_once __DIR__.'/Support/ManagedDnsTestHelpers.php';
+require_once __DIR__.'/Support/StripeTestHelpers.php';
+require_once __DIR__.'/Support/RemoteProcessTestHelpers.php';
 
 function remoteOutputSource(string $path): string
 {
@@ -141,3 +147,74 @@ function loginAndSkipBoarding(string $email = 'test@example.com', string $passwo
 // {
 //     // ..
 // }
+
+/**
+ * The variables that StartSentinel writes to sentinel.env, decoded from its remote script.
+ *
+ * @return array<string, string>
+ */
+function sentinelEnvFile(string $script): array
+{
+    preg_match("#([A-Za-z0-9+/=]+)'\\\\'' \\| base64 -d \\| tee \\S*sentinel\\.env#", $script, $matches);
+    expect($matches)->not->toBeEmpty('The script does not write sentinel.env.');
+
+    return collect(explode("\n", trim(base64_decode($matches[1]))))
+        ->mapWithKeys(fn (string $line): array => [str($line)->before('=')->toString() => str($line)->after('=')->toString()])
+        ->all();
+}
+
+/**
+ * Fakes all processes and keeps the content of every file that Server::uploadProxyFile()
+ * copies with scp, keyed by the remote upload path.
+ */
+function fakeProxyFileUploads(): void
+{
+    $GLOBALS['proxyFileUploads'] = [];
+    Process::fake(function (PendingProcess $process) {
+        if (preg_match("#'(/[^']*coolify-proxy-file-[^']+)'.*'(/tmp/coolify-upload-[0-9a-f]+)'#", (string) $process->command, $matches)) {
+            $GLOBALS['proxyFileUploads'][$matches[2]] = file_get_contents($matches[1]);
+        }
+
+        return Process::result();
+    });
+}
+
+/**
+ * The last content written to $file on the server, with Server::uploadProxyFile() or with
+ * `echo '<base64>' | base64 -d | tee $file`.
+ *
+ * @param  array<int, string>  $lines  remote script lines (see Process::assertRan)
+ */
+function writtenProxyFile(array $lines, string $file): ?string
+{
+    $content = null;
+    foreach ($lines as $line) {
+        if (preg_match('#mv -f (/tmp/coolify-upload-[0-9a-f]+) '.preg_quote($file, '#').'$#', $line, $matches)) {
+            $content = $GLOBALS['proxyFileUploads'][$matches[1]] ?? null;
+        } elseif (str_contains($line, "tee $file") && preg_match("/echo '([A-Za-z0-9+\/=]+)'/", $line, $matches)) {
+            $content = base64_decode($matches[1]);
+        }
+    }
+
+    return $content;
+}
+
+/**
+ * Inserts an environment variable next to one with the same key, like older versions could do.
+ * The model refuses such a row, so the insert skips it.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function insertDuplicateEnvironmentVariable(array $attributes): EnvironmentVariable
+{
+    $id = DB::table('environment_variables')->insertGetId([
+        'uuid' => new_public_id(),
+        'is_preview' => false,
+        'created_at' => now(),
+        'updated_at' => now(),
+        ...$attributes,
+        'value' => encrypt((string) ($attributes['value'] ?? '')),
+    ]);
+
+    return EnvironmentVariable::query()->findOrFail($id);
+}

@@ -9,8 +9,24 @@
     @if ($server->proxyType() === ProxyTypes::TRAEFIK->value)
         <x-application.settings-section id="server-proxy-certificates-section" title="TLS certificates"
             x-init="$wire.loadTraefikCertificates()"
-            helper="Review certificates stored in Traefik's acme.json file. Deleting an entry removes it from local ACME storage. It does not revoke the certificate at the certificate authority. If a route still uses the domain, Traefik requests a new certificate after the restart.">
+            helper="Review certificates stored in Traefik's acme.json file. Traefik renews every certificate in this file, also when no route uses its domain any more. Deleting an entry removes it from local ACME storage. It does not revoke the certificate at the certificate authority. If a route still uses the domain, Traefik requests a new certificate after the restart.">
             <x-slot:actions>
+                @php $unusedCertificates = collect($traefikCertificates)->where('in_use', false); @endphp
+                @if ($unusedCertificates->isNotEmpty())
+                    @can('update', $server)
+                        <x-modal-confirmation title="Delete Unused TLS Certificates?" isErrorButton
+                            buttonTitle="Delete unused ({{ $unusedCertificates->count() }})"
+                            submitAction="deleteUnusedTraefikCertificates"
+                            :actions="[
+                                'Save the current acme.json as a backup that you can restore below.',
+                                'Delete '.$unusedCertificates->count().' certificates that no route and no resource on this server uses: '.$unusedCertificates->pluck('main_domain')->implode(', ').'.',
+                            ]"
+                            warningMessage="The proxy keeps using the certificates until you restart it. If a route still uses a domain, Traefik requests a new certificate after the restart. You can restore the backup below to undo this."
+                            step2ButtonText="Delete Certificates"
+                            :confirmWithPassword="false"
+                            :confirmWithText="false" />
+                    @endcan
+                @endif
                 <x-forms.button type="button" wire:click="loadTraefikCertificates"
                     wire:loading.attr="disabled" wire:target="loadTraefikCertificates">
                     Refresh
@@ -37,14 +53,20 @@
                                         <th>Resolver</th>
                                         <th>Alternative names</th>
                                         <th>Expires</th>
-                                        <th><span class="sr-only">Actions</span></th>
+                                        <th class="text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach ($traefikCertificates as $certificate)
                                         <tr wire:key="traefik-certificate-{{ $certificate['id'] }}">
                                             <td class="font-medium text-neutral-950 dark:text-fg">
-                                                {{ $certificate['main_domain'] }}
+                                                <div class="flex flex-col items-start gap-1">
+                                                    {{ $certificate['main_domain'] }}
+                                                    @if (($certificate['in_use'] ?? null) === false)
+                                                        <x-status-badge label="Not used" type="warning" size="sm"
+                                                            title="No route and no resource on this server uses this domain. Traefik renews the certificate until you delete it." />
+                                                    @endif
+                                                </div>
                                             </td>
                                             <td>
                                                 <span class="font-mono text-xs">{{ $certificate['resolver'] }}</span>
@@ -71,22 +93,31 @@
                                             <td>
                                                 {{ $certificate['expires_at'] ?? 'Unknown' }}
                                             </td>
-                                            <td class="text-right">
+                                            <td>
                                                 @can('update', $server)
-                                                    <x-modal-confirmation title="Delete TLS Certificate?"
-                                                        buttonTitle="Delete"
-                                                        submitAction="deleteTraefikCertificate({{ $certificate['id'] }})"
-                                                        :actions="[
-                                                            'Save the current acme.json as a backup that you can restore below.',
-                                                            'Delete the certificate for '.$certificate['main_domain'].' from acme.json.',
-                                                        ]"
-                                                        warningMessage="The proxy keeps using the certificate until you restart it. If a route still uses the domain, Traefik requests a new certificate after the restart. You can restore the backup below to undo this."
-                                                        confirmationText="{{ $certificate['main_domain'] }}"
-                                                        confirmationLabel="Confirm by entering the domain"
-                                                        shortConfirmationLabel="Domain"
-                                                        step2ButtonText="Delete Certificate"
-                                                        isErrorButton :confirmWithPassword="false"
-                                                        :confirmWithText="true" />
+                                                    <div class="flex justify-end">
+                                                        <x-modal-confirmation title="Delete TLS Certificate?"
+                                                            submitAction="deleteTraefikCertificate({{ $certificate['id'] }})"
+                                                            :actions="[
+                                                                'Save the current acme.json as a backup that you can restore below.',
+                                                                'Delete the certificate for '.$certificate['main_domain'].' from acme.json.',
+                                                            ]"
+                                                            warningMessage="The proxy keeps using the certificate until you restart it. If a route still uses the domain, Traefik requests a new certificate after the restart. You can restore the backup below to undo this."
+                                                            confirmationText="{{ $certificate['main_domain'] }}"
+                                                            confirmationLabel="Confirm by entering the domain"
+                                                            shortConfirmationLabel="Domain"
+                                                            step2ButtonText="Delete Certificate"
+                                                            :confirmWithPassword="false"
+                                                            :confirmWithText="true">
+                                                            <x-slot:trigger>
+                                                                <button type="button"
+                                                                    class="icon-button shrink-0 text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                                                                    title="Delete certificate" aria-label="Delete certificate for {{ $certificate['main_domain'] }}">
+                                                                    <x-reicon name="trash" class="size-3.5" />
+                                                                </button>
+                                                            </x-slot:trigger>
+                                                        </x-modal-confirmation>
+                                                    </div>
                                                 @endcan
                                             </td>
                                         </tr>
@@ -115,7 +146,7 @@
                                                 <th>Backup</th>
                                                 <th>Created</th>
                                                 <th>Size</th>
-                                                <th><span class="sr-only">Actions</span></th>
+                                                <th class="text-right">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -127,28 +158,40 @@
                                                     <td>{{ $backup['created_at'] }}</td>
                                                     <td>{{ formatBytes($backup['size']) }}</td>
                                                     <td>
-                                                        <div class="flex justify-end gap-2">
-                                                            <x-modal-confirmation title="Restore acme.json Backup?"
-                                                                buttonTitle="Restore"
-                                                                submitAction="restoreTraefikAcmeBackup('{{ $backup['name'] }}')"
-                                                                :checkboxes="[
-                                                                    ['id' => 'restartProxyAfterAcmeRestore', 'label' => 'Restart the proxy now. Sites on this server are unavailable for a few seconds.'],
-                                                                ]"
-                                                                :actions="[
-                                                                    'Save the current acme.json as a new backup.',
-                                                                    'Replace acme.json with the backup from '.$backup['created_at'].'.',
-                                                                ]"
-                                                                warningMessage="Until the proxy restarts, it keeps its loaded certificates and can write them back to acme.json. Certificates issued after this backup are removed from acme.json."
-                                                                step2ButtonText="Restore Backup"
-                                                                :confirmWithPassword="false"
-                                                                :confirmWithText="false" />
-                                                            <x-modal-confirmation title="Delete acme.json Backup?"
-                                                                buttonTitle="Delete"
-                                                                submitAction="deleteTraefikAcmeBackup('{{ $backup['name'] }}')"
-                                                                :actions="['Delete the backup '.$backup['name'].'.']"
-                                                                step2ButtonText="Delete Backup"
-                                                                isErrorButton :confirmWithPassword="false"
-                                                                :confirmWithText="false" />
+                                                        <div class="flex justify-end">
+                                                            <x-table.row-actions label="Backup actions">
+                                                                <x-modal-confirmation title="Restore acme.json Backup?"
+                                                                    buttonFullWidth
+                                                                    submitAction="restoreTraefikAcmeBackup('{{ $backup['name'] }}')"
+                                                                    :checkboxes="[
+                                                                        ['id' => 'restartProxyAfterAcmeRestore', 'label' => 'Restart the proxy now. Sites on this server are unavailable for a few seconds.'],
+                                                                    ]"
+                                                                    :actions="[
+                                                                        'Save the current acme.json as a new backup.',
+                                                                        'Replace acme.json with the backup from '.$backup['created_at'].'.',
+                                                                    ]"
+                                                                    warningMessage="Until the proxy restarts, it keeps its loaded certificates and can write them back to acme.json. Certificates issued after this backup are removed from acme.json."
+                                                                    step2ButtonText="Restore Backup"
+                                                                    :confirmWithPassword="false"
+                                                                    :confirmWithText="false">
+                                                                    <x-slot:trigger>
+                                                                        <x-table.row-action>Restore</x-table.row-action>
+                                                                    </x-slot:trigger>
+                                                                </x-modal-confirmation>
+                                                                <x-slot:danger>
+                                                                    <x-modal-confirmation title="Delete acme.json Backup?"
+                                                                        buttonFullWidth
+                                                                        submitAction="deleteTraefikAcmeBackup('{{ $backup['name'] }}')"
+                                                                        :actions="['Delete the backup '.$backup['name'].'.']"
+                                                                        step2ButtonText="Delete Backup"
+                                                                        :confirmWithPassword="false"
+                                                                        :confirmWithText="false">
+                                                                        <x-slot:trigger>
+                                                                            <x-table.row-action>Delete</x-table.row-action>
+                                                                        </x-slot:trigger>
+                                                                    </x-modal-confirmation>
+                                                                </x-slot:danger>
+                                                            </x-table.row-actions>
                                                         </div>
                                                     </td>
                                                 </tr>

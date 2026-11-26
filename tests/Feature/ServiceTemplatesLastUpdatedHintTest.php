@@ -48,7 +48,7 @@ it('uses resource tile icons for databases', function () {
     $databases = collect((new Select)->loadServices()['databases'])->keyBy('id');
 
     foreach (['keydb', 'dragonfly', 'clickhouse'] as $database) {
-        expect($databases[$database]['logo'])->toBe(asset("svgs/resources/{$database}.svg"));
+        expect($databases[$database]['logo'])->toBe(resource_logo_url($database));
     }
 });
 
@@ -156,9 +156,9 @@ it('links service websites to the project page instead of a shared host root', f
 
     $services = (new Select)->loadServices()['services'];
 
-    expect($services['uptime-kuma']['website'])->toBe('https://github.com/louislam/uptime-kuma')
-        ->and($services['alexandrie']['website'])->toBe('https://www.github.com/Smaug6739/Alexandrie')
-        ->and($services['radarr']['website'])->toBe('https://hub.docker.com/r/linuxserver/radarr')
-        ->and($services['n8n']['website'])->toBe('https://n8n.io')
+    expect($services['uptime-kuma']['website'])->toBe('https://github.com/louislam/uptime-kuma?ref=coolify.io')
+        ->and($services['alexandrie']['website'])->toBe('https://www.github.com/Smaug6739/Alexandrie?ref=coolify.io')
+        ->and($services['radarr']['website'])->toBe('https://hub.docker.com/r/linuxserver/radarr?ref=coolify.io')
+        ->and($services['n8n']['website'])->toBe('https://n8n.io?ref=coolify.io')
         ->and($services['broken']['website'])->toBeNull();
 });

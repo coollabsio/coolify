@@ -31,7 +31,7 @@ class ServerLimitCheckJob implements ShouldBeEncrypted, ShouldQueue
     public function handle()
     {
         try {
-            $servers = $this->team->servers;
+            $servers = $this->team->managedServers;
             $servers_count = $servers->count();
             $number_of_servers_to_disable = $servers_count - $this->team->limits;
             if ($number_of_servers_to_disable > 0) {

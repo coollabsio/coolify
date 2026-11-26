@@ -40,8 +40,6 @@
                     <livewire:project.service.storage :resource="$database" />
                 @elseif ($currentRoute === 'project.database.healthcheck')
                     <livewire:project.database.health :database="$database" />
-                @elseif ($currentRoute === 'project.database.import-backup')
-                    <livewire:project.database.import :resource="$database" />
                 @elseif ($currentRoute === 'project.database.webhooks')
                     <livewire:project.shared.webhooks :resource="$database" />
                 @elseif ($currentRoute === 'project.database.resource-limits')
@@ -50,6 +48,12 @@
                     <livewire:project.shared.resource-operations :resource="$database" />
                 @elseif ($currentRoute === 'project.database.metrics')
                     <livewire:project.shared.metrics :resource="$database" />
+                @elseif ($currentRoute === 'project.database.vulnerabilities')
+                    <div class="flex flex-col gap-6">
+                        <livewire:image-scan.vulnerabilities resource-type="database" :resource-uuid="$database->uuid" />
+                        <livewire:image-scan.packages resource-type="database" :resource-uuid="$database->uuid" />
+                        <livewire:image-scan.scan-settings scope-type="database" :scope-uuid="$database->uuid" />
+                    </div>
                 @elseif ($currentRoute === 'project.database.tags')
                     <livewire:project.shared.tags :resource="$database" />
                 @elseif ($currentRoute === 'project.database.danger')

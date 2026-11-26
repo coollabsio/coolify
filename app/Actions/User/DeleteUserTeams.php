@@ -137,7 +137,6 @@ class DeleteUserTeams
 
                 // Update the new owner's role to owner
                 $team->members()->updateExistingPivot($newOwner->id, ['role' => 'owner']);
-                RevokeUserTeamTokens::forUserTeam($newOwner, $team->id);
 
                 // Remove the current user from the team
                 $team->members()->detach($this->user->id);

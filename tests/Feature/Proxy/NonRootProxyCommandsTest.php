@@ -43,7 +43,7 @@ function nonRootProxyScriptLines(): array
 {
     $lines = [];
     Process::assertRan(function ($process) use (&$lines) {
-        array_push($lines, ...explode("\n", $process->command));
+        array_push($lines, ...explode("\n", remoteProcessScript($process)));
 
         return true;
     });
@@ -79,7 +79,7 @@ it('starts the proxy without entering proxy directories as the SSH user', functi
     $lines = nonRootProxyScriptLines();
     expectNoUnprivilegedProxyFileAccess($lines);
     expect($lines)
-        ->toContain("sudo docker compose -f {$proxyPath}/docker-compose.yml pull")
+        ->toContain("sudo DOCKER_CONTEXT=default DOCKER_CONFIG=\"\$(sudo find \"\$HOME/.docker/config.json\" -maxdepth 0 -exec dirname {} \\; 2>/dev/null)\" docker compose -f {$proxyPath}/docker-compose.yml pull")
         ->toContain("sudo docker compose -f {$proxyPath}/docker-compose.yml up -d --wait --remove-orphans")
         // The backfill reads a stored configuration in an `else` branch, which must run through sudo too.
         ->and(implode("\n", $lines))->toMatch("/^sudo\\s+head -c \\d+ '\\S+\\/docker-compose\\.yml'$/m");
@@ -93,8 +93,10 @@ it('writes the Caddyfile through sudo', function () {
 
     StartProxy::run($this->server, async: false, force: true);
 
+    $base64 = base64_encode("import /dynamic/*.caddy\n");
+
     expect(nonRootProxyScriptLines())
-        ->toContain("echo 'import /dynamic/*.caddy' | sudo tee /data/coolify/proxy/caddy/dynamic/Caddyfile > /dev/null");
+        ->toContain("echo '{$base64}' | sudo base64 -d | sudo tee /data/coolify/proxy/caddy/dynamic/Caddyfile > /dev/null");
 });
 
 it('deploys the swarm proxy stack with an absolute compose file path', function () {
@@ -112,8 +114,8 @@ it('deploys the swarm proxy stack with an absolute compose file path', function 
 it('builds restart commands without entering proxy directories as the SSH user', function (string $proxyType, string $proxyPath) {
     useNonRootProxy($this->server, $proxyType);
     $configuration = $this->server->proxyType() === ProxyTypes::CADDY->value
-        ? "services:\n  caddy:\n    image: lucaslorentz/caddy-docker-proxy:2.13-alpine\n"
-        : "services:\n  traefik:\n    image: traefik:v3.6\n";
+        ? "services:\n  caddy:\n    container_name: coolify-proxy\n    image: lucaslorentz/caddy-docker-proxy:2.13-alpine\n"
+        : "services:\n  traefik:\n    container_name: coolify-proxy\n    image: traefik:v3.6\n";
 
     $method = new ReflectionMethod(RestartProxyJob::class, 'buildRestartCommands');
     $commands = $method->invoke(new RestartProxyJob($this->server), $configuration);
@@ -121,7 +123,7 @@ it('builds restart commands without entering proxy directories as the SSH user',
 
     expectNoUnprivilegedProxyFileAccess($lines);
     expect($lines)
-        ->toContain("sudo docker compose -f {$proxyPath}/docker-compose.yml pull")
+        ->toContain("sudo DOCKER_CONTEXT=default DOCKER_CONFIG=\"\$(sudo find \"\$HOME/.docker/config.json\" -maxdepth 0 -exec dirname {} \\; 2>/dev/null)\" docker compose -f {$proxyPath}/docker-compose.yml pull")
         ->toContain("sudo docker compose -f {$proxyPath}/docker-compose.yml up -d --wait --remove-orphans");
 })->with([
     'traefik' => [ProxyTypes::TRAEFIK->value, '/data/coolify/proxy'],
@@ -133,7 +135,7 @@ it('backs up and prunes proxy configurations through sudo without bash', functio
     $this->server->proxy->last_saved_settings = 'a1b2c3d4e5f6';
     $this->server->save();
 
-    SaveProxyConfiguration::run($this->server, "services:\n  caddy:\n    image: lucaslorentz/caddy-docker-proxy:2.13-alpine\n");
+    SaveProxyConfiguration::run($this->server, "services:\n  caddy:\n    container_name: coolify-proxy\n    image: lucaslorentz/caddy-docker-proxy:2.13-alpine\n");
 
     $lines = nonRootProxyScriptLines();
     $backups = '/data/coolify/proxy/caddy/backups';

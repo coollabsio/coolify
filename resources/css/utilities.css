@@ -49,12 +49,12 @@
 }
 
 @utility input-sticky-active {
-    @apply text-black border-2 border-coollabs dark:border-warning dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs dark:focus:border-warning;
+    @apply text-black border-2 border-coollabs dark:border-brand-light dark:text-white focus:bg-neutral-200 dark:focus:bg-coolgray-400 focus:border-coollabs dark:focus:border-brand-light;
 }
 
 /* Focus */
 @utility input-focus {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-warning focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coollabs dark:focus-visible:ring-brand-light focus-visible:ring-offset-2 dark:focus-visible:ring-offset-base;
 }
 
 /*  input, select before */
@@ -142,7 +142,7 @@
 }
 
 @utility loading-indicator {
-    @apply text-coollabs dark:text-warning;
+    @apply text-coollabs dark:text-brand-light;
 }
 
 /* Compact icon-only control (gear, chevrons, etc.) */
@@ -162,7 +162,7 @@
 
 /* Active resource tab (used with aria-current="page") */
 @utility app-tab-active {
-    @apply bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20;
+    @apply bg-coollabs/10 text-coollabs shadow-sm ring-1 ring-coollabs/25 hover:bg-coollabs/15 dark:bg-brand/15 dark:text-brand-light dark:ring-brand-light/25 dark:hover:bg-brand/20;
 }
 
 @utility auth-tooltip {
@@ -249,11 +249,6 @@
     @apply px-2.5 pt-1 pb-1 text-[11px] font-medium text-nav-muted select-none;
 }
 
-/* Collapsible group header (accordion) for the resource settings sidebar. */
-@utility nav-section-toggle {
-    @apply w-full items-center justify-between gap-2 px-2.5 pt-1 pb-1 text-[11px] font-medium text-nav-muted select-none rounded-md transition-colors cursor-pointer hover:text-nav-active;
-}
-
 /* Indented child rows in a collapsible nav group */
 @utility menu-subitem {
     /* Label owns text ellipsis; keep this row overflow-visible so the focus ring is not clipped. */
@@ -276,7 +271,7 @@
 }
 
 @utility heading-item-active {
-    @apply text-black rounded-sm dark:bg-coolgray-200 dark:text-warning;
+    @apply text-black rounded-sm dark:bg-coolgray-200 dark:text-brand-light;
 }
 
 @utility icon {
@@ -300,11 +295,11 @@
 }
 
 @utility loading {
-    @apply w-4 dark:text-warning text-coollabs;
+    @apply w-4 dark:text-brand-light text-coollabs;
 }
 
 @utility kbd-custom {
-    @apply px-2 text-xs rounded-sm border border-dashed border-neutral-700 dark:text-warning;
+    @apply px-2 text-xs rounded-sm border border-dashed border-neutral-700 dark:text-brand-light;
 }
 
 @utility box {
@@ -348,7 +343,7 @@
 }
 
 @utility text-helper {
-    @apply inline-block font-semibold text-coollabs dark:text-warning;
+    @apply inline-block font-semibold text-coollabs dark:text-brand-light;
 }
 
 @utility info-helper {
@@ -433,6 +428,16 @@
         justify-content: flex-start;
         padding-left: 0.625rem;
         padding-right: 0.625rem;
+    }
+
+    /* Flat rows show their own fill, so make it a 2rem square (same as the h-8
+       height) with the icon centered, in line with the footer controls. */
+    html[data-nav-items="flat"] .sidebar-collapsed .menu-item:not(.sidebar-toggle) {
+        width: 2rem;
+        margin-left: 0.1875rem;
+        justify-content: center;
+        padding-left: 0;
+        padding-right: 0;
     }
 
     .sidebar-collapsed .sidebar-collapsed-label {

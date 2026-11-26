@@ -3,11 +3,11 @@
 # category: monitoring
 # tags: monitoring, status, performance, web, services, applications, real-time
 # logo: svgs/healthchecks.webp
-# port: 80000
+# port: 8000
 
 services:
   healthchecks:
-    image: "healthchecks/healthchecks:v4.2"
+    image: "healthchecks/healthchecks:v5.0.3"
     container_name: healthchecks
     environment:
       - SERVICE_URL_HEALTHCHECKS_8000

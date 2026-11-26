@@ -144,7 +144,7 @@ class RestoreDatabase extends Command
 
         // Use pg_restore for custom format dumps
         $command = sprintf(
-            'PGPASSWORD=%s pg_restore -h %s -p %s -U %s -d %s -v %s',
+            'PGPASSWORD=%s pg_restore --no-owner --no-acl -h %s -p %s -U %s -d %s -v %s',
             escapeshellarg($password),
             escapeshellarg($host),
             escapeshellarg($port),
