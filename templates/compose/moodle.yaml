@@ -1,3 +1,4 @@
+# ignore: true
 # documentation: https://moodle.org
 # slogan: Moodle is the world’s most customisable and trusted eLearning solution that empowers educators to improve our world.
 # category: cms
@@ -27,7 +28,7 @@ services:
       retries: 5
 
   moodle:
-    image: docker.io/bitnamilegacy/moodle:4.3
+    image: docker.io/bitnamilegacy/moodle:5.0.2
     depends_on:
       - mariadb
     environment:

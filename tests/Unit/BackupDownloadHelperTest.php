@@ -13,9 +13,11 @@ function backupDownloadServer(): Server
         'ip' => '192.0.2.10',
         'port' => 2222,
         'user' => 'root',
+        'team_id' => 5,
     ]);
 
-    $privateKey = Mockery::mock(PrivateKey::class);
+    $privateKey = Mockery::mock(PrivateKey::class)->makePartial();
+    $privateKey->forceFill(['team_id' => 5]);
     $privateKey->shouldReceive('getKeyLocation')->andReturn('/tmp/private-key');
     $server->setRelation('privateKey', $privateKey);
 
@@ -44,6 +46,15 @@ it('throws when the backup file does not exist on the server', function () {
     streamBackupFromServer(backupDownloadServer(), '/backups/archive.tar.gz', 'application/gzip');
 })->throws(FileNotFoundException::class);
 
+it('refuses a private key from another team', function () {
+    $server = backupDownloadServer();
+    $server->privateKey->forceFill(['team_id' => 6]);
+
+    Storage::shouldReceive('build')->never();
+
+    streamBackupFromServer($server, '/backups/archive.tar.gz', 'application/gzip');
+})->throws(RuntimeException::class);
+
 it('streams a backup file with the requested content type', function () {
     $stream = fopen('php://memory', 'r+');
     fwrite($stream, 'backup contents');
@@ -70,3 +81,20 @@ it('streams a backup file with the requested content type', function () {
 
     expect($contents)->toBe('backup contents');
 });
+
+it('brackets an IPv6 server address for the sftp host', function (string $ip) {
+    $server = backupDownloadServer();
+    $server->forceFill(['ip' => $ip]);
+
+    $disk = Mockery::mock();
+    $disk->shouldReceive('exists')->once()->andReturnFalse();
+    Storage::shouldReceive('build')
+        ->once()
+        ->withArgs(fn (array $config): bool => $config['host'] === '[2a01:4f8::1]')
+        ->andReturn($disk);
+
+    streamBackupFromServer($server, '/backups/archive.tar.gz', 'application/gzip');
+})->with([
+    'raw' => '2a01:4f8::1',
+    'bracketed' => '[2a01:4f8::1]',
+])->throws(FileNotFoundException::class);

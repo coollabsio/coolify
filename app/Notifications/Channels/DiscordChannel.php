@@ -24,6 +24,6 @@ class DiscordChannel
             $message->isCritical = false;
         }
 
-        SendMessageToDiscordJob::dispatch($message, $discordSettings->discord_webhook_url);
+        SendMessageToDiscordJob::dispatch($message, $discordSettings->discord_webhook_url, data_get($notification, 'isTestNotification', false) ? null : $discordSettings);
     }
 }

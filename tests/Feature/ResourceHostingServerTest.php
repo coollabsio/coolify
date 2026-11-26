@@ -17,7 +17,6 @@ use App\Models\SwarmDocker;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Blade;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -86,7 +85,34 @@ test('legacy server settings with a null role use the combined role', function (
     expect($this->server->settings->effectiveServerRole()->value)->toBe('both')
         ->and($this->server->canHostResources())->toBeTrue()
         ->and(Server::isUsable()->pluck('id'))->toContain($this->server->id)
-        ->and(Server::isUsableBuildServer()->pluck('id'))->toContain($this->server->id);
+        ->and(Server::isUsableBuildServer()->pluck('id'))->not->toContain($this->server->id)
+        ->and(Server::buildServers($this->team->id)->pluck('id'))->not->toContain($this->server->id);
+});
+
+test('legacy build servers with a null role stay build only', function () {
+    $this->actingAs($this->user);
+    $this->server->settings()->update(['server_role' => null, 'is_build_server' => true]);
+    $this->server->refresh()->load('settings');
+
+    expect($this->server->settings->effectiveServerRole()->value)->toBe('build')
+        ->and(Server::isUsable()->pluck('id'))->not->toContain($this->server->id)
+        ->and(Server::isUsableBuildServer()->pluck('id'))->toContain($this->server->id)
+        ->and(Server::buildServers($this->team->id)->pluck('id'))->toContain($this->server->id);
+});
+
+test('deployments only requires a dedicated build server, not a combined server', function () {
+    $combinedServer = Server::factory()->create(['team_id' => $this->team->id]);
+    $combinedServer->settings()->update(['server_role' => 'both',
+        'is_build_server' => false, 'is_reachable' => true, 'is_usable' => true]);
+
+    Livewire::actingAs($this->user)
+        ->test(Show::class, ['server_uuid' => $this->server->uuid])
+        ->set('serverRole', 'deployment')
+        ->call('requestServerRoleChange')
+        ->assertSet('serverRole', 'both')
+        ->assertDispatched('error');
+
+    expect($this->server->settings->fresh()->server_role->value)->toBe('both');
 });
 
 test('changing from build only to deployments and builds requires confirmation', function () {
@@ -169,25 +195,29 @@ test('resource selection keeps excluded build servers visible for explanation', 
     expect($component->servers->pluck('id'))->toContain($this->server->id)
         ->not->toContain($buildServer->id)
         ->and(Server::isUsableBuildServer()->pluck('id'))->toContain($buildServer->id)
-        ->toContain($this->server->id)
+        ->not->toContain($this->server->id)
         ->and($component->buildServers->pluck('id'))->toContain($buildServer->id)
         ->and($component->allServers->pluck('id'))->toContain($this->server->id, $buildServer->id);
 });
 
-test('resource selection does not show the empty server message when only build servers are available', function () {
-    $html = Blade::render(
-        file_get_contents(resource_path('views/livewire/project/new/select.blade.php')),
-        [
-            'current_step' => 'servers',
-            'onlyBuildServerAvailable' => true,
-            'servers' => collect(),
-            'buildServers' => collect(),
-        ],
-    );
+test('resource selection lists each combined server once', function () {
+    $this->actingAs($this->user);
+    $otherServer = Server::factory()->create(['team_id' => $this->team->id]);
+    $otherServer->settings()->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+        'server_role' => 'both',
+        'is_build_server' => false,
+        'is_swarm_worker' => false,
+        'force_disabled' => false,
+    ]);
 
-    expect($html)
-        ->toContain('Only build servers are available')
-        ->not->toContain('No validated & reachable servers found');
+    $component = new ResourceSelect;
+    $component->loadServers();
+
+    expect($component->buildServers)->toBeEmpty()
+        ->and($component->servers->pluck('id')->all())->toEqualCanonicalizing([$this->server->id, $otherServer->id])
+        ->and($component->allServers->pluck('id')->duplicates())->toBeEmpty();
 });
 
 test('application API rejects build servers', function () {
@@ -244,11 +274,11 @@ test('server API rejects enabling build mode when resources exist', function () 
 
     $this->withHeaders(resourceHostingApiHeaders($this->bearerToken))
         ->patchJson('/api/v1/servers/'.$this->server->uuid, [
-            'is_build_server' => true,
+            'server_role' => 'build',
             'name' => 'should-not-be-saved',
         ])
         ->assertUnprocessable()
-        ->assertInvalid(['is_build_server']);
+        ->assertInvalid(['server_role']);
 
     expect((bool) $this->server->settings->fresh()->is_build_server)->toBeFalse()
         ->and($this->server->fresh()->name)->toBe($originalName);
@@ -260,7 +290,7 @@ test('server API allows keeping build mode enabled when resources exist', functi
 
     $this->withHeaders(resourceHostingApiHeaders($this->bearerToken))
         ->patchJson('/api/v1/servers/'.$this->server->uuid, [
-            'is_build_server' => true,
+            'server_role' => 'build',
         ])
         ->assertCreated();
 
@@ -273,12 +303,13 @@ test('server API allows disabling build mode when resources exist', function () 
 
     $this->withHeaders(resourceHostingApiHeaders($this->bearerToken))
         ->patchJson('/api/v1/servers/'.$this->server->uuid, [
-            'is_build_server' => false,
+            'server_role' => 'both',
             'name' => 'Deployment Server',
         ])
         ->assertCreated();
 
     expect((bool) $this->server->settings->fresh()->is_build_server)->toBeFalse()
+        ->and($this->server->settings->fresh()->server_role->value)->toBe('both')
         ->and($this->server->fresh()->name)->toBe('Deployment Server');
 });
 
@@ -483,7 +514,5 @@ test('resource operations explains why build servers cannot be clone targets', f
     ]);
 
     Livewire::test(ResourceOperations::class, ['resource' => $source])
-        ->assertSet('buildServers', fn ($servers) => $servers->contains('id', $buildServer->id))
-        ->assertSee('Dedicated Builder')
-        ->assertSee('build server');
+        ->assertSet('buildServers', fn ($servers) => $servers->contains('id', $buildServer->id));
 });

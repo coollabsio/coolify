@@ -7,7 +7,7 @@
 
 services:
   ryot:
-    image: ignisda/ryot:v10.3.0
+    image: ignisda/ryot:v10.5.8
     environment:
       - SERVICE_URL_RYOT_8000
       - DATABASE_URL=postgres://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@postgresql:5432/${POSTGRES_DB}
@@ -23,9 +23,9 @@ services:
       retries: 10
 
   postgresql:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     volumes:
-      - ryot_postgresql_data:/var/lib/postgresql/data
+      - ryot_postgresql_data:/var/lib/postgresql
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}

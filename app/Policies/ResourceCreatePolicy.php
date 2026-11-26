@@ -2,62 +2,41 @@
 
 namespace App\Policies;
 
-use App\Models\Application;
-use App\Models\Service;
-use App\Models\StandaloneClickhouse;
-use App\Models\StandaloneDragonfly;
-use App\Models\StandaloneKeydb;
-use App\Models\StandaloneMariadb;
-use App\Models\StandaloneMongodb;
-use App\Models\StandaloneMysql;
-use App\Models\StandalonePostgresql;
-use App\Models\StandaloneRedis;
+use App\Enums\AccessLevel;
+use App\Models\Environment;
 use App\Models\User;
+use App\Services\Access\AccessResolver;
+use Illuminate\Auth\Access\Response;
+use Illuminate\Database\Eloquent\Model;
 
 class ResourceCreatePolicy
 {
     /**
-     * List of resource classes that can be created
+     * Determine whether the user can create resources in the environment.
+     * Without an environment, the user needs write access on the whole current team.
      */
-    public const CREATABLE_RESOURCES = [
-        StandalonePostgresql::class,
-        StandaloneRedis::class,
-        StandaloneMongodb::class,
-        StandaloneMysql::class,
-        StandaloneMariadb::class,
-        StandaloneKeydb::class,
-        StandaloneDragonfly::class,
-        StandaloneClickhouse::class,
-        Service::class,
-        Application::class,
-        GithubApp::class,
-    ];
-
-    /**
-     * Determine whether the user can create any resource.
-     */
-    public function createAny(User $user): bool
+    public function createAny(User $user, ?Environment $environment = null): bool
     {
-        return $user->isAdmin();
-    }
-
-    /**
-     * Determine whether the user can create a specific resource type.
-     */
-    public function create(User $user, string $resourceClass): bool
-    {
-        if (! in_array($resourceClass, self::CREATABLE_RESOURCES)) {
-            return false;
+        if ($environment !== null) {
+            return $user->canAccess(AccessLevel::Write, $environment);
         }
 
-        return $user->isAdmin();
+        $teamId = $user->currentTeam()?->id;
+
+        return $teamId !== null && app(AccessResolver::class)->allowsTeamWide($user, AccessLevel::Write, $teamId);
     }
 
     /**
-     * Authorize creation of all supported resource types.
+     * Determine whether the user can use a team credential or team-wide location that the resource does not use
+     * yet: private keys, git sources, integration tokens, and backup files of other resources.
+     * Needs write access on the whole team of the resource, or of the current team without a resource.
      */
-    public function authorizeAllResourceCreation(User $user): bool
+    public function useTeamCredentials(User $user, ?Model $resource = null): Response
     {
-        return $this->createAny($user);
+        $teamId = $resource !== null ? $resource->team()?->id : $user->currentTeam()?->id;
+
+        return $teamId !== null && app(AccessResolver::class)->allowsTeamWide($user, AccessLevel::Write, (int) $teamId)
+            ? Response::allow()
+            : Response::deny('You need write access on the whole team to use team credentials, such as private keys, git sources, and S3 storages.');
     }
 }

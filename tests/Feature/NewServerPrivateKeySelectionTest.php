@@ -1,10 +1,13 @@
 <?php
 
+use App\Helpers\SshMultiplexingHelper;
 use App\Livewire\Server\New\ByIp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
+use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -90,4 +93,46 @@ it('preselects a manually added private key without clearing server form data', 
         ->assertSet('port', 2222)
         ->assertSet('server_role', 'build')
         ->assertSee('Manual SSH Key');
+});
+
+it('only accepts a private key from the current team when adding a server', function () {
+    $otherTeamKey = PrivateKey::factory()->create(['team_id' => Team::factory()->create()->id]);
+
+    Livewire::test(ByIp::class, [
+        'private_keys' => collect([$this->existingPrivateKey]),
+        'limit_reached' => false,
+    ])
+        ->set('ip', '192.0.2.60')
+        ->set('private_key_id', $otherTeamKey->id)
+        ->call('submit')
+        ->assertHasErrors(['private_key_id']);
+
+    expect(Server::where('ip', '192.0.2.60')->exists())->toBeFalse();
+
+    Livewire::test(ByIp::class, [
+        'private_keys' => collect([$this->existingPrivateKey]),
+        'limit_reached' => false,
+    ])
+        ->set('ip', '192.0.2.61')
+        ->set('private_key_id', $this->existingPrivateKey->id)
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect(Server::where('ip', '192.0.2.61')->value('private_key_id'))->toBe($this->existingPrivateKey->id);
+});
+
+it('ssh configuration only uses a private key from the server team', function () {
+    $otherTeamKey = PrivateKey::factory()->create(['team_id' => Team::factory()->create()->id]);
+    $server = Server::factory()->create([
+        'team_id' => $this->team->id,
+        'private_key_id' => $this->existingPrivateKey->id,
+    ]);
+
+    expect(SshMultiplexingHelper::serverSshConfiguration($server)['sshKeyLocation'])
+        ->toBe($this->existingPrivateKey->getKeyLocation());
+
+    Server::query()->whereKey($server->id)->update(['private_key_id' => $otherTeamKey->id]);
+
+    expect(fn () => SshMultiplexingHelper::serverSshConfiguration($server->fresh()))
+        ->toThrow(ModelNotFoundException::class);
 });

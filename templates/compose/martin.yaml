@@ -4,10 +4,11 @@
 # tags: postgis, vector, tiles
 # logo: svgs/martin.png
 # port: 3000
+# outdated: true
 
 services:
   martin:
-    image: ghcr.io/maplibre/martin:v0.13.0
+    image: ghcr.io/maplibre/martin:1.16.1
     environment:
       - SERVICE_URL_MARTIN_3000
       - HOST=${SERVICE_URL_MARTIN}
@@ -16,7 +17,7 @@ services:
       postgresql:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/health"]
       interval: 5s
       timeout: 20s
       retries: 10

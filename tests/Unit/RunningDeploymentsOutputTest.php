@@ -11,7 +11,7 @@ it('shows only the active deployment count by default', function () {
     ]]);
 
     expect($output)
-        ->toBe("\n=== Running Deployments ===\nTotal active deployments: 1\n")
+        ->toBe("\n=== Running Deployments ===\nTotal active deployments: 1\nTotal running scheduled jobs: 0\n")
         ->not->toContain('secret-application')
         ->not->toContain('https://example.com/secret-deployment')
         ->not->toContain('member@example.com');

@@ -1,0 +1,6 @@
+# Reference compose for the service parser error path: a bind source with shell metacharacters must be rejected.
+services:
+  web:
+    image: nginx:alpine
+    volumes:
+      - "./data;touch /tmp/pwned:/data"

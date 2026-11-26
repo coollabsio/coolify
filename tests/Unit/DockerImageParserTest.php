@@ -139,3 +139,15 @@ it('correctly parses image when user provides digest-decorated name with colon h
         ->and($parser->getTag())->toBe($hash)
         ->and($parser->isImageHash())->toBeTrue();
 });
+
+it('parses a tag with a default value as one tag', function (string $imageString, string $imageName) {
+    $parser = new DockerImageParser;
+    $parser->parse($imageString);
+
+    expect($parser->getFullImageNameWithoutTag())->toBe($imageName)
+        ->and($parser->getTag())->toBe('${API_VERSION:-latest}')
+        ->and($parser->isImageHash())->toBeFalse();
+})->with([
+    'image' => ['nginx:${API_VERSION:-latest}', 'nginx'],
+    'registry image with port' => ['localhost:5000/team/app:${API_VERSION:-latest}', 'localhost:5000/team/app'],
+]);

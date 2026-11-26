@@ -7,7 +7,7 @@
 
 services:
   sonarr:
-    image: lscr.io/linuxserver/sonarr:latest
+    image: lscr.io/linuxserver/sonarr:4.0.20.3014-ls5
     environment:
       - SERVICE_URL_SONARR_8989
       - _APP_URL=$SERVICE_URL_SONARR

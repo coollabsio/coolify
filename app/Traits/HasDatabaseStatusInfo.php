@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\Auth;
  */
 trait HasDatabaseStatusInfo
 {
+    use ListensToTeamChannel;
+
     public ?string $dbUrl = null;
 
     public ?string $dbUrlPublic = null;
@@ -65,24 +67,23 @@ trait HasDatabaseStatusInfo
 
         $listeners["echo-private:user.{$user->id},DatabaseStatusChanged"] = 'refresh';
 
-        $team = $user->currentTeam();
-        if ($team) {
-            $listeners["echo-private:team.{$team->id},ServiceChecked"] = 'refresh';
-        }
-
-        return $listeners;
+        return [
+            ...$listeners,
+            ...$this->teamChannelListeners(['ServiceChecked' => 'refresh']),
+        ];
     }
 
     public function mount(): void
     {
-        $this->isPasswordHiddenForMember = auth()->user()?->isMember() ?? false;
         $this->refresh();
     }
 
     public function refresh(): void
     {
         $this->database->refresh();
-        if ($this->isPasswordHiddenForMember) {
+        $this->isPasswordHiddenForMember = ! (auth()->user()?->can('update', $this->database) ?? false);
+        $isCredentialLocked = method_exists($this->database, 'isCredentialLocked') && $this->database->isCredentialLocked();
+        if ($this->isPasswordHiddenForMember || $isCredentialLocked) {
             $this->dbUrl = null;
             $this->dbUrlPublic = null;
         } else {
@@ -156,8 +157,16 @@ trait HasDatabaseStatusInfo
                 caKey: $caCert->ssl_private_key,
                 configurationDir: $existingCert->configuration_dir,
                 mountPath: $existingCert->mount_path,
-                isPemKeyFileRequired: true,
+                isPemKeyFileRequired: $existingCert->requiresPemKeyFile(),
             );
+
+            auditLog('ui.database.ssl_certificate_regenerated', [
+                'team_id' => $server->team_id,
+                'database_uuid' => $this->database->uuid,
+                'database_name' => $this->database->name,
+                'database_type' => $this->database->type(),
+                'server_uuid' => $server->uuid,
+            ]);
 
             $this->refresh();
             $this->dispatch('success', 'SSL certificates regenerated. Restart database to apply changes.');

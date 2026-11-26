@@ -2,10 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\HasSmtpServers;
+use App\Traits\TracksDeliveryFailures;
 use Illuminate\Database\Eloquent\Model;
 
 class EmailNotificationSettings extends Model
 {
+    use HasSmtpServers, TracksDeliveryFailures;
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -25,11 +29,14 @@ class EmailNotificationSettings extends Model
 
         'resend_enabled',
         'resend_api_key',
+        'resend_from_address',
+        'resend_from_name',
 
         'use_instance_email_settings',
 
         'deployment_success_email_notifications',
         'deployment_failure_email_notifications',
+        'deployment_commit_details_email_notifications',
         'status_change_email_notifications',
         'restart_limit_reached_email_notifications',
         'backup_success_email_notifications',
@@ -43,6 +50,7 @@ class EmailNotificationSettings extends Model
         'server_unreachable_email_notifications',
         'server_patch_email_notifications',
         'traefik_outdated_email_notifications',
+        'image_vulnerabilities_email_notifications',
     ];
 
     protected $hidden = [
@@ -53,6 +61,8 @@ class EmailNotificationSettings extends Model
         'smtp_username',
         'smtp_password',
         'resend_api_key',
+        'resend_from_address',
+        'resend_from_name',
     ];
 
     protected $casts = [
@@ -68,11 +78,14 @@ class EmailNotificationSettings extends Model
 
         'resend_enabled' => 'boolean',
         'resend_api_key' => 'encrypted',
+        'resend_from_address' => 'encrypted',
+        'resend_from_name' => 'encrypted',
 
         'use_instance_email_settings' => 'boolean',
 
         'deployment_success_email_notifications' => 'boolean',
         'deployment_failure_email_notifications' => 'boolean',
+        'deployment_commit_details_email_notifications' => 'boolean',
         'status_change_email_notifications' => 'boolean',
         'restart_limit_reached_email_notifications' => 'boolean',
         'backup_success_email_notifications' => 'boolean',
@@ -82,6 +95,7 @@ class EmailNotificationSettings extends Model
         'server_disk_usage_email_notifications' => 'boolean',
         'server_patch_email_notifications' => 'boolean',
         'traefik_outdated_email_notifications' => 'boolean',
+        'image_vulnerabilities_email_notifications' => 'boolean',
     ];
 
     public function team()
@@ -91,6 +105,17 @@ class EmailNotificationSettings extends Model
 
     public function isEnabled()
     {
-        return $this->smtp_enabled || $this->resend_enabled || $this->use_instance_email_settings;
+        return filled(enabled_email_provider($this)) || $this->use_instance_email_settings;
+    }
+
+    public function notificationChannelName(): string
+    {
+        return 'Email';
+    }
+
+    protected function disableNotificationChannel(): void
+    {
+        $this->smtp_enabled = false;
+        $this->resend_enabled = false;
     }
 }

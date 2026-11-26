@@ -7,7 +7,7 @@
 
 services:
   teable:
-    image: ghcr.io/teableio/teable:latest
+    image: ghcr.io/teableio/teable:release.2026-11-13T02-21-01Z.3890
     volumes:
       - teable_data:/app/.assets:rw
     environment:
@@ -30,6 +30,8 @@ services:
       - BACKEND_MAIL_AUTH_USER=${BACKEND_MAIL_AUTH_USER}
       - BACKEND_MAIL_AUTH_PASS=${BACKEND_MAIL_AUTH_PASS}
     depends_on:
+      teable-db:
+        condition: service_healthy
       teable-cache:
         condition: service_healthy
     healthcheck:
@@ -59,15 +61,6 @@ services:
       interval: 5s
       timeout: 20s
       retries: 10
-  teable-db-migrate:
-    image: ghcr.io/teableio/teable-db-migrate:latest
-    restart: no
-    environment:
-      - TZ=${TIMEZONE}
-      - PRISMA_DATABASE_URL=postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_POSTGRES}@teable-db:${POSTGRES_PORT}/${POSTGRES_DB}
-    depends_on:
-      teable-db:
-        condition: service_healthy
   teable-cache:
     image: redis:7.2.4
     environment:

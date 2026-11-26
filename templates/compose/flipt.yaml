@@ -7,7 +7,7 @@
 
 services:
   flipt:
-    image: 'docker.flipt.io/flipt/flipt:latest'
+    image: 'docker.flipt.io/flipt/flipt:v1.62.0'
     volumes:
       - 'flipt-data:/var/opt/flipt'
     environment:

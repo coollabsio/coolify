@@ -11,7 +11,7 @@
 
 services:
   electric:
-    image: electricsql/electric:1.4.2
+    image: electricsql/electric:1.8.1
     environment:
       - SERVICE_URL_ELECTRIC_3000
       - DATABASE_URL=${DATABASE_URL:?}

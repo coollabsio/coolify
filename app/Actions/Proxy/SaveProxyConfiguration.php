@@ -3,7 +3,11 @@
 namespace App\Actions\Proxy;
 
 use App\Models\Server;
+use App\Services\ProxyPortParser;
+use Illuminate\Validation\ValidationException;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Symfony\Component\Yaml\Tag\TaggedValue;
+use Symfony\Component\Yaml\Yaml;
 
 class SaveProxyConfiguration
 {
@@ -13,6 +17,18 @@ class SaveProxyConfiguration
 
     public function handle(Server $server, string $configuration): void
     {
+        try {
+            ProxyPortParser::fromConfiguration($configuration);
+        } catch (\InvalidArgumentException $exception) {
+            throw ValidationException::withMessages([
+                'configuration' => [$exception->getMessage()],
+            ]);
+        }
+
+        if (! $server->isSwarm()) {
+            $this->ensureDefaultContainerName($configuration);
+        }
+
         $proxy_path = $server->proxyPath();
         $docker_compose_yml_base64 = base64_encode($configuration);
         $new_hash = str($docker_compose_yml_base64)->pipe('md5')->value;
@@ -36,14 +52,43 @@ class SaveProxyConfiguration
             $timestamp = now()->format('Y-m-d_H-i-s');
             $backup_file = "docker-compose.{$timestamp}.{$short_hash}.yml";
             $commands[] = "mkdir -p $backup_path";
-            // Skip backup if a file with the same hash already exists (identical content)
-            $commands[] = "ls $backup_path/docker-compose.*.$short_hash.yml 1>/dev/null 2>&1 || cp -f $proxy_path/docker-compose.yml $backup_path/$backup_file 2>/dev/null || true";
-            // Prune old backups, keep only the most recent ones
-            $commands[] = 'cd '.$backup_path.' && ls -1t docker-compose.*.yml 2>/dev/null | tail -n +'.((int) self::MAX_BACKUPS + 1).' | xargs rm -f 2>/dev/null || true';
+            // Skip backup if a file with the same hash already exists (identical content).
+            // find instead of a shell glob, and no `|` with `||`: the non-root sudo parser would need bash -c,
+            // and the SSH user may not be able to read the directory (#4255).
+            $commands[] = "if [ -z \"$(find $backup_path -maxdepth 1 -name 'docker-compose.*.$short_hash.yml')\" ]; then";
+            $commands[] = "    cp -f $proxy_path/docker-compose.yml $backup_path/$backup_file 2>/dev/null || true";
+            $commands[] = 'fi';
+            // Prune old backups, keep only the most recent ones (the timestamp in the name sorts by age)
+            $commands[] = "find $backup_path -maxdepth 1 -name 'docker-compose.*.yml' | sort -r | tail -n +".((int) self::MAX_BACKUPS + 1).' | xargs -r rm -f';
         }
 
         $commands[] = "echo '$docker_compose_yml_base64' | base64 -d | tee $proxy_path/docker-compose.yml > /dev/null";
 
         instant_remote_process($commands, $server);
+    }
+
+    /**
+     * Coolify finds the proxy by its container name, so a renamed or unnamed proxy shows as stopped (#7083).
+     */
+    private function ensureDefaultContainerName(string $configuration): void
+    {
+        $services = data_get(Yaml::parse($configuration, Yaml::PARSE_CUSTOM_TAGS), 'services');
+
+        foreach (['traefik', 'caddy'] as $proxyService) {
+            if (! is_array($services) || ! array_key_exists($proxyService, $services)) {
+                continue;
+            }
+
+            $containerName = data_get($services, "{$proxyService}.container_name");
+            if ($containerName instanceof TaggedValue) {
+                $containerName = $containerName->getValue();
+            }
+
+            if ($containerName !== 'coolify-proxy') {
+                throw ValidationException::withMessages([
+                    'configuration' => ["The {$proxyService} container_name must be coolify-proxy. Coolify uses this name to manage the proxy."],
+                ]);
+            }
+        }
     }
 }

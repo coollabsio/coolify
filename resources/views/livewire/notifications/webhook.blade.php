@@ -11,13 +11,14 @@
                 description="Send JSON event payloads to your own HTTP endpoint.">
                 <x-slot:actions>
                     <x-notification.channel-actions :enabled="$webhookEnabled" enabledProperty="webhookEnabled"
-                        toggleMethod="instantSaveWebhookEnabled" :canUpdate="auth()->user()->can('update', $settings)" />
+                        toggleMethod="instantSaveWebhookEnabled" :canUpdate="auth()->user()->can('update', $settings)"
+                        :canResource="$settings" />
                 </x-slot:actions>
 
                 <div class="grid gap-4 lg:grid-cols-2">
                     <div class="lg:col-span-2">
                         @can('update', $settings)
-                            <x-forms.input type="password" required id="webhookUrl" label="Webhook URL"
+                            <x-forms.input type="password" :required="$webhookEnabled" id="webhookUrl" label="Webhook URL"
                                 helper="Coolify sends POST requests to this HTTP or HTTPS endpoint." />
                         @else
                             <x-forms.input disabled label="Webhook URL" value="Hidden (only admins can view)" />

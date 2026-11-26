@@ -1,0 +1,53 @@
+# documentation: https://docs.notifuse.com/self-hosting/installation
+# slogan: Self-hosted email marketing and automation platform with built-in cookieless web analytics.
+# category: email
+# tags: email, newsletter, marketing, automation, smtp, analytics, self-hosted
+# logo: svgs/notifuse.svg
+# port: 8080
+
+services:
+  notifuse:
+    image: notifuse/notifuse:v44.0
+    environment:
+      - SERVICE_URL_NOTIFUSE_8080
+      - API_ENDPOINT=${SERVICE_URL_NOTIFUSE}
+      - SECRET_KEY=${SERVICE_REALBASE64_64_NOTIFUSE}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=$SERVICE_USER_POSTGRES
+      - DB_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - DB_NAME=notifuse_system
+      - DB_SSLMODE=disable
+      - ROOT_EMAIL=${NOTIFUSE_ROOT_EMAIL:?}
+      - SMTP_HOST=${NOTIFUSE_SMTP_HOST}
+      - SMTP_PORT=${NOTIFUSE_SMTP_PORT}
+      - SMTP_USERNAME=${NOTIFUSE_SMTP_USERNAME}
+      - SMTP_PASSWORD=${NOTIFUSE_SMTP_PASSWORD}
+      - SMTP_FROM_EMAIL=${NOTIFUSE_SMTP_FROM_EMAIL}
+      - SMTP_FROM_NAME=${NOTIFUSE_SMTP_FROM_NAME}
+      - SMTP_EHLO_HOSTNAME=${NOTIFUSE_SMTP_EHLO_HOSTNAME}
+    volumes:
+      - notifuse-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=notifuse_system
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

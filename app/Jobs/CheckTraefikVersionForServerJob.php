@@ -58,8 +58,8 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
 
         // Check if image tag is 'latest' by inspecting the image (makes SSH call)
         $imageTag = instant_remote_process([
-            "docker inspect coolify-proxy --format '{{.Config.Image}}' 2>/dev/null",
-        ], $this->server, false);
+            remoteCommandWithTimeout("docker inspect coolify-proxy --format '{{.Config.Image}}'").' 2>/dev/null',
+        ], $this->server, false, timeout: 30);
 
         // Handle empty/null response from SSH command
         if (empty(trim($imageTag))) {
@@ -159,7 +159,7 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
     }
 
     /**
-     * Store outdated information and notify for minor or major upgrades.
+     * Store outdated information and notify once per upgrade target or patch version.
      */
     private function storeOutdatedInfo(string $current, string $latest, string $type, ?string $upgradeTarget = null): void
     {
@@ -178,10 +178,12 @@ class CheckTraefikVersionForServerJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->server->update(['traefik_outdated_info' => $outdatedInfo]);
 
-        $isRepeatedUpgrade = ($previousOutdatedInfo['type'] ?? null) === $type
-            && ($previousOutdatedInfo['upgrade_target'] ?? null) === $upgradeTarget;
+        $alreadyNotified = ($previousOutdatedInfo['type'] ?? null) === $type
+            && ($type === 'minor_upgrade'
+                ? ($previousOutdatedInfo['upgrade_target'] ?? null) === $upgradeTarget
+                : ($previousOutdatedInfo['latest'] ?? null) === $latest);
 
-        if ($type !== 'patch_update' && ! $isRepeatedUpgrade) {
+        if (! $alreadyNotified) {
             $this->sendNotification($outdatedInfo);
         }
 
