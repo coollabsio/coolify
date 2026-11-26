@@ -45,28 +45,26 @@
                                     id="description"></x-forms.input>
                             </div>
                             <div class="grid gap-4 sm:grid-cols-2">
-                                @if (!$serviceApplication->serviceType()?->contains(str($serviceApplication->image)->before(':')))
-                                    <div data-domain-summary
-                                        class="rounded-lg border border-neutral-200 p-4 dark:border-white/[0.08]">
-                                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                            <p class="text-sm text-neutral-500 dark:text-fg-dim">
-                                                @php($domainCount = countDomains($fqdn))
-                                                @if ($domainCount === 0)
-                                                    No domains set.
-                                                @elseif ($domainCount === 1)
-                                                    1 domain set.
-                                                @else
-                                                    {{ $domainCount }} domains set.
-                                                @endif
-                                            </p>
-                                            <a class="button shrink-0" href="{{ route('project.service.domains', $parameters) }}"
-                                                {{ wireNavigate() }}>
-                                                <x-reicon name="globe" class="size-4" />
-                                                Manage domains
-                                            </a>
-                                        </div>
+                                <div data-domain-summary
+                                    class="rounded-lg border border-neutral-200 p-4 dark:border-white/[0.08]">
+                                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <p class="text-sm text-neutral-500 dark:text-fg-dim">
+                                            @php($domainCount = countDomains($fqdn))
+                                            @if ($domainCount === 0)
+                                                No domains set.
+                                            @elseif ($domainCount === 1)
+                                                1 domain set.
+                                            @else
+                                                {{ $domainCount }} domains set.
+                                            @endif
+                                        </p>
+                                        <a class="button shrink-0" href="{{ route('project.service.domains', $parameters) }}"
+                                            {{ wireNavigate() }}>
+                                            <x-reicon name="globe" class="size-4" />
+                                            Manage domains
+                                        </a>
                                     </div>
-                                @endif
+                                </div>
                                 <x-forms.input canGate="update" :canResource="$serviceApplication"
                                     helper="You can change the image you would like to deploy.<br><br><span class='dark:text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
                                     label="Image" id="image"></x-forms.input>

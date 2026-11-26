@@ -25,8 +25,12 @@
                 && JSON.stringify($wire.editingDomainParts) !== this.editingDomainBaseline
                 && !$wire.showPortWarningModal && !$wire.showDomainConflictModal;
         },
-        openEditDomain(index, domain, parts, serviceApplicationId, serviceLabel, indexing, redirect) {
+        endpointApp(serviceApplicationId) {
+            return ($wire.serviceApps.find(app => app.id === serviceApplicationId)?.endpoints ?? []).length > 0;
+        },
+        openEditDomain(index, domain, parts, serviceApplicationId, serviceLabel, indexing, redirect, endpoint) {
             if (index !== undefined) {
+                $wire.set('editingEndpoint', endpoint ?? null, false);
                 $wire.set('editingIndex', index, false);
                 $wire.set('editingDomain', domain, false);
                 $wire.set('editingDomainParts', parts, false);
@@ -102,7 +106,17 @@
                                 ])->values()->all()"
                                 :disabled="! auth()->user()->can('update', $service)" />
 
-                            <x-forms.domain-input id="newDomainParts" errorId="newDomain" />
+                            @foreach (collect($serviceApps)->filter(fn ($app) => $app['endpoints'] !== []) as $endpointApp)
+                                <div x-show="$wire.newServiceApplicationId == {{ $endpointApp['id'] }}" x-cloak>
+                                    <x-forms.listbox canGate="update" :canResource="$service" label="Endpoint" id="newEndpoint"
+                                        htmlId="new-endpoint-{{ $endpointApp['id'] }}" portal
+                                        helper="The proxy routes this domain to the port of the endpoint."
+                                        :options="$endpointApp['endpoints']" />
+                                </div>
+                            @endforeach
+
+                            <x-forms.domain-input id="newDomainParts" errorId="newDomain"
+                                hidePortExpression="endpointApp(Number($wire.newServiceApplicationId))" />
 
                             @if ($addDomainDnsFailed)
                                 <x-callout type="danger" title="DNS is not pointing to the right IP">
@@ -256,7 +270,17 @@
                                     </p>
                                 </div>
 
-                                <x-forms.domain-input id="editingDomainParts" errorId="editingDomain" />
+                                @foreach (collect($serviceApps)->filter(fn ($app) => $app['endpoints'] !== []) as $endpointApp)
+                                    <div x-show="$wire.editingServiceApplicationId == {{ $endpointApp['id'] }}" x-cloak>
+                                        <x-forms.listbox label="Endpoint" id="editingEndpoint"
+                                            htmlId="editing-endpoint-{{ $endpointApp['id'] }}" portal
+                                            helper="The proxy routes this domain to the port of the endpoint."
+                                            :options="$endpointApp['endpoints']" />
+                                    </div>
+                                @endforeach
+
+                                <x-forms.domain-input id="editingDomainParts" errorId="editingDomain"
+                                    hidePortExpression="endpointApp(Number($wire.editingServiceApplicationId))" />
 
                                 @if ($editDomainDnsFailed)
                                     <x-callout type="danger" title="DNS is not pointing to the right IP">

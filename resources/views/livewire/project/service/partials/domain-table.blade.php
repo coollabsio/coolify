@@ -125,7 +125,12 @@
                 <div class="service-domain-detail"
                     title="{{ ($row['has_port_override'] ?? false) ? 'Custom internal port for this domain' : 'Inherited from the Coolify service port' }}">
                     <span class="service-domain-detail-label">Internal port</span>
-                    <span @if (filled($row['internal_port'] ?? null)) aria-label="Internal port {{ $row['internal_port'] }}" @endif>{{ $row['internal_port'] ?? '—' }}</span>
+                    <span class="flex items-center gap-1.5">
+                        <span @if (filled($row['internal_port'] ?? null)) aria-label="Internal port {{ $row['internal_port'] }}" @endif>{{ $row['internal_port'] ?? '—' }}</span>
+                        @if (filled($row['endpoint_label'] ?? null))
+                            <span class="rounded-sm bg-neutral-100 px-1.5 text-[11px] dark:bg-white/[0.06]">{{ $row['endpoint_label'] }}</span>
+                        @endif
+                    </span>
                 </div>
                 <div class="service-domain-detail">
                     <span class="service-domain-detail-label">Search indexing</span>
@@ -145,6 +150,9 @@
                         <span>No redirects</span>
                     @endif
                     <span>Port {{ $row['internal_port'] ?? 'missing' }}</span>
+                    @if (filled($row['endpoint_label'] ?? null))
+                        <span>{{ $row['endpoint_label'] }}</span>
+                    @endif
                     <span>{{ $isNoindexed ? 'Noindex' : 'Indexable' }}</span>
                 </div>
 
@@ -193,7 +201,7 @@
                                     Check DNS
                                 </x-table.row-action>
                                 <x-table.row-action aria-label="Edit {{ $publicUrl }}"
-                                    x-on:click="openEditDomain({{ \Illuminate\Support\Js::from($index) }}, {{ \Illuminate\Support\Js::from($row['url']) }}, {{ \Illuminate\Support\Js::from($editingParts) }}, {{ \Illuminate\Support\Js::from((int) $row['service_application_id']) }}, {{ \Illuminate\Support\Js::from($serviceLabel) }}, {{ \Illuminate\Support\Js::from($isNoindexed ? 'noindex' : 'index') }}, {{ \Illuminate\Support\Js::from($rowDirection) }})">
+                                    x-on:click="openEditDomain({{ \Illuminate\Support\Js::from($index) }}, {{ \Illuminate\Support\Js::from($row['url']) }}, {{ \Illuminate\Support\Js::from($editingParts) }}, {{ \Illuminate\Support\Js::from((int) $row['service_application_id']) }}, {{ \Illuminate\Support\Js::from($serviceLabel) }}, {{ \Illuminate\Support\Js::from($isNoindexed ? 'noindex' : 'index') }}, {{ \Illuminate\Support\Js::from($rowDirection) }}, {{ \Illuminate\Support\Js::from($row['endpoint_key'] ?? null) }})">
                                     Edit
                                 </x-table.row-action>
                                 <x-slot:danger>

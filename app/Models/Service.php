@@ -7,6 +7,7 @@ use App\Services\ContainerStatusAggregator;
 use App\Services\DockerImageParser;
 use App\Support\DomainPortOverrides;
 use App\Support\ResourceStartActivity;
+use App\Support\ServiceEndpoint;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasComposeVolumeWarnings;
@@ -756,30 +757,6 @@ class Service extends BaseModel
                     }
                     $fields->put('Tolgee', $data->toArray());
                     break;
-                case $image->contains('logto'):
-                    $data = collect([]);
-                    $logto_endpoint = $this->environment_variables()->where('key', 'LOGTO_ENDPOINT')->first();
-                    $logto_admin_endpoint = $this->environment_variables()->where('key', 'LOGTO_ADMIN_ENDPOINT')->first();
-                    if ($logto_endpoint) {
-                        $data = $data->merge([
-                            'Endpoint' => [
-                                'key' => data_get($logto_endpoint, 'key'),
-                                'value' => data_get($logto_endpoint, 'value'),
-                                'rules' => 'required|url',
-                            ],
-                        ]);
-                    }
-                    if ($logto_admin_endpoint) {
-                        $data = $data->merge([
-                            'Admin Endpoint' => [
-                                'key' => data_get($logto_admin_endpoint, 'key'),
-                                'value' => data_get($logto_admin_endpoint, 'value'),
-                                'rules' => 'required|url',
-                            ],
-                        ]);
-                    }
-                    $fields->put('Logto', $data->toArray());
-                    break;
                 case $image->contains('unleash-server'):
                     $data = collect([]);
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_UNLEASH')->first();
@@ -908,8 +885,6 @@ class Service extends BaseModel
                     $fields->put('Supabase', $data->toArray());
                 case $image->contains(['minio', 'pgsty/silo']):
                     $data = collect([]);
-                    $console_url = $this->environment_variables()->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
-                    $s3_api_url = $this->environment_variables()->where('key', 'MINIO_SERVER_URL')->first();
                     $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_MINIO')->first();
                     if (is_null($admin_user)) {
                         $admin_user = $this->environment_variables()->where('key', 'MINIO_ROOT_USER')->first();
@@ -919,24 +894,6 @@ class Service extends BaseModel
                         $admin_password = $this->environment_variables()->where('key', 'MINIO_ROOT_PASSWORD')->first();
                     }
 
-                    if ($console_url) {
-                        $data = $data->merge([
-                            'Console URL' => [
-                                'key' => data_get($console_url, 'key'),
-                                'value' => data_get($console_url, 'value'),
-                                'rules' => 'required|url',
-                            ],
-                        ]);
-                    }
-                    if ($s3_api_url) {
-                        $data = $data->merge([
-                            'S3 API URL' => [
-                                'key' => data_get($s3_api_url, 'key'),
-                                'value' => data_get($s3_api_url, 'value'),
-                                'rules' => 'required|url',
-                            ],
-                        ]);
-                    }
                     if ($admin_user) {
                         $data = $data->merge([
                             'Admin User' => [
@@ -961,9 +918,6 @@ class Service extends BaseModel
                     break;
                 case $image->contains('garage'):
                     $data = collect([]);
-                    $s3_api_url = $this->environment_variables()->where('key', 'GARAGE_S3_API_URL')->first();
-                    $web_url = $this->environment_variables()->where('key', 'GARAGE_WEB_URL')->first();
-                    $admin_url = $this->environment_variables()->where('key', 'GARAGE_ADMIN_URL')->first();
                     $admin_token = $this->environment_variables()->where('key', 'GARAGE_ADMIN_TOKEN')->first();
                     if (is_null($admin_token)) {
                         $admin_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GARAGE')->first();
@@ -978,33 +932,6 @@ class Service extends BaseModel
                         $metrics_token = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GARAGEMETRICS')->first();
                     }
 
-                    if ($s3_api_url) {
-                        $data = $data->merge([
-                            'S3 API URL' => [
-                                'key' => data_get($s3_api_url, 'key'),
-                                'value' => data_get($s3_api_url, 'value'),
-                                'rules' => 'required|url',
-                            ],
-                        ]);
-                    }
-                    if ($web_url) {
-                        $data = $data->merge([
-                            'Web URL' => [
-                                'key' => data_get($web_url, 'key'),
-                                'value' => data_get($web_url, 'value'),
-                                'rules' => 'required|url',
-                            ],
-                        ]);
-                    }
-                    if ($admin_url) {
-                        $data = $data->merge([
-                            'Admin URL' => [
-                                'key' => data_get($admin_url, 'key'),
-                                'value' => data_get($admin_url, 'value'),
-                                'rules' => 'required|url',
-                            ],
-                        ]);
-                    }
                     if ($admin_token) {
                         $data = $data->merge([
                             'Admin Token' => [
@@ -1687,6 +1614,23 @@ class Service extends BaseModel
     public function requiresPort(): bool
     {
         return $this->getRequiredPort() !== null;
+    }
+
+    /**
+     * Environment variables that the Domains page writes for the endpoints of its applications.
+     *
+     * @return list<string>
+     */
+    public function endpointVariableKeys(): array
+    {
+        return $this->applications
+            ->flatMap(fn (ServiceApplication $application): array => array_map(
+                fn (ServiceEndpoint $endpoint): string => $endpoint->envKey,
+                $application->serviceEndpoints(),
+            ))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function applications()

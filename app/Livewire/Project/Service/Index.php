@@ -162,6 +162,7 @@ class Index extends Component
                 ];
                 $this->query = request()->query();
                 $this->currentRoute = 'project.service.index';
+                $serviceApplication->importServiceEndpoints();
                 $this->serviceApplication = $serviceApplication;
                 $this->resourceType = 'application';
                 $this->initializeApplicationProperties();

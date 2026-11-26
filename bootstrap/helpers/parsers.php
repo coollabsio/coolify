@@ -3676,11 +3676,14 @@ function serviceParser(Service $resource): Collection
             $coolifyEnvironments->put('COOLIFY_CONTAINER_NAME', "{$containerName}");
         }
 
-        if ($savedService->serviceType()) {
-            $fqdns = generateServiceSpecificFqdns($savedService);
-        } else {
-            $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
+        if ($savedService instanceof ServiceApplication) {
+            $savedService->importServiceEndpoints();
+            // The environment above holds the values from before the sync; references stay references.
+            $syncedEndpointValues = collect($savedService->syncServiceEndpointVariables())
+                ->filter(fn (string $value, string $key): bool => $environment->has($key) && ! str((string) $environment->get($key))->startsWith('$'));
+            $environment = $environment->merge($syncedEndpointValues);
         }
+        $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
         // Flags live on the ServiceApplication; a ServiceDatabase has no domains.
         $noindexDomains = $savedService instanceof ServiceApplication
             ? $savedService->noindexDomains()
