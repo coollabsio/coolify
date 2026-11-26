@@ -23,6 +23,7 @@ use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\RequirePassword;
 use App\Http\Middleware\RequireTeamTwoFactor;
+use App\Http\Middleware\SwitchToResourceTeam;
 use App\Http\Middleware\ThrottleFailedApiRequests;
 use App\Http\Middleware\TrimStrings;
 use App\Http\Middleware\TrustProxies;
@@ -84,6 +85,7 @@ class Kernel extends HttpKernel
             VerifyCsrfToken::class,
             SubstituteBindings::class,
             CheckForcePasswordReset::class,
+            SwitchToResourceTeam::class,
             DecideWhatToDoWithUser::class,
             RequireTeamTwoFactor::class,
             PreventHtmlTransform::class,
