@@ -182,7 +182,6 @@
         container_name: web-referenceapplication0001-20260102T030405
         restart: unless-stopped
         networks:
-          internal: null
           referenceapplication0001: null
           coolify: null
         logging:
@@ -271,7 +270,6 @@
           - 'caddy_0=http://api-referenceapplication0001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceapplication0001
         networks:
-          internal: null
           referenceapplication0001: null
           coolify: null
         logging:
@@ -346,7 +344,6 @@
           - 'caddy_0=http://my-app-referenceapplication0001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceapplication0001
         networks:
-          internal: null
           referenceapplication0001: null
           coolify: null
         logging:
@@ -375,7 +372,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
         networks:
-          internal: null
           referenceapplication0001: null
           coolify: null
         environment:
@@ -558,7 +554,6 @@
           - 'caddy_0=http://blog-referenceapplication0001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceapplication0001
         networks:
-          internal: null
           referenceapplication0001: null
           coolify: null
         logging:
@@ -808,7 +803,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
         networks:
-          internal: null
           referenceapplication0001: null
           coolify: null
         logging:
@@ -837,7 +831,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
         networks:
-          internal: null
           referenceapplication0001: null
           coolify: null
         environment:
@@ -1111,7 +1104,6 @@
         container_name: web-referenceapplication0001-20260102T030405
         restart: unless-stopped
         networks:
-          internal: null
           referenceapplication0001: null
           coolify: null
         logging:
@@ -1214,7 +1206,6 @@
           - 'caddy_0=https://www.api.example.com'
           - caddy_ingress_network=referenceapplication0001
         networks:
-          internal: null
           referenceapplication0001: null
           coolify: null
         logging:
@@ -1298,7 +1289,6 @@
           - 'caddy_0=https://my-app.example.com'
           - caddy_ingress_network=referenceapplication0001
         networks:
-          internal: null
           referenceapplication0001: null
           coolify: null
         logging:
@@ -1344,7 +1334,6 @@
           - 'caddy_0=https://api-v2.example.com'
           - caddy_ingress_network=referenceapplication0001
         networks:
-          internal: null
           referenceapplication0001: null
           coolify: null
         environment:
@@ -1547,7 +1536,6 @@
           - 'caddy_0=https://blog.example.com'
           - caddy_ingress_network=referenceapplication0001
         networks:
-          internal: null
           referenceapplication0001: null
           coolify: null
         logging:
@@ -1805,7 +1793,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
         networks:
-          internal: null
           referenceapplication0001: null
           coolify: null
         logging:
@@ -1834,7 +1821,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
         networks:
-          internal: null
           referenceapplication0001: null
           coolify: null
         environment:
@@ -2138,7 +2124,6 @@
         container_name: web-referenceapplication0001-pr-7
         restart: unless-stopped
         networks:
-          internal: null
           referenceapplication0001-7:
             aliases:
               - web
@@ -2241,7 +2226,6 @@
           - 'caddy_0=https://7.www.api.example.com'
           - caddy_ingress_network=referenceapplication0001-7
         networks:
-          internal: null
           referenceapplication0001-7:
             aliases:
               - api
@@ -2330,7 +2314,6 @@
           - 'caddy_0=https://7.my-app.example.com'
           - caddy_ingress_network=referenceapplication0001-7
         networks:
-          internal: null
           referenceapplication0001-7:
             aliases:
               - my-app
@@ -2381,7 +2364,6 @@
           - 'caddy_0=https://7.api-v2.example.com'
           - caddy_ingress_network=referenceapplication0001-7
         networks:
-          internal: null
           referenceapplication0001-7:
             aliases:
               - api.v2
@@ -2593,7 +2575,6 @@
           - 'caddy_0=https://7.blog.example.com'
           - caddy_ingress_network=referenceapplication0001-7
         networks:
-          internal: null
           referenceapplication0001-7:
             aliases:
               - blog
@@ -2857,7 +2838,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=7
         networks:
-          internal: null
           referenceapplication0001-7:
             aliases:
               - worker
@@ -2888,7 +2868,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=7
         networks:
-          internal: null
           referenceapplication0001-7:
             aliases:
               - empty-lists
@@ -3154,7 +3133,6 @@
         container_name: web-referenceapplication0001-pr-8
         restart: unless-stopped
         networks:
-          internal: null
           referenceapplication0001-8:
             aliases:
               - web
@@ -3219,7 +3197,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          internal: null
           referenceapplication0001-8:
             aliases:
               - api
@@ -3270,7 +3247,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          internal: null
           referenceapplication0001-8:
             aliases:
               - my-app
@@ -3301,7 +3277,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          internal: null
           referenceapplication0001-8:
             aliases:
               - api.v2
@@ -3422,7 +3397,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          internal: null
           referenceapplication0001-8:
             aliases:
               - blog
@@ -3638,7 +3612,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          internal: null
           referenceapplication0001-8:
             aliases:
               - worker
@@ -3669,7 +3642,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          internal: null
           referenceapplication0001-8:
             aliases:
               - empty-lists

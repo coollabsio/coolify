@@ -278,7 +278,6 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
-          internal: null
           referenceservice00000001: null
         logging:
           driver: fluentd
@@ -377,7 +376,6 @@
           - 'caddy_0=http://api-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -440,7 +438,6 @@
           - 'caddy_0=http://my_app-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -501,7 +498,6 @@
           - 'caddy_0=http://www-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -569,7 +565,6 @@
           - 'caddy_0=http://blog-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -630,7 +625,6 @@
           - 'caddy_0=http://gateway-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -692,7 +686,6 @@
           - 'caddy_0=http://gateway-referenceservice00000001.10.0.0.1.sslip.io'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -740,7 +733,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=worker
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -786,7 +778,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=scheduler
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -959,7 +950,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=empty-lists
         networks:
-          internal: null
           referenceservice00000001: null
         environment:
           COOLIFY_RESOURCE_UUID: referenceservice00000001
@@ -1298,7 +1288,6 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
-          internal: null
           referenceservice00000001: null
         logging:
           driver: fluentd
@@ -1404,7 +1393,6 @@
           - 'caddy_0=https://api.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1474,7 +1462,6 @@
           - 'caddy_0=https://my_app.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1544,7 +1531,6 @@
           - 'caddy_0=https://www.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1619,7 +1605,6 @@
           - 'caddy_0=https://blog.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1685,7 +1670,6 @@
           - 'caddy_0=https://gateway.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1752,7 +1736,6 @@
           - 'caddy_0=https://gateway.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1800,7 +1783,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=worker
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1846,7 +1828,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=scheduler
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2019,7 +2000,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=empty-lists
         networks:
-          internal: null
           referenceservice00000001: null
         environment:
           COOLIFY_RESOURCE_UUID: referenceservice00000001
@@ -2362,7 +2342,6 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
-          internal: null
           referenceservice00000001: null
         logging:
           driver: fluentd
@@ -2468,7 +2447,6 @@
           - 'caddy_0=https://api.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2538,7 +2516,6 @@
           - 'caddy_0=https://my_app.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2608,7 +2585,6 @@
           - 'caddy_0=https://www.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2683,7 +2659,6 @@
           - 'caddy_0=https://blog.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2749,7 +2724,6 @@
           - 'caddy_0=https://gateway.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2816,7 +2790,6 @@
           - 'caddy_0=https://gateway.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2890,7 +2863,6 @@
           - 'caddy_0=https://worker-extra.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2962,7 +2934,6 @@
           - 'caddy_0=https://scheduler-extra.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -3176,7 +3147,6 @@
           - 'caddy_0=https://empty-lists-extra.example.com'
           - caddy_ingress_network=referenceservice00000001
         networks:
-          internal: null
           referenceservice00000001: null
         environment:
           COOLIFY_RESOURCE_UUID: referenceservice00000001

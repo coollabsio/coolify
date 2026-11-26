@@ -177,7 +177,6 @@
         container_name: web-referenceapplication0001-20260102T030405
         restart: unless-stopped
         networks:
-          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -252,7 +251,6 @@
           - traefik.http.routers.http-0-referenceapplication0001-api-8a5d.service=http-0-referenceapplication0001-api-8a5d
           - traefik.http.services.http-0-referenceapplication0001-api-8a5d.loadbalancer.server.port=3001
         networks:
-          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -313,7 +311,6 @@
           - traefik.http.routers.http-0-referenceapplication0001-my-app-4dcb.service=http-0-referenceapplication0001-my-app-4dcb
           - traefik.http.services.http-0-referenceapplication0001-my-app-4dcb.loadbalancer.server.port=80
         networks:
-          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -333,7 +330,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
         networks:
-          internal: null
           referenceapplication0001: null
         environment:
           COOLIFY_BRANCH: '"main"'
@@ -487,7 +483,6 @@
           - 'traefik.http.routers.http-0-referenceapplication0001-blog-126a.middlewares=gzip-no-media,redir-ghost-referenceapplication0001'
           - 'traefik.http.routers.http-0-referenceapplication0001-blog-126a.rule=Host(`blog-referenceapplication0001.10.0.0.1.sslip.io`) && PathPrefix(`/blog:2368`)'
         networks:
-          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -702,7 +697,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
         networks:
-          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -722,7 +716,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
         networks:
-          internal: null
           referenceapplication0001: null
         environment:
           COOLIFY_BRANCH: '"main"'
@@ -979,7 +972,6 @@
         container_name: web-referenceapplication0001-20260102T030405
         restart: unless-stopped
         networks:
-          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -1066,7 +1058,6 @@
           - traefik.http.services.http-0-referenceapplication0001-api-8a5d.loadbalancer.server.port=3001
           - traefik.http.services.https-0-referenceapplication0001-api-8a5d.loadbalancer.server.port=3001
         networks:
-          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -1136,7 +1127,6 @@
           - traefik.http.services.http-0-referenceapplication0001-my-app-4dcb.loadbalancer.server.port=80
           - traefik.http.services.https-0-referenceapplication0001-my-app-4dcb.loadbalancer.server.port=80
         networks:
-          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -1168,7 +1158,6 @@
           - traefik.http.routers.https-0-referenceapplication0001-api-v2-b0fa.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceapplication0001-api-v2-b0fa.tls=true
         networks:
-          internal: null
           referenceapplication0001: null
         environment:
           COOLIFY_BRANCH: '"main"'
@@ -1342,7 +1331,6 @@
           - traefik.http.routers.https-0-referenceapplication0001-blog-126a.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceapplication0001-blog-126a.tls=true
         networks:
-          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -1565,7 +1553,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
         networks:
-          internal: null
           referenceapplication0001: null
         env_file:
           - .env
@@ -1585,7 +1572,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=0
         networks:
-          internal: null
           referenceapplication0001: null
         environment:
           COOLIFY_BRANCH: '"main"'
@@ -1870,7 +1856,6 @@
         container_name: web-referenceapplication0001-pr-7
         restart: unless-stopped
         networks:
-          internal: null
           referenceapplication0001-7:
             aliases:
               - web-pr-7
@@ -1957,7 +1942,6 @@
           - traefik.http.services.http-0-referenceapplication0001-7-api-8a5d.loadbalancer.server.port=3001
           - traefik.http.services.https-0-referenceapplication0001-7-api-8a5d.loadbalancer.server.port=3001
         networks:
-          internal: null
           referenceapplication0001-7:
             aliases:
               - api-pr-7
@@ -2030,7 +2014,6 @@
           - traefik.http.services.http-0-referenceapplication0001-7-my-app-4dcb.loadbalancer.server.port=80
           - traefik.http.services.https-0-referenceapplication0001-7-my-app-4dcb.loadbalancer.server.port=80
         networks:
-          internal: null
           referenceapplication0001-7:
             aliases:
               - my-app-pr-7
@@ -2065,7 +2048,6 @@
           - traefik.http.routers.https-0-referenceapplication0001-7-api-v2-b0fa.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceapplication0001-7-api-v2-b0fa.tls=true
         networks:
-          internal: null
           referenceapplication0001-7:
             aliases:
               - api.v2-pr-7
@@ -2245,7 +2227,6 @@
           - traefik.http.routers.https-0-referenceapplication0001-7-blog-126a.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceapplication0001-7-blog-126a.tls=true
         networks:
-          internal: null
           referenceapplication0001-7:
             aliases:
               - blog-pr-7
@@ -2474,7 +2455,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=7
         networks:
-          internal: null
           referenceapplication0001-7:
             aliases:
               - worker-pr-7
@@ -2496,7 +2476,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=7
         networks:
-          internal: null
           referenceapplication0001-7:
             aliases:
               - empty-lists-pr-7
@@ -2750,7 +2729,6 @@
         container_name: web-referenceapplication0001-pr-8
         restart: unless-stopped
         networks:
-          internal: null
           referenceapplication0001-8:
             aliases:
               - web-pr-8
@@ -2806,7 +2784,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          internal: null
           referenceapplication0001-8:
             aliases:
               - api-pr-8
@@ -2848,7 +2825,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          internal: null
           referenceapplication0001-8:
             aliases:
               - my-app-pr-8
@@ -2870,7 +2846,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          internal: null
           referenceapplication0001-8:
             aliases:
               - api.v2-pr-8
@@ -2973,7 +2948,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          internal: null
           referenceapplication0001-8:
             aliases:
               - blog-pr-8
@@ -3154,7 +3128,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          internal: null
           referenceapplication0001-8:
             aliases:
               - worker-pr-8
@@ -3176,7 +3149,6 @@
           - coolify.environmentName=production
           - coolify.pullRequestId=8
         networks:
-          internal: null
           referenceapplication0001-8:
             aliases:
               - empty-lists-pr-8

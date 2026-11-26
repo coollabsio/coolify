@@ -1973,23 +1973,6 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
         }
 
         if (! $use_network_mode) {
-            if ($topLevel->get('networks')?->count() > 0) {
-                foreach ($topLevel->get('networks') as $networkName => $network) {
-                    if ($networkName === 'default') {
-                        continue;
-                    }
-                    // ignore aliases
-                    if ($network['aliases'] ?? false) {
-                        continue;
-                    }
-                    $networkExists = $networks->contains(function ($value, $key) use ($networkName) {
-                        return $value == $networkName || $key == $networkName;
-                    });
-                    if (! $networkExists) {
-                        $networks->put($networkName, null);
-                    }
-                }
-            }
             $baseNetworkExists = $networks->contains(function ($value, $_) use ($baseNetwork) {
                 return $value == $baseNetwork;
             });
@@ -3335,23 +3318,6 @@ function serviceParser(Service $resource): Collection
         }
 
         if (! $use_network_mode) {
-            if ($topLevel->get('networks')?->count() > 0) {
-                foreach ($topLevel->get('networks') as $networkName => $network) {
-                    if ($networkName === 'default') {
-                        continue;
-                    }
-                    // ignore aliases
-                    if ($network['aliases'] ?? false) {
-                        continue;
-                    }
-                    $networkExists = $networks->contains(function ($value, $key) use ($networkName) {
-                        return $value == $networkName || $key == $networkName;
-                    });
-                    if (! $networkExists) {
-                        $networks->put($networkName, null);
-                    }
-                }
-            }
             $baseNetworkExists = $networks->contains(function ($value, $_) use ($baseNetwork) {
                 return $value == $baseNetwork;
             });

@@ -266,7 +266,6 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
-          internal: null
           referenceservice00000001: null
       api:
         image: 'node:22-alpine'
@@ -350,7 +349,6 @@
           - traefik.http.routers.http-0-referenceservice00000001-api-8a5d.service=http-0-referenceservice00000001-api-8a5d
           - traefik.http.services.http-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -405,7 +403,6 @@
           - traefik.http.routers.http-0-referenceservice00000001-my-app-4dcb.service=http-0-referenceservice00000001-my-app-4dcb
           - traefik.http.services.http-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -458,7 +455,6 @@
           - traefik.http.routers.http-0-referenceservice00000001-www-4eae.middlewares=gzip-no-media
           - 'traefik.http.routers.http-0-referenceservice00000001-www-4eae.rule=Host(`www-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -518,7 +514,6 @@
           - traefik.http.routers.http-0-referenceservice00000001-blog-126a.service=http-0-referenceservice00000001-blog-126a
           - traefik.http.services.http-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -571,7 +566,6 @@
           - traefik.http.routers.http-0-referenceservice00000001-gateway-3e21.middlewares=gzip-no-media
           - 'traefik.http.routers.http-0-referenceservice00000001-gateway-3e21.rule=Host(`gateway-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -625,7 +619,6 @@
           - 'traefik.http.routers.http-0-referenceservice00000001-gateway-ws-d203.middlewares=http-0-referenceservice00000001-gateway-ws-d203-stripprefix,gzip-no-media'
           - 'traefik.http.routers.http-0-referenceservice00000001-gateway-ws-d203.rule=Host(`gateway-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/ws`)'
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -673,7 +666,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=worker
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -719,7 +711,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=scheduler
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -884,7 +875,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=empty-lists
         networks:
-          internal: null
           referenceservice00000001: null
         environment:
           COOLIFY_RESOURCE_UUID: referenceservice00000001
@@ -1213,7 +1203,6 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
-          internal: null
           referenceservice00000001: null
       api:
         image: 'node:22-alpine'
@@ -1304,7 +1293,6 @@
           - traefik.http.services.http-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
           - traefik.http.services.https-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1366,7 +1354,6 @@
           - traefik.http.services.http-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
           - traefik.http.services.https-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1424,7 +1411,6 @@
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.tls=true
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1491,7 +1477,6 @@
           - traefik.http.services.http-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
           - traefik.http.services.https-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1549,7 +1534,6 @@
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.tls=true
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1608,7 +1592,6 @@
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.tls=true
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1656,7 +1639,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=worker
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1702,7 +1684,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=scheduler
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -1867,7 +1848,6 @@
           - coolify.service.subType=application
           - coolify.service.subName=empty-lists
         networks:
-          internal: null
           referenceservice00000001: null
         environment:
           COOLIFY_RESOURCE_UUID: referenceservice00000001
@@ -2200,7 +2180,6 @@
         container_name: web-referenceservice00000001
         restart: unless-stopped
         networks:
-          internal: null
           referenceservice00000001: null
       api:
         image: 'node:22-alpine'
@@ -2291,7 +2270,6 @@
           - traefik.http.services.http-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
           - traefik.http.services.https-0-referenceservice00000001-api-8a5d.loadbalancer.server.port=3000
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2353,7 +2331,6 @@
           - traefik.http.services.http-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
           - traefik.http.services.https-0-referenceservice00000001-my-app-4dcb.loadbalancer.server.port=80
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2411,7 +2388,6 @@
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-www-4eae.tls=true
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2478,7 +2454,6 @@
           - traefik.http.services.http-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
           - traefik.http.services.https-0-referenceservice00000001-blog-126a.loadbalancer.server.port=2368
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2536,7 +2511,6 @@
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-gateway-3e21.tls=true
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2595,7 +2569,6 @@
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-gateway-ws-d203.tls=true
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2661,7 +2634,6 @@
           - traefik.http.services.http-0-referenceservice00000001-worker-b618.loadbalancer.server.port=8080
           - traefik.http.services.https-0-referenceservice00000001-worker-b618.loadbalancer.server.port=8080
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2725,7 +2697,6 @@
           - traefik.http.services.http-0-referenceservice00000001-scheduler-499f.loadbalancer.server.port=8080
           - traefik.http.services.https-0-referenceservice00000001-scheduler-499f.loadbalancer.server.port=8080
         networks:
-          internal: null
           referenceservice00000001: null
         env_file:
           - .env
@@ -2915,7 +2886,6 @@
           - traefik.http.routers.https-0-referenceservice00000001-empty-lists-625d.tls.certresolver=letsencrypt
           - traefik.http.routers.https-0-referenceservice00000001-empty-lists-625d.tls=true
         networks:
-          internal: null
           referenceservice00000001: null
         environment:
           COOLIFY_RESOURCE_UUID: referenceservice00000001
