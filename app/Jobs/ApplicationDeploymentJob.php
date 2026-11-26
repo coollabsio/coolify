@@ -3773,8 +3773,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      * The proxy adds the new container some seconds after it is healthy. Stopping the old
      * container before that sends requests to a closed port (502), see #8627.
      *
-     * Returns true when the old containers must stop without the grace period: the proxy drops a
-     * route that two containers define differently (503) until the old container exits.
+     * Returns true when the old containers must stop without the grace period. Traefik drops a
+     * router that two containers define differently until the old container exits. This is done
+     * only once, on the first deploy that adds the retry labels. Caddy merges the labels of both
+     * containers, so it keeps routing and needs no immediate stop.
      */
     private function wait_for_proxy_to_route_new_container(): bool
     {
@@ -3787,10 +3789,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($oldContainerNames->isEmpty()) {
             return false;
         }
-        if ($this->proxyLabelsChanged($oldContainerNames)) {
-            $this->application_deployment_queue->addLogEntry('The proxy labels changed, so the old containers stop now, without waiting and without the grace period.');
+        $proxyLabels = $this->proxyLabelsOf($oldContainerNames);
+        if ($proxyLabels->unique()->count() > 1) {
+            $newContainerHasRetry = $this->hasTraefikRetryLabel($proxyLabels->first());
+            $oldContainersHaveRetry = $proxyLabels->skip(1)->contains(fn (array $labels) => $this->hasTraefikRetryLabel($labels));
+            if ($newContainerHasRetry && ! $oldContainersHaveRetry) {
+                $this->application_deployment_queue->addLogEntry('The proxy labels changed to retry failed connections, so the old containers stop now, without waiting and without the grace period.');
 
-            return true;
+                return true;
+            }
+            $this->application_deployment_queue->addLogEntry('The proxy labels changed, so the old containers stop without waiting.');
+
+            return false;
         }
         $seconds = $this->application->settings->rollingUpdateDrainSeconds();
         if ($seconds === 0) {
@@ -3802,7 +3812,12 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         return false;
     }
 
-    private function proxyLabelsChanged(Collection $oldContainerNames): bool
+    /**
+     * The proxy labels of the new container (first) and of the old containers.
+     *
+     * @return Collection<int, array<string, string>>
+     */
+    private function proxyLabelsOf(Collection $oldContainerNames): Collection
     {
         $containerNames = $oldContainerNames->prepend($this->container_name)->map(fn (string $name) => escapeshellarg($name))->implode(' ');
         $output = instant_remote_process(["docker inspect --format '{{json .Config.Labels}}' {$containerNames}"], $this->server, false);
@@ -3811,9 +3826,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ->map(fn (string $labels) => collect(json_decode($labels, true) ?: [])
                 ->filter(fn ($value, string $key) => str_starts_with($key, 'traefik.') || str_starts_with($key, 'caddy'))
                 ->sortKeys()
-                ->all())
-            ->unique()
-            ->count() > 1;
+                ->all());
+    }
+
+    /**
+     * @param  array<string, string>  $labels
+     */
+    private function hasTraefikRetryLabel(array $labels): bool
+    {
+        return collect($labels)->keys()->contains(fn (string $key) => str_starts_with($key, 'traefik.http.middlewares.retry-') && str_ends_with($key, '.retry.attempts'));
     }
 
     private function health_check()

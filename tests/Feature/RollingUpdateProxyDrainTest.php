@@ -62,10 +62,15 @@ function createApplicationForRollingUpdateDrainTest(string $proxyType = 'TRAEFIK
  * @param  array<string, string>  $newProxyLabels
  * @return list<string>
  */
-function runRollingUpdateDrainStep(Application $application, bool $newVersionIsHealthy, ?array $oldProxyLabels = ['traefik.enable' => 'true'], array $newProxyLabels = ['traefik.enable' => 'true']): array
+function runRollingUpdateDrainStep(Application $application, bool $newVersionIsHealthy, ?array $oldProxyLabels = ['traefik.enable' => 'true'], array $newProxyLabels = ['traefik.enable' => 'true'], ?array &$stopCommands = null): array
 {
-    Process::fake(function ($process) use ($application, $oldProxyLabels, $newProxyLabels) {
+    $runStopStep = func_num_args() >= 5;
+    $stopCommands = [];
+    Process::fake(function ($process) use ($application, $oldProxyLabels, $newProxyLabels, &$stopCommands) {
         $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
+        if (str_contains($command, 'docker stop')) {
+            $stopCommands[] = $command;
+        }
         if (str_contains($command, 'docker inspect')) {
             return Process::result(output: json_encode(['coolify.name' => 'new', ...$newProxyLabels])."\n".json_encode(['coolify.name' => 'old', ...$oldProxyLabels]));
         }
@@ -105,7 +110,11 @@ function runRollingUpdateDrainStep(Application $application, bool $newVersionIsH
         Cache::put('deployment-new-version-healthy:rolling-update-drain', true);
     }
 
-    $reflection->getMethod('wait_for_proxy_to_route_new_container')->invoke($job);
+    $stopImmediately = $reflection->getMethod('wait_for_proxy_to_route_new_container')->invoke($job);
+    if ($runStopStep) {
+        $reflection->getProperty('saved_outputs')->setValue($job, collect());
+        $reflection->getMethod('stop_running_container')->invoke($job, false, $stopImmediately);
+    }
 
     return $logs;
 }
@@ -187,12 +196,36 @@ it('stops the old containers without waiting when the proxy labels changed', fun
         $application,
         newVersionIsHealthy: true,
         oldProxyLabels: ['traefik.http.routers.http-0-app.middlewares' => 'gzip-sse'],
-        newProxyLabels: ['traefik.http.routers.http-0-app.middlewares' => 'gzip-sse,retry-app'],
+        newProxyLabels: ['traefik.http.routers.http-0-app.middlewares' => 'gzip-sse,retry-app', 'traefik.http.middlewares.retry-app.retry.attempts' => '5'],
     );
 
     Sleep::assertNeverSlept();
-    expect($logs)->toBe(['The proxy labels changed, so the old containers stop now, without waiting and without the grace period.']);
+    expect($logs)->toBe(['The proxy labels changed to retry failed connections, so the old containers stop now, without waiting and without the grace period.']);
 });
+
+it('stops the old container without the grace period only on the first deploy with Traefik retry labels', function (array $oldProxyLabels, array $newProxyLabels, int $drainSeconds, string $expectedTimeout) {
+    Sleep::fake();
+    $application = createApplicationForRollingUpdateDrainTest();
+    $application->settings->update(['stop_grace_period' => 20, 'rolling_update_drain_seconds' => $drainSeconds]);
+
+    runRollingUpdateDrainStep(
+        $application,
+        newVersionIsHealthy: true,
+        oldProxyLabels: $oldProxyLabels,
+        newProxyLabels: $newProxyLabels,
+        stopCommands: $stopCommands,
+    );
+
+    expect($stopCommands)->toHaveCount(1)
+        ->and($stopCommands[0])->toMatch("/docker stop --(time|timeout)={$expectedTimeout} 'app-old'/");
+})->with([
+    'Traefik retry labels added' => [['traefik.enable' => 'true'], ['traefik.enable' => 'true', 'traefik.http.middlewares.retry-app.retry.attempts' => '5'], 5, '0'],
+    'Traefik retry labels added, drain turned off' => [['traefik.enable' => 'true'], ['traefik.enable' => 'true', 'traefik.http.middlewares.retry-app.retry.attempts' => '5'], 0, '0'],
+    'Caddy retry labels added (Caddy merges the labels)' => [['caddy_0' => 'example.com'], ['caddy_0' => 'example.com', 'caddy_0.handle_path.0_reverse_proxy.lb_try_duration' => '5s'], 5, '20'],
+    'other labels changed, retry labels already on the old container' => [['traefik.http.routers.http-0-app.rule' => 'Host(`a.com`)', 'traefik.http.middlewares.retry-app.retry.attempts' => '5'], ['traefik.http.routers.http-0-app.rule' => 'Host(`b.com`)', 'traefik.http.middlewares.retry-app.retry.attempts' => '5'], 5, '20'],
+    'other labels changed, no retry labels (custom labels)' => [['traefik.http.routers.http-0-app.rule' => 'Host(`a.com`)'], ['traefik.http.routers.http-0-app.rule' => 'Host(`b.com`)'], 5, '20'],
+    'labels unchanged' => [['traefik.http.middlewares.retry-app.retry.attempts' => '5'], ['traefik.http.middlewares.retry-app.retry.attempts' => '5'], 5, '20'],
+]);
 
 it('saves the rolling update drain time on the advanced page', function () {
     $user = User::factory()->create();
