@@ -7,7 +7,7 @@
 
 services:
   nextcloud:
-    image: lscr.io/linuxserver/nextcloud:latest
+    image: lscr.io/linuxserver/nextcloud:35.0.3
     environment:
       - SERVICE_URL_NEXTCLOUD_80
       - PUID=1000
@@ -34,9 +34,9 @@ services:
       retries: 15
 
   nextcloud-db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     volumes:
-      - nextcloud-postgresql-data:/var/lib/postgresql/data
+      - nextcloud-postgresql-data:/var/lib/postgresql
     environment:
       - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}

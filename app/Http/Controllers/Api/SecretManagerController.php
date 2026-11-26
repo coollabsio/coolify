@@ -8,6 +8,7 @@ use App\Models\IntegrationToken;
 use App\Models\SecretManagerLink;
 use App\Models\Service;
 use App\Services\SecretManagers\ResourceSecretManager;
+use App\Support\RemoteSecretReferences;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,9 +20,10 @@ use Throwable;
 
 #[OA\Schema(
     schema: 'SecretManagerSource',
-    description: 'The secret manager source of an application, service, or database. Routes start with the resource type (`applications`, `services`, `databases`), so tokens limited to some resources can use them.',
+    description: 'A secret manager source of an application, service, or database. A resource can have several named sources: variables reference the `default` source as {{vault.KEY}} and other sources as {{vault.<name>.KEY}}. Routes start with the resource type (`applications`, `services`, `databases`), so tokens limited to some resources can use them.',
     type: 'object',
     properties: [
+        new OA\Property(property: 'name', type: 'string', description: 'Name of the source that the other fields describe.'),
         new OA\Property(property: 'linked', type: 'boolean'),
         new OA\Property(property: 'integration_token_uuid', type: 'string', nullable: true),
         new OA\Property(property: 'provider', type: 'string', nullable: true, enum: ['doppler', 'infisical', 'vault', null]),
@@ -30,6 +32,12 @@ use Throwable;
             new OA\Property(property: 'uuid', type: 'string'),
             new OA\Property(property: 'name', type: 'string'),
             new OA\Property(property: 'provider', type: 'string'),
+        ])),
+        new OA\Property(property: 'sources', type: 'array', description: 'All sources of the resource, sorted by name.', items: new OA\Items(type: 'object', properties: [
+            new OA\Property(property: 'name', type: 'string'),
+            new OA\Property(property: 'integration_token_uuid', type: 'string'),
+            new OA\Property(property: 'provider', type: 'string'),
+            new OA\Property(property: 'settings', type: 'object', nullable: true),
         ])),
     ],
 )]
@@ -44,7 +52,7 @@ class SecretManagerController extends Controller
         operationId: 'get-secret-manager-source',
         security: [['bearerAuth' => []]],
         tags: ['Secret Managers'],
-        parameters: [new OA\Parameter(name: 'resource_type', in: 'path', required: true, description: 'Resource type.', schema: new OA\Schema(type: 'string', enum: ['applications', 'services', 'databases'])), new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Resource UUID.', schema: new OA\Schema(type: 'string'))],
+        parameters: [new OA\Parameter(name: 'resource_type', in: 'path', required: true, description: 'Resource type.', schema: new OA\Schema(type: 'string', enum: ['applications', 'services', 'databases'])), new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Resource UUID.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'name', in: 'query', required: false, description: 'Source name. Default: default.', schema: new OA\Schema(type: 'string', default: 'default'))],
         responses: [
             new OA\Response(response: 200, description: 'Secret manager source.', content: new OA\JsonContent(ref: '#/components/schemas/SecretManagerSource')),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
@@ -58,13 +66,17 @@ class SecretManagerController extends Controller
         if ($resource instanceof JsonResponse) {
             return $resource;
         }
+        $name = $this->sourceName($request);
+        if ($name instanceof JsonResponse) {
+            return $name;
+        }
 
-        return response()->json($this->sourceData($resource));
+        return response()->json($this->sourceData($resource, $name));
     }
 
     #[OA\Patch(
         summary: 'Set Secret Manager Source',
-        description: 'Link a secret manager token of the team to an application, service, or database, or change the token or settings of the link. References resolve at the next deployment.',
+        description: 'Link a secret manager token of the team to an application, service, or database as a named source (`default` when no name is given), or change the token or settings of that source. References resolve at the next deployment.',
         path: '/{resource_type}/{uuid}/secret-manager',
         operationId: 'set-secret-manager-source',
         security: [['bearerAuth' => []]],
@@ -75,6 +87,7 @@ class SecretManagerController extends Controller
             content: new OA\JsonContent(
                 required: ['integration_token_uuid'],
                 properties: [
+                    new OA\Property(property: 'name', type: 'string', default: 'default', description: 'Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.'),
                     new OA\Property(property: 'integration_token_uuid', type: 'string'),
                     new OA\Property(property: 'settings', type: 'object', description: 'Doppler service account: project, config. Infisical: project_id, environment, secret_path. Vault: mount, path.'),
                 ],
@@ -101,6 +114,7 @@ class SecretManagerController extends Controller
             content: new OA\JsonContent(
                 required: ['integration_token_uuid'],
                 properties: [
+                    new OA\Property(property: 'name', type: 'string', default: 'default', description: 'Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.'),
                     new OA\Property(property: 'integration_token_uuid', type: 'string'),
                     new OA\Property(property: 'settings', type: 'object'),
                 ],
@@ -125,6 +139,10 @@ class SecretManagerController extends Controller
         if ($return instanceof JsonResponse) {
             return $return;
         }
+        $name = $this->sourceName($request);
+        if ($name instanceof JsonResponse) {
+            return $name;
+        }
 
         $body = $request->json()->all();
         $token = is_string($body['integration_token_uuid'] ?? null)
@@ -136,6 +154,7 @@ class SecretManagerController extends Controller
 
         $settingsRules = $this->secretManager->settingsRules($token);
         $body = $this->validateBody($body, [
+            'name' => ['sometimes', 'string'],
             'integration_token_uuid' => ['required', 'string'],
             'settings' => ['sometimes', 'array'],
         ] + $settingsRules);
@@ -144,9 +163,10 @@ class SecretManagerController extends Controller
         }
 
         $settingKeys = array_map(fn (string $field): string => Str::after($field, 'settings.'), array_keys($settingsRules));
-        $link = $this->secretManager->link($resource, $token, Arr::only($body['settings'] ?? [], $settingKeys), 'api');
+        $link = $this->secretManager->link($resource, $token, Arr::only($body['settings'] ?? [], $settingKeys), 'api', $name);
 
         return response()->json([
+            'name' => $name,
             'integration_token_uuid' => $token->uuid,
             'provider' => $token->provider,
             'settings' => $link->settings,
@@ -155,12 +175,12 @@ class SecretManagerController extends Controller
 
     #[OA\Delete(
         summary: 'Remove Secret Manager Source',
-        description: 'Remove the secret manager source. Existing {{vault.*}} variables stay and fail the next deployment until they are removed.',
+        description: 'Remove a secret manager source (`default` when no name is given). Existing references to it stay and fail the next deployment until they are removed.',
         path: '/{resource_type}/{uuid}/secret-manager',
         operationId: 'remove-secret-manager-source',
         security: [['bearerAuth' => []]],
         tags: ['Secret Managers'],
-        parameters: [new OA\Parameter(name: 'resource_type', in: 'path', required: true, description: 'Resource type.', schema: new OA\Schema(type: 'string', enum: ['applications', 'services', 'databases'])), new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Resource UUID.', schema: new OA\Schema(type: 'string'))],
+        parameters: [new OA\Parameter(name: 'resource_type', in: 'path', required: true, description: 'Resource type.', schema: new OA\Schema(type: 'string', enum: ['applications', 'services', 'databases'])), new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Resource UUID.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'name', in: 'query', required: false, description: 'Source name. Default: default.', schema: new OA\Schema(type: 'string', default: 'default'))],
         responses: [
             new OA\Response(response: 200, description: 'Source removed.'),
             new OA\Response(response: 401, ref: '#/components/responses/401'),
@@ -175,13 +195,18 @@ class SecretManagerController extends Controller
             return $resource;
         }
 
-        if ($this->sourceLink($resource) === null) {
-            return $this->noSourceResponse();
+        $name = $this->sourceName($request);
+        if ($name instanceof JsonResponse) {
+            return $name;
         }
 
-        $this->secretManager->unlink($resource, 'api');
+        if ($this->sourceLink($resource, $name) === null) {
+            return $this->noSourceResponse($name);
+        }
 
-        return response()->json(['message' => 'Secret manager source removed. Existing {{vault.*}} variables fail the next deployment until they are removed.']);
+        $this->secretManager->unlink($resource, 'api', $name);
+
+        return response()->json(['message' => 'Secret manager source removed. Existing references to it fail the next deployment until they are removed.']);
     }
 
     #[OA\Get(
@@ -191,7 +216,7 @@ class SecretManagerController extends Controller
         operationId: 'list-secret-manager-keys',
         security: [['bearerAuth' => []]],
         tags: ['Secret Managers'],
-        parameters: [new OA\Parameter(name: 'resource_type', in: 'path', required: true, description: 'Resource type.', schema: new OA\Schema(type: 'string', enum: ['applications', 'services', 'databases'])), new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Resource UUID.', schema: new OA\Schema(type: 'string'))],
+        parameters: [new OA\Parameter(name: 'resource_type', in: 'path', required: true, description: 'Resource type.', schema: new OA\Schema(type: 'string', enum: ['applications', 'services', 'databases'])), new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Resource UUID.', schema: new OA\Schema(type: 'string')), new OA\Parameter(name: 'name', in: 'query', required: false, description: 'Source name. Default: default.', schema: new OA\Schema(type: 'string', default: 'default'))],
         responses: [
             new OA\Response(response: 200, description: 'Key names.', content: new OA\JsonContent(properties: [new OA\Property(property: 'keys', type: 'array', items: new OA\Items(type: 'string'))])),
             new OA\Response(response: 400, description: 'The secret manager did not return the keys.'),
@@ -207,9 +232,13 @@ class SecretManagerController extends Controller
             return $resource;
         }
 
-        $link = $this->sourceLink($resource);
+        $name = $this->sourceName($request);
+        if ($name instanceof JsonResponse) {
+            return $name;
+        }
+        $link = $this->sourceLink($resource, $name);
         if ($link === null) {
-            return $this->noSourceResponse();
+            return $this->noSourceResponse($name);
         }
 
         try {
@@ -221,13 +250,13 @@ class SecretManagerController extends Controller
 
     #[OA\Post(
         summary: 'Add Secret Manager Reference',
-        description: 'Add a {{vault.KEY}} environment variable for one key of the linked source.',
+        description: 'Add a {{vault.KEY}} environment variable ({{vault.<name>.KEY}} for a named source) for one key of the source.',
         path: '/{resource_type}/{uuid}/secret-manager/references',
         operationId: 'add-secret-manager-reference',
         security: [['bearerAuth' => []]],
         tags: ['Secret Managers'],
         parameters: [new OA\Parameter(name: 'resource_type', in: 'path', required: true, description: 'Resource type.', schema: new OA\Schema(type: 'string', enum: ['applications', 'services', 'databases'])), new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Resource UUID.', schema: new OA\Schema(type: 'string'))],
-        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['key'], properties: [new OA\Property(property: 'key', type: 'string')])),
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['key'], properties: [new OA\Property(property: 'key', type: 'string'), new OA\Property(property: 'name', type: 'string', default: 'default', description: 'Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.')])),
         responses: [
             new OA\Response(response: 201, description: 'Variable added.'),
             new OA\Response(response: 400, description: 'The secret manager did not return the keys.'),
@@ -244,16 +273,20 @@ class SecretManagerController extends Controller
             return $resource;
         }
 
-        $link = $this->sourceLink($resource);
+        $name = $this->sourceName($request);
+        if ($name instanceof JsonResponse) {
+            return $name;
+        }
+        $link = $this->sourceLink($resource, $name);
         if ($link === null) {
-            return $this->noSourceResponse();
+            return $this->noSourceResponse($name);
         }
 
         $return = validateIncomingRequest($request);
         if ($return instanceof JsonResponse) {
             return $return;
         }
-        $body = $this->validateBody($request->json()->all(), ['key' => ['required', 'string', 'max:255']]);
+        $body = $this->validateBody($request->json()->all(), ['key' => ['required', 'string', 'max:255'], 'name' => ['sometimes', 'string']]);
         if ($body instanceof JsonResponse) {
             return $body;
         }
@@ -268,22 +301,23 @@ class SecretManagerController extends Controller
             if (! in_array($body['key'], $keys, true)) {
                 throw ValidationException::withMessages(['key' => "{$body['key']} is not a key of the secret manager source."]);
             }
-            $this->secretManager->addReference($resource, $body['key'], 'api');
+            $reference = $this->secretManager->addReference($resource, $body['key'], 'api', $name);
         } catch (ValidationException $e) {
             return response()->json(['message' => 'Validation failed.', 'errors' => $e->errors()], 422);
         }
 
-        return response()->json(['key' => $body['key'], 'value' => '{{vault.'.$body['key'].'}}'], 201);
+        return response()->json(['key' => $body['key'], 'value' => $reference], 201);
     }
 
     #[OA\Post(
         summary: 'Import Secret Manager References',
-        description: 'Add a {{vault.KEY}} environment variable for every key of the linked source that has no variable yet. Keys that are not valid variable names are skipped.',
+        description: 'Add a {{vault.KEY}} environment variable ({{vault.<name>.KEY}} for a named source) for every key of the source that has no variable yet. Keys that are not valid variable names are skipped.',
         path: '/{resource_type}/{uuid}/secret-manager/import',
         operationId: 'import-secret-manager-references',
         security: [['bearerAuth' => []]],
         tags: ['Secret Managers'],
         parameters: [new OA\Parameter(name: 'resource_type', in: 'path', required: true, description: 'Resource type.', schema: new OA\Schema(type: 'string', enum: ['applications', 'services', 'databases'])), new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Resource UUID.', schema: new OA\Schema(type: 'string'))],
+        requestBody: new OA\RequestBody(required: false, content: new OA\JsonContent(properties: [new OA\Property(property: 'name', type: 'string', default: 'default', description: 'Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.')])),
         responses: [
             new OA\Response(response: 200, description: 'Import result.', content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'imported', type: 'array', items: new OA\Items(type: 'string')),
@@ -302,9 +336,13 @@ class SecretManagerController extends Controller
             return $resource;
         }
 
-        $link = $this->sourceLink($resource);
+        $name = $this->sourceName($request);
+        if ($name instanceof JsonResponse) {
+            return $name;
+        }
+        $link = $this->sourceLink($resource, $name);
         if ($link === null) {
-            return $this->noSourceResponse();
+            return $this->noSourceResponse($name);
         }
 
         try {
@@ -339,24 +377,43 @@ class SecretManagerController extends Controller
         return $resource;
     }
 
-    private function sourceLink(Model $resource): ?SecretManagerLink
+    /**
+     * The source name from the `name` query parameter or body field, `default` without one.
+     */
+    private function sourceName(Request $request): string|JsonResponse
     {
-        return $resource->secretManagerLink()->with('integrationToken')->first();
+        $name = $request->input('name', RemoteSecretReferences::DEFAULT_SOURCE);
+        if (! RemoteSecretReferences::isValidSourceName($name)) {
+            return response()->json(['message' => 'Validation failed.', 'errors' => [
+                'name' => ['Use a source name of lowercase letters, digits, - and _ (up to 63 characters), starting with a letter or digit.'],
+            ]], 422);
+        }
+
+        return $name;
     }
 
-    private function noSourceResponse(): JsonResponse
+    private function sourceLink(Model $resource, string $name): ?SecretManagerLink
     {
-        return response()->json(['message' => 'The resource has no secret manager source.'], 404);
+        return $resource->secretManagerLinkNamed($name)->with('integrationToken')->first();
+    }
+
+    private function noSourceResponse(string $name): JsonResponse
+    {
+        return response()->json(['message' => $name === RemoteSecretReferences::DEFAULT_SOURCE
+            ? 'The resource has no secret manager source.'
+            : "The resource has no secret manager source named \"{$name}\"."], 404);
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function sourceData(Model $resource): array
+    private function sourceData(Model $resource, string $name): array
     {
-        $link = $this->sourceLink($resource);
+        $links = $resource->secretManagerLinks()->with('integrationToken')->get()->sortBy(fn (SecretManagerLink $link) => $link->sourceName())->values();
+        $link = $links->first(fn (SecretManagerLink $link) => $link->sourceName() === $name);
 
         return [
+            'name' => $name,
             'linked' => $link !== null,
             'integration_token_uuid' => $link?->integrationToken?->uuid,
             'provider' => $link?->integrationToken?->provider,
@@ -364,6 +421,12 @@ class SecretManagerController extends Controller
             'available_tokens' => $this->secretManager->availableTokens($resource)
                 ->map(fn (IntegrationToken $token): array => ['uuid' => $token->uuid, 'name' => $token->name, 'provider' => $token->provider])
                 ->all(),
+            'sources' => $links->map(fn (SecretManagerLink $link): array => [
+                'name' => $link->sourceName(),
+                'integration_token_uuid' => $link->integrationToken?->uuid,
+                'provider' => $link->integrationToken?->provider,
+                'settings' => $link->settings,
+            ])->all(),
         ];
     }
 

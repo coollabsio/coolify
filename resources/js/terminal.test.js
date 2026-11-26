@@ -33,6 +33,10 @@ function terminalComponent() {
     vm.runInNewContext(`${componentSource}\ninitializeTerminalComponent();`, {
         window: { Alpine: { data: (_name, value) => { factory = value; } } },
         localStorage, console, logTerminal() {},
+        document: {
+            getElementById: () => ({ clientWidth: 1600, clientHeight: 800 }),
+            querySelector: () => ({ classList: { add() {} } }),
+        },
         setTimeout, clearTimeout,
         MAX_TERMINAL_SESSION_SECONDS, applicationTerminalThemes: { system: {} },
         ...terminalConnection,
@@ -155,4 +159,23 @@ test('text frames from the terminal server stay control messages', () => {
 
     component.handleSocketMessage({ data: 'unknown text frame' });
     assert.deepEqual(writes, []);
+});
+
+test('each new PTY gets the terminal size, also when the xterm size did not change', () => {
+    const { component } = socketMessageComponent();
+    const resizes = [];
+    component.sendMessage = (message) => message.resize && resizes.push({ ...message.resize });
+    component.startTerminalSessionCountdown = () => {};
+    component.focusActiveInput = () => {};
+    Object.assign(component.term, { cols: 80, rows: 30, element: { style: {} } });
+    component.fitAddon = { fit: () => Object.assign(component.term, { cols: 200, rows: 50 }) };
+
+    component.handleSocketMessage({ data: 'pty-ready' });
+    component.resizeTerminal();
+    assert.deepEqual(resizes, [{ cols: 200, rows: 50 }]);
+
+    // The next PTY (a reconnect or another container) starts at 80x30 on the server.
+    component.handleSocketMessage({ data: 'pty-exited' });
+    component.handleSocketMessage({ data: 'pty-ready' });
+    assert.deepEqual(resizes, [{ cols: 200, rows: 50 }, { cols: 200, rows: 50 }]);
 });

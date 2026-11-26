@@ -16,6 +16,9 @@ use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
+use App\Notifications\Channels\DiscordChannel;
+use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\VolumeBackup\BackupSuccess;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
@@ -164,6 +167,7 @@ it('signs each upload with the region of its destination', function () {
 
 it('keeps the local archive and cleans the partial upload when one destination fails', function () {
     [$backup, $first, $second] = createMultiDestinationVolumeBackup(['disable_local_backup' => true]);
+    $backup->team->discordNotificationSettings()->update(['discord_enabled' => true, 'backup_success_discord_notifications' => true, 'backup_failure_discord_notifications' => true]);
     fakeMultiDestinationS3Disks();
     fakeRemoteProcesses([
         '*du -b*' => '128',
@@ -187,6 +191,18 @@ it('keeps the local archive and cleans the partial upload when one destination f
         ->and($secondReplica->s3_uploaded)->toBeFalse()
         ->and($secondReplica->s3_storage_deleted)->toBeTrue()
         ->and($secondReplica->message)->not->toBeEmpty();
+    Notification::assertSentTo($backup->team, BackupSuccess::class, function (BackupSuccess $notification): bool {
+        $discord = $notification->toDiscord();
+
+        return $notification->uploadFailed
+            && $notification->via($notification->backup->team) === [DiscordChannel::class]
+            && $discord->title === ':cross_mark: Storage backup upload failed'
+            && $discord->color === DiscordMessage::errorColor()
+            && str_contains($discord->description, 'the upload to the backup storage failed')
+            && str_contains($discord->description, 'second storage: ')
+            && ! str_contains($discord->description, 'was successful')
+            && $notification->toWebhook()['upload_failed'] === true;
+    });
 });
 
 it('uploads again when the first upload to a destination fails', function () {

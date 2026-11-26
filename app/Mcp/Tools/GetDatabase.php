@@ -49,7 +49,7 @@ class GetDatabase extends Tool
         $database->makeVisible($visibleSensitiveKeys);
 
         return $this->mcpSuccess($request, $this->respond(
-            $this->scrubSensitive($database->toArray(), $visibleSensitiveKeys),
+            redactLockedApiResourceValues($database, $this->scrubSensitive($database->toArray(), $visibleSensitiveKeys)),
             $this->actionsForDatabase($uuid, $database->status ?? null),
         ), ['resource_uuid' => $uuid]);
     }

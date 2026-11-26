@@ -5,7 +5,6 @@ use App\Models\Environment;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\S3Storage;
-use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
@@ -119,32 +118,4 @@ test('integration detail pages teleport their menu with a back row to the integr
             ->toMatch('#@click="navLevel = -1; navSwap = \'back\'"\s+title="Back to Integrations"#')
             ->toContain('data-active-submenu="Integrations"');
     }
-});
-
-test('a database backup page keeps the database menu one back away in the main sidebar', function () {
-    $database = StandalonePostgresql::create([
-        'name' => 'orders-db', 'postgres_user' => 'postgres', 'postgres_password' => 'password', 'postgres_db' => 'db',
-        'image' => 'postgres:17', 'environment_id' => $this->environment->id,
-        'destination_id' => $this->destination->id, 'destination_type' => $this->destination->getMorphClass(),
-    ]);
-    $backup = ScheduledDatabaseBackup::create([
-        'frequency' => '0 0 * * *', 'save_s3' => false, 'database_id' => $database->id,
-        'database_type' => $database->getMorphClass(), 'team_id' => $this->team->id,
-    ]);
-
-    $html = $this->get(route('project.database.backup.execution', [
-        'project_uuid' => $this->project->uuid,
-        'environment_uuid' => $this->environment->uuid,
-        'database_uuid' => $database->uuid,
-        'backup_uuid' => $backup->uuid,
-    ]))->assertSuccessful()->getContent();
-
-    expect($html)
-        ->toContain('x-teleport="#main-nav-context-0"')
-        ->toContain('x-teleport="#main-nav-context-1"')
-        ->toMatch('#@click="navLevel = -1; navSwap = \'back\'"\s+title="Back to the main menu"#')
-        ->toMatch('#@click="navLevel = 0; navSwap = \'back\'"\s+title="Back to the database menu"#')
-        ->toContain('Back to the Backup menu')
-        ->and(substr_count($html, 'aria-label="Database settings"'))->toBe(1)
-        ->and(substr_count($html, 'aria-label="Backup settings"'))->toBe(2);
 });

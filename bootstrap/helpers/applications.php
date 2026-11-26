@@ -5,6 +5,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\CancelPreviousDeployments;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Jobs\CancelSupersededDeploymentJob;
+use App\Jobs\CleanupHelperContainersJob;
 use App\Jobs\SyncGithubDeploymentJob;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
@@ -250,7 +251,7 @@ function cancel_superseded_deployments(ApplicationDeploymentQueue $deployment, A
         ->whereKey($old->getKey())
         ->where('status', $old->status)
         ->whereNull('deploy_started_at')
-        ->update(['status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value]) === 1);
+        ->update(['status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value, 'finished_at' => now()]) === 1);
     [$building, $queued] = $cancelled->partition(fn (ApplicationDeploymentQueue $old) => $old->status === ApplicationDeploymentStatus::IN_PROGRESS->value);
     $cancelled->each(fn (ApplicationDeploymentQueue $old) => $old->status = ApplicationDeploymentStatus::CANCELLED_BY_USER->value);
 
@@ -378,16 +379,70 @@ function start_queued_deployment(ApplicationDeploymentQueue $deployment, bool $f
  */
 function fail_undispatchable_deployment(ApplicationDeploymentQueue $deployment, Throwable $exception): void
 {
+    fail_unattended_deployment($deployment, "Deployment could not be started: {$exception->getMessage()}");
+}
+
+/**
+ * Fail the in-progress deployments whose worker stopped during the deployment, for example
+ * because the kernel killed it when the Coolify host ran out of memory. Such a job never ends:
+ * Redis gives it back only after the queue retry_after (24 hours), so until then it blocks the
+ * later deployments of its application and holds a build slot of its server.
+ *
+ * The worker kills a job at the deployment timeout of the server, and the reservation by a worker
+ * and each log entry update the deployment. A reserved deployment without an update for longer
+ * than that timeout and a grace period has no live worker. A deployment that waits for a worker
+ * has no Horizon job ID yet, so it stays.
+ *
+ * @return int The number of failed deployments.
+ */
+function fail_deployments_of_stopped_workers(): int
+{
+    $graceSeconds = 600;
+
+    return ApplicationDeploymentQueue::query()
+        ->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)
+        ->where(fn ($query) => $query->whereNotNull('horizon_job_id')->orWhereNotNull('horizon_job_worker'))
+        ->where('updated_at', '<', now()->subSeconds($graceSeconds))
+        ->get()
+        ->filter(function (ApplicationDeploymentQueue $deployment) use ($graceSeconds): bool {
+            $timeout = $deployment->server?->settings?->dynamic_timeout ?? 3600;
+
+            return $deployment->updated_at->lt(now()->subSeconds($timeout + $graceSeconds));
+        })
+        ->filter(function (ApplicationDeploymentQueue $deployment): bool {
+            $failed = fail_unattended_deployment(
+                $deployment,
+                'Deployment failed: the worker that ran it stopped, for example because the Coolify host ran out of memory. Check the free memory and deploy again.',
+            );
+            if ($failed) {
+                // The helper container of the stopped worker can still run the build.
+                Server::query()
+                    ->whereKey(array_filter([$deployment->server_id, $deployment->build_server_id]))
+                    ->get()
+                    ->each(fn (Server $server) => CleanupHelperContainersJob::dispatch($server));
+            }
+
+            return $failed;
+        })
+        ->count();
+}
+
+/**
+ * Fail an in-progress deployment that no job runs, and start the deployments that it blocked.
+ * It returns false when the deployment is no longer in progress.
+ */
+function fail_unattended_deployment(ApplicationDeploymentQueue $deployment, string $reason): bool
+{
     $failed = ApplicationDeploymentQueue::query()
         ->whereKey($deployment->id)
         ->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)
-        ->update(['status' => ApplicationDeploymentStatus::FAILED->value]);
+        ->update(['status' => ApplicationDeploymentStatus::FAILED->value, 'finished_at' => now()]);
 
     if ($failed === 0) {
-        return;
+        return false;
     }
 
-    Log::warning("Deployment {$deployment->deployment_uuid} could not be started: {$exception->getMessage()}");
+    Log::warning("Deployment {$deployment->deployment_uuid} failed: {$reason}");
 
     $deployment->refresh();
     // The query update above fires no model event.
@@ -397,12 +452,12 @@ function fail_undispatchable_deployment(ApplicationDeploymentQueue $deployment, 
         Log::warning("Failed to queue the GitHub deployment sync of deployment {$deployment->deployment_uuid}: {$e->getMessage()}");
     }
     $deployment->addLogEntry('========================================', 'stderr');
-    $deployment->addLogEntry("Deployment could not be started: {$exception->getMessage()}", 'stderr');
+    $deployment->addLogEntry($reason, 'stderr');
     $deployment->addLogEntry('========================================', 'stderr');
 
     $application = Application::query()->find($deployment->application_id);
     if (! $application) {
-        return;
+        return true;
     }
 
     try {
@@ -422,6 +477,8 @@ function fail_undispatchable_deployment(ApplicationDeploymentQueue $deployment, 
     } catch (Throwable $queueException) {
         Log::warning("Starting the next queued deployment after {$deployment->deployment_uuid} failed: {$queueException->getMessage()}");
     }
+
+    return true;
 }
 
 /**
@@ -558,7 +615,7 @@ function clone_application(Application $source, $destination, array $overrides =
         'status' => 'exited',
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),
-    ], $overrides));
+    ], $source->is_archive_source ? ['git_commit_sha' => 'HEAD'] : [], $overrides));
     $newApplication->save();
 
     // Update custom labels if needed

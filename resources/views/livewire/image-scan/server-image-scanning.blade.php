@@ -21,9 +21,9 @@
             default => 'idle',
         };
         $sectionHelper = collect([
-            'Scan the images on this server for known vulnerabilities before and after deployments. Coolify also scans the operating system packages of the server every day.',
+            'Scan the images on this server for known vulnerabilities before and after deployments, and again at each rescan. Coolify also scans the operating system packages of the server at each rescan.',
             "Scanner tools: {$toolVersions}.",
-            'Coolify downloads the latest vulnerability database every day, between 02:00 and 05:00 server time.'
+            'Coolify downloads the latest vulnerability database at each rescan, between 02:00 and 05:00 server time, and before a scan when the database is older than 3 days.'
                 .($builtAt ? ' Database built ' . $builtAt->diffForHumans() . '.' : ''),
             $diskUsed ? "Disk used by scanner data: {$diskUsed}." : null,
             $costText,
@@ -108,17 +108,26 @@
                     @php
                         $cannotUpdate = auth()->user()->cannot('update', $server);
                     @endphp
-                    <x-application.settings-subsection id="image-scan-limits-section" title="Scanner limits"
-                        helper="Limits of each scanner step on this server. Raise one when a scan stops because it took too long or ran out of memory. A new limit applies to the next scan."
+                    <x-application.settings-subsection id="image-rescan-section" title="Rescans"
+                        helper="A rescan checks the images that run on this server again with the newest vulnerability database, between 02:00 and 05:00 server time. It finds vulnerabilities that became known after the deployment. Coolify does not run the scanner again for an image when the image and the database did not change. A failed rescan runs again the next day."
                         first>
+                        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                            <x-forms.listbox id="rescanDays" label="Rescan frequency" onChange="$commit"
+                                :disabled="$cannotUpdate"
+                                helper="With Never, Coolify scans images only at deployments and when you start a scan. Results get old, and you get no alerts for new vulnerabilities in images that run. The operating system packages are scanned only after a package update."
+                                :options="$rescanOptions" />
+                        </div>
+                    </x-application.settings-subsection>
+                    <x-application.settings-subsection id="image-scan-limits-section" title="Scanner limits"
+                        helper="Limits of each scanner step on this server. Raise one when a scan stops because it took too long or ran out of memory. A new limit applies to the next scan.">
                         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                             <x-forms.listbox id="scannerSyftTimeout" label="Syft time limit" onChange="$commit"
                                 :disabled="$cannotUpdate"
-                                helper="Time to list the packages of one image. Large images need more time."
+                                helper="Time to export one local image from Docker, and time to list its packages. Large images and slow disks need more time."
                                 :options="$timeoutOptions" />
                             <x-forms.listbox id="scannerGrypeTimeout" label="Grype time limit" onChange="$commit"
                                 :disabled="$cannotUpdate"
-                                helper="Time to match the packages of one image with the vulnerability database."
+                                helper="Time to check the vulnerability database, and time to match the packages of one image with it. Slow disks need more time."
                                 :options="$timeoutOptions" />
                             <x-forms.listbox id="scannerCpus" label="Scanner CPU limit" onChange="$commit"
                                 :disabled="$cannotUpdate"

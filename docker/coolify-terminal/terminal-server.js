@@ -119,7 +119,7 @@ const server = http.createServer((req, res) => {
 });
 
 const verifyClient = async (req) => {
-    const authHeaderCandidates = getTerminalAuthHeaders(req.headers.cookie);
+    const authHeaderCandidates = getTerminalAuthHeaders(req.headers.cookie, req.headers.origin);
     const requestContext = {
         remoteAddress: req.socket?.remoteAddress,
         origin: req.headers.origin,

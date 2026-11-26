@@ -8,8 +8,9 @@ use Illuminate\Contracts\Validation\ValidationRule;
 /**
  * Validates a custom Fluent Bit classic-mode file for the log drain container.
  *
- * Only a supported subset of sections, directives, and plugins is allowed. With $parsersOnly, the value
- * must only contain [PARSER] and [MULTILINE_PARSER] declarations.
+ * Only a supported subset of sections, directives, and plugins is allowed. The config replaces the full
+ * Fluent Bit config, so it must have the forward input that the containers send their logs to. With
+ * $parsersOnly, the value must only contain [PARSER] and [MULTILINE_PARSER] declarations.
  */
 class ValidFluentBitConfig implements ValidationRule
 {
@@ -47,6 +48,7 @@ class ValidFluentBitConfig implements ValidationRule
 
         $allowedSections = $this->parsersOnly ? self::PARSER_SECTIONS : self::CONFIG_SECTIONS;
         $section = null;
+        $hasForwardInput = false;
 
         foreach (preg_split('/\r\n|\r|\n/', $value) as $number => $rawLine) {
             $line = trim($rawLine);
@@ -97,7 +99,12 @@ class ValidFluentBitConfig implements ValidationRule
                 if (in_array($plugin, self::DENIED_PLUGINS, true)) {
                     return "line {$lineNumber} uses the {$plugin} plugin.";
                 }
+                $hasForwardInput = $hasForwardInput || ($section === 'INPUT' && $plugin === 'forward');
             }
+        }
+
+        if (! $this->parsersOnly && ! $hasForwardInput) {
+            return 'it has no [INPUT] section with "Name forward". Containers send their logs to this input on port 24224.';
         }
 
         return null;

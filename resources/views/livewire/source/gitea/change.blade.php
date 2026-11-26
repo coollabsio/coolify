@@ -18,9 +18,12 @@
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2 sm:ml-auto">
                 @can('view', $gitea_app)
-                    <x-forms.button type="button" wire:click.prevent="testConnection">
-                        Test connection
-                    </x-forms.button>
+                    {{-- The test uses the saved settings, and its request would hide the unsaved bar without a save. --}}
+                    <fieldset class="contents" wire:dirty.attr="disabled" title="Tests the saved settings">
+                        <x-forms.button type="button" wire:click.prevent="testConnection">
+                            Test connection
+                        </x-forms.button>
+                    </fieldset>
                 @endcan
                 @can('delete', $gitea_app)
                     <x-modal-confirmation title="Confirm Gitea / Forgejo App Deletion?" isErrorButton buttonTitle="Delete"

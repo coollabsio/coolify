@@ -113,7 +113,12 @@ class AccessResolver
             return null;
         }
 
-        $levels = AccessLevel::parseMany($token->abilities ?? []);
+        $abilities = $token->abilities ?? [];
+        $levels = AccessLevel::parseMany($abilities);
+        // Scopes only pick what a terminal token reaches: its abilities still allow only the exec endpoints, and layers only narrow access.
+        if ($levels === [] && in_array('terminal', $abilities, true)) {
+            $levels = [AccessLevel::Read];
+        }
 
         return array_map(
             fn (Grant $scope) => new Grant($scope->scope, $scope->uuid, $levels),

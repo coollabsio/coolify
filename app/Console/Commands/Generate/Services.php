@@ -98,6 +98,10 @@ class Services extends Command
             $payload['arm_only'] = true;
         }
 
+        if (str($data->get('outdated'))->toBoolean()) {
+            $payload['outdated'] = true;
+        }
+
         return $payload;
     }
 
@@ -199,6 +203,10 @@ class Services extends Command
             $payload['arm_only'] = true;
         }
 
+        if (str($data->get('outdated'))->toBoolean()) {
+            $payload['outdated'] = true;
+        }
+
         return $payload;
     }
 
@@ -275,6 +283,10 @@ class Services extends Command
 
         if (str($data->get('arm_only'))->toBoolean()) {
             $payload['arm_only'] = true;
+        }
+
+        if (str($data->get('outdated'))->toBoolean()) {
+            $payload['outdated'] = true;
         }
 
         return $payload;

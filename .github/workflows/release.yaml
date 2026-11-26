@@ -45,8 +45,10 @@ jobs:
       - name: Plan the releases
         id: plan
         env:
+          GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ github.ref_name }}
         run: |
+          gh auth setup-git
           releases="$(scripts/plan-version.sh --release)"
           echo "releases=$releases" | tee -a "$GITHUB_OUTPUT"
 
@@ -146,7 +148,10 @@ jobs:
 
       - name: Plan the moving tags
         id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          gh auth setup-git
           tags="$(scripts/plan-version.sh --tags)"
           echo "tags=$tags" | tee -a "$GITHUB_OUTPUT"
 

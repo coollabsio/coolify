@@ -79,6 +79,13 @@
                     x-bind:disabled="isRoot || {{ $canUseDeployPermissions ? 'false' : 'true' }}" />
             </div>
             <div class="listbox-option p-0!">
+                <x-forms.checkbox id="permission-terminal" label="Terminal" fullWidth
+                    wire:model.live="{{ $form }}.permissions" domValue="terminal"
+                    helper="Run one-shot commands on servers and in application containers. Cannot be combined with other permissions, and always expires after at most 90 days."
+                    :disabled="!$canUseTerminalPermissions"
+                    x-bind:disabled="isRoot || {{ $canUseTerminalPermissions ? 'false' : 'true' }}" />
+            </div>
+            <div class="listbox-option p-0!">
                 <x-forms.checkbox id="permission-read" label="Read" fullWidth
                     wire:model.live="{{ $form }}.permissions" domValue="read"
                     helper="Read non-sensitive resource data."

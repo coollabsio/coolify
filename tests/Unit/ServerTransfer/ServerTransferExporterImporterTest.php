@@ -42,6 +42,7 @@ use App\Services\ServerTransfer\ServerTransferImporter;
 use App\Services\ServerTransfer\TransferFinishChecklist;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
@@ -416,6 +417,19 @@ test('a swarm server gets only the destinations of the bundle', function () {
         ->and($server->swarmDockers()->pluck('network')->all())->toBe(['swarm-overlay']);
 });
 
+test('the public IPs of the server move with it', function () {
+    $this->server->settings->forceFill(['public_ipv4' => '95.217.1.10', 'public_ipv6' => '2a01:4f8::10'])->saveQuietly();
+    $bundle = $this->exporter->export($this->server->fresh());
+    $serverUuid = $this->server->uuid;
+    removeTransferSourceResources($this);
+
+    $this->importer->import($bundle, teamId: Team::factory()->create()->id);
+
+    expect(Server::where('uuid', $serverUuid)->firstOrFail()->settings)
+        ->public_ipv4->toBe('95.217.1.10')
+        ->public_ipv6->toBe('2a01:4f8::10');
+});
+
 test('variables with a legacy key that new variables cannot use move unchanged', function () {
     $variable = EnvironmentVariable::create(['key' => 'LEGACY_KEY', 'value' => 'legacy', 'resourceable_type' => $this->application->getMorphClass(), 'resourceable_id' => $this->application->id]);
     DB::table('environment_variables')->where('id', $variable->id)->update(['key' => 'legacy-key']);
@@ -685,6 +699,7 @@ test('system-wide github apps are not exported and re-link on import by uuid', f
         'team_id' => $this->team->id,
         'app_id' => 12345,
         'installation_id' => 67890,
+        'installation_account' => 'acme-installation',
         'client_id' => 'Iv1.test',
         'client_secret' => 'secret',
         'webhook_secret' => 'hook',
@@ -758,6 +773,7 @@ test('system-wide github apps are not exported and re-link on import by uuid', f
         ->and($importedSystem->source_id)->toBe($targetSystemWide->id)
         ->and($importedTeam->source_id)->toBe($importedGhTeam->id)
         ->and($importedGhTeam->is_system_wide)->toBeFalse()
+        ->and($importedGhTeam->installation_account)->toBe('acme-installation')
         ->and(GithubApp::where('is_system_wide', true)->where('uuid', 'system-github-public')->count())->toBe(1);
 });
 
@@ -907,6 +923,7 @@ test('service nested apps dbs volumes backups and db file storages round-trip', 
         'status' => 'running:healthy',
         'git_type' => 'github',
         'keeps_production_values' => true,
+        'is_same_repository' => true,
     ]);
     $preview->uuid = 'preview-pr-42';
     $preview->save();
@@ -1019,6 +1036,7 @@ test('service nested apps dbs volumes backups and db file storages round-trip', 
         ->and($importedApp->previews)->toHaveCount(1)
         ->and($importedApp->previews->first()->uuid)->toBe('preview-pr-42')
         ->and($importedApp->previews->first()->keeps_production_values)->toBeTrue()
+        ->and($importedApp->previews->first()->is_same_repository)->toBeTrue()
         ->and($importedApp->previews->first()->persistentStorages)->toHaveCount(1);
 
     $importedVolBackup = ScheduledVolumeBackup::where('uuid', 'svc-app-vol-backup')->first();
@@ -1231,6 +1249,35 @@ test('transfer keeps the legacy escaping flag and treats old exports as legacy',
         ->and($this->application->environment_variables()->where('key', 'OLD_EXPORT_VAR')->first()->uses_legacy_escaping)->toBeTrue();
 });
 
+test('transfer keeps the expected healthcheck response text only from a bundle that checks it', function (bool $exportedFlag, ?string $expected) {
+    $this->application->forceFill(['health_check_response_text' => 'OK'])->saveQuietly();
+    $bundle = $this->exporter->export($this->server);
+    $app = &$bundle['projects'][0]['environments'][0]['applications'][0];
+    expect($app['checks_health_check_response_text'])->toBeTrue();
+    if (! $exportedFlag) {
+        // A bundle from a Coolify version whose healthcheck did not check the text.
+        unset($app['checks_health_check_response_text']);
+    }
+    unset($app);
+    $originalAppUuid = $this->application->uuid;
+
+    $this->service->forceDelete();
+    $this->application->forceDelete();
+    $this->database->forceDelete();
+    $this->server->forceDelete();
+    Tag::query()->delete();
+    ScheduledDatabaseBackup::query()->delete();
+    ScheduledTask::query()->delete();
+    $this->privateKey->delete();
+
+    $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: true, adoptMode: true);
+
+    expect(Application::where('uuid', $originalAppUuid)->sole()->health_check_response_text)->toBe($expected);
+})->with([
+    'current bundle' => [true, 'OK'],
+    'bundle without the flag' => [false, null],
+]);
+
 test('transfer keeps whether a volume ignores the Compose driver options', function (?bool $exported, bool $expected) {
     LocalPersistentVolume::query()->update(['ignores_compose_driver_options' => (bool) $exported]);
     $bundle = $this->exporter->export($this->server);
@@ -1320,7 +1367,7 @@ test('transfer keeps the link between an application volume and its sqlite datab
         ->and($importedSqlite->persistentStorages()->sole()->isSharedWithAnotherResource())->toBeTrue();
 });
 
-test('secret manager links of applications and databases move with their integration token', function () {
+test('all named secret manager links of applications and databases move with their integration token', function () {
     $token = IntegrationToken::factory()->create([
         'team_id' => $this->team->id,
         'provider' => 'vault',
@@ -1328,6 +1375,7 @@ test('secret manager links of applications and databases move with their integra
         'capabilities' => ['secrets'],
     ]);
     $this->application->secretManagerLink()->create(['integration_token_id' => $token->id, 'settings' => ['mount' => 'secret', 'path' => 'app']]);
+    $this->application->secretManagerLinks()->create(['name' => 'urls', 'integration_token_id' => $token->id, 'settings' => ['mount' => 'secret', 'path' => 'urls']]);
     $this->database->secretManagerLink()->create(['integration_token_id' => $token->id, 'settings' => ['mount' => 'kv', 'path' => 'db']]);
 
     $bundle = $this->exporter->export($this->server);
@@ -1335,7 +1383,8 @@ test('secret manager links of applications and databases move with their integra
     expect(collect($bundle['warnings'])->filter(fn (string $warning) => str_contains($warning, 'secret manager')))->toBeEmpty()
         ->and($bundle['integration_tokens'])->toHaveCount(1)
         ->and($bundle['integration_tokens'][0]['token'])->toBe('vault-root-token')
-        ->and(data_get($bundle, 'projects.0.environments.0.databases.0.secret_manager_link.integration_token_uuid'))->toBe($token->uuid);
+        ->and(data_get($bundle, 'projects.0.environments.0.databases.0.secret_manager_links.0.integration_token_uuid'))->toBe($token->uuid)
+        ->and(data_get($bundle, 'projects.0.environments.0.applications.0.secret_manager_links.*.name'))->toBe(['default', 'urls']);
 
     $this->service->forceDelete();
     $this->application->forceDelete();
@@ -1347,6 +1396,11 @@ test('secret manager links of applications and databases move with their integra
     $this->privateKey->delete();
     $token->delete();
 
+    // Bundles of older instances have one `secret_manager_link` per resource.
+    $databaseLinks = data_get($bundle, 'projects.0.environments.0.databases.0.secret_manager_links');
+    data_set($bundle, 'projects.0.environments.0.databases.0.secret_manager_link', Arr::except($databaseLinks[0], 'name'));
+    Arr::forget($bundle, 'projects.0.environments.0.databases.0.secret_manager_links');
+
     $this->importer->import($bundle, teamId: $this->team->id, dryRun: false, preserveUuids: true, adoptMode: true);
 
     $imported = IntegrationToken::where('uuid', $token->uuid)->where('team_id', $this->team->id)->firstOrFail();
@@ -1355,6 +1409,9 @@ test('secret manager links of applications and databases move with their integra
     expect($imported->token)->toBe('vault-root-token')
         ->and($application->secretManagerLink->integration_token_id)->toBe($imported->id)
         ->and($application->secretManagerLink->settings)->toBe(['mount' => 'secret', 'path' => 'app'])
+        ->and($application->secretManagerLinkNamed('urls')->first()?->integration_token_id)->toBe($imported->id)
+        ->and($application->secretManagerLinkNamed('urls')->first()?->settings)->toBe(['mount' => 'secret', 'path' => 'urls'])
+        ->and($application->secretManagerLinks()->count())->toBe(2)
         ->and($database->secretManagerLink->integration_token_id)->toBe($imported->id)
         ->and($database->secretManagerLink->settings)->toBe(['mount' => 'kv', 'path' => 'db']);
 });
@@ -2471,6 +2528,7 @@ test('the image scanner limits move with the server', function () {
         'image_scan_grype_timeout' => 1200,
         'image_scan_cpus' => 2.0,
         'image_scan_memory_mb' => 4096,
+        'image_rescan_days' => 14,
     ])->saveQuietly();
 
     $bundle = $this->exporter->export($this->server);
@@ -2485,7 +2543,8 @@ test('the image scanner limits move with the server', function () {
     expect($settings->image_scan_syft_timeout)->toBe(1800)
         ->and($settings->image_scan_grype_timeout)->toBe(1200)
         ->and($settings->image_scan_cpus)->toBe(2.0)
-        ->and($settings->image_scan_memory_mb)->toBe(4096);
+        ->and($settings->image_scan_memory_mb)->toBe(4096)
+        ->and($settings->image_rescan_days)->toBe(14);
 });
 
 test('transfer keeps the fork pull request approval state of previews and the approval setting', function () {

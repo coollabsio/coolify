@@ -7,7 +7,7 @@
 
 services:
   grist:
-    image: gristlabs/grist:latest
+    image: gristlabs/grist:1.7.22
     environment:
       - SERVICE_URL_GRIST_8484
       - APP_HOME_URL=${SERVICE_URL_GRIST}

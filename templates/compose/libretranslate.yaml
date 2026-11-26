@@ -7,7 +7,7 @@
 
 services:
   libretranslate:
-    image: "libretranslate/libretranslate:latest"
+    image: "libretranslate/libretranslate:v1.9.6"
     environment:
       - SERVICE_URL_LIBRETRANSLATE_5000
       - LT_SSL=${LT_SSL:-true}

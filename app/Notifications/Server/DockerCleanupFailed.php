@@ -7,6 +7,7 @@ use App\Models\NotificationThrottle;
 use App\Models\Server;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Database\Eloquent\Model;
@@ -69,6 +70,15 @@ class DockerCleanupFailed extends CustomEmailNotification implements ThrottledNo
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
+            title: 'Docker cleanup job failed',
+            level: 'error',
+            message: "[ACTION REQUIRED] Docker cleanup job failed on {$this->server->name}!\n\n{$this->message}",
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
             title: 'Docker cleanup job failed',
             level: 'error',
             message: "[ACTION REQUIRED] Docker cleanup job failed on {$this->server->name}!\n\n{$this->message}",

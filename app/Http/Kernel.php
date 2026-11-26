@@ -15,13 +15,16 @@ use App\Http\Middleware\DecideWhatToDoWithUser;
 use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\EnsureMcpEnabled;
 use App\Http\Middleware\EnsureTeamMcpEnabled;
+use App\Http\Middleware\EnsureTeamTerminalApiEnabled;
 use App\Http\Middleware\EnsureTeamWideAccess;
 use App\Http\Middleware\EnsureTokenBelongsToCurrentTeamMember;
 use App\Http\Middleware\KeepConcurrentTeamSwitch;
+use App\Http\Middleware\PreventHtmlTransform;
 use App\Http\Middleware\PreventRequestsDuringMaintenance;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\RequirePassword;
 use App\Http\Middleware\RequireTeamTwoFactor;
+use App\Http\Middleware\SwitchToResourceTeam;
 use App\Http\Middleware\ThrottleFailedApiRequests;
 use App\Http\Middleware\TrimStrings;
 use App\Http\Middleware\TrustProxies;
@@ -83,9 +86,10 @@ class Kernel extends HttpKernel
             VerifyCsrfToken::class,
             SubstituteBindings::class,
             CheckForcePasswordReset::class,
+            SwitchToResourceTeam::class,
             DecideWhatToDoWithUser::class,
             RequireTeamTwoFactor::class,
-
+            PreventHtmlTransform::class,
         ],
 
         'api' => [
@@ -125,5 +129,6 @@ class Kernel extends HttpKernel
         'mcp.enabled' => EnsureMcpEnabled::class,
         'api.ip.allowed' => ApiIpAllowed::class,
         'mcp.team.enabled' => EnsureTeamMcpEnabled::class,
+        'terminal.team.enabled' => EnsureTeamTerminalApiEnabled::class,
     ];
 }

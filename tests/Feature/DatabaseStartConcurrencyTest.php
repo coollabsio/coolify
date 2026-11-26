@@ -311,9 +311,9 @@ describe('pending operation reservation', function () {
             ->assertOk();
     });
 
-    it('stops and starts in the queued restart action and then releases the reservation', function () {
+    it('starts in the queued restart action without a separate stop and then releases the reservation', function () {
         Queue::fake();
-        StopDatabase::shouldRun()->once();
+        StopDatabase::shouldRun()->never();
 
         $this->withHeaders(databaseStartApiHeaders($this->bearerToken))
             ->postJson("/api/v1/databases/{$this->database->uuid}/restart")
@@ -438,19 +438,15 @@ describe('pending operation reservation', function () {
         expect(data_get($failed, 'properties.error'))->toBe(DatabaseOperationReservation::EXPIRED_MESSAGE);
     });
 
-    it('keeps the reservation of a queued restart while the database stops', function () {
+    it('starts a queued restart near the end of its reservation without stopping the database first', function () {
         Queue::fake();
+        StopDatabase::shouldRun()->never();
 
         $this->withHeaders(databaseStartApiHeaders($this->bearerToken))
             ->postJson("/api/v1/databases/{$this->database->uuid}/restart")
             ->assertOk();
 
         $this->travel(DatabaseOperationReservation::TTL_SECONDS - 10)->seconds();
-        StopDatabase::shouldRun()->once()->andReturnUsing(function () {
-            $this->travel(20)->seconds();
-
-            return 'Database stopped successfully';
-        });
 
         expect(runPushedDatabaseAction(RestartDatabase::class))->toBeInstanceOf(Activity::class);
         Queue::assertPushed(DatabaseStartJob::class, 1);
@@ -475,7 +471,7 @@ describe('pending operation reservation', function () {
 
     it('records a failed start when the queued restart action throws', function () {
         Queue::fake();
-        StopDatabase::shouldRun()->once()->andThrow(new RuntimeException('ssh: connection refused'));
+        StartDatabase::partialMock()->shouldReceive('handle')->once()->andThrow(new RuntimeException('ssh: connection refused'));
 
         $this->withHeaders(databaseStartApiHeaders($this->bearerToken))
             ->postJson("/api/v1/databases/{$this->database->uuid}/restart")

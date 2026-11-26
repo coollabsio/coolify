@@ -7,7 +7,7 @@
 
 services:
   cells:
-    image: pydio/cells:4.4
+    image: pydio/cells:5.1
     environment:
       - SERVICE_URL_CELLS_8080
       - CELLS_SITE_EXTERNAL=${SERVICE_URL_CELLS}

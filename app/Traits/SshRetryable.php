@@ -70,6 +70,22 @@ trait SshRetryable
     }
 
     /**
+     * sshd closes a new connection before the key exchange when it has too many unauthenticated
+     * connections (MaxStartups, often bots on a public port 22) or when it blocks the source address
+     * for a time (PerSourcePenalties). This can last longer than the normal retries. No session
+     * existed, so the remote command did not run and a retry cannot run it two times.
+     */
+    protected function sshAttemptLimit(\Throwable $exception, int $maxAttempts): int
+    {
+        $message = $exception->getMessage();
+        if (! str_contains($message, 'kex_exchange_identification') && ! str_contains($message, 'ssh_exchange_identification')) {
+            return $maxAttempts;
+        }
+
+        return max($maxAttempts, (int) config('constants.ssh.handshake_max_retries'));
+    }
+
+    /**
      * Calculate delay for exponential backoff
      */
     protected function calculateRetryDelay(int $attempt): int
@@ -89,7 +105,7 @@ trait SshRetryable
      * @param  callable  $callback  The operation to execute
      * @param  array  $context  Context for logging (server, command, etc.)
      * @param  bool  $throwError  Whether to throw error on final failure
-     * @param  int|null  $maxAttempts  Attempts in total, defaults to constants.ssh.max_retries
+     * @param  int|null  $maxAttempts  Attempts in total, defaults to constants.ssh.max_retries (constants.ssh.handshake_max_retries when sshd refused the handshake)
      * @return mixed The result from the callback
      */
     protected function executeWithSshRetry(callable $callback, array $context = [], bool $throwError = true, ?int $maxAttempts = null)
@@ -101,20 +117,21 @@ trait SshRetryable
         // if (random_int(1, 10) === 1) { // 10% chance to fail
         //     throw new \RuntimeException('SSH key exchange failed: kex_exchange_identification: read: Connection reset by peer');
         // }
-        for ($attempt = 0; $attempt < $maxRetries; $attempt++) {
+        for ($attempt = 0; ; $attempt++) {
             try {
                 return $callback();
             } catch (\Throwable $e) {
                 $lastError = $e;
                 $lastErrorMessage = $e->getMessage();
+                $attemptLimit = $maxAttempts ?? $this->sshAttemptLimit($e, $maxRetries);
 
                 // Check if it's retryable and not the last attempt
-                if ($this->isRetryableSshFailure($e) && $attempt < $maxRetries - 1) {
+                if ($this->isRetryableSshFailure($e) && $attempt < $attemptLimit - 1) {
                     $delay = $this->calculateRetryDelay($attempt);
 
                     // Add deployment log if available (for ExecuteRemoteCommand trait)
                     if (isset($this->application_deployment_queue) && method_exists($this, 'addRetryLogEntry')) {
-                        $this->addRetryLogEntry($attempt + 1, $maxRetries, $delay, $lastErrorMessage);
+                        $this->addRetryLogEntry($attempt + 1, $attemptLimit, $delay, $lastErrorMessage);
                     }
 
                     sleep($delay);
@@ -128,9 +145,9 @@ trait SshRetryable
         }
 
         // All retries exhausted
-        if ($attempt >= $maxRetries) {
+        if ($attempt > 0) {
             Log::error('SSH operation failed after all retries', array_merge($context, [
-                'attempts' => $attempt,
+                'attempts' => $attempt + 1,
                 'error' => $lastErrorMessage,
             ]));
         }
@@ -139,7 +156,7 @@ trait SshRetryable
             // If the error message is empty, provide a more meaningful one
             if (empty($lastErrorMessage) || trim($lastErrorMessage) === '') {
                 $contextInfo = isset($context['server']) ? " to server {$context['server']}" : '';
-                $attemptInfo = $attempt > 1 ? " after {$attempt} attempts" : '';
+                $attemptInfo = $attempt > 0 ? ' after '.($attempt + 1).' attempts' : '';
                 throw new \RuntimeException("SSH connection failed{$contextInfo}{$attemptInfo}", $lastError->getCode());
             }
             throw $lastError;

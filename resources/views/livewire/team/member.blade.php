@@ -51,7 +51,8 @@
     @endcan
     <div class="flex justify-end">
         @can('manageMembers', currentTeam())
-            @if ($member->id !== Auth::id())
+            {{-- The root user stays an owner of the root team. --}}
+            @if ($member->id !== Auth::id() && ! ($member->id === 0 && currentTeam()->id === 0))
                 @if (data_get($member, 'pivot.role') === 'owner' && ! Auth::user()->isOwner())
                     <x-modal-confirmation title="Remove team member?" submitAction="remove"
                         :actions="['This user loses access to all resources of this team.']"

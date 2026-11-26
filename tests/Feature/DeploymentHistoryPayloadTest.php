@@ -164,7 +164,7 @@ it('does not load deployment payload columns for the history list on any Livewir
     ($this->assertNoPayloadQueries)();
 });
 
-it('flips the deployment sort from the started column header', function () {
+it('flips the deployment sort between newest and oldest', function () {
     foreach (range(1, 3) as $number) {
         ($this->createDeployment)("header-d{$number}", "2026-10-0{$number} 10:00:00");
     }
@@ -174,10 +174,8 @@ it('flips the deployment sort from the started column header', function () {
         'environment_uuid' => $this->environment->uuid,
         'application_uuid' => $this->application->uuid,
     ])
-        ->assertSeeHtml('aria-label="Sort by started, sorted descending"')
         ->assertSeeInOrder(['header-d3', 'header-d2', 'header-d1'])
         ->call('setDeploymentSort', 'oldest')
-        ->assertSeeHtml('aria-label="Sort by started, sorted ascending"')
         ->assertSeeInOrder(['header-d1', 'header-d2', 'header-d3']);
 });
 

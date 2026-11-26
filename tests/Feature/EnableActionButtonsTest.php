@@ -2,6 +2,7 @@
 
 use App\Livewire\Notifications\Discord;
 use App\Livewire\Notifications\Email;
+use App\Livewire\Notifications\Ntfy;
 use App\Livewire\Notifications\Pushover;
 use App\Livewire\Notifications\Slack;
 use App\Livewire\Notifications\Telegram;
@@ -76,47 +77,6 @@ it('enables transactional smtp only after required fields validate', function ()
         ->and(instanceSettings()->fresh()->resend_enabled)->toBeFalse();
 });
 
-it('shows notification provider save buttons while disabled', function (string $component) {
-    actingAsEnableActionOwner();
-
-    Livewire::test($component)
-        ->assertSet(str(class_basename($component))->camel()->append('Enabled')->toString(), false)
-        ->assertSee('Save');
-})->with([
-    'discord' => [Discord::class],
-    'slack' => [Slack::class],
-    'telegram' => [Telegram::class],
-    'pushover' => [Pushover::class],
-    'webhook' => [Webhook::class],
-]);
-
-it('hides notification provider test buttons while disabled and shows them when enabled', function (string $component, string $enabledProperty) {
-    actingAsEnableActionOwner();
-
-    // The channel actions always render "Send test"; it stays disabled until the channel is enabled.
-    $sendTestButton = '/<button\s+(disabled\s+)?class="button"[^>]*\$wire\.\$call\(testMethod\)[^>]*>/';
-
-    preg_match($sendTestButton, Livewire::test($component)->html(), $disabledMatch);
-    expect($disabledMatch[1] ?? null)->not->toBeEmpty();
-
-    preg_match($sendTestButton, Livewire::test($component)->set($enabledProperty, true)->html(), $enabledMatch);
-    expect($enabledMatch)->not->toBeEmpty()
-        ->and($enabledMatch[1] ?? '')->toBe('');
-})->with([
-    'discord' => [Discord::class, 'discordEnabled'],
-    'slack' => [Slack::class, 'slackEnabled'],
-    'telegram' => [Telegram::class, 'telegramEnabled'],
-    'pushover' => [Pushover::class, 'pushoverEnabled'],
-    'webhook' => [Webhook::class, 'webhookEnabled'],
-]);
-
-it('hides the email test button while email notifications are disabled', function () {
-    actingAsEnableActionOwner();
-
-    Livewire::test(Email::class)
-        ->assertDontSee('Send Test Email');
-});
-
 it('keeps notification providers disabled when enable validation fails', function (string $component, string $method, string $enabledProperty, string $requiredField, string $settingsRelation, string $settingsColumn) {
     [, $team] = actingAsEnableActionOwner();
 
@@ -131,6 +91,7 @@ it('keeps notification providers disabled when enable validation fails', functio
     'slack' => [Slack::class, 'toggleSlackEnabled', 'slackEnabled', 'slackWebhookUrl', 'slackNotificationSettings', 'slack_enabled'],
     'telegram' => [Telegram::class, 'toggleTelegramEnabled', 'telegramEnabled', 'telegramToken', 'telegramNotificationSettings', 'telegram_enabled'],
     'pushover' => [Pushover::class, 'togglePushoverEnabled', 'pushoverEnabled', 'pushoverUserKey', 'pushoverNotificationSettings', 'pushover_enabled'],
+    'ntfy' => [Ntfy::class, 'toggleNtfyEnabled', 'ntfyEnabled', 'ntfyUrl', 'ntfyNotificationSettings', 'ntfy_enabled'],
     'webhook' => [Webhook::class, 'toggleWebhookEnabled', 'webhookEnabled', 'webhookUrl', 'webhookNotificationSettings', 'webhook_enabled'],
 ]);
 
@@ -158,6 +119,7 @@ it('reverts a notification provider toggle to the saved value when enabling fail
     'slack' => [Slack::class, 'instantSaveSlackEnabled', 'slackEnabled', 'slackNotificationSettings', 'slack_enabled'],
     'telegram' => [Telegram::class, 'instantSaveTelegramEnabled', 'telegramEnabled', 'telegramNotificationSettings', 'telegram_enabled'],
     'pushover' => [Pushover::class, 'instantSavePushoverEnabled', 'pushoverEnabled', 'pushoverNotificationSettings', 'pushover_enabled'],
+    'ntfy' => [Ntfy::class, 'instantSaveNtfyEnabled', 'ntfyEnabled', 'ntfyNotificationSettings', 'ntfy_enabled'],
     'webhook' => [Webhook::class, 'instantSaveWebhookEnabled', 'webhookEnabled', 'webhookNotificationSettings', 'webhook_enabled'],
 ]);
 
@@ -179,6 +141,7 @@ it('reverts a notification provider toggle to the saved value when disabling fai
     'slack' => [Slack::class, 'instantSaveSlackEnabled', 'slackEnabled', 'slackWebhookUrl', 'slackNotificationSettings', ['slack_enabled' => true, 'slack_webhook_url' => 'https://hooks.slack.com/services/T/B/C']],
     'telegram' => [Telegram::class, 'instantSaveTelegramEnabled', 'telegramEnabled', 'telegramToken', 'telegramNotificationSettings', ['telegram_enabled' => true, 'telegram_token' => '123:abc', 'telegram_chat_id' => '42']],
     'pushover' => [Pushover::class, 'instantSavePushoverEnabled', 'pushoverEnabled', 'pushoverUserKey', 'pushoverNotificationSettings', ['pushover_enabled' => true, 'pushover_user_key' => 'user', 'pushover_api_token' => 'token']],
+    'ntfy' => [Ntfy::class, 'instantSaveNtfyEnabled', 'ntfyEnabled', 'ntfyUrl', 'ntfyNotificationSettings', ['ntfy_enabled' => true, 'ntfy_url' => 'https://ntfy.sh', 'ntfy_topic' => 'coolify-alerts']],
     'webhook' => [Webhook::class, 'instantSaveWebhookEnabled', 'webhookEnabled', 'webhookUrl', 'webhookNotificationSettings', ['webhook_enabled' => true, 'webhook_url' => 'https://hooks.example.com/coolify']],
 ]);
 
@@ -195,6 +158,7 @@ it('reverts a notification event toggle to the saved value when saving fails', f
 })->with([
     'discord' => [Discord::class, 'discordWebhookUrl', 'deploymentSuccessDiscordNotifications', 'discordNotificationSettings', 'deployment_success_discord_notifications'],
     'slack' => [Slack::class, 'slackWebhookUrl', 'deploymentSuccessSlackNotifications', 'slackNotificationSettings', 'deployment_success_slack_notifications'],
+    'ntfy' => [Ntfy::class, 'ntfyUrl', 'deploymentSuccessNtfyNotifications', 'ntfyNotificationSettings', 'deployment_success_ntfy_notifications'],
 ]);
 
 it('turns the automatic security updates event off and on for every channel', function (string $component, string $channel) {

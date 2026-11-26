@@ -91,6 +91,7 @@ function resource_logo(Model $resource): ?array
 
     if ($resource instanceof Application) {
         $logo = match (true) {
+            $resource->is_archive_source => $resourceLogo('static-archive'),
             $resource->build_pack === 'dockerimage' => $resourceLogo('docker-image'),
             $resource->build_pack === 'dockerfile' => $resourceLogo('dockerfile'),
             $resource->build_pack === 'dockercompose' => $resourceLogo('docker-compose'),
@@ -347,6 +348,8 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 instant_remote_process([
                     "mkdir -p -- {$dir}",
                     "echo '$content' | base64 -d | tee -- {$escapedFileLocation}",
+                    // Same mode as LocalFileVolume::saveStorageOnServer(): readable for a non-root container user with any umask.
+                    "chmod a+rx -- {$escapedFileLocation}",
                 ], $server);
             } elseif ($state === 'missing' && $fileVolume->is_directory && $isInit) {
                 // Does not exists (no dir or file), flagged as directory, is init
@@ -383,7 +386,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         // Switch Image
         $updatedImage = data_get_str($resource, 'image');
         $currentImage = data_get_str($dockerCompose, ['services', $name, 'image']);
-        if ($currentImage !== $updatedImage) {
+        if ($updatedImage->isNotEmpty() && $currentImage->value() !== $updatedImage->value()) {
             data_set($dockerCompose, ['services', $name, 'image'], $updatedImage->value());
             $dockerComposeRaw = Yaml::dump($dockerCompose, 10, 2);
             $resource->service->docker_compose_raw = $dockerComposeRaw;

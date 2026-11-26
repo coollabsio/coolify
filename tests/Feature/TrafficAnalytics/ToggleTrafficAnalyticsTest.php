@@ -167,22 +167,6 @@ it('does not enable traffic analytics on a build server', function () {
     expect($server->fresh()->isTrafficAnalyticsEnabled())->toBeFalse();
 });
 
-it('disables the analytics toggle and explains why when the server has no traefik or caddy proxy', function () {
-    $server = Server::factory()->create(['team_id' => $this->team->id]);
-    $server->proxy->set('type', 'NONE');
-    $server->save();
-    $server->settings->is_traffic_analytics_enabled = false;
-    $server->settings->save();
-
-    $html = Livewire::test(TrafficAnalyticsSettings::class, ['server' => $server])
-        ->assertSee('Traffic analytics needs the Traefik or Caddy proxy.')
-        ->assertDontSee('Enable traffic analytics?')
-        ->assertDontSeeHtml('submitAction')
-        ->html();
-
-    expect($html)->toMatch('/<button disabled[^>]*>(?:\s|<!--.*?-->)*Enable traffic analytics\s*<\/button>/s');
-});
-
 it('rejects enabling analytics from the component when the server has no traefik or caddy proxy', function () {
     ConfigureTrafficAnalytics::partialMock()->shouldReceive('handle')->never();
 

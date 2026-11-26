@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\InstanceSettings;
 use App\Models\PersonalAccessToken;
 use App\Models\Team;
 use App\Models\User;
@@ -40,6 +41,10 @@ class PersonalAccessTokenSeeder extends Seeder
             return;
         }
 
+        // The Terminal API is off by default; turn it on so the dev terminal token works.
+        InstanceSettings::query()->whereKey(0)->update(['is_terminal_api_enabled' => true]);
+        $team->update(['is_terminal_api_enabled' => true]);
+
         // Define test tokens with different scopes
         $testTokens = [
             [
@@ -72,6 +77,11 @@ class PersonalAccessTokenSeeder extends Seeder
                 'token' => 'deploy',
                 'abilities' => ['deploy'],
             ],
+            [
+                'name' => 'Development Terminal Token',
+                'token' => 'terminal',
+                'abilities' => ['terminal'],
+            ],
         ];
 
         DB::transaction(function () use ($user, $team, $testTokens) {
@@ -98,6 +108,8 @@ class PersonalAccessTokenSeeder extends Seeder
                     'token' => hash('sha256', $plainTextToken),
                     'abilities' => $tokenData['abilities'],
                     'team_id' => $team->id,
+                    // Terminal tokens are forced to expire; mirror that rule for the dev seed token.
+                    'expires_at' => in_array('terminal', $tokenData['abilities'], true) ? now()->addDays(90) : null,
                 ]);
 
                 $this->command->info("Created token '{$tokenData['name']}' with Bearer token: {$plainTextToken}");
@@ -113,5 +125,6 @@ class PersonalAccessTokenSeeder extends Seeder
         $this->command->info('  Bearer write          - Write access');
         $this->command->info('  Bearer write-sensitive - Write with sensitive data access');
         $this->command->info('  Bearer deploy         - Deploy access');
+        $this->command->info('  Bearer terminal       - Terminal access');
     }
 }

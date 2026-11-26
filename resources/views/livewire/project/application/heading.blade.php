@@ -67,8 +67,9 @@
                                     <x-reicon name="play-circle" class="size-3.5" />
                                     {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment' : 'Deploy' }}
                                 </x-slot:main>
-                                @if (!$application->destination->server->isSwarm())
-                                    <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="deploy(true)"
+                                @if (!$application->destination?->server?->isSwarm())
+                                    <button type="button" class="listbox-option justify-start! gap-2.5! {{ $application->is_archive_source ? 'listbox-option-disabled' : '' }}" wire:click="deploy(true)"
+                                        @disabled($application->is_archive_source) @if ($application->is_archive_source) title="Archive sites build only from a new upload." @endif
                                         @click="open = false" role="menuitem">
                                         <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                         {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment (without cache)' : 'Deploy (without cache)' }}
@@ -82,7 +83,7 @@
                                     </button>
                                 @endif
                             @else
-                                @if ($application->destination->server->isSwarm())
+                                @if ($application->destination?->server?->isSwarm())
                                     @if ($application->build_pack !== 'dockercompose')
                                         <x-slot:main wire:click="deploy">
                                             <x-reicon name="refresh" class="size-3.5" />
@@ -99,8 +100,9 @@
                                         <x-reicon name="refresh" class="size-3.5" />
                                         Redeploy
                                     </x-slot:main>
-                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    <button type="button" class="listbox-option justify-start! gap-2.5! {{ $application->is_archive_source ? 'listbox-option-disabled' : '' }}"
                                         wire:click="{{ str($application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)' }}"
+                                        @disabled($application->is_archive_source) @if ($application->is_archive_source) title="Archive sites build only from a new upload." @endif
                                         @click="open = false" role="menuitem">
                                         <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                         Redeploy (without cache)
@@ -114,7 +116,7 @@
                                         </button>
                                     @endif
                                 @endif
-                                @unless ($application->destination->server->isSwarm() && $application->build_pack === 'dockercompose')
+                                @unless ($application->destination?->server?->isSwarm() && $application->build_pack === 'dockercompose')
                                     <button type="button" class="listbox-option justify-start! gap-2.5!"
                                         @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()"
                                         role="menuitem">
@@ -140,10 +142,28 @@
                             <button id="application-mobile-stop-trigger" type="button">Stop</button>
                         </x-slot:trigger>
                     </x-modal-confirmation>
+                    @php
+                        $restartPlan = $this->restartPlan;
+                        $restartReasons = collect($restartPlan['reasons']);
+                        $restartReasonText = $restartReasons->take(3)->implode(', ')
+                            . ($restartReasons->count() > 3 ? ' and ' . ($restartReasons->count() - 3) . ' more' : '');
+                    @endphp
                     <x-modal-confirmation title="Confirm Application Restart?" buttonTitle="Restart"
-                        submitAction="restart" :actions="[
-                            'This application will be restarted without rebuilding.',
-                        ]" :confirmWithText="false" :confirmWithPassword="false"
+                        submitAction="restart" :ignoreWire="false"
+                        :warningMessage="$restartPlan['builds']
+                            ? 'This restart builds a new image, because a build setting changed: ' . e($restartReasonText) . '.'
+                            : 'This restart does not build. It recreates the container from the current image.'"
+                        :actions="$restartPlan['builds']
+                            ? [
+                                'Build a new image. A restart cannot reuse the current image, because the build output can change.',
+                                'Recreate the container with the new image and the current runtime settings.',
+                            ]
+                            : [
+                                'Recreate the container from the current image.',
+                                'Apply the current runtime environment variables, ports, mounts, and labels.',
+                                'Build only if the image is no longer on the server.',
+                            ]"
+                        :confirmWithText="false" :confirmWithPassword="false"
                         step2ButtonText="Confirm">
                         <x-slot:trigger>
                             <button id="application-mobile-restart-trigger" type="button">Restart</button>
@@ -195,8 +215,9 @@
                                         <x-reicon name="play-circle" class="size-3.5" />
                                         {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment' : 'Deploy' }}
                                     </x-slot:main>
-                                    @if (!$application->destination->server->isSwarm())
-                                        <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="deploy(true)"
+                                    @if (!$application->destination?->server?->isSwarm())
+                                        <button type="button" class="listbox-option justify-start! gap-2.5! {{ $application->is_archive_source ? 'listbox-option-disabled' : '' }}" wire:click="deploy(true)"
+                                            @disabled($application->is_archive_source) @if ($application->is_archive_source) title="Archive sites build only from a new upload." @endif
                                             @click="open = false" role="menuitem">
                                             <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                             {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment (without cache)' : 'Deploy (without cache)' }}
@@ -210,7 +231,7 @@
                                         </button>
                                     @endif
                                 @else
-                                    @if ($application->destination->server->isSwarm())
+                                    @if ($application->destination?->server?->isSwarm())
                                         @if ($application->build_pack !== 'dockercompose')
                                             <x-slot:main wire:click="deploy">
                                                 <x-reicon name="refresh" class="size-3.5" />
@@ -227,8 +248,9 @@
                                             <x-reicon name="refresh" class="size-3.5" />
                                             Redeploy
                                         </x-slot:main>
-                                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        <button type="button" class="listbox-option justify-start! gap-2.5! {{ $application->is_archive_source ? 'listbox-option-disabled' : '' }}"
                                             wire:click="{{ str($application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)' }}"
+                                            @disabled($application->is_archive_source) @if ($application->is_archive_source) title="Archive sites build only from a new upload." @endif
                                             @click="open = false" role="menuitem">
                                             <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                             Redeploy (without cache)
@@ -242,7 +264,7 @@
                                             </button>
                                         @endif
                                     @endif
-                                    @unless ($application->destination->server->isSwarm() && $application->build_pack === 'dockercompose')
+                                    @unless ($application->destination?->server?->isSwarm() && $application->build_pack === 'dockercompose')
                                         <button type="button" class="listbox-option justify-start! gap-2.5!"
                                             @click="open = false; document.getElementById('application-mobile-stop-trigger')?.click()"
                                             role="menuitem">

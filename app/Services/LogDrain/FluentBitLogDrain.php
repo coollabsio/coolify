@@ -67,7 +67,7 @@ abstract class FluentBitLogDrain implements LogDrainDriver
 [FILTER]
     Name grep
     Match *
-    Exclude log 127.0.0.1
+    Exclude log ^127\.0\.0\.1\s
 [FILTER]
     Name                modify
     Match               *

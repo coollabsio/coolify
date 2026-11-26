@@ -104,6 +104,7 @@ class LocalFileVolume extends BaseModel
         'is_host_file',
         'is_based_on_git',
         'is_preview_suffix_enabled',
+        'variable_fs_path',
     ];
 
     public $appends = ['is_binary', 'is_too_large'];
@@ -361,7 +362,8 @@ class LocalFileVolume extends BaseModel
             } else {
                 $commands->push("touch {$escapedPath}");
             }
-            $commands->push("chmod +x {$escapedPath}");
+            // a+rx instead of +x: +x follows the server umask, so a strict umask leaves the file unreadable for a non-root container user.
+            $commands->push("chmod a+rx {$escapedPath}");
             if ($chown) {
                 $commands->push('chown -- '.escapeshellarg($chown)." {$escapedPath}");
             }
@@ -551,6 +553,11 @@ class LocalFileVolume extends BaseModel
         return str(addPreviewDeploymentSuffix($path, $this->previewPullRequestId));
     }
 
+    public function isForPullRequest(): bool
+    {
+        return $this->previewPullRequestId !== 0;
+    }
+
     /**
      * A copy that uses the path of the preview of a pull request, as the Compose parser mounts it
      * (`<path>-pr-<id>` unless the PR suffix is off for this storage). The row keeps the path of
@@ -565,7 +572,8 @@ class LocalFileVolume extends BaseModel
     }
 
     /**
-     * Coolify writes this file from its content when the file is missing on the server. Files from
+     * Coolify writes this file from its content when the file is missing on the server. A file without
+     * content becomes an empty file, so Docker does not create a directory at its path. Files from
      * the Git repository, host files and placeholders for binary or large files are not written.
      */
     public function hasContentToWrite(): bool
@@ -574,8 +582,7 @@ class LocalFileVolume extends BaseModel
             && ! $this->is_host_file
             && ! $this->is_based_on_git
             && ! $this->is_binary
-            && ! $this->is_too_large
-            && (string) $this->content !== '';
+            && ! $this->is_too_large;
     }
 
     /**

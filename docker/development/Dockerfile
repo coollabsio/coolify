@@ -1,21 +1,21 @@
 # Versions
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
-ARG BASE_IMAGE=docker.io/serversideup/php:8.4-fpm-nginx-alpine-v5.0.3@sha256:72189e423ff5e4e1acf5ced07cec52b6dfac3c7db80c542c97f160eb80744f20
+ARG BASE_IMAGE=docker.io/serversideup/php:8.4-fpm-nginx-alpine-v5.1.5@sha256:d5fb2815a81adad2d5ca3be575c3fd8da13443e794588532f97ff9bcb2b2cda7
 ARG DISTRO=alpine-3.24
 # https://github.com/cloudflare/cloudflared/releases
-ARG CLOUDFLARED_VERSION=2026.10.3
+ARG CLOUDFLARED_VERSION=2026.11.1
 # https://www.postgresql.org/support/versioning/
 # Note: We are using version 18 of the postgres client (while still using postgres 15 for the postgres server) as version 15 has been removed from Alpine 3.23+ https://pkgs.alpinelinux.org/packages?name=postgresql*-client&branch=v3.23&repo=&arch=x86_64&origin=&flagged=&maintainer=
 ARG POSTGRES_VERSION=18
 # https://nginx.org/en/linux_packages.html
-ARG NGINX_VERSION=1.31.8-r1
+ARG NGINX_VERSION=1.31.9-r1
 # https://pecl.php.net/package/uv
-ARG PHP_UV_VERSION=0.3.0
+ARG PHP_UV_VERSION=0.3.1
 
 # =================================================================
 # Get MinIO client
 # =================================================================
-FROM ghcr.io/coollabsio/mx:0.1.0 AS minio-client
+FROM ghcr.io/coollabsio/mx:0.2.1 AS minio-client
 
 # =================================================================
 # Final Stage: Production image
@@ -36,13 +36,14 @@ WORKDIR /var/www/html
 USER root
 
 # Install patched Nginx from the official nginx.org Alpine repository
+# nginx.org no longer serves this key for download; it still signs the Alpine packages.
+COPY docker/nginx/nginx_signing.rsa.pub /etc/apk/keys/nginx_signing.rsa.pub
 RUN set -eux; \
     apk add --no-cache ca-certificates curl; \
     NGINX_ALPINE_VERSION="$(egrep -o '^[0-9]+\.[0-9]+' /etc/alpine-release)"; \
     NGINX_REPOSITORY="https://nginx.org/packages/mainline/alpine/v${NGINX_ALPINE_VERSION}/main"; \
     sed -i 's|http://nginx.org/packages|https://nginx.org/packages|g' /etc/apk/repositories; \
     grep -qxF "@nginx ${NGINX_REPOSITORY}" /etc/apk/repositories || echo "@nginx ${NGINX_REPOSITORY}" >> /etc/apk/repositories; \
-    curl -fsSL https://nginx.org/keys/nginx_signing.rsa.pub -o /etc/apk/keys/nginx_signing.rsa.pub; \
     apk add --no-cache --upgrade "nginx@nginx=${NGINX_VERSION}"; \
     rm -f /etc/nginx/nginx.conf /etc/nginx/conf.d/default.conf; \
     nginx -v
@@ -81,7 +82,7 @@ RUN install-php-extensions sockets uv-${PHP_UV_VERSION}
 # Configure shell aliases
 RUN echo "alias ll='ls -al'" >> /etc/profile && \
     echo "alias a='php artisan'" >> /etc/profile && \
-    echo "alias logs='tail -f storage/logs/laravel.log'" >> /etc/profile
+    echo "alias logs='tail -F storage/logs/laravel-\$(date -u +%F).log'" >> /etc/profile
 
 # Install Cloudflared based on architecture
 RUN mkdir -p /usr/local/bin && \
@@ -94,6 +95,7 @@ RUN mkdir -p /usr/local/bin && \
 
 # Configure PHP
 COPY docker/development/etc/php/conf.d/zzz-custom-php.ini /usr/local/etc/php/conf.d/zzz-custom-php.ini
+COPY docker/production/etc/php-fpm.d/zzzz-coolify-listen.conf /usr/local/etc/php-fpm.d/zzzz-coolify-listen.conf
 ENV PHP_OPCACHE_ENABLE=0
 
 # Install terminal WebSocket server dependencies
@@ -104,9 +106,19 @@ COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
 COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
 RUN chown -R www-data:www-data /terminal
 
+# Configure the Nginx site of the base image
+ENV NGINX_CLIENT_MAX_BODY_SIZE=2048M
+ENV NGINX_FASTCGI_BUFFERS="16 16k"
+ENV NGINX_FASTCGI_BUFFER_SIZE=32k
+ENV TRUSTED_PROXY=off
+
 # Configure Nginx and S6 overlay
 COPY docker/development/etc/nginx/conf.d/custom.conf /etc/nginx/conf.d/custom.conf
-COPY docker/development/etc/nginx/site-opts.d/http.conf /etc/nginx/site-opts.d/http.conf
+COPY docker/production/etc/nginx/server-opts.d/coolify.conf /etc/nginx/server-opts.d/coolify.conf
+# Drop HSTS, which would force HTTPS on every subdomain of the dashboard domain, and the
+# year-long caching of static files, which keeps files without a hash in their name stale after an upgrade
+RUN sed -i '/Strict-Transport-Security/d' /etc/nginx/server-opts.d/security.conf && \
+    rm /etc/nginx/server-opts.d/performance.conf
 COPY --chmod=755 docker/development/etc/s6-overlay/ /etc/s6-overlay/
 
 RUN mkdir -p /etc/nginx/conf.d && \

@@ -6,7 +6,7 @@
 
 services:
   shlink:
-    image: shlinkio/shlink:stable
+    image: shlinkio/shlink:5.1.8
     environment:
       - SERVICE_URL_SHLINK_8080
       - DEFAULT_DOMAIN=${SERVICE_FQDN_SHLINK}
@@ -20,7 +20,7 @@ services:
       timeout: 10s
       retries: 15
   shlink-web:
-    image: shlinkio/shlink-web-client
+    image: shlinkio/shlink-web-client:4.9.0
     environment:
       - SERVICE_URL_SHLINKWEB_8080
       - SHLINK_SERVER_API_KEY=${SERVICE_BASE64_SHLINKAPIKEY}

@@ -68,7 +68,7 @@ it('streams a large compose file over stdin instead of the command line', functi
     expect($composeWrite)->not->toBeNull()
         ->and($composeWrite['command'])->toEndWith(escapeshellarg("{$tee} '{$workdir}/docker-compose.yml' > /dev/null"));
 
-    $envWrite = $this->processes->first(fn (array $process) => $process['input'] === 'SERVICE_NAME_APP=app');
+    $envWrite = $this->processes->first(fn (array $process) => $process['input'] === "SERVICE_NAME_APP=app\nCOOLIFY_RESOURCE_UUID={$this->service->uuid}");
     expect($envWrite)->not->toBeNull()
         ->and($envWrite['command'])->toMatch('/'.preg_quote($tee, '/').' \S+\.env\.tmp/');
 

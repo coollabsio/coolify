@@ -26,6 +26,7 @@ use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
+use App\Models\SecretManagerLink;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
@@ -564,8 +565,8 @@ class ServerTransferExporter
     {
         $tokenIds = collect([$server->settings?->cloudflare_tunnel_integration_token_id]);
         foreach ($resources as $resource) {
-            if (method_exists($resource, 'secretManagerLink')) {
-                $tokenIds->push($resource->secretManagerLink()->value('integration_token_id'));
+            if (method_exists($resource, 'secretManagerLinks')) {
+                $tokenIds->push(...$resource->secretManagerLinks()->pluck('integration_token_id'));
             }
         }
         foreach ($dnsRecords as $record) {
@@ -1004,11 +1005,12 @@ class ServerTransferExporter
             'scheduled_tasks' => $this->exportScheduledTasks($application->scheduled_tasks()->get()),
             'tags' => $this->exportTags($application->tags),
             'previews' => $this->exportPreviews($application->previews),
-            'secret_manager_link' => $this->exportSecretManagerLink($application),
+            'secret_manager_links' => $this->exportSecretManagerLinks($application),
             'source' => $source,
             'private_key_uuid' => $application->private_key?->uuid,
             'had_git_source' => filled($application->source_id),
             'had_private_key' => filled($application->private_key_id),
+            'checks_health_check_response_text' => true,
         ];
     }
 
@@ -1078,7 +1080,7 @@ class ServerTransferExporter
             'scheduled_backups' => method_exists($database, 'scheduledBackups')
                 ? $this->exportScheduledBackups($database->scheduledBackups)
                 : [],
-            'secret_manager_link' => $this->exportSecretManagerLink($database),
+            'secret_manager_links' => $this->exportSecretManagerLinks($database),
         ];
     }
 
@@ -1131,7 +1133,7 @@ class ServerTransferExporter
             'environment_variables' => $this->exportEnvVars($service->environment_variables()->get()),
             'scheduled_tasks' => $this->exportScheduledTasks($service->scheduled_tasks()->get()),
             'tags' => $this->exportTags($service->tags),
-            'secret_manager_link' => $this->exportSecretManagerLink($service),
+            'secret_manager_links' => $this->exportSecretManagerLinks($service),
             'applications' => $service->applications
                 ->map(fn ($app) => $this->exportServiceApplication($app))
                 ->values()
@@ -1461,6 +1463,7 @@ class ServerTransferExporter
             'custom_port' => $app->custom_port,
             'app_id' => $app->app_id,
             'installation_id' => $app->installation_id,
+            'installation_account' => $app->installation_account,
             'client_id' => $app->client_id,
             'client_secret' => $app->client_secret,
             'webhook_secret' => $app->webhook_secret,
@@ -1637,23 +1640,25 @@ class ServerTransferExporter
     }
 
     /**
-     * @return array{uuid: string, integration_token_uuid: string, settings: array<string, mixed>|null}|null
+     * All named secret manager sources of the resource.
+     *
+     * @return list<array{uuid: string, name: string, integration_token_uuid: string, settings: array<string, mixed>|null}>
      */
-    private function exportSecretManagerLink(Model $resource): ?array
+    private function exportSecretManagerLinks(Model $resource): array
     {
-        if (! method_exists($resource, 'secretManagerLink')) {
-            return null;
-        }
-        $link = $resource->secretManagerLink()->with('integrationToken')->first();
-        if (! $link) {
-            return null;
+        if (! method_exists($resource, 'secretManagerLinks')) {
+            return [];
         }
 
-        return [
-            'uuid' => $link->uuid,
-            'integration_token_uuid' => $link->integrationToken->uuid,
-            'settings' => $link->settings,
-        ];
+        return $resource->secretManagerLinks()->with('integrationToken')->orderBy('name')->get()
+            ->map(fn (SecretManagerLink $link): array => [
+                'uuid' => $link->uuid,
+                'name' => $link->sourceName(),
+                'integration_token_uuid' => $link->integrationToken->uuid,
+                'settings' => $link->settings,
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -1816,6 +1821,7 @@ class ServerTransferExporter
                 'approved_commit' => $preview->approved_commit,
                 'approved_at' => $preview->approved_at?->toIso8601String(),
                 'keeps_production_values' => $preview->keeps_production_values,
+                'is_same_repository' => $preview->is_same_repository,
                 'persistent_storages' => method_exists($preview, 'persistentStorages')
                     ? $this->exportPersistentStorages($preview->persistentStorages)
                     : [],

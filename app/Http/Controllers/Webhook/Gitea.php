@@ -317,10 +317,12 @@ class Gitea extends Controller
                             }
                         }
 
-                        ($found ?? $pr_app)->markForkPullRequest($this->isForkPreviewRepository(
+                        $isFork = $this->isForkPreviewRepository(
                             data_get($payload, 'pull_request.head.repo.id'),
                             data_get($payload, 'pull_request.base.repo.id'),
-                        ), $commit ?? null);
+                        );
+                        ($found ?? $pr_app)->recordSameRepository(! $isFork);
+                        ($found ?? $pr_app)->markForkPullRequest($isFork, $commit ?? null);
 
                         $result = queue_application_deployment(
                             application: $application,
@@ -591,10 +593,12 @@ class Gitea extends Controller
                                     $pr_app->generate_preview_fqdn();
                                 }
                             }
-                            ($found ?? $pr_app)->markForkPullRequest($this->isForkPreviewRepository(
+                            $isFork = $this->isForkPreviewRepository(
                                 data_get($payload, 'pull_request.head.repo.id'),
                                 data_get($payload, 'pull_request.base.repo.id'),
-                            ), $commit ?? null);
+                            );
+                            ($found ?? $pr_app)->recordSameRepository(! $isFork);
+                            ($found ?? $pr_app)->markForkPullRequest($isFork, $commit ?? null);
 
                             $result = queue_application_deployment(
                                 application: $application,

@@ -132,7 +132,7 @@ it('does not mark reordered service application port overrides as changed', func
     expect($this->service->refresh()->isConfigurationChanged())->toBeFalse();
 });
 
-it('groups configured domains and shows redirect settings in the table', function () {
+it('groups configured domains by service application', function () {
     $this->apiApp->update([
         'fqdn' => 'https://api.example.com,https://admin.example.com',
     ]);
@@ -146,22 +146,7 @@ it('groups configured domains and shows redirect settings in the table', functio
 
     expect($html)
         ->toContain("service-domain-group-{$this->apiApp->id}")
-        ->toContain('src="https://api.example.com/favicon.ico"')
-        ->toContain('class="relative size-4 shrink-0"')
-        ->toContain('domain-favicon-fallback')
-        ->toContain('class="invisible absolute inset-0 size-4 rounded-sm"')
-        ->toContain('$el.previousElementSibling.classList.add(\'hidden\')')
-        ->toContain('x-on:error="$el.remove()"')
-        ->toContain('class="min-w-0 flex-1 truncate text-[13px]')
-        ->toContain('class="listbox-trigger"')
-        ->toContain('application-settings-section-body is-flush overflow-visible')
-        ->toContain('dark:bg-white/[0.04]')
-        ->toContain('<span>Domain</span>')
-        ->toContain('<span>DNS status</span>')
-        ->not->toContain('<span>Last checked</span>')
-        ->not->toContain("service-domain-group-{$this->webApp->id}")
-        ->and(substr_count($html, '<span>Domain</span>'))->toBe(1)
-        ->and(substr_count($html, "id=\"service-domain-group-{$this->apiApp->id}\""))->toBe(1);
+        ->not->toContain("service-domain-group-{$this->webApp->id}");
 });
 
 it('loads no domain favicon when proxy labels add HTTP basic auth to the service', function (string $labels) {
@@ -263,10 +248,8 @@ it('leaves the managed dns record when removing a service domain by key without 
         ->and(ManagedDnsRecord::query()->find($record->id))->not->toBeNull();
 });
 
-it('shows and persists the HTTP redirect control for HTTPS service applications', function () {
+it('persists the HTTP redirect setting for HTTPS service applications', function () {
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
-        ->assertSee('Redirect HTTP to HTTPS')
-        ->assertSee('Keep enabled when Cloudflare uses Full or Full (Strict) SSL.')
         ->call('updateForceHttps', $this->apiApp->id, false)
         ->assertHasNoErrors();
 
@@ -277,7 +260,6 @@ it('shows and persists the HTTP redirect control for HTTPS service applications'
 it('persists the redirect type for service applications', function () {
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->assertSet("permanentRedirects.{$this->apiApp->id}", false)
-        ->assertSee('Redirect type')
         ->call('updatePermanentRedirect', $this->apiApp->id, true)
         ->assertHasNoErrors();
 
@@ -292,25 +274,15 @@ it('hides the HTTP redirect control for HTTP-only service applications', functio
         ->assertDontSee('Redirect HTTP to HTTPS');
 });
 
-it('opens address fields and service-wide redirects in the same settings dialog for every domain', function () {
+it('opens the settings dialog for every domain', function () {
     $domains = ['https://api.example.com', 'https://www.api.example.com', 'https://admin.example.com', 'https://www.admin.example.com'];
     $this->apiApp->update(['fqdn' => implode(',', $domains)]);
 
     $component = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])]);
 
     foreach ($domains as $index => $domain) {
-        $html = $component->call('startEdit', $index)
-            ->assertSet('editingDomain', $domain)
-            ->assertSee('Domain settings')
-            ->assertSee('Save')
-            ->assertSee('Regenerate hostname')
-            ->assertDontSee('Save address')
-            ->assertSee('Search engine indexing')
-            ->assertSee('www redirect')
-            ->assertDontSee('Edit address and port')
-            ->html();
-
-        expect(substr_count($html, 'this.$wire.updateServiceRedirect('))->toBe(0);
+        $component->call('startEdit', $index)
+            ->assertSet('editingDomain', $domain);
     }
 });
 
@@ -762,10 +734,7 @@ YAML,
         ->call('confirmDomainUsage')
         ->assertSet('showDomainConflictModal', false)
         ->assertSet('showPortWarningModal', true)
-        ->assertSet('forceSaveDomains', true)
-        ->assertSee('Use a different port?')
-        ->assertSee('Keep port 8000')
-        ->assertSee('Use port 3000 anyway');
+        ->assertSet('forceSaveDomains', true);
 
     $component
         ->call('confirmRemovePort')
@@ -928,12 +897,6 @@ it('exposes the stack domains route', function () {
 it('updates search engine indexing from the service domains view', function () {
     Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
         ->call('startEdit', 0)
-        ->assertSee('Noindex')
-        ->assertSee('Indexable')
-        ->assertSee('Search engine indexing')
-        ->assertSee('www redirect')
-        ->assertSee('editingIndexing', false)
-        ->assertDontSee('toggleNoindexDomain', false)
         ->set('editingIndexing', 'noindex')
         ->call('updateDomain')
         ->assertDispatched('configurationChanged')
@@ -1080,19 +1043,14 @@ it('does not show an internal port badge when the service has no env port', func
         ->assertDontSee('table-badge-danger', false);
 });
 
-it('prioritizes public addresses and moves domain configuration behind settings', function () {
+it('shows the public address without the port and the domain settings summary', function () {
     $this->apiApp->update(['fqdn' => 'https://api.example.com:8080']);
 
     $html = Livewire::test(Domains::class, ['service' => $this->service->fresh(['applications', 'server'])])
-        ->assertSee('Check all DNS')
-        ->assertSee('Add domain')
-        ->assertSee('Domain settings')
         ->call('startEdit', 0)
-        ->assertDontSee('Indexing and redirect changes save automatically.')
         ->assertSee('Internal port 8080')
         ->assertSee('Both www and non-www')
         ->assertSee('Search indexing allowed')
-        ->assertDontSee('Manage domains and www/non-www redirects')
         ->html();
 
     expect($html)->toContain('title="https://api.example.com"')

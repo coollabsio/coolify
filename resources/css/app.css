@@ -1631,9 +1631,10 @@ html[data-theme="custom"] [class~="dark:hover:text-coollabs"]:hover {
    so components fall back to hardcoded neutrals. Remap the dominant light
    surface/border utilities to the tinted custom vars so the color reaches the
    whole UI, not just design-system classes. A light sidebar on a dark page
-   gets the same remap. */
-html[data-theme="custom"]:not(.dark) :is([class~="bg-white"], [class~="bg-white/95"], [class~="bg-white/80"]),
-html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobile-sidebar-sheet [role="dialog"]) :is([class~="bg-white"], [class~="bg-white/95"], [class~="bg-white/80"]) {
+   gets the same remap. Checkbox boxes keep their own colors: the !important
+   remap would hide their peer-checked fill. */
+html[data-theme="custom"]:not(.dark) :is([class~="bg-white"], [class~="bg-white/95"], [class~="bg-white/80"]):not([class~="peer-checked:bg-coollabs"]),
+html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobile-sidebar-sheet [role="dialog"]) :is([class~="bg-white"], [class~="bg-white/95"], [class~="bg-white/80"]):not([class~="peer-checked:bg-coollabs"]) {
     background-color: var(--coollabs-elevated) !important;
 }
 
@@ -1652,8 +1653,8 @@ html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobil
     border-color: var(--coollabs-hairline) !important;
 }
 
-html[data-theme="custom"]:not(.dark) :is([class~="border-neutral-300"], [class~="border-neutral-100"]),
-html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobile-sidebar-sheet [role="dialog"]) :is([class~="border-neutral-300"], [class~="border-neutral-100"]) {
+html[data-theme="custom"]:not(.dark) :is([class~="border-neutral-300"], [class~="border-neutral-100"]):not([class~="peer-checked:border-coollabs"]),
+html[data-sidebar-scheme="light"] :where(.app-sidebar, .app-topbar-brand, .mobile-sidebar-sheet [role="dialog"]) :is([class~="border-neutral-300"], [class~="border-neutral-100"]):not([class~="peer-checked:border-coollabs"]) {
     border-color: var(--coollabs-line) !important;
 }
 
@@ -4037,8 +4038,19 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(12rem, 1.4fr) minmax(9rem, 1fr) minmax(9rem, 1fr) 6rem 6rem;
 }
 
-.scheduled-backups-table-grid {
-    grid-template-columns: minmax(10rem, 1.25fr) 8rem minmax(9rem, 1fr) 6rem 5rem;
+/* Shared by the Schedules and Executions tables of a standalone database, so their columns line up. */
+.database-backup-table-grid {
+    grid-template-columns: minmax(8rem, 1fr) 7.5rem minmax(8rem, 1fr) minmax(11rem, 1.2fr) minmax(6rem, 0.7fr) 4.5rem;
+    width: 100%;
+}
+
+.data-table-header.database-backup-table-grid {
+    border-bottom: 0;
+}
+
+/* Search hides rows, so dividers must not depend on DOM position. */
+.data-table-row.database-backup-table-grid {
+    border-top: 1px solid var(--coollabs-fill);
 }
 
 .backup-executions-table-grid {
@@ -4205,15 +4217,6 @@ input[type="search"]::-webkit-search-results-decoration {
 
     .host-vulnerabilities-table-grid > :nth-child(2),
     .host-vulnerabilities-table-grid > :nth-child(3) {
-        display: none;
-    }
-
-    .scheduled-backups-table-grid {
-        grid-template-columns: minmax(0, 1fr) 8rem 5rem;
-    }
-
-    .scheduled-backups-table-grid > :nth-child(3),
-    .scheduled-backups-table-grid > :nth-child(4) {
         display: none;
     }
 
@@ -4536,6 +4539,47 @@ html[data-theme="custom"] .logs-viewer-timestamp {
 
     .logs-viewer-end:not(.runtime-logs-viewer-end) > .logs-viewer-search {
         order: -1;
+        flex: 1 1 100%;
+    }
+
+    /* One row of equal buttons: View, Export, then cancel/force-start.
+       If the row is too narrow, the cancel group wraps and fills its own row. */
+    .logs-viewer-end:not(.runtime-logs-viewer-end) > .runtime-log-menus {
+        order: 1;
+        flex: 2 1 0;
+        min-width: max-content;
+    }
+
+    .logs-viewer-end:not(.runtime-logs-viewer-end) > .runtime-log-menus > *,
+    .logs-viewer-end:not(.runtime-logs-viewer-end) > .runtime-log-menus .button {
+        flex: 1 1 0;
+        width: 100%;
+        justify-content: center;
+    }
+
+    .logs-viewer-end:not(.runtime-logs-viewer-end) > .logs-viewer-deployment-actions:not(.hidden) {
+        order: 2;
+        flex: 1 1 0;
+        min-width: max-content;
+    }
+
+    .logs-viewer-end:not(.runtime-logs-viewer-end) > .logs-viewer-deployment-actions > div,
+    .logs-viewer-end:not(.runtime-logs-viewer-end) .logs-viewer-deployment-btn {
+        flex: 1 1 auto;
+        width: 100%;
+    }
+
+    .logs-viewer-end:not(.runtime-logs-viewer-end) .logs-viewer-deployment-btn {
+        font-size: 13px !important;
+    }
+
+    /* The hidden "N matches" text must not take a flex gap next to the cancel button. */
+    .logs-viewer-end:not(.runtime-logs-viewer-end) > .logs-viewer-meta {
+        display: contents;
+    }
+
+    .logs-viewer-end:not(.runtime-logs-viewer-end) > .logs-viewer-meta > * {
+        order: 3;
         flex: 1 1 100%;
     }
 }

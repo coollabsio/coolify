@@ -21,11 +21,13 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
+use App\Services\ProjectConfig\ConfigExporter;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ResourceOperations extends Component
 {
@@ -421,8 +423,26 @@ class ResourceOperations extends Component
         return $destination;
     }
 
+    public function downloadExport(): ?StreamedResponse
+    {
+        try {
+            $this->authorize('view', $this->resource);
+            // Commands and Compose files can hold credentials.
+            abort_unless(auth()->user()->isAdminOfTeam($this->resourceTeamId()), 403, 'Only a team admin can do this.');
+            $file = json_encode(app(ConfigExporter::class)->export($this->resource->environment, $this->resource), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
+
+            return response()->streamDownload(fn () => print ($file), 'coolify.json', ['Content-Type' => 'application/json']);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return null;
+        }
+    }
+
     public function render()
     {
-        return view('livewire.project.shared.resource-operations');
+        return view('livewire.project.shared.resource-operations', [
+            'isTeamAdmin' => auth()->user()->isAdminOfTeam($this->resourceTeamId()),
+        ]);
     }
 }

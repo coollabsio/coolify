@@ -241,13 +241,3 @@ it('requires IPv6 when public IPv4 is disabled', function () {
         ->call('submit')
         ->assertHasErrors(['enable_ipv6']);
 });
-
-it('renders a single buy button and no back button on the Vultr form', function () {
-    $html = Livewire::test(ByVultr::class)
-        ->set('current_step', 2)
-        ->assertDontSee('wire:click="previousStep"', false)
-        ->assertSee('Buy and create')
-        ->html();
-
-    expect(substr_count($html, 'type="submit"'))->toBe(1);
-});

@@ -280,6 +280,7 @@ class Index extends Component
             ApplicationDeploymentStatus::IN_PROGRESS->value => 'In progress',
             ApplicationDeploymentStatus::QUEUED->value => 'Queued',
             ApplicationDeploymentStatus::CANCELLED_BY_USER->value => 'Cancelled',
+            ApplicationDeploymentStatus::SKIPPED->value => 'Skipped',
         ];
 
         $this->statusFilterOptions = collect($statusLabels)

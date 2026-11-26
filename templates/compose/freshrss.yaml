@@ -7,7 +7,7 @@
 
 services:
   freshrss:
-    image: freshrss/freshrss:latest
+    image: freshrss/freshrss:1.30.4
     environment:
       - SERVICE_URL_FRESHRSS_80
       - CRON_MIN=${CRON_MIN:-1,31}

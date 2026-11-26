@@ -1,7 +1,10 @@
 <?php
 
 use App\Http\Controllers\Api\OtherController;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+
+uses(RefreshDatabase::class);
 
 it('does not expose the running version on the healthcheck response', function () {
     config(['constants.coolify.version' => '4.3.1']);

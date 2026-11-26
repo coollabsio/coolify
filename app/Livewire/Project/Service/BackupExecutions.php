@@ -91,7 +91,7 @@ class BackupExecutions extends Component
 
     public function downloadExecution(string $executionUuid): void
     {
-        $this->authorize('update', $this->service);
+        $this->authorize('manageBackups', $this->service);
         $row = $this->executionQuery($executionUuid)->first();
         abort_unless($row, 404);
 
@@ -208,6 +208,7 @@ class BackupExecutions extends Component
                 's3_tooltip' => $s3Storages === '' ? null : 'S3 storage: '.$s3Storages,
                 'status' => $execution->status,
                 'started_at' => $execution->created_at,
+                'finished_at' => $execution->finished_at ?? $execution->updated_at,
                 'size' => $execution->size,
                 'message' => $execution->message,
                 'filename' => $execution->filename,

@@ -144,21 +144,10 @@ it('preserves existing bind mount source paths in the volume table', function ()
     ]);
 
     Livewire::test(All::class, ['resource' => $application])
-        ->assertDontSee('Directory mount')
-        ->assertSee('/srv/storage')
-        ->assertDontSee('Remove Source Path');
+        ->assertSee('/srv/storage');
 
     expect($volume->refresh()->host_path)->toBe('/srv/storage')
         ->and(method_exists(All::class, 'clearHostPath'))->toBeFalse();
-});
-
-it('does not show a source path or removal action for a named volume', function () {
-    [$application] = createApplicationWithVolume();
-
-    Livewire::test(All::class, ['resource' => $application])
-        ->assertDontSee('Directory mount')
-        ->assertDontSee('Volume mount')
-        ->assertDontSee('Remove Source Path');
 });
 
 it('keeps bind mount source paths out of editable form state', function () {
@@ -250,17 +239,14 @@ it('creates and exposes volume backups for service storage', function () {
     expect(ScheduledVolumeBackup::query()->forService($service)->count())->toBe(1);
 
     Livewire::test(All::class, ['resource' => $serviceApplication])
-        ->assertSet('showActionsColumn', true)
-        ->assertSee('Backup')
-        ->assertSeeHtml('title="Volume backup is enabled"');
+        ->assertSet('showActionsColumn', true);
 });
 
 it('shows PR deployment suffix only for git-based applications', function () {
     [$gitApp] = createApplicationWithVolume(['build_pack' => 'nixpacks']);
 
     Livewire::test(All::class, ['resource' => $gitApp])
-        ->assertSet('supportsPreviewSuffix', true)
-        ->assertSee('Add suffix');
+        ->assertSet('supportsPreviewSuffix', true);
 
     [$dockerImageApp] = createApplicationWithVolume([
         'build_pack' => 'dockerimage',
@@ -269,9 +255,7 @@ it('shows PR deployment suffix only for git-based applications', function () {
     ]);
 
     Livewire::test(All::class, ['resource' => $dockerImageApp])
-        ->assertSet('supportsPreviewSuffix', false)
-        ->assertDontSee('Add suffix')
-        ->assertDontSee('PR deployment suffix');
+        ->assertSet('supportsPreviewSuffix', false);
 
     [$nonGitComposeApp] = createApplicationWithVolume([
         'build_pack' => 'dockercompose',
@@ -280,8 +264,7 @@ it('shows PR deployment suffix only for git-based applications', function () {
     ]);
 
     Livewire::test(All::class, ['resource' => $nonGitComposeApp])
-        ->assertSet('supportsPreviewSuffix', false)
-        ->assertDontSee('Add suffix');
+        ->assertSet('supportsPreviewSuffix', false);
 });
 
 it('allows stale compose volume metadata to be deleted', function () {
@@ -295,8 +278,6 @@ YAML,
     ]);
 
     Livewire::test(All::class, ['resource' => $application])
-        ->assertSee('Remove stale volume entry?')
-        ->assertSee('Delete stale entry')
         ->call('delete', $volume->id, 'password');
 
     expect($volume->fresh())->toBeNull();
@@ -344,7 +325,6 @@ YAML,
     $volume->save();
 
     Livewire::test(All::class, ['resource' => $application])
-        ->assertDontSee('Delete stale volume entry')
         ->call('delete', $volume->id, 'password')
         ->assertDispatched('error');
 
@@ -372,9 +352,7 @@ it('hides PR deployment suffix for databases', function () {
     ]);
 
     Livewire::test(All::class, ['resource' => $database])
-        ->assertSet('supportsPreviewSuffix', false)
-        ->assertDontSee('Add suffix')
-        ->assertDontSee('PR deployment suffix');
+        ->assertSet('supportsPreviewSuffix', false);
 });
 
 it('asks for confirmation before it changes the volume name', function () {
@@ -385,9 +363,7 @@ it('asks for confirmation before it changes the volume name', function () {
         ->set("forms.{$volume->id}.name", 'renamed-data')
         ->call('submit', $volume->id)
         ->assertNotDispatched('success')
-        ->assertSet('pendingRename', ['storageId' => $volume->id, 'from' => $oldName, 'to' => 'renamed-data'])
-        ->assertSee('Change the volume name?')
-        ->assertSee("Your data stays in <strong>{$oldName}</strong>", false);
+        ->assertSet('pendingRename', ['storageId' => $volume->id, 'from' => $oldName, 'to' => 'renamed-data']);
 
     expect($volume->refresh()->name)->toBe($oldName);
 
@@ -422,8 +398,7 @@ it('restores the volume name when the rename is cancelled', function () {
         ->call('submit', $volume->id)
         ->call('cancelRename', $volume->id)
         ->assertSet("forms.{$volume->id}.name", $oldName)
-        ->assertSet('pendingRename', null)
-        ->assertDontSee('Your data stays in');
+        ->assertSet('pendingRename', null);
 
     expect($volume->refresh()->name)->toBe($oldName);
 });

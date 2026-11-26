@@ -32,7 +32,7 @@
                 'label' => 'Swarm',
                 'route' => 'project.application.swarm',
                 'active' => $currentRoute === 'project.application.swarm',
-                'visible' => $application->destination->server->isSwarm(),
+                'visible' => $application->destination?->server?->isSwarm(),
             ],
             [
                 'label' => 'Environment Variables',
@@ -54,13 +54,13 @@
                 'route' => 'project.application.command',
                 'active' => $currentRoute === 'project.application.command',
                 'navigate' => false,
-                'visible' => ! $application->destination->server->isSwarm() && auth()->user()?->can('canAccessTerminal'),
+                'visible' => ! $application->destination?->server?->isSwarm() && auth()->user()?->can('canAccessTerminal'),
             ],
             [
                 'label' => 'Files',
                 'route' => 'project.application.files',
                 'active' => $currentRoute === 'project.application.files',
-                'visible' => ! $application->destination->server->isSwarm() && auth()->user()?->can('canAccessTerminal'),
+                'visible' => ! $application->destination?->server?->isSwarm() && auth()->user()?->can('canAccessTerminal'),
             ],
             [
                 'label' => 'Deployment Logs',
@@ -157,7 +157,7 @@
 
         $configurationMenuItems = array_values(array_filter(
             $configurationMenuItems,
-            fn (array $item): bool => $item['visible'] ?? true,
+            fn (array $item): bool => ($item['visible'] ?? true) && $application->hasConfigurationPage($item['route']),
         ));
 
         // Icons follow the main sidebar's reicon set

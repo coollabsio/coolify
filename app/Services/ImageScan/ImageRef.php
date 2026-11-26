@@ -21,6 +21,14 @@ final class ImageRef implements Stringable
 
     public static function parse(string $ref): self
     {
+        // Docker reads `name:tag@digest` by its digest alone, so the tag only has to be valid.
+        if (preg_match('#\A([^@]+):([^:/@]+)(@[^@]+)\z#', $ref, $matches) === 1) {
+            if (! self::isValidTag($matches[2])) {
+                throw new InvalidArgumentException('Invalid image tag.');
+            }
+            $ref = $matches[1].$matches[3];
+        }
+
         $failed = $ref === '';
         (new DockerImageFormat)->validate('image', $ref, function () use (&$failed): void {
             $failed = true;
@@ -87,6 +95,22 @@ final class ImageRef implements Stringable
         }
 
         return new self($this->registry, $this->repository, $tag, null);
+    }
+
+    /**
+     * The Docker Hub image behind a GitLab dependency proxy reference
+     * (`gitlab.example.com/group/dependency_proxy/containers/redis` → `docker.io/library/redis`), with the same tag.
+     * The proxy has no tag list, so the tags are read upstream. Null for every other reference.
+     */
+    public function dockerHubUpstream(): ?self
+    {
+        if ($this->registry === 'docker.io'
+            || preg_match('#\A(?:[^/]+/)+dependency_proxy/containers/([^/]+(?:/[^/]+)*)\z#', $this->repository, $matches) !== 1) {
+            return null;
+        }
+        $repository = str_contains($matches[1], '/') ? $matches[1] : 'library/'.$matches[1];
+
+        return new self('docker.io', $repository, $this->tag, null);
     }
 
     /**

@@ -217,14 +217,14 @@
         <span class="shrink-0 text-neutral-300 dark:text-fg-faint px-0.5">/</span>
         {{-- Project switcher --}}
         <div class="relative min-w-0 shrink" x-data="{ open: false }" @keydown.escape.window="open = false">
-            <div class="flex h-8 min-w-0 items-center rounded-md opacity-70 transition-opacity hover:opacity-100">
+            <div class="flex h-8 min-w-0 items-center rounded-md opacity-70 transition-[background-color,opacity] hover:bg-neutral-100 hover:opacity-100 dark:hover:bg-white/[0.05]">
                 <a href="{{ route($projectDestinationRoute, ['project_uuid' => $currentProject->uuid]) }}" {{ wireNavigate() }} title="Go to project"
-                    class="flex h-8 min-w-0 items-center rounded-l-md pr-1 pl-2 transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
+                    class="flex h-8 min-w-0 items-center pr-1 pl-2">
                     <span class="min-w-0 truncate font-semibold text-black dark:text-fg"
                         x-text="nameOf(@js($currentProject->uuid), @js($currentProject->name))">{{ $currentProject->name }}</span>
                 </a>
                 <button type="button" @click="open = !open" @click.outside="open = false" title="Switch project"
-                    class="flex h-8 shrink-0 items-center rounded-r-md px-0.5 transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
+                    class="flex h-8 shrink-0 items-center px-0.5">
                     <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24" fill="none">
                         <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>
@@ -249,13 +249,13 @@
         <span class="shrink-0 text-neutral-300 dark:text-fg-faint px-0.5">/</span>
         {{-- Environment switcher --}}
         <div class="relative min-w-0 shrink" x-data="{ open: false }" @keydown.escape.window="open = false">
-            <div class="flex h-8 min-w-0 items-center rounded-md opacity-70 transition-opacity hover:opacity-100">
+            <div class="flex h-8 min-w-0 items-center rounded-md opacity-70 transition-[background-color,opacity] hover:bg-neutral-100 hover:opacity-100 dark:hover:bg-white/[0.05]">
                 <a href="{{ route('project.resource.index', ['project_uuid' => $currentProject->uuid, 'environment_uuid' => $currentEnvironment->uuid]) }}" {{ wireNavigate() }} title="Go to environment"
-                    class="flex h-8 min-w-0 items-center rounded-l-md pr-1 pl-2 transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
+                    class="flex h-8 min-w-0 items-center pr-1 pl-2">
                     <span class="min-w-0 truncate font-semibold text-black dark:text-fg">{{ $currentEnvironment->name }}</span>
                 </a>
                 <button type="button" @click="open = !open" @click.outside="open = false" title="Switch environment"
-                    class="flex h-8 shrink-0 items-center rounded-r-md px-0.5 transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
+                    class="flex h-8 shrink-0 items-center px-0.5">
                     <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24" fill="none">
                         <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
                     </svg>

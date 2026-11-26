@@ -8,7 +8,7 @@
 services:
   hi-events:
     # Use an HTTPS domain: Hi.Events always sets its login cookie as Secure, so sign-in fails over plain HTTP.
-    image: daveearley/hi.events-all-in-one:v2.0.0
+    image: daveearley/hi.events-all-in-one:v2.2.0
     environment:
       - SERVICE_URL_HIEVENTS_80
       - VITE_APP_NAME=${VITE_APP_NAME:-Hi.Events}

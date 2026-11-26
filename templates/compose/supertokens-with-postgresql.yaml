@@ -7,7 +7,7 @@
 
 services:
   supertokens:
-    image: registry.supertokens.io/supertokens/supertokens-postgresql:latest
+    image: registry.supertokens.io/supertokens/supertokens-postgresql:12.5.0
     depends_on:
       postgres:
         condition: service_healthy

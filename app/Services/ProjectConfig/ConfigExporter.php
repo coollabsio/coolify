@@ -4,16 +4,18 @@ namespace App\Services\ProjectConfig;
 
 use App\Models\Environment;
 use App\Models\EnvironmentConfigLink;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 /**
  * Writes the current state of an environment as a coolify.json file, without secret values.
+ * With $only, the file holds that one resource of the environment.
  */
 class ConfigExporter
 {
     public function __construct(private readonly AdapterRegistry $registry) {}
 
-    public function export(Environment $environment): array
+    public function export(Environment $environment, ?Model $only = null): array
     {
         $link = self::linkFor($environment);
         $ctx = ApplyContext::for($link);
@@ -29,6 +31,9 @@ class ConfigExporter
             ->map(fn ($model) => [$adapter, $model]));
         // Managed resources keep their keys, so a proposed key never takes one of them.
         $taken = $models->pluck('1.config_key')->filter()->flip()->all();
+        if ($only !== null) {
+            $models = $models->filter(fn ($pair) => $pair[1]->is($only));
+        }
 
         foreach ($models as [$adapter, $model]) {
             $key = $model->config_key;

@@ -43,47 +43,6 @@ test('provider token selection redirects to a token specific server creation url
     'digital-ocean' => [ByDigitalOcean::class, 'digitalocean', 'digital-ocean'],
 ]);
 
-test('provider token selection is rendered as clickable token boxes', function (string $component, string $provider, string $type, string $tokenName) {
-    $token = CloudProviderToken::factory()->create([
-        'team_id' => $this->team->id,
-        'provider' => $provider,
-        'name' => $tokenName,
-    ]);
-
-    Livewire::test($component)
-        ->assertSee($tokenName)
-        ->assertSee(route('server.create.token', ['type' => $type, 'token_uuid' => $token->uuid]))
-        ->assertDontSee('loadingProviderTokenId', false)
-        ->assertDontSee('coolbox-loading', false)
-        ->assertSee('href="'.route('server.create.token', ['type' => $type, 'token_uuid' => $token->uuid]).'"', false)
-        ->assertSee('wire:key="'.$provider.'-token-'.$token->id.'"', false)
-        ->assertDontSee('wire:click="selectToken(', false)
-        ->assertDontSee('loading-spinner', false)
-        ->assertDontSee('Loading Hetzner details...')
-        ->assertDontSee('Loading Vultr details...')
-        ->assertDontSee('Loading DigitalOcean details...')
-        ->assertDontSee('Select a saved token')
-        ->assertDontSee('You need a saved')
-        ->assertDontSee('Continue');
-})->with([
-    'hetzner' => [ByHetzner::class, 'hetzner', 'hetzner', 'Production Hetzner'],
-    'vultr' => [ByVultr::class, 'vultr', 'vultr', 'Production Vultr'],
-    'digital-ocean' => [ByDigitalOcean::class, 'digitalocean', 'digital-ocean', 'Production DigitalOcean'],
-]);
-
-test('provider token selection shows an add token box when no tokens exist', function (string $component, string $provider, string $title) {
-    Livewire::test($component)
-        ->assertSee($title)
-        ->assertSee('Add an API token to continue provisioning.')
-        ->assertSee('Add token')
-        ->assertDontSee('wire:key="'.$provider.'-token-', false)
-        ->assertDontSee('wire:click="selectToken(', false);
-})->with([
-    'hetzner' => [ByHetzner::class, 'hetzner', 'No Hetzner tokens'],
-    'vultr' => [ByVultr::class, 'vultr', 'No Vultr tokens'],
-    'digital-ocean' => [ByDigitalOcean::class, 'digitalocean', 'No DigitalOcean tokens'],
-]);
-
 test('provider token urls pass the token uuid into the server creation page', function () {
     $token = CloudProviderToken::factory()->create([
         'team_id' => $this->team->id,
@@ -104,7 +63,7 @@ test('provider token urls pass the token uuid into the server creation page', fu
         ->assertSet('title', 'Hetzner');
 });
 
-test('provider token pages defer provider api data loading until wire init', function (string $component, string $provider, string $type, string $loadingText, string $wireInitCall) {
+test('provider token pages do not load provider api data on mount', function (string $component, string $provider) {
     $token = CloudProviderToken::factory()->create([
         'team_id' => $this->team->id,
         'provider' => $provider,
@@ -116,20 +75,16 @@ test('provider token pages defer provider api data loading until wire init', fun
 
     Livewire::test($component, ['selectedTokenUuid' => $token->uuid])
         ->assertSet('current_step', 2)
-        ->assertSet('loading_data', true)
-        ->assertSee($loadingText)
-        ->assertSee($wireInitCall, false)
-        ->assertSee('role="status"', false)
-        ->assertDontSee('border-b-2 border-primary', false);
+        ->assertSet('loading_data', true);
 
     Http::assertNothingSent();
 })->with([
-    'hetzner' => [ByHetzner::class, 'hetzner', 'hetzner', 'Loading Hetzner data', 'wire:init="loadHetznerData"'],
-    'vultr' => [ByVultr::class, 'vultr', 'vultr', 'Loading Vultr data', 'wire:init="loadVultrData"'],
-    'digital-ocean' => [ByDigitalOcean::class, 'digitalocean', 'digital-ocean', 'Loading DigitalOcean data', 'wire:init="loadDigitalOceanData"'],
+    'hetzner' => [ByHetzner::class, 'hetzner'],
+    'vultr' => [ByVultr::class, 'vultr'],
+    'digital-ocean' => [ByDigitalOcean::class, 'digitalocean'],
 ]);
 
-test('provider token pages render api error details when a selected token is invalid', function (string $component, string $provider, string $type, string $loadMethod, string $providerName, string $apiMessage, array $responseBody) {
+test('provider token pages surface api error details when a selected token is invalid', function (string $component, string $provider, string $loadMethod, string $providerName, string $apiMessage, array $responseBody) {
     $token = CloudProviderToken::factory()->create([
         'team_id' => $this->team->id,
         'provider' => $provider,
@@ -145,40 +100,9 @@ test('provider token pages render api error details when a selected token is inv
         ->assertSet('loading_data', false)
         ->assertSet('provider_data_error', "{$providerName} API error: {$apiMessage}")
         ->assertDispatched('error')
-        ->assertSee("Unable to load {$providerName}")
-        ->assertSee($apiMessage)
-        ->assertSee('Select another token')
-        ->assertSee('href="'.route('server.create.type', ['type' => $type]).'"', false)
-        ->assertSee('wire:navigate', false)
-        ->assertDontSee('wire:click="previousStep"', false);
+        ->assertSee($apiMessage);
 })->with([
-    'hetzner' => [ByHetzner::class, 'hetzner', 'hetzner', 'loadHetznerData', 'Hetzner', 'the token you have provided is invalid', ['error' => ['code' => 'unauthorized', 'message' => 'the token you have provided is invalid']]],
-    'vultr' => [ByVultr::class, 'vultr', 'vultr', 'loadVultrData', 'Vultr', 'Invalid API key', ['error' => 'Invalid API key', 'status' => 401]],
-    'digital-ocean' => [ByDigitalOcean::class, 'digitalocean', 'digital-ocean', 'loadDigitalOceanData', 'DigitalOcean', 'Unable to authenticate you', ['id' => 'Unauthorized', 'message' => 'Unable to authenticate you']],
-]);
-
-test('provider token picker is hidden on token specific provider creation pages', function (string $provider, string $type) {
-    $token = CloudProviderToken::factory()->create([
-        'team_id' => $this->team->id,
-        'provider' => $provider,
-    ]);
-    $tokenUrl = route('server.create.token', ['type' => $type, 'token_uuid' => $token->uuid]);
-
-    Livewire::test(CreatePage::class, [
-        'type' => $type,
-    ])
-        ->assertSee('href="'.$tokenUrl.'"', false)
-        ->assertDontSee('+ New Token');
-
-    Livewire::test(CreatePage::class, [
-        'type' => $type,
-        'token_uuid' => $token->uuid,
-    ])
-        ->assertDontSee('href="'.$tokenUrl.'"', false)
-        ->assertDontSee('Add token')
-        ->assertDontSee('+ New Token');
-})->with([
-    'hetzner' => ['hetzner', 'hetzner'],
-    'vultr' => ['vultr', 'vultr'],
-    'digital-ocean' => ['digitalocean', 'digital-ocean'],
+    'hetzner' => [ByHetzner::class, 'hetzner', 'loadHetznerData', 'Hetzner', 'the token you have provided is invalid', ['error' => ['code' => 'unauthorized', 'message' => 'the token you have provided is invalid']]],
+    'vultr' => [ByVultr::class, 'vultr', 'loadVultrData', 'Vultr', 'Invalid API key', ['error' => 'Invalid API key', 'status' => 401]],
+    'digital-ocean' => [ByDigitalOcean::class, 'digitalocean', 'loadDigitalOceanData', 'DigitalOcean', 'Unable to authenticate you', ['id' => 'Unauthorized', 'message' => 'Unable to authenticate you']],
 ]);

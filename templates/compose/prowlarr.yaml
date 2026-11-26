@@ -7,7 +7,7 @@
 
 services:
   prowlarr:
-    image: lscr.io/linuxserver/prowlarr:latest
+    image: lscr.io/linuxserver/prowlarr:2.7.0.5723-ls168
     environment:
       - SERVICE_URL_PROWLARR_9696
       - _APP_URL=$SERVICE_URL_PROWLARR

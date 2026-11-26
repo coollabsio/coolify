@@ -2,9 +2,11 @@
 
 namespace App\Notifications\Database;
 
+use App\Enums\BackupTrigger;
 use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -15,9 +17,12 @@ class BackupSuccess extends CustomEmailNotification
 
     public string $frequency;
 
-    public function __construct(ScheduledDatabaseBackup $backup, public $database, public $database_name)
+    public BackupTrigger $trigger = BackupTrigger::Scheduled;
+
+    public function __construct(ScheduledDatabaseBackup $backup, public $database, public $database_name, BackupTrigger $trigger = BackupTrigger::Scheduled)
     {
         $this->onQueue('high');
+        $this->trigger = $trigger;
 
         $this->name = $database->name;
         $this->frequency = $backup->frequency;
@@ -36,6 +41,7 @@ class BackupSuccess extends CustomEmailNotification
             'name' => $this->name,
             'database_name' => $this->database_name,
             'frequency' => $this->frequency,
+            'trigger' => $this->trigger->label(),
         ]);
 
         return $mail;
@@ -50,13 +56,14 @@ class BackupSuccess extends CustomEmailNotification
         );
 
         $message->addField('Frequency', $this->frequency, true);
+        $message->addField('Trigger', $this->trigger->label(), true);
 
         return $message;
     }
 
     public function toTelegram(): array
     {
-        $message = "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was successful.";
+        $message = "Coolify: Database backup for {$this->name} (db:{$this->database_name}) with frequency of {$this->frequency} was successful.\nTrigger: {$this->trigger->label()}";
 
         return [
             'message' => $message,
@@ -68,7 +75,16 @@ class BackupSuccess extends CustomEmailNotification
         return new PushoverMessage(
             title: 'Database backup successful',
             level: 'success',
-            message: "Database backup for {$this->name} (db:{$this->database_name}) was successful.<br/><br/><b>Frequency:</b> {$this->frequency}.",
+            message: "Database backup for {$this->name} (db:{$this->database_name}) was successful.<br/><br/><b>Frequency:</b> {$this->frequency}.<br/><b>Trigger:</b> {$this->trigger->label()}",
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
+            title: 'Database backup successful',
+            level: 'success',
+            message: "Database backup for {$this->name} (db:{$this->database_name}) was successful.\n\nFrequency: {$this->frequency}.",
         );
     }
 
@@ -78,6 +94,7 @@ class BackupSuccess extends CustomEmailNotification
         $description = "Database backup for {$this->name} (db:{$this->database_name}) was successful.";
 
         $description .= "\n\n*Frequency:* {$this->frequency}";
+        $description .= "\n\n*Trigger:* {$this->trigger->label()}";
 
         return new SlackMessage(
             title: $title,
@@ -98,6 +115,7 @@ class BackupSuccess extends CustomEmailNotification
             'database_uuid' => $this->database->uuid,
             'database_type' => $this->database_name,
             'frequency' => $this->frequency,
+            'trigger' => $this->trigger->value,
             'url' => $url,
         ];
     }

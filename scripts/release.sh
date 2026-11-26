@@ -175,7 +175,7 @@ print_notes() {
 	local section entries
 	for section in "${SECTIONS[@]}"; do
 		entries="$(awk -v section="$section" '
-			FNR == 1 { fences = 0; type = ""; breaking = 0 }
+			FNR == 1 { fences = 0; type = ""; breaking = 0; summary = "" }
 			fences < 2 {
 				if ($0 == "---") fences++
 				else if ($1 == "type:") type = $2
@@ -183,9 +183,12 @@ print_notes() {
 				next
 			}
 			NF && tolower(section) == (breaking ? "breaking changes" : type) {
-				prefix = /^- / ? "  " : "- "
-				print prefix $0
+				if (summary == "") summary = $0
+				entry = (/^- / ? "  " : "- ") $0 "\n"
+				if (summary ~ / from [^ ]*[0-9][^ ]* to [^ ]*[0-9][^ ]*$/) bumps = bumps entry
+				else entries = entries entry
 			}
+			END { printf "%s%s", entries, bumps }
 		' "$CHANGE_DIRECTORY"/*.md)"
 		[ -z "$entries" ] || printf '### %s\n\n%s\n\n' "$section" "$entries"
 	done

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
+use Illuminate\Support\Stringable;
 
 class LocalPersistentVolume extends BaseModel
 {
@@ -252,6 +253,13 @@ class LocalPersistentVolume extends BaseModel
                 foreach (data_get($service, 'volumes', []) as $volume) {
                     $parsedVolume = is_array($volume) ? $volume : parseDockerVolumeString($volume);
                     $source = data_get($parsedVolume, 'source');
+                    // An old volume of a host path that its variable now gives is replaced (see replacedComposeHostPath()).
+                    if (is_string($volume) && $this->replacesComposeHostPath($source)) {
+                        continue;
+                    }
+                    if (is_string($volume) && $source) {
+                        $source = composeNamedVolumeSource(str($source));
+                    }
                     if (is_string($volume) && $source) {
                         $source = composeNamedVolumeSource(str($source));
                     }
@@ -289,6 +297,62 @@ class LocalPersistentVolume extends BaseModel
         }
 
         return $resource->previews()->where('pull_request_id', (int) $matches[1])->exists();
+    }
+
+    /**
+     * The host path that a variable of the Compose file now gives this volume, or null. v4.7.6 and older
+     * made a short-syntax volume such as `${DATA}/config:/config` a named volume, also when the resource
+     * set DATA. While this storage entry exists, the parsers keep the volume so that the resource keeps
+     * its data (see keepSavedComposeNamedVolume()).
+     */
+    public function replacedComposeHostPath(): ?string
+    {
+        try {
+            $resource = $this->resource;
+            if (! $resource) {
+                return null;
+            }
+
+            $parent = $resource instanceof Application ? $resource : $resource->service;
+            if (! $parent || blank($parent->docker_compose_raw)) {
+                return null;
+            }
+
+            $services = data_get(parseDockerComposeYaml($parent->docker_compose_raw), 'services', []);
+            if ($this->isServiceResource()) {
+                $services = array_intersect_key($services, [$resource->name => true]);
+            }
+
+            foreach ($services as $service) {
+                foreach (data_get($service, 'volumes', []) as $volume) {
+                    if (! is_string($volume)) {
+                        continue;
+                    }
+                    $hostPath = $this->replacesComposeHostPath(parseDockerVolumeString($volume)['source']);
+                    if ($hostPath !== null) {
+                        return $hostPath;
+                    }
+                }
+            }
+
+            return null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * The host path that the variable of a short-syntax source now gives, when this storage entry is the old volume of that source.
+     */
+    private function replacesComposeHostPath(Stringable $source): ?string
+    {
+        $resource = $this->resource;
+        $parent = $resource instanceof Application ? $resource : $resource?->service;
+        if (! $parent || composeShortVolumeSavedName($source, $parent->uuid) !== $this->name) {
+            return null;
+        }
+
+        return composeShortVolumeVariableHostPath($source, composeVolumeSourceVariables($parent));
     }
 
     /**

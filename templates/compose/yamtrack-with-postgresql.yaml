@@ -4,10 +4,11 @@
 # tags: self-hosted, automation, tracker, media, movies, shows, anime, manga, games, books, comics
 # logo: svgs/yamtrack.svg
 # port: 8000
+# outdated: true
 
 services:
   yamtrack:
-    image: ghcr.io/fuzzygrim/yamtrack
+    image: ghcr.io/fuzzygrim/yamtrack:0.26.3
     environment:
       - SERVICE_URL_YAMTRACK_8000
       - URLS=${SERVICE_URL_YAMTRACK}
@@ -54,7 +55,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    image: redis:8-alpine
     volumes:
       - yamtrack_redis_data:/data
     healthcheck:

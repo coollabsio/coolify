@@ -7,6 +7,8 @@ IMAGE=coollabsio/coolify
 VARIANTS=""
 KEEP_TAG_PATTERN='^(latest|preview|main|nightly|v?[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?)$'
 KEEP_TAG_EXCEPTIONS=v3,4.0.0-beta.420.1,4.0.0-beta.420.2,4.0.0-beta.420.3,4.0.0-beta.420.4,4.0.0-beta.420.5,4.0.0-beta.420.6,4.0.0-beta.420.7,4.0.0-beta.420.8,4.0.0-beta.420.9,4.0.0-beta.420.10
+# Temporary: the Docker Hub API still lists this deleted tag, its images without a push date. Remove it once the API no longer lists the tag
+SKIP_DOCKERHUB_TAG=sha-710f236
 KEEP_NIGHTLY_DAYS=14
 MIN_AGE_DAYS=1
 DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME:-}"
@@ -50,8 +52,12 @@ main() {
 }
 
 read_ghcr_versions() {
-	local page window=$((${LIMIT:-0} * 2))
-	list_ghcr_versions "state=active" --paginate > "$WORK_DIR/ghcr-active.tsv"
+	local page versions window=$((${LIMIT:-0} * 2))
+	for ((page = 1; ; page++)); do
+		versions="$(list_ghcr_versions "state=active&page=$page")"
+		[ -n "$versions" ] || break
+		printf '%s\n' "$versions"
+	done > "$WORK_DIR/ghcr-active.tsv"
 	for ((page = 1; page <= (window + 99) / 100; page++)); do
 		list_ghcr_versions "state=deleted&page=$page"
 	done | awk -v window="$window" 'NR <= window' > "$WORK_DIR/ghcr-deleted.tsv"
@@ -68,6 +74,7 @@ read_dockerhub_tags() {
 	: > "$WORK_DIR/dockerhub-images.tsv"
 	while [ -n "$url" ]; do
 		page="$(curl -sSf --retry 3 -H "Authorization: Bearer $hub" "$url")" || die "could not list the tags of docker.io/$IMAGE from the Docker Hub API"
+		page="$(jq --arg tag "$SKIP_DOCKERHUB_TAG" 'del(.results[] | select(.name == $tag))' <<< "$page")"
 		jq -r '.results[] | [.name, (.digest // ""), (.media_type // ""), (.tag_last_pushed // .last_updated // ""), (.full_size // 0)] | @tsv' <<< "$page" >> "$WORK_DIR/hub-tags.tsv"
 		jq -r '.results[] | .name as $tag | .images[]? | select(.digest) | [$tag, .digest, ([.os, .architecture] | join("/")), (.last_pushed // ""), (.size // 0)] | @tsv' <<< "$page" >> "$WORK_DIR/hub-images.tsv"
 		url="$(jq -r '.next // empty' <<< "$page")"
@@ -253,11 +260,16 @@ verify_kept_manifests() {
 }
 
 list_ghcr_versions() {
-	local query="$1"
-	shift
-	gh api "$@" "/orgs/${IMAGE%%/*}/packages/container/${IMAGE#*/}/versions?per_page=100&$query" \
-		--jq '.[] | [.name, (.id | tostring), (.metadata.container.tags | join(",")), .created_at] | @tsv' 2> /dev/null \
-		|| die "gh could not list the versions of ghcr.io/$IMAGE, its token needs read:packages and delete:packages: gh auth refresh -s read:packages,delete:packages"
+	local attempt versions
+	for attempt in 1 2 3 4 5; do
+		if versions="$(gh api "/orgs/${IMAGE%%/*}/packages/container/${IMAGE#*/}/versions?per_page=100&$1" \
+			--jq '.[] | [.name, (.id | tostring), (.metadata.container.tags | join(",")), .created_at] | @tsv')"; then
+			[ -z "$versions" ] || printf '%s\n' "$versions"
+			return
+		fi
+		sleep $((attempt * 5))
+	done
+	die "gh could not list the versions of ghcr.io/$IMAGE"
 }
 
 request_manifests() {

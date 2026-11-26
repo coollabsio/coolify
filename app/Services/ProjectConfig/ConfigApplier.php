@@ -278,11 +278,11 @@ class ConfigApplier
     }
 
     /**
-     * Tags, scheduled tasks, backups, the name, and the description do not change the running containers.
+     * Tags, scheduled tasks, backups, storage backups, the name, and the description do not change the running containers.
      */
     private function affectsRuntime(string $path): bool
     {
-        return ! in_array(explode('.', $path)[0], ['tags', 'scheduled_tasks', 'backups', 'name', 'description'], true);
+        return ! in_array(explode('.', $path)[0], ['tags', 'scheduled_tasks', 'backups', 'storage_backups', 'name', 'description'], true);
     }
 
     private function setKey(?Model $model, ?string $key): void

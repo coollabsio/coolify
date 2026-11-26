@@ -7,6 +7,7 @@ use App\Actions\Service\CreateServiceFromCompose;
 use App\Actions\Service\RestartService;
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
+use App\Exceptions\ComposeRejectedException;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteResourceJob;
 use App\Jobs\ServerStorageSaveJob;
@@ -23,10 +24,12 @@ use App\Services\Dns\ManagedDnsRecordCleanup;
 use App\Services\Dns\ResourceDnsRecords;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
 use Spatie\Activitylog\Models\Activity;
@@ -49,7 +52,7 @@ class ServicesController extends Controller
 
     private function exposeFileStorageContentIfAllowed(LocalFileVolume|LocalPersistentVolume $storage): LocalFileVolume|LocalPersistentVolume
     {
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        if (canReadResourceSecretsFromApi($storage->resource)) {
             $storage->makeVisible(['content']);
         }
 
@@ -68,7 +71,7 @@ class ServicesController extends Controller
             'resourceable_id',
             'resourceable_type',
         ]);
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        if (canReadResourceSecretsFromApi($service)) {
             $service->makeVisible([
                 'docker_compose_raw',
                 'docker_compose',
@@ -141,6 +144,33 @@ class ServicesController extends Controller
         $service->applications()->get()
             ->filter(fn (ServiceApplication $application): bool => isset($previousHostnames[$application->id]))
             ->each(fn (ServiceApplication $application) => $cleanup->queueReleaseOfRemovedHostnames($application, $previousHostnames[$application->id], $teamId));
+    }
+
+    /**
+     * Applies the urls of a service that the request creates. Rejected urls throw the error response, so the
+     * transaction of the creation rolls back and no part of the service stays.
+     *
+     * @throws HttpResponseException
+     */
+    private function applyNewServiceUrls(Service $service, Request $request, string $teamId): void
+    {
+        if (! $request->has('urls') || ! is_array($request->urls)) {
+            return;
+        }
+        $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
+        if (isset($urlResult['errors'])) {
+            throw new HttpResponseException(response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $urlResult['errors'],
+            ], 422));
+        }
+        if (isset($urlResult['conflicts'])) {
+            throw new HttpResponseException(response()->json([
+                'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+                'conflicts' => $urlResult['conflicts'],
+                'warning' => $urlResult['warning'],
+            ], 409));
+        }
     }
 
     private function applyServiceUrls(Service $service, array $urlsArray, string $teamId, bool $forceDomainOverride = false): ?array
@@ -579,36 +609,21 @@ class ServicesController extends Controller
                 if ($request->has('redact_all_env_values_in_logs')) {
                     $attributes['redact_all_env_values_in_logs'] = $request->boolean('redact_all_env_values_in_logs');
                 }
-                $service = app(CreateServiceFromCompose::class)->handle(
-                    environment: $environment,
-                    server: $server,
-                    destination: $destination,
-                    dockerComposeRaw: $dockerComposeRaw,
-                    templateKey: $oneClickServiceName,
-                    attributes: $attributes,
-                    connectToDockerNetwork: $request->boolean('connect_to_docker_network'),
-                    name: $request->name,
-                );
+                $service = DB::transaction(function () use ($environment, $server, $destination, $dockerComposeRaw, $oneClickServiceName, $attributes, $request, $teamId) {
+                    $service = app(CreateServiceFromCompose::class)->handle(
+                        environment: $environment,
+                        server: $server,
+                        destination: $destination,
+                        dockerComposeRaw: $dockerComposeRaw,
+                        templateKey: $oneClickServiceName,
+                        attributes: $attributes,
+                        connectToDockerNetwork: $request->boolean('connect_to_docker_network'),
+                        name: $request->name,
+                    );
+                    $this->applyNewServiceUrls($service, $request, $teamId);
 
-                if ($request->has('urls') && is_array($request->urls)) {
-                    $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
-                    if ($urlResult !== null) {
-                        $service->delete();
-                        if (isset($urlResult['errors'])) {
-                            return response()->json([
-                                'message' => 'Validation failed.',
-                                'errors' => $urlResult['errors'],
-                            ], 422);
-                        }
-                        if (isset($urlResult['conflicts'])) {
-                            return response()->json([
-                                'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
-                                'conflicts' => $urlResult['conflicts'],
-                                'warning' => $urlResult['warning'],
-                            ], 409);
-                        }
-                    }
-                }
+                    return $service;
+                });
 
                 if ($request->has('tags')) {
                     $this->attachTagsToResource($service, $request->tags, $teamId);
@@ -778,28 +793,20 @@ class ServicesController extends Controller
             if ($request->has('redact_all_env_values_in_logs')) {
                 $service->redact_all_env_values_in_logs = $request->boolean('redact_all_env_values_in_logs');
             }
-            $service->save();
-
-            $service->parse(isNew: true);
-
-            if ($request->has('urls') && is_array($request->urls)) {
-                $urlResult = $this->applyServiceUrls($service, $request->urls, $teamId, $request->boolean('force_domain_override'));
-                if ($urlResult !== null) {
-                    $service->delete();
-                    if (isset($urlResult['errors'])) {
-                        return response()->json([
-                            'message' => 'Validation failed.',
-                            'errors' => $urlResult['errors'],
-                        ], 422);
-                    }
-                    if (isset($urlResult['conflicts'])) {
-                        return response()->json([
-                            'message' => 'Domain conflicts detected. Use force_domain_override=true to proceed.',
-                            'conflicts' => $urlResult['conflicts'],
-                            'warning' => $urlResult['warning'],
-                        ], 409);
-                    }
-                }
+            try {
+                DB::transaction(function () use ($service, $request, $teamId) {
+                    $service->save();
+                    $service->parse(isNew: true);
+                    $service->ensureDockerComposeAccepted();
+                    $this->applyNewServiceUrls($service, $request, $teamId);
+                });
+            } catch (ComposeRejectedException $e) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => [
+                        'docker_compose_raw' => $e->getMessage(),
+                    ],
+                ], 422);
             }
 
             if ($request->has('tags')) {
@@ -1026,6 +1033,7 @@ class ServicesController extends Controller
             new OA\Parameter(name: 'delete_volumes', in: 'query', required: false, description: 'Delete volumes.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'docker_cleanup', in: 'query', required: false, description: 'Run docker cleanup when the server disk usage is at or above its cleanup threshold. Skipped when a cleanup ran on the server in the last hour.', schema: new OA\Schema(type: 'boolean', default: true)),
             new OA\Parameter(name: 'delete_connected_networks', in: 'query', required: false, description: 'Delete connected networks.', schema: new OA\Schema(type: 'boolean', default: true)),
+            new OA\Parameter(name: 'delete_backups', in: 'query', required: false, description: 'Delete the database and storage backups, on the server and on S3.', schema: new OA\Schema(type: 'boolean', default: false)),
         ],
         responses: [
             new OA\Response(
@@ -1090,6 +1098,7 @@ class ServicesController extends Controller
             deleteConnectedNetworks: $request->boolean('delete_connected_networks', true),
             deleteConfigurations: $request->boolean('delete_configurations', true),
             dockerCleanup: $request->boolean('docker_cleanup', true),
+            deleteBackups: $request->boolean('delete_backups', false),
         );
 
         auditLog('api.service.deleted', [
@@ -1338,9 +1347,23 @@ class ServicesController extends Controller
             $service->include_coolify_default_variables = $request->boolean('include_coolify_default_variables');
         }
         $previousDnsHostnames = $this->serviceApplicationDnsHostnames($service);
-        $service->save();
-
-        $service->parse();
+        $isComposeChanged = $service->isDirty('docker_compose_raw');
+        try {
+            DB::transaction(function () use ($service, $isComposeChanged) {
+                $service->save();
+                $service->parse();
+                if ($isComposeChanged) {
+                    $service->ensureDockerComposeAccepted();
+                }
+            });
+        } catch (ComposeRejectedException $e) {
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => [
+                    'docker_compose_raw' => $e->getMessage(),
+                ],
+            ], 422);
+        }
 
         $urlResult = null;
         if ($request->has('urls') && is_array($request->urls)) {
@@ -2125,7 +2148,7 @@ class ServicesController extends Controller
 
     #[OA\Post(
         summary: 'Start',
-        description: 'Start service.',
+        description: 'Start service. Pulls the latest images first.',
         path: '/services/{uuid}/start',
         operationId: 'start-service-by-uuid',
         security: [
@@ -2197,7 +2220,7 @@ class ServicesController extends Controller
         if ($service->isStarting()) {
             return response()->json(['message' => 'There is a deployment in progress.'], 400);
         }
-        $activity = StartService::run($service);
+        $activity = StartService::run($service, true);
 
         auditLog('api.service.deployed', [
             'team_id' => $teamId,

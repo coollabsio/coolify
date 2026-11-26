@@ -7,7 +7,7 @@
 
 services:
   soju:
-    image: codeberg.org/emersion/soju:latest
+    image: codeberg.org/emersion/soju:v0.11.1
     volumes:
       - soju-db:/db
       - soju-uploads:/uploads

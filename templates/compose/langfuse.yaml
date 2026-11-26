@@ -61,7 +61,7 @@ x-app-env: &app-env
 
 services:
   langfuse:
-    image: langfuse/langfuse:3
+    image: langfuse/langfuse:4
     depends_on: &langfuse-depends-on
       postgres:
         condition: service_healthy
@@ -84,7 +84,7 @@ services:
       retries: 3
 
   langfuse-worker:
-    image: langfuse/langfuse-worker:3
+    image: langfuse/langfuse-worker:4
     environment:
       <<: *app-env
     depends_on: *langfuse-depends-on
@@ -124,7 +124,7 @@ services:
       retries: 10
 
   clickhouse:
-    image: clickhouse/clickhouse-server:26.2.4.23
+    image: clickhouse/clickhouse-server:26.10.4.207
     user: "101:101"
     environment:
       - CLICKHOUSE_DB=${CLICKHOUSE_DB:-default}

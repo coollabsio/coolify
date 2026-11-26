@@ -370,7 +370,8 @@ describe('GET /api/v1/deployments sensitive field gating', function () {
             'Authorization' => 'Bearer '.$token,
         ])->getJson("/api/v1/deployments/applications/{$this->application->uuid}");
 
-        $response->assertStatus(200);
+        $response->assertStatus(200)
+            ->assertJsonStructure(['count', 'deployments' => [['deployment_uuid', 'status', 'logs']]]);
 
         expect($response->getContent())->toContain('"logs":');
     });

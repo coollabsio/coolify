@@ -8,15 +8,15 @@
 <div class="relative min-w-0 shrink" x-data="{ open: false, search: '' }" @keydown.escape.window="open = false"
     @click.outside="open = false">
     <div class="flex h-8 min-w-0 items-center gap-1">
-        <div class="flex h-8 min-w-0 items-center rounded-md opacity-70 transition-opacity hover:opacity-100">
+        <div class="flex h-8 min-w-0 items-center rounded-md opacity-70 transition-[background-color,opacity] hover:bg-neutral-100 hover:opacity-100 dark:hover:bg-white/[0.05]">
             <a href="{{ $href }}" {{ wireNavigate() }} title="Go to {{ strtolower(str($title)->singular()) }}"
-                class="flex h-8 min-w-0 items-center rounded-l-md pr-1 pl-2 transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
+                class="flex h-8 min-w-0 items-center pr-1 pl-2">
                 <span class="min-w-0 truncate font-semibold text-black dark:text-fg"
                     x-text="nameOf(@js($uuid), @js($label))">{{ $label }}</span>
             </a>
             <button type="button"
                 @click="open = !open; if (open) { search = ''; $nextTick(() => $refs.search.focus()) }"
-                title="Switch resource" class="flex h-8 shrink-0 items-center rounded-r-md px-0.5 transition-colors hover:bg-neutral-100 dark:hover:bg-white/[0.05]">
+                title="Switch resource" class="flex h-8 shrink-0 items-center px-0.5">
                 <svg class="size-4 shrink-0 text-neutral-400 dark:text-fg-faint" viewBox="0 0 24 24" fill="none">
                     <path d="M8 9l4-4 4 4M8 15l4 4 4-4" stroke="currentColor" stroke-width="1.6"
                         stroke-linecap="round" stroke-linejoin="round" />

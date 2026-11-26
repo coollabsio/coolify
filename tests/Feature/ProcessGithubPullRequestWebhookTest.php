@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Application\CleanupPreviewDeployment;
+use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\ProcessGithubPullRequestWebhook;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -35,6 +36,24 @@ beforeEach(function () {
         'destination_type' => $this->destination->getMorphClass(),
     ]);
 });
+
+function expectSkippedPreviewDeployment(Application $application, int $pullRequestId, string $reason): ApplicationDeploymentQueue
+{
+    expect(ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pullRequestId)->exists())->toBeFalse();
+
+    $deployments = ApplicationDeploymentQueue::where('application_id', $application->id)->where('pull_request_id', $pullRequestId)->get();
+    expect($deployments)->toHaveCount(1);
+
+    $deployment = $deployments->first();
+    expect($deployment->status)->toBe(ApplicationDeploymentStatus::SKIPPED->value)
+        ->and($deployment->commit_message)->toBe($reason)
+        ->and($deployment->is_webhook)->toBeTruthy()
+        ->and($deployment->finished_at)->not->toBeNull()
+        ->and($deployment->server_id)->toBe($application->destination->server->id)
+        ->and($deployment->logs)->toContain($reason);
+
+    return $deployment;
+}
 
 it('cleans up a closed pull request preview when pull request comment cleanup fails', function () {
     $preview = ApplicationPreview::create([
@@ -103,8 +122,7 @@ it('skips a synchronized GitHub pull request preview when the head commit messag
 
     $job->handle();
 
-    expect(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBeFalse()
-        ->and(ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBeFalse();
+    expectSkippedPreviewDeployment($this->application, 42, 'Skipped the preview deployment: the pull request title or the head commit message contains a skip marker ([skip ci] or [skip cd]).');
 
     Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.github.com/repos/example/repo/commits/after-sha');
 });
@@ -198,8 +216,7 @@ it('skips a GitHub pull request preview when the opened or reopened head commit 
 
     $job->handle();
 
-    expect(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBeFalse()
-        ->and(ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBeFalse();
+    expectSkippedPreviewDeployment($this->application, 42, 'Skipped the preview deployment: the pull request title or the head commit message contains a skip marker ([skip ci] or [skip cd]).');
 
     Http::assertSent(fn (Request $request): bool => $request->url() === 'https://api.github.com/repos/example/repo/commits/head-sha');
     Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), '/repos/example/repo/pulls/42/files'));
@@ -348,8 +365,12 @@ it('skips an opened GitHub pull request preview when no changed file matches the
 
     $job->handle();
 
-    expect(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBeFalse()
-        ->and(ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBeFalse();
+    $deployment = expectSkippedPreviewDeployment($this->application, 42, 'Skipped the preview deployment: no changed file matches the watch paths.');
+    expect(collect(json_decode($deployment->logs, true))->pluck('output')->all())->toBe([
+        'Skipped the preview deployment: no changed file matches the watch paths.',
+        'Watch paths: apps/app/**',
+        'Changed files (1): README.md',
+    ]);
 });
 
 it('uses one GitHub App installation token for all GitHub API calls of a pull request job', function () {
@@ -459,8 +480,12 @@ it('deploys an opened GitHub pull request preview by fork status, not by author 
 
     $job->handle();
 
-    expect(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBe($deploys)
-        ->and(ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('pull_request_id', 42)->exists())->toBe($deploys);
+    if ($deploys) {
+        expect(ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', 42)->value('is_same_repository'))->toBe(! $isForkPullRequest)
+            ->and(ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('pull_request_id', 42)->value('status'))->not->toBe(ApplicationDeploymentStatus::SKIPPED->value);
+    } else {
+        expectSkippedPreviewDeployment($this->application, 42, 'Skipped the preview deployment: the pull request comes from a fork and public PR deployments are disabled.');
+    }
 })->with([
     'same-repository branch with public deployments off' => [false, false, true],
     'fork with public deployments off' => [true, false, false],

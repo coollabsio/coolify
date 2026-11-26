@@ -252,6 +252,7 @@ test('loading files for a service writes content inside the resource directory',
     $base64 = base64_encode($content);
     Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "{$sudo}mkdir -p -- ".escapeshellarg(dirname($writePath))));
     Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "echo '{$base64}' | {$sudo}base64 -d | {$sudo}tee -- {$escapedPath}"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "\n{$sudo}chmod a+rx -- {$escapedPath}"));
 })->with([
     'home directory' => ['/etc/b.conf', 'b'],
     'bare relative path' => ['/etc/c.conf', 'c'],
