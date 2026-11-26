@@ -210,8 +210,8 @@
             <div x-show="viewMode === 'table'"
                 class="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-white/[0.08] dark:bg-white/[0.05]">
                 <div @class([
-                    'grid min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:min-w-[740px] md:grid-cols-[minmax(0,1fr)_11rem_6rem_9.5rem] dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint',
-                    'lg:min-w-[940px] lg:grid-cols-[minmax(0,1fr)_11rem_6rem_12rem_9.5rem]' => $showPatches,
+                    'grid min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] border-b border-neutral-200 bg-neutral-50 px-4 py-2.5 text-[11px] font-medium text-neutral-500 md:min-w-[756px] md:grid-cols-[minmax(0,1fr)_12rem_6rem_9.5rem] dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-fg-faint',
+                    'lg:min-w-[956px] lg:grid-cols-[minmax(0,1fr)_12rem_6rem_12rem_9.5rem]' => $showPatches,
                 ])>
                     <div>Server</div>
                     <div class="hidden md:block">Address</div>
@@ -224,8 +224,8 @@
                 <template x-for="server in filteredServers" :key="server.uuid">
                     <a :href="server.href" {{ wireNavigate() }}
                         @class([
-                            'grid min-h-14 min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline md:min-w-[740px] md:grid-cols-[minmax(0,1fr)_11rem_6rem_9.5rem] dark:border-white/[0.07] dark:hover:bg-white/[0.025]',
-                            'lg:min-w-[940px] lg:grid-cols-[minmax(0,1fr)_11rem_6rem_12rem_9.5rem]' => $showPatches,
+                            'grid min-h-14 min-w-[480px] grid-cols-[minmax(0,1fr)_9.5rem] items-center border-b border-neutral-200 px-4 py-2.5 text-[12px] transition-colors last:border-b-0 hover:bg-neutral-50 hover:no-underline md:min-w-[756px] md:grid-cols-[minmax(0,1fr)_12rem_6rem_9.5rem] dark:border-white/[0.07] dark:hover:bg-white/[0.025]',
+                            'lg:min-w-[956px] lg:grid-cols-[minmax(0,1fr)_12rem_6rem_12rem_9.5rem]' => $showPatches,
                         ])>
                         <div class="flex min-w-0 items-center gap-3">
                             <div
@@ -248,7 +248,7 @@
                         <div class="hidden min-w-0 md:block">
                             @include('livewire.server.partials.address-cell', ['uuid' => 'server.uuid'])
                         </div>
-                        <div class="hidden text-[12px] font-medium text-neutral-600 md:block dark:text-fg-dim">
+                        <div class="hidden items-center text-[12px] font-medium text-neutral-600 md:flex dark:text-fg-dim">
                             <span class="inline-flex items-center gap-1" :title="`${server.resourceCount} ${server.resourceCount === 1 ? 'resource' : 'resources'}`">
                                 <x-reicon name="grid" class="size-3.5 text-neutral-400 dark:text-fg-faint" />
                                 <span x-text="server.resourceCount"></span>
