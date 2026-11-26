@@ -1890,6 +1890,13 @@ class Service extends BaseModel
                     Log::warning("Could not prepare storage {$fileStorage->mount_path} for service {$this->uuid}: {$error}");
                 }
             }
+            /** From now on, the storage mounts the host path that Docker Compose resolves for this start. */
+            foreach ($resource->fileStorages()->get() as $fileStorage) {
+                $error = $fileStorage->pinComposeHostPath();
+                if ($error !== null) {
+                    Log::warning("Could not save the host path of storage {$fileStorage->mount_path} for service {$this->uuid}: {$error}");
+                }
+            }
         }
     }
 

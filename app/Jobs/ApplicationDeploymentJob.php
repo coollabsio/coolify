@@ -2059,6 +2059,14 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         $this->logStorageWarning($fileStorage, $error);
                     }
                 }
+                if ($this->pull_request_id === 0 && ! $this->application->settings->is_raw_compose_deployment_enabled) {
+                    foreach ($this->application->fileStorages()->get() as $fileStorage) {
+                        $error = $fileStorage->pinComposeHostPath($composeFileName, $projectDirectory, $envFile, $this->mainServer);
+                        if ($error !== null) {
+                            $this->logStorageWarning($fileStorage, $error);
+                        }
+                    }
+                }
             }
             if ($this->use_build_server) {
                 $this->server = $this->build_server;

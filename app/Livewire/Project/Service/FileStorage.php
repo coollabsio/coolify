@@ -155,8 +155,8 @@ class FileStorage extends Component
     }
 
     /**
-     * Switches a storage that kept its saved host path to the path that its Compose variable gives. The next
-     * deployment mounts the new path; the data at the saved path stays where it is.
+     * Switches a storage that kept its host path to its new Compose source. The next deployment mounts the path that
+     * Docker Compose resolves and writes the storage there; the data at the old path stays where it is.
      */
     public function useVariablePath(): void
     {
@@ -164,17 +164,18 @@ class FileStorage extends Component
 
         $variablePath = $this->fileStorage->variable_fs_path;
         if (blank($variablePath)) {
-            $this->dispatch('error', 'This storage already uses the path of its variable.');
+            $this->dispatch('error', 'This storage already uses its Compose source.');
 
             return;
         }
         $this->fileStorage->fs_path = $variablePath;
         $this->fileStorage->variable_fs_path = null;
+        $this->fileStorage->pending_initialization = true;
         $changedFields = auditChangedFields($this->fileStorage);
         $this->fileStorage->save();
         $this->auditFileStorageUpdate($changedFields, 'switched_to_variable_path');
         $this->fs_path = $variablePath;
-        $this->dispatch('success', 'The storage uses the path of its variable from the next deployment.');
+        $this->dispatch('success', 'The storage uses the new path from the next deployment.');
     }
 
     public function convertToDirectory()

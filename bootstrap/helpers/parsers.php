@@ -508,44 +508,31 @@ function validateComposeShortBindVariables(Stringable $source, Application|Servi
 }
 
 /**
- * Before v4.7.6, a short-syntax host path such as `${DATA:-./data}` always used the default, also when the resource
- * set DATA. A storage that Coolify saved with that path keeps it, so its data does not move after the upgrade. The
- * storage keeps the source with the variable in `variable_fs_path`, and the user switches to it on the storage.
+ * A Compose source with a variable, such as `${DATA}/config`, can give another host path after a change of the
+ * variable or of the Compose file. A storage that has a host path already (saved by an older version, or pinned
+ * by a deployment, see LocalFileVolume::pinComposeHostPath()) keeps it, so its data does not move. The storage
+ * keeps the new source in `variable_fs_path`, and the user switches to it on the storage page.
  *
- * @return array{0: Stringable, 1: ?string} The host path, and the source with the variable while the saved path is kept
+ * @return array{0: Stringable, 1: ?string} The host path, and the new source while the host path is kept
  */
-function keepSavedComposeBindSource(Stringable $source, ?string $volume, Stringable $mainDirectory, ?LocalFileVolume $savedStorage, Application|Service $resource): array
+function keepSavedComposeBindSource(Stringable $source, ?string $writtenSource, ?LocalFileVolume $savedStorage, Application|Service $resource): array
 {
-    if ($volume === null || $savedStorage === null || ! str_contains($volume, '${')) {
+    $savedPath = $savedStorage?->fs_path;
+    if ($writtenSource === null || ! str_contains($writtenSource, '${') || ! is_string($savedPath)
+        || ! str_starts_with($savedPath, '/') || str_contains($savedPath, '$') || $savedPath === $source->value()) {
         return [$source, null];
     }
-    try {
-        $defaultSource = str(resolveComposeVolumeSourceVariables(parseDockerVolumeString($volume)['source']->value()));
-    } catch (Exception) {
-        return [$source, null];
+    $newPath = str_contains($source->value(), '$')
+        ? composeShortVolumeVariableHostPath($source, composeVolumeSourceVariables($resource))
+        : $source->value();
+    if ($newPath === $savedPath) {
+        return [str($savedPath), null];
     }
-    if ($defaultSource->contains('${') || ! sourceIsLocal($defaultSource)) {
-        return [$source, null];
-    }
-    $defaultSource = resolveComposeBindSource($defaultSource, $mainDirectory, $savedStorage->fs_path);
-    if ($savedStorage->fs_path !== $defaultSource->value()) {
-        return [$source, null];
-    }
-    $variablePath = resolveComposeVolumeSourceVariables($source->value(), composeVolumeSourceVariables($resource));
-    if ($variablePath === $defaultSource->value()) {
-        preg_match_all('/\$\{([A-Za-z_][A-Za-z0-9_]*)/', $source->value(), $names);
-        $hasValue = composeEnvironmentVariablesQuery($resource)->whereIn('key', $names[1])->get()
-            ->contains(fn ($variable) => filled($variable->real_value));
-        if (! $hasValue) {
-            // The variable has no value now. The saved path stays, so the data does not move when it gets one.
-            return [$defaultSource, null];
-        }
-        // A value with a variable or vault reference: only Docker Compose can resolve it.
-        $variablePath = $source->value();
-    }
-    $resource->addComposeVolumeWarning("The storage {$savedStorage->mount_path} keeps its saved host path {$defaultSource}. Its variable gives {$variablePath}. To use that path, open the storage and click Use the variable path.");
+    $resource->addComposeVolumeWarning($newPath === null
+        ? "The storage {$savedStorage->mount_path} keeps its host path {$savedPath}, so its data does not move. Its Compose source is now {$source}, which Docker Compose resolves. To use it, open the storage and click Use the new path."
+        : "The storage {$savedStorage->mount_path} keeps its host path {$savedPath}, so its data does not move. Its Compose source now gives {$newPath}. To use that path, move the data, then open the storage and click Use the new path.");
 
-    return [$defaultSource, $source->value()];
+    return [str($savedPath), $source->value()];
 }
 
 /**
@@ -1813,9 +1800,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $target = null;
                 $content = null;
                 $isDirectory = false;
+                $writtenSource = null;
                 if (is_string($volume)) {
                     $parsed = parseDockerVolumeString($volume);
                     $source = $parsed['source'];
+                    $writtenSource = $source->value();
                     $target = $parsed['target'];
                     $source = composeShortVolumeVariableSource($source, $uuid, $originalResource, $resource, $isPullRequest);
                     // Mode is available in $parsed['mode'] if needed
@@ -1837,6 +1826,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 } elseif (is_array($volume)) {
                     $type = data_get_str($volume, 'type');
                     $source = data_get_str($volume, 'source');
+                    $writtenSource = $source->value();
                     $target = data_get_str($volume, 'target');
                     $content = data_get($volume, 'content');
                     $isDirectory = data_get($volume, 'is_directory') ?? data_get($volume, 'isDirectory');
@@ -1887,7 +1877,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
                         $source = resolveComposeBindSource($source, $mainDirectory, $foundConfig?->fs_path);
-                        [$source, $variableSource] = keepSavedComposeBindSource($source, is_string($volume) ? $volume : null, $mainDirectory, $foundConfig, $resource);
+                        [$source, $variableSource] = keepSavedComposeBindSource($source, $writtenSource, $foundConfig, $resource);
                         // The file storage keeps the path of the application; a preview deployment adds the suffix (LocalFileVolume::forPullRequest()).
                         $storedSource = $source;
                         $isPreviewSuffixEnabled = $foundConfig
@@ -3182,9 +3172,11 @@ function serviceParser(Service $resource): Collection
                 $target = null;
                 $content = null;
                 $isDirectory = false;
+                $writtenSource = null;
                 if (is_string($volume)) {
                     $parsed = parseDockerVolumeString($volume);
                     $source = $parsed['source'];
+                    $writtenSource = $source->value();
                     $target = $parsed['target'];
                     $source = composeShortVolumeVariableSource($source, $uuid, $originalResource, $resource, false);
                     // Mode is available in $parsed['mode'] if needed
@@ -3206,6 +3198,7 @@ function serviceParser(Service $resource): Collection
                 } elseif (is_array($volume)) {
                     $type = data_get_str($volume, 'type');
                     $source = data_get_str($volume, 'source');
+                    $writtenSource = $source->value();
                     $target = data_get_str($volume, 'target');
                     $content = data_get($volume, 'content');
                     $isDirectory = data_get($volume, 'is_directory') ?? data_get($volume, 'isDirectory');
@@ -3256,7 +3249,7 @@ function serviceParser(Service $resource): Collection
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
                         $source = resolveComposeBindSource($source, $mainDirectory, $foundConfig?->fs_path);
-                        [$source, $variableSource] = keepSavedComposeBindSource($source, is_string($volume) ? $volume : null, $mainDirectory, $foundConfig, $resource);
+                        [$source, $variableSource] = keepSavedComposeBindSource($source, $writtenSource, $foundConfig, $resource);
                         // With `bind.create_host_path: false`, the host path must exist already: Coolify does not create or manage it.
                         if (! composeBindKeepsMissingHostPath($volume)) {
                             LocalFileVolume::updateOrCreate(

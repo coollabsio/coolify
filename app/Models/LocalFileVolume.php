@@ -655,6 +655,30 @@ class LocalFileVolume extends BaseModel
         return null;
     }
 
+    /**
+     * Saves the host path that Docker Compose resolved for a source with a variable as the path of the storage. Later
+     * deployments mount this path, also when the variable or the Compose file gives another one, so the data never
+     * moves without the user (see keepSavedComposeBindSource()).
+     *
+     * @return string|null The error message when Docker Compose could not resolve the source.
+     */
+    public function pinComposeHostPath(?string $composeFile = null, ?string $projectDirectory = null, ?string $envFile = null, ?Server $server = null): ?string
+    {
+        if ($this->is_host_file || ! str_contains((string) $this->fs_path, '$') || ! $this->usesComposeBindSource()) {
+            return null;
+        }
+        try {
+            $path = $this->composeBindHostPath($server, $composeFile, $projectDirectory, $envFile);
+        } catch (\Throwable $e) {
+            return $e->getMessage();
+        }
+        $this->fs_path = $path;
+        $this->variable_fs_path = null;
+        $this->saveQuietly();
+
+        return null;
+    }
+
     public function resolvedStoragePath(string $workdir, Server $server, ?string $composeFile = null, ?string $projectDirectory = null, ?string $envFile = null): string
     {
         if ($this->usesComposeBindSource()) {
@@ -758,6 +782,23 @@ class LocalFileVolume extends BaseModel
     /**
      * The Application, Service or standalone database that owns the storage directory.
      */
+    /**
+     * The host path that the new Compose source in `variable_fs_path` gives with the plain values of the resource,
+     * or null when only Docker Compose can resolve it.
+     */
+    public function variableHostPath(): ?string
+    {
+        $owner = $this->ownerResource();
+        if (blank($this->variable_fs_path) || ! ($owner instanceof Application || $owner instanceof Service)) {
+            return null;
+        }
+        if (! str_contains($this->variable_fs_path, '$')) {
+            return $this->variable_fs_path;
+        }
+
+        return composeShortVolumeVariableHostPath(str($this->variable_fs_path), composeVolumeSourceVariables($owner));
+    }
+
     protected function ownerResource(): mixed
     {
         $resource = $this->resource;

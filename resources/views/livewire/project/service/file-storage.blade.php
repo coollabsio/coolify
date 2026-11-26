@@ -32,18 +32,24 @@
             </div>
         </div>
         @if (filled($fileStorage->variable_fs_path))
-            <x-callout type="warning" title="Saved host path">
-                This storage keeps its saved host path, so its data does not move. The variable in the Compose file
-                gives <span class="font-mono">{{ $fileStorage->variable_fs_path }}</span>.
+            @php($newHostPath = $fileStorage->variableHostPath())
+            <x-callout type="warning" title="Kept host path">
+                This storage keeps the host path <span class="font-mono">{{ $fileStorage->fs_path }}</span>, so its
+                data does not move. Its Compose source <span class="font-mono">{{ $fileStorage->variable_fs_path }}</span>
+                @if ($newHostPath)
+                    now gives <span class="font-mono">{{ $newHostPath }}</span>.
+                @else
+                    can give another path, which Docker Compose resolves at the next deployment.
+                @endif
                 @can('update', $resource)
                     <div class="pt-2">
-                        <x-modal-confirmation title="Use the Variable Path?" buttonTitle="Use the variable path"
+                        <x-modal-confirmation title="Use the New Path?" buttonTitle="Use the new path"
                             submitAction="useVariablePath" :confirmWithText="false" :confirmWithPassword="false"
-                            warningMessage="The data stays at the saved host path. Coolify does not copy or delete it."
+                            warningMessage="Coolify does not copy, move, or delete the data at the old path."
                             :actions="[
-                                'From the next deployment, the storage mounts ' . $fileStorage->variable_fs_path . '.',
-                                'Coolify does not move the data from ' . $fileStorage->fs_path . '. Copy it yourself if you need it.',
-                            ]" step2ButtonText="Use the variable path" />
+                                'From the next deployment, the storage mounts ' . ($newHostPath ?? $fileStorage->variable_fs_path) . '.',
+                                'The data stays at ' . $fileStorage->fs_path . '. Copy it to the new path before you deploy if you need it.',
+                            ]" step2ButtonText="Use the new path" />
                     </div>
                 @endcan
             </x-callout>
