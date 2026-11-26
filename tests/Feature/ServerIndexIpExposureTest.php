@@ -39,3 +39,22 @@ test('server index does not expose server IP addresses', function () {
         ->assertSee('production-server')
         ->assertDontSee('203.0.113.45');
 });
+
+test('server index loads the address of a team server on demand', function () {
+    Livewire::test(ServerIndex::class)
+        ->call('loadServerAddress', $this->server->uuid)
+        ->assertReturned('203.0.113.45');
+});
+
+test('server index does not load the address of another team server', function () {
+    $otherTeam = Team::factory()->create();
+    $otherServer = Server::factory()->create([
+        'ip' => '198.51.100.77',
+        'team_id' => $otherTeam->id,
+        'private_key_id' => PrivateKey::factory()->create(['team_id' => $otherTeam->id])->id,
+    ]);
+
+    Livewire::test(ServerIndex::class)
+        ->call('loadServerAddress', $otherServer->uuid)
+        ->assertReturned(null);
+});
