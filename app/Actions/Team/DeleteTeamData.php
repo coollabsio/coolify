@@ -22,6 +22,7 @@ use App\Models\LocalFileVolume;
 use App\Models\LocalPersistentVolume;
 use App\Models\ManagedDnsRecord;
 use App\Models\ManagedDnsRecordReference;
+use App\Models\NtfyNotificationSettings;
 use App\Models\Project;
 use App\Models\PushoverNotificationSettings;
 use App\Models\ScheduledDatabaseBackup;
@@ -69,6 +70,7 @@ class DeleteTeamData
         TelegramNotificationSettings::class,
         PushoverNotificationSettings::class,
         WebhookNotificationSettings::class,
+        NtfyNotificationSettings::class,
     ];
 
     /**

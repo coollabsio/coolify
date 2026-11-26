@@ -13,6 +13,7 @@ use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -215,6 +216,8 @@ class GlobalSearch extends Component
             'new mongodb' => 'mongodb',
             'new mongo' => 'mongodb',
             'new clickhouse' => 'clickhouse',
+            'new influxdb' => 'influxdb',
+            'new influx' => 'influxdb',
         ];
 
         foreach ($resourceMap as $command => $type) {
@@ -254,7 +257,7 @@ class GlobalSearch extends Component
             'dockerfile', 'docker-compose-empty', 'docker-image',
             // Databases
             'postgresql', 'mysql', 'mariadb', 'redis', 'keydb',
-            'dragonfly', 'mongodb', 'clickhouse', 'sqlite',
+            'dragonfly', 'mongodb', 'clickhouse', 'influxdb', 'sqlite',
         ]) || str_starts_with($type, 'one-click-service-')) {
             return $user->can('createAnyResource');
         }
@@ -547,6 +550,27 @@ class GlobalSearch extends Component
                 })
         );
 
+        // InfluxDB
+        $databases = $databases->merge(
+            StandaloneInfluxdb::ownedByCurrentTeam()
+                ->with(['environment.project'])
+                ->get()
+                ->map(function ($db) {
+                    return [
+                        'id' => $db->id,
+                        'name' => $db->name,
+                        'type' => 'database',
+                        'subtype' => 'influxdb',
+                        'uuid' => $db->uuid,
+                        'description' => $db->description,
+                        'link' => $db->link(),
+                        'project' => $db->environment->project->name ?? null,
+                        'environment' => $db->environment->name ?? null,
+                        'search_text' => strtolower($db->name.' '.$db->uuid.' influxdb '.$db->description.' database databases db'),
+                    ];
+                })
+        );
+
         // SQLite
         $databases = $databases->merge(
             StandaloneSqlite::ownedByCurrentTeam()
@@ -783,7 +807,7 @@ class GlobalSearch extends Component
                 'type' => 'navigation',
                 'description' => 'Configure email, Discord, Telegram notifications',
                 'link' => route('notifications.email'),
-                'search_text' => 'notifications alerts email discord telegram slack pushover',
+                'search_text' => 'notifications alerts email discord telegram slack pushover ntfy',
             ],
             [
                 'name' => 'Analytics',
@@ -896,6 +920,13 @@ class GlobalSearch extends Component
                 'description' => 'Configure Pushover notifications',
                 'link' => route('notifications.pushover'),
                 'search_text' => 'notifications alerts pushover',
+            ],
+            [
+                'name' => 'Ntfy Notifications',
+                'type' => 'navigation',
+                'description' => 'Configure Ntfy notifications',
+                'link' => route('notifications.ntfy'),
+                'search_text' => 'notifications alerts ntfy push',
             ],
             [
                 'name' => 'Webhook Notifications',
@@ -1394,6 +1425,16 @@ class GlobalSearch extends Component
                 'type' => 'clickhouse',
                 'category' => 'Databases',
                 'logo' => 'svgs/clickhouse-icon.svg',
+                'resourceType' => 'database',
+            ]);
+
+            $items->push([
+                'name' => 'InfluxDB',
+                'description' => 'Time series database for metrics and events',
+                'quickcommand' => '(type: new influxdb)',
+                'type' => 'influxdb',
+                'category' => 'Databases',
+                'logo' => 'svgs/resources/influxdb.svg',
                 'resourceType' => 'database',
             ]);
 

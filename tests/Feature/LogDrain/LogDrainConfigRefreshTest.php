@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Server\StartLogDrain;
+use App\Enums\LogDrainType;
 use App\Jobs\PushServerUpdateJob;
 use App\Jobs\ServerCheckJob;
 use App\Models\InstanceSettings;
@@ -33,12 +34,11 @@ beforeEach(function () {
         'name' => 'log-drain-server',
         'private_key_id' => PrivateKey::factory()->create(['team_id' => $this->team->id])->id,
     ]);
-    $this->server->settings()->update([
+    $this->server->settings->update([
         'is_reachable' => true,
         'is_usable' => true,
-        'is_logdrain_axiom_enabled' => true,
-        'logdrain_axiom_dataset_name' => 'dataset',
-        'logdrain_axiom_api_key' => 'key',
+        'logdrain_type' => LogDrainType::Axiom,
+        'logdrain_config' => ['axiom' => ['dataset_name' => 'dataset', 'api_key' => 'key']],
     ]);
 });
 
@@ -128,9 +128,8 @@ it('labels the log drain container with the current configuration version', func
 
 it('mounts the user files directory read-only, so that a custom drain can read a credentials file', function () {
     $this->server->settings->update([
-        'is_logdrain_axiom_enabled' => false,
-        'is_logdrain_custom_enabled' => true,
-        'logdrain_custom_config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stackdriver\n    Match *\n    google_service_credentials /files/gcp.json\n",
+        'logdrain_type' => LogDrainType::Custom,
+        'logdrain_config' => ['custom' => ['config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stackdriver\n    Match *\n    google_service_credentials /files/gcp.json\n"]],
     ]);
     $scripts = startLogDrainScripts($this->server);
     $compose = Yaml::parse(generatedLogDrainFile($scripts, 'docker-compose.yml'));
@@ -156,9 +155,8 @@ it('pulls the new image before it removes the running log drain', function () {
 
 it('keeps the running log drain when the custom config is not allowed', function () {
     $this->server->settings->update([
-        'is_logdrain_axiom_enabled' => false,
-        'is_logdrain_custom_enabled' => true,
-        'logdrain_custom_config' => "[OUTPUT]\n    Name exec\n",
+        'logdrain_type' => LogDrainType::Custom,
+        'logdrain_config' => ['custom' => ['config' => "[OUTPUT]\n    Name exec\n"]],
     ]);
 
     $scripts = new Collection;
@@ -178,9 +176,9 @@ it('keeps the running log drain when the custom config is not allowed', function
  */
 it('changes the configuration version when the generated files change', function () {
     $hashes = collect([
-        'newrelic' => ['is_logdrain_axiom_enabled' => false, 'is_logdrain_newrelic_enabled' => true, 'logdrain_newrelic_license_key' => 'key', 'logdrain_newrelic_base_uri' => 'https://log-api.newrelic.com/log/v1'],
+        'newrelic' => ['logdrain_type' => LogDrainType::NewRelic, 'logdrain_config' => ['newrelic' => ['license_key' => 'key', 'base_uri' => 'https://log-api.newrelic.com/log/v1']]],
         'axiom' => [],
-        'custom' => ['is_logdrain_axiom_enabled' => false, 'is_logdrain_custom_enabled' => true, 'logdrain_custom_config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout\n", 'logdrain_custom_config_parser' => "[PARSER]\n    Name p\n"],
+        'custom' => ['logdrain_type' => LogDrainType::Custom, 'logdrain_config' => ['custom' => ['config' => "[INPUT]\n    Name forward\n[OUTPUT]\n    Name stdout\n", 'parser_config' => "[PARSER]\n    Name p\n"]]],
     ])->map(function (array $settings) {
         $this->server->settings->update($settings);
         $scripts = startLogDrainScripts($this->server);
@@ -191,5 +189,5 @@ it('changes the configuration version when the generated files change', function
     });
 
     expect([StartLogDrain::CONFIG_VERSION, hash('sha256', $hashes->implode("\0"))])
-        ->toBe(['4', '9d8dab1d13bd0a54ccaf64e3407500f1ba2036e7e85e366034b5ae934389272e']);
+        ->toBe(['5', 'e8cd7e814c93e57c57614e47f002acb628cb40fb482b68c6f2977a5c080b21a2']);
 });

@@ -2,6 +2,7 @@
 
 use App\Livewire\Notifications\Discord;
 use App\Livewire\Notifications\Email;
+use App\Livewire\Notifications\Ntfy;
 use App\Livewire\Notifications\Pushover;
 use App\Livewire\Notifications\Slack;
 use App\Livewire\Notifications\Telegram;
@@ -90,6 +91,7 @@ it('keeps notification providers disabled when enable validation fails', functio
     'slack' => [Slack::class, 'toggleSlackEnabled', 'slackEnabled', 'slackWebhookUrl', 'slackNotificationSettings', 'slack_enabled'],
     'telegram' => [Telegram::class, 'toggleTelegramEnabled', 'telegramEnabled', 'telegramToken', 'telegramNotificationSettings', 'telegram_enabled'],
     'pushover' => [Pushover::class, 'togglePushoverEnabled', 'pushoverEnabled', 'pushoverUserKey', 'pushoverNotificationSettings', 'pushover_enabled'],
+    'ntfy' => [Ntfy::class, 'toggleNtfyEnabled', 'ntfyEnabled', 'ntfyUrl', 'ntfyNotificationSettings', 'ntfy_enabled'],
     'webhook' => [Webhook::class, 'toggleWebhookEnabled', 'webhookEnabled', 'webhookUrl', 'webhookNotificationSettings', 'webhook_enabled'],
 ]);
 
@@ -117,6 +119,7 @@ it('reverts a notification provider toggle to the saved value when enabling fail
     'slack' => [Slack::class, 'instantSaveSlackEnabled', 'slackEnabled', 'slackNotificationSettings', 'slack_enabled'],
     'telegram' => [Telegram::class, 'instantSaveTelegramEnabled', 'telegramEnabled', 'telegramNotificationSettings', 'telegram_enabled'],
     'pushover' => [Pushover::class, 'instantSavePushoverEnabled', 'pushoverEnabled', 'pushoverNotificationSettings', 'pushover_enabled'],
+    'ntfy' => [Ntfy::class, 'instantSaveNtfyEnabled', 'ntfyEnabled', 'ntfyNotificationSettings', 'ntfy_enabled'],
     'webhook' => [Webhook::class, 'instantSaveWebhookEnabled', 'webhookEnabled', 'webhookNotificationSettings', 'webhook_enabled'],
 ]);
 
@@ -138,6 +141,7 @@ it('reverts a notification provider toggle to the saved value when disabling fai
     'slack' => [Slack::class, 'instantSaveSlackEnabled', 'slackEnabled', 'slackWebhookUrl', 'slackNotificationSettings', ['slack_enabled' => true, 'slack_webhook_url' => 'https://hooks.slack.com/services/T/B/C']],
     'telegram' => [Telegram::class, 'instantSaveTelegramEnabled', 'telegramEnabled', 'telegramToken', 'telegramNotificationSettings', ['telegram_enabled' => true, 'telegram_token' => '123:abc', 'telegram_chat_id' => '42']],
     'pushover' => [Pushover::class, 'instantSavePushoverEnabled', 'pushoverEnabled', 'pushoverUserKey', 'pushoverNotificationSettings', ['pushover_enabled' => true, 'pushover_user_key' => 'user', 'pushover_api_token' => 'token']],
+    'ntfy' => [Ntfy::class, 'instantSaveNtfyEnabled', 'ntfyEnabled', 'ntfyUrl', 'ntfyNotificationSettings', ['ntfy_enabled' => true, 'ntfy_url' => 'https://ntfy.sh', 'ntfy_topic' => 'coolify-alerts']],
     'webhook' => [Webhook::class, 'instantSaveWebhookEnabled', 'webhookEnabled', 'webhookUrl', 'webhookNotificationSettings', ['webhook_enabled' => true, 'webhook_url' => 'https://hooks.example.com/coolify']],
 ]);
 
@@ -154,6 +158,28 @@ it('reverts a notification event toggle to the saved value when saving fails', f
 })->with([
     'discord' => [Discord::class, 'discordWebhookUrl', 'deploymentSuccessDiscordNotifications', 'discordNotificationSettings', 'deployment_success_discord_notifications'],
     'slack' => [Slack::class, 'slackWebhookUrl', 'deploymentSuccessSlackNotifications', 'slackNotificationSettings', 'deployment_success_slack_notifications'],
+    'ntfy' => [Ntfy::class, 'ntfyUrl', 'deploymentSuccessNtfyNotifications', 'ntfyNotificationSettings', 'deployment_success_ntfy_notifications'],
+]);
+
+it('turns the automatic security updates event off and on for every channel', function (string $component, string $channel) {
+    [, $team] = actingAsEnableActionOwner();
+    $property = 'serverAutoUpdate'.ucfirst($channel).'Notifications';
+    $column = "server_auto_update_{$channel}_notifications";
+    $settings = $team->{$channel.'NotificationSettings'};
+    expect((bool) $settings->{$column})->toBeTrue();
+
+    $page = Livewire::test($component)->call('toggleEvent', $property)->assertSet($property, false);
+    expect((bool) $settings->fresh()->{$column})->toBeFalse();
+
+    $page->call('toggleEvent', $property)->assertSet($property, true);
+    expect((bool) $settings->fresh()->{$column})->toBeTrue();
+})->with([
+    'email' => [Email::class, 'email'],
+    'discord' => [Discord::class, 'discord'],
+    'slack' => [Slack::class, 'slack'],
+    'telegram' => [Telegram::class, 'telegram'],
+    'pushover' => [Pushover::class, 'pushover'],
+    'webhook' => [Webhook::class, 'webhook'],
 ]);
 
 it('reverts the discord mention setting to the saved value when saving fails', function () {

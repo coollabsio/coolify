@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Database\StartClickhouse;
+use App\Actions\Database\StartInfluxdb;
 use App\Actions\Database\StartMariadb;
 use App\Actions\Database\StartMysql;
 use App\Actions\Database\StartPostgresql;
@@ -94,6 +95,19 @@ test('clickhouse healthcheck passes the user and password as exec-form arguments
 
     expect(startedDatabaseHealthcheck(StartClickhouse::class, $database))
         ->toBe(['CMD', 'clickhouse-client', '--user', HEALTHCHECK_INJECTION_PAYLOAD, '--password', HEALTHCHECK_INJECTION_PAYLOAD.'pw', '--query', 'SELECT 1']);
+});
+
+test('influxdb healthcheck pings the local http port without user fields', function () {
+    $database = create_standalone_influxdb($this->environment->id, $this->destination, [
+        'influxdb_admin_user' => HEALTHCHECK_INJECTION_PAYLOAD,
+        'influxdb_admin_password' => HEALTHCHECK_INJECTION_PAYLOAD.'pw',
+        'influxdb_admin_token' => HEALTHCHECK_INJECTION_PAYLOAD.'token',
+        'influxdb_org' => HEALTHCHECK_INJECTION_PAYLOAD.'org',
+        'influxdb_bucket' => HEALTHCHECK_INJECTION_PAYLOAD.'bucket',
+    ]);
+
+    expect(startedDatabaseHealthcheck(StartInfluxdb::class, $database))
+        ->toBe(['CMD', 'influx', 'ping', '--host', 'http://127.0.0.1:8086']);
 });
 
 test('mysql healthcheck passes the root password as an exec-form argument', function () {

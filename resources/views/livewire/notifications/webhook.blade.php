@@ -24,6 +24,15 @@
                             <x-forms.input disabled label="Webhook URL" value="Hidden (only admins can view)" />
                         @endcan
                     </div>
+                    <div class="lg:col-span-2">
+                        @can('update', $settings)
+                            <x-forms.input type="password" id="webhookAuthorizationHeader" label="Authorization Header"
+                                placeholder="Bearer your-token"
+                                helper="Optional. Coolify sends this value in the Authorization header of each request, for example: Bearer your-token." />
+                        @else
+                            <x-forms.input disabled label="Authorization Header" value="Hidden (only admins can view)" />
+                        @endcan
+                    </div>
                 </div>
             </x-application.settings-section>
         </form>

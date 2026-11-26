@@ -91,6 +91,7 @@ function resource_logo(Model $resource): ?array
 
     if ($resource instanceof Application) {
         $logo = match (true) {
+            $resource->is_archive_source => $resourceLogo('static-archive'),
             $resource->build_pack === 'dockerimage' => $resourceLogo('docker-image'),
             $resource->build_pack === 'dockerfile' => $resourceLogo('dockerfile'),
             $resource->build_pack === 'dockercompose' => $resourceLogo('docker-compose'),
@@ -117,6 +118,7 @@ function resource_logo(Model $resource): ?array
         'keydb' => $resourceLogo('keydb', true),
         'dragonfly' => $resourceLogo('dragonfly', true),
         'clickhouse' => $resourceLogo('clickhouse'),
+        'influxdb' => $resourceLogo('influxdb'),
         'sqlite' => $resourceLogo('sqlite'),
         default => null,
     };
@@ -693,10 +695,13 @@ function clone_service(Service $source, StandaloneDocker|SwarmDocker $destinatio
     $teamId = $source->team()->id;
     $uuid = $overrides['uuid'] ?? new_public_id();
 
+    // A clone is not managed by coolify.json: config_key is unique per environment.
     $newService = $source->replicate([
         'id',
         'created_at',
         'updated_at',
+        'config_key',
+        'config_meta',
     ])->fill([
         'name' => clone_resource_name($source->name, $uuid),
         ...$overrides,
@@ -728,6 +733,7 @@ function clone_service(Service $source, StandaloneDocker|SwarmDocker $destinatio
             'id',
             'created_at',
             'updated_at',
+            'config_meta',
         ])->fill([
             'resourceable_id' => $newService->id,
             'resourceable_type' => $newService->getMorphClass(),

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Application;
 
+use App\Actions\Application\ApproveForkPreviewCommit;
 use App\Actions\Docker\GetContainersStatus;
 use App\Events\ServiceStatusChanged;
 use App\Jobs\DeleteResourceJob;
@@ -25,6 +26,10 @@ class Previews extends Component
     public bool $isPreviewDeploymentsEnabled = false;
 
     public bool $isPrDeploymentsPublicEnabled = false;
+
+    public bool $isPrDeploymentsPublicApprovalRequired = true;
+
+    public bool $useProductionValuesInPreviews = true;
 
     public string $deployment_uuid;
 
@@ -58,6 +63,8 @@ class Previews extends Component
     {
         $this->isPreviewDeploymentsEnabled = $this->application->settings->is_preview_deployments_enabled;
         $this->isPrDeploymentsPublicEnabled = $this->application->settings->is_pr_deployments_public_enabled ?? false;
+        $this->isPrDeploymentsPublicApprovalRequired = $this->application->settings->is_pr_deployments_public_approval_required ?? true;
+        $this->useProductionValuesInPreviews = $this->application->settings->use_production_values_in_previews ?? true;
         $this->pull_requests = collect();
         $this->parameters = get_route_parameters();
         $this->syncDockerTags();
@@ -69,10 +76,27 @@ class Previews extends Component
         $this->validate([
             'isPreviewDeploymentsEnabled' => 'boolean',
             'isPrDeploymentsPublicEnabled' => 'boolean',
+            'useProductionValuesInPreviews' => 'boolean',
         ]);
 
         $this->application->settings->is_preview_deployments_enabled = $this->isPreviewDeploymentsEnabled;
         $this->application->settings->is_pr_deployments_public_enabled = $this->isPrDeploymentsPublicEnabled;
+        $this->application->settings->use_production_values_in_previews = $this->useProductionValuesInPreviews;
+        $this->saveApplicationSettingsWithAudit($this->application);
+
+        $this->dispatch('success', 'Settings saved.');
+        $this->dispatch('configurationChanged');
+    }
+
+    /**
+     * Saves only the fork approval policy, so that a stale value in another save cannot turn approval off.
+     */
+    public function saveForkApprovalSetting(): void
+    {
+        $this->authorize('update', $this->application);
+        $this->validate(['isPrDeploymentsPublicApprovalRequired' => 'boolean']);
+
+        $this->application->settings->is_pr_deployments_public_approval_required = $this->isPrDeploymentsPublicApprovalRequired;
         $this->saveApplicationSettingsWithAudit($this->application);
 
         $this->dispatch('success', 'Settings saved.');
@@ -302,6 +326,39 @@ class Previews extends Component
             'pull_request_html_url' => ['nullable', 'url:http,https', 'max:2048'],
             'docker_registry_image_tag' => ValidationPatterns::dockerImageTagRules(),
         ])->validate();
+    }
+
+    /**
+     * An admin approves the reviewed commit of a fork pull request and deploys it.
+     */
+    public function approveForkCommit(int $previewId, string $commit): void
+    {
+        $preview = $this->application->previews()->whereKey($previewId)->firstOrFail();
+        $this->authorize('approve', $preview);
+
+        try {
+            $result = ApproveForkPreviewCommit::run($preview, $commit);
+            $this->application->refresh();
+            if ($result['status'] === 'queue_full') {
+                $this->dispatch('error', 'Deployment queue full', $result['message']);
+
+                return;
+            }
+            if ($result['status'] === 'skipped') {
+                $this->dispatch('success', 'Deployment skipped', $result['message']);
+
+                return;
+            }
+
+            $this->redirectRoute('project.application.deployment.show', [
+                'project_uuid' => $this->application->environment->project->uuid,
+                'application_uuid' => $this->application->uuid,
+                'deployment_uuid' => $result['deployment_uuid'],
+                'environment_uuid' => $this->application->environment->uuid,
+            ]);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
     private function saveDockerTagWithAudit(ApplicationPreview $preview, string $dockerRegistryImageTag): void

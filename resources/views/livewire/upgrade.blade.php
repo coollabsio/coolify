@@ -152,6 +152,17 @@
                                         <p>Any deployments running during the update process will fail.</p>
                                     </x-callout>
 
+                                    @unless (in_array($updateChannel, ['nightly', 'custom'], true))
+                                        <p class="text-[13px] leading-5 text-neutral-700 dark:text-fg">
+                                            Read the
+                                            <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 hover:decoration-coollabs dark:text-brand-light dark:decoration-brand-light/30 dark:hover:decoration-brand-light"
+                                                href="https://github.com/coollabsio/coolify/releases/tag/v{{ $latestVersion }}"
+                                                target="_blank" rel="noopener noreferrer">release notes of
+                                                {{ $latestVersion }}</a>
+                                            before you upgrade.
+                                        </p>
+                                    @endunless
+
                                     <p class="text-[12px] leading-5" style="color: var(--coollabs-subtle)">
                                         If something goes wrong, check the
                                         <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 hover:decoration-coollabs dark:text-brand-light dark:decoration-brand-light/30 dark:hover:decoration-brand-light"

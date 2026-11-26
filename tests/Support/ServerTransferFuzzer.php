@@ -29,7 +29,10 @@ final class ServerTransferFuzzer
                 || (in_array($morph, ServerTransferSnapshot::MORPHS, true) && Schema::hasColumn($model->getTable(), "{$morph}_type"))) {
                 continue;
             }
-            $value = self::value($name, strtolower($column['type_name']), (string) ($casts[$name] ?? ''), $column['default'], $model->getAttributes()[$name] ?? null);
+            // config_key is unique per environment, so each record gets its own.
+            $value = $name === 'config_key'
+                ? 'fuzz-key-'.$model->getKey()
+                : self::value($name, strtolower($column['type_name']), (string) ($casts[$name] ?? ''), $column['default'], $model->getAttributes()[$name] ?? null);
             // Text must fit the column, such as character varying(10).
             $fuzzed[$name] = is_string($value) && preg_match('/char[a-z ]*\((\d+)\)/', (string) $column['type'], $length) ? substr($value, 0, (int) $length[1]) : $value;
         }

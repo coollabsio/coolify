@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\PersonalAccessToken;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -79,6 +80,21 @@ class ApiTokenExpiringNotification extends CustomEmailNotification
             title: 'API token expiring soon',
             level: 'warning',
             message: $message,
+            buttons: [
+                [
+                    'text' => 'Manage API tokens',
+                    'url' => $this->manageUrl,
+                ],
+            ],
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
+            title: 'API token expiring soon',
+            level: 'warning',
+            message: "API token {$this->tokenName} expires on {$this->expiresAt}.\n\nAction Required: Rotate this token before it expires to avoid API outages.",
             buttons: [
                 [
                     'text' => 'Manage API tokens',

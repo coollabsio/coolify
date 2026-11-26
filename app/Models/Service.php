@@ -15,7 +15,9 @@ use App\Traits\HasSafeStringAttribute;
 use App\Traits\HasSecretManager;
 use App\Traits\HasStars;
 use App\Traits\ScopedByAccessGrants;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -61,6 +63,8 @@ class Service extends BaseModel
         'docker_compose',
         'connect_to_docker_network',
         'service_type',
+        'template_reference_hash',
+        'template_dismissed_hash',
         'config_hash',
         'compose_parsing_version',
         'is_container_label_escape_enabled',
@@ -72,6 +76,11 @@ class Service extends BaseModel
     ];
 
     protected $appends = ['server_status', 'status'];
+
+    /**
+     * The status that admitted the service to a status-filtered listing (see pageByStatus()).
+     */
+    private ?string $listedStatus = null;
 
     protected $casts = [
         'include_coolify_default_variables' => 'boolean',
@@ -97,6 +106,7 @@ class Service extends BaseModel
     protected function casts(): array
     {
         return [
+            'config_meta' => 'array',
             'is_maintenance_enabled' => 'boolean',
         ];
     }
@@ -140,6 +150,12 @@ class Service extends BaseModel
 
         $newConfigHash = $images.$domains.$images.$storages.$noindexDomains.json_encode($domainPortOverrides);
         $newConfigHash .= json_encode($this->environment_variables()->get('value')->makeVisible('value')->sort());
+        // Only added when a variable is scoped, so the hash of an unscoped service stays the same.
+        $scopes = composeEnvironmentVariableScopes($this->environment_variables()->whereNotNull('compose_services')->get());
+        if ($scopes !== []) {
+            ksort($scopes);
+            $newConfigHash .= json_encode($scopes);
+        }
         $newConfigHash = md5($newConfigHash);
         $oldConfigHash = data_get($this, 'config_hash');
         if ($oldConfigHash === null) {
@@ -214,6 +230,108 @@ class Service extends BaseModel
      * Get query builder for services owned by current team.
      * If you need all services without further query chaining, use ownedByCurrentTeamCached() instead.
      */
+    /**
+     * Filter the services of a team (API and MCP listings).
+     * A project, environment, or server UUID that the team does not own matches no service.
+     * The name is a case-insensitive substring match. Status is computed, so use pageByStatus() for it.
+     *
+     * @param  array{project_uuid?: ?string, environment_uuid?: ?string, server_uuid?: ?string, name?: ?string}  $filters
+     */
+    public function scopeApplyListFilters(Builder $query, int $teamId, array $filters): Builder
+    {
+        $projectUuid = $filters['project_uuid'] ?? null;
+        $environmentUuid = $filters['environment_uuid'] ?? null;
+        $serverUuid = $filters['server_uuid'] ?? null;
+        $name = $filters['name'] ?? null;
+
+        return $query
+            ->when($projectUuid !== null, function (Builder $query) use ($projectUuid, $teamId) {
+                $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
+                if (! $project) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $query->whereHas('environment', fn (Builder $q) => $q->where('project_id', $project->id));
+            })
+            ->when($environmentUuid !== null, function (Builder $query) use ($environmentUuid, $teamId) {
+                $environment = Environment::ownedByCurrentTeamAPI($teamId)->where('uuid', $environmentUuid)->first();
+                if (! $environment) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $query->where('environment_id', $environment->id);
+            })
+            ->when($serverUuid !== null, function (Builder $query) use ($serverUuid, $teamId) {
+                $server = Server::whereTeamId($teamId)->where('uuid', $serverUuid)->first();
+                if (! $server) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $standaloneDockerIds = $server->standaloneDockers()->pluck('id');
+                $swarmDockerIds = $server->swarmDockers()->pluck('id');
+                $query->where(function (Builder $q) use ($server, $standaloneDockerIds, $swarmDockerIds) {
+                    $q->where('server_id', $server->id)
+                        ->orWhere(fn (Builder $inner) => $inner->where('destination_type', StandaloneDocker::class)->whereIn('destination_id', $standaloneDockerIds))
+                        ->orWhere(fn (Builder $inner) => $inner->where('destination_type', SwarmDocker::class)->whereIn('destination_id', $swarmDockerIds));
+                });
+            })
+            ->when($name !== null, fn (Builder $query) => apiWhereContains($query, 'name', $name));
+    }
+
+    /**
+     * Filter services by their computed status (case-insensitive substring), ordered by name and id.
+     * Reads the ordered ids in one query, so a rename or a new service during the scan cannot shift the set.
+     * Then loads the services in chunks of these ids, so large teams never hydrate every service at once.
+     * Each returned service keeps the status that admitted it, so a start activity that ends
+     * during the request cannot change the status in the response.
+     *
+     * @return array{0: int, 1: EloquentCollection<int, Service>} total matches and the services of the page
+     */
+    public static function pageByStatus(Builder $query, string $status, int $offset = 0, ?int $limit = null): array
+    {
+        $statusNeedle = strtolower(trim($status));
+        $matched = new EloquentCollection;
+        $total = 0;
+
+        $orderedIds = (clone $query)->reorder()->orderBy('name')->orderBy('id')->pluck('id');
+
+        foreach ($orderedIds->chunk(100) as $idChunk) {
+            $services = (clone $query)
+                ->with([
+                    'applications:id,service_id,status,exclude_from_status,is_removed_from_compose',
+                    'databases:id,service_id,status,exclude_from_status,is_removed_from_compose',
+                ])
+                ->whereIn('id', $idChunk)
+                ->get()
+                ->keyBy('id');
+            $startingUuids = ResourceStartActivity::runningTypeUuids($services->pluck('uuid')->all());
+
+            foreach ($idChunk as $id) {
+                $service = $services->get($id);
+                $serviceStatus = match (true) {
+                    $service === null => null,
+                    in_array($service->uuid, $startingUuids, true) => 'starting:unhealthy',
+                    default => $service->containerStatus(),
+                };
+                if (! $service || ! str_contains(strtolower((string) $serviceStatus), $statusNeedle)) {
+                    continue;
+                }
+
+                if ($total >= $offset && ($limit === null || $total < $offset + $limit)) {
+                    $service->listedStatus = $serviceStatus;
+                    $matched->push($service);
+                }
+
+                $total++;
+            }
+        }
+
+        return [$total, $matched->values()];
+    }
+
     public static function ownedByCurrentTeam()
     {
         return Service::whereRelation('environment.project.team', 'id', currentTeam()->id)->orderBy('name');
@@ -262,6 +380,10 @@ class Service extends BaseModel
      */
     public function getStatusAttribute()
     {
+        if ($this->listedStatus !== null) {
+            return $this->listedStatus;
+        }
+
         if ($this->isStarting()) {
             return 'starting:unhealthy';
         }
@@ -320,8 +442,8 @@ class Service extends BaseModel
      * This helper method consolidates status aggregation logic using ContainerStatusAggregator.
      * It processes container status strings stored in the database (not live Docker data).
      *
-     * @param  \Illuminate\Database\Eloquent\Collection  $applications  Collection of Application models
-     * @param  \Illuminate\Database\Eloquent\Collection  $databases  Collection of Database models
+     * @param  EloquentCollection  $applications  Collection of Application models
+     * @param  EloquentCollection  $databases  Collection of Database models
      * @param  bool  $excludedOnly  If true, only process excluded containers; if false, only process non-excluded
      * @return array{0: string|null, 1: string|null, 2?: bool} [status, health, hasNonExcluded (only when excludedOnly=false)]
      */
@@ -1579,7 +1701,7 @@ class Service extends BaseModel
      */
     public function maintenanceDomains(): Collection
     {
-        return $this->applications()->get()
+        return $this->applications
             ->flatMap(fn (ServiceApplication $application) => collect($application->fqdns)
                 ->map(fn ($url) => trim((string) $url))
                 ->filter()
@@ -1656,6 +1778,12 @@ class Service extends BaseModel
         return $this->redact_all_env_values_in_logs ?? true;
     }
 
+    /** Composes before a template change, newest first. */
+    public function templateRevisions(): HasMany
+    {
+        return $this->hasMany(ServiceTemplateRevision::class)->latest('id');
+    }
+
     public function environment_variables()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable');
@@ -1709,11 +1837,12 @@ class Service extends BaseModel
         $envs = collect([]);
 
         // Generate SERVICE_NAME_* environment variables from docker-compose services
+        $composeServiceNames = [];
         if ($this->docker_compose) {
             try {
                 $dockerCompose = parseDockerComposeYaml($this->docker_compose);
-                $services = data_get($dockerCompose, 'services', []);
-                foreach ($services as $serviceName => $_) {
+                $composeServiceNames = array_map('strval', array_keys(data_get($dockerCompose, 'services', [])));
+                foreach ($composeServiceNames as $serviceName) {
                     $envs->push('SERVICE_NAME_'.str($serviceName)->replace('-', '_')->replace('.', '_')->upper().'='.$serviceName);
                 }
             } catch (\Exception $e) {
@@ -1742,7 +1871,15 @@ class Service extends BaseModel
             $envs->push($this->composeEnvironmentFileLine($env));
         }
         instant_remote_write_file($this->server, $environmentFile, $envs->implode("\n"));
-        instant_remote_process(["mv {$environmentFile} $workdir/.env"], $this->server);
+        $moves = ["mv {$environmentFile} $workdir/.env"];
+
+        $scopes = composeEnvironmentVariableScopes($envs_from_coolify);
+        foreach ($composeServiceNames as $serviceName) {
+            $serviceEnvironmentFile = "$workdir/".new_public_id().'.env.tmp';
+            instant_remote_write_file($this->server, $serviceEnvironmentFile, composeEnvironmentLinesForService($envs, $scopes, $serviceName)->implode("\n"));
+            $moves[] = 'mv '.escapeshellarg($serviceEnvironmentFile).' '.escapeshellarg("$workdir/".composeServiceEnvironmentFile($serviceName));
+        }
+        instant_remote_process($moves, $this->server);
     }
 
     /**

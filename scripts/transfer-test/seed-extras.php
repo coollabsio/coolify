@@ -47,6 +47,7 @@ $record->addReference($app);
 
 // Secret manager link
 $quiet(SecretManagerLink::class, ['resourceable_type' => $app->getMorphClass(), 'resourceable_id' => $app->id, 'integration_token_id' => $infisical->id, 'settings' => ['project_id' => 'fake-project', 'environment' => 'prod', 'secret_path' => '/']]);
+$quiet(SecretManagerLink::class, ['resourceable_type' => $app->getMorphClass(), 'resourceable_id' => $app->id, 'name' => 'urls', 'integration_token_id' => $infisical->id, 'settings' => ['project_id' => 'fake-urls', 'environment' => 'prod', 'secret_path' => '/']]);
 
 // Server: Cloudflare tunnel token + custom proxy error page
 $server->settings->forceFill(['cloudflare_tunnel_integration_token_id' => $cloudflare->id, 'cloudflare_tunnel_id' => 'fake-tunnel', 'cloudflare_tunnel_account_id' => 'fake-account'])->saveQuietly();

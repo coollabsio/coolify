@@ -3,12 +3,14 @@ import { initializeCopyButtonComponent } from './copy-button.js';
 import { initializeNumberStepperComponent } from './number-stepper.js';
 import { initializeRuntimeLogsComponent } from './runtime-logs.js';
 import { initializeTerminalComponent } from './terminal.js';
+import { parseItermColors } from './iterm-colors.js';
 import './traffic-globe.js';
 import './traffic-table.js';
 import { registerLivewireRequestFailureHandler } from './livewire-request-failure.js';
 import { registerLivewireUpdateDedupe } from './livewire-update-dedupe.js';
 import { parseSubmitAction } from './modal-confirmation.js';
 import { dismissSecurityCallout, securityCallout } from './security-callout.js';
+import { initializeStarredMenu, starredMenuCommands } from './starred-menu.js';
 import { vulnerabilitySearchItem } from './vulnerability-search.js';
 
 // The canvases (Svelte, Svelte Flow) load only on pages that have one. After the
@@ -43,6 +45,8 @@ window.dismissSecurityCallout = dismissSecurityCallout;
 
 // Used by the log viewers to copy logs that a Livewire call still loads.
 window.copyTextToClipboard = copyTextToClipboard;
+// The Custom theme dialog (themeControls in layouts/base.blade.php) imports iTerm2 color files with it.
+window.parseItermColors = parseItermColors;
 
 document.addEventListener('livewire:init', () => {
     registerLivewireRequestFailureHandler(window.Livewire);
@@ -64,6 +68,7 @@ document.addEventListener('alpine:init', initializeTerminalComponent);
 document.addEventListener('alpine:init', initializeCopyButtonComponent);
 document.addEventListener('alpine:init', initializeNumberStepperComponent);
 document.addEventListener('alpine:init', initializeRuntimeLogsComponent);
+document.addEventListener('alpine:init', initializeStarredMenu);
 
 /**
  * Smooth-scroll a settings section into view, then flash its border for 500ms
@@ -233,7 +238,7 @@ window.currentPageSearchItems = function currentPageSearchItems() {
         items.push({ label, breadcrumb: 'Section', search_text: label + ' section', href: 'section-' + index, element: section });
     });
 
-    return items;
+    return [...items, ...starredMenuCommands()];
 };
 
 // When a settings sub-section link navigates across pages (href="route#section-id"),

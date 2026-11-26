@@ -24,7 +24,7 @@ class All extends Component
     /**
      * Editable form state keyed by storage id.
      *
-     * @var array<int|string, array{name: string, mountPath: string, isPreviewSuffixEnabled: bool, isReadOnly: bool, isShared: bool, canDeleteStale: bool, replacedExternalVolume: ?string, replacedHostPath: ?string, ignoresDriverOptions: bool, canDeleteToApplyDriverOptions: bool, usedByContainers: list<string>}>
+     * @var array<int|string, array{name: string, mountPath: string, savedName: string, savedMountPath: string, isPreviewSuffixEnabled: bool, isReadOnly: bool, isShared: bool, isExternal: bool, canDeleteStale: bool, replacedExternalVolume: ?string, replacedHostPath: ?string, ignoresDriverOptions: bool, canDeleteToApplyDriverOptions: bool, usedByContainers: list<string>}>
      */
     public array $forms = [];
 
@@ -93,25 +93,61 @@ class All extends Component
         $this->rebuildVolumeBackupMeta();
     }
 
-    public function submit(int $storageId, bool $renameConfirmed = false): void
+    /**
+     * Saves the name and mount path of one storage, or of every storage with unsaved changes when
+     * no storage is given (the unsaved changes bar). A rename stops the save until the user confirms it.
+     */
+    public function submit(?int $storageId = null, bool $renameConfirmed = false): void
     {
         $this->authorize('update', $this->resource);
+
+        $storageIds = $storageId !== null ? [$storageId] : $this->changedStorageIds();
+        foreach ($storageIds as $id) {
+            if (! $this->saveStorage($id, $renameConfirmed)) {
+                return;
+            }
+        }
+
+        if ($storageIds !== []) {
+            $this->dispatch('success', 'Storage updated successfully');
+        }
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function changedStorageIds(): array
+    {
+        return $this->resource->persistentStorages
+            ->filter(fn (LocalPersistentVolume $storage): bool => isset($this->forms[$storage->id])
+                && ! $this->forms[$storage->id]['isReadOnly']
+                && ($this->forms[$storage->id]['name'] !== $storage->name
+                    || $this->forms[$storage->id]['mountPath'] !== $storage->mount_path))
+            ->pluck('id')
+            ->all();
+    }
+
+    /**
+     * Returns false when the storage is not saved: it is read-only, or a rename waits for confirmation.
+     */
+    private function saveStorage(int $storageId, bool $renameConfirmed): bool
+    {
         $this->validateStorage($storageId);
 
         $storage = $this->findStorageOrFail($storageId);
         if ($storage->shouldBeReadOnlyInUI()) {
             $this->dispatch('error', 'This volume is read-only.');
 
-            return;
+            return false;
         }
 
         $form = $this->forms[$storageId];
-        $isRename = ! $storage->isSharedWithAnotherResource() && $form['name'] !== $storage->name;
+        $isRename = ! $storage->is_external && ! $storage->isSharedWithAnotherResource() && $form['name'] !== $storage->name;
         $rename = ['storageId' => $storageId, 'from' => $storage->name, 'to' => $form['name']];
         if ($isRename && ! ($renameConfirmed && $this->pendingRename === $rename)) {
             $this->pendingRename = $rename;
 
-            return;
+            return false;
         }
         $this->pendingRename = null;
 
@@ -119,15 +155,17 @@ class All extends Component
             $storage->name = $form['name'];
         }
         $storage->mount_path = $form['mountPath'];
-        $storage->is_preview_suffix_enabled = (bool) $form['isPreviewSuffixEnabled'];
         $changedFields = auditChangedFields($storage);
         $storage->save();
 
         if ($changedFields !== []) {
             $this->auditStorageChange($this->resource, 'updated', $storage, ['changed_fields' => $changedFields]);
         }
+        $this->forms[$storageId]['name'] = $storage->name;
+        $this->forms[$storageId]['savedName'] = $storage->name;
+        $this->forms[$storageId]['savedMountPath'] = $storage->mount_path;
 
-        $this->dispatch('success', 'Storage updated successfully');
+        return true;
     }
 
     public function cancelRename(int $storageId): void
@@ -138,9 +176,32 @@ class All extends Component
         $this->pendingRename = null;
     }
 
+    /**
+     * Saves only the PR suffix setting, so that unsaved name or mount path edits stay unsaved.
+     */
     public function instantSave(int $storageId): void
     {
-        $this->submit($storageId);
+        $this->authorize('update', $this->resource);
+        $this->validate([
+            "forms.{$storageId}.isPreviewSuffixEnabled" => 'required|boolean',
+        ]);
+
+        $storage = $this->findStorageOrFail($storageId);
+        if ($storage->shouldBeReadOnlyInUI()) {
+            $this->dispatch('error', 'This volume is read-only.');
+
+            return;
+        }
+
+        $storage->is_preview_suffix_enabled = (bool) $this->forms[$storageId]['isPreviewSuffixEnabled'];
+        $changedFields = auditChangedFields($storage);
+        $storage->save();
+
+        if ($changedFields !== []) {
+            $this->auditStorageChange($this->resource, 'updated', $storage, ['changed_fields' => $changedFields]);
+        }
+
+        $this->dispatch('success', 'Storage updated successfully');
     }
 
     /**
@@ -186,7 +247,7 @@ class All extends Component
             return false;
         }
 
-        $this->deleteDockerVolume = in_array('deleteDockerVolume', $selectedActions, true);
+        $this->deleteDockerVolume = ! $storage->is_external && in_array('deleteDockerVolume', $selectedActions, true);
         if ($this->deleteDockerVolume) {
             $server = $this->resource instanceof Application
                 ? $this->resource->destination->server
@@ -238,9 +299,12 @@ class All extends Component
             $forms[$storage->id] = [
                 'name' => $storage->name,
                 'mountPath' => $storage->mount_path,
+                'savedName' => $storage->name,
+                'savedMountPath' => $storage->mount_path,
                 'isPreviewSuffixEnabled' => (bool) ($storage->is_preview_suffix_enabled ?? true),
                 'isReadOnly' => $storage->shouldBeReadOnlyInUI() || ! $this->canUpdate,
                 'isShared' => $storage->isSharedWithAnotherResource(),
+                'isExternal' => $storage->is_external,
                 'canDeleteStale' => $this->canUpdate
                     && ($storage->isServiceResource() || $storage->isDockerComposeResource())
                     && ! $ignoresDriverOptions

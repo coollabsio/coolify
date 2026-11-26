@@ -5,6 +5,7 @@
         ['label' => 'Telegram', 'route' => 'notifications.telegram', 'brandIcon' => 'telegram'],
         ['label' => 'Slack', 'route' => 'notifications.slack', 'brandIcon' => 'slack'],
         ['label' => 'Pushover', 'route' => 'notifications.pushover', 'brandIcon' => 'pushover'],
+        ['label' => 'Ntfy', 'route' => 'notifications.ntfy', 'brandIcon' => 'ntfy-mono'],
         ['label' => 'Webhook', 'route' => 'notifications.webhook', 'icon' => 'destinations'],
     ];
 @endphp

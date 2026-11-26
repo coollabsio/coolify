@@ -8,6 +8,7 @@ use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Database\Eloquent\Model;
@@ -94,6 +95,15 @@ class BackupFailed extends CustomEmailNotification implements ThrottledNotificat
             title: 'Database backup failed',
             level: 'error',
             message: "Database backup for {$this->name} (db:{$this->database_name}) was FAILED<br/><br/><b>Frequency:</b> {$this->frequency}.<br/><b>Trigger:</b> {$this->trigger->label()}<br/><b>Reason:</b> {$this->output}",
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
+            title: 'Database backup failed',
+            level: 'error',
+            message: "Database backup for {$this->name} (db:{$this->database_name}) was FAILED\n\nFrequency: {$this->frequency} .\nReason: {$this->output}",
         );
     }
 

@@ -120,6 +120,19 @@ it('returns and changes the Syft and Grype time limits and the CPU limit', funct
     Queue::assertNothingPushed();
 });
 
+it('returns and changes the rescan days', function () {
+    $this->getJson("/api/v1/servers/{$this->server->uuid}/image-scanning", imageScanningApiToken($this->user, $this->team, ['read']))
+        ->assertOk()
+        ->assertJsonPath('image_rescan_days', 1);
+    app('auth')->forgetGuards();
+
+    $this->patchJson("/api/v1/servers/{$this->server->uuid}/image-scanning", ['image_rescan_days' => 7], imageScanningApiToken($this->user, $this->team, ['write']))
+        ->assertOk()
+        ->assertJsonPath('image_rescan_days', 7);
+
+    expect($this->server->settings->fresh()->image_rescan_days)->toBe(7);
+});
+
 it('refuses time and CPU limits that are not one of the options', function (array $body, string $field) {
     $this->patchJson("/api/v1/servers/{$this->server->uuid}/image-scanning", $body, imageScanningApiToken($this->user, $this->team, ['write']))
         ->assertStatus(422)
@@ -130,6 +143,7 @@ it('refuses time and CPU limits that are not one of the options', function (arra
     'syft time limit' => [['image_scan_syft_timeout' => 45], 'image_scan_syft_timeout'],
     'grype time limit' => [['image_scan_grype_timeout' => 7200], 'image_scan_grype_timeout'],
     'cpus' => [['image_scan_cpus' => 3], 'image_scan_cpus'],
+    'rescan days' => [['image_rescan_days' => 2], 'image_rescan_days'],
 ]);
 
 it('refuses memory and CPU limits above what the server has', function (array $body, string $field, string $message) {

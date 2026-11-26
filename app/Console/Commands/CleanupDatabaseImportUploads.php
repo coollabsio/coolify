@@ -3,6 +3,11 @@
 namespace App\Console\Commands;
 
 use App\Actions\Database\StartDatabaseImport;
+use App\Enums\ApplicationDeploymentStatus;
+use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
+use App\Support\DatabaseImport\DatabaseImportS3Upload;
+use App\Support\StaticSiteArchive;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -13,7 +18,7 @@ class CleanupDatabaseImportUploads extends Command
 
     protected $signature = 'cleanup:database-import-uploads';
 
-    protected $description = 'Delete staged API database import uploads that were not imported within a day';
+    protected $description = 'Delete staged database import uploads and static site archives (on the instance or in S3) that were not used within a day';
 
     /**
      * Uploads are staged at upload/imports/{team}/{database uuid}/{upload id}/restore. Starting an import
@@ -37,7 +42,52 @@ class CleanupDatabaseImportUploads extends Command
             $this->deleteIfEmpty($teamDirectory);
         }
 
+        // Browser uploads to S3: the marker is saved again when an import starts, so a day counts from that start.
+        foreach (DatabaseImportS3Upload::staleUploads($cutoff) as $upload) {
+            if ($this->discardUnlessImporting($upload)) {
+                $deleted++;
+            }
+        }
+
         $this->info("Deleted {$deleted} staged database import upload(s).");
+
+        // Static site archives are staged at upload/static-archives/{team}/{upload id}/archive, or in an S3 storage
+        // with the reference s3.json there. Publishing one moves it away.
+        $deletedArchives = 0;
+        foreach (Storage::directories('upload/static-archives') as $teamDirectory) {
+            foreach (Storage::directories($teamDirectory) as $uploadDirectory) {
+                if ($this->lastModified($uploadDirectory) < $cutoff) {
+                    StaticSiteArchive::deleteStagedUpload($uploadDirectory);
+                    $deletedArchives++;
+                }
+            }
+            $this->deleteIfEmpty($teamDirectory);
+        }
+        $this->info("Deleted {$deletedArchives} staged static site archive upload(s).");
+
+        // A deployment deletes its archive at applications/{uuid}/static-archives/{deployment uuid} (or the S3
+        // reference {deployment uuid}.json) when it copies it to the server. Archives of deployments that were
+        // cancelled or never ran stay behind.
+        $orphans = collect(Storage::directories('applications'))
+            ->flatMap(fn (string $directory): array => Storage::files("{$directory}/static-archives"))
+            ->filter(fn (string $file): bool => Storage::lastModified($file) < $cutoff)
+            ->mapWithKeys(fn (string $file): array => [$file => basename($file, '.json')]);
+        $pending = $orphans->isEmpty() ? [] : ApplicationDeploymentQueue::query()
+            ->whereIn('deployment_uuid', $orphans->values()->all())
+            ->whereIn('status', [ApplicationDeploymentStatus::QUEUED->value, ApplicationDeploymentStatus::IN_PROGRESS->value])
+            ->pluck('deployment_uuid')
+            ->all();
+        $deletedOrphans = 0;
+        foreach ($orphans->reject(fn (string $deploymentUuid): bool => in_array($deploymentUuid, $pending, true)) as $file => $deploymentUuid) {
+            $application = Application::query()->where('uuid', basename(dirname($file, 2)))->first();
+            if ($application) {
+                StaticSiteArchive::deleteDeploymentArchive($application, $deploymentUuid);
+            } else {
+                Storage::delete($file);
+            }
+            $deletedOrphans++;
+        }
+        $this->info("Deleted {$deletedOrphans} static site archive(s) of deployments that did not run.");
 
         return self::SUCCESS;
     }
@@ -58,6 +108,20 @@ class CleanupDatabaseImportUploads extends Command
 
         try {
             return Storage::deleteDirectory($directory);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function discardUnlessImporting(DatabaseImportS3Upload $upload): bool
+    {
+        $lock = Cache::lock(StartDatabaseImport::lockKey($upload->marker['resource_uuid']), 60);
+        if (! $lock->get()) {
+            return false;
+        }
+
+        try {
+            return $upload->discard();
         } finally {
             $lock->release();
         }

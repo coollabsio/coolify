@@ -120,23 +120,34 @@ class InstallDocker
     }
 
     /**
-     * Docker has no repository for Amazon Linux, so it gets Docker from its own repository and the Compose plugin from GitHub.
+     * Amazon Linux is not supported by get.docker.com or the CentOS repo, so use its own docker package.
+     * validateOS() returns the whole RHEL family group, so check the real distro ID at runtime.
      */
     private function getRhelDockerInstallCommand(): string
     {
-        $pluginDirectory = '/usr/local/lib/docker/cli-plugins';
+        return 'if (. /etc/os-release && [ "$ID" = "amzn" ]); then '.
+            $this->getAmazonLinuxDockerInstallCommand().
+            '; else '.
+            $this->getRhelDockerCeInstallCommand().
+            '; fi';
+    }
 
-        return "sh -c '. /etc/os-release; if [ \"\$ID\" = amzn ]; then ".
-            'dnf install -y docker && '.
-            "mkdir -p {$pluginDirectory} && ".
-            "curl -fsSL \"https://github.com/docker/compose/releases/latest/download/docker-compose-linux-\$(uname -m)\" -o {$pluginDirectory}/docker-compose && ".
-            "chmod +x {$pluginDirectory}/docker-compose; ".
-            'else curl -fsSL https://get.docker.com | sh || ('.
+    private function getAmazonLinuxDockerInstallCommand(): string
+    {
+        return 'dnf install -y docker && '.
+            'mkdir -p /usr/local/lib/docker/cli-plugins && '.
+            'curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" -o /usr/local/lib/docker/cli-plugins/docker-compose && '.
+            'chmod +x /usr/local/lib/docker/cli-plugins/docker-compose';
+    }
+
+    private function getRhelDockerCeInstallCommand(): string
+    {
+        return 'curl -fsSL https://get.docker.com | sh || ('.
             'dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo && '.
             'dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin && '.
             'systemctl start docker && '.
             'systemctl enable docker'.
-            "); fi'";
+            ')';
     }
 
     private function getSuseDockerInstallCommand(): string

@@ -33,6 +33,11 @@ class Index extends Component
         $this->application = $this->findApplication();
         $this->authorize('view', $this->application);
         $this->parameters = get_route_parameters();
+        if (! $this->application->hasConfigurationPage('project.application.backup.index')) {
+            $this->redirectRoute('project.application.configuration', $this->parameters);
+
+            return;
+        }
         $this->search = request()->string('search')->toString();
     }
 

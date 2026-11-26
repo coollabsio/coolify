@@ -77,6 +77,7 @@ class Kernel extends ConsoleKernel
         $this->scheduleInstance->command('cleanup:database-import-uploads')->hourly()->onOneServer();
         // Deletes upload chunks older than an hour (config/chunk-upload.php), so a more frequent run only starts more PHP processes.
         $this->scheduleInstance->command('uploads:clear')->hourly();
+        $this->scheduleInstance->command('project-config:release-stuck')->everyFiveMinutes()->onOneServer();
         $this->scheduleInstance->command('dns:release-orphaned-records')
             ->hourly()
             ->onOneServer()
@@ -96,7 +97,6 @@ class Kernel extends ConsoleKernel
 
             // Server Jobs
             $this->scheduleInstance->job(new ServerManagerJob)->everyMinute()->onOneServer();
-
         } else {
             // Instance Jobs
             $this->scheduleInstance->command('horizon:snapshot')->everyFiveMinutes();

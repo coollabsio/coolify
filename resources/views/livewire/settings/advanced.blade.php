@@ -53,6 +53,12 @@
                                 ['value' => true, 'label' => 'Enabled'],
                                 ['value' => false, 'label' => 'Disabled'],
                             ]" />
+                        <x-forms.listbox id="is_terminal_api_enabled" label="Terminal API"
+                            helper="Allows API tokens with the terminal permission to run commands on servers and in application containers. Each team must also enable it."
+                            onChange="instantSave" :options="[
+                                ['value' => true, 'label' => 'Enabled'],
+                                ['value' => false, 'label' => 'Disabled'],
+                            ]" />
                         <div class="lg:col-span-2">
                             <x-forms.input id="allowed_ips" label="Allowed IPs"
                                 helper="Applies to the REST API and the MCP endpoint. Comma-separated IPs or CIDR ranges. Empty or 0.0.0.0 allows all sources."
@@ -205,8 +211,28 @@
                         storage must be reachable from your servers, and the S3 provider must support lifecycle rules.
                     </x-callout>
                 </x-application.settings-subsection>
+                <x-application.settings-subsection id="upload-storage-section" title="Uploads"
+                    helper="Choose where files go that users upload in the browser (database imports and static site archives). With S3, the browser uploads each file straight to the bucket, so it does not use disk space on this instance, and the servers download it from S3. Coolify deletes each file when it no longer needs it. Database imports through the API still go to this instance. Static site archives through the API use POST /api/v1/applications/archive/uploads/s3.">
+                    <div class="flex max-w-md flex-col gap-4">
+                        <x-forms.listbox id="upload_storage" label="Upload storage" onChange="instantSave"
+                            :options="[
+                                ['value' => 'local', 'label' => 'Upload to Coolify'],
+                                ...array_values(array_filter($avatar_storage_options, fn ($option) => $option['value'] !== 'local')),
+                            ]" />
+                    </div>
+                    <x-callout type="info" title="Bucket rules" class="mt-4">
+                        When you select an S3 storage, Coolify adds a CORS rule that allows <span class="font-mono">PUT</span>
+                        from <span class="font-mono">{{ rtrim(base_url(), '/') }}</span>, and a lifecycle rule that deletes objects under
+                        <span class="font-mono">coolify-uploads/</span> after 1 day, as a safety net. If your S3 provider does not
+                        accept these API calls, add the CORS rule yourself. The bucket must be reachable from the browsers of your users
+                        and from your servers.
+                    </x-callout>
+                </x-application.settings-subsection>
             </x-application.settings-section>
 
         </form>
+        <div class="mt-6">
+            <livewire:settings.custom-theme />
+        </div>
     </x-settings.layout>
 </div>

@@ -236,9 +236,15 @@
                             <div class="volumes-cell-name min-w-0">
                                 <span class="volumes-mobile-label volumes-field-label">Storage Name</span>
                                 <div class="flex min-w-0 items-center gap-2">
-                                    <div class="min-w-0 flex-1">
-                                        <x-forms.input id="forms.{{ $id }}.name" required :readonly="$form['isShared']" />
-                                    </div>
+                                    @if ($form['isExternal'])
+                                        <span class="min-w-0 truncate text-[13px] font-medium text-neutral-950 dark:text-fg"
+                                            title="{{ $form['name'] }}">{{ $form['name'] }}</span>
+                                        <x-helper helper="Existing Docker volume. Coolify does not delete, rename, or copy it." />
+                                    @else
+                                        <div class="min-w-0 flex-1">
+                                            <x-forms.input id="forms.{{ $id }}.name" required :readonly="$form['isShared']" />
+                                        </div>
+                                    @endif
                                 </div>
                                 @if ($storage->standaloneSqlite)
                                     <a href="{{ $storage->standaloneSqlite->link() }}"
@@ -270,7 +276,7 @@
                                         <span>PR suffix</span>
                                         <x-helper helper="Adds -pr-N to the storage name or path so each preview uses isolated data. Disabling it shares production data with previews." />
                                     </div>
-                                    <x-forms.listbox id="forms.{{ $id }}.isPreviewSuffixEnabled" portal :options="[
+                                    <x-forms.listbox id="forms.{{ $id }}.isPreviewSuffixEnabled" portal live :options="[
                                         ['value' => true, 'label' => 'Add suffix'],
                                         ['value' => false, 'label' => 'Share volume'],
                                     ]" canGate="update" :canResource="$resource" />
@@ -303,20 +309,16 @@
 
                             <div
                                 class="volumes-col-actions volumes-cell-actions flex flex-nowrap items-center justify-end gap-1.5">
-                                <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true">Update</button>
+                                <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true">Save</button>
                                 @php
                                     $hasBackupAction = auth()->user()?->can('update', $resource)
                                         && (($showBackupAction && ! $form['isShared'])
                                             || (method_exists($resource, 'isBackupSolutionAvailable') && $resource->isBackupSolutionAvailable()));
                                 @endphp
                                 @if ($form['isShared'] && ! $hasBackupAction)
-                                    <button type="button" wire:click="submit({{ $id }})" class="icon-button shrink-0"
-                                        title="Update storage" aria-label="Update {{ $form['name'] }}">
-                                        <x-reicon name="check" class="size-3.5" />
-                                    </button>
+                                    <span class="data-table-cell-dash">-</span>
                                 @else
                                     <x-table.row-actions label="Storage actions">
-                                        <x-table.row-action wire:click="submit({{ $id }})">Update</x-table.row-action>
                                         @can('update', $resource)
                                             @if ($showBackupAction && ! $form['isShared'])
                                                 <x-modal-input title="Configure Volume Backup" :wireIgnore="false">
@@ -347,9 +349,13 @@
                                             <x-slot:danger>
                                                 <x-modal-confirmation title="Confirm persistent storage deletion?" buttonFullWidth
                                                     submitAction="delete({{ $id }})" :actions="[
-                                                        'The selected persistent storage/volume will be permanently deleted.',
-                                                        'If the persistent storage/volume is actvily used by a resource data will be lost.',
-                                                    ]" confirmationText="{{ $form['name'] }}"
+                                                        'The volume mount will be removed from this resource.',
+                                                        $form['isExternal']
+                                                            ? 'The existing Docker volume and its data stay on the server.'
+                                                            : 'The Docker volume and its data stay on the server. Delete the volume on the server if you no longer need it.',
+                                                    ]"
+                                                    warningMessage="The resource no longer has access to this volume after the next deployment."
+                                                    confirmationText="{{ $form['name'] }}"
                                                     confirmationLabel="Please confirm the execution of the actions by entering the Storage Name below"
                                                     shortConfirmationLabel="Storage Name">
                                                     <x-slot:trigger>
@@ -417,4 +423,8 @@
         </div>
     @endif
 
+    @if ($canUpdate)
+        <x-unsaved-bar action="submit"
+            dirty="Object.values($wire.forms ?? {}).some((form) => ! form.isReadOnly && (form.name !== form.savedName || form.mountPath !== form.savedMountPath))" />
+    @endif
 </div>

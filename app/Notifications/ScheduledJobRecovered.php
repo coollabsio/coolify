@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -70,6 +71,16 @@ class ScheduledJobRecovered extends CustomEmailNotification
     public function toPushover(): PushoverMessage
     {
         return new PushoverMessage(
+            title: $this->title,
+            level: 'success',
+            message: 'The last run succeeded after failed runs.',
+            buttons: $this->url ? [['text' => 'Open in Coolify', 'url' => $this->url]] : [],
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        return new NtfyMessage(
             title: $this->title,
             level: 'success',
             message: 'The last run succeeded after failed runs.',

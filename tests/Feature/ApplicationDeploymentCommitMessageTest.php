@@ -45,6 +45,7 @@ beforeEach(function () {
         'fullRepoUrl' => 'repo',
     ]);
     $application->id = 1;
+    $application->setRelation('settings', null);
 
     $this->queue = $queue = Mockery::mock(ApplicationDeploymentQueue::class)->makePartial();
     $queue->shouldReceive('addLogEntry');

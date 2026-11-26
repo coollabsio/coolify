@@ -12,6 +12,7 @@ use App\Models\Server;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -20,11 +21,13 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
 use App\Models\SwarmDocker;
+use App\Services\ProjectConfig\ConfigExporter;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ResourceOperations extends Component
 {
@@ -127,13 +130,19 @@ class ResourceOperations extends Component
                 $this->resource->getMorphClass() === StandaloneKeydb::class ||
                 $this->resource->getMorphClass() === StandaloneDragonfly::class ||
                 $this->resource->getMorphClass() === StandaloneClickhouse::class ||
+                $this->resource->getMorphClass() === StandaloneInfluxdb::class ||
                 $this->resource->getMorphClass() === StandaloneSqlite::class
             ) {
+                foreach ($this->resource->persistentStorages()->get() as $volume) {
+                    $volume->ensureCloneTargetIsAvailable($this->resource->destination->server, $server);
+                }
                 $uuid = new_public_id();
+                // A clone is not managed by coolify.json: config_key is unique per environment.
                 $new_resource = $this->resource->replicate([
                     'id',
                     'created_at',
                     'updated_at',
+                    'config_key',
                 ])->fill([
                     'uuid' => $uuid,
                     'name' => clone_resource_name($this->resource->name, $uuid),
@@ -157,7 +166,9 @@ class ResourceOperations extends Component
                     $originalName = $volume->name;
                     $newName = '';
 
-                    if (str_starts_with($originalName, 'postgres-data-')) {
+                    if ($volume->is_external) {
+                        $newName = $originalName;
+                    } elseif (str_starts_with($originalName, 'postgres-data-')) {
                         $newName = 'postgres-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'mysql-data-')) {
                         $newName = 'mysql-data-'.$new_resource->uuid;
@@ -165,6 +176,10 @@ class ResourceOperations extends Component
                         $newName = 'redis-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'clickhouse-data-')) {
                         $newName = 'clickhouse-data-'.$new_resource->uuid;
+                    } elseif (str_starts_with($originalName, 'influxdb-data-')) {
+                        $newName = 'influxdb-data-'.$new_resource->uuid;
+                    } elseif (str_starts_with($originalName, 'influxdb-config-')) {
+                        $newName = 'influxdb-config-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'mariadb-data-')) {
                         $newName = 'mariadb-data-'.$new_resource->uuid;
                     } elseif (str_starts_with($originalName, 'mongodb-data-')) {
@@ -194,7 +209,7 @@ class ResourceOperations extends Component
                     ]);
                     $newPersistentVolume->save();
 
-                    if ($this->cloneVolumeData) {
+                    if ($volume->shouldCopyDataWhenCloning($this->cloneVolumeData)) {
                         $pendingVolumeClones[] = new VolumeCloneJob(
                             $volume->name,
                             $newPersistentVolume->name,
@@ -246,6 +261,7 @@ class ResourceOperations extends Component
                         'id',
                         'created_at',
                         'updated_at',
+                        'config_meta',
                     ])->fill($payload);
                     $newEnvironmentVariable->save();
                 }
@@ -407,8 +423,26 @@ class ResourceOperations extends Component
         return $destination;
     }
 
+    public function downloadExport(): ?StreamedResponse
+    {
+        try {
+            $this->authorize('view', $this->resource);
+            // Commands and Compose files can hold credentials.
+            abort_unless(auth()->user()->isAdminOfTeam($this->resourceTeamId()), 403, 'Only a team admin can do this.');
+            $file = json_encode(app(ConfigExporter::class)->export($this->resource->environment, $this->resource), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)."\n";
+
+            return response()->streamDownload(fn () => print ($file), 'coolify.json', ['Content-Type' => 'application/json']);
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+
+            return null;
+        }
+    }
+
     public function render()
     {
-        return view('livewire.project.shared.resource-operations');
+        return view('livewire.project.shared.resource-operations', [
+            'isTeamAdmin' => auth()->user()->isAdminOfTeam($this->resourceTeamId()),
+        ]);
     }
 }

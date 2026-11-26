@@ -22,9 +22,16 @@ paths:
           required: true
           schema:
             type: string
+        -
+          $ref: '#/components/parameters/Page'
+        -
+          $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           description: 'List of preview deployments.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -35,6 +42,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -247,6 +256,66 @@ paths:
       security:
         -
           bearerAuth: []
+  '/applications/{uuid}/previews/{pull_request_id}/approve':
+    post:
+      tags:
+        - Applications
+      summary: 'Approve Preview Commit'
+      description: 'Approve the commit of a fork pull request that waits for approval, and queue its deployment. Send the commit that you reviewed (pending_approval_commit of the preview). Needs admin or owner permissions and a token with the `write` and `deploy` abilities.'
+      operationId: approve-preview-commit-by-pull-request-id
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: pull_request_id
+          in: path
+          description: 'Pull request ID of the preview.'
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - commit
+              properties:
+                commit:
+                  description: 'Full SHA of the reviewed commit. It must match pending_approval_commit of the preview.'
+                  type: string
+                  pattern: '^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$'
+              type: object
+      responses:
+        '200':
+          description: 'Commit approved.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string }
+                  deployment_uuid: { type: [string, 'null'] }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Missing permissions.'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'The preview does not wait for approval of this commit, for example because the pull request has a newer commit.'
+        '422':
+          $ref: '#/components/responses/422'
+        '429':
+          description: 'Deployment queue is full.'
+      security:
+        -
+          bearerAuth: []
   /applications:
     get:
       tags:
@@ -262,9 +331,51 @@ paths:
           required: false
           schema:
             type: string
+        -
+          name: project_uuid
+          in: query
+          description: 'Filter applications by project UUID.'
+          required: false
+          schema:
+            type: string
+        -
+          name: environment_uuid
+          in: query
+          description: 'Filter applications by environment UUID.'
+          required: false
+          schema:
+            type: string
+        -
+          name: server_uuid
+          in: query
+          description: 'Filter applications by the UUID of the server they are deployed to.'
+          required: false
+          schema:
+            type: string
+        -
+          name: status
+          in: query
+          description: 'Filter applications by status (case-insensitive substring, for example running or exited).'
+          required: false
+          schema:
+            type: string
+        -
+          name: name
+          in: query
+          description: 'Filter applications by name (case-insensitive substring).'
+          required: false
+          schema:
+            type: string
+        -
+          $ref: '#/components/parameters/Page'
+        -
+          $ref: '#/components/parameters/PerPage'
       responses:
         '200':
-          description: 'Get all applications.'
+          description: 'Get all applications. An unknown project, environment, or server UUID gives an empty list.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -275,6 +386,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -524,7 +637,7 @@ paths:
                   description: 'Use build server.'
                 use_build_secrets:
                   type: boolean
-                  default: false
+                  default: true
                   description: 'Use Docker Build Secrets for build-time environment variables.'
                 is_git_submodules_enabled:
                   type: boolean
@@ -566,6 +679,13 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                is_pr_deployments_public_approval_required:
+                  type: boolean
+                  default: true
+                  description: 'With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -679,6 +799,10 @@ paths:
                   maximum: 12
                   default: 4
                   description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
+                ip_allowlist:
+                  type: string
+                  nullable: true
+                  description: 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -972,7 +1096,7 @@ paths:
                   description: 'Use build server.'
                 use_build_secrets:
                   type: boolean
-                  default: false
+                  default: true
                   description: 'Use Docker Build Secrets for build-time environment variables.'
                 is_git_submodules_enabled:
                   type: boolean
@@ -1014,6 +1138,13 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                is_pr_deployments_public_approval_required:
+                  type: boolean
+                  default: true
+                  description: 'With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -1127,6 +1258,10 @@ paths:
                   maximum: 12
                   default: 4
                   description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
+                ip_allowlist:
+                  type: string
+                  nullable: true
+                  description: 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -1464,6 +1599,10 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                is_pr_deployments_public_approval_required:
+                  type: boolean
+                  default: true
+                  description: 'With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -1577,6 +1716,10 @@ paths:
                   maximum: 12
                   default: 4
                   description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
+                ip_allowlist:
+                  type: string
+                  nullable: true
+                  description: 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -1870,7 +2013,7 @@ paths:
                   description: 'Use build server.'
                 use_build_secrets:
                   type: boolean
-                  default: false
+                  default: true
                   description: 'Use Docker Build Secrets for build-time environment variables.'
                 is_git_submodules_enabled:
                   type: boolean
@@ -1912,6 +2055,13 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                is_pr_deployments_public_approval_required:
+                  type: boolean
+                  default: true
+                  description: 'With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -2025,6 +2175,10 @@ paths:
                   maximum: 12
                   default: 4
                   description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
+                ip_allowlist:
+                  type: string
+                  nullable: true
+                  description: 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -2255,7 +2409,7 @@ paths:
                   description: 'Use build server.'
                 use_build_secrets:
                   type: boolean
-                  default: false
+                  default: true
                   description: 'Use Docker Build Secrets for build-time environment variables.'
                 is_git_submodules_enabled:
                   type: boolean
@@ -2297,6 +2451,13 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                is_pr_deployments_public_approval_required:
+                  type: boolean
+                  default: true
+                  description: 'With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -2410,6 +2571,10 @@ paths:
                   maximum: 12
                   default: 4
                   description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
+                ip_allowlist:
+                  type: string
+                  nullable: true
+                  description: 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -2626,7 +2791,7 @@ paths:
                   description: 'Use build server.'
                 use_build_secrets:
                   type: boolean
-                  default: false
+                  default: true
                   description: 'Use Docker Build Secrets for build-time environment variables.'
                 is_git_submodules_enabled:
                   type: boolean
@@ -2668,6 +2833,13 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                is_pr_deployments_public_approval_required:
+                  type: boolean
+                  default: true
+                  description: 'With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -2781,6 +2953,10 @@ paths:
                   maximum: 12
                   default: 4
                   description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
+                ip_allowlist:
+                  type: string
+                  nullable: true
+                  description: 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'
                 connect_to_docker_network:
                   type: boolean
                   description: 'The flag to connect the service to the predefined Docker network.'
@@ -2825,6 +3001,69 @@ paths:
                   warning: { type: string, example: 'Using the same domain for multiple resources can cause routing conflicts and unpredictable behavior.' }
                   conflicts: { type: array, items: { properties: { domain: { type: string, example: example.com }, resource_name: { type: string, example: 'My Application' }, resource_uuid: { type: string, nullable: true, example: abc123-def456 }, resource_type: { type: string, enum: [application, service, instance], example: application }, message: { type: string, example: "Domain example.com is already in use by application 'My Application'" } }, type: object } }
                 type: object
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/exec':
+    post:
+      tags:
+        - Applications
+      summary: 'Execute Command'
+      description: 'Execute a non-interactive shell command inside a running application container.'
+      operationId: execute-command-on-application-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Application UUID'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - command
+              properties:
+                command:
+                  type: string
+                  description: 'Shell command to execute in the application container.'
+                timeout:
+                  type: integer
+                  description: 'Command timeout in seconds. Maximum 10 seconds. Defaults to 10 seconds.'
+                container:
+                  type: string
+                  description: 'Optional container name when the application has multiple running containers.'
+                server_uuid:
+                  type: string
+                  description: 'Optional server UUID when the application runs on multiple servers.'
+                pull_request_id:
+                  type: integer
+                  description: 'Optional preview pull request identifier.'
+              type: object
+      responses:
+        '200':
+          description: 'Command finished.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  exit_code: { type: integer }
+                  stdout: { type: string }
+                  stderr: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Terminal access is disabled on the target server, or the terminal API is disabled on the instance or for the team.'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+        '429':
+          $ref: '#/components/responses/TerminalRateLimited'
       security:
         -
           bearerAuth: []
@@ -3132,6 +3371,10 @@ paths:
                   nullable: true
                   description: 'How to set redirect with Traefik / Caddy. www<->non-www.'
                   enum: [www, non-www, both]
+                ip_allowlist:
+                  type: string
+                  nullable: true
+                  description: 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'
                 instant_deploy:
                   type: boolean
                   description: 'The flag to indicate if the application should be deployed instantly.'
@@ -3227,6 +3470,12 @@ paths:
                 is_pr_deployments_public_enabled:
                   type: boolean
                   description: 'Make pull request deployments public.'
+                is_pr_deployments_public_approval_required:
+                  type: boolean
+                  description: 'With public pull request deployments, each commit of a pull request from a fork waits for an admin to approve it. Set to false to deploy fork pull requests without approval. If you omit it, the current value stays.'
+                use_production_values_in_previews:
+                  type: boolean
+                  description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value. Default: true.'
                 stop_grace_period:
                   type: integer
                   nullable: true
@@ -3562,6 +3811,14 @@ paths:
                 is_shown_once:
                   type: boolean
                   description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
+                copy_value_to_preview:
+                  type: boolean
+                  description: 'Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false.'
+                compose_services:
+                  type: array
+                  items: { type: string }
+                  nullable: true
+                  description: 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'
               type: object
       responses:
         '201':
@@ -3623,6 +3880,11 @@ paths:
                 is_shown_once:
                   type: boolean
                   description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
+                compose_services:
+                  type: array
+                  items: { type: string }
+                  nullable: true
+                  description: 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'
               type: object
       responses:
         '201':
@@ -3666,7 +3928,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.' } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_preview: { type: boolean, description: 'The flag to indicate if the environment variable is used in preview deployments.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.' }, copy_value_to_preview: { type: boolean, description: 'Only for a new production variable of an application: false leaves its preview copy empty. True or not set uses the use_production_values_in_previews setting of the application, so it cannot copy the value when that setting is false.' }, compose_services: { type: array, items: { type: string }, nullable: true, description: 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.' } }, type: object }
               type: object
       responses:
         '201':
@@ -4503,6 +4765,58 @@ paths:
       security:
         -
           bearerAuth: []
+  '/applications/{uuid}/destinations/{destination_uuid}/deploy':
+    post:
+      tags:
+        - Applications
+      summary: 'Deploy to Destination'
+      description: 'Queue a deployment of the application to a single destination (primary or attached) without redeploying the other destinations.'
+      operationId: deploy-application-destination
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: destination_uuid
+          in: path
+          description: 'UUID of the destination.'
+          required: true
+          schema:
+            type: string
+        -
+          name: force
+          in: query
+          description: 'Force rebuild.'
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: 'Deployment queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Deployment request queued.', description: Message. }
+                  deployment_uuid: { type: string, example: doogksw, description: 'UUID of the deployment.' }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'A deployment of this application is already queued or in progress on the server of this destination.'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   /audit-events:
     get:
       tags:
@@ -4563,17 +4877,17 @@ paths:
               - scheduler
       responses:
         '200':
-          description: 'A page of audit events, newest first.'
+          description: 'A page of audit events, newest first. The X-Total-Count header gives the total.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
-                properties:
-                  current_page: { type: integer }
-                  data: { type: array, items: { type: object, properties: { id: { type: integer }, team_id: { type: integer, nullable: true }, event: { type: string }, source: { type: string }, action: { type: string }, level: { type: string }, actor_type: { type: string, nullable: true }, actor_id: { type: integer, nullable: true }, actor_name: { type: string, nullable: true }, resource_type: { type: string, nullable: true }, resource_uuid: { type: string, nullable: true }, resource_name: { type: string, nullable: true }, description: { type: string, nullable: true }, created_at: { type: string, format: date-time } } } }
-                  per_page: { type: integer }
-                  last_page: { type: integer }
-                  total: { type: integer }
-                type: object
+                type: array
+                items:
+                  properties: { id: { type: integer }, team_id: { type: [integer, 'null'] }, event: { type: string }, source: { type: string }, action: { type: string }, level: { type: string }, actor_type: { type: [string, 'null'] }, actor_id: { type: [integer, 'null'] }, actor_name: { type: [string, 'null'] }, resource_type: { type: [string, 'null'] }, resource_uuid: { type: [string, 'null'] }, resource_name: { type: [string, 'null'] }, description: { type: [string, 'null'] }, created_at: { type: string, format: date-time } }
+                  type: object
         '401':
           $ref: '#/components/responses/401'
         '403':
@@ -5046,9 +5360,52 @@ paths:
       summary: List
       description: 'List all databases.'
       operationId: list-databases
+      parameters:
+        -
+          name: project_uuid
+          in: query
+          description: 'Filter databases by project UUID.'
+          required: false
+          schema:
+            type: string
+        -
+          name: environment_uuid
+          in: query
+          description: 'Filter databases by environment UUID.'
+          required: false
+          schema:
+            type: string
+        -
+          name: server_uuid
+          in: query
+          description: 'Filter databases by the UUID of the server they are deployed to.'
+          required: false
+          schema:
+            type: string
+        -
+          name: status
+          in: query
+          description: 'Filter databases by status (case-insensitive substring, for example running or exited).'
+          required: false
+          schema:
+            type: string
+        -
+          name: name
+          in: query
+          description: 'Filter databases by name (case-insensitive substring).'
+          required: false
+          schema:
+            type: string
+        -
+          $ref: '#/components/parameters/Page'
+        -
+          $ref: '#/components/parameters/PerPage'
       responses:
         '200':
-          description: 'Get all databases'
+          description: 'Get all databases. An unknown project, environment, or server UUID gives an empty list.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -5059,6 +5416,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -5393,6 +5752,21 @@ paths:
                 clickhouse_admin_password:
                   type: string
                   description: 'Clickhouse admin password'
+                influxdb_admin_user:
+                  type: string
+                  description: 'InfluxDB admin user. Only before the first start.'
+                influxdb_admin_password:
+                  type: string
+                  description: 'InfluxDB admin password. Only before the first start.'
+                influxdb_admin_token:
+                  type: string
+                  description: 'InfluxDB admin API token. Only before the first start.'
+                influxdb_org:
+                  type: string
+                  description: 'InfluxDB initial organization. Only before the first start.'
+                influxdb_bucket:
+                  type: string
+                  description: 'InfluxDB initial bucket. Only before the first start.'
                 dragonfly_password:
                   type: string
                   description: 'DragonFly password'
@@ -5800,6 +6174,112 @@ paths:
                 clickhouse_admin_password:
                   type: string
                   description: 'Clickhouse admin password'
+                name:
+                  type: string
+                  description: 'Name of the database'
+                description:
+                  type: string
+                  description: 'Description of the database'
+                image:
+                  type: string
+                  description: 'Docker Image of the database'
+                is_public:
+                  type: boolean
+                  description: 'Is the database public?'
+                public_port:
+                  type: integer
+                  description: 'Public port of the database'
+                public_port_timeout:
+                  type: integer
+                  description: 'Public port timeout in seconds (default: 3600)'
+                limits_memory:
+                  type: string
+                  description: 'Memory limit of the database'
+                limits_memory_swap:
+                  type: string
+                  description: 'Memory swap limit of the database'
+                limits_memory_swappiness:
+                  type: integer
+                  description: 'Memory swappiness of the database'
+                limits_memory_reservation:
+                  type: string
+                  description: 'Memory reservation of the database'
+                limits_cpus:
+                  type: string
+                  description: 'CPU limit of the database'
+                limits_cpuset:
+                  type: string
+                  description: 'CPU set of the database'
+                limits_cpu_shares:
+                  type: integer
+                  description: 'CPU shares of the database'
+                instant_deploy:
+                  type: boolean
+                  description: 'Instant deploy the database'
+                tags:
+                  type: array
+                  items: { type: string }
+                  description: 'Tags to assign to the database.'
+              type: object
+      responses:
+        '200':
+          description: 'Database updated'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /databases/influxdb:
+    post:
+      tags:
+        - Databases
+      summary: 'Create (InfluxDB)'
+      description: 'Create a new InfluxDB 2.x database.'
+      operationId: create-database-influxdb
+      requestBody:
+        description: 'Database data'
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - server_uuid
+                - project_uuid
+              properties:
+                server_uuid:
+                  type: string
+                  description: 'UUID of the server'
+                project_uuid:
+                  type: string
+                  description: 'UUID of the project'
+                environment_name:
+                  type: string
+                  description: 'Name of the environment. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'UUID of the environment. You need to provide at least one of environment_name or environment_uuid.'
+                destination_uuid:
+                  type: string
+                  description: 'UUID of the destination if the server has multiple destinations'
+                influxdb_admin_user:
+                  type: string
+                  description: 'InfluxDB admin user.'
+                influxdb_admin_password:
+                  type: string
+                  description: 'InfluxDB admin password.'
+                influxdb_admin_token:
+                  type: string
+                  description: 'InfluxDB admin API token.'
+                influxdb_org:
+                  type: string
+                  description: 'InfluxDB initial organization.'
+                influxdb_bucket:
+                  type: string
+                  description: 'InfluxDB initial bucket.'
                 name:
                   type: string
                   description: 'Name of the database'
@@ -6679,17 +7159,27 @@ paths:
           required: true
           schema:
             type: string
+        -
+          $ref: '#/components/parameters/Page'
+        -
+          $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           description: 'List of backup executions'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
-                properties:
-                  executions: { type: array, items: { properties: { uuid: { type: string }, filename: { type: string }, size: { type: integer }, created_at: { type: string }, message: { description: 'Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.', type: [string, 'null'] }, status: { type: string } }, type: object } }
-                type: object
+                type: array
+                items:
+                  properties: { uuid: { type: string }, filename: { type: string }, size: { type: integer }, created_at: { type: string }, message: { description: 'Redacted execution output. Null unless the token has the `read:sensitive` or `root` ability.', type: [string, 'null'] }, status: { type: string } }
+                  type: object
         '404':
           description: 'Backup configuration not found.'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -7703,10 +8193,30 @@ paths:
           schema:
             type: string
         -
+          name: page
+          in: query
+          description: 'Page number. page and per_page take precedence over skip and take.'
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        -
+          name: per_page
+          in: query
+          description: 'Items per page.'
+          required: false
+          schema:
+            type: integer
+            default: 10
+            maximum: 100
+            minimum: 1
+        -
           name: skip
           in: query
-          description: 'Number of records to skip.'
+          description: 'Number of records to skip. Deprecated: use page and per_page.'
           required: false
+          deprecated: true
           schema:
             type: integer
             default: 0
@@ -7714,8 +8224,9 @@ paths:
         -
           name: take
           in: query
-          description: 'Number of records to take.'
+          description: 'Number of records to take. Deprecated: use page and per_page.'
           required: false
+          deprecated: true
           schema:
             type: integer
             default: 10
@@ -9989,6 +10500,43 @@ paths:
       security:
         -
           bearerAuth: []
+  /notifications/ntfy:
+    get:
+      tags:
+        - Notifications
+      summary: 'Get Ntfy notification settings'
+      description: 'Get the current team Ntfy notification settings. Encrypted secrets are only returned when the token has `read:sensitive` (or `root`) and the user is a team admin/owner.'
+      operationId: get-current-team-ntfy-notifications
+      responses:
+        '200':
+          description: 'Ntfy notification settings.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Notifications
+      summary: 'Update Ntfy notification settings'
+      description: 'Update the current team Ntfy notification settings.'
+      operationId: update-current-team-ntfy-notifications
+      responses:
+        '200':
+          description: 'Updated Ntfy notification settings.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          description: Forbidden.
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   /notifications/webhook:
     get:
       tags:
@@ -10152,6 +10700,535 @@ paths:
           $ref: '#/components/responses/400'
         '503':
           description: 'Database migrations are not finished yet.'
+  '/environments/{uuid}/config/export':
+    get:
+      tags:
+        - 'Project config'
+      summary: 'Export coolify.json'
+      description: 'Export an environment as a coolify.json file. Variable values are never exported. Requires the `read:sensitive` or `root` token ability, because commands and Compose files can hold credentials.'
+      operationId: export-environment-config
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The coolify.json file.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'The token cannot read sensitive data.'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/config/export':
+    get:
+      tags:
+        - 'Project config'
+      summary: 'Export application as coolify.json'
+      description: 'Export one application as a coolify.json file for its environment. Variable values are never exported. Requires the `read:sensitive` or `root` token ability, because commands and Compose files can hold credentials.'
+      operationId: export-application-config
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The coolify.json file.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'The token cannot read sensitive data.'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/environments/{uuid}/config/plan':
+    post:
+      tags:
+        - 'Project config'
+      summary: 'Plan coolify.json'
+      description: 'Compare a coolify.json file with the environment. Nothing changes.'
+      operationId: plan-environment-config
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - file
+              properties:
+                file:
+                  description: 'The coolify.json file as text.'
+                  type: string
+              type: object
+      responses:
+        '200':
+          description: 'The plan.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/environments/{uuid}/config/template/plan':
+    post:
+      tags:
+        - 'Project config'
+      summary: 'Plan coolify.json as a template'
+      description: 'Read coolify.json from a repository and plan the resources that a template creates in the environment. Nothing changes. Needs the right to create resources in the environment. A git source or deploy key needs write access to the whole team.'
+      operationId: plan-environment-config-template
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - repository
+                - branch
+                - source_type
+                - server_uuid
+              properties:
+                repository:
+                  description: 'The repository: a URL, or owner/name for a git app.'
+                  type: string
+                branch:
+                  type: string
+                file_path:
+                  description: 'The default is coolify.json.'
+                  type: string
+                source_type:
+                  type: string
+                  enum: [public, github_app, gitlab_app, gitea_app, deploy_key]
+                source_uuid:
+                  description: 'The UUID of the git app or the private key.'
+                  type: string
+                server_uuid:
+                  description: 'The server that reads the file. Resources that name no server run on it.'
+                  type: string
+                destination_uuid:
+                  description: 'Needed only when the server has more than one destination.'
+                  type: string
+              type: object
+      responses:
+        '200':
+          description: 'The plan. Its commit goes to the create request.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Not allowed.'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          description: 'The request or the file is not valid.'
+      security:
+        -
+          bearerAuth: []
+  '/environments/{uuid}/config/template':
+    post:
+      tags:
+        - 'Project config'
+      summary: 'Create resources from coolify.json'
+      description: 'Create the resources of coolify.json in the environment one time. They are normal resources: the file does not manage them. Nothing deploys. Needs the right to create resources in the environment.'
+      operationId: create-from-environment-config-template
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - repository
+                - branch
+                - source_type
+                - server_uuid
+              properties:
+                repository:
+                  type: string
+                branch:
+                  type: string
+                file_path:
+                  type: string
+                source_type:
+                  type: string
+                  enum: [public, github_app, gitlab_app, gitea_app, deploy_key]
+                source_uuid:
+                  type: string
+                server_uuid:
+                  type: string
+                destination_uuid:
+                  type: string
+                commit:
+                  description: 'The commit of the plan. Coolify creates the resources from the file at this commit. Without it, the head of the branch.'
+                  type: string
+              type: object
+      responses:
+        '201':
+          description: 'The created resources.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  resources: { type: array, items: { properties: { uuid: { type: string }, type: { type: string }, name: { type: string } }, type: object } }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Not allowed.'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          description: 'The request or the file is not valid.'
+      security:
+        -
+          bearerAuth: []
+  /config/links:
+    post:
+      tags:
+        - 'Project config'
+      summary: 'Link coolify.json'
+      description: 'Link an environment to coolify.json. Creates a missing project or environment.'
+      operationId: create-config-link
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - project
+                - environment
+                - mode
+              properties:
+                project:
+                  type: string
+                environment:
+                  type: string
+                mode:
+                  type: string
+                  enum: [api, git]
+                auto_apply:
+                  type: boolean
+                server_uuid:
+                  description: 'Required for git. Reads the file, and resources that name no server go to it.'
+                  type: string
+                destination_uuid:
+                  description: 'The destination on that server. Needed when the server has more than one.'
+                  type: string
+              type: object
+      responses:
+        '201':
+          description: 'The link.'
+        '403':
+          description: 'Not allowed.'
+        '409':
+          description: 'The environment already has a link.'
+      security:
+        -
+          bearerAuth: []
+  '/config/links/{uuid}':
+    get:
+      tags:
+        - 'Project config'
+      summary: 'Get a coolify.json link'
+      operationId: get-config-link
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The link.'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - 'Project config'
+      summary: 'Disconnect coolify.json'
+      description: 'Removes the link. The resources stay and can be edited in Coolify again.'
+      operationId: delete-config-link
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Disconnected.
+        '403':
+          description: 'Team admins only.'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - 'Project config'
+      summary: 'Update a coolify.json link'
+      operationId: update-config-link
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                auto_apply:
+                  type: boolean
+                server_uuid:
+                  description: 'Another server for the link. Plans the file again; resources that move wait for approval. Needs the deploy ability.'
+                  type: string
+                destination_uuid:
+                  description: 'The destination on that server. Needed when the server has more than one.'
+                  type: string
+              type: object
+      responses:
+        '200':
+          description: 'The link.'
+        '403':
+          description: 'Team admins only, and the deploy ability for a server change.'
+        '422':
+          description: 'Validation failed.'
+      security:
+        -
+          bearerAuth: []
+  '/config/links/{uuid}/revisions':
+    get:
+      tags:
+        - 'Project config'
+      summary: 'List revisions'
+      operationId: list-config-revisions
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Revisions, newest first.'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/config/links/{uuid}/apply':
+    post:
+      tags:
+        - 'Project config'
+      summary: 'Apply coolify.json'
+      description: 'In api mode, plan the posted file and apply it when the plan is safe.'
+      operationId: apply-config
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                file:
+                  type: string
+              type: object
+      responses:
+        '200':
+          description: 'The revision waits for approval.'
+        '202':
+          description: 'The revision is applied or queued.'
+        '409':
+          description: 'The link is suspended.'
+        '422':
+          description: 'The file is not valid.'
+      security:
+        -
+          bearerAuth: []
+  '/config/revisions/{uuid}/approve':
+    post:
+      tags:
+        - 'Project config'
+      summary: 'Approve a plan'
+      operationId: approve-config-revision
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                delete_data:
+                  type: array
+                  items: { type: string }
+              type: object
+      responses:
+        '200':
+          description: Approved.
+        '403':
+          description: 'Not allowed.'
+        '422':
+          description: 'Not waiting, or a key is not removed.'
+      security:
+        -
+          bearerAuth: []
+  '/config/links/{uuid}/suspend':
+    post:
+      tags:
+        - 'Project config'
+      summary: 'Suspend a link'
+      operationId: suspend-config-link
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Suspended.
+        '403':
+          description: 'Team admins only.'
+      security:
+        -
+          bearerAuth: []
+  '/config/links/{uuid}/resume':
+    post:
+      tags:
+        - 'Project config'
+      summary: 'Resume a link'
+      description: 'Without confirm=1, returns the plan of the latest file. With confirm=1, resumes and applies, which needs the deploy ability.'
+      operationId: resume-config-link
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: confirm
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: 'The plan, or the link and its new revision.'
+        '403':
+          description: 'Team admins only.'
+      security:
+        -
+          bearerAuth: []
+  '/config/revisions/{uuid}/release':
+    post:
+      tags:
+        - 'Project config'
+      summary: 'Release a stuck apply'
+      operationId: release-config-revision
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Released.
+        '403':
+          description: 'Team admins only.'
+      security:
+        -
+          bearerAuth: []
+  '/config/revisions/{uuid}/retry':
+    post:
+      tags:
+        - 'Project config'
+      summary: 'Retry a revision'
+      operationId: retry-config-revision
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: 'Planned again.'
+        '403':
+          description: 'Needs the deploy ability.'
+      security:
+        -
+          bearerAuth: []
   /projects:
     get:
       tags:
@@ -10550,6 +11627,206 @@ paths:
           description: 'Environment with this name already exists.'
         '422':
           $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/metrics':
+    get:
+      tags:
+        - Applications
+      summary: 'Get application metrics'
+      description: 'Get the CPU and memory history that Sentinel collects for the container of an application. Send minutes, or from with an optional to. The retention period is the one of the server of the application.'
+      operationId: get-application-metrics-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          $ref: '#/components/parameters/MetricsMinutes'
+        -
+          $ref: '#/components/parameters/MetricsFrom'
+        -
+          $ref: '#/components/parameters/MetricsTo'
+      responses:
+        '200':
+          description: 'Container CPU and memory metrics.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContainerMetrics'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+        '502':
+          description: 'Sentinel did not return metrics.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Failed to fetch metrics from Sentinel.' }
+                type: object
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/metrics':
+    get:
+      tags:
+        - Databases
+      summary: 'Get database metrics'
+      description: 'Get the CPU and memory history that Sentinel collects for the container of a database. Send minutes, or from with an optional to. The retention period is the one of the server of the database.'
+      operationId: get-database-metrics-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the database.'
+          required: true
+          schema:
+            type: string
+        -
+          $ref: '#/components/parameters/MetricsMinutes'
+        -
+          $ref: '#/components/parameters/MetricsFrom'
+        -
+          $ref: '#/components/parameters/MetricsTo'
+      responses:
+        '200':
+          description: 'Container CPU and memory metrics.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContainerMetrics'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+        '502':
+          description: 'Sentinel did not return metrics.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Failed to fetch metrics from Sentinel.' }
+                type: object
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/traffic':
+    get:
+      tags:
+        - Applications
+      summary: 'Get application traffic'
+      description: 'Get the traffic analytics of an application.'
+      operationId: get-application-traffic-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+        -
+          name: range
+          in: query
+          description: 'Time range of the traffic analytics.'
+          required: false
+          schema:
+            type: string
+            default: 24h
+            enum:
+              - 24h
+              - 7d
+              - 30d
+      responses:
+        '200':
+          description: 'Traffic analytics of the application.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceTraffic'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+        '502':
+          description: 'Sentinel did not return traffic analytics.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Failed to fetch traffic analytics from Sentinel.' }
+                type: object
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/traffic':
+    get:
+      tags:
+        - Services
+      summary: 'Get service traffic'
+      description: 'Get the traffic analytics of a service.'
+      operationId: get-service-traffic-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+        -
+          name: range
+          in: query
+          description: 'Time range of the traffic analytics.'
+          required: false
+          schema:
+            type: string
+            default: 24h
+            enum:
+              - 24h
+              - 7d
+              - 30d
+      responses:
+        '200':
+          description: 'Traffic analytics of the service.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceTraffic'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+        '502':
+          description: 'Sentinel did not return traffic analytics.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Failed to fetch traffic analytics from Sentinel.' }
+                type: object
       security:
         -
           bearerAuth: []
@@ -11098,9 +12375,16 @@ paths:
           required: true
           schema:
             type: string
+        -
+          $ref: '#/components/parameters/Page'
+        -
+          $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           description: 'Get all executions for a scheduled task.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -11111,6 +12395,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -11348,9 +12634,16 @@ paths:
           required: true
           schema:
             type: string
+        -
+          $ref: '#/components/parameters/Page'
+        -
+          $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           description: 'Get all executions for a scheduled task.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -11361,6 +12654,8 @@ paths:
           $ref: '#/components/responses/401'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -11458,6 +12753,14 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: name
+          in: query
+          description: 'Source name. Default: default.'
+          required: false
+          schema:
+            type: string
+            default: default
       responses:
         '200':
           description: 'Secret manager source.'
@@ -11478,7 +12781,7 @@ paths:
       tags:
         - 'Secret Managers'
       summary: 'Remove Secret Manager Source'
-      description: 'Remove the secret manager source. Existing {{vault.*}} variables stay and fail the next deployment until they are removed.'
+      description: 'Remove a secret manager source (`default` when no name is given). Existing references to it stay and fail the next deployment until they are removed.'
       operationId: remove-secret-manager-source
       parameters:
         -
@@ -11499,6 +12802,14 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: name
+          in: query
+          description: 'Source name. Default: default.'
+          required: false
+          schema:
+            type: string
+            default: default
       responses:
         '200':
           description: 'Source removed.'
@@ -11515,7 +12826,7 @@ paths:
       tags:
         - 'Secret Managers'
       summary: 'Set Secret Manager Source'
-      description: 'Link a secret manager token of the team to an application, service, or database, or change the token or settings of the link. References resolve at the next deployment.'
+      description: 'Link a secret manager token of the team to an application, service, or database as a named source (`default` when no name is given), or change the token or settings of that source. References resolve at the next deployment.'
       operationId: set-secret-manager-source
       parameters:
         -
@@ -11544,6 +12855,10 @@ paths:
               required:
                 - integration_token_uuid
               properties:
+                name:
+                  description: 'Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.'
+                  type: string
+                  default: default
                 integration_token_uuid:
                   type: string
                 settings:
@@ -11586,6 +12901,10 @@ paths:
               required:
                 - integration_token_uuid
               properties:
+                name:
+                  description: 'Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.'
+                  type: string
+                  default: default
                 integration_token_uuid:
                   type: string
                 settings:
@@ -11631,6 +12950,14 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: name
+          in: query
+          description: 'Source name. Default: default.'
+          required: false
+          schema:
+            type: string
+            default: default
       responses:
         '200':
           description: 'Key names.'
@@ -11656,7 +12983,7 @@ paths:
       tags:
         - 'Secret Managers'
       summary: 'Add Secret Manager Reference'
-      description: 'Add a {{vault.KEY}} environment variable for one key of the linked source.'
+      description: 'Add a {{vault.KEY}} environment variable ({{vault.<name>.KEY}} for a named source) for one key of the source.'
       operationId: add-secret-manager-reference
       parameters:
         -
@@ -11687,6 +13014,10 @@ paths:
               properties:
                 key:
                   type: string
+                name:
+                  description: 'Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.'
+                  type: string
+                  default: default
               type: object
       responses:
         '201':
@@ -11709,7 +13040,7 @@ paths:
       tags:
         - 'Secret Managers'
       summary: 'Import Secret Manager References'
-      description: 'Add a {{vault.KEY}} environment variable for every key of the linked source that has no variable yet. Keys that are not valid variable names are skipped.'
+      description: 'Add a {{vault.KEY}} environment variable ({{vault.<name>.KEY}} for a named source) for every key of the source that has no variable yet. Keys that are not valid variable names are skipped.'
       operationId: import-secret-manager-references
       parameters:
         -
@@ -11730,6 +13061,17 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  description: 'Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.'
+                  type: string
+                  default: default
+              type: object
       responses:
         '200':
           description: 'Import result.'
@@ -12227,9 +13569,31 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: page
+          in: query
+          description: 'Page number.'
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        -
+          name: per_page
+          in: query
+          description: 'Items per page.'
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+            minimum: 1
       responses:
         '200':
           description: 'Recent Docker cleanup executions.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -12243,6 +13607,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -12448,6 +13814,7 @@ paths:
                   image_scan_syft_timeout: { description: 'Time limit of one Syft run (package list of an image), in seconds.', type: integer, enum: [300, 600, 1200, 1800, 3600] }
                   image_scan_grype_timeout: { description: 'Time limit of one Grype run (vulnerability match), in seconds.', type: integer, enum: [300, 600, 1200, 1800, 3600] }
                   image_scan_cpus: { description: 'CPU limit of each scanner step.', type: number, enum: [0.5, 1, 2, 4] }
+                  image_rescan_days: { description: 'Days between two rescans of the running images and the host packages. 0: no rescans, only scans at deployments and on request.', type: integer, enum: [1, 3, 7, 14, 30, 0] }
                   scanner_state: { description: 'State of the scanner on the server. Null when unknown.', type: [string, 'null'], enum: [pulling, updating_database, ready, failed] }
                   scanner_failed_step: { description: 'The step that failed when scanner_state is failed.', type: [string, 'null'] }
                   scanner_built_at: { description: 'Time of the vulnerability database on the server.', type: [string, 'null'], format: date-time }
@@ -12502,6 +13869,10 @@ paths:
                   description: 'CPU limit of each scanner step. A value above the CPU count of the server is refused.'
                   type: number
                   enum: [0.5, 1, 2, 4]
+                image_rescan_days:
+                  description: 'Days between two rescans of the running images and the host packages. 0: no rescans, only scans at deployments and on request.'
+                  type: integer
+                  enum: [1, 3, 7, 14, 30, 0]
               type: object
       responses:
         '200':
@@ -12571,7 +13942,7 @@ paths:
       tags:
         - Servers
       summary: 'Update log drain settings'
-      description: 'Update New Relic, Axiom, or custom log drain settings for a server owned by the authenticated team. Needs a token with the write and deploy permissions. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.'
+      description: 'Update New Relic, Axiom, Amazon CloudWatch Logs, or custom log drain settings for a server owned by the authenticated team. Needs a token with the write and deploy permissions. Custom configs cannot use the lua, wasm, exec, exec_wasi, or file plugins, @INCLUDE, or plugins_file, and the parser file can only contain [PARSER] and [MULTILINE_PARSER] sections.'
       operationId: update-server-log-drains
       parameters:
         -
@@ -12634,6 +14005,68 @@ paths:
       security:
         -
           bearerAuth: []
+  '/servers/{uuid}/metrics':
+    get:
+      tags:
+        - Servers
+      summary: 'Get server metrics'
+      description: 'Get the metric history that Sentinel collects for a server owned by the authenticated team. Send minutes, or from with an optional to. The response has only the requested types. Each type is null when metrics are disabled for the server.'
+      operationId: get-server-metrics
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: string
+        -
+          $ref: '#/components/parameters/MetricsMinutes'
+        -
+          $ref: '#/components/parameters/MetricsFrom'
+        -
+          $ref: '#/components/parameters/MetricsTo'
+        -
+          name: types
+          in: query
+          description: 'Comma-separated metric types: cpu, memory, disk, network, load.'
+          required: false
+          schema:
+            type: string
+            example: 'cpu,memory,disk'
+            default: 'cpu,memory'
+      responses:
+        '200':
+          description: 'Server metrics of the requested types.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  cpu: { $ref: '#/components/schemas/MetricSeries', description: 'CPU usage in percent.' }
+                  memory: { $ref: '#/components/schemas/MetricSeries', description: 'Memory usage in percent.' }
+                  disk: { description: 'Disk usage in percent, keyed by mount path.', type: [object, 'null'], example: { /: [[1787259000000, 41.2]] }, additionalProperties: { $ref: '#/components/schemas/MetricSeries' } }
+                  network: { description: 'Received and sent bytes per second.', properties: { rx: { $ref: '#/components/schemas/MetricSeries' }, tx: { $ref: '#/components/schemas/MetricSeries' } }, type: [object, 'null'] }
+                  load: { description: 'Load averages over 1, 5, and 15 minutes.', properties: { load1: { $ref: '#/components/schemas/MetricSeries' }, load5: { $ref: '#/components/schemas/MetricSeries' }, load15: { $ref: '#/components/schemas/MetricSeries' } }, type: [object, 'null'] }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+        '502':
+          description: 'Sentinel did not return metrics.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  message: { type: string, example: 'Failed to fetch metrics from Sentinel.' }
+                type: object
+      security:
+        -
+          bearerAuth: []
   '/servers/{uuid}/proxy':
     get:
       tags:
@@ -12660,6 +14093,7 @@ paths:
                   status: { type: [string, 'null'], example: running }
                   redirect_enabled: { type: boolean, example: true }
                   redirect_url: { type: [string, 'null'], example: 'https://example.com' }
+                  unknown_host_status: { description: 'Saved status of the catch-all for hosts that no resource on the server uses. Traefik and Caddy use it only when redirect_enabled is true and redirect_url is empty. In that mode, the domains of resources on the server get 503 while the resource is down.', type: integer, example: 404, enum: [404, 503] }
                   proxy_error_page: { type: [string, 'null'] }
                   generate_exact_labels: { type: boolean, example: false }
                   traefik_certificate_resolver: { description: 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.', type: [string, 'null'], example: letsencrypt }
@@ -12699,6 +14133,10 @@ paths:
                 redirect_url:
                   description: 'Public http(s) redirect URL, or null to clear.'
                   type: [string, 'null']
+                unknown_host_status:
+                  description: 'Status of the catch-all for hosts that no resource on the server uses. Traefik and Caddy use it only when redirect_enabled is true and redirect_url is empty. In that mode, the domains of resources on the server get 503 while the resource is down.'
+                  type: integer
+                  enum: [404, 503]
                 proxy_error_page:
                   description: 'Custom HTML error page that the proxy shows for unknown hosts (when redirect_url is empty) and for resources in maintenance mode. Null restores the default page.'
                   type: [string, 'null']
@@ -12723,6 +14161,7 @@ paths:
                   status: { type: [string, 'null'] }
                   redirect_enabled: { type: boolean }
                   redirect_url: { type: [string, 'null'] }
+                  unknown_host_status: { type: integer, enum: [404, 503] }
                   proxy_error_page: { type: [string, 'null'] }
                   generate_exact_labels: { type: boolean }
                   traefik_certificate_resolver: { type: [string, 'null'] }
@@ -12780,6 +14219,7 @@ paths:
                   status: { type: [string, 'null'] }
                   redirect_enabled: { type: boolean }
                   redirect_url: { type: [string, 'null'] }
+                  unknown_host_status: { type: integer, enum: [404, 503] }
                   proxy_error_page: { type: [string, 'null'] }
                   generate_exact_labels: { type: boolean }
                   configuration: { type: [string, 'null'] }
@@ -12858,6 +14298,7 @@ paths:
                   sentinel_metrics_history_days: { type: integer }
                   sentinel_push_interval_seconds: { type: integer }
                   sentinel_custom_url: { description: 'Only present with read:sensitive.', type: string }
+                  is_sentinel_pull_enabled: { description: 'Coolify reads Sentinel reports over SSH instead of Sentinel pushing them to the Coolify URL.', type: boolean }
                   sentinel_updated_at: { type: [string, 'null'] }
                   traffic_topn: { type: integer }
                   traffic_sample_threshold: { type: integer }
@@ -12866,6 +14307,10 @@ paths:
                   is_geoip_enabled: { type: boolean }
                   geoip_refresh_days: { type: integer }
                   traffic_ip_mode: { description: 'How Sentinel stores client IPs for the Top IPs breakdown.', type: string, enum: [full, anonymized, 'off'] }
+                  is_container_log_archive_enabled: { description: 'Sentinel keeps the logs of Coolify-managed containers in files, so they stay readable after the container is removed.', type: boolean }
+                  log_archive_max_file_mb: { type: integer }
+                  log_archive_max_total_mb: { type: integer }
+                  log_archive_retention_days: { type: integer }
                   geoip_maxmind_license_key: { description: 'Only present with read:sensitive.', type: string }
                 type: object
         '401':
@@ -12914,6 +14359,9 @@ paths:
                   minimum: 10
                 sentinel_custom_url:
                   type: [string, 'null']
+                is_sentinel_pull_enabled:
+                  description: 'Coolify reads Sentinel reports over SSH. Use it when the server cannot reach Coolify. Restarts Sentinel.'
+                  type: boolean
                 traffic_topn:
                   type: integer
                   maximum: 1000
@@ -12940,6 +14388,24 @@ paths:
                   description: 'How Sentinel stores client IPs: full, anonymized (IPv4 /24, IPv6 /48), or off.'
                   type: string
                   enum: [full, anonymized, 'off']
+                is_container_log_archive_enabled:
+                  description: 'Keep the logs of Coolify-managed containers after the container is removed. The size and retention limits need Sentinel 1.1.8 or later.'
+                  type: boolean
+                log_archive_max_file_mb:
+                  description: 'Size in MB at which an archive file is rotated. One rotated file is kept.'
+                  type: integer
+                  maximum: 1024
+                  minimum: 1
+                log_archive_max_total_mb:
+                  description: 'Total archive size in MB. Sentinel deletes the oldest files above it.'
+                  type: integer
+                  maximum: 102400
+                  minimum: 1
+                log_archive_retention_days:
+                  description: 'Sentinel deletes archive files that were not written for this many days.'
+                  type: integer
+                  maximum: 365
+                  minimum: 1
               type: object
       responses:
         '200':
@@ -13631,6 +15097,60 @@ paths:
           $ref: '#/components/responses/404'
         '422':
           $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/servers/{uuid}/exec':
+    post:
+      tags:
+        - Servers
+      summary: 'Execute Command'
+      description: 'Execute a non-interactive shell command on a server through Coolify SSH.'
+      operationId: execute-command-on-server-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Server UUID'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - command
+              properties:
+                command:
+                  type: string
+                  description: 'Shell command to execute on the server.'
+                timeout:
+                  type: integer
+                  description: 'Command timeout in seconds. Maximum 10 seconds. Defaults to 10 seconds.'
+              type: object
+      responses:
+        '200':
+          description: 'Command finished.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  exit_code: { type: integer }
+                  stdout: { type: string }
+                  stderr: { type: string }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Terminal access is disabled on this server, or the terminal API is disabled on the instance or for the team.'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+        '429':
+          $ref: '#/components/responses/TerminalRateLimited'
       security:
         -
           bearerAuth: []
@@ -14482,9 +16002,52 @@ paths:
       summary: List
       description: 'List all services.'
       operationId: list-services
+      parameters:
+        -
+          name: project_uuid
+          in: query
+          description: 'Filter services by project UUID.'
+          required: false
+          schema:
+            type: string
+        -
+          name: environment_uuid
+          in: query
+          description: 'Filter services by environment UUID.'
+          required: false
+          schema:
+            type: string
+        -
+          name: server_uuid
+          in: query
+          description: 'Filter services by the UUID of the server they are deployed to.'
+          required: false
+          schema:
+            type: string
+        -
+          name: status
+          in: query
+          description: 'Filter services by status (case-insensitive substring, for example running or exited).'
+          required: false
+          schema:
+            type: string
+        -
+          name: name
+          in: query
+          description: 'Filter services by name (case-insensitive substring).'
+          required: false
+          schema:
+            type: string
+        -
+          $ref: '#/components/parameters/Page'
+        -
+          $ref: '#/components/parameters/PerPage'
       responses:
         '200':
-          description: 'Get all services'
+          description: 'Get all services. An unknown project, environment, or server UUID gives an empty list.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -14495,6 +16058,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -14932,6 +16497,11 @@ paths:
                 is_shown_once:
                   type: boolean
                   description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
+                compose_services:
+                  type: array
+                  items: { type: string }
+                  nullable: true
+                  description: 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'
               type: object
       responses:
         '201':
@@ -14992,6 +16562,11 @@ paths:
                 is_shown_once:
                   type: boolean
                   description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.'
+                compose_services:
+                  type: array
+                  items: { type: string }
+                  nullable: true
+                  description: 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.'
               type: object
       responses:
         '201':
@@ -15037,7 +16612,7 @@ paths:
               properties:
                 data:
                   type: array
-                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.' } }, type: object }
+                  items: { properties: { key: { type: string, description: 'The key of the environment variable.' }, value: { type: string, description: 'The value of the environment variable.' }, is_literal: { type: boolean, description: 'The flag to indicate if the environment variable is a literal, nothing espaced.' }, is_multiline: { type: boolean, description: 'The flag to indicate if the environment variable is multiline.' }, is_shown_once: { type: boolean, description: 'If true, the saved value is hidden in the UI and API responses. A lock is permanent: false does not unlock a locked variable, but a new value can still replace the locked one. MCP never returns environment variable values.' }, compose_services: { type: array, items: { type: string }, nullable: true, description: 'Docker Compose services that get this variable. Null or an empty list means all services. Only for Docker Compose resources.' } }, type: object }
               type: object
       responses:
         '201':
@@ -15218,6 +16793,7 @@ paths:
               schema:
                 properties:
                   message: { type: string, example: 'Service starting request queued.' }
+                  activity_id: { type: integer, description: 'ID of the activity running the start. Poll it with GET /services/{uuid}/activities/{activity_id}.', example: 1234 }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -15297,7 +16873,54 @@ paths:
             application/json:
               schema:
                 properties:
-                  message: { type: string, example: 'Service restaring request queued.' }
+                  message: { type: string, example: 'Service restarting request queued.' }
+                  activity_id: { type: integer, description: 'ID of the activity running the restart. Poll it with GET /services/{uuid}/activities/{activity_id}.', example: 1234 }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/services/{uuid}/activities/{activity_id}':
+    get:
+      tags:
+        - Services
+      summary: 'Get activity'
+      description: 'Get the status and output of a start or restart activity of a service.'
+      operationId: get-service-activity-by-id
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the service.'
+          required: true
+          schema:
+            type: string
+        -
+          name: activity_id
+          in: path
+          description: 'ID of the activity, as returned by the start or restart endpoints.'
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Activity status and output.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  id: { type: integer, example: 1234 }
+                  status: { type: string, description: 'One of queued, in_progress, finished, error, killed, cancelled, closed.', example: finished }
+                  exit_code: { type: integer, nullable: true, example: 0 }
+                  output: { type: string, nullable: true, description: 'Combined output of the executed commands. Null unless the token has the read:sensitive ability and its user is an admin or owner of the team.' }
+                  created_at: { type: string, format: date-time }
+                  updated_at: { type: string, format: date-time }
+                  finished_at: { type: string, format: date-time, nullable: true, description: 'Null while the activity is still running.' }
                 type: object
         '401':
           $ref: '#/components/responses/401'
@@ -16198,6 +17821,242 @@ paths:
       security:
         -
           bearerAuth: []
+  /applications/archive/uploads:
+    post:
+      tags:
+        - Applications
+      summary: 'Upload static site archive'
+      description: 'Upload a .tar, .tar.gz, or .tgz archive of a static site in DropZone chunks (dzuuid, dzchunkindex, dztotalchunkcount, dzchunkbyteoffset, dztotalfilesize). Send the same upload_id with every chunk. The last chunk validates the archive: at most 1 GiB, 5 GiB extracted, 100,000 entries, and only regular files and directories with relative paths. The upload is kept for 24 hours, and a team keeps its 3 newest uploads. A team can upload 5 GiB in an hour; more returns 429. Without application_uuid, the token user must be able to create applications.'
+      operationId: upload-static-site-archive
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              required:
+                - upload_id
+                - file
+              properties:
+                upload_id:
+                  type: string
+                  format: uuid
+                  description: 'A UUID that the client generates for this upload.'
+                file:
+                  type: string
+                  format: binary
+                  description: 'The archive, or one chunk of it.'
+                application_uuid:
+                  type: string
+                  description: 'The archive site that this upload is a new version of.'
+              type: object
+      responses:
+        '200':
+          description: 'Chunk received.'
+        '201':
+          description: 'Upload completed and validated.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  upload_id: { type: string }
+                  size: { type: integer, description: 'The size of the archive in bytes.' }
+                  sha: { type: string, description: 'The site version: the first 40 hex characters of the SHA-256 of the archive.' }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'The token user cannot create applications or update and deploy the application.'
+        '404':
+          description: 'Application not found.'
+        '422':
+          $ref: '#/components/responses/422'
+        '409':
+          description: 'The instance sends uploads to its S3 upload storage. Use /applications/archive/uploads/s3.'
+        '429':
+          description: 'The team uploaded more than 5 GiB of archives in the last hour.'
+      security:
+        -
+          bearerAuth: []
+  /applications/archive/uploads/s3:
+    post:
+      tags:
+        - Applications
+      summary: 'Prepare static site archive upload to S3'
+      description: 'Return a presigned URL that uploads an archive straight to the upload storage that the instance admin selected, so the archive does not use the disk of the Coolify instance. When the instance has an upload storage, use this instead of /applications/archive/uploads, which then returns 409. Send the archive with one PUT request to the URL, with the returned headers, before expires_at. Then use the upload_id like the upload_id of a direct upload. Creating or deploying the site reads the archive from the bucket to check it (at most 1 GiB), and the deployment deletes it from the bucket. The upload is kept for 24 hours, and a team keeps its 3 newest uploads.'
+      operationId: prepare-static-site-archive-s3-upload
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              properties:
+                application_uuid:
+                  type: string
+                  description: 'The archive site that this upload is a new version of.'
+              type: object
+      responses:
+        '201':
+          description: 'Presigned upload URL.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  upload_id: { type: string }
+                  url: { type: string, description: 'The presigned PUT URL.' }
+                  headers: { type: object, additionalProperties: { type: string }, description: 'Headers to send with the PUT request.' }
+                  expires_at: { type: string, format: date-time }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'The token user cannot create applications or update and deploy the application.'
+        '404':
+          description: 'Application not found.'
+        '422':
+          description: 'The instance has no upload storage.'
+      security:
+        -
+          bearerAuth: []
+  /applications/archive:
+    post:
+      tags:
+        - Applications
+      summary: 'Create (static site from an archive)'
+      description: 'Create a static site that is deployed from uploaded archives instead of a Git repository. With upload_id, the uploaded archive becomes the first version of the site and is deployed, which needs a token with the deploy ability.'
+      operationId: create-static-site-archive-application
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - project_uuid
+                - server_uuid
+              properties:
+                project_uuid:
+                  type: string
+                  description: 'The project UUID.'
+                server_uuid:
+                  type: string
+                  description: 'The server UUID.'
+                environment_name:
+                  type: string
+                  description: 'The environment name. You need to provide at least one of environment_name or environment_uuid.'
+                environment_uuid:
+                  type: string
+                  description: 'The environment UUID. You need to provide at least one of environment_name or environment_uuid.'
+                destination_uuid:
+                  type: string
+                  description: 'The destination UUID. Required when the server has more than one destination.'
+                name:
+                  type: string
+                  description: 'The application name.'
+                description:
+                  type: string
+                  description: 'The application description.'
+                domains:
+                  type: string
+                  description: 'The application URLs in a comma-separated list.'
+                autogenerate_domain:
+                  type: boolean
+                  default: true
+                  description: 'Generate a domain when domains is empty.'
+                force_domain_override:
+                  type: boolean
+                  default: false
+                  description: 'Use the domains even when another resource uses them.'
+                is_spa:
+                  type: boolean
+                  default: false
+                  description: 'Serve index.html for unknown paths (single-page application).'
+                upload_id:
+                  type: string
+                  format: uuid
+                  description: 'A completed upload from POST /applications/archive/uploads.'
+              type: object
+      responses:
+        '201':
+          description: 'Application created.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  uuid: { type: string }
+                  domains: { type: string, nullable: true }
+                  link: { type: string, nullable: true, description: 'The page of the application in the Coolify UI.' }
+                  deployment_uuid: { type: string, description: 'Set when a deployment was queued.' }
+                  message: { type: string, description: 'Set when the deployment could not be queued.' }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability to deploy the archive.'
+        '404':
+          description: 'Project, environment, server, or upload not found.'
+        '409':
+          description: 'Domain conflicts detected.'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/archive':
+    post:
+      tags:
+        - Applications
+      summary: 'Deploy static site archive'
+      description: 'Make an uploaded archive the current version of a static site that is deployed from archives, and build and deploy it. Needs a token with the write and deploy abilities.'
+      operationId: deploy-static-site-archive
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the application.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - upload_id
+              properties:
+                upload_id:
+                  type: string
+                  format: uuid
+                  description: 'A completed upload from POST /applications/archive/uploads.'
+              type: object
+      responses:
+        '201':
+          description: 'Deployment queued.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  deployment_uuid: { type: string }
+                  sha: { type: string, description: 'The site version.' }
+                  domains: { type: string, nullable: true }
+                  link: { type: string, nullable: true, description: 'The page of the application in the Coolify UI.' }
+                type: object
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'The token needs the deploy ability.'
+        '404':
+          description: 'Application or upload not found.'
+        '422':
+          $ref: '#/components/responses/422'
+        '429':
+          description: 'The deployment queue is full. Upload the archive again later.'
+      security:
+        -
+          bearerAuth: []
   /tags:
     get:
       tags:
@@ -16506,6 +18365,41 @@ paths:
         -
           bearerAuth: []
   '/applications/{uuid}/storages/{storage_uuid}/backups':
+    get:
+      tags:
+        - Applications
+      summary: 'Get application storage backup schedule'
+      description: 'Get the backup schedule of an application storage.'
+      operationId: get-application-storage-backup-schedule
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: storage_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Backup schedule.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolumeBackupScheduleResponse'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: Forbidden.
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
     put:
       tags:
         - Applications
@@ -16593,6 +18487,41 @@ paths:
         -
           bearerAuth: []
   '/databases/{uuid}/storages/{storage_uuid}/backups':
+    get:
+      tags:
+        - Databases
+      summary: 'Get database storage backup schedule'
+      description: 'Get the backup schedule of a database storage.'
+      operationId: get-database-storage-backup-schedule
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: storage_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Backup schedule.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolumeBackupScheduleResponse'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: Forbidden.
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
     put:
       tags:
         - Databases
@@ -16680,6 +18609,41 @@ paths:
         -
           bearerAuth: []
   '/services/{uuid}/storages/{storage_uuid}/backups':
+    get:
+      tags:
+        - Services
+      summary: 'Get service storage backup schedule'
+      description: 'Get the backup schedule of a service storage.'
+      operationId: get-service-storage-backup-schedule
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: storage_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Backup schedule.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolumeBackupScheduleResponse'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: Forbidden.
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
     put:
       tags:
         - Services
@@ -16878,19 +18842,29 @@ paths:
           schema:
             type: string
             example: 'update_now,update_available'
+        -
+          $ref: '#/components/parameters/Page'
+        -
+          $ref: '#/components/parameters/PerPage'
       responses:
         '200':
           description: 'Resources with their security status, worst first.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
-                properties:
-                  resources: { type: array, items: { properties: { uuid: { type: string }, name: { type: string }, type: { type: string, enum: [application, service, database] }, project_uuid: { type: [string, 'null'] }, environment_uuid: { type: [string, 'null'] }, server_uuid: { type: [string, 'null'] }, images: { properties: { update: { type: integer }, total: { type: integer } }, type: object }, security: { $ref: '#/components/schemas/SecurityStatus' } }, type: object } }
-                type: object
+                type: array
+                items:
+                  properties: { uuid: { type: string }, name: { type: string }, type: { type: string, enum: [application, service, database] }, project_uuid: { type: [string, 'null'] }, environment_uuid: { type: [string, 'null'] }, server_uuid: { type: [string, 'null'] }, images: { properties: { update: { type: integer }, total: { type: integer } }, type: object }, security: { $ref: '#/components/schemas/SecurityStatus' } }
+                  type: object
         '401':
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '422':
+          $ref: '#/components/responses/422'
       security:
         -
           bearerAuth: []
@@ -16923,7 +18897,10 @@ paths:
           $ref: '#/components/parameters/VulnerabilityPerPage'
       responses:
         '200':
-          description: 'Scan results.'
+          description: 'Scan results. The X-Total-Count header gives the total number of matching findings.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -16968,7 +18945,10 @@ paths:
           $ref: '#/components/parameters/VulnerabilityPerPage'
       responses:
         '200':
-          description: 'Scan results.'
+          description: 'Scan results. The X-Total-Count header gives the total number of matching findings.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -17013,7 +18993,10 @@ paths:
           $ref: '#/components/parameters/VulnerabilityPerPage'
       responses:
         '200':
-          description: 'Scan results.'
+          description: 'Scan results. The X-Total-Count header gives the total number of matching findings.'
+          headers:
+            X-Total-Count:
+              $ref: '#/components/headers/X-Total-Count'
           content:
             application/json:
               schema:
@@ -17280,6 +19263,7 @@ components:
             - standalone-keydb
             - standalone-dragonfly
             - standalone-clickhouse
+            - standalone-influxdb
             - standalone-sqlite
         image:
           type: string
@@ -17519,6 +19503,18 @@ components:
           format: password
         clickhouse_db:
           type: string
+        influxdb_admin_user:
+          type: string
+        influxdb_admin_password:
+          type: string
+          format: password
+        influxdb_admin_token:
+          type: string
+          format: password
+        influxdb_org:
+          type: string
+        influxdb_bucket:
+          type: string
         sqlite_databases:
           description: 'Comma-separated SQLite database file names.'
           type: string
@@ -17729,15 +19725,6 @@ components:
               owner_uuid:
                 type: string
             type: object
-        pagination:
-          properties:
-            page:
-              type: integer
-            per_page:
-              type: integer
-            total:
-              type: integer
-          type: object
       type: object
     ApplicationPreview:
       properties:
@@ -17788,6 +19775,35 @@ components:
           type:
             - string
             - 'null'
+        is_fork_pull_request:
+          description: 'The pull request comes from a fork. null: Coolify does not know the origin yet (no webhook event of the pull request), and each commit needs an approval as for a fork.'
+          type:
+            - boolean
+            - 'null'
+        approval_status:
+          description: 'Approval state of a fork pull request. waiting_for_approval: pending_approval_commit waits for an admin. approved: approved_commit was approved. null: no commit needed approval.'
+          type:
+            - string
+            - 'null'
+          enum:
+            - waiting_for_approval
+            - approved
+            - null
+        pending_approval_commit:
+          description: 'Commit that waits for approval before it deploys.'
+          type:
+            - string
+            - 'null'
+        approved_commit:
+          description: 'Last approved commit.'
+          type:
+            - string
+            - 'null'
+        approved_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
         created_at:
           type: string
         updated_at:
@@ -17945,9 +19961,174 @@ components:
         updated_at:
           type: string
       type: object
-    SecretManagerSource:
-      description: 'The secret manager source of an application, service, or database. Routes start with the resource type (`applications`, `services`, `databases`), so tokens limited to some resources can use them.'
+    MetricSeries:
+      description: 'Data points as [unix_timestamp_ms, value].'
+      type:
+        - array
+        - 'null'
+      items:
+        type: array
+        items:
+          type: number
+      example:
+        -
+          - 1787259000000
+          - 12.5
+        -
+          - 1787259060000
+          - 17.25
+    ContainerMetrics:
       properties:
+        cpu:
+          $ref: '#/components/schemas/MetricSeries'
+          description: 'CPU usage of the container in percent. Null when metrics are disabled for the server.'
+        memory:
+          $ref: '#/components/schemas/MetricSeries'
+          description: 'Memory usage of the container in MB. Null when metrics are disabled for the server.'
+      type: object
+    ResourceTraffic:
+      description: 'Traffic analytics that Sentinel records from the proxy access log. When traffic analytics is disabled on the server, enabled is false and every field except range is null.'
+      properties:
+        enabled:
+          type: boolean
+        range:
+          type: string
+          enum:
+            - 24h
+            - 7d
+            - 30d
+        overview:
+          properties:
+            requests:
+              type: integer
+            unique_visitors:
+              type: integer
+            bytes_in:
+              type: integer
+            bytes_out:
+              type: integer
+            error_rate:
+              description: 'Share of 4xx and 5xx responses in percent.'
+              type: number
+            latency:
+              description: 'Response time percentiles in milliseconds.'
+              properties:
+                p50:
+                  type: number
+                p95:
+                  type: number
+                p99:
+                  type: number
+              type: object
+            status:
+              properties:
+                s2xx:
+                  type: integer
+                s3xx:
+                  type: integer
+                s4xx:
+                  type: integer
+                s5xx:
+                  type: integer
+              type: object
+          type:
+            - object
+            - 'null'
+        latency_approximate:
+          description: 'True when the latency merges several sources and takes the worst value.'
+          type:
+            - boolean
+            - 'null'
+        uniques_approximate:
+          description: 'True when unique visitors are summed over several sources.'
+          type:
+            - boolean
+            - 'null'
+        series:
+          type:
+            - array
+            - 'null'
+          items:
+            properties:
+              bucket:
+                description: 'Bucket start as a unix timestamp in milliseconds.'
+                type: integer
+              s2xx:
+                type: integer
+              s3xx:
+                type: integer
+              s4xx:
+                type: integer
+              s5xx:
+                type: integer
+              requests:
+                type: integer
+              bytes_in:
+                type: integer
+              bytes_out:
+                type: integer
+              unique_visitors:
+                type: integer
+              p95:
+                type: number
+            type: object
+        top_paths:
+          type:
+            - array
+            - 'null'
+          items:
+            properties:
+              path:
+                type: string
+              domain:
+                type:
+                  - string
+                  - 'null'
+              requests:
+                type: integer
+              bytes_out:
+                type: integer
+              s4xx:
+                type: integer
+              s5xx:
+                type: integer
+              p95:
+                type: number
+            type: object
+        breakdowns:
+          description: 'Top values per dimension: country, city, referer, browser, os, device, protocol, cache, status, agent, ip, useragent. ip and useragent need the `read:sensitive` or `root` token ability. ip and city are left out when the server does not record IPs.'
+          type:
+            - object
+            - 'null'
+          additionalProperties:
+            type: array
+            items:
+              properties:
+                value:
+                  type: string
+                requests:
+                  type: integer
+                bytes_out:
+                  type: integer
+                lat:
+                  description: 'Only for city.'
+                  type: number
+                lon:
+                  description: 'Only for city.'
+                  type: number
+              type: object
+        attribution:
+          description: 'GeoIP data attribution to show with country and city data.'
+          type:
+            - string
+            - 'null'
+      type: object
+    SecretManagerSource:
+      description: 'A secret manager source of an application, service, or database. A resource can have several named sources: variables reference the `default` source as {{vault.KEY}} and other sources as {{vault.<name>.KEY}}. Routes start with the resource type (`applications`, `services`, `databases`), so tokens limited to some resources can use them.'
+      properties:
+        name:
+          description: 'Name of the source that the other fields describe.'
+          type: string
         linked:
           type: boolean
         integration_token_uuid:
@@ -17978,6 +20159,22 @@ components:
                 type: string
               provider:
                 type: string
+            type: object
+        sources:
+          description: 'All sources of the resource, sorted by name.'
+          type: array
+          items:
+            properties:
+              name:
+                type: string
+              integration_token_uuid:
+                type: string
+              provider:
+                type: string
+              settings:
+                type:
+                  - object
+                  - 'null'
             type: object
       type: object
     SharedEnvironmentVariableCreateRequest:
@@ -18104,7 +20301,6 @@ components:
     VolumeBackupScheduleResponse:
       required:
         - uuid
-        - message
         - storage_uuid
         - storage_type
         - frequency
@@ -18124,6 +20320,7 @@ components:
         uuid:
           type: string
         message:
+          description: 'Only in the response of a create or replace.'
           type: string
         storage_uuid:
           type: string
@@ -18372,6 +20569,9 @@ components:
           type: string
           nullable: true
           description: 'Dockerfile content. Used for dockerfile build pack.'
+        is_archive_source:
+          type: boolean
+          description: 'The static site is deployed from uploaded archives instead of a Git repository.'
         dockerfile_location:
           type: string
           description: 'Dockerfile location.'
@@ -18517,6 +20717,10 @@ components:
           minimum: 1
           maximum: 12
           description: 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'
+        ip_allowlist:
+          type: string
+          nullable: true
+          description: 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'
         settings:
           $ref: '#/components/schemas/ApplicationSetting'
       type: object
@@ -18667,6 +20871,12 @@ components:
           type: boolean
         is_pr_deployments_public_enabled:
           type: boolean
+        is_pr_deployments_public_approval_required:
+          type: boolean
+          description: 'Fork pull request previews wait for an admin to approve each commit.'
+        use_production_values_in_previews:
+          type: boolean
+          description: 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value.'
         use_build_secrets:
           type: boolean
         redact_all_env_values_in_logs:
@@ -18739,6 +20949,12 @@ components:
         comment:
           type: string
           nullable: true
+        compose_services:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: 'Docker Compose services that get this variable. Null means all services.'
         version:
           type: string
         created_at:
@@ -18969,14 +21185,6 @@ components:
           type: boolean
         is_jump_server:
           type: boolean
-        is_logdrain_axiom_enabled:
-          type: boolean
-        is_logdrain_cloudwatch_enabled:
-          type: boolean
-        is_logdrain_custom_enabled:
-          type: boolean
-        is_logdrain_newrelic_enabled:
-          type: boolean
         is_metrics_enabled:
           type: boolean
         is_traffic_analytics_enabled:
@@ -18999,6 +21207,12 @@ components:
             - full
             - anonymized
             - 'off'
+        log_archive_max_file_mb:
+          type: integer
+        log_archive_max_total_mb:
+          type: integer
+        log_archive_retention_days:
+          type: integer
         traefik_certificate_resolver:
           type: string
           nullable: true
@@ -19052,35 +21266,109 @@ components:
           description: 'SHA256 fingerprints of the host key that did not match.'
         is_sentinel_enabled:
           type: boolean
+        is_sentinel_pull_enabled:
+          type: boolean
+          description: 'Coolify reads Sentinel reports over SSH instead of Sentinel pushing them.'
         is_swarm_manager:
           type: boolean
         is_swarm_worker:
           type: boolean
         is_terminal_enabled:
           type: boolean
+        is_container_log_archive_enabled:
+          type: boolean
+          description: 'Sentinel keeps the logs of containers after they are removed.'
         is_usable:
           type: boolean
-        logdrain_axiom_api_key:
+        logdrain_type:
           type: string
-        logdrain_axiom_dataset_name:
-          type: string
-        logdrain_axiom_domain:
-          type: string
-          description: 'Base domain of the Axiom edge deployment, for example us-east-1.aws.edge.axiom.co or eu-central-1.aws.edge.axiom.co.'
-        logdrain_cloudwatch_region:
-          type: string
-        logdrain_cloudwatch_group:
-          type: string
-        logdrain_cloudwatch_stream_prefix:
-          type: string
-        logdrain_custom_config:
-          type: string
-        logdrain_custom_config_parser:
-          type: string
-        logdrain_newrelic_base_uri:
-          type: string
+          nullable: true
+          enum:
+            - newrelic
+            - axiom
+            - cloudwatch
+            - custom
+          description: 'The active log drain, or null when no log drain is enabled.'
+        is_logdrain_newrelic_enabled:
+          type: boolean
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        is_logdrain_axiom_enabled:
+          type: boolean
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        is_logdrain_custom_enabled:
+          type: boolean
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        is_logdrain_cloudwatch_enabled:
+          type: boolean
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
         logdrain_newrelic_license_key:
           type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_newrelic_base_uri:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_axiom_dataset_name:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_axiom_api_key:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_axiom_domain:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_custom_config:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_custom_config_parser:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_cloudwatch_region:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_cloudwatch_group:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
+        logdrain_cloudwatch_stream_prefix:
+          type: string
+          nullable: true
+          deprecated: true
+          readOnly: true
+          description: 'Deprecated: use logdrain_type and the /servers/{uuid}/log-drains endpoint instead.'
         sentinel_metrics_history_days:
           type: integer
         sentinel_metrics_refresh_rate_seconds:
@@ -19356,6 +21644,26 @@ components:
                 type: string
                 example: 'Rate limit exceeded. Please try again later.'
             type: object
+    TerminalRateLimited:
+      description: 'Terminal command rate or concurrency limit exceeded.'
+      headers:
+        Retry-After:
+          description: 'Number of seconds to wait before retrying.'
+          schema:
+            type: integer
+            example: 42
+      content:
+        application/json:
+          schema:
+            properties:
+              message:
+                type: string
+                example: 'Too many terminal command requests. Please retry in 42 seconds.'
+              retry_after:
+                description: 'Number of seconds to wait before retrying.'
+                type: integer
+                example: 42
+            type: object
     '502':
       description: 'The cloud provider API rejected the request.'
       content:
@@ -19377,6 +21685,52 @@ components:
                 example: forbidden
             type: object
   parameters:
+    Page:
+      name: page
+      in: query
+      description: 'Page number. With page or per_page, the list is paginated and the X-Total-Count header gives the total.'
+      required: false
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+    PerPage:
+      name: per_page
+      in: query
+      description: 'Items per page. With page or per_page, the list is paginated and the X-Total-Count header gives the total.'
+      required: false
+      schema:
+        type: integer
+        default: 50
+        maximum: 100
+        minimum: 1
+    MetricsMinutes:
+      name: minutes
+      in: query
+      description: 'Number of minutes of metric history before now. Cannot be sent with from or to. Cannot exceed the Sentinel metrics retention period of the server.'
+      required: false
+      schema:
+        type: integer
+        default: 10
+        minimum: 1
+    MetricsFrom:
+      name: from
+      in: query
+      description: 'Start of the metric history, as an ISO 8601 date. Cannot be older than the Sentinel metrics retention period of the server. The window length is rounded up to whole minutes, so the history can start up to a minute before from.'
+      required: false
+      schema:
+        type: string
+        format: date-time
+        example: '2026-11-20T08:00:00Z'
+    MetricsTo:
+      name: to
+      in: query
+      description: 'End of the metric history, as an ISO 8601 date after from. Needs from. Defaults to now.'
+      required: false
+      schema:
+        type: string
+        format: date-time
+        example: '2026-11-20T09:00:00Z'
     VulnerabilityState:
       name: state
       in: query
@@ -19422,6 +21776,11 @@ components:
         default: 50
         maximum: 200
         minimum: 1
+  headers:
+    X-Total-Count:
+      description: 'Total number of items that match the filters, on all pages. Sent when the list is paginated.'
+      schema:
+        type: integer
   securitySchemes:
     bearerAuth:
       type: http
@@ -19480,8 +21839,14 @@ tags:
     name: Notifications
     description: Notifications
   -
+    name: 'Project config'
+    description: 'Project config'
+  -
     name: Projects
     description: Projects
+  -
+    name: Services
+    description: Services
   -
     name: Resources
     description: Resources
@@ -19506,9 +21871,6 @@ tags:
   -
     name: 'Service databases'
     description: 'Service databases'
-  -
-    name: Services
-    description: Services
   -
     name: 'Shared Environment Variables'
     description: 'Shared Environment Variables'

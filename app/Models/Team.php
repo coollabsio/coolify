@@ -7,6 +7,7 @@ use App\Contracts\ThrottledNotification;
 use App\Events\ServerReachabilityChanged;
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\Channels\SendsNtfy;
 use App\Notifications\Channels\SendsPushover;
 use App\Notifications\Channels\SendsSlack;
 use App\Notifications\Server\Unreachable;
@@ -46,7 +47,7 @@ use OpenApi\Attributes as OA;
     ]
 )]
 
-class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, SendsSlack
+class Team extends Model implements SendsDiscord, SendsEmail, SendsNtfy, SendsPushover, SendsSlack
 {
     use Auditable, HasFactory, HasNotificationSettings, HasSafeStringAttribute;
     use Notifiable {
@@ -63,6 +64,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'is_build_server_fallback_enabled',
         'is_two_factor_required',
         'scan_images_on_new_servers',
+        'is_terminal_api_enabled',
     ];
 
     protected $attributes = [
@@ -70,6 +72,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'is_build_server_fallback_enabled' => true,
         'is_two_factor_required' => false,
         'scan_images_on_new_servers' => false,
+        'is_terminal_api_enabled' => false,
     ];
 
     protected $casts = [
@@ -78,6 +81,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         'is_build_server_fallback_enabled' => 'boolean',
         'is_two_factor_required' => 'boolean',
         'scan_images_on_new_servers' => 'boolean',
+        'is_terminal_api_enabled' => 'boolean',
     ];
 
     protected static function booted()
@@ -114,6 +118,7 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         $this->telegramNotificationSettings()->create();
         $this->pushoverNotificationSettings()->create();
         $this->webhookNotificationSettings()->create();
+        $this->ntfyNotificationSettings()->create();
     }
 
     /**
@@ -265,6 +270,15 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
         ];
     }
 
+    public function routeNotificationForNtfy()
+    {
+        return [
+            'url' => data_get($this, 'ntfy_url', null),
+            'topic' => data_get($this, 'ntfy_topic', null),
+            'token' => data_get($this, 'ntfy_token', null),
+        ];
+    }
+
     public function getRecipients(): array
     {
         $recipients = $this->members()->pluck('email')->toArray();
@@ -289,7 +303,8 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
             $this->getNotificationSettings('slack')?->isEnabled() ||
             $this->getNotificationSettings('telegram')?->isEnabled() ||
             $this->getNotificationSettings('pushover')?->isEnabled() ||
-            $this->getNotificationSettings('webhook')?->isEnabled();
+            $this->getNotificationSettings('webhook')?->isEnabled() ||
+            $this->getNotificationSettings('ntfy')?->isEnabled();
     }
 
     /**
@@ -502,5 +517,10 @@ class Team extends Model implements SendsDiscord, SendsEmail, SendsPushover, Sen
     public function webhookNotificationSettings()
     {
         return $this->hasOne(WebhookNotificationSettings::class);
+    }
+
+    public function ntfyNotificationSettings()
+    {
+        return $this->hasOne(NtfyNotificationSettings::class);
     }
 }

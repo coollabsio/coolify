@@ -299,9 +299,26 @@
                     icon-name="projects" />
             @endif
         </x-application.settings-section>
-    @else
+    @endcan
+
+    @if ($isTeamAdmin)
+        <x-application.settings-section id="export-resource-section" title="Export as coolify.json"
+            helper="Download the current settings of this resource as a coolify.json file. Secret values stay out of it.">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-[13px] text-neutral-500 dark:text-fg-dim">
+                    The file holds only this resource. Applied to a linked environment, it removes the other managed resources.
+                </p>
+                <x-forms.button wire:click="downloadExport" title="Download coolify.json with the current settings">
+                    <x-reicon name="download" class="size-3.5" />
+                    Export
+                </x-forms.button>
+            </div>
+        </x-application.settings-section>
+    @endif
+
+    @cannot('update', $resource)
         <x-callout type="danger" title="Insufficient permissions">
             You do not have permission to clone or move this resource. Contact a team administrator for access.
         </x-callout>
-    @endcan
+    @endcannot
 </div>

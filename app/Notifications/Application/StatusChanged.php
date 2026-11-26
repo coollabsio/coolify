@@ -10,6 +10,7 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Database\Eloquent\Model;
@@ -126,6 +127,23 @@ class StatusChanged extends CustomEmailNotification implements ThrottledNotifica
                     'url' => $this->resource_url,
                 ],
             ],
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        $message = $this->resource_name.' has been stopped.';
+
+        return new NtfyMessage(
+            title: 'Application stopped',
+            message: $message,
+            buttons: [
+                [
+                    'text' => 'Open Application in Coolify',
+                    'url' => $this->resource_url,
+                ],
+            ],
+            level: 'error',
         );
     }
 

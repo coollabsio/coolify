@@ -34,6 +34,7 @@ require_once __DIR__.'/Support/BrowserTestHelpers.php';
 require_once __DIR__.'/Support/ManagedDnsTestHelpers.php';
 require_once __DIR__.'/Support/StripeTestHelpers.php';
 require_once __DIR__.'/Support/RemoteProcessTestHelpers.php';
+require_once __DIR__.'/Support/ProjectConfigTestHelpers.php';
 
 function remoteOutputSource(string $path): string
 {
@@ -197,6 +198,26 @@ function writtenProxyFile(array $lines, string $file): ?string
     }
 
     return $content;
+}
+
+/**
+ * The mode that Server::uploadProxyFile() set on the upload before it moved the upload to $file.
+ *
+ * @param  array<int, string>  $lines  remote script lines (see Process::assertRan)
+ */
+function uploadedProxyFileMode(array $lines, string $file): ?string
+{
+    $modes = [];
+    $mode = null;
+    foreach ($lines as $line) {
+        if (preg_match('#chmod ([0-7]+) (/tmp/coolify-upload-[0-9a-f]+)$#', $line, $matches)) {
+            $modes[$matches[2]] = $matches[1];
+        } elseif (preg_match('#mv -f (/tmp/coolify-upload-[0-9a-f]+) '.preg_quote($file, '#').'$#', $line, $matches)) {
+            $mode = $modes[$matches[1]] ?? null;
+        }
+    }
+
+    return $mode;
 }
 
 /**

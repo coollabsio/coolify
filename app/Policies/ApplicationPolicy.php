@@ -6,6 +6,7 @@ use App\Enums\AccessLevel;
 use App\Models\Application;
 use App\Models\Environment;
 use App\Models\User;
+use App\Services\ProjectConfig\ManagedResources;
 use Illuminate\Auth\Access\Response;
 
 class ApplicationPolicy
@@ -39,6 +40,9 @@ class ApplicationPolicy
      */
     public function update(User $user, Application $application): Response
     {
+        if (ManagedResources::isManaged($application)) {
+            return Response::deny(ManagedResources::denyReason($application));
+        }
         if ($user->canAccess(AccessLevel::Write, $application)) {
             return Response::allow();
         }
@@ -68,6 +72,15 @@ class ApplicationPolicy
     public function forceDelete(User $user, Application $application): bool
     {
         return false;
+    }
+
+    /**
+     * Determine whether the user can schedule, run, and download storage backups. The read-only lock of coolify.json
+     * does not apply. When the file has `storage_backups`, its next apply replaces the schedules edited in the dashboard.
+     */
+    public function manageBackups(User $user, Application $application): bool
+    {
+        return $user->canAccess(AccessLevel::Write, $application);
     }
 
     /**

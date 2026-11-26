@@ -7,8 +7,10 @@ use App\Enums\AccessScope;
 use App\Livewire\Forms\ApiTokenForm;
 use App\Models\Environment;
 use App\Models\Project;
+use App\Models\Server;
 use App\Services\Access\AccessResolver;
 use App\Services\Access\Grant;
+use Carbon\CarbonInterface;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -58,6 +60,9 @@ class ApiTokens extends Component
     public bool $canUseDeployPermissions = false;
 
     #[Locked]
+    public bool $canUseTerminalPermissions = false;
+
+    #[Locked]
     public bool $canUseSensitivePermissions = false;
 
     #[Locked]
@@ -96,7 +101,7 @@ class ApiTokens extends Component
     }
 
     /**
-     * Projects, environments, and resources of the current team that the user can see, for the scope picker.
+     * Projects, environments, resources, and servers of the current team that the user can see, for the scope picker.
      *
      * Each option lists its "parents": the project and environment scopes that already include it.
      * A project or environment is an option only when the member has a grant on all of it, because a token
@@ -134,6 +139,12 @@ class ApiTokens extends Component
             ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)
             ->values();
 
+        // Server grants cover team-level server endpoints, so only users with access to the whole team can pick them.
+        $servers = $resolver->coversWholeTeam(auth()->user(), currentTeam()->id)
+            ? Server::query()->where('team_id', currentTeam()->id)->orderBy('name')->get(['id', 'uuid', 'name', 'server_metadata'])
+                ->reject(fn (Server $server) => $server->isTransferredAway())
+            : collect();
+
         return [
             ...($selectableProjects->isEmpty() ? [] : [['value' => '__projects', 'label' => 'Projects', 'header' => true]]),
             ...$selectableProjects->map(fn (Project $project) => ['value' => "project:{$project->uuid}", 'label' => $project->name])->values()->all(),
@@ -146,6 +157,8 @@ class ApiTokens extends Component
                 ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)->values()->all(),
             ...($resources->isEmpty() ? [] : [['value' => '__resources', 'label' => 'Resources', 'header' => true]]),
             ...$resources->all(),
+            ...($servers->isEmpty() ? [] : [['value' => '__servers', 'label' => 'Servers', 'header' => true]]),
+            ...$servers->map(fn (Server $server) => ['value' => "server:{$server->uuid}", 'label' => $server->name])->values()->all(),
         ];
     }
 
@@ -154,6 +167,7 @@ class ApiTokens extends Component
         $this->canUseRootPermissions = auth()->user()->can('useRootPermissions', PersonalAccessToken::class);
         $this->canUseWritePermissions = auth()->user()->can('useWritePermissions', PersonalAccessToken::class);
         $this->canUseDeployPermissions = auth()->user()->can('useDeployPermissions', PersonalAccessToken::class);
+        $this->canUseTerminalPermissions = auth()->user()->can('useTerminalPermissions', PersonalAccessToken::class);
         $this->canUseSensitivePermissions = auth()->user()->can('useSensitivePermissions', PersonalAccessToken::class);
         $this->canUseDeletePermissions = auth()->user()->can('useDeletePermissions', PersonalAccessToken::class);
         $this->canUseTeamScope = app(AccessResolver::class)->coversWholeTeam(auth()->user(), currentTeam()->id);
@@ -186,7 +200,7 @@ class ApiTokens extends Component
 
             $teamId = currentTeam()->id;
             ['permissions' => $permissions, 'scopes' => $storedScopes, 'expiresInDays' => $expiresInDays] = $this->validateTokenForm($this->form, $teamId);
-            $expiresAt = filled($expiresInDays) ? now()->addDays((int) $expiresInDays) : null;
+            $expiresAt = $this->limitTerminalTokenExpiry($permissions, filled($expiresInDays) ? now()->addDays((int) $expiresInDays) : null);
             // One transaction, so a token never exists team-wide when saving its scopes fails.
             $token = DB::transaction(function () use ($permissions, $expiresAt, $teamId, $storedScopes) {
                 $token = auth()->user()->createToken($this->form->description, $permissions, $expiresAt, $teamId);
@@ -236,6 +250,10 @@ class ApiTokens extends Component
                     'api_token_expiration_warning_sent_at' => null,
                 ]);
             }
+            $limitedExpiry = $this->limitTerminalTokenExpiry($permissions, $token->expires_at);
+            if ($limitedExpiry != $token->expires_at) {
+                $token->forceFill(['expires_at' => $limitedExpiry, 'api_token_expiration_warning_sent_at' => null]);
+            }
             $token->save();
 
             auditLog('ui.api_token.updated', [
@@ -270,12 +288,12 @@ class ApiTokens extends Component
             'description' => 'required|min:3|max:255',
             'expiresInDays' => ['nullable', Rule::in($expiryChoices)],
             'permissions' => 'required|array|min:1',
-            'permissions.*' => ['required', 'string', Rule::in(['read', 'read:sensitive', 'write', 'write:sensitive', 'deploy', 'delete', 'root'])],
+            'permissions.*' => ['required', 'string', Rule::in(['read', 'read:sensitive', 'write', 'write:sensitive', 'deploy', 'delete', 'root', 'terminal'])],
             'scopeMode' => ['required', Rule::in(['team', 'selected'])],
             'selectedScopes' => ['exclude_unless:scopeMode,selected', 'required', 'array', 'min:1'],
-            'selectedScopes.*' => ['string', 'regex:/^(project|environment|resource):[A-Za-z0-9_-]+$/'],
+            'selectedScopes.*' => ['string', 'regex:/^(project|environment|resource|server):[A-Za-z0-9_-]+$/'],
         ], [
-            'selectedScopes.required' => 'Select at least one project, environment, or resource.',
+            'selectedScopes.required' => 'Select at least one project, environment, resource, or server.',
         ]);
         $permissions = array_values($validated['permissions']);
         $form->selectedScopes = $this->withoutCoveredScopes($form->selectedScopes);
@@ -284,12 +302,20 @@ class ApiTokens extends Component
         if (in_array('write:sensitive', $permissions, true) && ! auth()->user()->isAdminOfTeam($teamId)) {
             throw new \Exception('You do not have permission to give tokens write:sensitive permissions.');
         }
+        if (in_array('terminal', $permissions, true)) {
+            if (! auth()->user()->isAdminOfTeam($teamId)) {
+                throw new \Exception('You do not have permission to give tokens terminal permissions.');
+            }
+            if ($permissions !== ['terminal']) {
+                throw new \Exception('A terminal token must have only the terminal permission.');
+            }
+        }
         $levels = AccessLevel::parseMany($permissions);
         $grants = $scopes === null
             ? [Grant::team($levels)]
             : array_map(fn (Grant $scope) => new Grant($scope->scope, $scope->uuid, $levels), $scopes);
         if (! app(AccessResolver::class)->userHolds(auth()->user(), $teamId, $grants)) {
-            throw new \Exception('A token cannot have more access than you have. Choose fewer permissions or narrower projects, environments, or resources.');
+            throw new \Exception('A token cannot have more access than you have. Choose fewer permissions or narrower projects, environments, resources, or servers.');
         }
 
         return [
@@ -297,6 +323,22 @@ class ApiTokens extends Component
             'scopes' => $scopes === null ? null : array_map(fn (Grant $scope) => ['scope' => $scope->scope->value, 'uuid' => $scope->uuid], $scopes),
             'expiresInDays' => $validated['expiresInDays'] ?? null,
         ];
+    }
+
+    /**
+     * Terminal tokens can run commands on servers, so they always expire after at most 90 days.
+     *
+     * @param  list<string>  $permissions
+     */
+    private function limitTerminalTokenExpiry(array $permissions, ?CarbonInterface $expiresAt): ?CarbonInterface
+    {
+        if (! in_array('terminal', $permissions, true)) {
+            return $expiresAt;
+        }
+
+        $maxExpiry = now()->addDays(90);
+
+        return $expiresAt === null || $expiresAt->greaterThan($maxExpiry) ? $maxExpiry : $expiresAt;
     }
 
     private function findOwnToken(int $id): PersonalAccessToken
@@ -318,14 +360,19 @@ class ApiTokens extends Component
         foreach (array_unique($selectedScopes) as $selected) {
             [$scope, $uuid] = explode(':', $selected, 2);
             $grant = new Grant(AccessScope::from($scope), $uuid, []);
+            if ($grant->scope === AccessScope::Server && ! $resolver->coversWholeTeam(auth()->user(), $teamId)) {
+                throw new \Exception('Only users with access to the whole team can limit a token to servers.');
+            }
             $layer = $resolver->resolve($teamId, [new Grant($grant->scope, $uuid, [AccessLevel::Read])]);
             $existsInTeam = match ($grant->scope) {
                 AccessScope::Project => $layer->visibleProjectIds() !== [],
                 AccessScope::Environment => $layer->fullEnvironmentIds() !== [],
-                default => $layer->resourceUuids() !== [],
+                AccessScope::Resource => $layer->resourceUuids() !== [],
+                AccessScope::Server => $layer->serverUuids() !== [],
+                AccessScope::Team => false,
             };
             if (! $existsInTeam) {
-                throw new \Exception('A selected project, environment, or resource does not exist in this team.');
+                throw new \Exception('A selected project, environment, resource, or server does not exist in this team.');
             }
             $scopes[] = $grant;
         }

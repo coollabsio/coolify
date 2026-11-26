@@ -724,7 +724,7 @@ it('updates the vulnerability database once when it is missing', function () {
     Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'GRYPE_DB_UPDATE_URL'));
 });
 
-it('fails when the vulnerability database is older than 5 days', function () {
+it('fails when the vulnerability database is older than 5 days after an update', function () {
     scanImageTestFake(['db-status' => scanImageTestPayload('db-status', json_encode(['built' => now()->subDays(7)->toIso8601ZuluString(), 'valid' => true]))]);
 
     $scan = scanImageTestRun();
@@ -733,7 +733,8 @@ it('fails when the vulnerability database is older than 5 days', function () {
         ->and($scan->status)->toBe(ImageScanStatus::Failed)
         ->and($scan->error_code)->toBe(ImageScanErrorCode::DbTooOld)
         ->and($scan->error_context)->toBe(['server' => $this->server->name, 'n' => 7]);
-    Process::assertDidntRun(fn ($process) => str_contains(remoteProcessScript($process), 'coolify-scan-exit db-update'));
+    // A database older than 3 days gets an update first; this one stays old.
+    Process::assertRanTimes(fn ($process) => str_contains(remoteProcessScript($process), 'coolify-scan-exit db-update'), 1);
 });
 
 it('stores the security status of a build server scan with the rules of the main destination server', function () {

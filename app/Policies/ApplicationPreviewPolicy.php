@@ -77,6 +77,19 @@ class ApplicationPreviewPolicy
         return $this->allows($user, AccessLevel::Deploy, $applicationPreview);
     }
 
+    /**
+     * Determine whether the user can approve a commit of a fork pull request. Approving lets
+     * untrusted code run on the server, so it needs write access to the application.
+     */
+    public function approve(User $user, ApplicationPreview $applicationPreview): Response
+    {
+        if ($this->allows($user, AccessLevel::Write, $applicationPreview)) {
+            return Response::allow();
+        }
+
+        return Response::deny('You need write access to this application to approve a fork pull request.');
+    }
+
     private function allows(User $user, AccessLevel $level, ApplicationPreview $applicationPreview): bool
     {
         $application = $applicationPreview->application;

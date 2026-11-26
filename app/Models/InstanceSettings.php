@@ -17,6 +17,7 @@ class InstanceSettings extends Model
     ];
 
     protected $fillable = [
+        'custom_theme',
         'public_ipv4',
         'public_ipv6',
         'fqdn',
@@ -66,12 +67,14 @@ class InstanceSettings extends Model
         'dev_helper_version',
         'is_wire_navigate_enabled',
         'is_mcp_server_enabled',
+        'is_terminal_api_enabled',
         'webhook_allowed_internal_hosts',
         'webhook_allow_localhost',
         'avatar_storage_type',
         'avatar_s3_storage_id',
         'image_cdn_url',
         'file_download_s3_storage_id',
+        'upload_s3_storage_id',
         'is_dashboard_force_https_enabled',
         'is_passkey_enabled',
     ];
@@ -122,6 +125,7 @@ class InstanceSettings extends Model
         'sentinel_token' => 'encrypted',
         'is_wire_navigate_enabled' => 'boolean',
         'is_mcp_server_enabled' => 'boolean',
+        'is_terminal_api_enabled' => 'boolean',
         'webhook_allowed_internal_hosts' => 'array',
         'webhook_allow_localhost' => 'boolean',
         'is_dashboard_force_https_enabled' => 'boolean',

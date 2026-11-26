@@ -8,6 +8,7 @@ use App\Models\NotificationThrottle;
 use App\Models\ScheduledDatabaseBackup;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Database\Eloquent\Model;
@@ -112,6 +113,21 @@ class BackupSuccessWithS3Warning extends CustomEmailNotification implements Thro
 
         return new PushoverMessage(
             title: 'Database backup succeeded locally, storage upload failed',
+            level: 'warning',
+            message: $message,
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        $message = "Database backup for {$this->name} (db:{$this->database_name}) was created successfully on local storage, but failed to upload to S3.\n\nFrequency: {$this->frequency}.\nS3 Error: {$this->s3_error}";
+
+        if ($this->s3_storage_url) {
+            $message .= "\n\nCheck S3 Configuration: {$this->s3_storage_url}";
+        }
+
+        return new NtfyMessage(
+            title: 'Database backup succeeded locally, S3 upload failed',
             level: 'warning',
             message: $message,
         );

@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Actions\Server\AuthorizedKeys;
 use App\Actions\Server\DeleteServer;
 use App\Actions\Server\ValidateServer;
+use App\Enums\AccessLevel;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Enums\ServerRole;
 use App\Helpers\SshMultiplexingHelper;
+use App\Http\Controllers\Api\Concerns\HandlesTerminalApi;
 use App\Http\Controllers\Api\Concerns\RequiresDeployAbility;
 use App\Http\Controllers\Controller;
 use App\Jobs\ServerConnectionCheckJob;
@@ -21,10 +23,13 @@ use App\Models\Server as ModelsServer;
 use App\Models\ServerSetting;
 use App\Models\Team;
 use App\Rules\ValidServerIp;
+use App\Services\Access\AccessResolver;
+use App\Services\LogDrain\LegacyLogDrainFields;
 use App\Services\ServerTransfer\ServerTransferClaimer;
 use App\Support\ValidationPatterns;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Process\Exceptions\ProcessTimedOutException;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 use OpenApi\Attributes as OA;
@@ -32,6 +37,7 @@ use Stringable;
 
 class ServersController extends Controller
 {
+    use HandlesTerminalApi;
     use RequiresDeployAbility;
 
     /**
@@ -45,14 +51,12 @@ class ServersController extends Controller
             $settings = $settings->makeVisible([
                 'sentinel_token',
                 'sentinel_custom_url',
-                'logdrain_newrelic_license_key',
-                'logdrain_axiom_api_key',
-                'logdrain_custom_config',
-                'logdrain_custom_config_parser',
+                'logdrain_config',
             ]);
         }
 
         return serializeApiResponse($settings)
+            ->merge(LegacyLogDrainFields::fromSettings($settings, request()->attributes->get('can_read_sensitive', false) === true))
             ->put('is_build_server', $settings->effectiveServerRole() === ServerRole::BUILD)
             ->put('ssh_host_key_fingerprints', ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key))
             ->put('ssh_host_key_pending_fingerprints', ServerSetting::sshHostKeyFingerprints($settings->ssh_host_key_pending));
@@ -106,12 +110,6 @@ class ServersController extends Controller
             'id',
         ]);
         $canReadSensitive = request()->attributes->get('can_read_sensitive', false) === true;
-        if ($canReadSensitive) {
-            $server->makeVisible([
-                'logdrain_axiom_api_key',
-                'logdrain_newrelic_license_key',
-            ]);
-        }
 
         $serialized = serializeApiResponse($server);
         if (! $canReadSensitive && is_array($serialized->get('proxy'))) {
@@ -159,12 +157,15 @@ class ServersController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $servers = ModelsServer::whereTeamId($teamId)->select('id', 'name', 'uuid', 'ip', 'user', 'port', 'description')->get()->load(['settings'])->map(function ($server) {
-            $server['is_reachable'] = $server->settings->is_reachable;
-            $server['is_usable'] = $server->settings->is_usable;
+        $scopedServerUuids = app(AccessResolver::class)->scopedServerUuids($request->user(), (int) $teamId);
+        $servers = ModelsServer::whereTeamId($teamId)
+            ->when($scopedServerUuids !== null, fn ($query) => $query->whereIn('uuid', $scopedServerUuids))
+            ->select('id', 'name', 'uuid', 'ip', 'user', 'port', 'description')->get()->load(['settings'])->map(function ($server) {
+                $server['is_reachable'] = $server->settings->is_reachable;
+                $server['is_usable'] = $server->settings->is_usable;
 
-            return $server;
-        });
+                return $server;
+            });
         $servers = $servers->map(function ($server) {
             $settings = $this->removeSensitiveDataFromSettings($server->settings);
             $server = $this->removeSensitiveData($server);
@@ -840,6 +841,11 @@ class ServersController extends Controller
         $newPort = $request->filled('port') ? (int) $request->input('port') : (int) $server->port;
         $endpointChanged = ModelsServer::normalizeIp($newIp) !== ModelsServer::normalizeIp($server->getRawOriginal('ip'))
             || $newPort !== (int) $server->port;
+        $privateKeyChanged = $request->filled('private_key_uuid') && $request->input('private_key_uuid') !== $server->privateKey?->uuid;
+        if (($endpointChanged || $privateKeyChanged)
+            && ! app(AccessResolver::class)->allowsTeamWide($request->user(), AccessLevel::Write, $teamId)) {
+            return response()->json(['message' => 'Changing the IP address, SSH port, or private key of a server needs write access on the whole team.'], 403);
+        }
         if ($endpointChanged && ModelsServer::sshEndpointInUse($newIp, $newPort, $server->id)) {
             return response()->json(['message' => 'A server with this IP/Domain and SSH port is already in use.'], 400);
         }
@@ -1409,5 +1415,134 @@ class ServersController extends Controller
         }
 
         return str(str($authority)->explode(':')[0]);
+    }
+
+    #[OA\Post(
+        summary: 'Execute Command',
+        description: 'Execute a non-interactive shell command on a server through Coolify SSH.',
+        path: '/servers/{uuid}/exec',
+        operationId: 'execute-command-on-server-by-uuid',
+        security: [
+            ['bearerAuth' => []],
+        ],
+        tags: ['Servers'],
+        parameters: [
+            new OA\Parameter(name: 'uuid', in: 'path', required: true, description: 'Server UUID', schema: new OA\Schema(type: 'string')),
+        ],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'application/json',
+                schema: new OA\Schema(
+                    required: ['command'],
+                    properties: [
+                        'command' => ['type' => 'string', 'description' => 'Shell command to execute on the server.'],
+                        'timeout' => ['type' => 'integer', 'description' => 'Command timeout in seconds. Maximum 10 seconds. Defaults to 10 seconds.'],
+                    ],
+                    type: 'object',
+                ),
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Command finished.',
+                content: [
+                    new OA\MediaType(
+                        mediaType: 'application/json',
+                        schema: new OA\Schema(
+                            type: 'object',
+                            properties: [
+                                'exit_code' => ['type' => 'integer'],
+                                'stdout' => ['type' => 'string'],
+                                'stderr' => ['type' => 'string'],
+                            ],
+                        ),
+                    ),
+                ],
+            ),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Terminal access is disabled on this server, or the terminal API is disabled on the instance or for the team.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+            new OA\Response(response: 429, ref: '#/components/responses/TerminalRateLimited'),
+        ]
+    )]
+    public function execute_command(Request $request)
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+
+        $return = validateIncomingRequest($request);
+        if ($return instanceof JsonResponse) {
+            return $return;
+        }
+
+        $allowedFields = ['command', 'timeout'];
+        $validator = customApiValidator($request->all(), [
+            'command' => 'required|string|max:20000|not_regex:/\x00/',
+            'timeout' => 'integer|nullable|min:1|max:10',
+        ]);
+
+        $extraFields = array_diff(array_keys($request->all()), $allowedFields);
+        if ($validator->fails() || ! empty($extraFields)) {
+            $errors = $validator->errors();
+            foreach ($extraFields as $field) {
+                $errors->add($field, 'This field is not allowed.');
+            }
+
+            return response()->json([
+                'message' => 'Validation failed.',
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $server = ModelsServer::whereTeamId($teamId)->whereUuid($request->route('uuid'))->first();
+        if (! $server) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+        if ($this->isTerminalDisabledOn($server)) {
+            return response()->json(['message' => 'Terminal access is disabled on this server.'], 403);
+        }
+
+        $rateLimitResponse = $this->enforceTerminalServerRateLimit($server, $teamId);
+        if ($rateLimitResponse instanceof JsonResponse) {
+            return $rateLimitResponse;
+        }
+
+        $timeout = $request->integer('timeout') ?: self::TERMINAL_COMMAND_TIMEOUT;
+        try {
+            // Bash runs the command as before (see SshMultiplexingHelper::remoteShellCommand()), sh when the server has no bash.
+            $remoteCommand = $this->withRemoteTimeout($request->command, $timeout, '$(command -v bash || echo sh)');
+            $process = $this->runConcurrentTerminalProcess($server, $teamId, $remoteCommand, $timeout);
+        } catch (ProcessTimedOutException) {
+            auditLog('api.server.command.executed', [
+                'team_id' => $teamId,
+                'server_uuid' => $server->uuid,
+                'server_name' => $server->name,
+                'exit_code' => 124,
+            ]);
+
+            return $this->terminalTimedOutResponse($timeout);
+        }
+
+        if ($process instanceof JsonResponse) {
+            return $process;
+        }
+
+        auditLog('api.server.command.executed', [
+            'team_id' => $teamId,
+            'server_uuid' => $server->uuid,
+            'server_name' => $server->name,
+            'exit_code' => $process->exitCode(),
+        ]);
+
+        return response()->json([
+            'exit_code' => $process->exitCode(),
+            'stdout' => $this->formatTerminalCommandOutput($process->output()),
+            'stderr' => $this->formatTerminalCommandOutput($process->errorOutput()),
+        ]);
     }
 }

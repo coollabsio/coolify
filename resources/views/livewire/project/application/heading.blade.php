@@ -3,8 +3,14 @@
     @teleport('#resource-star-slot-mobile')
         <livewire:star-toggle :resource="$application" :wire:key="'star-mobile-'.$application->getMorphClass().'-'.$application->uuid" />
     @endteleport
+    @teleport('#configuration-warning-hud-slot')
+        <div><x-project-config.hud-chip :resource="$application" /></div>
+    @endteleport
+    @teleport('#configuration-warning-hud-slot-mobile')
+        <div><x-project-config.hud-chip :resource="$application" /></div>
+    @endteleport
     <div>
-        @if ($application->build_pack === 'nixpacks')
+        @if ($application->build_pack === 'nixpacks' && $activeRouteName !== 'project.application.configuration')
             <x-callout type="warning" title="Nixpacks is deprecated" class="mb-4">
                 {{ config('deprecations.nixpacks') }}
                 <a class="underline" href="{{ route('project.application.configuration', $parameters) }}" {{ wireNavigate() }}>
@@ -62,7 +68,8 @@
                                     {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment' : 'Deploy' }}
                                 </x-slot:main>
                                 @if (!$application->destination?->server?->isSwarm())
-                                    <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="deploy(true)"
+                                    <button type="button" class="listbox-option justify-start! gap-2.5! {{ $application->is_archive_source ? 'listbox-option-disabled' : '' }}" wire:click="deploy(true)"
+                                        @disabled($application->is_archive_source) @if ($application->is_archive_source) title="Archive sites build only from a new upload." @endif
                                         @click="open = false" role="menuitem">
                                         <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                         {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment (without cache)' : 'Deploy (without cache)' }}
@@ -93,8 +100,9 @@
                                         <x-reicon name="refresh" class="size-3.5" />
                                         Redeploy
                                     </x-slot:main>
-                                    <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                    <button type="button" class="listbox-option justify-start! gap-2.5! {{ $application->is_archive_source ? 'listbox-option-disabled' : '' }}"
                                         wire:click="{{ str($application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)' }}"
+                                        @disabled($application->is_archive_source) @if ($application->is_archive_source) title="Archive sites build only from a new upload." @endif
                                         @click="open = false" role="menuitem">
                                         <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                         Redeploy (without cache)
@@ -181,9 +189,9 @@
         <div class="hidden w-full items-center xl:flex xl:w-auto">
             <div
                 class="resource-heading-navbar application-heading-actions flex w-full min-w-0 items-center justify-start gap-1 overflow-visible xl:w-auto xl:justify-end">
-                <div class="resource-heading-actions flex shrink-0 items-center gap-0.5">
+                <div class="resource-heading-actions flex shrink-0 items-center gap-1">
                     @if ($this->runningDeploymentUrl)
-                        <x-deploying-indicator :href="$this->runningDeploymentUrl" class="mr-1" />
+                        <x-deploying-indicator :href="$this->runningDeploymentUrl" size="md" />
                     @endif
                     @if ($this->needsComposeFile())
                         @can('update', $application)
@@ -208,7 +216,8 @@
                                         {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment' : 'Deploy' }}
                                     </x-slot:main>
                                     @if (!$application->destination?->server?->isSwarm())
-                                        <button type="button" class="listbox-option justify-start! gap-2.5!" wire:click="deploy(true)"
+                                        <button type="button" class="listbox-option justify-start! gap-2.5! {{ $application->is_archive_source ? 'listbox-option-disabled' : '' }}" wire:click="deploy(true)"
+                                            @disabled($application->is_archive_source) @if ($application->is_archive_source) title="Archive sites build only from a new upload." @endif
                                             @click="open = false" role="menuitem">
                                             <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                             {{ $application->stoppedAfterRestartLimit() ? 'Retry deployment (without cache)' : 'Deploy (without cache)' }}
@@ -239,8 +248,9 @@
                                             <x-reicon name="refresh" class="size-3.5" />
                                             Redeploy
                                         </x-slot:main>
-                                        <button type="button" class="listbox-option justify-start! gap-2.5!"
+                                        <button type="button" class="listbox-option justify-start! gap-2.5! {{ $application->is_archive_source ? 'listbox-option-disabled' : '' }}"
                                             wire:click="{{ str($application->status)->startsWith('running') ? 'force_deploy_without_cache' : 'deploy(true)' }}"
+                                            @disabled($application->is_archive_source) @if ($application->is_archive_source) title="Archive sites build only from a new upload." @endif
                                             @click="open = false" role="menuitem">
                                             <x-reicon name="refresh" class="size-3.5 opacity-70" />
                                             Redeploy (without cache)

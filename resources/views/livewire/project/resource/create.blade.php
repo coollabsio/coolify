@@ -29,6 +29,8 @@
         <livewire:project.new.docker-compose :type="$type" />
     @elseif ($type === 'docker-image')
         <livewire:project.new.docker-image :type="$type" />
+    @elseif ($type === 'static-archive')
+        <livewire:project.new.static-archive />
     @else
         <livewire:project.new.select />
     @endif

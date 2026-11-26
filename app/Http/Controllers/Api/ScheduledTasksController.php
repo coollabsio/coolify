@@ -258,7 +258,9 @@ class ScheduledTasksController extends Controller
             return response()->json(['message' => 'Scheduled task not found.'], 404);
         }
 
-        $executions = $task->executions()->get()->map(function ($execution) use ($task) {
+        $request->validate(apiPaginationRules());
+        [$executions, $headers] = apiPaginate($task->executions()->orderBy('id', 'desc'), $request);
+        $executions = $executions->map(function ($execution) use ($task) {
             $execution->makeHidden(['id', 'scheduled_task_id']);
             if (! $this->canReadSensitive($task)) {
                 $execution->makeHidden(['message']);
@@ -267,7 +269,7 @@ class ScheduledTasksController extends Controller
             return serializeApiResponse($execution);
         });
 
-        return response()->json($executions);
+        return response()->json($executions, 200, $headers);
     }
 
     private function executeTask(Request $request, Application|Service $resource): JsonResponse
@@ -625,10 +627,13 @@ class ScheduledTasksController extends Controller
                     type: 'string',
                 )
             ),
+            new OA\Parameter(ref: '#/components/parameters/Page'),
+            new OA\Parameter(ref: '#/components/parameters/PerPage'),
         ],
         responses: [
             new OA\Response(
                 response: 200,
+                headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')],
                 description: 'Get all executions for a scheduled task.',
                 content: [
                     new OA\MediaType(
@@ -648,6 +653,7 @@ class ScheduledTasksController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
     public function executions_by_application_uuid(Request $request): JsonResponse
@@ -998,10 +1004,13 @@ class ScheduledTasksController extends Controller
                     type: 'string',
                 )
             ),
+            new OA\Parameter(ref: '#/components/parameters/Page'),
+            new OA\Parameter(ref: '#/components/parameters/PerPage'),
         ],
         responses: [
             new OA\Response(
                 response: 200,
+                headers: [new OA\Header(header: 'X-Total-Count', ref: '#/components/headers/X-Total-Count')],
                 description: 'Get all executions for a scheduled task.',
                 content: [
                     new OA\MediaType(
@@ -1021,6 +1030,7 @@ class ScheduledTasksController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
         ]
     )]
     public function executions_by_service_uuid(Request $request): JsonResponse

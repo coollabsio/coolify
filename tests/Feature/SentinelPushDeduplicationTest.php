@@ -1,7 +1,7 @@
 <?php
 
+use App\Actions\Server\ProcessSentinelReport;
 use App\Events\SentinelSynchronized;
-use App\Http\Controllers\Api\SentinelController;
 use App\Jobs\PushServerUpdateJob;
 use App\Models\AuditEvent;
 use App\Models\Server;
@@ -65,11 +65,10 @@ it('skips dispatch decision when sentinel lock acquisition times out', function 
         ->with('sentinel:push-lock:'.$this->server->id, 10)
         ->andReturn($lock);
 
-    $controller = new SentinelController;
-    $method = new ReflectionMethod($controller, 'shouldDispatchUpdate');
-    $method->setAccessible(true);
+    $action = new ProcessSentinelReport;
+    $method = new ReflectionMethod($action, 'shouldDispatchUpdate');
 
-    expect($method->invoke($controller, $this->server, sentinelPayload($running())))->toBeFalse();
+    expect($method->invoke($action, $this->server, sentinelPayload($running())))->toBeFalse();
 });
 
 it('dispatches the job on the first push', function () use ($running) {

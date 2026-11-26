@@ -31,7 +31,7 @@
                 $isTransferredAway => 'Transferred away',
                 $server->settings->force_disabled => 'Disabled',
                 $proxyNeedsAttention || $sentinelNeedsAttention => 'Attention required',
-                $isReady => 'Ready',
+                $isReady => 'Operational',
                 default => 'Validation required',
             };
 

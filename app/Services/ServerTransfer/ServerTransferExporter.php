@@ -26,6 +26,7 @@ use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledTask;
 use App\Models\ScheduledVolumeBackup;
+use App\Models\SecretManagerLink;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
@@ -73,6 +74,8 @@ class ServerTransferExporter
         'patch_check_result',
         'patch_check_error',
         'patch_checked_at',
+        // The target reads the last automatic update run again and keeps it as its baseline.
+        'auto_security_updates_last_run',
         // The daily candidate scan counter of the source; the target counts its own.
         'image_candidate_scans_today',
         'image_candidate_scans_date',
@@ -163,6 +166,9 @@ class ServerTransferExporter
         if (ImageScanIgnore::query()->where('team_id', $server->team_id)->whereNull('resource_type')->exists()) {
             $warnings[] = 'Team-wide vulnerability ignores stay on this instance.';
         }
+        if ($server->proxyConfigurationVersions()->exists()) {
+            $warnings[] = 'The proxy configuration history stays on this instance. The current proxy configuration is transferred.';
+        }
         if ($leftOutLinks > 0) {
             $warnings[] = $leftOutLinks.' '.Str::plural('link', $leftOutLinks).' between resources on the environment canvas '
                 .($leftOutLinks === 1 ? 'is' : 'are').' not transferred, because one of the linked resources stays on this instance.';
@@ -175,7 +181,7 @@ class ServerTransferExporter
             ],
             'warnings' => $warnings,
             // Manual steps after the transfer. The source replaces {target_url} with the URL of the target.
-            'post_transfer_checklist' => $this->postTransferChecklist($dependencies, $runnerConfig, $applications),
+            'post_transfer_checklist' => $this->postTransferChecklist($dependencies, $runnerConfig, $applications, $applications->concat($databases)->concat($services)),
             // Back-compat: single server key
             'private_key' => $this->exportPrivateKey($privateKey),
             // All keys needed by server, apps, and git sources
@@ -559,8 +565,8 @@ class ServerTransferExporter
     {
         $tokenIds = collect([$server->settings?->cloudflare_tunnel_integration_token_id]);
         foreach ($resources as $resource) {
-            if (method_exists($resource, 'secretManagerLink')) {
-                $tokenIds->push($resource->secretManagerLink()->value('integration_token_id'));
+            if (method_exists($resource, 'secretManagerLinks')) {
+                $tokenIds->push(...$resource->secretManagerLinks()->pluck('integration_token_id'));
             }
         }
         foreach ($dnsRecords as $record) {
@@ -576,11 +582,15 @@ class ServerTransferExporter
      *
      * @param  array{github_apps: Collection<int, GithubApp>, gitlab_apps: Collection<int, GitlabApp>, gitea_apps: Collection<int, GiteaApp>}  $dependencies
      * @param  Collection<int, Application>  $applications
+     * @param  Collection<int, Model>  $resources  applications, databases, and services
      * @return list<string>
      */
-    private function postTransferChecklist(array $dependencies, ?GithubRunnerConfig $runnerConfig, Collection $applications): array
+    private function postTransferChecklist(array $dependencies, ?GithubRunnerConfig $runnerConfig, Collection $applications, Collection $resources): array
     {
         $steps = [];
+        if ($resources->contains(fn (Model $resource) => filled($resource->config_key))) {
+            $steps[] = 'Some resources were managed by coolify.json. Link their environments again on {target_url}: the link does not move with the server.';
+        }
         // A manual webhook is set in the repository itself, so its URL still points to this instance. Every
         // application has the secrets, so list the git applications that do not deploy through a private App.
         $manualWebhookApps = $applications
@@ -954,6 +964,7 @@ class ServerTransferExporter
             'custom_labels',
             'is_maintenance_enabled',
             'maintenance_page',
+            'config_key',
         ] as $hidden) {
             if (in_array($hidden, $columns, true)) {
                 $attrs[$hidden] = $application->{$hidden};
@@ -994,7 +1005,7 @@ class ServerTransferExporter
             'scheduled_tasks' => $this->exportScheduledTasks($application->scheduled_tasks()->get()),
             'tags' => $this->exportTags($application->tags),
             'previews' => $this->exportPreviews($application->previews),
-            'secret_manager_link' => $this->exportSecretManagerLink($application),
+            'secret_manager_links' => $this->exportSecretManagerLinks($application),
             'source' => $source,
             'private_key_uuid' => $application->private_key?->uuid,
             'had_git_source' => filled($application->source_id),
@@ -1029,6 +1040,7 @@ class ServerTransferExporter
             }
             $attrs[$field] = $database->{$field};
         }
+        $attrs['config_key'] = $database->config_key;
 
         // Secrets are often $hidden and sometimes omitted from $fillable (e.g. redis_password).
         foreach ($columns as $column) {
@@ -1068,7 +1080,7 @@ class ServerTransferExporter
             'scheduled_backups' => method_exists($database, 'scheduledBackups')
                 ? $this->exportScheduledBackups($database->scheduledBackups)
                 : [],
-            'secret_manager_link' => $this->exportSecretManagerLink($database),
+            'secret_manager_links' => $this->exportSecretManagerLinks($database),
         ];
     }
 
@@ -1101,6 +1113,8 @@ class ServerTransferExporter
             }
             $attrs[$field] = $service->{$field};
         }
+        $attrs['config_key'] = $service->config_key;
+        $attrs['config_meta'] = $service->config_meta;
 
         // Hidden compose fields, maintenance mode and the Coolify default variables switch (not fillable)
         foreach (['docker_compose', 'docker_compose_raw', 'is_maintenance_enabled', 'maintenance_page', 'include_coolify_default_variables'] as $hidden) {
@@ -1119,7 +1133,7 @@ class ServerTransferExporter
             'environment_variables' => $this->exportEnvVars($service->environment_variables()->get()),
             'scheduled_tasks' => $this->exportScheduledTasks($service->scheduled_tasks()->get()),
             'tags' => $this->exportTags($service->tags),
-            'secret_manager_link' => $this->exportSecretManagerLink($service),
+            'secret_manager_links' => $this->exportSecretManagerLinks($service),
             'applications' => $service->applications
                 ->map(fn ($app) => $this->exportServiceApplication($app))
                 ->values()
@@ -1290,6 +1304,7 @@ class ServerTransferExporter
                 'is_literal' => (bool) $variable->is_literal,
                 'is_multiline' => (bool) $variable->is_multiline,
                 'is_preview' => (bool) $variable->is_preview,
+                'is_production_value_copy' => (bool) $variable->is_production_value_copy,
                 'is_runtime' => (bool) $variable->is_runtime,
                 'is_buildtime' => (bool) $variable->is_buildtime,
                 'is_shown_once' => (bool) $variable->is_shown_once,
@@ -1298,7 +1313,9 @@ class ServerTransferExporter
                 'uses_legacy_escaping' => (bool) $variable->uses_legacy_escaping,
                 'preserve_compose_null' => (bool) $variable->preserve_compose_null,
                 'comment' => $variable->comment,
+                'compose_services' => $variable->compose_services,
                 'order' => $variable->order,
+                'config_meta' => $variable->config_meta,
                 // The Coolify version that created the variable.
                 'version' => $variable->version,
             ];
@@ -1321,6 +1338,7 @@ class ServerTransferExporter
                 'mount_path' => $volume->mount_path,
                 'host_path' => $volume->host_path,
                 'is_preview_suffix_enabled' => (bool) ($volume->is_preview_suffix_enabled ?? false),
+                'is_external' => (bool) $volume->is_external,
                 'ignores_compose_driver_options' => (bool) $volume->ignores_compose_driver_options,
                 'standalone_sqlite_uuid' => $volume->standaloneSqlite?->uuid,
             ];
@@ -1621,23 +1639,25 @@ class ServerTransferExporter
     }
 
     /**
-     * @return array{uuid: string, integration_token_uuid: string, settings: array<string, mixed>|null}|null
+     * All named secret manager sources of the resource.
+     *
+     * @return list<array{uuid: string, name: string, integration_token_uuid: string, settings: array<string, mixed>|null}>
      */
-    private function exportSecretManagerLink(Model $resource): ?array
+    private function exportSecretManagerLinks(Model $resource): array
     {
-        if (! method_exists($resource, 'secretManagerLink')) {
-            return null;
-        }
-        $link = $resource->secretManagerLink()->with('integrationToken')->first();
-        if (! $link) {
-            return null;
+        if (! method_exists($resource, 'secretManagerLinks')) {
+            return [];
         }
 
-        return [
-            'uuid' => $link->uuid,
-            'integration_token_uuid' => $link->integrationToken->uuid,
-            'settings' => $link->settings,
-        ];
+        return $resource->secretManagerLinks()->with('integrationToken')->orderBy('name')->get()
+            ->map(fn (SecretManagerLink $link): array => [
+                'uuid' => $link->uuid,
+                'name' => $link->sourceName(),
+                'integration_token_uuid' => $link->integrationToken->uuid,
+                'settings' => $link->settings,
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -1795,6 +1815,10 @@ class ServerTransferExporter
                 'docker_registry_image_tag' => $preview->docker_registry_image_tag,
                 'domain_port_overrides' => $preview->domain_port_overrides,
                 'max_restart_count' => $preview->max_restart_count,
+                'is_fork_pull_request' => $preview->is_fork_pull_request,
+                'pending_approval_commit' => $preview->pending_approval_commit,
+                'approved_commit' => $preview->approved_commit,
+                'approved_at' => $preview->approved_at?->toIso8601String(),
                 'keeps_production_values' => $preview->keeps_production_values,
                 'is_same_repository' => $preview->is_same_repository,
                 'persistent_storages' => method_exists($preview, 'persistentStorages')

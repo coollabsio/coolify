@@ -124,6 +124,7 @@
                             // Members limited to some projects see the resources they have access to.
                             ['label' => 'Security', 'icon' => 'shield-alert', 'href' => route('vulnerabilities'), 'active' => request()->is('vulnerabilities')],
                         ]],
+                        ['label' => 'Deployments', 'icon' => 'time-back', 'href' => route('deployments.index'), 'active' => request()->is('deployments'), 'visible' => $teamWide],
                         ['label' => 'Terminal', 'icon' => 'browser-terminal', 'href' => route('terminal'), 'active' => request()->is('terminal*'), 'navigate' => false, 'visible' => $teamWide && auth()->user()?->can('canAccessTerminal')],
                     ],
                     'Infrastructure' => [
@@ -157,6 +158,7 @@
                             ['label' => 'Telegram', 'brandIcon' => 'telegram', 'href' => route('notifications.telegram'), 'active' => request()->is('notifications/telegram')],
                             ['label' => 'Slack', 'brandIcon' => 'slack', 'href' => route('notifications.slack'), 'active' => request()->is('notifications/slack')],
                             ['label' => 'Pushover', 'brandIcon' => 'pushover', 'href' => route('notifications.pushover'), 'active' => request()->is('notifications/pushover')],
+                            ['label' => 'Ntfy', 'brandIcon' => 'ntfy-mono', 'href' => route('notifications.ntfy'), 'active' => request()->is('notifications/ntfy')],
                             ['label' => 'Webhook', 'icon' => 'destinations', 'href' => route('notifications.webhook'), 'active' => request()->is('notifications/webhook')],
                         ]],
                         ['label' => 'Keys & Tokens', 'icon' => 'keys', 'children' => [

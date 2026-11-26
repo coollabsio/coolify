@@ -7,6 +7,7 @@ use App\Enums\BuildPackTypes;
 use App\Enums\HttpBasicAuthHashAlgorithm;
 use App\Enums\ProxyTypes;
 use App\Exceptions\DeploymentException;
+use App\Rules\ValidIpAllowlist;
 use App\Services\ComposeIncludeFlattener;
 use App\Services\ConfigurationGenerator;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
@@ -14,6 +15,7 @@ use App\Services\DeploymentConfiguration\ConfigurationDiff;
 use App\Services\DeploymentConfiguration\ConfigurationDiffer;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
+use App\Support\StaticSiteArchive;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasComposeVolumeWarnings;
@@ -28,12 +30,14 @@ use App\Traits\HasStars;
 use App\Traits\ReleasesManagedDnsRecords;
 use App\Traits\ScopedByAccessGrants;
 use Database\Factories\ApplicationFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use OpenApi\Attributes as OA;
@@ -102,6 +106,7 @@ use Symfony\Component\Yaml\Yaml;
         'private_key_id' => ['type' => 'integer', 'nullable' => true, 'description' => 'Private key identifier.'],
         'environment_id' => ['type' => 'integer', 'description' => 'Environment identifier.'],
         'dockerfile' => ['type' => 'string', 'nullable' => true, 'description' => 'Dockerfile content. Used for dockerfile build pack.'],
+        'is_archive_source' => ['type' => 'boolean', 'description' => 'The static site is deployed from uploaded archives instead of a Git repository.'],
         'dockerfile_location' => ['type' => 'string', 'description' => 'Dockerfile location.'],
         'custom_labels' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom labels.'],
         'dockerfile_target_build' => ['type' => 'string', 'nullable' => true, 'description' => 'Dockerfile target build.'],
@@ -137,6 +142,7 @@ use Symfony\Component\Yaml\Yaml;
         'http_basic_auth_bcrypt_cost' => ['type' => 'integer', 'minimum' => 4, 'maximum' => 14, 'description' => 'Bcrypt cost for the HTTP Basic Authentication password.'],
         'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
         'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
+        'ip_allowlist' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'],
         new OA\Property(property: 'settings', ref: '#/components/schemas/ApplicationSetting'),
     ]
 )]
@@ -149,6 +155,17 @@ class Application extends BaseModel
     public const MAX_DOCKER_COMPOSE_SIZE_BYTES = 5 * 1024 * 1024;
 
     public const MAX_DOCKER_COMPOSE_COLLECTION_ALIASES = 256;
+
+    /**
+     * Configuration pages that do not apply to a site deployed from uploaded archives, as route name prefixes.
+     */
+    private const ARCHIVE_SITE_HIDDEN_ROUTES = [
+        'project.application.environment-variables',
+        'project.application.persistent-storage',
+        'project.application.backup.',
+        'project.application.scheduled-tasks',
+        'project.application.webhooks',
+    ];
 
     private static $parserVersion = '5';
 
@@ -236,6 +253,7 @@ class Application extends BaseModel
         'redirect',
         'compose_parsing_version',
         'custom_nginx_configuration',
+        'is_archive_source',
         'custom_network_aliases',
         'custom_healthcheck_found',
         'nixpkgsarchive',
@@ -246,6 +264,7 @@ class Application extends BaseModel
         'http_basic_auth_bcrypt_cost',
         'http_basic_auth_argon2id_memory_cost',
         'http_basic_auth_argon2id_time_cost',
+        'ip_allowlist',
         'connect_to_docker_network',
         'force_domain_override',
         'is_container_label_escape_enabled',
@@ -332,6 +351,7 @@ class Application extends BaseModel
             'is_maintenance_enabled' => 'boolean',
             'health_check_enabled' => 'boolean',
             'custom_healthcheck_found' => 'boolean',
+            'is_archive_source' => 'boolean',
         ];
     }
 
@@ -437,8 +457,11 @@ class Application extends BaseModel
             }
         });
         static::created(function ($application) {
+            // New applications keep build-time values out of image layers. Clones and server transfer
+            // imports overwrite this row with the settings of their source application.
             ApplicationSetting::create([
                 'application_id' => $application->id,
+                'use_build_secrets' => true,
             ]);
 
             // Add default NIXPACKS_NODE_VERSION environment variable for Nixpacks applications
@@ -458,11 +481,12 @@ class Application extends BaseModel
         });
         static::forceDeleting(function ($application) {
             $application->update(['fqdn' => null]);
+            Storage::deleteDirectory(StaticSiteArchive::storageDirectory($application));
             $application->settings()->delete();
             $application->persistentStorages()->delete();
             $application->environment_variables()->delete();
             $application->environment_variables_preview()->delete();
-            $application->secretManagerLink()->delete();
+            $application->secretManagerLinks()->delete();
             foreach ($application->scheduled_tasks as $task) {
                 $task->delete();
             }
@@ -564,6 +588,81 @@ class Application extends BaseModel
     }
 
     /**
+     * Filter the applications of a team (API and MCP listings).
+     * A project, environment, or server UUID that the team does not own matches no application.
+     * Status and name are case-insensitive substring matches. Status matches the aggregated status of multi-server applications.
+     *
+     * @param  array{tag?: ?string, project_uuid?: ?string, environment_uuid?: ?string, server_uuid?: ?string, status?: ?string, name?: ?string}  $filters
+     */
+    public function scopeApplyListFilters(Builder $query, int $teamId, array $filters): Builder
+    {
+        $tag = $filters['tag'] ?? null;
+        $projectUuid = $filters['project_uuid'] ?? null;
+        $environmentUuid = $filters['environment_uuid'] ?? null;
+        $serverUuid = $filters['server_uuid'] ?? null;
+        $status = $filters['status'] ?? null;
+        $name = $filters['name'] ?? null;
+
+        return $query
+            ->when($tag !== null, fn (Builder $query) => $query->whereHas('tags', fn (Builder $q) => $q->where('name', $tag)))
+            ->when($projectUuid !== null, function (Builder $query) use ($projectUuid, $teamId) {
+                $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
+                if (! $project) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $query->whereHas('environment', fn (Builder $q) => $q->where('project_id', $project->id));
+            })
+            ->when($environmentUuid !== null, function (Builder $query) use ($environmentUuid, $teamId) {
+                $environment = Environment::ownedByCurrentTeamAPI($teamId)->where('uuid', $environmentUuid)->first();
+                if (! $environment) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $query->where('environment_id', $environment->id);
+            })
+            ->when($serverUuid !== null, function (Builder $query) use ($serverUuid, $teamId) {
+                $server = Server::whereTeamId($teamId)->where('uuid', $serverUuid)->first();
+                if (! $server) {
+                    $query->whereRaw('1 = 0');
+
+                    return;
+                }
+                $standaloneDockerIds = $server->standaloneDockers()->pluck('id');
+                $swarmDockerIds = $server->swarmDockers()->pluck('id');
+                $query->where(function (Builder $q) use ($standaloneDockerIds, $swarmDockerIds, $server) {
+                    $q->where(fn (Builder $inner) => $inner->where('destination_type', StandaloneDocker::class)->whereIn('destination_id', $standaloneDockerIds))
+                        ->orWhere(fn (Builder $inner) => $inner->where('destination_type', SwarmDocker::class)->whereIn('destination_id', $swarmDockerIds))
+                        ->orWhereHas('additional_servers', fn (Builder $inner) => $inner->where('servers.id', $server->id));
+                });
+            })
+            ->when($name !== null, fn (Builder $query) => apiWhereContains($query, 'name', $name))
+            ->when($status !== null, fn (Builder $query) => $query->whereStatusContains($status));
+    }
+
+    /**
+     * Match the status that the application returns: the stored status for one server,
+     * and the status aggregated with the additional servers (for example `degraded:unhealthy`) for more servers.
+     */
+    public function scopeWhereStatusContains(Builder $query, string $status): Builder
+    {
+        $needle = mb_strtolower($status);
+        $multiServerIds = (clone $query)
+            ->setEagerLoads([])
+            ->with('additional_servers')
+            ->has('additional_servers')
+            ->get(['applications.id', 'applications.status'])
+            ->filter(fn (Application $application) => str_contains(mb_strtolower($application->status), $needle))
+            ->modelKeys();
+
+        return $query->where(fn (Builder $q) => $q
+            ->where(fn (Builder $single) => apiWhereContains($single->doesntHave('additional_servers'), 'status', $status))
+            ->orWhereIn('id', $multiServerIds));
+    }
+
+    /**
      * Get query builder for applications owned by current team.
      * If you need all applications without further query chaining, use ownedByCurrentTeamCached() instead.
      */
@@ -617,7 +716,7 @@ class Application extends BaseModel
         }
         $server = data_get($this, 'destination.server');
         foreach ($persistentStorages as $storage) {
-            if ($storage->isSharedWithAnotherResource()) {
+            if ($storage->is_external || $storage->isSharedWithAnotherResource()) {
                 continue;
             }
             instant_remote_process(['docker volume rm -f '.escapeshellarg($storage->name)], $server, false);
@@ -1080,6 +1179,16 @@ class Application extends BaseModel
         return $this->getRawOriginal('status');
     }
 
+    /**
+     * Stores the allowlist as comma-separated unique entries, or null when empty.
+     */
+    protected function ipAllowlist(): Attribute
+    {
+        return Attribute::make(
+            set: fn (?string $value) => implode(',', ValidIpAllowlist::entries($value)) ?: null,
+        );
+    }
+
     protected function serverStatus(): Attribute
     {
         return Attribute::make(
@@ -1396,6 +1505,44 @@ class Application extends BaseModel
             ->where('is_preview', true);
     }
 
+    /**
+     * IDs of preview variables that have the production value: automatic copies of a production variable that
+     * the user did not change, and preview variables with the same value as the production variable with the
+     * same key. An automatic copy stays in the list after production changes (for example a rotated secret),
+     * because the old production value can still be valid. Empty values do not count, because they hold no
+     * production data. Give $previewIds to check only those preview variables.
+     *
+     * @param  array<int, int>|null  $previewIds
+     * @return array<int, int>
+     */
+    public function previewEnvironmentVariableIdsWithProductionValues(?array $previewIds = null): array
+    {
+        if ($previewIds === []) {
+            return [];
+        }
+
+        $previewVariables = $this->environment_variables_preview()
+            ->when($previewIds !== null, fn ($query) => $query->whereKey($previewIds))
+            ->get()
+            ->reject(fn (EnvironmentVariable $env) => blank($env->value));
+
+        if ($previewVariables->isEmpty()) {
+            return [];
+        }
+
+        $productionVariables = $this->environment_variables()
+            ->whereIn('key', $previewVariables->pluck('key')->unique()->values()->all())
+            ->get()
+            ->reject(fn (EnvironmentVariable $env) => blank($env->value))
+            ->keyBy('key');
+
+        // Shared variable references count by their resolved value, so a preview cannot get a production secret through them.
+        return $previewVariables
+            ->filter(fn (EnvironmentVariable $env) => $env->is_production_value_copy || $env->hasSameValueAs($productionVariables->get($env->key)))
+            ->pluck('id')
+            ->all();
+    }
+
     public function runtime_environment_variables_preview()
     {
         return $this->morphMany(EnvironmentVariable::class, 'resourceable')
@@ -1664,9 +1811,14 @@ class Application extends BaseModel
         return false;
     }
 
+    public function hasConfigurationPage(string $routeName): bool
+    {
+        return ! $this->is_archive_source || ! Str::startsWith($routeName, self::ARCHIVE_SITE_HIDDEN_ROUTES);
+    }
+
     public function git_based(): bool
     {
-        if ($this->dockerfile) {
+        if ($this->dockerfile || $this->is_archive_source) {
             return false;
         }
         if ($this->build_pack === 'dockerimage') {
@@ -1910,7 +2062,9 @@ class Application extends BaseModel
                     $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && echo 'Fetching the commit.' && {$sshCommand} {$gitCommand} fetch --depth=1 origin {$escapedCommit} && {$checkoutCommand}";
                 }
             } else {
-                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$sshCommand} {$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
+                // A commit that no branch contains (a fork pull request commit) is fetched by its SHA.
+                $checkoutCommand = "{$gitCommand} -c advice.detachedHead=false checkout {$escapedCommit} >/dev/null 2>&1";
+                $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && ({$checkoutCommand} || ({$sshCommand} {$gitCommand} fetch origin {$escapedCommit} && {$checkoutCommand}))";
             }
         }
         // A checkout that only reads files (the Compose file) needs neither submodules nor LFS objects.
@@ -2324,6 +2478,9 @@ class Application extends BaseModel
         }
         if ($pull_request_id !== 0) {
             $pr_branch_name = "pr-{$pull_request_id}-coolify";
+            // A deployment of a specific pull request commit (for example an approved fork commit) stays on that commit
+            // when the pull request gets new commits before the clone.
+            $pr_checkout_target = $commit !== 'HEAD' ? $commit : $pr_branch_name;
         }
         if ($this->deploymentType() === 'source') {
             $source_html_url = data_get($this, 'source.html_url');
@@ -2375,7 +2532,7 @@ class Application extends BaseModel
                 if ($pull_request_id !== 0) {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
 
-                    $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitSshCommand($deployment_uuid), $gitConfigOption ?? null);
+                    $git_checkout_command = $this->buildGitCheckoutCommand($pr_checkout_target, gitSshCommand($deployment_uuid), $gitConfigOption ?? null);
                     $escapedPrBranch = escapeshellarg($branch);
                     $git_pr_command = "{$this->gitLfsSkipSmudgePrefix($only_checkout)}cd {$escapedBaseDir} && git fetch origin {$escapedPrBranch} && $git_checkout_command";
                     if ($exec_in_docker) {
@@ -2425,7 +2582,7 @@ class Application extends BaseModel
                         } else {
                             $commands->push("echo 'Checking out {$branch}'");
                         }
-                        $git_checkout_command = $this->buildGitCheckoutCommand($pr_branch_name, gitSshCommand($deployment_uuid), $gitConfigOption);
+                        $git_checkout_command = $this->buildGitCheckoutCommand($pr_checkout_target, gitSshCommand($deployment_uuid), $gitConfigOption);
                         $escapedPrBranch = escapeshellarg($branch);
                         $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && git {$gitConfigOption} fetch origin {$escapedPrBranch} && {$git_checkout_command}";
                     }
@@ -2464,7 +2621,7 @@ class Application extends BaseModel
                         } else {
                             $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                         }
-                        $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$gitlabGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $gitlabSshCommand);
+                        $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$gitlabGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_checkout_target, $gitlabSshCommand);
                     }
 
                     if ($exec_in_docker) {
@@ -2521,7 +2678,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$deployKeyGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $deployKeySshCommand);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$deployKeyGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_checkout_target, $deployKeySshCommand);
                 } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -2529,7 +2686,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$deployKeyGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $deployKeySshCommand);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && {$deployKeyGitSshCommand} git fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_checkout_target, $deployKeySshCommand);
                 } elseif ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push($this->gitCommand(executeInDocker($deployment_uuid, "echo 'Checking out $branch'")));
@@ -2571,7 +2728,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" {$gitCommand} fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $otherSshCommand, $gitConfigOption);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" {$gitCommand} fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_checkout_target, $otherSshCommand, $gitConfigOption);
                 } elseif ($git_type === 'github' || $git_type === 'gitea') {
                     $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
                     if ($exec_in_docker) {
@@ -2579,7 +2736,7 @@ class Application extends BaseModel
                     } else {
                         $commands->push($this->gitCommand("echo 'Checking out $branch'"));
                     }
-                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" {$gitCommand} fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_branch_name, $otherSshCommand, $gitConfigOption);
+                    $git_clone_command = "{$git_clone_command} && cd {$escapedBaseDir} && GIT_SSH_COMMAND=\"{$otherSshCommand}\" {$gitCommand} fetch origin $branch && ".$this->buildGitCheckoutCommand($pr_checkout_target, $otherSshCommand, $gitConfigOption);
                 } elseif ($git_type === 'bitbucket') {
                     if ($exec_in_docker) {
                         $commands->push($this->gitCommand(executeInDocker($deployment_uuid, "echo 'Checking out $branch'")));
@@ -2884,9 +3041,9 @@ class Application extends BaseModel
      * One shell command that clones the repository without a checkout into $checkoutDir on the server,
      * with the same credentials (GitHub App token, GitLab token, or deploy key) as a deployment.
      */
-    public function serverCheckoutCommand(string $uuid, string $checkoutDir): string
+    public function serverCheckoutCommand(string $uuid, string $checkoutDir, ?string $commit = null): string
     {
-        return $this->serverCheckout($uuid, $checkoutDir)['command'];
+        return $this->serverCheckout($uuid, $checkoutDir, $commit)['command'];
     }
 
     /**
@@ -2894,9 +3051,9 @@ class Application extends BaseModel
      *
      * @return array{command: string, git: string}
      */
-    private function serverCheckout(string $uuid, string $checkoutDir): array
+    private function serverCheckout(string $uuid, string $checkoutDir, ?string $commit = null): array
     {
-        ['commands' => $cloneCommand, 'git' => $git] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: $checkoutDir);
+        ['commands' => $cloneCommand, 'git' => $git] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: $checkoutDir, commit: $commit);
 
         // Callers read data from stdout after the checkout, so progress lines of the checkout go to stderr.
         return [
@@ -3352,13 +3509,7 @@ class Application extends BaseModel
 
         // Always check if healthcheck was removed, regardless of health_check_enabled setting
         if (! $hasHealthcheck && $this->custom_healthcheck_found) {
-            // HEALTHCHECK was removed from Dockerfile, reset to defaults
-            $this->custom_healthcheck_found = false;
-            $this->health_check_interval = 5;
-            $this->health_check_timeout = 5;
-            $this->health_check_retries = 10;
-            $this->health_check_start_period = 5;
-            $this->save();
+            $this->resetCustomHealthcheck();
 
             return;
         }
@@ -3373,6 +3524,47 @@ class Application extends BaseModel
             $this->custom_healthcheck_found = true;
             $this->save();
         }
+    }
+
+    /**
+     * Read the HEALTHCHECK of a pulled Docker image from the output of
+     * `docker inspect --format '{{json .Config.Healthcheck}}'`. Docker gives the durations in
+     * nanoseconds and leaves out zero values, which mean the Docker defaults (30s, 30s, 0s, 3 retries).
+     */
+    public function parseHealthcheckFromImage(?string $inspectOutput): void
+    {
+        $healthcheck = json_decode(trim((string) $inspectOutput), true);
+        $test = is_array($healthcheck) ? ($healthcheck['Test'] ?? null) : null;
+        $hasHealthcheck = is_array($test) && $test !== [] && strtoupper((string) $test[0]) !== 'NONE';
+
+        if (! $hasHealthcheck) {
+            if ($this->custom_healthcheck_found) {
+                $this->resetCustomHealthcheck();
+            }
+
+            return;
+        }
+
+        $seconds = fn (string $key, int $default): int => isset($healthcheck[$key]) && $healthcheck[$key] > 0
+            ? max(1, intdiv((int) $healthcheck[$key], 1_000_000_000))
+            : $default;
+
+        $this->health_check_interval = $seconds('Interval', 30);
+        $this->health_check_timeout = $seconds('Timeout', 30);
+        $this->health_check_start_period = $seconds('StartPeriod', 0);
+        $this->health_check_retries = isset($healthcheck['Retries']) && $healthcheck['Retries'] > 0 ? (int) $healthcheck['Retries'] : 3;
+        $this->custom_healthcheck_found = true;
+        $this->save();
+    }
+
+    private function resetCustomHealthcheck(): void
+    {
+        $this->custom_healthcheck_found = false;
+        $this->health_check_interval = 5;
+        $this->health_check_timeout = 5;
+        $this->health_check_retries = 10;
+        $this->health_check_start_period = 5;
+        $this->save();
     }
 
     public function getLimits(): array

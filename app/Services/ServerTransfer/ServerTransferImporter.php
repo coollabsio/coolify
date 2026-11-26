@@ -40,6 +40,7 @@ use App\Models\SslCertificate;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
 use App\Models\StandaloneDragonfly;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandaloneKeydb;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
@@ -54,7 +55,9 @@ use App\Notifications\Internal\GeneralNotification;
 use App\Rules\DockerImageFormat;
 use App\Rules\ValidServerIp;
 use App\Services\Dns\CloudflareDnsProvider;
+use App\Services\LogDrain\LegacyLogDrainFields;
 use App\Services\ProjectIconStorageService;
+use App\Support\RemoteSecretReferences;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -80,6 +83,7 @@ class ServerTransferImporter
         'StandaloneKeydb' => StandaloneKeydb::class,
         'StandaloneDragonfly' => StandaloneDragonfly::class,
         'StandaloneClickhouse' => StandaloneClickhouse::class,
+        'StandaloneInfluxdb' => StandaloneInfluxdb::class,
         'StandaloneSqlite' => StandaloneSqlite::class,
     ];
 
@@ -707,6 +711,13 @@ class ServerTransferImporter
             'swarm_cluster' => data_get($payload, 'swarm_cluster'),
         ]);
         $server->uuid = $uuid;
+        $proxy = data_get($payload, 'proxy');
+        $proxy = is_array($proxy) ? $proxy : [];
+        // A bundle of an older Coolify has no status for unknown hosts: keep the status of the source.
+        $proxy['unknown_host_status'] ??= Server::LEGACY_UNKNOWN_HOST_STATUS;
+        foreach ($proxy as $key => $value) {
+            $server->proxy->set($key, $value);
+        }
         $server->save();
 
         if ($server->settings) {
@@ -719,16 +730,10 @@ class ServerTransferImporter
             $server->settings->save();
         }
 
-        $proxy = data_get($payload, 'proxy', []);
-        if (is_array($proxy) && $proxy !== []) {
-            foreach ($proxy as $key => $value) {
-                $server->proxy->set($key, $value);
-            }
-            $server->save();
-        }
-
         $settingsPayload = data_get($payload, 'settings', []);
         if (is_array($settingsPayload) && $server->settings) {
+            // Bundles of older instances have a flag and columns for each log drain.
+            $settingsPayload = LegacyLogDrainFields::convert($settingsPayload);
             $safe = collect($settingsPayload)
                 ->except([
                     'id', 'server_id', 'created_at', 'updated_at',
@@ -738,6 +743,7 @@ class ServerTransferImporter
                     'cloudflare_tunnel_integration_token_id',
                     'cloudflare_tunnel_integration_token_uuid',
                     'patch_check_result', 'patch_check_error', 'patch_checked_at',
+                    'auto_security_updates_last_run',
                     'image_candidate_scans_today', 'image_candidate_scans_date',
                     'ssh_host_key_pending',
                 ])
@@ -1328,8 +1334,8 @@ class ServerTransferImporter
         }
 
         $application = new Application($attributes);
-        // Maintenance mode is not fillable.
-        $application->forceFill(collect($attributes)->only(['is_maintenance_enabled', 'maintenance_page'])->all());
+        // Maintenance mode and the coolify.json key are not fillable.
+        $application->forceFill(collect($attributes)->only(['is_maintenance_enabled', 'maintenance_page', 'config_key'])->all());
         $application->save();
         // The created hook gives a new application the newest compose parser and default variables. A transferred
         // application keeps its parser, which names its volumes and domains, and gets only the variables of the bundle.
@@ -1352,7 +1358,7 @@ class ServerTransferImporter
         $this->importScheduledTasks(data_get($payload, 'scheduled_tasks', []), $application, $teamId);
         $this->importTags(data_get($payload, 'tags', []), $application, $teamId);
         $this->importPreviews(data_get($payload, 'previews', []), $application, $preserveUuids, $adoptMode, $teamId);
-        $this->importSecretManagerLink(data_get($payload, 'secret_manager_link'), $application, "Application {$name}");
+        $this->importSecretManagerLinks($payload, $application, "Application {$name}");
 
         return $application;
     }
@@ -1411,7 +1417,7 @@ class ServerTransferImporter
             $this->importTags(data_get($payload, 'tags', []), $database, $teamId);
         }
         $this->importScheduledBackups(data_get($payload, 'scheduled_backups', []), $database, $teamId);
-        $this->importSecretManagerLink(data_get($payload, 'secret_manager_link'), $database, "Database {$database->name}");
+        $this->importSecretManagerLinks($payload, $database, "Database {$database->name}");
 
         return $database;
     }
@@ -1446,8 +1452,8 @@ class ServerTransferImporter
         $attributes['destination_type'] = $destination->getMorphClass();
 
         $service = new Service($attributes);
-        // Maintenance mode and the Coolify default variables switch are not fillable.
-        $service->forceFill(collect($attributes)->only(['is_maintenance_enabled', 'maintenance_page', 'include_coolify_default_variables'])->all());
+        // Maintenance mode, the Coolify default variables switch, and the coolify.json fields are not fillable.
+        $service->forceFill(collect($attributes)->only(['is_maintenance_enabled', 'maintenance_page', 'include_coolify_default_variables', 'config_key', 'config_meta'])->all());
         $service->save();
         // The created hook gives a new service the newest compose parser; a transferred service keeps its own.
         $service->forceFill(collect($attributes)->only('compose_parsing_version')->filter()->all())->saveQuietly();
@@ -1455,7 +1461,7 @@ class ServerTransferImporter
         $this->importEnvVars(data_get($payload, 'environment_variables', []), $service, false);
         $this->importScheduledTasks(data_get($payload, 'scheduled_tasks', []), $service, $teamId);
         $this->importTags(data_get($payload, 'tags', []), $service, $teamId);
-        $this->importSecretManagerLink(data_get($payload, 'secret_manager_link'), $service, "Service {$service->name}");
+        $this->importSecretManagerLinks($payload, $service, "Service {$service->name}");
 
         foreach (data_get($payload, 'applications', []) as $appPayload) {
             $serviceApp = $this->importServiceApplication($appPayload, $service, $preserveUuids, $adoptMode);
@@ -1569,6 +1575,7 @@ class ServerTransferImporter
                     'is_literal' => (bool) data_get($variable, 'is_literal', false),
                     'is_multiline' => (bool) data_get($variable, 'is_multiline', false),
                     'is_preview' => $isPreview || (bool) data_get($variable, 'is_preview', false),
+                    'is_production_value_copy' => (bool) data_get($variable, 'is_production_value_copy', false),
                     'is_runtime' => (bool) data_get($variable, 'is_runtime', true),
                     'is_buildtime' => (bool) data_get($variable, 'is_buildtime', true),
                     'is_shown_once' => (bool) data_get($variable, 'is_shown_once', false),
@@ -1577,7 +1584,9 @@ class ServerTransferImporter
                     // Exports from older versions have no flag; their values use the old escaping.
                     'uses_legacy_escaping' => (bool) data_get($variable, 'uses_legacy_escaping', true),
                     'preserve_compose_null' => (bool) data_get($variable, 'preserve_compose_null', false),
+                    'config_meta' => data_get($variable, 'config_meta'),
                     'comment' => data_get($variable, 'comment'),
+                    'compose_services' => data_get($variable, 'compose_services'),
                     'order' => data_get($variable, 'order'),
                     'resourceable_type' => $resource->getMorphClass(),
                     'resourceable_id' => $resource->id,
@@ -1610,6 +1619,8 @@ class ServerTransferImporter
                 'mount_path' => data_get($volume, 'mount_path'),
                 'host_path' => data_get($volume, 'host_path'),
                 'is_preview_suffix_enabled' => (bool) data_get($volume, 'is_preview_suffix_enabled', false),
+                // An existing Docker volume that Coolify mounts. It stays on the server, so the target must not create or delete it.
+                'is_external' => (bool) data_get($volume, 'is_external', false),
                 // The server keeps its Docker volumes. A bundle without the flag is from a Coolify version that created them without driver options.
                 'ignores_compose_driver_options' => (bool) data_get($volume, 'ignores_compose_driver_options', true),
                 'resource_type' => $resource->getMorphClass(),
@@ -2157,9 +2168,32 @@ class ServerTransferImporter
         return $this->integrationTokenMap[$tokenUuid]->id;
     }
 
+    /**
+     * The named secret manager sources of a resource. Bundles of older instances have one `secret_manager_link`, the `default` source.
+     *
+     * @param  array<string, mixed>  $resourcePayload
+     */
+    private function importSecretManagerLinks(array $resourcePayload, Model $resource, string $label): void
+    {
+        $links = data_get($resourcePayload, 'secret_manager_links');
+        if (! is_array($links)) {
+            $links = is_array($legacy = data_get($resourcePayload, 'secret_manager_link')) ? [$legacy] : [];
+        }
+
+        foreach ($links as $link) {
+            $this->importSecretManagerLink($link, $resource, $label);
+        }
+    }
+
     private function importSecretManagerLink(mixed $payload, Model $resource, string $label): void
     {
-        if (! is_array($payload) || ! method_exists($resource, 'secretManagerLink')) {
+        if (! is_array($payload) || ! method_exists($resource, 'secretManagerLinks')) {
+            return;
+        }
+        $name = data_get($payload, 'name', RemoteSecretReferences::DEFAULT_SOURCE);
+        if (! RemoteSecretReferences::isValidSourceName($name)) {
+            $this->importWarnings[] = "{$label}: a secret manager source has an invalid name and was skipped; link it again.";
+
             return;
         }
 
@@ -2180,6 +2214,7 @@ class ServerTransferImporter
         $link->forceFill([
             'resourceable_type' => $resource->getMorphClass(),
             'resourceable_id' => $resource->getKey(),
+            'name' => $name,
             'integration_token_id' => $tokenId,
             'settings' => data_get($payload, 'settings'),
         ]);
@@ -2392,6 +2427,10 @@ class ServerTransferImporter
                 'docker_registry_image_tag' => data_get($previewPayload, 'docker_registry_image_tag'),
                 'domain_port_overrides' => data_get($previewPayload, 'domain_port_overrides'),
                 'max_restart_count' => (int) data_get($previewPayload, 'max_restart_count', 0),
+                'is_fork_pull_request' => data_get($previewPayload, 'is_fork_pull_request') === null ? null : (bool) data_get($previewPayload, 'is_fork_pull_request'),
+                'pending_approval_commit' => data_get($previewPayload, 'pending_approval_commit'),
+                'approved_commit' => data_get($previewPayload, 'approved_commit'),
+                'approved_at' => data_get($previewPayload, 'approved_at'),
                 'keeps_production_values' => (bool) data_get($previewPayload, 'keeps_production_values', false),
                 'is_same_repository' => (bool) data_get($previewPayload, 'is_same_repository', false),
             ];

@@ -12,6 +12,7 @@ use App\Models\Service;
 use App\Models\ServiceDatabase;
 use App\Models\StandaloneClickhouse;
 use App\Models\StandaloneDocker;
+use App\Models\StandaloneInfluxdb;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\StandaloneSqlite;
@@ -216,6 +217,40 @@ it('creates a clickhouse backup for its configured database', function () {
 
     expect($backup->database_type)->toBe(StandaloneClickhouse::class)
         ->and($backup->databases_to_backup)->toBe('analytics');
+});
+
+it('creates an influxdb backup for its configured bucket', function () {
+    $server = Server::factory()->create(['team_id' => $this->team->id]);
+    $destination = StandaloneDocker::where('server_id', $server->id)->firstOrFail();
+    $project = Project::factory()->create(['team_id' => $this->team->id]);
+    $environment = Environment::factory()->create(['project_id' => $project->id]);
+    $database = StandaloneInfluxdb::create([
+        'name' => 'influxdb-scheduled-backup',
+        'influxdb_admin_user' => 'influx',
+        'influxdb_admin_password' => 'password',
+        'influxdb_admin_token' => 'token',
+        'influxdb_org' => 'coolify',
+        'influxdb_bucket' => 'metrics',
+        'environment_id' => $environment->id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+
+    $component = Livewire::test(CreateScheduledBackup::class, ['database' => $database])
+        ->set('frequency', 'daily')
+        ->call('submit');
+
+    $backup = ScheduledDatabaseBackup::firstOrFail();
+
+    $component->assertRedirectToRoute('project.database.backup.index', [
+        'project_uuid' => $project->uuid,
+        'environment_uuid' => $environment->uuid,
+        'database_uuid' => $database->uuid,
+        'schedule' => $backup->uuid,
+    ]);
+
+    expect($backup->database_type)->toBe(StandaloneInfluxdb::class)
+        ->and($backup->databases_to_backup)->toBe('metrics');
 });
 
 it('creates a sqlite backup for its configured database files', function () {
