@@ -96,6 +96,7 @@ const LOADERS = {
 const BUILD_PACKS = [['railpack', 'Railpack'], ['nixpacks', 'Nixpacks', 'Deprecated'], ['static', 'Static'], ['dockerfile', 'Dockerfile'], ['dockercompose', 'Docker Compose']];
 // The PostgreSQL images of the New resource page (project/new/select.blade.php).
 const POSTGRES_IMAGES = [
+  ['postgres:19-alpine', 'PostgreSQL 19'],
   ['postgres:18-alpine', 'PostgreSQL 18'],
   ['postgres:17-alpine', 'PostgreSQL 17'],
   ['postgres:16-alpine', 'PostgreSQL 16'],
@@ -264,7 +265,7 @@ export const TYPES = {
   database: {
     title: 'Database', sub: 'A managed database', stage: 'source', kind: 'database', icon: ICONS.db,
     fields: [
-      // A new engine starts with its default image (PostgreSQL: PostgreSQL 18).
+      // A new engine starts with its default image (PostgreSQL: PostgreSQL 19).
       { key: 'engine', label: 'Engine', kind: 'select', options: DATABASES, value: 'postgresql', required: true,
         after: d => { d.image = d.engine === 'postgresql' ? POSTGRES_IMAGES[0][0] : ''; } },
       { key: 'image', label: 'Image', kind: 'select', options: POSTGRES_IMAGES, value: POSTGRES_IMAGES[0][0], show: d => d.engine === 'postgresql', required: true },
