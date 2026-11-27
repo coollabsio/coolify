@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Node\MoveNodeWorkload;
 use App\Actions\Node\PublishNodeWorkloadPort;
+use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Actions\Node\RemoveNodePublishedPort;
 use App\Actions\Node\UpdateNodeWorkloadDomains;
 use App\Actions\Node\UpdateNodeWorkloadProxyOptions;
@@ -11,9 +12,11 @@ use App\Actions\Node\UpdateNodeWorkloadResources;
 use App\Actions\Sentinel\FetchContainerLogs;
 use App\Http\Controllers\Api\Concerns\HandlesClusterResourcesApi;
 use App\Http\Controllers\Controller;
+use App\Models\NodeCluster;
 use App\Models\NodePublishedPort;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use OpenApi\Attributes as OA;
 
 /**
@@ -89,18 +92,32 @@ class ClusterApplicationSettingsController extends Controller
         }
 
         return $this->runClusterAction(function () use ($request, $workload): JsonResponse {
+            $user = $request->user();
             $proxyKeys = ['is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'ingress_allowed_ips', 'ingress_request_headers', 'ingress_response_headers', 'is_gzip_enabled', 'is_stripprefix_enabled'];
-            if ($request->hasAny($proxyKeys)) {
-                $workload = UpdateNodeWorkloadProxyOptions::run($workload, $request->only($proxyKeys), $request->user());
-            }
             $routes = $request->has('domains')
                 ? UpdateNodeWorkloadDomains::routesFromUrls($workload, $request->input('domains', []))
                 : ($workload->domain_routes ?? []);
-            $workload = UpdateNodeWorkloadDomains::run($workload, $routes, $request->user(), array_filter([
+            // Both parts are validated before anything is saved, and saved in one transaction, so a 422 saves nothing.
+            $domainValues = UpdateNodeWorkloadDomains::make()->validated($workload, $routes, $user, array_filter([
                 'force_https' => $request->has('force_https') ? $request->boolean('force_https') : null,
                 'www_redirect' => $request->input('www_redirect'),
                 'permanent_redirect' => $request->has('permanent_redirect') ? $request->boolean('permanent_redirect') : null,
             ], fn ($value): bool => $value !== null));
+            $proxyValues = $request->hasAny($proxyKeys)
+                ? UpdateNodeWorkloadProxyOptions::validated($workload, $request->only($proxyKeys), $user)
+                : null;
+            $changed = UpdateNodeWorkloadDomains::withLock(fn (): bool => DB::transaction(function () use ($workload, $proxyValues, $domainValues, $user): bool {
+                $proxyChanged = $proxyValues !== null && UpdateNodeWorkloadProxyOptions::apply($workload, $proxyValues);
+
+                return UpdateNodeWorkloadDomains::apply($workload, $domainValues, $user) || $proxyChanged;
+            }));
+            $workload->refresh();
+            if ($changed) {
+                NodeCluster::query()
+                    ->whereKey($workload->clusterIds())
+                    ->get()
+                    ->each(fn (NodeCluster $cluster) => QueueNodeClusterNetworkRevision::run($cluster, $user));
+            }
 
             return response()->json($this->workloadResponse($workload));
         });

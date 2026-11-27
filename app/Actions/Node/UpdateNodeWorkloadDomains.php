@@ -36,6 +36,45 @@ class UpdateNodeWorkloadDomains
      */
     public function handle(NodeWorkload $workload, array $routes, User $user, array $redirects = []): NodeWorkload
     {
+        $values = $this->validated($workload, $routes, $user, $redirects);
+        // One writer at a time, so two applications cannot claim the same domain concurrently.
+        $changed = self::withLock(fn (): bool => DB::transaction(fn (): bool => self::apply($workload, $values, $user)));
+
+        $workload->refresh();
+        if ($changed) {
+            NodeCluster::query()
+                ->whereKey($workload->clusterIds())
+                ->get()
+                ->each(fn (NodeCluster $cluster) => QueueNodeClusterNetworkRevision::run($cluster, $user));
+        }
+
+        return $workload;
+    }
+
+    /**
+     * Runs the callback while it holds the lock of the domain writers.
+     *
+     * @template T
+     *
+     * @param  callable(): T  $callback
+     * @return T
+     */
+    public static function withLock(callable $callback): mixed
+    {
+        return Cache::lock('node-workload-domains', 30)->block(10, $callback);
+    }
+
+    /**
+     * Checks the authorization and every rule that does not need the lock, and writes nothing.
+     *
+     * @param  list<array{scheme?: string, host?: string, port?: int|string|null, path?: string|null, noindex?: bool}>  $routes
+     * @param  array{www_redirect?: string, force_https?: bool, permanent_redirect?: bool}  $redirects
+     * @return array{routes: list<array<string, mixed>>, domains: list<string>, redirects: array<string, mixed>} The values for apply().
+     *
+     * @throws ValidationException with `routes` and redirect setting keys.
+     */
+    public function validated(NodeWorkload $workload, array $routes, User $user, array $redirects = []): array
+    {
         Gate::forUser($user)->authorize('update', $workload);
         // A database has no public HTTP domain (decision 0010); public access uses port publishing.
         if ($workload->isDatabase() && $routes !== []) {
@@ -75,56 +114,58 @@ class UpdateNodeWorkloadDomains
             ->all();
         $domains = collect($routes)->pluck('host')->unique()->values()->all();
 
-        // One writer at a time, so two applications cannot claim the same domain concurrently.
-        $changed = Cache::lock('node-workload-domains', 30)->block(10, fn (): bool => DB::transaction(function () use ($workload, $routes, $domains, $redirects, $user): bool {
-            $workload = NodeWorkload::query()->lockForUpdate()->findOrFail($workload->id);
-            if ($domains !== []) {
-                // Each cluster serves only its own team's routes, so a domain is unique per team. The check must see
-                // the applications that the access grants of the user hide.
-                $taken = app(AccessResolver::class)->withoutVisibilityScope(fn () => NodeWorkload::query()
-                    ->where('team_id', $workload->team_id)
-                    ->whereKeyNot($workload->id)
-                    ->whereNotNull('domains')
-                    ->where(function ($query) use ($domains): void {
-                        foreach ($domains as $domain) {
-                            $query->orWhereJsonContains('domains', $domain);
-                        }
-                    })
-                    ->pluck('domains'))
-                    ->flatten()
-                    ->intersect($domains)
-                    ->first();
-                if ($taken !== null) {
-                    throw ValidationException::withMessages(['routes' => "{$taken} is already used by another application."]);
-                }
-                // v4 applications and services of the team route through another proxy, so the same host cannot serve both.
-                $legacyConflict = legacyResourceDomainConflict($domains, $workload->team_id, $user);
-                if ($legacyConflict !== null) {
-                    throw ValidationException::withMessages(['routes' => $legacyConflict]);
-                }
+        return ['routes' => $routes, 'domains' => $domains, 'redirects' => $redirects];
+    }
+
+    /**
+     * Saves the values of validated(). Call it in a transaction, under withLock(). It checks that no other
+     * application uses a domain.
+     *
+     * @param  array{routes: list<array<string, mixed>>, domains: list<string>, redirects: array<string, mixed>}  $values
+     * @return bool True when the routes changed, so the clusters need a network revision.
+     *
+     * @throws ValidationException when another application uses a domain.
+     */
+    public static function apply(NodeWorkload $workload, array $values, User $user): bool
+    {
+        ['routes' => $routes, 'domains' => $domains, 'redirects' => $redirects] = $values;
+        $workload = NodeWorkload::query()->lockForUpdate()->findOrFail($workload->id);
+        if ($domains !== []) {
+            // Each cluster serves only its own team's routes, so a domain is unique per team. The check must see
+            // the applications that the access grants of the user hide.
+            $taken = app(AccessResolver::class)->withoutVisibilityScope(fn () => NodeWorkload::query()
+                ->where('team_id', $workload->team_id)
+                ->whereKeyNot($workload->id)
+                ->whereNotNull('domains')
+                ->where(function ($query) use ($domains): void {
+                    foreach ($domains as $domain) {
+                        $query->orWhereJsonContains('domains', $domain);
+                    }
+                })
+                ->pluck('domains'))
+                ->flatten()
+                ->intersect($domains)
+                ->first();
+            if ($taken !== null) {
+                throw ValidationException::withMessages(['routes' => "{$taken} is already used by another application."]);
             }
-
-            $wasRouted = $workload->hasIngressRoutes();
-            $workload->fill([
-                'domains' => $domains === [] ? null : $domains,
-                'domain_routes' => $routes === [] ? null : $routes,
-                ...$redirects,
-            ]);
-            $dirty = $workload->isDirty();
-            $workload->save();
-
-            return $dirty && ($wasRouted || $workload->hasIngressRoutes());
-        }));
-
-        $workload->refresh();
-        if ($changed) {
-            NodeCluster::query()
-                ->whereKey($workload->clusterIds())
-                ->get()
-                ->each(fn (NodeCluster $cluster) => QueueNodeClusterNetworkRevision::run($cluster, $user));
+            // v4 applications and services of the team route through another proxy, so the same host cannot serve both.
+            $legacyConflict = legacyResourceDomainConflict($domains, $workload->team_id, $user);
+            if ($legacyConflict !== null) {
+                throw ValidationException::withMessages(['routes' => $legacyConflict]);
+            }
         }
 
-        return $workload;
+        $wasRouted = $workload->hasIngressRoutes();
+        $workload->fill([
+            'domains' => $domains === [] ? null : $domains,
+            'domain_routes' => $routes === [] ? null : $routes,
+            ...$redirects,
+        ]);
+        $dirty = $workload->isDirty();
+        $workload->save();
+
+        return $dirty && ($wasRouted || $workload->hasIngressRoutes());
     }
 
     /** @return array{scheme: string, host: string, port: int|string|null, path: string, noindex: bool} */

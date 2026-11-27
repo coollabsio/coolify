@@ -45,6 +45,30 @@ class UpdateNodeWorkloadProxyOptions
      */
     public function handle(NodeWorkload $workload, array $input, User $user): NodeWorkload
     {
+        $values = self::validated($workload, $input, $user);
+        $changed = DB::transaction(fn (): bool => self::apply($workload, $values));
+
+        $workload->refresh();
+        if ($changed) {
+            NodeCluster::query()
+                ->whereKey($workload->clusterIds())
+                ->get()
+                ->each(fn (NodeCluster $cluster) => QueueNodeClusterNetworkRevision::run($cluster, $user));
+        }
+
+        return $workload;
+    }
+
+    /**
+     * Checks the authorization and every rule, and writes nothing.
+     *
+     * @param  array<string, mixed>  $input  As for handle().
+     * @return array<string, mixed> The column values to save with apply().
+     *
+     * @throws ValidationException with the key of each field.
+     */
+    public static function validated(NodeWorkload $workload, array $input, User $user): array
+    {
         Gate::forUser($user)->authorize('update', $workload);
         if ($workload->isDatabase()) {
             throw ValidationException::withMessages(['ingress' => 'A database has no domain, so it has no proxy options.']);
@@ -143,31 +167,32 @@ class UpdateNodeWorkloadProxyOptions
             }
         }
 
-        $changed = DB::transaction(function () use ($workload, $values): bool {
-            $locked = NodeWorkload::query()->lockForUpdate()->findOrFail($workload->id);
-            $locked->fill($values);
-            if ($locked->hasProtectedIngressOptions()) {
-                $unsupported = NodeCluster::query()->whereKey($locked->clusterIds())->get()
-                    ->first(fn (NodeCluster $cluster): bool => ! $cluster->supportsIngressRouteOptions());
-                if ($unsupported !== null) {
-                    throw ValidationException::withMessages(['ingress' => "Basic auth and the IP allow list need Sentinel with ingress.route_options.v1 on every server of the cluster {$unsupported->name}. Upgrade Sentinel on the servers of the cluster first."]);
-                }
+        return $values;
+    }
+
+    /**
+     * Saves the values of validated(). Call it in a transaction: it locks the workload row.
+     *
+     * @param  array<string, mixed>  $values
+     * @return bool True when the routes of the workload changed, so the clusters need a network revision.
+     *
+     * @throws ValidationException when a cluster of the workload cannot apply a protected option.
+     */
+    public static function apply(NodeWorkload $workload, array $values): bool
+    {
+        $locked = NodeWorkload::query()->lockForUpdate()->findOrFail($workload->id);
+        $locked->fill($values);
+        if ($locked->hasProtectedIngressOptions()) {
+            $unsupported = NodeCluster::query()->whereKey($locked->clusterIds())->get()
+                ->first(fn (NodeCluster $cluster): bool => ! $cluster->supportsIngressRouteOptions());
+            if ($unsupported !== null) {
+                throw ValidationException::withMessages(['ingress' => "Basic auth and the IP allow list need Sentinel with ingress.route_options.v1 on every server of the cluster {$unsupported->name}. Upgrade Sentinel on the servers of the cluster first."]);
             }
-            $dirty = $locked->isDirty();
-            $locked->save();
-
-            return $dirty && $locked->hasIngressRoutes();
-        });
-
-        $workload->refresh();
-        if ($changed) {
-            NodeCluster::query()
-                ->whereKey($workload->clusterIds())
-                ->get()
-                ->each(fn (NodeCluster $cluster) => QueueNodeClusterNetworkRevision::run($cluster, $user));
         }
+        $dirty = $locked->isDirty();
+        $locked->save();
 
-        return $workload;
+        return $dirty && $locked->hasIngressRoutes();
     }
 
     /** A random password for basic auth: 24 letters and digits. */
