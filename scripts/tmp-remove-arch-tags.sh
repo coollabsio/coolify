@@ -6,10 +6,13 @@ LIMIT="${2:-}"
 IMAGE=coollabsio/coolify
 VARIANTS=""
 ARCH_TAG_PATTERN='-(amd64|aarch64|arm64)$'
-# The KEEP_ rules are the same ones as in clean-manifests.sh
+# The rules from here to MIN_AGE_DAYS are the same ones as in clean-manifests.sh
 KEEP_TAG_PATTERN='^(latest|preview|main|nightly|v?[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?)$'
 KEEP_TAG_EXCEPTIONS=v3,4.0.0-beta.420.1,4.0.0-beta.420.2,4.0.0-beta.420.3,4.0.0-beta.420.4,4.0.0-beta.420.5,4.0.0-beta.420.6,4.0.0-beta.420.7,4.0.0-beta.420.8,4.0.0-beta.420.9,4.0.0-beta.420.10
+# Temporary: the Docker Hub API still lists this deleted tag, its images without a push date. Remove it once the API no longer lists the tag
+SKIP_DOCKERHUB_TAG=sha-710f236
 KEEP_NIGHTLY_DAYS=14
+MIN_AGE_DAYS=1
 DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME:-}"
 DOCKERHUB_TOKEN="${DOCKERHUB_TOKEN:-}"
 GHCR_TOKEN=""
@@ -58,7 +61,7 @@ read_ghcr_versions() {
 		printf '%s\n' "$versions"
 	done > "$WORK_DIR/ghcr-active.tsv"
 	cut -f 1 "$WORK_DIR/ghcr-active.tsv" > "$WORK_DIR/on-ghcr.txt"
-	awk -F '\t' -v OFS='\t' '$3 != "" { n = split($3, tags, ","); for (i = 1; i <= n; i++) print $1, tags[i] }' "$WORK_DIR/ghcr-active.tsv" > "$WORK_DIR/ghcr.io.tsv"
+	awk -F '\t' -v OFS='\t' '$3 != "" { n = split($3, tags, ","); for (i = 1; i <= n; i++) print $1, tags[i], $4 }' "$WORK_DIR/ghcr-active.tsv" > "$WORK_DIR/ghcr.io.tsv"
 	check_tags ghcr.io
 }
 
@@ -71,6 +74,7 @@ read_dockerhub_tags() {
 	: > "$WORK_DIR/dockerhub-images.tsv"
 	while [ -n "$url" ]; do
 		page="$(curl -sSf --retry 3 -H "Authorization: Bearer $hub" "$url")" || die "could not list the tags of docker.io/$IMAGE from the Docker Hub API"
+		page="$(jq --arg tag "$SKIP_DOCKERHUB_TAG" 'del(.results[] | select(.name == $tag))' <<< "$page")"
 		jq -r '.results[] | [.name, (.digest // ""), (.media_type // ""), (.tag_last_pushed // .last_updated // ""), (.full_size // 0)] | @tsv' <<< "$page" >> "$WORK_DIR/hub-tags.tsv"
 		jq -r '.results[] | .name as $tag | .images[]? | select(.digest) | [$tag, .digest, ([.os, .architecture] | join("/")), (.last_pushed // ""), (.size // 0)] | @tsv' <<< "$page" >> "$WORK_DIR/hub-images.tsv"
 		url="$(jq -r '.next // empty' <<< "$page")"
@@ -80,10 +84,10 @@ read_dockerhub_tags() {
 		|| die "could not read the digests of the old tags of docker.io/$IMAGE, the Docker Hub API lists them without one"
 	awk -F '\t' -v OFS='\t' -v images="$WORK_DIR/dockerhub-images.tsv" '
 		FILENAME == ARGV[1] { old_digest[$1] = $2; old_type[$1] = $3; next }
-		FILENAME == ARGV[2] { if ($2 == "") $2 = old_digest[$1]; if ($3 == "") $3 = old_type[$1]; root[$1] = $2; print $2, $3, $1; next }
+		FILENAME == ARGV[2] { if ($2 == "") $2 = old_digest[$1]; if ($3 == "") $3 = old_type[$1]; root[$1] = $2; print $2, $3, $1, $4; next }
 		$2 != root[$1] && !((root[$1], $2) in pair) { pair[root[$1], $2]; print root[$1], $2 > images }' \
 		"$WORK_DIR/old-tags.tsv" "$WORK_DIR/hub-tags.tsv" "$WORK_DIR/hub-images.tsv" > "$WORK_DIR/dockerhub.tsv"
-	awk -F '\t' -v OFS='\t' '{ print $1, $3 }' "$WORK_DIR/dockerhub.tsv" > "$WORK_DIR/docker.io.tsv"
+	awk -F '\t' -v OFS='\t' '{ print $1, $3, $4 }' "$WORK_DIR/dockerhub.tsv" > "$WORK_DIR/docker.io.tsv"
 	check_tags docker.io
 }
 
@@ -126,17 +130,19 @@ select_kept_manifests() {
 }
 
 write_list() {
-	local registry
+	local registry cutoff
+	cutoff="$(jq -nr --argjson days "$MIN_AGE_DAYS" 'now - $days * 86400 | strftime("%Y-%m-%dT%H:%M:%SZ")')"
 	for registry in ghcr.io docker.io; do
-		awk -F '\t' -v OFS='\t' -v registry="$registry" -v arch="$ARCH_TAG_PATTERN" 'FILENAME == ARGV[1] { kept_tag[$1]; next } FILENAME == ARGV[2] { kept[$1]; next }
-			$2 ~ arch && !($2 in kept_tag) { print registry, $2, $1, (($1 in kept) ? "remove" : "stay") }' "$WORK_DIR/kept-tags.txt" "$WORK_DIR/kept.txt" "$WORK_DIR/$registry.tsv"
-	done | sort -t $'\t' -k2,2 -k1,1 > "$WORK_DIR/arch-tags.tsv"
+		awk -F '\t' -v OFS='\t' -v registry="$registry" -v arch="$ARCH_TAG_PATTERN" -v cutoff="$cutoff" 'FILENAME == ARGV[1] { kept_tag[$1]; next } FILENAME == ARGV[2] { kept[$1]; next }
+			$2 ~ arch && !($2 in kept_tag) { print registry, $2, $1, (!($1 in kept) ? "unused" : ($3 >= cutoff ? "recent" : "remove")) }' "$WORK_DIR/kept-tags.txt" "$WORK_DIR/kept.txt" "$WORK_DIR/$registry.tsv"
+	done | sort -u -t $'\t' -k2,2 -k1,1 > "$WORK_DIR/arch-tags.tsv"
 	{
 		printf 'registry\ttag\tdigest\n'
 		awk -F '\t' -v OFS='\t' '$4 == "remove" { print $1, $2, $3 }' "$WORK_DIR/arch-tags.tsv"
 	} > "$LIST_FILE"
 	ok "$(arch_tags remove) arch tags to remove ($(arch_tags remove ghcr.io) on ghcr.io, $(arch_tags remove docker.io) on docker.io), clean-manifests.sh keeps their image"
-	ok "$(arch_tags stay) arch tags stay ($(arch_tags stay ghcr.io) on ghcr.io, $(arch_tags stay docker.io) on docker.io), clean-manifests.sh deletes them with their manifest"
+	ok "keeping the $(arch_tags recent) arch tags pushed since $cutoff ($(arch_tags recent ghcr.io) on ghcr.io, $(arch_tags recent docker.io) on docker.io), a running build may still need them"
+	[ "$(arch_tags unused)" = 0 ] || ok "not listing $(arch_tags unused) arch tags ($(arch_tags unused ghcr.io) on ghcr.io, $(arch_tags unused docker.io) on docker.io), no kept tag uses their image, so clean-manifests.sh deletes it and the tags go with it"
 	info "$LIST_FILE lists every arch tag to remove in the order it removes them"
 }
 
@@ -225,7 +231,7 @@ verify_kept_manifests() {
 
 check_tags() {
 	awk -F '\t' '$2 == "latest" { found = 1 } END { exit !found }' "$WORK_DIR/$1.tsv" || die "$1/$IMAGE lists no latest tag, expected every tag"
-	awk -F '\t' '$1 !~ /^sha256:[0-9a-f]+$/ || length($1) != 71 { exit 1 }' "$WORK_DIR/$1.tsv" || die "$1/$IMAGE lists tags without a digest, expected one for each"
+	awk -F '\t' '$1 !~ /^sha256:[0-9a-f]+$/ || length($1) != 71 || $3 == "" { exit 1 }' "$WORK_DIR/$1.tsv" || die "$1/$IMAGE lists tags without a digest or push date, expected both for each"
 	ok "$1/$IMAGE has $(count < "$WORK_DIR/$1.tsv") tags, $(awk -F '\t' -v arch="$ARCH_TAG_PATTERN" '$2 ~ arch' "$WORK_DIR/$1.tsv" | count) of them arch tags"
 }
 
