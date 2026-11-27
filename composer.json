@@ -63,7 +63,6 @@
         "fakerphp/faker": "^1.24.1",
         "laravel/boost": "^2.10.4",
         "laravel/pint": "^1.32.3",
-        "laravel/vet": "^0.2.1",
         "mockery/mockery": "^1.6.15",
         "nunomaduro/collision": "^8.9.6",
         "pestphp/pest": "^4.7.8",
@@ -93,10 +92,14 @@
     "config": {
         "allow-plugins": {
             "pestphp/pest-plugin": true,
-            "php-http/discovery": true,
-            "laravel/vet": true
+            "php-http/discovery": true
         },
         "optimize-autoloader": true,
+        "policy": {
+            "cooldown": {
+                "period": "3 days"
+            }
+        },
         "preferred-install": "dist",
         "sort-packages": true
     },

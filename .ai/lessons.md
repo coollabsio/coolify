@@ -49,8 +49,8 @@
 
 - To prove BuildKit cache behavior, use a new Dockerfile with a unique step for each experiment and repeat each build. Old cache records can make a changed input look cached. BuildKit keys `RUN` steps on the `--add-host` names and their order, but not on the IPs.
 
-## Add dependencies through the trust gate
-- `composer require` stops until `vendor/bin/vet` records the new packages in `vet.json`. Read the package source first, then record it with `vendor/bin/vet` in a terminal (it needs a TTY). Prefer the existing dependencies (Guzzle, curl, Flysystem) over a package with a large dependency tree.
+## Add dependencies through the Composer cooldown
+- Composer holds back releases that are younger than 3 days (`config.policy.cooldown` in `composer.json`). For an urgent security fix, name only the packages that need it: `composer update vendor/package --no-cooldown`. Read the source of a new package before you add it. Prefer the existing dependencies (Guzzle, curl, Flysystem) over a package with a large dependency tree.
 
 ## Verify the complete user flow
 - Do not use a passing unit test, a successful build, or a healthy process as proof for a reported UI failure.
