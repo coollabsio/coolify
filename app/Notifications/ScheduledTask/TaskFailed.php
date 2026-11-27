@@ -7,6 +7,7 @@ use App\Models\NotificationThrottle;
 use App\Models\ScheduledTask;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use Illuminate\Database\Eloquent\Model;
@@ -130,6 +131,30 @@ class TaskFailed extends CustomEmailNotification implements ThrottledNotificatio
 
         return new PushoverMessage(
             title: $this->disabled ? 'Scheduled task disabled' : 'Scheduled task failed',
+            level: 'error',
+            message: $message,
+            buttons: $buttons,
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        $message = "Scheduled task ({$this->task->name}) failed";
+
+        if ($this->output) {
+            $message .= "\n\nError Output: {$this->output}";
+        }
+
+        $buttons = [];
+        if ($this->url) {
+            $buttons[] = [
+                'text' => 'Open task in Coolify',
+                'url' => (string) $this->url,
+            ];
+        }
+
+        return new NtfyMessage(
+            title: 'Scheduled task failed',
             level: 'error',
             message: $message,
             buttons: $buttons,

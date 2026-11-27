@@ -49,7 +49,19 @@ class ApplicationPreview extends BaseModel
         'approved_at' => 'datetime',
         'keeps_production_values' => 'boolean',
         'trigger_set' => 'array',
+        'is_same_repository' => 'boolean',
     ];
+
+    /**
+     * Records whether the branch of the pull request is in the repository of the application. Only then
+     * does the preview deploy the Compose file of its pull request (ApplicationDeploymentJob::usesPullRequestComposeFile()).
+     */
+    public function recordSameRepository(bool $isSameRepository): void
+    {
+        if ($this->is_same_repository !== $isSameRepository) {
+            $this->forceFill(['is_same_repository' => $isSameRepository])->save();
+        }
+    }
 
     protected static function booted(): void
     {
@@ -503,7 +515,7 @@ class ApplicationPreview extends BaseModel
     }
 
     /**
-     * Original compose service names for this preview (PR suffix stripped), excluding database images.
+     * Compose service names for this preview (the PR suffix of the legacy parser stripped), excluding database images.
      *
      * @return list<string>
      */
@@ -521,9 +533,9 @@ class ApplicationPreview extends BaseModel
                 continue;
             }
 
-            $names[] = str((string) $serviceName)
-                ->replaceLast('-pr-'.$this->pull_request_id, '')
-                ->toString();
+            $names[] = $this->application->renamesPreviewComposeServices()
+                ? str((string) $serviceName)->replaceLast('-pr-'.$this->pull_request_id, '')->toString()
+                : (string) $serviceName;
         }
 
         return array_values(array_unique($names));

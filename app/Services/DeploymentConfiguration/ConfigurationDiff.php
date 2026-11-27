@@ -54,6 +54,26 @@ class ConfigurationDiff
         return $this->legacyFallback || collect($this->changes)->contains(fn (array $change): bool => $change['impact'] === 'build');
     }
 
+    /**
+     * Why the next deployment or restart must build the image, one short reason per change.
+     *
+     * @return array<int, string>
+     */
+    public function buildReasons(): array
+    {
+        if ($this->legacyFallback) {
+            return ['The last deployment stored no configuration snapshot'];
+        }
+
+        return collect($this->changes)
+            ->filter(fn (array $change): bool => $change['impact'] === 'build')
+            ->map(fn (array $change): string => data_get($change, 'section') === 'environment'
+                ? data_get($change, 'label').' (build-time variable)'
+                : (string) data_get($change, 'label'))
+            ->values()
+            ->all();
+    }
+
     public function requiresRedeploy(): bool
     {
         return $this->isChanged();
@@ -68,7 +88,7 @@ class ConfigurationDiff
     }
 
     /**
-     * @return array{changed: bool, count: int, requires_build: bool, requires_redeploy: bool, legacy_fallback: bool, changes: array<int, array<string, mixed>>}
+     * @return array{changed: bool, count: int, requires_build: bool, build_reasons: array<int, string>, requires_redeploy: bool, legacy_fallback: bool, changes: array<int, array<string, mixed>>}
      */
     public function toArray(): array
     {
@@ -76,6 +96,7 @@ class ConfigurationDiff
             'changed' => $this->isChanged(),
             'count' => $this->count(),
             'requires_build' => $this->requiresBuild(),
+            'build_reasons' => $this->buildReasons(),
             'requires_redeploy' => $this->requiresRedeploy(),
             'legacy_fallback' => $this->isLegacyFallback(),
             'changes' => $this->changes(),

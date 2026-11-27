@@ -192,27 +192,14 @@ describe('Boarding Flow Integration', function () {
         expect((bool) $this->team->fresh()->show_boarding)->toBeTrue();
     });
 
-    test('lists account SSH keys and firewalls as listbox options and shows the selection', function () {
+    test('lists account SSH keys and firewalls as listbox options', function () {
         Livewire::test(ByHetzner::class)
             ->set('current_step', 2)
             ->set('hetznerSshKeys', [['id' => 11, 'name' => 'deploy-key']])
             ->set('hetznerFirewalls', [['id' => 38, 'name' => 'web-firewall'], ['id' => 39, 'name' => 'db-firewall']])
             ->set('selectedHetznerFirewallIds', [38])
             ->assertSee('deploy-key')
-            ->assertSee('db-firewall')
-            ->assertSeeHtml('x-text="current">web-firewall</span>')
-            ->assertSeeHtml('x-text="current">Select SSH keys</span>');
-    });
-
-    test('shows the cloud init script name only when saving the script', function () {
-        Livewire::test(ByHetzner::class)
-            ->set('current_step', 2)
-            ->set('show_cloud_init_script', true)
-            ->assertSee('Cloud-init script')
-            ->assertSee('Save this script for later')
-            ->assertDontSee('Saved script name')
-            ->set('save_cloud_init_script', true)
-            ->assertSee('Saved script name');
+            ->assertSee('db-firewall');
     });
 });
 

@@ -2,6 +2,7 @@
 
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
+use App\Models\ApplicationSetting;
 use App\Models\EnvironmentVariable;
 use App\Models\Server;
 
@@ -94,7 +95,7 @@ it('generates escaped railpack env args from resolved values and includes instal
 it('uses preview railpack environment variables for preview deployments', function () {
     $application = Mockery::mock(Application::class);
     $application->shouldReceive('getAttribute')->with('install_command')->andReturn(null);
-    $application->shouldReceive('getAttribute')->with('settings')->andReturn((object) ['is_pr_deployments_public_enabled' => false]);
+    $application->shouldReceive('getAttribute')->with('settings')->andReturn(new ApplicationSetting(['is_pr_deployments_public_enabled' => false]));
 
     $previewValue = Mockery::mock(EnvironmentVariable::class)->makePartial();
     $previewValue->forceFill([

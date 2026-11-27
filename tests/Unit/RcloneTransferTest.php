@@ -122,6 +122,16 @@ it('labels the rclone container and stops it after the timeout of its job', func
     'no timeout' => [null, 86400],
 ]);
 
+it('mounts files with --mount, so a file that Docker cannot see fails instead of becoming a directory', function () {
+    Process::fake();
+    $transfer = new RcloneTransfer(rcloneTransferTestStorage(), rcloneTransferTestServer(), 'backup-of-x');
+
+    $transfer->start(['/host/backups/dump.gz' => '/data/coolify/backups/dump.gz']);
+
+    Process::assertRan(fn (PendingProcess $process): bool => str_contains(remoteProcessScript($process),
+        "--label coolify.type=rclone --mount 'type=bind,source=/host/backups/dump.gz,target=/data/coolify/backups/dump.gz,readonly' --entrypoint sleep"));
+});
+
 it('follows the registry setting of the instance for the default rclone image', function (string $configured, string $expected) {
     Process::fake();
     InstanceSettings::unguarded(fn () => InstanceSettings::updateOrCreate(['id' => 0], ['docker_registry_url' => 'ghcr.io']));

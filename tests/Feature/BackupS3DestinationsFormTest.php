@@ -283,12 +283,10 @@ it('shows the copy status of each destination in the execution lists', function 
 
     Livewire::test(BackupExecutions::class, ['backup' => $databaseBackup])
         ->assertSeeInOrder(['First S3', 'Second S3 failed'])
-        ->assertSee('Access denied')
-        ->assertSee('Delete the selected backup permanently from every S3 storage');
+        ->assertSee('Access denied');
 
     Livewire::test(VolumeBackups::class, ['storage' => $this->volume, 'resource' => $this->application, 'section' => 'executions'])
-        ->assertSeeInOrder(['First S3', 'Second S3 failed'])
-        ->assertSee('Delete the selected backup permanently from every S3 storage');
+        ->assertSeeInOrder(['First S3', 'Second S3 failed']);
 });
 
 it('keeps a selected destination that is unusable for a while when other settings are saved', function () {

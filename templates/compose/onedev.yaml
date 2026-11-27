@@ -7,7 +7,7 @@
 
 services:
   onedev:
-    image: 1dev/server:latest
+    image: 1dev/server:17.2.0
     volumes:
       - onedev-docker-sock:/var/run/docker.sock
       - onedev-data:/opt/onedev

@@ -6,7 +6,7 @@
 
 services:
   grimmory:
-    image: 'grimmory/grimmory:nightly-20260403-3a371f7' # Released on April 3 2026
+    image: 'grimmory/grimmory:v3.5.0'
     environment:
       - SERVICE_URL_GRIMMORY_80
       - 'USER_ID=${GRIMMORY_USER_ID:-0}'

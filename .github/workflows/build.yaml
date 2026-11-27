@@ -46,9 +46,11 @@ jobs:
       - name: Plan the Coolify version
         id: plan
         env:
+          GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ github.base_ref || github.ref_name }}
           PULL_REQUEST: ${{ github.event.pull_request.number }}
         run: |
+          gh auth setup-git
           coolify="$(scripts/plan-version.sh --build)"
           echo "coolify=$coolify" >> "$GITHUB_OUTPUT"
 
@@ -92,6 +94,8 @@ jobs:
 
       - name: Build the image
         uses: docker/build-push-action@v7.4.0
+        env:
+          DOCKER_BUILD_SUMMARY: false
         with:
           context: .
           file: docker/production/Dockerfile

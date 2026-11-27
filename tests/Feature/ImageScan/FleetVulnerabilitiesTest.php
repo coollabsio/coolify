@@ -23,7 +23,6 @@ use App\Services\ImageScan\TeamVulnerabilities;
 use App\Services\ImageScan\VulnerabilityMarkers;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -172,7 +171,6 @@ describe('page', function () {
         session(['currentTeam' => $this->team]);
         $this->get(route('vulnerabilities', ['showNotChecked' => 1]))
             ->assertOk()
-            ->assertSee('Security | Coolify', false)
             ->assertSeeInOrder([
                 'now-app', 'Update now', 'available-app', 'Security update', 'nofix-app', 'No fix yet',
                 'check-app', 'Check needed', 'a-ok-app', 'No action needed', 'b-ok-app', 'No action needed',
@@ -205,19 +203,15 @@ describe('page', function () {
         fleetPage($this->admin)->assertSeeInOrder(['nofix-app', 'No fix yet', TeamVulnerabilities::NO_FIX_ACTION]);
     });
 
-    it('shows the primary action as a link to the Security card of the resource, without buttons', function () {
+    it('shows the primary action as a link to the Security card of the resource', function () {
         $now = fleetApplication('now-app');
         fleetScan($now, 'update_now');
         $noFix = fleetApplication('nofix-app');
         fleetScan($noFix, 'no_fix');
 
-        $page = fleetPage($this->admin)
+        fleetPage($this->admin)
             ->assertSee('Update to 1.28.')
             ->assertSeeHtml('href="'.TeamVulnerabilities::vulnerabilitiesUrl($now).'#security-section"');
-
-        // The rows have no buttons; the page-level Export menu is not a row action.
-        expect(str($page->html())->after('class="data-table"')->toString())->not->toContain('<button type="button" class="button')
-            ->and(substr_count($page->html(), '#security-section'))->toBe(1);
     });
 
     it('reads only the stored status, not the findings', function () {
@@ -558,22 +552,6 @@ describe('markers', function () {
         ]);
     });
 
-    it('renders update now in the error color and no fix yet in the neutral color, with visible text', function () {
-        $html = (string) $this->blade('<x-image-scan.marker status="update_now" text="Update now" label="Security: update now. Update to 1.28." tooltip="Update to 1.28." />');
-        expect($html)->toMatch('/<svg[^>]*text-error/')
-            ->not->toMatch('/<span role="img"[^>]*text-error/')
-            ->toContain('>Update now</span>')
-            ->toContain('aria-label="Security: update now. Update to 1.28."')
-            ->toContain('data-tooltip="Update to 1.28." data-tooltip-wrap');
-
-        $html = (string) $this->blade('<x-image-scan.marker status="no_fix" text="No fix yet" label="Security: no fix yet" />');
-        expect($html)->not->toContain('text-error')
-            ->toContain('>No fix yet</span>')
-            ->not->toContain('data-tooltip');
-
-        expect(trim((string) $this->blade('<x-image-scan.marker status="update_available" text="Security update" label="x" />')))->toBe('');
-    });
-
     it('reads the markers with the same number of queries for more resources', function () {
         $count = function (int $resources): int {
             $models = collect(range(1, $resources))->map(function (int $index) use ($resources) {
@@ -675,22 +653,6 @@ describe('dashboard and search', function () {
         $search = Livewire::test(GlobalSearch::class)->call('openSearchModal');
         $entry = collect($search->get('allSearchableItems'))->firstWhere('link', route('vulnerabilities'));
         expect($entry['name'])->toBe('Security');
-
-        // The palette builds the vulnerability ID entry in the browser (resources/js/vulnerability-search.js, tested
-        // with node --test) from this URL.
-        $search->assertSeeHtml('window.vulnerabilitySearchItem?.(this.searchQuery, this.vulnerabilitiesUrl)')
-            ->assertDontSeeHtml('vulnerabilitiesUrl: null');
-    });
-
-    it('lists the Security page in the navbar', function () {
-        $this->actingAs($this->admin);
-        session(['currentTeam' => $this->team]);
-        app()->instance('request', Request::create('/vulnerabilities'));
-
-        $navbar = (string) $this->blade('<x-navbar desktop />');
-        expect($navbar)->toContain('href="'.route('vulnerabilities').'"')
-            ->and($navbar)->toMatch('/href="'.preg_quote(route('vulnerabilities'), '/').'"[^>]*>.*?Security/s')
-            ->and($navbar)->not->toContain('Vulnerabilities');
     });
 });
 

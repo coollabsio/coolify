@@ -112,3 +112,38 @@ test('an admin token for the whole team can reference team and server variables'
     $response = scopedSharedVariablesApi($token, 'GET', "/api/v1/applications/{$this->application->uuid}/envs")->assertOk();
     expect(collect($response->json())->firstWhere('key', 'FROM_TEAM')['real_value'])->toBe('team-secret-value');
 });
+
+test('a scoped token does not resolve team or server references with invisible characters', function (string $reference, string $secret) {
+    $token = scopedSharedVariablesToken($this->admin, $this->team, [['scope' => 'environment', 'uuid' => $this->staging->uuid]]);
+
+    $response = scopedSharedVariablesApi($token, 'POST', "/api/v1/applications/{$this->application->uuid}/envs", [
+        'key' => 'LEAK',
+        'value' => $reference,
+    ]);
+
+    $variable = $this->application->environment_variables()->where('key', 'LEAK')->first();
+    if ($variable !== null) {
+        expect($variable->real_value)->not->toContain($secret);
+        expect(resolveSharedEnvironmentVariables($variable->value, $this->application))->not->toContain($secret);
+    } else {
+        $response->assertUnprocessable();
+    }
+})->with([
+    'NUL before team' => ["{{\0team.TEAM_SECRET}}", 'team-secret-value'],
+    'zero-width space before team' => ["{{\u{200B}team.TEAM_SECRET}}", 'team-secret-value'],
+    'BOM before team' => ["{{\u{FEFF}team.TEAM_SECRET}}", 'team-secret-value'],
+    'LRM before team' => ["{{\u{200E}team.TEAM_SECRET}}", 'team-secret-value'],
+    'NUL after key' => ["{{team.TEAM_SECRET\0}}", 'team-secret-value'],
+    'zero-width space before server' => ["{{\u{200B}server.SERVER_SECRET}}", 'server-secret-value'],
+]);
+
+test('the API refuses an environment variable value with a NUL character', function () {
+    $token = scopedSharedVariablesToken($this->admin, $this->team, null);
+
+    scopedSharedVariablesApi($token, 'POST', "/api/v1/applications/{$this->application->uuid}/envs", [
+        'key' => 'WITH_NUL',
+        'value' => "{{\0team.TEAM_SECRET}}",
+    ])->assertUnprocessable()->assertJsonValidationErrors(['value' => 'NUL']);
+
+    expect($this->application->environment_variables()->where('key', 'WITH_NUL')->exists())->toBeFalse();
+});

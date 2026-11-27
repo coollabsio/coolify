@@ -7,7 +7,7 @@
 
 services:
   litellm:
-    image: "ghcr.io/berriai/litellm-database:main-stable"
+    image: "ghcr.io/berriai/litellm-database:1.109.1"
     depends_on:
       postgres:
         condition: service_healthy

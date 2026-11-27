@@ -807,7 +807,7 @@ class GlobalSearch extends Component
                 'type' => 'navigation',
                 'description' => 'Configure email, Discord, Telegram notifications',
                 'link' => route('notifications.email'),
-                'search_text' => 'notifications alerts email discord telegram slack pushover',
+                'search_text' => 'notifications alerts email discord telegram slack pushover ntfy',
             ],
             [
                 'name' => 'Analytics',
@@ -920,6 +920,13 @@ class GlobalSearch extends Component
                 'description' => 'Configure Pushover notifications',
                 'link' => route('notifications.pushover'),
                 'search_text' => 'notifications alerts pushover',
+            ],
+            [
+                'name' => 'Ntfy Notifications',
+                'type' => 'navigation',
+                'description' => 'Configure Ntfy notifications',
+                'link' => route('notifications.ntfy'),
+                'search_text' => 'notifications alerts ntfy push',
             ],
             [
                 'name' => 'Webhook Notifications',
@@ -1839,6 +1846,7 @@ class GlobalSearch extends Component
             ] + service_logo_urls(data_get($service, 'logo')) + array_filter([
                 'amd_only' => data_get($service, 'amd_only') ? true : null,
                 'arm_only' => data_get($service, 'arm_only') ? true : null,
+                'outdated' => data_get($service, 'outdated') ? true : null,
             ]));
         }
 

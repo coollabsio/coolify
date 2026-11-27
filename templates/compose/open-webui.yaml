@@ -7,7 +7,7 @@
 
 services:
   open-webui:
-    image: "ghcr.io/open-webui/open-webui:main"
+    image: "ghcr.io/open-webui/open-webui:v0.13.3"
     volumes:
       - "open-webui:/app/backend/data"
     environment:

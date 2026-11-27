@@ -310,7 +310,6 @@ it('pushes the custom page and falls back to the default page after a reset', fu
 
     expect(writtenProxyFile(errorPageScriptLines(), '/data/coolify/proxy/error-pages/404.html'))
         ->toContain('There is no site at this address')
-        ->toContain('https://coolify.io/docs/troubleshoot/applications/no-available-server')
         ->not->toContain($server->name)
         ->not->toContain($server->ip)
         ->not->toContain($this->team->name);

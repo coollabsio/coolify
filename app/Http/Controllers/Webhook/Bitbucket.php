@@ -329,10 +329,9 @@ class Bitbucket extends Controller
                 $pr_app->generate_preview_fqdn();
             }
         }
-        ($found ?? $pr_app)->markForkPullRequest($this->isForkPreviewRepository(
-            $context->sourceRepository,
-            $context->targetRepository,
-        ), $context->commit);
+        $isFork = $this->isForkPreviewRepository($context->sourceRepository, $context->targetRepository);
+        ($found ?? $pr_app)->recordSameRepository(! $isFork);
+        ($found ?? $pr_app)->markForkPullRequest($isFork, $context->commit);
 
         $result = queue_application_deployment(
             application: $application,

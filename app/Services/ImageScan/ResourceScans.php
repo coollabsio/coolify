@@ -7,6 +7,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ImageScanStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\EnvironmentVariable;
 use App\Models\ImageScan;
 use App\Models\Server;
 use App\Models\Service;
@@ -78,8 +79,8 @@ final class ResourceScans
 
     /**
      * The images Coolify scans for a resource without a deployment: each application and database of a service, or
-     * the resource itself (a standalone database), with its image. Owners excluded from the status and owners without
-     * an image are not scanned.
+     * the resource itself (a standalone database), with its image as configuredImage() resolves it. Owners excluded from
+     * the status and owners without an image are not scanned.
      *
      * @return list<array{0: Model, 1: string}>
      */
@@ -93,7 +94,7 @@ final class ResourceScans
 
         return $owners
             ->filter(fn (Model $owner): bool => self::isScanTarget($owner))
-            ->map(fn (Model $owner): array => [$owner, trim((string) $owner->getAttribute('image'))])
+            ->map(fn (Model $owner): array => [$owner, self::configuredImage($owner)])
             ->values()
             ->all();
     }
@@ -168,8 +169,8 @@ final class ResourceScans
     /**
      * The images of a Compose application without a completed result in its current deployment: rows of that
      * deployment that failed or did not finish (their image ref), and images of the stored Compose file without a row
-     * of it (the image as the file writes it). `name` is the Compose service when the file names the image. Images set
-     * with a variable are left out. Empty for other resources.
+     * of it (the image as the file starts it, see `resolveComposeImages()`). `name` is the Compose service when the file
+     * names the image. Empty for other resources.
      *
      * @param  Collection<int, ImageScan>  $currentScans  The current scans of the application (see `currentFor()`).
      * @param  Collection<string, Collection<int, ImageScan>>|null  $deploymentRows  The rows of `composeDeploymentRows()`
@@ -276,8 +277,8 @@ final class ResourceScans
     }
 
     /**
-     * The images of the services of the stored Compose file of an application, keyed by the service name. Images set
-     * with a variable are left out.
+     * The images that the services of the stored Compose file of an application start, keyed by the service name (see
+     * `resolveComposeImages()`).
      *
      * @return array<string, string>
      */
@@ -285,26 +286,64 @@ final class ResourceScans
     {
         $yaml = (string) ($application->docker_compose ?: $application->docker_compose_raw);
         $key = hash('xxh128', $yaml);
-        if (array_key_exists($key, self::$composeImages)) {
-            return self::$composeImages[$key];
+        if (! array_key_exists($key, self::$composeImages)) {
+            try {
+                $images = collect((array) data_get(Yaml::parse($yaml), 'services', []))
+                    ->map(fn ($service) => data_get($service, 'image'))
+                    ->filter(fn ($image): bool => is_string($image) && trim($image) !== '')
+                    ->mapWithKeys(fn (string $image, $service): array => [(string) $service => $image])
+                    ->all();
+            } catch (ParseException) {
+                $images = [];
+            }
+
+            if (count(self::$composeImages) >= self::COMPOSE_IMAGES_CACHE_SIZE) {
+                self::$composeImages = [];
+            }
+            self::$composeImages[$key] = $images;
         }
 
-        try {
-            $compose = Yaml::parse($yaml);
-            $images = collect((array) data_get($compose, 'services', []))
-                ->map(fn ($service) => data_get($service, 'image'))
-                ->filter(fn ($image): bool => is_string($image) && trim($image) !== '' && ! str_contains($image, '$'))
-                ->mapWithKeys(fn (string $image, $service): array => [(string) $service => trim($image)])
-                ->all();
-        } catch (ParseException) {
-            $images = [];
+        return self::resolveComposeImages($application, self::$composeImages[$key]);
+    }
+
+    /**
+     * The images that Compose services of an application start, keyed like `$images`. A variable that sets the image
+     * (`${APP_IMAGE:-app:1.0}`, `app:${APP_VERSION}`) gets the value of the environment variable of the application,
+     * else its default, as the deploy resolves it. A preview takes its preview variable, else the variable of the
+     * application. Images with a variable in another form, or without a value and default, are left out.
+     *
+     * @template TKey of array-key
+     *
+     * @param  array<TKey, string>  $images
+     * @return array<TKey, string>
+     */
+    public static function resolveComposeImages(Application $application, array $images, bool $preview = false): array
+    {
+        $variables = array_filter(array_map(fn (string $image): ?ComposeImageVariable => ComposeImageVariable::parse($image), $images));
+        $values = [];
+        if ($variables !== [] && $application->exists) {
+            $keys = array_values(array_unique(array_map(fn (ComposeImageVariable $variable): string => $variable->key, $variables)));
+            // The preview value comes last, so it replaces the value of the application.
+            $application->morphMany(EnvironmentVariable::class, 'resourceable')
+                ->whereIn('key', $keys)
+                ->whereIn('is_preview', $preview ? [false, true] : [false])
+                ->orderBy('is_preview')
+                ->get(['key', 'value', 'is_preview'])
+                ->each(function (EnvironmentVariable $variable) use (&$values): void {
+                    $values[$variable->key] = $variable->value;
+                });
         }
 
-        if (count(self::$composeImages) >= self::COMPOSE_IMAGES_CACHE_SIZE) {
-            self::$composeImages = [];
+        $resolved = [];
+        foreach ($images as $name => $image) {
+            $ref = isset($variables[$name]) ? $variables[$name]->resolve($values[$variables[$name]->key] ?? null) : $image;
+            $ref = trim((string) $ref);
+            if ($ref !== '' && ! ComposeImageVariable::hasVariable($ref)) {
+                $resolved[$name] = $ref;
+            }
         }
 
-        return self::$composeImages[$key] = $images;
+        return $resolved;
     }
 
     /**
@@ -508,10 +547,10 @@ final class ResourceScans
      *
      * @return Collection<int, ImageScan>
      */
-    public static function currentForTeam(int $teamId): Collection
+    public static function currentForTeam(int $teamId, ?int $serverId = null): Collection
     {
         return ImageScan::query()
-            ->whereIn('server_id', Server::query()->where('team_id', $teamId)->select('id'))
+            ->whereIn('server_id', Server::query()->where('team_id', $teamId)->when($serverId !== null, fn ($query) => $query->whereKey($serverId))->select('id'))
             ->select(['resource_type', 'resource_id'])
             ->distinct()
             ->get()

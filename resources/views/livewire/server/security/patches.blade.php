@@ -131,6 +131,17 @@
                         </span>
                     </div>
 
+                    @if (filled($newerRelease = data_get($result, 'newer_release')))
+                        <x-callout type="info" title="Amazon Linux {{ $newerRelease }} is available">
+                            Amazon Linux keeps the server on its installed release, so the updates on this page and the
+                            automatic security updates come only from that release. Newer fixes come with a new
+                            release. To upgrade, run <code>dnf upgrade --releasever={{ $newerRelease }}</code> on the
+                            server, after you read the
+                            <a class="underline" target="_blank" rel="noopener noreferrer"
+                                href="https://docs.aws.amazon.com/linux/al2023/release-notes/relnotes-{{ $newerRelease }}.html">release notes</a>.
+                        </x-callout>
+                    @endif
+
                     @php
                         $autoUpdatesSupported = \App\Actions\Server\ConfigureAutomaticSecurityUpdates::supportFor($packageManager);
                     @endphp

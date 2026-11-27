@@ -790,7 +790,7 @@ describe('main card actions', function () {
 
         updateImagePage($this->admin, $this->database, 'database')
             ->assertDontSee('needs another check')
-            ->assertSee("Coolify cannot read the tags of postgres. Log in to docker.io on {$this->server->name}.")
+            ->assertSee("Cannot read the tags of postgres. Log in to docker.io on {$this->server->name}.")
             ->assertDontSeeHtml('updateImage(');
     });
 
@@ -812,7 +812,6 @@ describe('main card actions', function () {
         updateImagePage($this->admin, $service, 'service')
             ->assertSee('web: nginx:1.27 aaaaaaaaaaaa → nginx:1.29')
             ->assertSee('worker: nginx:1.27 → nginx:1.29')
-            ->assertSee('One-click services pin versions that work together. Check the service template before you update.')
             ->assertSeeHtml($web->uuid);
     });
 

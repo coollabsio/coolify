@@ -227,3 +227,10 @@ it('changes the state hash after an edit in the GUI', function () {
 
     expect(plannerPlan(['api' => plannerResource()])->stateHash)->not->toBe($before);
 });
+
+it('reports unknown keys in a list of secret manager sources', function () {
+    plannerApp();
+    $plan = plannerPlan(['api' => plannerResource(['secret_manager' => [['name' => 'urls', 'token' => 'x', 'extra' => true]]])]);
+
+    expect(array_map(fn ($error) => $error->path, $plan->errors))->toContain('resources.api.secret_manager.0.extra');
+});

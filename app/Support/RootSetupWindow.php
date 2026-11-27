@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Cache;
 /**
  * The first registration creates the root user. It is allowed only for a short time after
  * Coolify starts, so a bot cannot claim a fresh install. A restart opens the window again.
+ * When ROOT_USER_EMAIL and ROOT_USER_PASSWORD are set, only RootUserSeeder creates the root
+ * user, so the window never opens.
  */
 class RootSetupWindow
 {
@@ -21,7 +23,7 @@ class RootSetupWindow
      */
     public static function openIfNoUserExists(): void
     {
-        if (User::query()->exists()) {
+        if (self::isReservedForPredefinedRootUser() || User::query()->exists()) {
             return;
         }
 
@@ -33,6 +35,10 @@ class RootSetupWindow
      */
     public static function isOpen(): bool
     {
+        if (self::isReservedForPredefinedRootUser()) {
+            return false;
+        }
+
         $closesAt = Cache::get(self::CACHE_KEY);
 
         return is_numeric($closesAt) && now()->getTimestamp() < (int) $closesAt;
@@ -40,6 +46,11 @@ class RootSetupWindow
 
     public static function isPending(): bool
     {
-        return ! Cache::has(self::CACHE_KEY);
+        return ! self::isReservedForPredefinedRootUser() && ! Cache::has(self::CACHE_KEY);
+    }
+
+    public static function isReservedForPredefinedRootUser(): bool
+    {
+        return (bool) config('constants.seeder.is_root_user_predefined');
     }
 }

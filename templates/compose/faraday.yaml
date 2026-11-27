@@ -7,7 +7,7 @@
 
 services:
   postgresql:
-    image: postgres:latest
+    image: postgres:18.7
     volumes:
       - faraday-db:/var/lib/postgresql/data
     environment:
@@ -22,7 +22,7 @@ services:
       timeout: 10s
       retries: 15
   redis:
-    image: redis:alpine
+    image: redis:8.10.3-alpine
     command: '--save 60 1 --loglevel warning'
     volumes:
       - redis:/data
@@ -35,7 +35,7 @@ services:
       retries: 15
 
   faraday:
-    image: faradaysec/faraday:latest
+    image: faradaysec/faraday:5.25.4
     entrypoint: /entrypoint.sh
     environment:
       - SERVICE_URL_FARADAY_5985

@@ -7,7 +7,7 @@
 
 services:
   langflow:
-    image: langflowai/langflow:1.7.2
+    image: langflowai/langflow:1.13.2
     environment:
       - SERVICE_URL_LANGFLOW_7860
       - LANGFLOW_AUTO_LOGIN=${LANGFLOW_AUTO_LOGIN:-false}

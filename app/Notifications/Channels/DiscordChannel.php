@@ -20,7 +20,9 @@ class DiscordChannel
             return;
         }
 
-        if (! $discordSettings->discord_ping_enabled) {
+        if ($discordSettings->discord_ping_enabled) {
+            $message->pingText = $discordSettings->pingText();
+        } else {
             $message->isCritical = false;
         }
 

@@ -325,6 +325,21 @@ function getCurrentApplicationContainerStatus(Server $server, Application $appli
     return $containers;
 }
 
+/**
+ * Pick the container the proxy routes to when an application has several, as during a
+ * rolling update: running, ready (healthy or without a healthcheck) over starting or
+ * unhealthy, and the newest among equals, since the older one is about to be stopped.
+ */
+function selectServingContainer(Collection $containers): ?array
+{
+    $running = $containers->filter(fn ($container) => data_get($container, 'State') === 'running');
+    $ready = $running->reject(fn ($container) => str(data_get($container, 'Status'))->contains(['(health: starting)', '(unhealthy)']));
+
+    return ($ready->isEmpty() ? $running : $ready)
+        ->sortByDesc(fn ($container) => strtotime((string) data_get($container, 'CreatedAt')) ?: 0)
+        ->first();
+}
+
 function getCurrentServiceContainerStatus(Server $server, Service $service): Collection
 {
     $containers = collect([]);
@@ -509,6 +524,15 @@ function dockerRemoveCommand(string $container): string
 }
 
 /**
+ * The `docker run` option that mounts a host file read-only. Unlike `-v`, `--mount` fails when Docker cannot see
+ * the source, so a missing file does not become an empty directory on the host and in the container.
+ */
+function dockerReadOnlyFileMountOption(string $source, string $target): string
+{
+    return '--mount '.escapeshellarg("type=bind,source={$source},target={$target},readonly");
+}
+
+/**
  * Lists the containers of a Compose project, one JSON object per line, for composeContainersWithRemovedVolumes().
  */
 function composeProjectMountsCommand(string $projectName): string
@@ -634,15 +658,15 @@ function executeInDocker(string $containerId, string $command)
 function buildContainerStatusCommand(Server $server, string $container_id): string
 {
     if ($server->isSwarm()) {
-        return 'docker service ls --filter '.escapeshellarg("name={$container_id}")." --format '{{json .}}' ";
+        return remoteCommandWithTimeout('docker service ls --filter '.escapeshellarg("name={$container_id}")." --format '{{json .}}' ");
     }
 
-    return "docker inspect --format '{{json .}}' ".escapeshellarg($container_id);
+    return remoteCommandWithTimeout("docker inspect --format '{{json .}}' ".escapeshellarg($container_id));
 }
 
 function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
 {
-    $container = instant_remote_process([buildContainerStatusCommand($server, $container_id)], $server, $throwError);
+    $container = instant_remote_process([buildContainerStatusCommand($server, $container_id)], $server, $throwError, timeout: 30);
     if (! $container) {
         return 'exited';
     }
@@ -1054,9 +1078,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     $labels = collect([]);
     $labels->push('traefik.enable=true');
     if ($is_gzip_enabled) {
-        // Not named `gzip`: containers that are not redeployed still declare the old `gzip`
-        // definition, and Traefik drops a middleware with conflicting definitions (#5076).
-        $labels->push('traefik.http.middlewares.gzip-sse.compress.excludedcontenttypes=text/event-stream');
+        $labels->push('traefik.http.middlewares.'.TRAEFIK_GZIP_MIDDLEWARE.'.compress.excludedcontenttypes='.implode(',', TRAEFIK_GZIP_EXCLUDED_CONTENT_TYPES));
     }
     $labels->push('traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https');
     // Every container declares the shared middleware, so a permanent variant needs its own name.
@@ -1181,7 +1203,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push("{$https_label}-stripprefix");
                     }
                     if ($is_gzip_enabled) {
-                        $middlewares->push('gzip-sse');
+                        $middlewares->push(TRAEFIK_GZIP_MIDDLEWARE);
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
@@ -1209,7 +1231,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 } else {
                     $middlewares = collect($base_middlewares);
                     if ($is_gzip_enabled) {
-                        $middlewares->push('gzip-sse');
+                        $middlewares->push(TRAEFIK_GZIP_MIDDLEWARE);
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
@@ -1274,7 +1296,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                         $middlewares->push("{$http_label}-stripprefix");
                     }
                     if ($is_gzip_enabled) {
-                        $middlewares->push('gzip-sse');
+                        $middlewares->push(TRAEFIK_GZIP_MIDDLEWARE);
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
@@ -1303,7 +1325,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 } else {
                     $middlewares = collect($base_middlewares);
                     if ($is_gzip_enabled) {
-                        $middlewares->push('gzip-sse');
+                        $middlewares->push(TRAEFIK_GZIP_MIDDLEWARE);
                     }
                     if (str($image)->contains('ghost')) {
                         $middlewares->push("redir-ghost-{$uuid}");
@@ -2034,36 +2056,32 @@ function stripCoolifyCustomFields(array $yamlCompose): array
     return $yamlCompose;
 }
 
-function validateComposeFile(string $compose, int $server_id): string|Throwable
+/**
+ * Check a Compose file with `docker compose config` on the server. The file goes to the command on
+ * stdin, so no temporary file is written and large files are not limited by the argument length.
+ * Relative paths (such as `extends.file`) resolve in $projectDirectory, as in the deployment.
+ *
+ * @throws RuntimeException With the exit code of the check when Docker Compose rejects the file (255: SSH failure)
+ */
+function checkComposeFileOnServer(string $compose, Server $server, ?string $projectDirectory = null): void
 {
-    $uuid = Str::random(18);
-    $server = Server::ownedByCurrentTeam()->find($server_id);
+    $yamlCompose = stripCoolifyCustomFields(parseDockerComposeYaml($compose));
+    $projectDirectoryOption = filled($projectDirectory) ? '--project-directory '.escapeshellarg($projectDirectory).' ' : '';
+    $command = ($server->isNonRoot() ? 'sudo ' : '')."docker compose {$projectDirectoryOption}-f - config --no-interpolate --no-path-resolution -q";
+    instant_remote_process_with_input($server, $command, Yaml::dump($yamlCompose, 10, 2));
+}
+
+/**
+ * @return string 'OK', or the error of checkComposeFileOnServer()
+ */
+function validateComposeFile(string $compose, Server $server, ?string $projectDirectory = null): string
+{
     try {
-        if (! $server) {
-            throw new Exception('Server not found');
-        }
-        $yaml_compose = parseDockerComposeYaml($compose);
-
-        // Remove Coolify's custom fields before Docker validation
-        $yaml_compose = stripCoolifyCustomFields($yaml_compose);
-
-        $base64_compose = base64_encode(Yaml::dump($yaml_compose));
-        instant_remote_process([
-            "echo {$base64_compose} | base64 -d | tee /tmp/{$uuid}.yml > /dev/null",
-            "chmod 600 /tmp/{$uuid}.yml",
-            "docker compose -f /tmp/{$uuid}.yml config --no-interpolate --no-path-resolution -q",
-            "rm /tmp/{$uuid}.yml",
-        ], $server);
+        checkComposeFileOnServer($compose, $server, $projectDirectory);
 
         return 'OK';
     } catch (Throwable $e) {
         return $e->getMessage();
-    } finally {
-        if (filled($server)) {
-            instant_remote_process([
-                "rm /tmp/{$uuid}.yml",
-            ], $server, throwError: false);
-        }
     }
 }
 
@@ -2100,12 +2118,12 @@ function buildContainerLogsCommand(Server $server, string $container_id, int|str
         $command .= ' --timestamps';
     }
 
-    return "{$command} ".escapeshellarg($container_id).' 2>&1';
+    return remoteCommandWithTimeout("{$command} ".escapeshellarg($container_id), 30).' 2>&1';
 }
 
 function getContainerLogs(Server $server, string $container_id, int|string $lines = 100, bool $showTimestamps = false): string
 {
-    $output = instant_remote_process([buildContainerLogsCommand($server, $container_id, $lines, $showTimestamps)], $server);
+    $output = instant_remote_process([buildContainerLogsCommand($server, $container_id, $lines, $showTimestamps)], $server, timeout: DOCKER_LOGS_LOCAL_TIMEOUT);
     $output = removeAnsiColors($output);
 
     return $output;
@@ -2373,6 +2391,16 @@ function railpackBuilderBootstrapScript(): string
     return 'exec 8>/root/.docker/buildx/coolify-railpack-bootstrap.lock; flock -x 8; '
         .'DOCKER_CONFIG=/root/.docker docker buildx inspect --bootstrap coolify-railpack >/dev/null 2>&1; '
         .'flock -u 8';
+}
+
+/**
+ * Prune the build cache of the Railpack builder. Only a Railpack deployment creates the builder,
+ * so skip the prune when it does not exist. The prune fails on a stopped builder, so start it first.
+ */
+function railpackBuilderPruneScript(): string
+{
+    return 'if DOCKER_CONFIG=/root/.docker docker buildx inspect coolify-railpack >/dev/null 2>&1; then '
+        .railpackBuilderBootstrapScript().'; DOCKER_CONFIG=/root/.docker docker buildx prune --builder coolify-railpack -af; fi';
 }
 
 /**

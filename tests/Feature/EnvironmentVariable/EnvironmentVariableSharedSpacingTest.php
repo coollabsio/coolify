@@ -217,7 +217,7 @@ test('multiple shared variables preserve individual spacing', function () {
     expect($env->value)->toBe('{{ project.a }} and {{team.b}}');
 });
 
-test('leading and trailing spaces are trimmed', function () {
+test('leading and trailing spaces are kept (#4734)', function () {
     $env = EnvironmentVariable::create([
         'key' => 'TRIMMED',
         'value' => '   {{ project.aaa }}   ',
@@ -226,6 +226,5 @@ test('leading and trailing spaces are trimmed', function () {
     ]);
 
     $env->refresh();
-    // External spaces trimmed, internal preserved
-    expect($env->value)->toBe('{{ project.aaa }}');
+    expect($env->value)->toBe('   {{ project.aaa }}   ');
 });

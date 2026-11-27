@@ -52,7 +52,7 @@
     };
 @endphp
 
-<div class="relative shrink-0" x-data="{ open: false }" @click.outside="open = false"
+<div class="relative shrink-0 not-first:ml-1.5" x-data="{ open: false }" @click.outside="open = false"
     @keydown.escape.window="open = false">
     <x-status-badge as="button" dynamic @click="open = !open" x-bind:aria-expanded="open" aria-haspopup="menu"
         class="cursor-pointer">

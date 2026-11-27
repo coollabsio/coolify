@@ -725,7 +725,7 @@ describe('env API keeps multiline values exact', function () {
         $values = $application->environment_variables()->get()->pluck('value', 'key');
         expect($values['SSH_KEY'])->toBe($key)
             ->and($values['OTHER_KEY'])->toBe($key)
-            ->and($values['PLAIN'])->toBe('plain');
+            ->and($values['PLAIN'])->toBe('  plain ');
     });
 });
 

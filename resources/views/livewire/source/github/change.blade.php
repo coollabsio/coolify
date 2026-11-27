@@ -6,6 +6,9 @@
     @if (session('error'))
         <span x-data x-init="$wire.dispatch('error', @js(session('error')))" />
     @endif
+    @if (session('success'))
+        <span x-data x-init="$wire.dispatch('success', @js(session('success')))" />
+    @endif
 
     @if (data_get($github_app, 'app_id'))
         @php
@@ -172,7 +175,8 @@
                                         <x-forms.input canGate="update" :canResource="$github_app" type="number" id="appId"
                                             label="App ID" required />
                                         <x-forms.input canGate="update" :canResource="$github_app" type="number"
-                                            id="installationId" label="Installation ID" required />
+                                            id="installationId" label="Installation ID" required
+                                            helper="{{ filled($github_app->installation_account) ? 'Installed on '.$github_app->installation_account.'. ' : '' }}To use this GitHub App with another account or organization, click Repositories and install it there. Coolify adds a new source for each installation." />
                                         <x-forms.input canGate="update" :canResource="$github_app" id="clientId"
                                             label="Client ID" type="password" required />
                                         <x-forms.input canGate="update" :canResource="$github_app" id="clientSecret"
@@ -295,6 +299,15 @@
                                 <div x-show="!useCustomWebhookEndpoint">
                                     <x-forms.listbox id="webhook_endpoint" label="Instance endpoint"
                                         :options="$endpointOptions" x-model="webhookEndpoint" />
+                                    @if (!$this->hasPublicWebhookEndpoint())
+                                        <x-callout type="warning" title="No public endpoint" class="mt-2">
+                                            This instance has no domain and no public IP, so GitHub cannot send
+                                            webhooks to it. Set the <code>URL</code> or the
+                                            <code>Instance public IPv4</code> in
+                                            <a href="{{ route('settings.index') }}" class="font-medium underline">Settings</a>,
+                                            or use a custom endpoint.
+                                        </x-callout>
+                                    @endif
                                 </div>
                                 <div x-cloak x-show="useCustomWebhookEndpoint">
                                     <x-forms.input canGate="create" :canResource="$github_app"
@@ -426,7 +439,7 @@
                 }
                 if (github_runners && organization) {
                     default_permissions.organization_self_hosted_runners = 'write';
-                    default_permissions.actions = 'read';
+                    default_permissions.actions = 'write';
                     default_events.push('workflow_job');
                 }
 

@@ -61,6 +61,13 @@ If you find a way to reach one of these with less privilege (for example, as a m
 
 - Attacks that need the instance admin role.
 - Reports based only on automated scanner output, without a working attack path.
+- Intended behavior that is listed in [Intended behavior](#intended-behavior-not-a-vulnerability).
+
+### Intended behavior (not a vulnerability)
+
+These are design decisions. Do not report them. We close reports about them without a fix.
+
+- **MCP server and API access are separate switches.** On a self-hosted instance, the **MCP server** setting (instance and team) controls `/mcp`. The REST **API access** setting does not control MCP. MCP can read and change resources while REST API access is disabled. To remove MCP access, disable **MCP server** or revoke the token. **Allowed IPs**, token abilities, and the token team still apply to MCP.
 
 ### Severity
 

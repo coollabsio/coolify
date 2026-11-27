@@ -4,6 +4,7 @@
 # tags: canvas,diagrams,drawing,productivity,whiteboard
 # logo: svgs/excalidraw.svg
 # port: 80
+# outdated: true
 
 services:
   excalidraw:

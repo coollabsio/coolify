@@ -18,8 +18,8 @@ use OpenApi\Attributes as OA;
 
 class ServerImageScanningController extends Controller
 {
-    /** Scanner limits that the API can change; each one has fixed options in ServerSetting. */
-    private const LIMIT_FIELDS = ['image_scan_memory_mb', 'image_scan_syft_timeout', 'image_scan_grype_timeout', 'image_scan_cpus'];
+    /** Scanner settings that the API can change; each one has fixed options in ServerSetting. */
+    private const LIMIT_FIELDS = ['image_scan_memory_mb', 'image_scan_syft_timeout', 'image_scan_grype_timeout', 'image_scan_cpus', 'image_rescan_days'];
 
     private const ALLOWED_FIELDS = ['is_image_scan_enabled', ...self::LIMIT_FIELDS];
 
@@ -29,10 +29,11 @@ class ServerImageScanningController extends Controller
         'image_scan_syft_timeout' => 'api.server.image_scanner_syft_timeout_changed',
         'image_scan_grype_timeout' => 'api.server.image_scanner_grype_timeout_changed',
         'image_scan_cpus' => 'api.server.image_scanner_cpus_changed',
+        'image_rescan_days' => 'api.server.image_rescan_days_changed',
     ];
 
     /**
-     * @return array{is_image_scan_enabled: bool, image_scan_memory_mb: int, image_scan_syft_timeout: int, image_scan_grype_timeout: int, image_scan_cpus: float, scanner_state: ?string, scanner_failed_step: ?string, scanner_built_at: ?string, scanner_disk_used_bytes: ?int}
+     * @return array{is_image_scan_enabled: bool, image_scan_memory_mb: int, image_scan_syft_timeout: int, image_scan_grype_timeout: int, image_scan_cpus: float, image_rescan_days: int, scanner_state: ?string, scanner_failed_step: ?string, scanner_built_at: ?string, scanner_disk_used_bytes: ?int}
      */
     private function transform(Server $server): array
     {
@@ -46,6 +47,7 @@ class ServerImageScanningController extends Controller
             'image_scan_syft_timeout' => (int) $server->settings->image_scan_syft_timeout,
             'image_scan_grype_timeout' => (int) $server->settings->image_scan_grype_timeout,
             'image_scan_cpus' => (float) $server->settings->image_scan_cpus,
+            'image_rescan_days' => (int) $server->settings->image_rescan_days,
             'scanner_state' => is_string($state) ? $state : null,
             'scanner_failed_step' => is_string($failedStep) ? $failedStep : null,
             'scanner_built_at' => is_string($builtAt) ? CarbonImmutable::parse($builtAt)->toIso8601String() : null,
@@ -81,6 +83,7 @@ class ServerImageScanningController extends Controller
                         new OA\Property(property: 'image_scan_syft_timeout', type: 'integer', enum: ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS, description: 'Time limit of one Syft run (package list of an image), in seconds.'),
                         new OA\Property(property: 'image_scan_grype_timeout', type: 'integer', enum: ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS, description: 'Time limit of one Grype run (vulnerability match), in seconds.'),
                         new OA\Property(property: 'image_scan_cpus', type: 'number', enum: ServerSetting::IMAGE_SCAN_CPU_OPTIONS, description: 'CPU limit of each scanner step.'),
+                        new OA\Property(property: 'image_rescan_days', type: 'integer', enum: ServerSetting::IMAGE_RESCAN_DAYS_OPTIONS, description: 'Days between two rescans of the running images and the host packages. 0: no rescans, only scans at deployments and on request.'),
                         new OA\Property(property: 'scanner_state', type: 'string', nullable: true, enum: ['pulling', 'updating_database', 'ready', 'failed'], description: 'State of the scanner on the server. Null when unknown.'),
                         new OA\Property(property: 'scanner_failed_step', type: 'string', nullable: true, description: 'The step that failed when scanner_state is failed.'),
                         new OA\Property(property: 'scanner_built_at', type: 'string', format: 'date-time', nullable: true, description: 'Time of the vulnerability database on the server.'),
@@ -130,6 +133,7 @@ class ServerImageScanningController extends Controller
                     new OA\Property(property: 'image_scan_syft_timeout', type: 'integer', enum: ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS, description: 'Time limit of one Syft run (package list of an image), in seconds.'),
                     new OA\Property(property: 'image_scan_grype_timeout', type: 'integer', enum: ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS, description: 'Time limit of one Grype run (vulnerability match), in seconds.'),
                     new OA\Property(property: 'image_scan_cpus', type: 'number', enum: ServerSetting::IMAGE_SCAN_CPU_OPTIONS, description: 'CPU limit of each scanner step. A value above the CPU count of the server is refused.'),
+                    new OA\Property(property: 'image_rescan_days', type: 'integer', enum: ServerSetting::IMAGE_RESCAN_DAYS_OPTIONS, description: 'Days between two rescans of the running images and the host packages. 0: no rescans, only scans at deployments and on request.'),
                 ],
                 type: 'object',
             ),
@@ -169,6 +173,7 @@ class ServerImageScanningController extends Controller
             'image_scan_syft_timeout' => ['integer', Rule::in(ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS)],
             'image_scan_grype_timeout' => ['integer', Rule::in(ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS)],
             'image_scan_cpus' => ['numeric', Rule::in(ScannerCommands::cpuOptions($server))],
+            'image_rescan_days' => ['integer', Rule::in(ServerSetting::IMAGE_RESCAN_DAYS_OPTIONS)],
         ], [
             'image_scan_memory_mb.in' => 'This server allows: '.implode(', ', ScannerCommands::memoryOptionsMb($server)).'. A higher limit is more than the memory of the server.',
             'image_scan_cpus.in' => 'This server allows: '.implode(', ', ScannerCommands::cpuOptions($server)).'. A higher limit is more than the CPU count of the server.',

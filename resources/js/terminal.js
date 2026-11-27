@@ -207,6 +207,8 @@ export function initializeTerminalComponent() {
             // Resize handling
             resizeObserver: null,
             resizeTimeout: null,
+            // Size last sent to the current PTY. The server starts each PTY at 80x30.
+            ptySize: null,
             // Visibility handling - prevent disconnects when tab loses focus
             isDocumentVisible: true,
             wasConnectedBeforeHidden: false,
@@ -618,7 +620,6 @@ export function initializeTerminalComponent() {
                         cursorBlink: true,
                         cursorStyle: 'block',
                         rendererType: 'canvas',
-                        convertEol: true,
                         disableStdin: false,
                         scrollback: 5000,
                         theme: isApplicationConsole
@@ -1070,6 +1071,7 @@ export function initializeTerminalComponent() {
                         }
                     }
                     this.terminalActive = true;
+                    this.ptySize = null;
                     this.startTerminalSessionCountdown();
                     // In console (attach) mode the user types into the command box, not the
                     // read-only xterm, so keep focus on that input instead of the terminal.
@@ -1717,9 +1719,6 @@ export function initializeTerminalComponent() {
                         return;
                     }
 
-                    const previousCols = this.term.cols;
-                    const previousRows = this.term.rows;
-
                     this.fitAddon.fit();
 
                     // Keep the xterm chrome inside the host so overflow becomes scrollback,
@@ -1730,14 +1729,10 @@ export function initializeTerminalComponent() {
                         this.term.element.style.maxHeight = '100%';
                     }
 
-                    if (
-                        this.term.cols > 0 &&
-                        this.term.rows > 0 &&
-                        (this.term.cols !== previousCols || this.term.rows !== previousRows)
-                    ) {
-                        this.sendMessage({
-                            resize: { cols: this.term.cols, rows: this.term.rows },
-                        });
+                    const { cols, rows } = this.term;
+                    if (cols > 0 && rows > 0 && (cols !== this.ptySize?.cols || rows !== this.ptySize?.rows)) {
+                        this.sendMessage({ resize: { cols, rows } });
+                        this.ptySize = { cols, rows };
                     }
                 } catch (error) {
                     logTerminal('error', '[Terminal] Resize error:', error);

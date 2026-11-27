@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\DiscordNotificationSettings;
 use App\Models\EmailNotificationSettings;
+use App\Models\NtfyNotificationSettings;
 use App\Models\PushoverNotificationSettings;
 use App\Models\SlackNotificationSettings;
 use App\Models\Team;
@@ -89,6 +90,7 @@ class NotificationsController extends Controller
                     'traefik_outdated_discord_notifications' => 'sometimes|boolean',
                     'image_vulnerabilities_discord_notifications' => 'sometimes|boolean',
                     'discord_ping_enabled' => 'sometimes|boolean',
+                    'discord_ping_text' => 'sometimes|nullable|string|max:500',
                 ],
             ],
             'slack' => [
@@ -180,6 +182,41 @@ class NotificationsController extends Controller
                     'server_auto_update_pushover_notifications' => 'sometimes|boolean',
                     'traefik_outdated_pushover_notifications' => 'sometimes|boolean',
                     'image_vulnerabilities_pushover_notifications' => 'sometimes|boolean',
+                ],
+            ],
+            'ntfy' => [
+                'model' => NtfyNotificationSettings::class,
+                // Stored credentials must not follow a changed server URL to a new destination.
+                'credentials_bound_to' => ['ntfy_url' => ['ntfy_token', 'ntfy_username', 'ntfy_password']],
+                'rules' => [
+                    'ntfy_enabled' => 'sometimes|boolean',
+                    'ntfy_url' => ['sometimes', 'nullable', 'string', new SafeWebhookUrl],
+                    'ntfy_topic' => ['sometimes', 'nullable', 'string', 'max:64', 'regex:/\A[a-zA-Z0-9_-]+\z/'],
+                    'ntfy_auth_method' => 'sometimes|string|in:none,token,basic',
+                    'ntfy_token' => ['sometimes', 'nullable', 'string', 'max:255', 'not_regex:/[\x00-\x1F\x7F]/'],
+                    'ntfy_username' => ['sometimes', 'nullable', 'string', 'max:255', 'not_regex:/[\x00-\x1F\x7F]/'],
+                    'ntfy_password' => ['sometimes', 'nullable', 'string', 'max:255', 'not_regex:/[\x00-\x1F\x7F]/'],
+                    'ntfy_priority_success_events' => 'sometimes|integer|between:1,5',
+                    'ntfy_priority_info_events' => 'sometimes|integer|between:1,5',
+                    'ntfy_priority_warning_events' => 'sometimes|integer|between:1,5',
+                    'ntfy_priority_error_events' => 'sometimes|integer|between:1,5',
+                    'deployment_success_ntfy_notifications' => 'sometimes|boolean',
+                    'deployment_failure_ntfy_notifications' => 'sometimes|boolean',
+                    'status_change_ntfy_notifications' => 'sometimes|boolean',
+                    'restart_limit_reached_ntfy_notifications' => 'sometimes|boolean',
+                    'backup_success_ntfy_notifications' => 'sometimes|boolean',
+                    'backup_failure_ntfy_notifications' => 'sometimes|boolean',
+                    'scheduled_task_success_ntfy_notifications' => 'sometimes|boolean',
+                    'scheduled_task_failure_ntfy_notifications' => 'sometimes|boolean',
+                    'docker_cleanup_success_ntfy_notifications' => 'sometimes|boolean',
+                    'docker_cleanup_failure_ntfy_notifications' => 'sometimes|boolean',
+                    'server_disk_usage_ntfy_notifications' => 'sometimes|boolean',
+                    'server_reachable_ntfy_notifications' => 'sometimes|boolean',
+                    'server_unreachable_ntfy_notifications' => 'sometimes|boolean',
+                    'server_patch_ntfy_notifications' => 'sometimes|boolean',
+                    'server_auto_update_ntfy_notifications' => 'sometimes|boolean',
+                    'traefik_outdated_ntfy_notifications' => 'sometimes|boolean',
+                    'image_vulnerabilities_ntfy_notifications' => 'sometimes|boolean',
                 ],
             ],
             'webhook' => [
@@ -297,6 +334,14 @@ class NotificationsController extends Controller
         $this->authorize('update', $settings);
 
         $settings->fill(array_intersect_key($body, array_flip($allowedFields)));
+        foreach ($config['credentials_bound_to'] ?? [] as $destinationField => $credentialFields) {
+            if (! $settings->isDirty($destinationField)) {
+                continue;
+            }
+            foreach (array_diff($credentialFields, array_keys($body)) as $credentialField) {
+                $settings->{$credentialField} = null;
+            }
+        }
         $settings->save();
 
         auditLog("api.notifications.{$channel}.updated", [
@@ -498,6 +543,44 @@ class NotificationsController extends Controller
     public function update_pushover(Request $request): JsonResponse
     {
         return $this->updateChannel($request, 'pushover');
+    }
+
+    #[OA\Get(
+        summary: 'Get Ntfy notification settings',
+        description: 'Get the current team Ntfy notification settings. Encrypted secrets are only returned when the token has `read:sensitive` (or `root`) and the user is a team admin/owner.',
+        path: '/notifications/ntfy',
+        operationId: 'get-current-team-ntfy-notifications',
+        security: [['bearerAuth' => []]],
+        tags: ['Notifications'],
+        responses: [
+            new OA\Response(response: 200, description: 'Ntfy notification settings.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+        ]
+    )]
+    public function ntfy(Request $request): JsonResponse
+    {
+        return $this->showChannel('ntfy');
+    }
+
+    #[OA\Patch(
+        summary: 'Update Ntfy notification settings',
+        description: 'Update the current team Ntfy notification settings.',
+        path: '/notifications/ntfy',
+        operationId: 'update-current-team-ntfy-notifications',
+        security: [['bearerAuth' => []]],
+        tags: ['Notifications'],
+        responses: [
+            new OA\Response(response: 200, description: 'Updated Ntfy notification settings.'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 403, description: 'Forbidden.'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function update_ntfy(Request $request): JsonResponse
+    {
+        return $this->updateChannel($request, 'ntfy');
     }
 
     #[OA\Get(

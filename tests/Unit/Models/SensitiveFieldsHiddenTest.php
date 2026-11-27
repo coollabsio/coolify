@@ -9,6 +9,7 @@ use App\Models\EmailNotificationSettings;
 use App\Models\EnvironmentVariable;
 use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
+use App\Models\NtfyNotificationSettings;
 use App\Models\OauthSetting;
 use App\Models\PrivateKey;
 use App\Models\PushoverNotificationSettings;
@@ -162,6 +163,12 @@ describe('Sensitive model fields are hidden by default', function () {
         $hidden = (new PushoverNotificationSettings)->getHidden();
 
         expect($hidden)->toContain('pushover_user_key', 'pushover_api_token');
+    });
+
+    test('NtfyNotificationSettings hides server, topic, and credentials', function () {
+        $hidden = (new NtfyNotificationSettings)->getHidden();
+
+        expect($hidden)->toContain('ntfy_url', 'ntfy_topic', 'ntfy_token', 'ntfy_username', 'ntfy_password');
     });
 
     test('TelegramNotificationSettings hides bot, chat, and thread identifiers', function () {

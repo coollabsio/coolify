@@ -1001,8 +1001,8 @@ describe('service application lifecycle command escaping', function () {
 
         expect(buildContainerStatusCommand($server, 'app$(id)'))->toBe($expected);
     })->with([
-        'docker' => [false, "docker inspect --format '{{json .}}' 'app\$(id)'"],
-        'swarm' => [true, "docker service ls --filter 'name=app\$(id)' --format '{{json .}}' "],
+        'docker' => [false, "timeout -k 5s 20s docker inspect --format '{{json .}}' 'app\$(id)'"],
+        'swarm' => [true, "timeout -k 5s 20s docker service ls --filter 'name=app\$(id)' --format '{{json .}}' "],
     ]);
 
     test('application deployment shell commands escape the generated container name', function () {
@@ -1049,7 +1049,7 @@ describe('service application lifecycle command escaping', function () {
         expect($commands->all())
             ->toContain("docker inspect --format='{{json .State.Health.Status}}' {$escapedContainerName}")
             ->toContain("docker inspect --format='{{json .State.Health.Log}}' {$escapedContainerName}")
-            ->toContain("docker logs -n 100 {$escapedContainerName}")
+            ->toContain("timeout -k 5s 30s docker logs -n 100 {$escapedContainerName}")
             ->toContain(dockerStopCommand(10, $escapedContainerName, $server))
             ->and($commands->implode("\n"))->not->toContain(" {$containerName}");
     });

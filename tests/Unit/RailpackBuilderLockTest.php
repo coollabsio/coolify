@@ -70,3 +70,31 @@ test('concurrent builds bootstrap the builder one at a time', function () {
         rmdir($directory);
     }
 });
+
+test('the cleanup prunes the builder only when it exists', function (bool $builderExists, string $calls) {
+    $directory = sys_get_temp_dir().'/railpack-prune-'.bin2hex(random_bytes(8));
+    mkdir($directory);
+
+    try {
+        // The fake inspect fails like buildx for a builder that was never created.
+        $inspectStatus = $builderExists ? 0 : 1;
+        $setup = "exec 3>&1; docker() { printf '%s ' \"\$2\" >&3; if [ \"\$2\" = inspect ]; then return {$inspectStatus}; fi; }; ";
+        $script = str_replace(
+            ['/root/.docker/buildx/coolify-railpack.lock', '/root/.docker/buildx/coolify-railpack-bootstrap.lock'],
+            [$directory.'/builder.lock', $directory.'/bootstrap.lock'],
+            $setup.railpackBuilderLockedScript(railpackBuilderPruneScript()),
+        );
+
+        $process = new Process(['bash', '-c', $script]);
+        $process->run();
+
+        expect($process->getExitCode())->toBe(0);
+        expect($process->getOutput())->toBe($calls);
+    } finally {
+        array_map('unlink', glob($directory.'/*'));
+        rmdir($directory);
+    }
+})->with([
+    'missing builder' => [false, 'inspect stop '],
+    'existing builder' => [true, 'inspect inspect prune stop '],
+]);

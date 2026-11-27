@@ -103,10 +103,11 @@
                         </x-application.settings-section>
                     @elseif ($selectedLogDrainType === 'custom')
                         <x-application.settings-section id="server-custom-drain-section" title="Custom Fluent Bit"
-                            helper="Provide a custom Fluent Bit output and optional parser configuration.">
+                            helper="Provide the full Fluent Bit configuration and an optional parser configuration. The configuration must have an [INPUT] section with Name forward: containers send their logs to this input on port 24224. To use credential or certificate files, copy them to /data/coolify/log-drains/files on the server. Fluent Bit reads them at /files, for example: google_service_credentials /files/gcp.json">
                             <div class="grid gap-4 lg:grid-cols-2">
                                 <x-forms.textarea canGate="update" :canResource="$server" rows="8"
                                     id="logDrainConfig.custom.config" label="Fluent Bit configuration"
+                                    :placeholder="implode(PHP_EOL, ['[INPUT]', '    Name forward', '', '[OUTPUT]', '    Name  stdout', '    Match *'])"
                                     :disabled="$isActive" />
                                 <x-forms.textarea canGate="update" :canResource="$server" rows="8"
                                     id="logDrainConfig.custom.parser_config" label="Parser configuration"

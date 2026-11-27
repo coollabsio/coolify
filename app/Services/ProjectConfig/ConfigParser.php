@@ -21,7 +21,7 @@ class ConfigParser
 
     public const GENERATE_KINDS = ['password', 'base64', 'uuid'];
 
-    public const REF_PATTERN = '/^((team|project|environment|server|vault)\.[A-Za-z_][A-Za-z0-9_]*|resource\.[a-z][a-z0-9-]{0,62}\.(internal_url|host|port))\z/';
+    public const REF_PATTERN = '/^((team|project|environment|server|vault)\.[A-Za-z_][A-Za-z0-9_]*|vault\.[a-z0-9][a-z0-9_-]{0,62}\.[A-Za-z_][A-Za-z0-9_]*|resource\.[a-z][a-z0-9-]{0,62}\.(internal_url|host|port))\z/';
 
     private const TOP_LEVEL_KEYS = ['$schema', 'version', 'minimum_coolify_version', 'project', 'resources', 'environments', 'moved', 'unmanage'];
 
@@ -253,7 +253,7 @@ class ConfigParser
             'value' => is_string($value) ? null : $this->error($path, 'Use text for "value".'),
             'required' => $value === true ? null : $this->error($path, 'Use "required": true.'),
             'generate' => in_array($value, self::GENERATE_KINDS, true) ? null : $this->error("{$path}.generate", 'Use one of: '.implode(', ', self::GENERATE_KINDS).'.'),
-            'ref' => is_string($value) && preg_match(self::REF_PATTERN, $value) ? null : $this->error("{$path}.ref", 'Use team.X, project.X, environment.X, server.X, vault.X, or resource.<key>.internal_url|host|port.'),
+            'ref' => is_string($value) && preg_match(self::REF_PATTERN, $value) ? null : $this->error("{$path}.ref", 'Use team.X, project.X, environment.X, server.X, vault.X, vault.<source>.X, or resource.<key>.internal_url|host|port.'),
         };
 
         if (array_key_exists('length', $entry)) {

@@ -85,7 +85,7 @@ class GithubRunnerExecution extends BaseModel
     }
 
     /**
-     * Marks the runner running. When a job without a pending runner took it, returns a new queued execution for the original job.
+     * Marks the runner running. When a job without a runner container took it, returns a new queued execution for the original job.
      *
      * @param  array<string, mixed>  $jobDetails
      */
@@ -103,12 +103,15 @@ class GithubRunnerExecution extends BaseModel
                 ->where('trigger_workflow_job_id', $jobId)
                 ->lockForUpdate()
                 ->first();
-            if ($jobExecution?->isActive()) {
+            if ($jobExecution && in_array($jobExecution->status, GithubRunnerStatus::occupying(), true)) {
                 $execution->update($running);
 
                 return null;
             }
 
+            // A queued execution of the job is waiting for a runner that does not exist yet. That wait now
+            // belongs to the original job, so it moves there instead of being dropped by the attempt limit.
+            $movesQueuedExecution = $jobExecution?->status === GithubRunnerStatus::Queued;
             $replacement = [
                 ...$execution->only(['github_app_id', 'trigger_workflow_job_id', 'workflow_job_html_url', 'workflow_name', 'job_name', 'repository_full_name', 'labels', 'is_pull_request', 'provision_attempts']),
                 'workflow_job_id' => $execution->trigger_workflow_job_id,
@@ -118,7 +121,7 @@ class GithubRunnerExecution extends BaseModel
             $jobExecution?->delete();
             $execution->update([...$running, 'trigger_workflow_job_id' => $jobId]);
 
-            if ($replacement['provision_attempts'] >= ProvisionGithubRunnerJob::MAX_ATTEMPTS) {
+            if (! $movesQueuedExecution && $replacement['provision_attempts'] >= ProvisionGithubRunnerJob::MAX_ATTEMPTS) {
                 Log::warning('GitHub runner taken by another job too often; no new runner is started.', [
                     'github_app_id' => $execution->github_app_id,
                     'workflow_job_id' => $replacement['trigger_workflow_job_id'],

@@ -97,6 +97,8 @@ Route::group([
     Route::patch('/notifications/telegram', [NotificationsController::class, 'update_telegram'])->middleware(['api.ability:write']);
     Route::get('/notifications/pushover', [NotificationsController::class, 'pushover'])->middleware(['api.ability:read']);
     Route::patch('/notifications/pushover', [NotificationsController::class, 'update_pushover'])->middleware(['api.ability:write']);
+    Route::get('/notifications/ntfy', [NotificationsController::class, 'ntfy'])->middleware(['api.ability:read']);
+    Route::patch('/notifications/ntfy', [NotificationsController::class, 'update_ntfy'])->middleware(['api.ability:write']);
     Route::get('/notifications/webhook', [NotificationsController::class, 'webhook'])->middleware(['api.ability:read']);
     Route::patch('/notifications/webhook', [NotificationsController::class, 'update_webhook'])->middleware(['api.ability:write']);
     Route::get('/settings/email', [InstanceEmailSettingsController::class, 'show'])->middleware(['api.ability:read']);
@@ -263,6 +265,7 @@ Route::group([
     Route::get('/vulnerabilities', [VulnerabilitiesController::class, 'index'])->middleware(['api.ability:read']);
 
     Route::get('/environments/{uuid}/config/export', [ProjectConfigController::class, 'export'])->middleware(['api.ability:read']);
+    Route::get('/applications/{uuid}/config/export', [ProjectConfigController::class, 'exportApplication'])->middleware(['api.ability:read']);
     Route::post('/environments/{uuid}/config/plan', [ProjectConfigController::class, 'plan'])->middleware(['api.ability:read']);
     Route::post('/environments/{uuid}/config/template/plan', [ProjectConfigController::class, 'templatePlan'])->middleware(['api.ability:write']);
     Route::post('/environments/{uuid}/config/template', [ProjectConfigController::class, 'templateCreate'])->middleware(['api.ability:write']);
@@ -328,6 +331,9 @@ Route::group([
     Route::post('/applications/{uuid}/storages', [ApplicationsController::class, 'create_storage'])->middleware(['api.ability:write']);
     Route::patch('/applications/{uuid}/storages', [ApplicationsController::class, 'update_storage'])->middleware(['api.ability:write']);
     Route::delete('/applications/{uuid}/storages/{storage_uuid}', [ApplicationsController::class, 'delete_storage'])->middleware(['api.ability:delete']);
+    Route::get('/applications/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'show'])
+        ->defaults('resource_type', 'application')
+        ->middleware(['api.ability:read']);
     Route::put('/applications/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'upsert'])
         ->defaults('resource_type', 'application')
         ->middleware(['api.ability:write']);
@@ -411,6 +417,9 @@ Route::group([
     Route::post('/databases/{uuid}/storages', [DatabasesController::class, 'create_storage'])->middleware(['api.ability:write']);
     Route::patch('/databases/{uuid}/storages', [DatabasesController::class, 'update_storage'])->middleware(['api.ability:write']);
     Route::delete('/databases/{uuid}/storages/{storage_uuid}', [DatabasesController::class, 'delete_storage'])->middleware(['api.ability:delete']);
+    Route::get('/databases/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'show'])
+        ->defaults('resource_type', 'database')
+        ->middleware(['api.ability:read']);
     Route::put('/databases/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'upsert'])
         ->defaults('resource_type', 'database')
         ->middleware(['api.ability:write']);
@@ -454,6 +463,9 @@ Route::group([
     Route::post('/services/{uuid}/storages', [ServicesController::class, 'create_storage'])->middleware(['api.ability:write']);
     Route::patch('/services/{uuid}/storages', [ServicesController::class, 'update_storage'])->middleware(['api.ability:write']);
     Route::delete('/services/{uuid}/storages/{storage_uuid}', [ServicesController::class, 'delete_storage'])->middleware(['api.ability:delete']);
+    Route::get('/services/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'show'])
+        ->defaults('resource_type', 'service')
+        ->middleware(['api.ability:read']);
     Route::put('/services/{uuid}/storages/{storage_uuid}/backups', [VolumeBackupsController::class, 'upsert'])
         ->defaults('resource_type', 'service')
         ->middleware(['api.ability:write']);

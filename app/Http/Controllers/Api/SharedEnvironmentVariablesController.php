@@ -53,7 +53,7 @@ class SharedEnvironmentVariablesController extends Controller
             'version',
         ]);
 
-        if (request()->attributes->get('can_read_sensitive', false) === true) {
+        if (canReadResourceSecretsFromApi($env)) {
             $env->makeVisible(['value']);
         }
 

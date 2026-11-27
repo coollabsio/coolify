@@ -330,7 +330,7 @@
                                     @endif
                                     <x-forms.listbox id="isBuildServerEnabled" label="Builder selection"
                                         onChange="instantSave" :options="$buildServerOptions"
-                                        helper="Build your application on a dedicated build server. If several build servers are connected, Coolify picks an available one automatically. {{ $buildServerFallbackPolicy }} More info in the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
+                                        helper="Build your application on a dedicated build server. Only servers with the role <strong>Builds only</strong> are used. Servers with the role <strong>Deployments and builds</strong> are not used. If several build servers are connected, Coolify picks an available one automatically. {{ $buildServerFallbackPolicy }} More info in the <a href='https://coolify.io/docs/knowledge-base/server/build-server' class='underline' target='_blank'>documentation</a>."
                                         x-bind:disabled="!canUpdate" />
                                 </div>
                             @endif
@@ -457,7 +457,7 @@
                                 <x-forms.input id="dockerRegistryImageName" required label="Image"
                                     placeholder="ghcr.io/your-org/your-app" x-bind:disabled="!canUpdate" />
                                 <x-forms.input id="dockerRegistryImageTag"
-                                    helper="If set, it will tag the built image with this tag too. <br><br>Example: If you set it to 'latest', it will push the image with the commit sha tag + with the latest tag."
+                                    helper="If set, Coolify also tags the built image with this tag. The commit SHA tag stays, and the container runs it. <br><br>Example: If you set it to 'latest', Coolify pushes the image with the commit SHA tag and the latest tag. <br><br>Two applications cannot push the same Docker image name, also with different tags. Use a different image name for each application, for example ghcr.io/your-org/your-app-staging."
                                     placeholder="latest" label="Tag"
                                     x-bind:disabled="!canUpdate" />
                             @else
@@ -467,7 +467,7 @@
                                     label="Image" x-bind:disabled="!canUpdate" />
                                 <x-forms.input id="dockerRegistryImageTag"
                                     placeholder="latest"
-                                    helper="If set, it will tag the built image with this tag too. <br><br>Example: If you set it to 'latest', it will push the image with the commit sha tag + with the latest tag."
+                                    helper="If set, Coolify also tags the built image with this tag. The commit SHA tag stays, and the container runs it. <br><br>Example: If you set it to 'latest', Coolify pushes the image with the commit SHA tag and the latest tag. <br><br>Two applications cannot push the same Docker image name, also with different tags. Use a different image name for each application, for example ghcr.io/your-org/your-app-staging."
                                     label="Tag" x-bind:disabled="!canUpdate" />
                             @endif
                         @endif

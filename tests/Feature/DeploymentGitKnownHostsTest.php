@@ -6,6 +6,8 @@ use App\Livewire\Project\Application\Deployment\Show;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Project;
+use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\Team;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -113,6 +115,27 @@ it('logs the host key hint when a git command of Coolify fails with a host key e
 
     expect($queue->fresh()->logs)->toContain(ApplicationDeploymentJob::GIT_HOST_KEY_CHANGED_HINT);
 });
+
+it('logs the helper network hint when git in the helper container cannot connect to the Git host', function (string $error, bool $logged) {
+    $application = knownHostsTestApplication();
+    $queue = knownHostsTestQueue($application);
+    $job = knownHostsTestCheckGitJob($application, $queue, function () use ($error) {
+        throw new DeploymentException("Command execution failed (exit code 128): git ls-remote\nError: {$error}\nfatal: Could not read from remote repository.", 128);
+    });
+    (new ReflectionProperty(ApplicationDeploymentJob::class, 'server'))->setValue($job, new Server(['name' => 'prod']));
+    (new ReflectionProperty(ApplicationDeploymentJob::class, 'destination'))->setValue($job, new StandaloneDocker(['network' => 'coolify']));
+
+    expect(fn () => (new ReflectionMethod(ApplicationDeploymentJob::class, 'check_git_if_build_needed'))->invoke($job))->toThrow(DeploymentException::class);
+
+    $logs = $queue->fresh()->logs;
+    expect(str_contains($logs, 'The deployment helper container in the Docker network coolify on the server prod cannot connect to the Git host.'))->toBe($logged);
+    expect($logs)->not->toContain(ApplicationDeploymentJob::GIT_HOST_KEY_CHANGED_HINT);
+})->with([
+    'ssh timeout on a custom port' => ['ssh: connect to host gitea.example.com port 22222: Operation timed out', true],
+    'ssh name not resolved' => ['ssh: Could not resolve hostname gitea.example.com: Name or service not known', true],
+    'https connection failure' => ['unable to access \'https://gitea.example.com/repo.git/\': Failed to connect to gitea.example.com port 443 after 3 ms: Could not connect to server', true],
+    'repository access denied' => ['git@gitea.example.com: Permission denied (publickey).', false],
+]);
 
 it('shows the host key callout only when the git step of Coolify failed with a host key error', function (?string $log, string $status, bool $shown) {
     $application = knownHostsTestApplication();

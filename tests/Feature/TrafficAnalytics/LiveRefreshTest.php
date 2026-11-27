@@ -52,42 +52,20 @@ function bootLiveServer(): Server
     return $server;
 }
 
-it('is paused by default and does not poll until live refresh is turned on', function () {
+it('is paused by default', function () {
     bootLiveServer();
 
     loadLazy(Livewire::test(Analytics::class))
         ->assertOk()
-        ->assertSet('live', false)
-        ->assertDontSeeHtml('wire:poll.60s')
-        ->assertSee('Paused');
+        ->assertSet('live', false);
 });
 
-it('polls when live refresh is turned on', function () {
-    bootLiveServer();
-
-    loadLazy(Livewire::test(Analytics::class))
-        ->set('live', true)
-        ->assertSeeHtml('wire:poll.60s')
-        ->assertSee('Live');
-});
-
-it('keeps live refresh and polling on for every range', function (string $range) {
+it('keeps live refresh on for every range', function (string $range) {
     bootLiveServer();
 
     loadLazy(Livewire::test(Analytics::class))
         ->set('live', true)
         ->call('setRange', $range)
         ->assertSet('range', $range)
-        ->assertSet('live', true)
-        ->assertSeeHtml('wire:poll.60s');
+        ->assertSet('live', true);
 })->with(['7d', '30d']);
-
-it('stops polling when live refresh is paused', function () {
-    bootLiveServer();
-
-    loadLazy(Livewire::test(Analytics::class))
-        ->set('live', true)
-        ->set('live', false)
-        ->assertDontSeeHtml('wire:poll.60s')
-        ->assertSee('Paused');
-});

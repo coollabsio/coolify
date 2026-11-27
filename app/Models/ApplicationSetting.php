@@ -188,6 +188,15 @@ class ApplicationSetting extends Model
         }));
     }
 
+    /**
+     * Public PR deployments apply only while preview deployments are on. When they are off, webhooks
+     * do not deploy previews, so only team members deploy them.
+     */
+    public function hasPublicPrDeployments(): bool
+    {
+        return (bool) $this->is_preview_deployments_enabled && (bool) $this->is_pr_deployments_public_enabled;
+    }
+
     public function stopGracePeriodSeconds(): int
     {
         if (

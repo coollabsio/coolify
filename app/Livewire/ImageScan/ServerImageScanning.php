@@ -33,6 +33,8 @@ class ServerImageScanning extends Component
 
     public string $scannerCpus = '';
 
+    public string $rescanDays = '';
+
     public function getListeners()
     {
         return $this->teamChannelListeners([
@@ -61,6 +63,7 @@ class ServerImageScanning extends Component
             'scannerSyftTimeout' => ['image_scan_syft_timeout', $strings(ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS), 'image_scanner_syft_timeout_changed', 'Syft time limit saved. It applies to the next scan.'],
             'scannerGrypeTimeout' => ['image_scan_grype_timeout', $strings(ServerSetting::IMAGE_SCAN_TIMEOUT_OPTIONS_SECONDS), 'image_scanner_grype_timeout_changed', 'Grype time limit saved. It applies to the next scan.'],
             'scannerCpus' => ['image_scan_cpus', $strings(ScannerCommands::cpuOptions($this->server)), 'image_scanner_cpus_changed', 'Scanner CPU limit saved. It applies to the next scan.'],
+            'rescanDays' => ['image_rescan_days', $strings(ServerSetting::IMAGE_RESCAN_DAYS_OPTIONS), 'image_rescan_days_changed', 'Rescan frequency saved.'],
         ];
     }
 
@@ -107,6 +110,11 @@ class ServerImageScanning extends Component
     public function updatedScannerCpus()
     {
         return $this->saveScannerLimit('scannerCpus');
+    }
+
+    public function updatedRescanDays()
+    {
+        return $this->saveScannerLimit('rescanDays');
     }
 
     private function saveScannerLimit(string $property)
@@ -246,6 +254,13 @@ class ServerImageScanning extends Component
                 (float) $this->server->settings->image_scan_cpus,
                 fn (float $cpus): string => $cpus.' '.str('CPU')->plural($cpus > 1 ? 2 : 1),
             ),
+            'rescanOptions' => array_map(fn (int $days) => ['value' => (string) $days, 'label' => match ($days) {
+                0 => 'Never (only at deployments)',
+                1 => 'Every day',
+                7 => 'Every week',
+                14 => 'Every 2 weeks',
+                default => "Every {$days} days",
+            }], ServerSetting::IMAGE_RESCAN_DAYS_OPTIONS),
             'prepareState' => is_string($state) ? $state : null,
             'failedStep' => is_string($failedStep) ? $failedStep : null,
             'registries' => collect(config('constants.image_scan.images'))

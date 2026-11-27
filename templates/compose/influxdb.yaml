@@ -7,7 +7,7 @@
 
 services:
   influxdb:
-    image: influxdb:2.7-alpine
+    image: influxdb:2.9-alpine
     environment:
       - SERVICE_URL_INFLUXDB_8086
       - DOCKER_INFLUXDB_INIT_MODE=setup

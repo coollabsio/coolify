@@ -48,6 +48,10 @@ jobs:
           }
           merge() {
             local head="chore/merge-${1//\//-}-into-${2//\//-}" tag title conflicts pull_request
+            if ! git rev-parse --verify --quiet "origin/$2" > /dev/null; then
+              echo "$2 does not exist"
+              return
+            fi
             git switch --quiet --detach "origin/$2"
             if git merge-base --is-ancestor "origin/$1" HEAD; then
               echo "$2 contains $1 already"

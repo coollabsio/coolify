@@ -291,20 +291,12 @@ class Change extends Component
         }
     }
 
+    /**
+     * The System wide checkbox sends every pending form edit with its request, which hides the unsaved bar, so save the whole form.
+     */
     public function instantSave()
     {
-        try {
-            $this->authorize('update', $this->gitea_app);
-            $this->authorizeSystemWideChange();
-
-            $this->validateOnly('isSystemWide');
-
-            $this->gitea_app->is_system_wide = $this->isSystemWide;
-            $this->gitea_app->save();
-            $this->dispatch('success', 'Gitea / Forgejo App updated.');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
+        return $this->submit();
     }
 
     public function testConnection()

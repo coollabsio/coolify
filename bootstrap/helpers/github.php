@@ -193,6 +193,38 @@ function isTransientGithubFailure(Throwable $exception): bool
         || ($exception instanceof RequestException && $exception->response->serverError());
 }
 
+/**
+ * GitHub answers a rate-limited request with 403 or 429, the same status as a missing permission.
+ * Returns a message that tells when to try again, or null when the failure is not a rate limit.
+ *
+ * @see https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api#exceeding-the-rate-limit
+ */
+function githubRateLimitMessage(Response $response): ?string
+{
+    if (! in_array($response->status(), [403, 429], true)) {
+        return null;
+    }
+
+    $retryAfter = $response->header('Retry-After');
+    $reset = $response->header('X-RateLimit-Reset');
+    $errorMessage = (string) data_get($response->json(), 'message', '');
+
+    if ($response->header('X-RateLimit-Remaining') !== '0' && ! is_numeric($retryAfter) && ! Str::contains($errorMessage, 'rate limit', ignoreCase: true)) {
+        return null;
+    }
+
+    $retryAt = match (true) {
+        is_numeric($retryAfter) => CarbonImmutable::now('UTC')->addSeconds((int) $retryAfter),
+        is_numeric($reset) => CarbonImmutable::createFromTimestampUTC((int) $reset),
+        default => CarbonImmutable::now('UTC')->addMinute(),
+    };
+
+    $message = 'GitHub API rate limit exceeded. Try again after '.$retryAt->format('Y-m-d H:i:s').' UTC. See https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api.';
+    $requestId = $response->header('X-GitHub-Request-Id');
+
+    return filled($requestId) ? "{$message} GitHub request ID: {$requestId}." : $message;
+}
+
 function githubAppPrivateKey(GithubApp $source): ?PrivateKey
 {
     $privateKey = $source->privateKey;
@@ -412,14 +444,14 @@ function loadRepositoryByPage(GithubApp $source, string $token, int $page)
 {
     $response = Http::GitHub($source->api_url, $token)
         ->timeout(20)
-        ->retry(3, 200, throw: false)
+        ->retry(3, 200, isTransientGithubFailure(...), throw: false)
         ->get('/installation/repositories', [
             'per_page' => 100,
             'page' => $page,
         ]);
     $json = $response->json();
     if ($response->status() !== 200) {
-        $error = data_get($json, 'message', "HTTP {$response->status()}");
+        $error = githubRateLimitMessage($response) ?? data_get($json, 'message', "HTTP {$response->status()}");
 
         throw new RuntimeException("Failed to load repositories for {$source->name} with error: ".$error);
     }

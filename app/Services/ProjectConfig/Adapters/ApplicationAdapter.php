@@ -11,6 +11,7 @@ use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Rules\ValidIpAllowlist;
 use App\Services\ProjectConfig\Adapters\Concerns\MapsFields;
 use App\Services\ProjectConfig\Adapters\Concerns\ResolvesDestination;
 use App\Services\ProjectConfig\ApplyContext;
@@ -21,6 +22,7 @@ use App\Services\ProjectConfig\Children\FileStorages;
 use App\Services\ProjectConfig\Children\PersistentStorages;
 use App\Services\ProjectConfig\Children\ScheduledTasks;
 use App\Services\ProjectConfig\Children\SecretManager;
+use App\Services\ProjectConfig\Children\StorageBackups;
 use App\Services\ProjectConfig\Children\Tags;
 use App\Services\ProjectConfig\ConfigError;
 use App\Services\ProjectConfig\Field;
@@ -120,6 +122,7 @@ class ApplicationAdapter implements ResourceAdapter
             Field::derived('custom_healthcheck_found', 'Coolify finds it in the Dockerfile.'),
             Field::derived('trigger_base_commit', 'Coolify derives it from pushes and deployments.'),
             Field::derived('trigger_set', 'Coolify derives it from pushes and deployments.'),
+            Field::derived('is_archive_source', 'Coolify sets it for a static site that is deployed from an uploaded archive.'),
             Field::managed('ports_exposes', 'ports.exposes'),
             Field::managed('ports_mappings', 'ports.mappings'),
             Field::managed('custom_network_aliases', 'network.aliases'),
@@ -160,6 +163,7 @@ class ApplicationAdapter implements ResourceAdapter
             Field::managed('http_basic_auth_bcrypt_cost', 'basic_auth.bcrypt_cost', 10, 'integer'),
             Field::managed('http_basic_auth_argon2id_memory_cost', 'basic_auth.argon2id_memory_cost', 65536, 'integer'),
             Field::managed('http_basic_auth_argon2id_time_cost', 'basic_auth.argon2id_time_cost', 4, 'integer'),
+            Field::managed('ip_allowlist', 'ip_allowlist'),
             Field::managed('max_restart_count', 'restart.max_count', 0, 'integer'),
             Field::managed('is_maintenance_enabled', 'maintenance.enabled', false, 'boolean'),
             Field::managed('maintenance_page', 'maintenance.page'),
@@ -196,8 +200,8 @@ class ApplicationAdapter implements ResourceAdapter
             'is_consistent_container_name_enabled' => false, 'is_gzip_enabled' => true, 'is_stripprefix_enabled' => true,
             'connect_to_docker_network' => false, 'is_container_label_escape_enabled' => true, 'is_env_sorting_enabled' => false,
             'is_container_label_readonly_enabled' => true, 'is_preserve_repository_enabled' => false, 'disable_build_cache' => false,
-            'is_spa' => false, 'is_git_shallow_clone_enabled' => true, 'is_pr_deployments_public_enabled' => false, 'use_production_values_in_previews' => true,
-            'use_build_secrets' => false, 'inject_build_args_to_dockerfile' => true, 'include_source_commit_in_build' => false,
+            'is_spa' => false, 'is_git_shallow_clone_enabled' => true, 'is_pr_deployments_public_enabled' => false, 'is_pr_deployments_public_approval_required' => true, 'use_production_values_in_previews' => true,
+            'use_build_secrets' => true, 'inject_build_args_to_dockerfile' => true, 'include_source_commit_in_build' => false,
             'redact_all_env_values_in_logs' => true, 'include_coolify_default_variables' => true, 'is_permanent_redirect_enabled' => false,
             'is_image_scan_enabled' => true, 'is_auto_cancel_queued_deployments_enabled' => true,
             'is_auto_cancel_building_deployments_enabled' => false, 'include_network_hosts_in_build' => true,
@@ -221,6 +225,7 @@ class ApplicationAdapter implements ResourceAdapter
             Field::managed('custom_container_name_prefix', 'settings.custom_container_name_prefix', null, 'string', self::SETTINGS),
             Field::managed('traefik_certificate_resolver', 'settings.traefik_certificate_resolver', null, 'string', self::SETTINGS),
             Field::managed('rolling_update_drain_seconds', 'settings.rolling_update_drain_seconds', 5, 'integer', self::SETTINGS),
+            Field::state('dismissed_recommendations', 'The recommendations that a user dismissed on the Recommendations page.', self::SETTINGS),
             Field::state('has_unlinked_config_file', 'Coolify sets it when a deployment finds a coolify.json that no link uses.', self::SETTINGS),
         ];
     }
@@ -238,6 +243,7 @@ class ApplicationAdapter implements ResourceAdapter
             new Tags,
             new SecretManager,
             new AdditionalServers,
+            new StorageBackups,
         ];
     }
 
@@ -307,6 +313,10 @@ class ApplicationAdapter implements ResourceAdapter
             if ($desired['domains'] === []) {
                 unset($desired['domains']);
             }
+        }
+        if (isset($desired['ip_allowlist'])) {
+            // The model stores the entries without spaces, like this.
+            $desired['ip_allowlist'] = implode(',', ValidIpAllowlist::entries((string) $desired['ip_allowlist'])) ?: null;
         }
         $desired = $this->dropMappedDefaults($this->fieldMap(), $desired);
         foreach ($this->children() as $child) {
@@ -460,11 +470,10 @@ class ApplicationAdapter implements ResourceAdapter
      */
     private function validateChildren(string $base, array $desired, ApplyContext $ctx): array
     {
-        $errors = [];
-        $token = $desired['secret_manager']['token'] ?? null;
-        if ($token !== null && ($message = NamedCredentials::error('token', (string) $token, $ctx->teamId)) !== null) {
-            $errors[] = new ConfigError("{$base}.secret_manager.token", $message);
-        }
+        $errors = SecretManager::errors($base, $desired['secret_manager'] ?? null, $ctx->teamId);
+        $errors = [...$errors, ...SecretManager::referenceErrors($base, $desired['secret_manager'] ?? null, $desired['env'] ?? null)];
+        $volumes = ($desired['build']['pack'] ?? null) === 'dockercompose' ? null : array_map('strval', array_keys((array) ($desired['storages'] ?? [])));
+        $errors = [...$errors, ...StorageBackups::errors($base, $desired['storage_backups'] ?? null, $ctx->teamId, $volumes)];
         foreach (array_values((array) ($desired['additional_servers'] ?? [])) as $index => $entry) {
             $name = is_array($entry) ? ($entry['server'] ?? null) : $entry;
             $matches = Server::query()->where('team_id', $ctx->teamId)->get()->filter(fn (Server $server) => $server->name === $name);
@@ -533,7 +542,14 @@ class ApplicationAdapter implements ResourceAdapter
 
     private function writeChildren(Application $application, array $desired, ApplyContext $ctx): void
     {
+        $managesBackups = StorageBackups::managedBy($desired);
+        if ($managesBackups) {
+            (new StorageBackups)->prune($application, $desired['storage_backups']);
+        }
         foreach ($this->children() as $child) {
+            if ($child instanceof StorageBackups && ! $managesBackups) {
+                continue;
+            }
             $child->write($application, $desired[$child->key()] ?? null, $ctx);
         }
     }

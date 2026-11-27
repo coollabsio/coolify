@@ -305,6 +305,45 @@ describe('Manual Webhook Failed Authentication Rate Limiting', function () {
         expect(RateLimiter::attempts(manualWebhookFailureKey('github')))->toBe(0);
     });
 
+    test('one webhook per application deploys each application of a shared repository', function (string $provider) {
+        Queue::fake();
+        $backend = makeWebhookApplicationServerFunctional(createApplicationWithWebhook(overrides: ['name' => 'backend']));
+        $frontend = makeWebhookApplicationServerFunctional(createApplicationWithWebhook(overrides: ['name' => 'frontend']));
+
+        $response = sendManualWebhookPush($this, $provider, $backend);
+
+        $response->assertOk();
+        expect($response->json())->toHaveCount(1)
+            ->and($response->json('0.message'))->toBe('Deployment queued.');
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $backend->id)->count())->toBe(1)
+            ->and(ApplicationDeploymentQueue::query()->where('application_id', $frontend->id)->count())->toBe(0);
+
+        $response = sendManualWebhookPush($this, $provider, $frontend);
+
+        $response->assertOk();
+        expect($response->json())->toHaveCount(1)
+            ->and($response->json('0.message'))->toBe('Deployment queued.');
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $frontend->id)->count())->toBe(1)
+            ->and(RateLimiter::attempts(manualWebhookFailureKey($provider)))->toBe(0);
+    })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
+
+    test('one webhook deploys every application of a shared repository with the same secret', function (string $provider) {
+        Queue::fake();
+        $backend = makeWebhookApplicationServerFunctional(createApplicationWithWebhook(overrides: ['name' => 'backend']));
+        $frontend = makeWebhookApplicationServerFunctional(createApplicationWithWebhook(overrides: [
+            'name' => 'frontend',
+            "manual_webhook_secret_{$provider}" => $backend->{"manual_webhook_secret_{$provider}"},
+        ]));
+
+        $response = sendManualWebhookPush($this, $provider, $backend);
+
+        $response->assertOk();
+        expect($response->json())->toHaveCount(2)
+            ->and(collect($response->json())->pluck('message')->unique()->all())->toBe(['Deployment queued.']);
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $backend->id)->exists())->toBeTrue()
+            ->and(ApplicationDeploymentQueue::query()->where('application_id', $frontend->id)->exists())->toBeTrue();
+    })->with(['github', 'gitlab', 'bitbucket', 'gitea']);
+
     test('gitlab deliveries without a token are rejected and do not count as failed authentication', function () {
         createApplicationWithWebhook();
 

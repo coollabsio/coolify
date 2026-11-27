@@ -48,6 +48,7 @@ use App\Livewire\ImageScan\ServerImageScanning;
 use App\Livewire\ImageScan\TeamImageScanning;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
+use App\Livewire\Notifications\Ntfy as NotificationNtfy;
 use App\Livewire\Notifications\Pushover as NotificationPushover;
 use App\Livewire\Notifications\Slack as NotificationSlack;
 use App\Livewire\Notifications\Telegram as NotificationTelegram;
@@ -60,7 +61,6 @@ use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
 use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
 use App\Livewire\Project\Application\Deployment\Show as DeploymentShow;
 use App\Livewire\Project\CloneMe as ProjectCloneMe;
-use App\Livewire\Project\Database\Backup\Execution as DatabaseBackupExecution;
 use App\Livewire\Project\Database\Backup\Index as DatabaseBackupIndex;
 use App\Livewire\Project\Database\Configuration as DatabaseConfiguration;
 use App\Livewire\Project\Edit as ProjectEdit;
@@ -164,8 +164,11 @@ Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('p
 Route::get('/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
 Route::get('/verify', [Controller::class, 'verify'])->middleware('auth')->name('verify.email');
 Route::get('/email/verify/{id}/{hash}', [Controller::class, 'email_verify'])->middleware(['auth'])->name('verify.verify');
-Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
-Route::post('/auth/link', [Controller::class, 'acceptLink'])->middleware('throttle:magic-link')->name('auth.link.accept');
+// The invitation link acts for the invited user, so the state of a logged-in user must not redirect it.
+Route::withoutMiddleware([CheckForcePasswordReset::class, DecideWhatToDoWithUser::class, RequireTeamTwoFactor::class])->group(function () {
+    Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
+    Route::post('/auth/link', [Controller::class, 'acceptLink'])->middleware('throttle:magic-link')->name('auth.link.accept');
+});
 
 Route::get('/auth/{provider}/redirect', [OauthController::class, 'redirect'])->name('auth.redirect');
 Route::get('/auth/{provider}/callback', [OauthController::class, 'callback'])->name('auth.callback');
@@ -325,6 +328,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/slack', NotificationSlack::class)->name('notifications.slack');
         Route::get('/pushover', NotificationPushover::class)->name('notifications.pushover');
         Route::get('/webhook', NotificationWebhook::class)->name('notifications.webhook');
+        Route::get('/ntfy', NotificationNtfy::class)->name('notifications.ntfy');
     });
 
     Route::prefix('storages')->middleware('access.team-wide')->group(function () {
@@ -489,12 +493,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/terminal', ExecuteContainerCommand::class)->name('project.database.command')->middleware('can.access.terminal');
         Route::get('/files', FileBrowser::class)->name('project.database.files')->middleware('can.access.terminal');
         Route::get('/backups', DatabaseBackupIndex::class)->name('project.database.backup.index');
-        Route::get('/backups/{backup_uuid}', DatabaseBackupExecution::class)->name('project.database.backup.execution');
-        // S3 and retention settings moved into the general page; keep old links working.
-        Route::redirect('/backups/{backup_uuid}/s3', '/project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}/backups/{backup_uuid}');
-        Route::redirect('/backups/{backup_uuid}/retention', '/project/{project_uuid}/environment/{environment_uuid}/database/{database_uuid}/backups/{backup_uuid}');
-        Route::get('/backups/{backup_uuid}/executions', DatabaseBackupExecution::class)->name('project.database.backup.executions');
-        Route::get('/backups/{backup_uuid}/danger', DatabaseBackupExecution::class)->name('project.database.backup.danger');
+        // A schedule opens in a modal on the backups page; keep old links to its pages working.
+        Route::get('/backups/{backup_uuid}/{section?}', fn (Request $request) => redirect()->route('project.database.backup.index', [
+            ...collect($request->route()->parameters())->only(['project_uuid', 'environment_uuid', 'database_uuid'])->all(),
+            'schedule' => $request->route('backup_uuid'),
+        ]))->whereIn('section', ['executions', 'danger', 's3', 'retention']);
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/service/{service_uuid}')->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
@@ -646,8 +649,8 @@ Route::middleware(['auth'])->group(function () {
             if (is_null($execution_team_id)) {
                 return response()->json(['message' => 'Team not found.'], 404);
             }
-            if (! auth()->user()->isAdminOfTeam($execution_team_id)) {
-                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
+            if (! auth()->user()->can('manageBackups', $execution->scheduledDatabaseBackup->database)) {
+                return response()->json(['message' => 'You need write access on this database to download its backups.'], 403);
             }
             $filename = data_get($execution, 'filename');
             if (! $execution->local_storage_deleted && filled($filename)) {
@@ -691,8 +694,9 @@ Route::middleware(['auth'])->group(function () {
             if (is_null($execution_team_id)) {
                 return response()->json(['message' => 'Team not found.'], 404);
             }
-            if (! auth()->user()->isAdminOfTeam($execution_team_id)) {
-                return response()->json(['message' => 'Only team admins/owners can download backups.'], 403);
+            $resource = $execution->scheduledVolumeBackup->targetResource();
+            if (is_null($resource) || ! auth()->user()->can('update', $resource)) {
+                return response()->json(['message' => 'You need write access on this resource to download its backups.'], 403);
             }
             if (blank($execution->filename)) {
                 return response()->json(['message' => 'Backup not found locally on the server.'], 404);

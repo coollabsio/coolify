@@ -45,7 +45,7 @@
                                 {{ data_get($ghapp, 'name') }}
                             </div>
                             <p class="mt-0.5 truncate text-xs text-neutral-500 dark:text-fg-dim">
-                                {{ data_get($ghapp, 'html_url') }}
+                                {{ data_get($ghapp, 'html_url') }}{{ $ghapp->accountName() ? ' · '.$ghapp->accountName() : '' }}
                             </p>
                         </div>
                     </button>

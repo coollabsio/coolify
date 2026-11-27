@@ -352,7 +352,7 @@ final class SecurityStatus
             actions: $actions,
             eol: $eol,
             checkedAt: $scan->scanned_at === null ? null : CarbonImmutable::instance($scan->scanned_at),
-            facts: ['reasons' => $reasons, 'counts' => $counts, 'action_stats' => $stats, 'unfixed_why' => self::topWhy($unfixed)],
+            facts: ['reasons' => $reasons, 'counts' => $counts, 'action_stats' => $stats, 'unfixed_why' => self::topWhy($unfixed), 'stale_after_days' => self::staleAfterDays($scan)],
         )], null, false);
     }
 
@@ -370,6 +370,8 @@ final class SecurityStatus
         $unfixed = [];
         $eol = null;
         $checkedAt = null;
+        $staleAt = null;
+        $staleAfterDays = null;
         $unknownTime = false;
         foreach ($parts as $part) {
             $facts = $part->facts;
@@ -386,8 +388,16 @@ final class SecurityStatus
             }
             if ($part->checkedAt === null) {
                 $unknownTime = true;
-            } elseif ($checkedAt === null || $part->checkedAt->lt($checkedAt)) {
-                $checkedAt = $part->checkedAt;
+            } else {
+                if ($checkedAt === null || $part->checkedAt->lt($checkedAt)) {
+                    $checkedAt = $part->checkedAt;
+                }
+                $partStaleAfterDays = (int) ($facts['stale_after_days'] ?? self::STALE_AFTER_DAYS);
+                $partStaleAt = $part->checkedAt->addDays($partStaleAfterDays);
+                if ($staleAt === null || $partStaleAt->lt($staleAt)) {
+                    $staleAt = $partStaleAt;
+                    $staleAfterDays = $partStaleAfterDays;
+                }
             }
         }
         if ($unknownTime) {
@@ -408,7 +418,7 @@ final class SecurityStatus
 
         $storedReasons = array_values(array_unique($reasons));
         $allReasons = $storedReasons;
-        if ($checkedAt === null || $checkedAt->lt(now()->subDays(self::STALE_AFTER_DAYS))) {
+        if ($checkedAt === null || $staleAt === null || $staleAt->lt(now())) {
             $allReasons[] = self::REASON_STALE;
         }
         if ($images !== null && $images['checked'] < $images['total']) {
@@ -470,6 +480,7 @@ final class SecurityStatus
                 'counts' => $counts,
                 'action_stats' => array_map(fn (array $entry): array => $entry['stats'], $entries),
                 'unfixed_why' => self::topWhy($unfixed),
+                'stale_after_days' => $staleAfterDays ?? self::STALE_AFTER_DAYS,
             ],
             builderImage: $counts['signal_unfixed'] > 0 && $counts['builder_unfixed'] === $counts['signal_unfixed'],
         );
@@ -663,6 +674,17 @@ final class SecurityStatus
     }
 
     /**
+     * Days after which a result is stale: STALE_AFTER_DAYS, or one day more than the rescan days of the server, so a
+     * server that rescans less often does not need a check between two rescans.
+     */
+    private static function staleAfterDays(ImageScan $scan): int
+    {
+        $rescanDays = (int) $scan->server?->settings?->image_rescan_days;
+
+        return max(self::STALE_AFTER_DAYS, $rescanDays + 1);
+    }
+
+    /**
      * The vulnerability database was more than DATABASE_MAX_AGE_DAYS old when the image was scanned. Unknown for rows
      * without the build time, which every completed scan records.
      */
@@ -706,13 +728,14 @@ final class SecurityStatus
     }
 
     /**
-     * A version or base check that Coolify cannot finish by itself: the registry needs a login (`auth_required`), or
-     * the server reached the daily limit of checks (`failed` with `daily_limit`). Other failures and a busy lock
-     * (`failed` with `lock_busy`) are tried again, so they stay check_needed.
+     * A version or base check that Coolify cannot finish by itself: the registry needs a login (`auth_required`), the
+     * server does not trust the certificate of the registry (`failed` with `registry_tls`), or the server reached the
+     * daily limit of checks (`failed` with `daily_limit`). Other failures and a busy lock (`failed` with `lock_busy`)
+     * are tried again, so they stay check_needed.
      */
     public static function isBlockedCheck(mixed $status, mixed $error): bool
     {
-        return $status === 'auth_required' || ($status === 'failed' && $error === 'daily_limit');
+        return $status === 'auth_required' || ($status === 'failed' && in_array($error, ['daily_limit', 'registry_tls'], true));
     }
 
     private static function ownerName(Model $owner): ?string

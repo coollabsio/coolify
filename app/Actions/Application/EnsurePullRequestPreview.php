@@ -37,6 +37,7 @@ class EnsurePullRequestPreview
             }
         }
 
+        $preview->recordSameRepository(! $pullRequest->isFork);
         $preview->markForkPullRequest($pullRequest->isFork, $commit);
 
         return $preview;

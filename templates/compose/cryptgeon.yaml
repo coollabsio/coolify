@@ -7,7 +7,7 @@
 
 services:
   app:
-    image: cupcakearmy/cryptgeon:latest
+    image: cupcakearmy/cryptgeon:2.9.3
     environment:
       - SERVICE_URL_CRYPTGEON_8000
       - SIZE_LIMIT=${SIZE_LIMIT:-4 MiB}

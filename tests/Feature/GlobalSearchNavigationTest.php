@@ -73,6 +73,7 @@ it('lists team, security, notification and profile pages for a team owner', func
         route('notifications.telegram'),
         route('notifications.slack'),
         route('notifications.pushover'),
+        route('notifications.ntfy'),
         route('notifications.webhook'),
         route('profile.appearance'),
         route('team.image-scanning'),

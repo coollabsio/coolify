@@ -67,19 +67,7 @@ trait ManagesDatabaseBackup
             ]);
         }
 
-        // Instance databases (e.g. coolify-db) have no project/environment.
-        // Stay on the current page (settings.backup) instead of redirecting.
-        $project = $database->project();
-        $environment = $database->environment;
-        if (! $project || ! $environment) {
-            return null;
-        }
-
-        return redirect()->route('project.database.backup.executions', [
-            'project_uuid' => $project->uuid,
-            'environment_uuid' => $environment->uuid,
-            'database_uuid' => $database->uuid,
-            'backup_uuid' => $backup->uuid,
-        ]);
+        // Standalone and instance databases show their executions on the same page.
+        return null;
     }
 }

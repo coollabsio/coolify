@@ -7,7 +7,7 @@
 
 services:
   homebox:
-    image: ghcr.io/sysadminsmedia/homebox:latest
+    image: ghcr.io/sysadminsmedia/homebox:0.27.1
     environment:
       - SERVICE_URL_HOMEBOX_7745
       - HBOX_OPTIONS_ALLOW_REGISTRATION=${HBOX_OPTIONS_ALLOW_REGISTRATION:-false}

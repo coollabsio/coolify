@@ -7,7 +7,7 @@
 
 services:
   orbit:
-    image: ghcr.io/coollabsio/orbit:0.2.0
+    image: ghcr.io/coollabsio/orbit:0.3.0
     environment:
       - SERVICE_URL_ORBIT_8080
       - ORBIT_ENV=production

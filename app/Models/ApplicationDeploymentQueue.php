@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
-    description: 'Project model',
+    description: 'Application deployment model',
     type: 'object',
     properties: [
         'id' => ['type' => 'integer'],
@@ -107,6 +107,15 @@ class ApplicationDeploymentQueue extends Model
                 'deployment_uuid' => $deployment->deployment_uuid,
                 'commit' => $deployment->commit,
             ]);
+        });
+
+        // A worker that kills the job at the timeout skips the finally block of handle(), which records the end time.
+        static::saving(function (ApplicationDeploymentQueue $deployment): void {
+            if ($deployment->isDirty('status')
+                && $deployment->finished_at === null
+                && ApplicationDeploymentStatus::tryFrom((string) $deployment->status)?->isFinal()) {
+                $deployment->finished_at = now();
+            }
         });
 
         static::updated(function (ApplicationDeploymentQueue $deployment): void {

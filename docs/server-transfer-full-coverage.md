@@ -30,6 +30,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✓ | What | Value to set |
 |---|---|---|
 | ✅ | Wildcard domain | `http://{ip}.sslip.io` style, not empty |
+| ✅ | Public IPv4 and IPv6 (remote server, General) | `95.217.1.10`, `2a01:4f8::10` |
 | ✅ | Concurrent builds, dynamic timeout, deployment queue limit, connection timeout | 3, 1800, 5, 20 |
 | ✅ | Server timezone | `Europe/Budapest` |
 | ✅ | Docker cleanup | force cleanup on, frequency `0 4 * * *`, threshold 70, delete unused volumes on, delete unused networks on |
@@ -55,7 +56,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Second standalone destination | extra Docker network, one resource on it |
 | ✅ | Server shared variables | 2 variables, one multiline, one literal, one with a comment |
 | ✅ | SSL certificates | CA certificate (created automatically) + a database with SSL on (creates a server certificate) |
-| ✅ | Image vulnerability scanning | server opt-in on, server scan rules (block deploys `strict`, count medium problems: yes), application scan rules (if the scan cannot run: block, count medium problems: no), one ignore of a vulnerability on an application, one team-wide ignore (stays on the source, the export warns), application scan switch off and "images built by team" on, scanner limits that are not the defaults (Syft time limit 20 minutes, Grype time limit 30 minutes, scanner CPU limit 2, scanner memory limit 2 GB). A scan, its SBOM, and the daily candidate scan counter are not moved: the next rescan rebuilds them |
+| ✅ | Image vulnerability scanning | server opt-in on, server scan rules (block deploys `strict`, count medium problems: yes), application scan rules (if the scan cannot run: block, count medium problems: no), one ignore of a vulnerability on an application, one team-wide ignore (stays on the source, the export warns), application scan switch off and "images built by team" on, scanner limits that are not the defaults (Syft time limit 20 minutes, Grype time limit 30 minutes, scanner CPU limit 2, scanner memory limit 2 GB), rescan frequency every 2 weeks. A scan, its SBOM, and the daily candidate scan counter are not moved: the next rescan rebuilds them |
 | ✅ | GitHub runner config | labels, max runners 2, docker mode `dind`, image, CPU/memory limits, 3 timeouts, PR jobs off, dedicated on, uses the team GitHub App (see 4). Expected: on the target it is **disabled** and the checklist says to enable it |
 
 ## 4. Team credentials the server uses
@@ -113,7 +114,7 @@ When you add a model or a setting to the transfer, add it to this file too.
 | ✅ | Preview deployment | PR preview with domain port overrides + max restart count + keeps production values (previews from before v4.5.1) (needs the GitHub App, or create it in the database) |
 | ✅ | Fork PR approval off | on a git application (the seed uses `deploykey-app`, `gitlab-app`, `static-site`): fork PR approval not required (`is_pr_deployments_public_approval_required` off). Expected: still off on the target |
 | ✅ | Fork PR preview approval | on another application with PR deployments public and fork PR approval required, the default (the seed uses `whoami2`). Do not use an application of the row above, because there a new commit does not wait. A fork PR preview with an approved commit and a newer commit that waits for approval (`is_fork_pull_request`, `approved_commit`, `approved_at`, `pending_approval_commit`). Expected: on the target the approved commit still deploys and the pending one still waits |
-| ✅ | Secret manager link | the app loads variables from the secret manager token |
+| ✅ | Secret manager links | the app loads variables from the `default` source and from a second named source (`{{vault.<name>.KEY}}`, set through the API or coolify.json) |
 | ✅ | Managed DNS record | owned record in the Cloudflare zone for the app domain. Expected: the target takes ownership (provider comment changes) |
 
 ## 7. Databases (one of each of the 9 types)

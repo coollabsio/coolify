@@ -35,6 +35,7 @@ use App\Models\LocalPersistentVolume;
 use App\Models\ManagedDnsRecord;
 use App\Models\ManagedDnsRecordReference;
 use App\Models\NotificationThrottle;
+use App\Models\NtfyNotificationSettings;
 use App\Models\OauthIdentity;
 use App\Models\OauthSetting;
 use App\Models\PersonalAccessToken;
@@ -114,9 +115,9 @@ final class ServerTransferCoverage
         ManagedDnsRecord::class => ['managed_dns_records.*'],
         ManagedDnsRecordReference::class => ['managed_dns_records.*.references.*'],
         SecretManagerLink::class => [
-            'projects.*.environments.*.applications.*.secret_manager_link',
-            'projects.*.environments.*.databases.*.secret_manager_link',
-            'projects.*.environments.*.services.*.secret_manager_link',
+            'projects.*.environments.*.applications.*.secret_manager_links.*',
+            'projects.*.environments.*.databases.*.secret_manager_links.*',
+            'projects.*.environments.*.services.*.secret_manager_links.*',
         ],
         SslCertificate::class => ['ssl_certificates.*'],
         ImageScanPolicy::class => ['image_scan_policies.*'],
@@ -288,7 +289,7 @@ final class ServerTransferCoverage
             'resource_type' => self::LINKED, 'resource_id' => self::LINKED, 'standalone_sqlite_id' => self::LINKED,
             'container_id' => 'Not used: only listed in $fillable.',
         ],
-        LocalFileVolume::class => ['resource_type' => self::LINKED, 'resource_id' => self::LINKED],
+        LocalFileVolume::class => ['resource_type' => self::LINKED, 'resource_id' => self::LINKED, 'variable_fs_path' => self::RUNTIME],
         ScheduledTask::class => [
             'team_id' => self::TEAM, 'application_id' => self::LINKED, 'service_id' => self::LINKED,
             'consecutive_failures' => self::RUNTIME, 'failing_since' => self::RUNTIME,
@@ -385,6 +386,7 @@ final class ServerTransferCoverage
         TelegramNotificationSettings::class => 'Team notification settings, not server data.',
         PushoverNotificationSettings::class => 'Team notification settings, not server data.',
         WebhookNotificationSettings::class => 'Team notification settings, not server data.',
+        NtfyNotificationSettings::class => 'Team notification settings, not server data.',
         CloudInitScript::class => 'Team server-creation templates, not server data.',
         ProjectSetting::class => 'Created with the project on the target; it has no settings of its own yet.',
         ApplicationDeploymentQueue::class => 'Deployment history.',

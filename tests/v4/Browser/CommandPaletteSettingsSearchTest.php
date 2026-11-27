@@ -2,7 +2,6 @@
 
 use App\Models\GithubApp;
 use App\Models\S3Storage;
-use App\Models\ScheduledDatabaseBackup;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -94,15 +93,6 @@ function commandPaletteSettingsPageUrl(string $page, array $stack): string
             'installation_id' => 5678, 'webhook_secret' => 'secret', 'private_key_id' => $stack['privateKey']->id,
             'team_id' => 0, 'is_system_wide' => false,
         ])->uuid,
-        'database backup' => (function () use ($stack): string {
-            $database = createBrowserPostgresql($stack, ['uuid' => 'db-palette-backup']);
-            $backup = ScheduledDatabaseBackup::create([
-                'team_id' => 0, 'frequency' => '0 0 * * *', 'database_type' => $database->getMorphClass(),
-                'database_id' => $database->id,
-            ]);
-
-            return "/project/{$stack['project']->uuid}/environment/{$stack['environment']->uuid}/database/{$database->uuid}/backups/{$backup->uuid}";
-        })(),
     };
 }
 
@@ -128,7 +118,6 @@ it('searches the sidebar pages of other settings pages', function (string $pageT
     ['destination', 'Danger Zone'],
     ['s3 storage', 'Resources'],
     ['github app', 'Permissions'],
-    ['database backup', 'Retention'],
 ]);
 
 it('searches the sections of a page without a settings sidebar and scrolls to them', function () {

@@ -218,6 +218,7 @@ class Show extends Component
             $latestDeploymentId = ApplicationDeploymentQueue::query()
                 ->where('application_id', $this->application->id)
                 ->where('pull_request_id', $deployment->pull_request_id)
+                ->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)
                 ->max('id');
             if ((int) $latestDeploymentId !== (int) $deployment->id) {
                 $this->dispatch('error', 'A newer deployment exists.');
@@ -294,7 +295,7 @@ class Show extends Component
 
     private function isKeepAliveOn()
     {
-        if (in_array(data_get($this->application_deployment_queue, 'status'), ['finished', 'failed', ApplicationDeploymentStatus::SKIPPED->value], true)) {
+        if (in_array(data_get($this->application_deployment_queue, 'status'), [ApplicationDeploymentStatus::FINISHED->value, ApplicationDeploymentStatus::FAILED->value, ApplicationDeploymentStatus::SKIPPED->value], true)) {
             $this->isKeepAliveOn = false;
         } else {
             $this->isKeepAliveOn = true;

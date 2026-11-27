@@ -24,7 +24,7 @@ beforeEach(function () {
 
     $compose = "services:\n  app:\n    image: nginx:2\n";
     Cache::flush();
-    Cache::forever('coolify:service-templates-bundle', [
+    Cache::forever(service_templates_cache_key(), [
         'fetched_at' => now()->toIso8601String(),
         'json' => json_encode(['demo' => ['compose' => base64_encode($compose)]]),
     ]);

@@ -7,7 +7,7 @@
 
 services:
   gitlab:
-    image: "gitlab/gitlab-ce:latest"
+    image: "gitlab/gitlab-ce:19.5.5-ce.0"
     environment:
       - SERVICE_URL_GITLAB_80
       - TZ=${TZ:-UTC}

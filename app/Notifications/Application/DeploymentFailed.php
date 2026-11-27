@@ -7,6 +7,7 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Notifications\CustomEmailNotification;
 use App\Notifications\Dto\DiscordMessage;
+use App\Notifications\Dto\NtfyMessage;
 use App\Notifications\Dto\PushoverMessage;
 use App\Notifications\Dto\SlackMessage;
 use App\Notifications\ImageScan\NotificationText;
@@ -197,6 +198,31 @@ class DeploymentFailed extends CustomEmailNotification
             buttons: [
                 ...$buttons,
             ],
+        );
+    }
+
+    public function toNtfy(): NtfyMessage
+    {
+        if ($this->preview) {
+            $title = "Pull request #{$this->preview->pull_request_id} deployment failed";
+            $message = "Pull request deployment failed for {$this->application_name}";
+        } else {
+            $title = 'Deployment failed';
+            $message = "Deployment failed for {$this->application_name}";
+        }
+
+        $buttons[] = [
+            'text' => 'Deployment logs',
+            'url' => $this->deployment_url,
+        ];
+
+        return new NtfyMessage(
+            title: $title,
+            message: $message,
+            buttons: [
+                ...$buttons,
+            ],
+            level: 'error',
         );
     }
 

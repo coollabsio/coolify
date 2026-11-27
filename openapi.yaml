@@ -1306,6 +1306,8 @@ paths:
           description: 'The token needs the deploy ability to set a manual webhook secret.'
         '400':
           $ref: '#/components/responses/400'
+        '429':
+          description: 'GitHub API rate limit exceeded. The message tells when to try again.'
         '409':
           description: 'Domain conflicts detected.'
           content:
@@ -3160,6 +3162,14 @@ paths:
           schema:
             type: boolean
             default: true
+        -
+          name: delete_backups
+          in: query
+          description: 'Delete the storage backups, on the server and on S3.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'Application deleted.'
@@ -5648,6 +5658,14 @@ paths:
           schema:
             type: boolean
             default: true
+        -
+          name: delete_backups
+          in: query
+          description: 'Delete the database and storage backups, on the server and on S3.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'Database deleted.'
@@ -5885,7 +5903,7 @@ paths:
       tags:
         - Databases
       summary: 'Delete backup configuration'
-      description: 'Deletes a backup configuration and all its executions.'
+      description: 'Deletes a backup configuration and all its executions. When the server is not reachable, the local backup files stay on the server.'
       operationId: delete-backup-configuration-by-uuid
       parameters:
         -
@@ -7088,7 +7106,7 @@ paths:
       tags:
         - Databases
       summary: 'Delete backup execution'
-      description: 'Deletes a specific backup execution.'
+      description: 'Deletes a specific backup execution. When the server is not reachable, the local backup file stays on the server.'
       operationId: delete-backup-execution-by-uuid
       parameters:
         -
@@ -8240,13 +8258,16 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Application'
+                properties:
+                  count: { description: 'Total number of deployments of the application.', type: integer }
+                  deployments: { type: array, items: { $ref: '#/components/schemas/ApplicationDeploymentQueue' } }
+                type: object
         '401':
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -10500,6 +10521,43 @@ paths:
       security:
         -
           bearerAuth: []
+  /notifications/ntfy:
+    get:
+      tags:
+        - Notifications
+      summary: 'Get Ntfy notification settings'
+      description: 'Get the current team Ntfy notification settings. Encrypted secrets are only returned when the token has `read:sensitive` (or `root`) and the user is a team admin/owner.'
+      operationId: get-current-team-ntfy-notifications
+      responses:
+        '200':
+          description: 'Ntfy notification settings.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Notifications
+      summary: 'Update Ntfy notification settings'
+      description: 'Update the current team Ntfy notification settings.'
+      operationId: update-current-team-ntfy-notifications
+      responses:
+        '200':
+          description: 'Updated Ntfy notification settings.'
+        '401':
+          $ref: '#/components/responses/401'
+        '400':
+          $ref: '#/components/responses/400'
+        '403':
+          description: Forbidden.
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   /notifications/webhook:
     get:
       tags:
@@ -10661,6 +10719,8 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+        '503':
+          description: 'Database migrations are not finished yet.'
   '/environments/{uuid}/config/export':
     get:
       tags:
@@ -10668,6 +10728,36 @@ paths:
       summary: 'Export coolify.json'
       description: 'Export an environment as a coolify.json file. Variable values are never exported. Requires the `read:sensitive` or `root` token ability, because commands and Compose files can hold credentials.'
       operationId: export-environment-config
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The coolify.json file.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'The token cannot read sensitive data.'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/config/export':
+    get:
+      tags:
+        - 'Project config'
+      summary: 'Export application as coolify.json'
+      description: 'Export one application as a coolify.json file for its environment. Variable values are never exported. Requires the `read:sensitive` or `root` token ability, because commands and Compose files can hold credentials.'
+      operationId: export-application-config
       parameters:
         -
           name: uuid
@@ -12684,6 +12774,14 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: name
+          in: query
+          description: 'Source name. Default: default.'
+          required: false
+          schema:
+            type: string
+            default: default
       responses:
         '200':
           description: 'Secret manager source.'
@@ -12704,7 +12802,7 @@ paths:
       tags:
         - 'Secret Managers'
       summary: 'Remove Secret Manager Source'
-      description: 'Remove the secret manager source. Existing {{vault.*}} variables stay and fail the next deployment until they are removed.'
+      description: 'Remove a secret manager source (`default` when no name is given). Existing references to it stay and fail the next deployment until they are removed.'
       operationId: remove-secret-manager-source
       parameters:
         -
@@ -12725,6 +12823,14 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: name
+          in: query
+          description: 'Source name. Default: default.'
+          required: false
+          schema:
+            type: string
+            default: default
       responses:
         '200':
           description: 'Source removed.'
@@ -12741,7 +12847,7 @@ paths:
       tags:
         - 'Secret Managers'
       summary: 'Set Secret Manager Source'
-      description: 'Link a secret manager token of the team to an application, service, or database, or change the token or settings of the link. References resolve at the next deployment.'
+      description: 'Link a secret manager token of the team to an application, service, or database as a named source (`default` when no name is given), or change the token or settings of that source. References resolve at the next deployment.'
       operationId: set-secret-manager-source
       parameters:
         -
@@ -12770,6 +12876,10 @@ paths:
               required:
                 - integration_token_uuid
               properties:
+                name:
+                  description: 'Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.'
+                  type: string
+                  default: default
                 integration_token_uuid:
                   type: string
                 settings:
@@ -12812,6 +12922,10 @@ paths:
               required:
                 - integration_token_uuid
               properties:
+                name:
+                  description: 'Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.'
+                  type: string
+                  default: default
                 integration_token_uuid:
                   type: string
                 settings:
@@ -12857,6 +12971,14 @@ paths:
           required: true
           schema:
             type: string
+        -
+          name: name
+          in: query
+          description: 'Source name. Default: default.'
+          required: false
+          schema:
+            type: string
+            default: default
       responses:
         '200':
           description: 'Key names.'
@@ -12882,7 +13004,7 @@ paths:
       tags:
         - 'Secret Managers'
       summary: 'Add Secret Manager Reference'
-      description: 'Add a {{vault.KEY}} environment variable for one key of the linked source.'
+      description: 'Add a {{vault.KEY}} environment variable ({{vault.<name>.KEY}} for a named source) for one key of the source.'
       operationId: add-secret-manager-reference
       parameters:
         -
@@ -12913,6 +13035,10 @@ paths:
               properties:
                 key:
                   type: string
+                name:
+                  description: 'Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.'
+                  type: string
+                  default: default
               type: object
       responses:
         '201':
@@ -12935,7 +13061,7 @@ paths:
       tags:
         - 'Secret Managers'
       summary: 'Import Secret Manager References'
-      description: 'Add a {{vault.KEY}} environment variable for every key of the linked source that has no variable yet. Keys that are not valid variable names are skipped.'
+      description: 'Add a {{vault.KEY}} environment variable ({{vault.<name>.KEY}} for a named source) for every key of the source that has no variable yet. Keys that are not valid variable names are skipped.'
       operationId: import-secret-manager-references
       parameters:
         -
@@ -12956,6 +13082,17 @@ paths:
           required: true
           schema:
             type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  description: 'Source name: lowercase letters, digits, - and _. Variables reference a named source as {{vault.<name>.KEY}}.'
+                  type: string
+                  default: default
+              type: object
       responses:
         '200':
           description: 'Import result.'
@@ -13698,6 +13835,7 @@ paths:
                   image_scan_syft_timeout: { description: 'Time limit of one Syft run (package list of an image), in seconds.', type: integer, enum: [300, 600, 1200, 1800, 3600] }
                   image_scan_grype_timeout: { description: 'Time limit of one Grype run (vulnerability match), in seconds.', type: integer, enum: [300, 600, 1200, 1800, 3600] }
                   image_scan_cpus: { description: 'CPU limit of each scanner step.', type: number, enum: [0.5, 1, 2, 4] }
+                  image_rescan_days: { description: 'Days between two rescans of the running images and the host packages. 0: no rescans, only scans at deployments and on request.', type: integer, enum: [1, 3, 7, 14, 30, 0] }
                   scanner_state: { description: 'State of the scanner on the server. Null when unknown.', type: [string, 'null'], enum: [pulling, updating_database, ready, failed] }
                   scanner_failed_step: { description: 'The step that failed when scanner_state is failed.', type: [string, 'null'] }
                   scanner_built_at: { description: 'Time of the vulnerability database on the server.', type: [string, 'null'], format: date-time }
@@ -13752,6 +13890,10 @@ paths:
                   description: 'CPU limit of each scanner step. A value above the CPU count of the server is refused.'
                   type: number
                   enum: [0.5, 1, 2, 4]
+                image_rescan_days:
+                  description: 'Days between two rescans of the running images and the host packages. 0: no rescans, only scans at deployments and on request.'
+                  type: integer
+                  enum: [1, 3, 7, 14, 30, 0]
               type: object
       responses:
         '200':
@@ -14674,6 +14816,14 @@ paths:
           schema:
             type: boolean
             default: false
+        -
+          name: remove_resources_from_server
+          in: query
+          description: 'With force=true, also remove the containers, volumes, and files of the resources from the server. Set it to false to delete the resources only from Coolify and leave them running on the server.'
+          required: false
+          schema:
+            type: boolean
+            default: true
       responses:
         '403':
           description: 'The token needs the deploy permission to delete the resources or the cloud server.'
@@ -14775,6 +14925,14 @@ paths:
                   type: string
                   nullable: true
                   description: 'Wildcard domain (URL) used to generate domains for new resources on this server. Null removes it.'
+                public_ipv4:
+                  type: string
+                  nullable: true
+                  description: 'Public IPv4 that DNS checks and DNS records use instead of the server IP, for servers that Coolify reaches over a private network. Ignored for localhost. Null removes it.'
+                public_ipv6:
+                  type: string
+                  nullable: true
+                  description: 'Public IPv6 that DNS checks and DNS records use instead of the server IP, for servers that Coolify reaches over a private network. Ignored for localhost. Null removes it.'
                 server_timezone:
                   type: string
                   description: 'Timezone of the server, for example Europe/Berlin. Scheduled tasks and backups use it.'
@@ -16105,6 +16263,14 @@ paths:
           schema:
             type: boolean
             default: true
+        -
+          name: delete_backups
+          in: query
+          description: 'Delete the database and storage backups, on the server and on S3.'
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: 'Delete a service by UUID'
@@ -16630,7 +16796,7 @@ paths:
       tags:
         - Services
       summary: Start
-      description: 'Start service.'
+      description: 'Start service. Pulls the latest images first.'
       operationId: start-service-by-uuid
       parameters:
         -
@@ -18220,6 +18386,41 @@ paths:
         -
           bearerAuth: []
   '/applications/{uuid}/storages/{storage_uuid}/backups':
+    get:
+      tags:
+        - Applications
+      summary: 'Get application storage backup schedule'
+      description: 'Get the backup schedule of an application storage.'
+      operationId: get-application-storage-backup-schedule
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: storage_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Backup schedule.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolumeBackupScheduleResponse'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: Forbidden.
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
     put:
       tags:
         - Applications
@@ -18307,6 +18508,41 @@ paths:
         -
           bearerAuth: []
   '/databases/{uuid}/storages/{storage_uuid}/backups':
+    get:
+      tags:
+        - Databases
+      summary: 'Get database storage backup schedule'
+      description: 'Get the backup schedule of a database storage.'
+      operationId: get-database-storage-backup-schedule
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: storage_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Backup schedule.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolumeBackupScheduleResponse'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: Forbidden.
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
     put:
       tags:
         - Databases
@@ -18394,6 +18630,41 @@ paths:
         -
           bearerAuth: []
   '/services/{uuid}/storages/{storage_uuid}/backups':
+    get:
+      tags:
+        - Services
+      summary: 'Get service storage backup schedule'
+      description: 'Get the backup schedule of a service storage.'
+      operationId: get-service-storage-backup-schedule
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: storage_uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Backup schedule.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VolumeBackupScheduleResponse'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: Forbidden.
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
     put:
       tags:
         - Services
@@ -19874,8 +20145,11 @@ components:
             - 'null'
       type: object
     SecretManagerSource:
-      description: 'The secret manager source of an application, service, or database. Routes start with the resource type (`applications`, `services`, `databases`), so tokens limited to some resources can use them.'
+      description: 'A secret manager source of an application, service, or database. A resource can have several named sources: variables reference the `default` source as {{vault.KEY}} and other sources as {{vault.<name>.KEY}}. Routes start with the resource type (`applications`, `services`, `databases`), so tokens limited to some resources can use them.'
       properties:
+        name:
+          description: 'Name of the source that the other fields describe.'
+          type: string
         linked:
           type: boolean
         integration_token_uuid:
@@ -19906,6 +20180,22 @@ components:
                 type: string
               provider:
                 type: string
+            type: object
+        sources:
+          description: 'All sources of the resource, sorted by name.'
+          type: array
+          items:
+            properties:
+              name:
+                type: string
+              integration_token_uuid:
+                type: string
+              provider:
+                type: string
+              settings:
+                type:
+                  - object
+                  - 'null'
             type: object
       type: object
     SharedEnvironmentVariableCreateRequest:
@@ -20032,7 +20322,6 @@ components:
     VolumeBackupScheduleResponse:
       required:
         - uuid
-        - message
         - storage_uuid
         - storage_type
         - frequency
@@ -20052,6 +20341,7 @@ components:
         uuid:
           type: string
         message:
+          description: 'Only in the response of a create or replace.'
           type: string
         storage_uuid:
           type: string
@@ -20460,7 +20750,7 @@ components:
           $ref: '#/components/schemas/ApplicationSetting'
       type: object
     ApplicationDeploymentQueue:
-      description: 'Project model'
+      description: 'Application deployment model'
       properties:
         id:
           type: integer
@@ -20974,6 +21264,14 @@ components:
           type: string
           nullable: true
           description: 'Traefik certificate resolver for generated HTTPS routers. Null when the proxy uses its own certificates.'
+        public_ipv4:
+          type: string
+          nullable: true
+          description: 'Public IPv4 address that DNS records of resources on this server point to. Null uses the server IP.'
+        public_ipv6:
+          type: string
+          nullable: true
+          description: 'Public IPv6 address that DNS records of resources on this server point to. Null uses the server IP.'
         is_reachable:
           type: boolean
         ssh_host_key:

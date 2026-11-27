@@ -7,8 +7,14 @@
 
 services:
   trailbase:
-    image: trailbase/trailbase:0.22.6
+    image: trailbase/trailbase:0.35.12
     environment:
       - SERVICE_URL_TRAILBASE_4000
     volumes:
       - trailbase-data:/app/traildepot
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:4000/api/healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

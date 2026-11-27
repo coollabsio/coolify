@@ -816,7 +816,7 @@ it('preserves migrated null assignments separately for production and previews',
 
     $parsed = applicationParser($application, $pullRequestId, $previewId);
 
-    expect(data_get($parsed, 'services.'.($pullRequestId ? 'app-pr-42' : 'app').'.environment.LEGACY'))
+    expect(data_get($parsed, 'services.app.environment.LEGACY'))
         ->toBe($pullRequestId ? '${LEGACY:-default}' : '')
         ->and($application->fresh()->docker_compose_raw)->toBe($compose);
 })->with([0, 42]);

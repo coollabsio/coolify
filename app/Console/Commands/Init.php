@@ -39,6 +39,8 @@ class Init extends Command
         Artisan::call('optimize:clear');
         Artisan::call('optimize');
 
+        self::compressLegacyLogFile(storage_path('logs'));
+
         try {
             RootSetupWindow::openIfNoUserExists();
         } catch (\Throwable $e) {
@@ -100,12 +102,7 @@ class Init extends Command
         } catch (\Throwable $e) {
             echo "Error in cleanup:names command: {$e->getMessage()}\n";
         }
-        try {
-            $this->call('cleanup:stucked-resources');
-        } catch (\Throwable $e) {
-            echo "Error in cleanup:stucked-resources command: {$e->getMessage()}\n";
-            echo "Continuing with initialization - cleanup errors will not prevent Coolify from starting\n";
-        }
+        // Before cleanup:stucked-resources, which removes the helper containers of deployments that are not running.
         try {
             $stuckDeployments = ApplicationDeploymentQueue::whereIn('status', [
                 ApplicationDeploymentStatus::IN_PROGRESS->value,
@@ -113,6 +110,7 @@ class Init extends Command
             ])->get(['id', 'application_id', 'parent_deployment_uuid']);
             $updatedCount = ApplicationDeploymentQueue::whereKey($stuckDeployments->modelKeys())->update([
                 'status' => ApplicationDeploymentStatus::FAILED->value,
+                'finished_at' => Carbon::now(),
             ]);
 
             if ($updatedCount > 0) {
@@ -129,6 +127,12 @@ class Init extends Command
             echo "Could not cleanup inprogress deployments: {$e->getMessage()}\n";
         }
 
+        try {
+            $this->call('cleanup:stucked-resources');
+        } catch (\Throwable $e) {
+            echo "Error in cleanup:stucked-resources command: {$e->getMessage()}\n";
+            echo "Continuing with initialization - cleanup errors will not prevent Coolify from starting\n";
+        }
         try {
             $interruptedStartCount = ResourceStartActivity::failInterrupted();
 
@@ -187,6 +191,54 @@ class Init extends Command
         }
     }
 
+    /**
+     * Coolify logged to one laravel.log until it moved to daily files, which the daily driver deletes after
+     * LOG_DAILY_DAYS. The old file is compressed once, so it stops taking disk space but its lines stay readable.
+     * An error is only printed: the startup must go on.
+     */
+    public static function compressLegacyLogFile(string $directory): void
+    {
+        $legacyLog = "{$directory}/laravel.log";
+        $archive = "{$directory}/laravel-legacy-".now()->format('Ymd-His').'.log.gz';
+
+        try {
+            if (! is_file($legacyLog) || is_link($legacyLog)) {
+                return;
+            }
+
+            if (filesize($legacyLog) > 0) {
+                $source = fopen($legacyLog, 'rb');
+                $target = gzopen($archive, 'wb6');
+                if ($source === false || $target === false) {
+                    throw new \RuntimeException("Could not open {$legacyLog} or {$archive}");
+                }
+                try {
+                    while (! feof($source)) {
+                        $chunk = fread($source, 1024 * 1024);
+                        if ($chunk === false || ($chunk !== '' && gzwrite($target, $chunk) === false)) {
+                            throw new \RuntimeException("Could not write {$archive}");
+                        }
+                    }
+                } finally {
+                    fclose($source);
+                    if (! gzclose($target)) {
+                        throw new \RuntimeException("Could not write {$archive}");
+                    }
+                }
+            }
+
+            unlink($legacyLog);
+            if (is_file($archive)) {
+                echo "Compressed the old log file to {$archive}\n";
+            }
+        } catch (\Throwable $e) {
+            if (is_file($archive)) {
+                @unlink($archive);
+            }
+            echo "Could not compress the old log file {$legacyLog}: {$e->getMessage()}\n";
+        }
+    }
+
     private function pullHelperImage()
     {
         CheckHelperImageJob::dispatch();
@@ -194,10 +246,14 @@ class Init extends Command
 
     private function pullTemplatesFromCDN()
     {
+        $url = service_templates_cdn_url();
+        if ($url === null) {
+            return;
+        }
         $response = Http::retry(3, 1000, throw: false)
             ->timeout(60)
             ->connectTimeout(10)
-            ->get(config('constants.services.official'));
+            ->get($url);
         if ($response->successful()) {
             store_service_templates_bundle($response->body());
         }

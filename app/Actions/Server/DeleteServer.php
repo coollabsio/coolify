@@ -2,8 +2,10 @@
 
 namespace App\Actions\Server;
 
+use App\Jobs\DeleteResourceJob;
 use App\Models\CloudProviderToken;
 use App\Models\Server;
+use App\Models\Service;
 use App\Models\Team;
 use App\Notifications\Server\HetznerDeletionFailed;
 use App\Services\DigitalOceanService;
@@ -16,13 +18,21 @@ class DeleteServer
 {
     use AsAction;
 
-    public function handle(int $serverId, bool $deleteFromHetzner = false, ?int $hetznerServerId = null, ?int $cloudProviderTokenId = null, ?int $teamId = null, bool $deleteFromVultr = false, ?string $vultrInstanceId = null, bool $deleteFromDigitalOcean = false, ?int $digitalOceanDropletId = null, bool $deleteFromHostinger = false, ?int $hostingerVirtualMachineId = null)
+    public function handle(int $serverId, bool $deleteFromHetzner = false, ?int $hetznerServerId = null, ?int $cloudProviderTokenId = null, ?int $teamId = null, bool $deleteFromVultr = false, ?string $vultrInstanceId = null, bool $deleteFromDigitalOcean = false, ?int $digitalOceanDropletId = null, bool $deleteFromHostinger = false, ?int $hostingerVirtualMachineId = null, bool $removeResourcesFromServer = true)
     {
         $server = Server::withTrashed()->find($serverId);
         // Another Coolify instance manages the cloud server of a transferred server.
         if ($server?->isTransferredAway()) {
             $deleteFromHetzner = $deleteFromVultr = $deleteFromDigitalOcean = $deleteFromHostinger = false;
         }
+
+        // Before the cloud server is deleted, while the containers can still be removed.
+        // A deleted cloud server takes its containers with it, and another instance runs those of a transferred server.
+        $deletesCloudServer = $deleteFromHetzner || $deleteFromVultr || $deleteFromDigitalOcean || $deleteFromHostinger;
+        $resourcesDeleted = ! $server || $this->deleteResources(
+            $server,
+            removeFromServer: $removeResourcesFromServer && ! $deletesCloudServer && ! $server->isTransferredAway(),
+        );
 
         // A Sentinel that keeps running would push to Coolify for a server that no longer exists.
         if ($server && ! $server->isTransferredAway() && ! $deleteFromHetzner && ! $deleteFromVultr && ! $deleteFromDigitalOcean) {
@@ -69,6 +79,11 @@ class DeleteServer
             return; // Server already force deleted from Coolify
         }
 
+        // The server stays soft-deleted, so no resource is left without a server. cleanup:stucked-resources retries it.
+        if (! $resourcesDeleted) {
+            return;
+        }
+
         try {
             $server->forceDelete();
         } catch (\Throwable $e) {
@@ -77,6 +92,35 @@ class DeleteServer
                 'server_id' => $server->id,
             ]);
         }
+    }
+
+    /**
+     * Deletes the resources of the server one after the other, before the server and its destinations are deleted.
+     * A resource whose server does not respond is still deleted from Coolify.
+     */
+    private function deleteResources(Server $server, bool $removeFromServer): bool
+    {
+        $deleted = true;
+        foreach ($server->primaryResources() as $resource) {
+            // The server is soft-deleted, so the relations of the resource do not load it.
+            $resource->destination?->setRelation('server', $server);
+            if ($resource instanceof Service) {
+                $resource->setRelation('server', $server);
+            }
+            try {
+                (new DeleteResourceJob($resource, dockerCleanup: false, deleteFromCoolifyOnly: ! $removeFromServer))->handle();
+            } catch (\Throwable $e) {
+                $deleted = false;
+                logger()->error('Failed to delete a resource of a deleted server', [
+                    'error' => $e->getMessage(),
+                    'server_id' => $server->id,
+                    'resource_type' => $resource->getMorphClass(),
+                    'resource_id' => $resource->id,
+                ]);
+            }
+        }
+
+        return $deleted;
     }
 
     private function stopSentinel(Server $server): void
