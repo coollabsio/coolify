@@ -198,6 +198,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private bool $only_this_server = false;
 
+    private bool $missedAdditionalDestination = false;
+
     private string $container_name;
 
     private ?string $currently_running_container_name = null;
@@ -4215,6 +4217,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 continue;
             }
             if ($result['status'] !== 'queued') {
+                $this->missedAdditionalDestination = true;
                 $this->application_deployment_queue->addLogEntry("Deployment to {$server->name} was not queued: {$result['message']}", 'stderr');
 
                 continue;
@@ -7815,14 +7818,20 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         event(new ApplicationConfigurationChanged($this->application->team()->id));
 
         if (filled($this->application_deployment_queue->parent_deployment_uuid)) {
-            $this->recordTriggerBase();
+            if (Cache::has("deploy-triggers:destinations-queued:{$this->application_deployment_queue->parent_deployment_uuid}")) {
+                $this->recordTriggerBase();
+            }
             $this->sendMultiServerDeploymentNotification($this->application_deployment_queue->parent_deployment_uuid);
 
             return;
         }
 
         $queuedAdditionalDeployments = $this->only_this_server ? 0 : $this->deploy_to_additional_destinations();
-        $this->recordTriggerBase();
+        // The base moves only when every destination got this commit; children check the marker.
+        if (! $this->missedAdditionalDestination) {
+            Cache::put("deploy-triggers:destinations-queued:{$this->deployment_uuid}", true, now()->addDay());
+            $this->recordTriggerBase();
+        }
         if ($queuedAdditionalDeployments === 0) {
             $this->sendDeploymentNotification(DeploymentSuccess::class);
 

@@ -16,6 +16,7 @@ use App\Livewire\Source\Gitlab\Change as GitlabSource;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GitlabApp;
+use App\Services\DeployTriggers\ClosedPullRequests;
 use App\Services\DeployTriggers\PullRequestContext;
 use App\Services\DeployTriggers\PushTriggerRouter;
 use App\Services\ServerTransfer\TransferFinishChecklist;
@@ -268,6 +269,9 @@ class Gitlab extends Controller
                     }
 
                     if (in_array($action, ['open', 'opened', 'synchronize', 'reopened', 'reopen', 'update'], true)) {
+                        if (in_array($action, ['open', 'opened', 'reopen', 'reopened'], true)) {
+                            ClosedPullRequests::clear($application->id, $pull_request_id);
+                        }
                         if (! $application->isPRDeployable()) {
                             $return_payloads->push([
                                 'application' => $application->name,
@@ -346,6 +350,8 @@ class Gitlab extends Controller
                                 'status' => 'success',
                                 'message' => 'Preview deployment closed.',
                             ]);
+                        } else {
+                            ClosedPullRequests::markClosed($application, $pull_request_id);
                         }
                     }
                 }
@@ -584,6 +590,9 @@ class Gitlab extends Controller
                 }
                 if ($x_gitlab_event === 'merge_request') {
                     if ($action === 'open' || $action === 'opened' || $action === 'synchronize' || $action === 'reopened' || $action === 'reopen' || $action === 'update') {
+                        if (in_array($action, ['open', 'opened', 'reopen', 'reopened'], true)) {
+                            ClosedPullRequests::clear($application->id, $pull_request_id);
+                        }
                         if ($application->isPRDeployable()) {
                             if (! $this->isPreviewDeploymentRepositoryTrusted(
                                 data_get($payload, 'object_attributes.source_project_id'),
@@ -663,6 +672,7 @@ class Gitlab extends Controller
                                 'message' => 'Preview deployment closed.',
                             ]);
                         } else {
+                            ClosedPullRequests::markClosed($application, $pull_request_id);
                             $return_payloads->push([
                                 'application' => $application->name,
                                 'status' => 'failed',

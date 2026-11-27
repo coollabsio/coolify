@@ -282,7 +282,10 @@ final class TriggerSetBuilder
                 return null;
             }
             $sources = $snapshot->has($compose) ? ComposeSources::parse((string) $snapshot->read($compose), $compose, $context) : null;
-            foreach ($sources['dirs'] ?? [] as $directory) {
+            if ($sources === null) {
+                return null;
+            }
+            foreach ($sources['dirs'] as $directory) {
                 $owner = $graph->packageOwning($directory.'/x');
                 // A context that holds several packages (such as the root) can build any of them.
                 if ($owner === null && collect($graph->packages)->contains(fn (string $package): bool => RepoPath::isWithin($package, $directory))) {

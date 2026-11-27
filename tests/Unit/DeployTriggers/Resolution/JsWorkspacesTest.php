@@ -96,3 +96,88 @@ it('finds the packages a build command selects', function (string $command, ?arr
     ['npm run build --workspaces', null],
     ['nx run-many -t build', null],
 ]);
+
+it('follows the package scripts a command runs', function (string $command, ?array $expected) {
+    $graph = JsWorkspaces::resolve(jsSnapshot([
+        'package.json' => json_encode(['workspaces' => ['apps/*'], 'scripts' => [
+            'build' => 'turbo run build', 'build:web' => 'pnpm --filter @acme/web build', 'deploy' => 'npm run build:web',
+            'lint' => 'eslint .', 'prelint' => 'pnpm -r codegen', 'a' => 'npm run b', 'b' => 'npm run a',
+        ]]),
+        'apps/web/package.json' => json_encode(['name' => '@acme/web', 'scripts' => ['build' => 'next build']]),
+        'apps/api/package.json' => json_encode(['name' => 'api', 'scripts' => ['start' => 'node dist/main.js']]),
+    ]));
+
+    expect($graph->packagesFromCommand($command))->toBe($expected);
+})->with([
+    'root script that builds every package' => ['npm run build', null],
+    'pnpm shorthand' => ['pnpm build', null],
+    'root script that names a package' => ['yarn run build:web', ['@acme/web']],
+    'nested root scripts' => ['npm run deploy', ['@acme/web']],
+    'pre script' => ['npm run lint', null],
+    'filtered to a package script' => ['pnpm --filter @acme/web build', ['@acme/web']],
+    'cycle' => ['npm run a', []],
+    'no such script' => ['npm run test', []],
+]);
+
+it('adds the packages that root lifecycle scripts run', function () {
+    $graph = JsWorkspaces::resolve(jsSnapshot([
+        'package.json' => json_encode(['workspaces' => ['packages/*'], 'scripts' => ['postinstall' => 'node packages/codegen/generate.js', 'prepare' => 'husky']]),
+        'packages/codegen/package.json' => json_encode(['name' => 'codegen']),
+        'packages/codegen/generate.js' => 'x',
+        'packages/web/package.json' => json_encode(['name' => 'web']),
+    ]));
+
+    expect($graph->lifecycleDirectories)->toBe(['packages/codegen']);
+});
+
+it('widens on root lifecycle scripts it cannot bound', function (string $script) {
+    JsWorkspaces::resolve(jsSnapshot([
+        'package.json' => json_encode(['workspaces' => ['packages/*'], 'scripts' => ['postinstall' => $script]]),
+        'packages/web/package.json' => json_encode(['name' => 'web']),
+        'scripts/generate.js' => 'x',
+    ]));
+})->throws(WidenException::class)->with([
+    'every package' => 'turbo run generate',
+    'a repository file' => 'node scripts/generate.js',
+]);
+
+it('includes the workspace dependencies of lifecycle members', function () {
+    $graph = JsWorkspaces::resolve(jsSnapshot([
+        'package.json' => json_encode(['workspaces' => ['packages/*']]),
+        'packages/codegen/package.json' => json_encode(['name' => 'codegen', 'scripts' => ['postinstall' => 'node generate.js'], 'dependencies' => ['schema' => '*']]),
+        'packages/schema/package.json' => json_encode(['name' => 'schema', 'dependencies' => ['types' => '*']]),
+        'packages/types/package.json' => json_encode(['name' => 'types']),
+        'packages/web/package.json' => json_encode(['name' => 'web']),
+    ]));
+
+    expect($graph->lifecycleDirectories)->toBe(['packages/codegen', 'packages/schema', 'packages/types']);
+});
+
+it('includes the literal folder of a turbo global dependency that uses brace or bracket globs', function () {
+    $graph = JsWorkspaces::resolve(jsSnapshot([
+        'package.json' => json_encode(['workspaces' => ['apps/*']]),
+        'apps/web/package.json' => json_encode(['name' => 'web']),
+        'turbo.json' => json_encode(['globalDependencies' => ['packages/config/*.{json,yaml}', 'env/[ab].env', '.env']]),
+    ]));
+
+    expect($graph->globalPatterns)->toContain('packages/config', 'env', '.env')
+        ->not->toContain('packages/config/*.{json,yaml}');
+});
+
+it('widens on a turbo global dependency with brace globs at the root', function () {
+    JsWorkspaces::resolve(jsSnapshot([
+        'package.json' => json_encode(['workspaces' => ['apps/*']]),
+        'apps/web/package.json' => json_encode(['name' => 'web']),
+        'turbo.json' => json_encode(['globalDependencies' => ['**/*.{json,yaml}']]),
+    ]));
+})->throws(WidenException::class);
+
+it('reads a turbo.json with comments and trailing commas', function () {
+    $graph = JsWorkspaces::resolve(jsSnapshot([
+        'package.json' => json_encode(['workspaces' => ['apps/*']]),
+        'apps/web/package.json' => json_encode(['name' => 'web']),
+        'turbo.json' => "{\n  // shared inputs\n  \"globalDependencies\": [\".env\",],\n}",
+    ]));
+
+    expect($graph->globalPatterns)->toContain('.env');
+});

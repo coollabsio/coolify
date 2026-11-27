@@ -194,9 +194,9 @@ final class DockerfileSources
             }
         }
 
-        preg_match_all('/"([^"]*)"|\'([^\']*)\'|(\S+)/', $trimmed, $matches, PREG_SET_ORDER);
+        preg_match_all('/"([^"]*)"|\'([^\']*)\'|(\S+)/', $trimmed, $matches, PREG_SET_ORDER | PREG_UNMATCHED_AS_NULL);
 
-        return array_map(fn (array $match): string => $match[3] ?? ($match[2] !== '' ? $match[2] : $match[1]), $matches);
+        return array_map(fn (array $match): string => $match[3] ?? $match[2] ?? $match[1], $matches);
     }
 
     private static function contextPath(string $path): ?string

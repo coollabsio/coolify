@@ -11,7 +11,9 @@ use App\Models\ApplicationPreview;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
+use App\Services\DeployTriggers\ClosedPullRequests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Livewire;
@@ -416,3 +418,21 @@ it('offers evaluate now only when the application is evaluated on push', functio
     ['instance off', false],
     ['application off', false],
 ]);
+
+it('does not deploy anyway a skipped push of a pull request that closed', function () {
+    $row = skippedRow($this->application);
+    $row->update(['pull_request_id' => 7, 'git_type' => 'github', 'trigger_reason' => [
+        'reason_code' => 'no_match', 'reason' => 'No match.', 'matches' => [], 'pull_request_html_url' => 'https://github.com/acme/mono/pull/7',
+    ]]);
+    ClosedPullRequests::markClosed($this->application, 7);
+    // The closed marker expires, the closure must outlive it.
+    Cache::flush();
+
+    showTriggerDeployment($this, $row)
+        ->assertDontSee('Deploy anyway')
+        ->call('deploySkippedPush')
+        ->assertDispatched('error');
+
+    expect(ApplicationPreview::query()->where('application_id', $this->application->id)->exists())->toBeFalse()
+        ->and(ApplicationDeploymentQueue::query()->where('application_id', $this->application->id)->count())->toBe(1);
+});

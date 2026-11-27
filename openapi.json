@@ -32704,11 +32704,12 @@
                     "trigger_reason": {
                         "type": "object",
                         "nullable": true,
-                        "description": "Why smart deploy triggers deployed or skipped the push: reason_code, reason, matches."
+                        "description": "Why smart deploy triggers deployed or skipped the push: reason_code, reason, matches, and pull_request_closed when the pull request of a skipped push closed."
                     },
                     "skipped_count": {
                         "type": "integer",
-                        "description": "How many pushes a skipped row stands for."
+                        "nullable": true,
+                        "description": "How many pushes a skipped row stands for. Null for rows that deploy triggers did not skip."
                     },
                     "first_skipped_commit": {
                         "type": "string",

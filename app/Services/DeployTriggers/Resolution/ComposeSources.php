@@ -47,7 +47,10 @@ final class ComposeSources
                 $files[] = $path;
             }
             foreach (is_array($service['volumes'] ?? null) ? $service['volumes'] : [] as $volume) {
-                // Short syntax: only a source starting with `.` is a path. Long syntax: any source that is not absolute.
+                // Short syntax: only a source starting with `.` is a path, and an interpolated one may become one. Long syntax: any source that is not absolute.
+                if (! is_array($volume) && str_starts_with((string) $volume, '$')) {
+                    return null;
+                }
                 $source = is_array($volume)
                     ? (($volume['type'] ?? null) === 'bind' && is_string($volume['source'] ?? null) && ! preg_match('#^[/~]#', $volume['source']) ? $volume['source'] : null)
                     : (str_starts_with((string) $volume, '.') ? explode(':', (string) $volume)[0] : null);

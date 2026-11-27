@@ -16,6 +16,7 @@ use App\Livewire\Source\Gitea\Change as GiteaSource;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GiteaApp;
+use App\Services\DeployTriggers\ClosedPullRequests;
 use App\Services\DeployTriggers\PullRequestContext;
 use App\Services\DeployTriggers\PushTriggerRouter;
 use App\Services\ServerTransfer\TransferFinishChecklist;
@@ -273,6 +274,9 @@ class Gitea extends Controller
                     }
 
                     if (in_array($action, ['opened', 'synchronized', 'reopened'], true)) {
+                        if ($action !== 'synchronized') {
+                            ClosedPullRequests::clear($application->id, $pull_request_id);
+                        }
                         if (! $application->isPRDeployable()) {
                             $return_payloads->push([
                                 'application' => $application->name,
@@ -349,6 +353,8 @@ class Gitea extends Controller
                                 'status' => 'success',
                                 'message' => 'Preview deployment closed.',
                             ]);
+                        } else {
+                            ClosedPullRequests::markClosed($application, $pull_request_id);
                         }
                     }
                 }
@@ -557,6 +563,9 @@ class Gitea extends Controller
                 }
                 if ($x_gitea_event === 'pull_request') {
                     if ($action === 'opened' || $action === 'synchronized' || $action === 'reopened') {
+                        if ($action !== 'synchronized') {
+                            ClosedPullRequests::clear($application->id, $pull_request_id);
+                        }
                         if ($application->isPRDeployable()) {
                             if (! $this->isPreviewDeploymentRepositoryTrusted(
                                 data_get($payload, 'pull_request.head.repo.id'),
@@ -637,6 +646,7 @@ class Gitea extends Controller
                                 'message' => 'Preview deployment closed.',
                             ]);
                         } else {
+                            ClosedPullRequests::markClosed($application, $pull_request_id);
                             $return_payloads->push([
                                 'application' => $application->name,
                                 'status' => 'failed',

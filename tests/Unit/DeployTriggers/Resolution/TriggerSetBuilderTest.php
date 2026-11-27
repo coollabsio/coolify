@@ -367,3 +367,22 @@ it('lists each glob once, hides globs under missing folders, and folds the packa
         ->and(affects($built, '.yarn/releases/yarn.cjs'))->toBeTrue()
         ->and(affects($built, 'apps/api/package.json'))->toBeTrue();
 });
+
+it('widens the workspace when a Dockerfile runs a root script that builds every package', function () {
+    $built = (new TriggerSetBuilder)->build(builderApp(['dockerfileLocation' => '/apps/web/Dockerfile']), monorepo([
+        'package.json' => json_encode(['name' => 'root', 'private' => true, 'scripts' => ['build' => 'turbo run build']]),
+        'apps/web/Dockerfile' => "FROM node\nCOPY . .\nRUN pnpm install && npm run build\n",
+    ]))->toArray();
+
+    expect(affects($built, 'packages/other/index.ts'))->toBeTrue()
+        ->and($built['limits'])->not->toContain('workspace');
+});
+
+it('widens the workspace when the Compose file of an app with a base directory cannot be bounded', function () {
+    $built = (new TriggerSetBuilder)->build(builderApp(['buildPack' => 'dockercompose', 'baseDirectory' => '/apps/web', 'dockerfileLocation' => null, 'dockerComposeLocation' => '/docker-compose.yaml']), monorepo([
+        'apps/web/docker-compose.yaml' => "services:\n  web:\n    build: .\n    volumes:\n      - \${CONFIG_DIR:-../../packages/other}:/etc/app:ro\n",
+    ]))->toArray();
+
+    expect(affects($built, 'packages/other/index.ts'))->toBeTrue()
+        ->and($built['limits'])->not->toContain('workspace');
+});

@@ -67,14 +67,7 @@ final class PushTriggerRouter
         $deferred = $this->deferred;
         $this->deferred = [];
         foreach ($deferred as $teamId => $applicationIds) {
-            $context = $this->context->withTeam($teamId);
-            $context->recordArrival();
-            // A push to a reopened pull request deploys again.
-            if ($context->pullRequest !== null) {
-                foreach ($applicationIds as $applicationId) {
-                    ClosedPullRequests::clear($applicationId, $context->pullRequest->number);
-                }
-            }
+            $context = $this->context->withTeam($teamId)->recordArrival($applicationIds);
             EvaluatePush::dispatch($context, $applicationIds);
         }
     }

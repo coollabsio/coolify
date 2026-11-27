@@ -103,7 +103,7 @@ class EvaluationRequestBuilder
 
         $isNewPreview = $context->pullRequest !== null && $candidate->preview === null;
         if ($candidate->base === null && $candidate->mode === 'watch_paths' && $context->payloadChangedFiles !== null) {
-            return LegacyWatchPaths::decide($candidate, $context->payloadChangedFiles);
+            return LegacyWatchPaths::decide($candidate, $context);
         }
         if ($candidate->base === null && ! $isNewPreview) {
             return ApplicationDecision::deployBecause($candidate->id, 'no_base', 'Coolify does not know the deployed commit yet, so this push deploys.');

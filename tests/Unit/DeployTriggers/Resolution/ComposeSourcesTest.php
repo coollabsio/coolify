@@ -48,6 +48,7 @@ it('gives up on compose files it cannot bound', function (string $yaml) {
     'invalid yaml' => ["services: [\n"],
     'interpolated context' => ["services:\n  a:\n    build: ./\${SVC:-api}"],
     'interpolated mount' => ["services:\n  a:\n    image: x\n    volumes:\n      - ./\${DIR}:/data"],
+    'interpolated short-syntax mount source' => ["services:\n  a:\n    image: x\n    volumes:\n      - \${CONFIG_DIR:-./config}:/etc/app:ro"],
 ]);
 
 it('keeps interpolation outside paths', function () {

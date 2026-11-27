@@ -12,12 +12,14 @@ final readonly class JsWorkspaceGraph
      * @param  array<string, list<string>>  $dependencies  name => workspace package names it depends on
      * @param  list<string>  $lifecycleDirectories  members with install scripts, which `pnpm install` runs for every member
      * @param  list<string>  $globalPatterns  files and globs every member build reads
+     * @param  array<string, array<string, string>>  $scripts  package name (`''` for the root) => its package.json scripts
      */
     public function __construct(
         public array $packages,
         public array $dependencies,
         public array $lifecycleDirectories,
         public array $globalPatterns,
+        public array $scripts = [],
     ) {}
 
     /**
@@ -73,9 +75,7 @@ final readonly class JsWorkspaceGraph
     {
         $packages = [];
         // Each statement on its own: one that names a package does not bound another that builds them all.
-        foreach (preg_split('/&&|\|\||[;|\n]/', preg_replace('/\\\\\r?\n/', ' ', $command) ?? $command) ?: [] as $statement) {
-            // Exec form (`["pnpm", "-r", "start"]`) reads as the plain command.
-            $statement = ' '.(preg_replace('/[",\[\]]/', ' ', $statement) ?? $statement);
+        foreach (self::statements($this->withScripts($command)) as $statement) {
             $selected = $this->statementPackages($statement);
             if ($selected === null || ($selected === [] && preg_match(self::ALL_PACKAGES_PATTERN, $statement) === 1)) {
                 return null;
@@ -84,6 +84,92 @@ final readonly class JsWorkspaceGraph
         }
 
         return array_values(array_unique($packages));
+    }
+
+    /**
+     * The command followed by the bodies of the package scripts it runs, recursively. Without a package
+     * selector the working directory is unknown, so the script of every manifest that defines it counts.
+     */
+    public function withScripts(string $command): string
+    {
+        $seen = [];
+
+        return $this->expandScripts($command, $seen);
+    }
+
+    /**
+     * @param  array<string, true>  $seen
+     */
+    private function expandScripts(string $command, array &$seen): string
+    {
+        foreach (self::statements($command) as $statement) {
+            $script = self::invokedScript($statement);
+            if ($script === null) {
+                continue;
+            }
+            foreach ($this->statementPackages($statement) ?: array_keys($this->scripts) as $owner) {
+                foreach (["pre{$script}", $script, "post{$script}"] as $name) {
+                    $body = $this->scripts[$owner][$name] ?? null;
+                    if (! is_string($body) || isset($seen["{$owner}\0{$name}"])) {
+                        continue;
+                    }
+                    $seen["{$owner}\0{$name}"] = true;
+                    $command .= "\n".$this->expandScripts($body, $seen);
+                }
+            }
+        }
+
+        return $command;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function statements(string $command): array
+    {
+        return array_map(
+            // Exec form (`["pnpm", "-r", "start"]`) reads as the plain command.
+            fn (string $statement): string => ' '.(preg_replace('/[",\[\]]/', ' ', $statement) ?? $statement),
+            preg_split('/&&|\|\||[;|\n]/', preg_replace('/\\\\\r?\n/', ' ', $command) ?? $command) ?: [],
+        );
+    }
+
+    private const VALUE_FLAGS = ['--filter', '-F', '--workspace', '-w', '--scope', '-C', '--dir', '--prefix', '--cwd'];
+
+    /**
+     * The package script a statement runs, such as `build` for `npm run build`, `pnpm build`, or `yarn workspace web build`.
+     */
+    private static function invokedScript(string $statement): ?string
+    {
+        $tokens = preg_split('/\s+/', trim($statement)) ?: [];
+        $start = null;
+        foreach ($tokens as $index => $token) {
+            if (in_array($token, ['npm', 'pnpm', 'yarn', 'bun'], true)) {
+                $start = $index + 1;
+
+                break;
+            }
+        }
+        if ($start === null) {
+            return null;
+        }
+
+        $words = [];
+        for ($index = $start; $index < count($tokens); $index++) {
+            if (str_starts_with($tokens[$index], '-')) {
+                $index += in_array($tokens[$index], self::VALUE_FLAGS, true) ? 1 : 0;
+
+                continue;
+            }
+            $words[] = trim($tokens[$index], "'");
+        }
+
+        return match ($words[0] ?? null) {
+            null => null,
+            'run', 'run-script' => $words[1] ?? null,
+            'workspace' => $words[2] ?? null,
+            default => $words[0],
+        };
     }
 
     /**

@@ -11,13 +11,14 @@ use Illuminate\Support\Collection;
  */
 final class LegacyWatchPaths
 {
-    /**
-     * @param  list<string>|null  $changedFiles  null when the webhook has no file list
-     */
-    public static function decide(TriggerCandidate $candidate, ?array $changedFiles): ApplicationDecision
+    public static function decide(TriggerCandidate $candidate, PushContext $context): ApplicationDecision
     {
+        $changedFiles = $context->payloadChangedFiles;
         if ($changedFiles === null) {
             return ApplicationDecision::deployBecause($candidate->id, 'no_file_list', 'The webhook has no list of changed files, so it deploys.');
+        }
+        if ($context->followsUnevaluatedPush($candidate->application)) {
+            return ApplicationDecision::deployBecause($candidate->id, 'earlier_push_unevaluated', 'An earlier push of the branch was not evaluated, and the file list of the webhook covers only this push, so it deploys.');
         }
 
         $matched = self::matches($candidate->application, $changedFiles);

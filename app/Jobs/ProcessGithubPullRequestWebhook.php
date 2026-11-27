@@ -11,6 +11,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\GithubApp;
+use App\Services\DeployTriggers\ClosedPullRequests;
 use App\Services\DeployTriggers\PullRequestContext;
 use App\Services\DeployTriggers\PushContext;
 use App\Services\DeployTriggers\PushTriggerRouter;
@@ -67,6 +68,11 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
+        // A late update of a closed pull request must not deploy it again, only an open or a reopen does.
+        if ($this->action === 'opened' || $this->action === 'reopened') {
+            ClosedPullRequests::clear($application->id, $this->pullRequestId);
+        }
+
         if ($this->action === 'opened' || $this->action === 'synchronize' || $this->action === 'reopened') {
             $this->handleOpenAction($application, $githubApp);
         }
@@ -86,6 +92,9 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
             } finally {
                 CleanupPreviewDeployment::run($application, $this->pullRequestId, $found);
             }
+        } else {
+            // An evaluation of the pull request may still wait to create its first preview.
+            ClosedPullRequests::markClosed($application, $this->pullRequestId);
         }
     }
 

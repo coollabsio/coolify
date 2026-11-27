@@ -62,6 +62,7 @@ final class JsWorkspaces
 
         $dependencies = [];
         $lifecycle = [];
+        $scripts = ['' => self::scripts($root)];
         foreach ($manifests as $name => $data) {
             $names = [];
             foreach (self::DEPENDENCY_FIELDS as $field) {
@@ -72,24 +73,83 @@ final class JsWorkspaces
                 }
             }
             $dependencies[$name] = array_values(array_unique($names));
-            $scripts = is_array($data['scripts'] ?? null) ? $data['scripts'] : [];
-            if (array_intersect(self::LIFECYCLE_SCRIPTS, array_keys($scripts)) !== []) {
-                $lifecycle[] = $packages[$name];
+            $scripts[$name] = self::scripts($data);
+            if (array_intersect(self::LIFECYCLE_SCRIPTS, array_keys($scripts[$name])) !== []) {
+                $lifecycle[] = $name;
             }
         }
-        sort($lifecycle);
 
         $globals = self::GLOBAL_FILES;
         if ($snapshot->has('turbo.json')) {
-            $turbo = self::json($snapshot, 'turbo.json');
+            $turbo = Jsonc::decode((string) $snapshot->read('turbo.json')) ?? throw new WidenException('turbo.json is not valid JSON.');
             foreach (is_array($turbo['globalDependencies'] ?? null) ? $turbo['globalDependencies'] : [] as $pattern) {
                 if (is_string($pattern) && $pattern !== '') {
-                    $globals[] = ltrim($pattern, '/');
+                    $globals[] = self::globalPattern(ltrim($pattern, '/'));
                 }
             }
         }
+        $globals = array_values(array_unique($globals));
 
-        return new JsWorkspaceGraph($packages, $dependencies, $lifecycle, array_values(array_unique($globals)));
+        $graph = new JsWorkspaceGraph($packages, $dependencies, [], $globals, $scripts);
+        array_push($lifecycle, ...self::rootLifecyclePackages($graph, $snapshot, $scripts['']));
+        $lifecycleDirectories = array_map(fn (string $name): string => $packages[$name], $graph->closure($lifecycle));
+        sort($lifecycleDirectories);
+
+        return new JsWorkspaceGraph($packages, $dependencies, $lifecycleDirectories, $globals, $scripts);
+    }
+
+    /**
+     * The packages that the root install scripts run, which every install executes.
+     *
+     * @param  array<string, string>  $rootScripts
+     * @return list<string>
+     *
+     * @throws WidenException when they may run packages or repository files that cannot be named
+     */
+    private static function rootLifecyclePackages(JsWorkspaceGraph $graph, RepositorySnapshot $snapshot, array $rootScripts): array
+    {
+        $command = implode("\n", array_intersect_key($rootScripts, array_flip(self::LIFECYCLE_SCRIPTS)));
+        if ($command === '') {
+            return [];
+        }
+        $text = $graph->withScripts($command);
+        $selected = $graph->packagesFromCommand($command);
+        // A root file can import any package.
+        $runsRootFile = collect(preg_split('/[\s;&|()"\'=]+/', $text) ?: [])
+            ->map(fn (string $token): ?string => RepoPath::join('', $token))
+            ->contains(fn (?string $path): bool => $path !== null && $path !== '' && $snapshot->has($path) && $graph->packageOwning($path) === null);
+        if ($selected === null || $runsRootFile) {
+            throw new WidenException('A root install script runs packages or files that Coolify cannot bound.');
+        }
+
+        return [...$selected, ...$graph->packagesMentionedIn($text)];
+    }
+
+    /**
+     * The trigger matcher knows `*`, `?`, and `**`: a pattern with braces or brackets becomes its literal folder.
+     *
+     * @throws WidenException when that folder is the root
+     */
+    private static function globalPattern(string $pattern): string
+    {
+        if (strpbrk($pattern, '{[') === false) {
+            return $pattern;
+        }
+        $literal = preg_split('/[*?{\[]/', $pattern, 2)[0];
+        if (! str_contains($literal, '/')) {
+            throw new WidenException("turbo.json has a global dependency that Coolify cannot match: {$pattern}");
+        }
+
+        return substr($literal, 0, strrpos($literal, '/'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $manifest
+     * @return array<string, string>
+     */
+    private static function scripts(array $manifest): array
+    {
+        return array_filter(is_array($manifest['scripts'] ?? null) ? $manifest['scripts'] : [], 'is_string');
     }
 
     /**

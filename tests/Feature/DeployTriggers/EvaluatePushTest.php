@@ -449,7 +449,7 @@ it('drops a pending pull request evaluation once the pull request closed', funct
     FakeAffectedRunner::unsupported();
     $this->web->settings->update(['is_preview_deployments_enabled' => true]);
     $context = epContext(['provider' => 'github', 'ref' => 'refs/pull/7/head', 'pullRequest' => new PullRequestContext(7, 'main', false, 'github', 'https://github.com/acme/mono/pull/7')]);
-    $context->recordArrival();
+    $context = $context->recordArrival([$this->web->id]);
     ClosedPullRequests::markClosed($this->web, 7);
 
     epRun($context, [$this->web]);
@@ -458,7 +458,7 @@ it('drops a pending pull request evaluation once the pull request closed', funct
         ->and(ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->exists())->toBeFalse();
 });
 
-it('evaluates a reopened pull request again', function () {
+it('keeps a pull request closed when the router dispatches one of its updates', function () {
     $this->web->settings->update(['is_preview_deployments_enabled' => true]);
     ClosedPullRequests::markClosed($this->web, 7);
     Queue::fake([EvaluatePush::class, ApplicationDeploymentJob::class]);
@@ -466,7 +466,8 @@ it('evaluates a reopened pull request again', function () {
     $router->defer($this->web);
     $router->dispatch();
 
-    expect(ClosedPullRequests::isClosed($this->web->id, 7))->toBeFalse();
+    // Only an open or reopen event clears it (PullRequestClosureTest).
+    expect(ClosedPullRequests::isClosed($this->web->id, 7))->toBeTrue();
 });
 
 it('deploys a push when the application changed configuration that was not deployed yet', function () {
@@ -496,3 +497,17 @@ it('deploys a pending push when deploy triggers were turned off meanwhile', func
         ->and($row->trigger_reason['reason_code'])->toBe('triggers_off')
         ->and($runner->requests)->toBe([]);
 });
+
+it('neither deploys nor records a skip when the pull request closes during the evaluation', function (string $decision) {
+    $this->web->settings->update(['is_preview_deployments_enabled' => true]);
+    FakeAffectedRunner::respondWith(function (EvaluateRequest $request) use ($decision): string {
+        ClosedPullRequests::markClosed($this->web, 5);
+
+        return epRespond([$this->web->uuid.':pr-5' => [$decision, 'matched']])($request);
+    });
+
+    epRun(epContext(['ref' => 'refs/pull/5/head', 'pullRequest' => new PullRequestContext(5, 'main', false, 'github', 'https://github.com/acme/mono/pull/5')]), [$this->web]);
+
+    expect(ApplicationPreview::query()->where('application_id', $this->web->id)->exists())->toBeFalse()
+        ->and(ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->exists())->toBeFalse();
+})->with(['deploy', 'skip']);

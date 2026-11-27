@@ -43,3 +43,8 @@ it('treats copies from a stage or an image as no source', function () {
     expect(DockerfileSources::parse("FROM node AS build\nCOPY src /src\nFROM nginx\nCOPY --from=build /src /usr/share/nginx/html\nCOPY --from=nginx:alpine /etc/nginx /etc/nginx"))
         ->toBe(['src']);
 });
+
+it('reads quoted shell tokens', function () {
+    expect(DockerfileSources::parse("FROM a\nRUN echo \"hello\" 'world' \"\"\nRUN --mount=type=bind,source=scripts/x.sh,target=/x.sh sh -c \"/x.sh\"\nCOPY \"src\" /src"))
+        ->toBe(['scripts/x.sh', 'src']);
+});

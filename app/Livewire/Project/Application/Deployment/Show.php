@@ -96,6 +96,11 @@ class Show extends Component
 
                 return;
             }
+            if (data_get($row->trigger_reason, 'pull_request_closed')) {
+                $this->dispatch('error', 'The pull request is closed.');
+
+                return;
+            }
             if (! $this->isNewestDeployment()) {
                 $this->dispatch('error', 'A newer deployment exists.');
 

@@ -89,7 +89,7 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
      */
     public function failed(Throwable $exception): void
     {
-        if ($this->dryRun || $this->isSuperseded()) {
+        if ($this->dryRun) {
             return;
         }
 
@@ -114,10 +114,6 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
-        if ($this->isSuperseded()) {
-            return;
-        }
-
         $applications = $this->candidates();
         if ($applications->isEmpty()) {
             return;
@@ -205,6 +201,11 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
                 continue;
             }
 
+            // The pull request closed while the push was evaluated.
+            if ($this->context->pullRequest !== null && ClosedPullRequests::isClosed($candidate->application->id, $this->context->pullRequest->number)) {
+                continue;
+            }
+
             if (! $decision->deploys()) {
                 $recorder->recordSkip($candidate->application, $candidate->preview, $decision, $after, $candidate->base, $candidate->isStored, $this->context->commitMessage, $this->context->pullRequest);
 
@@ -269,14 +270,6 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
         return true;
     }
 
-    /**
-     * A newer push of the branch arrived while this one waited, and its evaluation compares with the deployed state.
-     */
-    private function isSuperseded(): bool
-    {
-        return ! $this->dryRun && $this->context->isSuperseded();
-    }
-
     private function fallbackCandidate(Application $application): TriggerCandidate
     {
         $pullRequest = $this->context->pullRequest;
@@ -300,7 +293,7 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
     {
         return $candidate->mode === 'smart'
             ? ApplicationDecision::deployBecause($candidate->id, 'no_server', 'No server of the team is reachable to evaluate the push, so it deploys.')
-            : LegacyWatchPaths::decide($candidate, $this->context->payloadChangedFiles);
+            : LegacyWatchPaths::decide($candidate, $this->context);
     }
 
     /**
@@ -344,6 +337,8 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             // The pull request closed while this push waited: its preview is gone and must not come back.
             ->reject(fn (Application $application): bool => ! $this->dryRun && $this->context->pullRequest !== null
                 && ClosedPullRequests::isClosed($application->id, $this->context->pullRequest->number))
+            // A newer push of the branch arrived while this one waited; its evaluation compares with the deployed state.
+            ->reject(fn (Application $application): bool => ! $this->dryRun && $this->context->isSupersededFor($application))
             // A redelivered webhook changes nothing when the newest deployment of the application already is this push.
             ->reject(fn (Application $application): bool => ! $this->dryRun && $this->context->after !== null
                 && $this->newestDeploymentIsThisPush($application))
