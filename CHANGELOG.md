@@ -42,23 +42,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Security
 
-- Bound PHP-FPM in the `coolify` container to the loopback interface
 - Hardened the first SSO sign-in of accounts that a team invitation created
   - An instance admin can run `php artisan user:allow-sso-link <email>` when email is not set up
 - Kept preview variables out of public previews also when their value only resolves to the production value, such as `{{team.KEY}}` and `{{ team.KEY }}` ([#12644](https://github.com/coollabsio/coolify/issues/12644))
   - A public preview that used such a variable does not get it after the upgrade. Give the preview variable its own value
 - Made the temporary folder of a repository read on the server fail when the folder exists already
-- Updated the dependencies of the Coolify image
-  - `serversideup/php` from `v5.0.3` to `v5.1.5`
-  - `PHP` from `8.4.27` to `8.4.28`
-  - `nginx` from `1.31.8` to `1.31.9`
-  - `Node.js` from `24.22.1` to `24.22.3`
-  - `cloudflared` from `2026.10.3` to `2026.11.1`
-  - `ext-uv` from `0.3.0` to `0.3.1`
-- Used the nginx defaults of the `serversideup/php` image in the `coolify` container
-  - PHP-FPM runs only existing PHP scripts outside `/storage`
-  - Responses carry the `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy` headers
-  - Requests for dotfiles and for backup, config, log, SQL, and shell files return `403`
 - Hardened the input validation and value handling of preview deployments, server pages, and server transfer imports
   - A preview Docker tag must be a valid image tag, as in the API, and a preview pull request URL must use http or https
 
