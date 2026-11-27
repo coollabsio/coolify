@@ -7823,7 +7823,7 @@
                     "Cluster Applications"
                 ],
                 "summary": "Update Domains",
-                "description": "Replace the domains of a cluster application. Ingress servers apply them without a redeploy. A domain without a scheme gets https. A port in a URL is the port of the container.",
+                "description": "Replace the domains of a cluster application, or change its redirects and proxy options. Ingress servers apply them without a redeploy. A domain without a scheme gets https. A port in a URL is the port of the container. Basic auth and the IP allow list need Sentinel with `ingress.route_options.v1` on every server of the cluster.",
                 "operationId": "update-cluster-application-domains",
                 "parameters": [
                     {
@@ -7861,6 +7861,44 @@
                                         ]
                                     },
                                     "permanent_redirect": {
+                                        "type": "boolean"
+                                    },
+                                    "is_http_basic_auth_enabled": {
+                                        "type": "boolean"
+                                    },
+                                    "http_basic_auth_username": {
+                                        "description": "1 to 64 printable ASCII characters, without `:`.",
+                                        "type": "string"
+                                    },
+                                    "http_basic_auth_password": {
+                                        "description": "8 to 72 printable ASCII characters. Coolify sends only a bcrypt hash to the servers.",
+                                        "type": "string"
+                                    },
+                                    "ingress_allowed_ips": {
+                                        "description": "At most 32 IP addresses or CIDR ranges. Other addresses get 403. An empty list allows every address.",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "ingress_request_headers": {
+                                        "description": "At most 16. Connection, framing, proxy, and forwarding headers are refused, and a value cannot have `{` or `}`.",
+                                        "type": "array",
+                                        "items": {
+                                            "$ref": "#\/components\/schemas\/ClusterIngressHeader"
+                                        }
+                                    },
+                                    "ingress_response_headers": {
+                                        "description": "At most 16, with the rules of the request headers.",
+                                        "type": "array",
+                                        "items": {
+                                            "$ref": "#\/components\/schemas\/ClusterIngressHeader"
+                                        }
+                                    },
+                                    "is_gzip_enabled": {
+                                        "type": "boolean"
+                                    },
+                                    "is_stripprefix_enabled": {
                                         "type": "boolean"
                                     }
                                 },
@@ -37163,6 +37201,19 @@
                 },
                 "type": "object"
             },
+            "ClusterIngressHeader": {
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "example": "X-Frame-Options"
+                    },
+                    "value": {
+                        "type": "string",
+                        "example": "DENY"
+                    }
+                },
+                "type": "object"
+            },
             "ClusterApplication": {
                 "properties": {
                     "uuid": {
@@ -37309,6 +37360,46 @@
                         ]
                     },
                     "permanent_redirect": {
+                        "type": "boolean"
+                    },
+                    "is_http_basic_auth_enabled": {
+                        "type": "boolean"
+                    },
+                    "http_basic_auth_username": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "http_basic_auth_password": {
+                        "description": "Only for a token that may read sensitive data.",
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "ingress_allowed_ips": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "ingress_request_headers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#\/components\/schemas\/ClusterIngressHeader"
+                        }
+                    },
+                    "ingress_response_headers": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#\/components\/schemas\/ClusterIngressHeader"
+                        }
+                    },
+                    "is_gzip_enabled": {
+                        "type": "boolean"
+                    },
+                    "is_stripprefix_enabled": {
                         "type": "boolean"
                     },
                     "internal_hostname": {
