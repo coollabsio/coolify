@@ -8,11 +8,11 @@
         "clean": "docker compose -f docker-compose.yml -f docker-compose.dev.yml down --remove-orphans"
     },
     "devDependencies": {
-        "@sveltejs/vite-plugin-svelte": "7.3.1",
+        "@sveltejs/vite-plugin-svelte": "7.3.2",
         "@tailwindcss/postcss": "4.3.5",
         "laravel-vite-plugin": "3.2.1",
         "postcss": "8.5.33",
-        "svelte": "5.57.3",
+        "svelte": "5.59.1",
         "tailwind-scrollbar": "4.0.2",
         "tailwindcss": "4.3.5",
         "vite": "8.3.8"
@@ -21,7 +21,7 @@
         "@laravel/passkeys": "^0.4.1",
         "@tailwindcss/forms": "0.5.11",
         "@tailwindcss/typography": "0.5.20",
-        "@tanstack/virtual-core": "3.19.11",
+        "@tanstack/virtual-core": "3.19.13",
         "@xterm/addon-fit": "0.11.0",
         "@xterm/xterm": "6.0.0",
         "cobe": "2.0.1",
