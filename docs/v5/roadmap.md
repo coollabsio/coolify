@@ -41,11 +41,11 @@ stable need.
 ## Sentinel versions
 
 Until the first release, Coolify uses Sentinel `main-<sha>` images, not
-releases: `FLUX_IMAGE` and `constants.node.builder_image` pin `main-725ed36`
+releases: `FLUX_IMAGE` and `constants.node.builder_image` pin `main-a7a95d5`
 by digest (Nodes 1 and 2 of the dev cluster run `sentinel-host` `main-725ed36`). `upstream.json` takes only release versions, so a
 new Node gets `sentinel-host` 1.1.7 from it. Such a Node has no
 `image.build.target.v1`, no read lane for fast commands (Sentinel
-`0d256e1`), no published ports (Sentinel `525e3be`), and no owner or mode of secret files (Sentinel `dd12f4d`), no Static builds (Sentinel `be0c977`), no Docker socket for stack services (Sentinel `b0a04a5`), no external image storage (Sentinel `8e040d0`), no `user:` for stack services (Sentinel `99c9629`), no image cleanup (Sentinel `5d8337f`), no workload convergence in Sentinel (`workload.reconcile.v1`, Sentinel `6774450`), no proxy options for domains (`ingress.route_options.v1`, Sentinel `9a4deb5`), and no runtime options of decision 0032 (`workload.runtime_options.v2`, `workload.gpu.v1`, Sentinel `725ed36`). Install the `main-<sha>` `sentinel-host` on it by hand with
+`0d256e1`), no published ports (Sentinel `525e3be`), and no owner or mode of secret files (Sentinel `dd12f4d`), no Static builds (Sentinel `be0c977`), no Docker socket for stack services (Sentinel `b0a04a5`), no external image storage (Sentinel `8e040d0`), no `user:` for stack services (Sentinel `99c9629`), no image cleanup (Sentinel `5d8337f`), no workload convergence in Sentinel (`workload.reconcile.v1`, Sentinel `6774450`), no proxy options for domains (`ingress.route_options.v1`, Sentinel `9a4deb5`), no runtime options of decision 0032 (`workload.runtime_options.v2`, `workload.gpu.v1`, Sentinel `725ed36`), and no concurrent builds or BuildKit limits (`image.build.concurrent.v1`, Sentinel `a7a95d5`). Install the `main-<sha>` `sentinel-host` on it by hand with
 `InstallSentinel`.
 
 ## Build when there is time
@@ -72,7 +72,7 @@ new Node gets `sentinel-host` 1.1.7 from it. Such a Node has no
 | L17 | ~~Container runtime options of cluster applications (custom options, GPU, pre- and post-deployment commands, labels)~~ Done: Custom Docker Options as typed Sentinel fields with the allow list of 0036, container labels, NVIDIA GPUs through CDI on servers that allow them, and pre- and post-deployment commands, on the General page and in the API, with Sentinel `workload.runtime_options.v2` and `workload.gpu.v1` (Sentinel `725ed36`). GPU is not tested live. | [0032](decisions/0032-node-container-runtime-options.md) |
 | L18 | Watch paths, submodules, and LFS of cluster applications. Decision accepted, not built. | [0033](decisions/0033-node-git-source-options.md) |
 | L19 | SSL and import from an upload for cluster databases. Decision accepted, not built. | [0034](decisions/0034-node-database-ssl-and-upload-import.md) |
-| L20 | Concurrent builds on builder Nodes and BuildKit limits. Decision accepted, not built. | [0035](decisions/0035-node-concurrent-builds.md) |
+| L20 | ~~Concurrent builds on builder Nodes and BuildKit limits~~ Done: `concurrent_builds` (1 to 16, default 1) on the Node page and in the Node API, a FIFO build queue for each cluster (at most 50) that holds no queue worker, the busy refusal of Sentinel as a second guard, and memory, CPU, process, and cache limits on BuildKit (Sentinel `a7a95d5`). The cluster build timeout is not built. | [0035](decisions/0035-node-concurrent-builds.md) |
 | L21 | ~~Isolation keys that lock templates on Nodes~~ Done: `cap_add`, `cap_drop`, `security_opt` (`no-new-privileges`), and `sysctls` of stack services with the allow list of 0032 and `workload.runtime_options.v2`; the team-admin tier needs an admin; host paths that are not system paths become stack volumes; `wireguard-easy` no longer adds `SYS_MODULE`. 330 of the 354 templates run on Nodes (317 before); `cloudflared` stays locked, because v4 needs its host network. | [0036](decisions/0036-node-stack-isolation-keys.md) |
 
 ## Small gaps

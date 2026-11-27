@@ -9727,6 +9727,62 @@ paths:
       security:
         -
           bearerAuth: []
+  '/nodes/{uuid}/builds':
+    patch:
+      tags:
+        - Clusters
+      summary: 'Set Node Build Limits'
+      description: 'Set the concurrent builds and the BuildKit limits of a builder server, like the Builds section of the Node page. An empty limit uses the default: 50% of the server memory, no CPU limit, and 20% of the root disk for the build cache. Needs a team admin.'
+      operationId: update-node-builds
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'UUID of the server.'
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              properties:
+                concurrent_builds:
+                  description: 'The builds that the server runs at the same time. The default is 1. A value above 1 needs a Sentinel with `image.build.concurrent.v1`.'
+                  type: integer
+                  maximum: 16
+                  minimum: 1
+                memory_limit_gb:
+                  description: 'The memory limit of BuildKit in GB. Null: 50% of the server memory.'
+                  type: [number, 'null']
+                cpu_limit:
+                  description: 'The CPU limit of BuildKit in CPUs. Null: no limit.'
+                  type: [number, 'null']
+                cache_gb:
+                  description: 'The build cache size in GB. Null: 20% of the root disk.'
+                  type: [integer, 'null']
+              type: object
+      responses:
+        '200':
+          description: 'The server.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+        '400':
+          $ref: '#/components/responses/400'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Not an admin or owner of the team.'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   '/nodes/{uuid}/image-cleanup':
     post:
       tags:
@@ -24322,6 +24378,24 @@ components:
             - string
             - 'null'
         image_cleanup_threshold:
+          type:
+            - integer
+            - 'null'
+        concurrent_builds:
+          description: 'The builds that the server runs at the same time.'
+          type: integer
+        memory_limit_gb:
+          description: 'The memory limit of BuildKit in GB. Null: 50% of the server memory.'
+          type:
+            - number
+            - 'null'
+        cpu_limit:
+          description: 'The CPU limit of BuildKit. Null: no limit.'
+          type:
+            - number
+            - 'null'
+        cache_gb:
+          description: 'The build cache size in GB. Null: 20% of the root disk.'
           type:
             - integer
             - 'null'

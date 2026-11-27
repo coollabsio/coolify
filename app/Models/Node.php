@@ -77,6 +77,10 @@ class Node extends BaseModel
             'is_ingress' => 'boolean',
             'is_gpu_enabled' => 'boolean',
             'is_builder' => 'boolean',
+            'concurrent_builds' => 'integer',
+            'build_memory_limit_bytes' => 'integer',
+            'build_cpu_limit_millis' => 'integer',
+            'build_cache_bytes' => 'integer',
             'volume_inventory' => 'array',
         ];
     }
@@ -100,6 +104,47 @@ class Node extends BaseModel
     public function canBuild(): bool
     {
         return $this->is_builder !== false && ($this->role?->runsWorkloads() ?? true);
+    }
+
+    /**
+     * The builds that may run on this Node at the same time (decision 0035). A value above 1
+     * needs a Sentinel that refuses a build at the limit (`image.build.concurrent.v1`).
+     */
+    public function buildSlots(): int
+    {
+        $slots = max(1, (int) $this->concurrent_builds);
+
+        return $slots > 1 && $this->supportsCapability(NodeBuild::CONCURRENT_CAPABILITY) === true ? $slots : 1;
+    }
+
+    /**
+     * Whether the memory or the disk of this builder is above the pressure threshold of its cluster.
+     * Such a builder gets no new build. Missing or old resource data does not stop builds.
+     */
+    public function hasBuildPressure(): bool
+    {
+        $cluster = $this->cluster;
+        $metadata = is_array($this->metadata) ? $this->metadata : [];
+        if ($cluster === null) {
+            return false;
+        }
+        try {
+            if (Carbon::parse($metadata['collected_at'] ?? '')->isBefore(now()->subMinutes($cluster->resource_stale_after_minutes))) {
+                return false;
+            }
+        } catch (\Throwable) {
+            return false;
+        }
+        $memoryTotal = (float) ($metadata['memory_bytes'] ?? 0);
+        $memoryUsed = $metadata['memory_used_bytes'] ?? null;
+        $diskTotal = (float) ($metadata['disk_total_bytes'] ?? 0);
+        $diskAvailable = $metadata['disk_available_bytes'] ?? null;
+        if ($memoryTotal > 0 && is_numeric($memoryUsed) && ($memoryUsed / $memoryTotal) * 100 >= $cluster->memory_pressure_threshold) {
+            return true;
+        }
+
+        return $diskTotal > 0 && is_numeric($diskAvailable)
+            && (($diskTotal - min((float) $diskAvailable, $diskTotal)) / $diskTotal) * 100 >= $cluster->disk_pressure_threshold;
     }
 
     /**

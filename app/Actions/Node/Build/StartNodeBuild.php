@@ -7,6 +7,7 @@ use App\Enums\NodeWorkloadSourceType;
 use App\Jobs\DeployDockerfileWorkloadJob;
 use App\Jobs\DeployRailpackWorkloadJob;
 use App\Models\NodeBuild;
+use App\Models\NodeCluster;
 use App\Models\NodeWorkload;
 use App\Models\User;
 use App\Services\NodeStack\NodeStackCompose;
@@ -52,12 +53,15 @@ class StartNodeBuild
             if ($user !== null) {
                 SelectBuilderNode::ensureMayBuild($workload, $user);
             }
+            $clusterId = collect($workload->clusterIds())->min();
             if ($rebuildOf !== null) {
                 if ($workload->builds()->active()->exists()) {
                     throw new RuntimeException('A build of this application is running. Wait for it or cancel it, then roll back again.');
                 }
+                self::ensureQueueHasRoom($clusterId);
 
                 return $workload->builds()->create([
+                    'node_cluster_id' => $clusterId,
                     'requested_by_user_id' => $user?->id,
                     ...$rebuildOf->only(['source_type', 'git_repository', 'git_branch', 'commit_sha', 'base_directory', 'dockerfile_location', 'dockerfile']),
                     'status' => NodeBuildStatus::QUEUED,
@@ -84,8 +88,11 @@ class StartNodeBuild
                 $workload->is_auto_cancel_building_deployments_enabled
                 || ($workload->is_auto_cancel_queued_deployments_enabled && $build->is_waiting)
             ));
+            // The builds that this push cancels make room in the queue.
+            self::ensureQueueHasRoom($clusterId, $superseded->filter(fn (NodeBuild $build): bool => $build->started_at === null)->count());
 
             return $workload->builds()->create([
+                'node_cluster_id' => $clusterId,
                 'is_webhook' => $fromWebhook,
                 'is_waiting' => $active->count() > $superseded->count(),
                 'requested_by_user_id' => $user?->id,
@@ -103,11 +110,37 @@ class StartNodeBuild
         });
 
         $superseded->each(fn (NodeBuild $old) => CancelNodeBuild::run($old, 'Cancelled by a newer push.'));
+        if ($build->wasRecentlyCreated && $build->is_waiting) {
+            $build->logLines()->create(['logged_at' => now(), 'line' => 'Waiting for the running build of this application.']);
+        }
         if ($build->wasRecentlyCreated && ! $build->is_waiting) {
             self::dispatchBuild($build);
         }
 
         return $build;
+    }
+
+    /**
+     * Refuses a new build when its cluster has StartQueuedNodeBuilds::MAX_QUEUED builds that wait for
+     * a builder or for a running build of their application. The lock on the cluster row makes two
+     * new builds count one after the other.
+     *
+     * @param  int  $leaving  Waiting builds that this request cancels.
+     */
+    private static function ensureQueueHasRoom(?int $clusterId, int $leaving = 0): void
+    {
+        if ($clusterId === null) {
+            return;
+        }
+        NodeCluster::query()->withoutGlobalScopes()->whereKey($clusterId)->lockForUpdate()->value('id');
+        $waiting = NodeBuild::query()
+            ->where('node_cluster_id', $clusterId)
+            ->where('status', NodeBuildStatus::QUEUED->value)
+            ->whereNull('started_at')
+            ->count();
+        if ($waiting - $leaving >= StartQueuedNodeBuilds::MAX_QUEUED) {
+            throw new RuntimeException(StartQueuedNodeBuilds::QUEUE_FULL);
+        }
     }
 
     public static function dispatchBuild(NodeBuild $build): void

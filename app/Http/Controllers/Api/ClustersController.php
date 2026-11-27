@@ -11,6 +11,7 @@ use App\Actions\Node\ManageNodeClusterNetwork;
 use App\Actions\Node\ManageNodeClusterSettings;
 use App\Actions\Node\RemoveNodeFromCluster;
 use App\Actions\Node\SetNodeBuilder;
+use App\Actions\Node\SetNodeBuildLimits;
 use App\Actions\Node\SetNodeIngress;
 use App\Actions\Node\UpgradeSentinel;
 use App\Http\Controllers\Api\Concerns\HandlesClusterResourcesApi;
@@ -172,6 +173,54 @@ class ClustersController extends Controller
 
             return response()->json($this->nodeResponse($node->refresh()));
         });
+    }
+
+    #[OA\Patch(
+        summary: 'Set Node Build Limits',
+        description: 'Set the concurrent builds and the BuildKit limits of a builder server, like the Builds section of the Node page. An empty limit uses the default: 50% of the server memory, no CPU limit, and 20% of the root disk for the build cache. Needs a team admin.',
+        path: '/nodes/{uuid}/builds',
+        operationId: 'update-node-builds',
+        security: [['bearerAuth' => []]],
+        tags: ['Clusters'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', description: 'UUID of the server.', required: true, schema: new OA\Schema(type: 'string'))],
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(
+            type: 'object',
+            properties: [
+                'concurrent_builds' => new OA\Property(property: 'concurrent_builds', type: 'integer', minimum: 1, maximum: 16, description: 'The builds that the server runs at the same time. The default is 1. A value above 1 needs a Sentinel with `image.build.concurrent.v1`.'),
+                'memory_limit_gb' => new OA\Property(property: 'memory_limit_gb', type: 'number', nullable: true, description: 'The memory limit of BuildKit in GB. Null: 50% of the server memory.'),
+                'cpu_limit' => new OA\Property(property: 'cpu_limit', type: 'number', nullable: true, description: 'The CPU limit of BuildKit in CPUs. Null: no limit.'),
+                'cache_gb' => new OA\Property(property: 'cache_gb', type: 'integer', nullable: true, description: 'The build cache size in GB. Null: 20% of the root disk.'),
+            ],
+        )),
+        responses: [
+            new OA\Response(response: 200, description: 'The server.', content: new OA\JsonContent(ref: '#/components/schemas/Node')),
+            new OA\Response(response: 400, ref: '#/components/responses/400'),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 403, description: 'Not an admin or owner of the team.'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+            new OA\Response(response: 422, ref: '#/components/responses/422'),
+        ]
+    )]
+    public function builds(Request $request): JsonResponse
+    {
+        $node = $this->findNode($request);
+        if ($node === null) {
+            return response()->json(['message' => 'Node not found.'], 404);
+        }
+        $this->authorize('update', $node);
+        $invalid = $this->validateRequest($request, [
+            'concurrent_builds' => 'integer',
+            'memory_limit_gb' => 'nullable|numeric',
+            'cpu_limit' => 'nullable|numeric',
+            'cache_gb' => 'nullable|integer',
+        ]);
+        if ($invalid !== null) {
+            return $invalid;
+        }
+
+        return $this->runClusterAction(fn (): JsonResponse => response()->json($this->nodeResponse(
+            SetNodeBuildLimits::run($node, $request->only(['concurrent_builds', 'memory_limit_gb', 'cpu_limit', 'cache_gb']), $request->user())
+        )));
     }
 
     #[OA\Post(
@@ -851,6 +900,7 @@ class ClustersController extends Controller
             'sentinel_version' => $node->sentinel_version,
             'image_cleanup_frequency' => $node->image_cleanup_frequency,
             'image_cleanup_threshold' => $node->image_cleanup_threshold,
+            ...SetNodeBuildLimits::values($node),
             'created_at' => $node->created_at,
             'updated_at' => $node->updated_at,
         ];

@@ -105,11 +105,11 @@ Coolify enforces the limit. Sentinel refuses as a second check.
 - Coolify claims a slot in one transaction, as `SelectBuilderNode::claim()`
   does today for the limit of 1. It compares the count with
   `concurrent_builds` instead of 0.
-- `builder.reconcile.v1` gets `max_concurrent_builds`. Before
-  `image.build.v1` starts a container, Sentinel counts the containers with the
-  `coolify.build` label. At the limit, it refuses with the fixed message
-  "The builder is busy." Coolify puts the build back in the queue on this
-  message.
+- `image.build.v1` gets `max_concurrent_builds` (changed on 2026-11-28, see
+  the implementation notes). Before Sentinel starts a container, it counts the
+  running containers with the `coolify.build` label. At the limit, it refuses
+  with the fixed message "The builder is busy." Coolify puts the build back in
+  the queue on this message.
 - A new capability, `image.build.concurrent.v1`, means that Sentinel refuses
   at the limit. Sentinel `57e889c` and later already keep the archive of
   another build until its load or for one day. Coolify uses a value above 1
@@ -150,12 +150,12 @@ option.
 
 | Limit | Field of `builder.reconcile.v1` | Default | Who changes it |
 | --- | --- | --- | --- |
-| Memory of BuildKit | `memory_limit_bytes` → `--memory` | 50% of `memory_bytes` of the Node, at least 1 GiB | Team admin, Node page |
-| CPU of BuildKit | `cpu_limit` → `--cpus` | none | Team admin, Node page |
+| Memory of BuildKit | `memory_limit_bytes` → `--memory` and `--memory-swap` | 50% of the memory of the Node, at least 256 MiB | Team admin, Node page |
+| CPU of BuildKit | `cpu_limit_millis` → `--cpus` | none | Team admin, Node page |
 | CPU weight of BuildKit | fixed `--cpu-shares 512` | half of the default | Nobody |
 | Processes | fixed `--pids-limit 4096` | — | Nobody |
 | Build cache | `max_used_space_bytes` (exists) | 20% of the root disk, at least 1 GiB | Team admin, Node page |
-| Free disk | new `min_free_space_percent` → `minFreeSpace` | 10% | Nobody |
+| Free disk | fixed `minFreeSpace = "10%"` | 10% | Nobody |
 | Build container | fixed `--memory 1g --cpus 1 --pids-limit 1024` | — | Nobody |
 
 - The CPU weight lets a build use idle CPU and gives workloads priority when
@@ -231,3 +231,115 @@ the text above.
 - Build slots that count by size (CPU or memory of each build).
 - A per-project or per-environment share of the build slots.
 - BuildKit `max-parallelism` for the steps of one build.
+
+## Implementation notes (2026-11-28)
+
+Built in Coolify and in Sentinel `a7a95d5` (`image.build.concurrent.v1`).
+
+### Changes to the decision
+
+- **The limit goes with each build, not with the builder reconcile.**
+  `max_concurrent_builds` is a field of `image.build.v1`. Sentinel checks the
+  value at the start of each build, so the check always uses the current
+  value of Coolify. A change of the slots then does not replace BuildKit and
+  does not wait for a network revision.
+- **The BuildKit memory has no minimum of 1 GiB.** The answer of 2026-11-26
+  sets 50% of the Node. A Node with 1 GiB would give all its memory to
+  BuildKit with a minimum of 1 GiB. Sentinel reads the memory of the host and
+  accepts a value from 256 MiB to the memory of the Node. `--memory-swap` has
+  the same value, so BuildKit does not use swap.
+- **The free disk is fixed.** `buildkitd.toml` always has
+  `minFreeSpace = "10%"`. No request field exists.
+- **Not built in this step:** `node_clusters.build_timeout_minutes`. The job
+  timeout stays 2400 s, and `NODE_BUILD_TIMEOUT_MINUTES` stops the build.
+
+### Coolify
+
+- `nodes.concurrent_builds` (default 1, 1 to 16), `build_memory_limit_bytes`,
+  `build_cpu_limit_millis`, and `build_cache_bytes` (null: the default of
+  Sentinel). `node_builds.node_cluster_id` and `builder_queued_at` hold the
+  queue. `Node::buildSlots()` gives 1 for a Node without
+  `image.build.concurrent.v1`.
+- `SetNodeBuildLimits` changes the settings, for the **Builds** section of the
+  Node page and `PATCH /api/v1/nodes/{uuid}/builds`. It authorizes
+  `NodePolicy::update`. A changed BuildKit limit queues a network revision.
+  The Node page warns when the sum of `concurrent_builds` of the instance is 3
+  or more.
+- `StartQueuedNodeBuilds` is the 1 function that starts waiting builds. It
+  locks the cluster row, then the Nodes of the queue in `id` order. For each
+  build in FIFO order (`id`), it runs `SelectBuilderNode` again, so the
+  architecture, the capabilities, and `placeResource` of the requester apply
+  when the build starts. A busy build stays in the queue. Another refusal
+  fails the build and sends the notification. A claimed build gets `node_id`
+  and `started_at`, and its job is dispatched again. The build job joins the
+  queue in the same transaction (`$enqueue`), so no claim can come between.
+- `SelectBuilderNode` takes the least busy builder (active builds divided by
+  slots) with a free slot. It skips a builder with
+  `builder_replace_pending` and a builder above the memory or disk pressure
+  threshold of the cluster. Missing or old resource data does not stop builds.
+  `claim()` is removed.
+- The build job has `tries = 1` and no `retryUntil()` or `release()`. A build
+  without a free slot writes "Waiting for a free builder server (position N of
+  M)." to its build log and ends its job. A build behind a running build of its
+  application writes "Waiting for the running build of this application." The
+  position is the position when the build joins the queue.
+- On "The builder is busy." from Sentinel, the job puts the build back in the
+  queue at its old position and writes the refusal to the build log. The
+  scheduler tries again within 1 minute, so a refusing builder does not loop.
+- `StartQueuedNodeBuilds` runs after each build ends or fails, after a cancel
+  (after the container stopped), after a builder reconcile with a running
+  BuildKit, after a change of the settings, and each minute from
+  `ProcessNodeBuildQueueJob`.
+- `ProcessNodeBuildQueueJob` also recovers stale builds. `RunImageBuild`
+  writes a heartbeat (`updated_at`) each 30 s while it follows the build. A
+  running build without a heartbeat for 20 minutes, or a claimed build whose
+  job did not start in 120 minutes, fails with "The build job stopped before
+  the build ended." Its container is stopped and the next build starts.
+- `StartNodeBuild` refuses a new build when its cluster has 50 builds without
+  a builder (both queues). The webhook response, the API, and the UI show
+  `StartQueuedNodeBuilds::QUEUE_FULL`. The builds that a newer push cancels
+  do not count.
+- `ReconcileNodeClusterNetwork::builderRequest()` sends
+  `max_used_space_bytes`, `memory_limit_bytes`, and `cpu_limit_millis` to a
+  Node with the capability (0: the default of Sentinel). The result stores
+  `builder_replace_pending` and `builder_memory_limit_bytes`. When the last
+  build of a pending Node ends, `StartQueuedNodeBuilds` queues a network
+  revision, so the new limits apply.
+- A stack deploy (`DeployNodeStackJob`) still holds its worker while the
+  builds of its services wait. This decision does not change it.
+
+### Sentinel
+
+- `builder::start()` refuses with "The builder is busy." when
+  `max_concurrent_builds` is above 0 and the Node runs that number of
+  `coolify.build` containers. A retry of the same build ID is not refused.
+- `coolify-buildkitd` runs with `--memory`, `--memory-swap`,
+  `--cpu-shares 512`, `--pids-limit 4096`, and `--cpus` when set. A build
+  container runs with `--memory 1g --cpus 1 --pids-limit 1024`.
+- The limits are part of the configuration hash. When the hash changes while
+  builds run, Sentinel keeps the old BuildKit and returns
+  `replace_pending: true`.
+- The outputs of local builds stay separate for each build ID (Sentinel
+  `57e889c`).
+
+### Live check on the dev cluster (2026-11-28)
+
+With 2 Nodes, Sentinel `main-a7a95d5`, and the builder role only on node-1:
+
+- With 1 slot, 3 builds of 3 applications: 1 ran, 2 waited with positions
+  1 and 2, then they ran one after the other.
+- With 2 slots, 2 builds ran at the same time on node-1, and both images
+  deployed.
+- A cancel of a running build started the waiting build. A cancel of the
+  first waiting build moved the second to position 1. A failed build started
+  the next build in the same second.
+- A build without a heartbeat for 25 minutes failed from the scheduled job,
+  and the waiting build started.
+- With a foreign `coolify.build` container on node-1, Sentinel refused the
+  build 2 times. The build waited and ran when the container was gone.
+- `podman inspect coolify-buildkitd`: memory 1524551680 (50% of 3049103360),
+  CPU shares 512, pids limit 4096. `buildkitd.toml` has `maxUsedSpace`
+  (20% of the disk) and `minFreeSpace = "10%"`.
+- A member could not change the setting, an admin could, and 17 was refused.
+- With 49 fake waiting builds in a rolled-back transaction, the 50th build
+  was accepted and the 51st was refused with the full-queue message.

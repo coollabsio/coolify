@@ -6,25 +6,27 @@ use App\Actions\Node\Build\IssueNodeGitCredential;
 use App\Actions\Node\Build\PublishBuiltRevision;
 use App\Actions\Node\Build\ResolveGitCommit;
 use App\Actions\Node\Build\RunImageBuild;
-use App\Actions\Node\Build\SelectBuilderNode;
+use App\Actions\Node\Build\StartQueuedNodeBuilds;
 use App\Actions\Node\Build\StartWaitingNodeBuild;
 use App\Actions\Node\NotifyNodeDeployment;
 use App\Enums\NodeBuildStatus;
 use App\Models\NodeBuild;
-use Illuminate\Support\Carbon;
 use RuntimeException;
 use Throwable;
 
 /**
  * The steps that every Git build job shares: issue the Git credential of a
- * private repository, resolve the commit, wait for a free builder Node,
- * build, then publish and deploy the revision. A job only
+ * private repository, resolve the commit, wait in the build queue of the
+ * cluster for a free builder slot, build, then publish and deploy the revision. A job only
  * says what the builder must do with the source.
  */
 trait BuildsNodeWorkloadImage
 {
-    /** Waiting for a free builder releases the job; any exception fails it. */
-    public int $maxExceptions = 1;
+    /**
+     * One attempt. A build that waits for a free builder ends its job and holds no worker;
+     * StartQueuedNodeBuilds dispatches it again when it claims a slot (decision 0035).
+     */
+    public int $tries = 1;
 
     public int $timeout = 2400;
 
@@ -38,11 +40,6 @@ trait BuildsNodeWorkloadImage
      * @return array{source_type: string, dockerfile_path?: string, dockerfile_content?: string}
      */
     abstract protected function source(NodeBuild $build): array;
-
-    public function retryUntil(): Carbon
-    {
-        return now()->addHour();
-    }
 
     public function handle(): void
     {
@@ -64,19 +61,34 @@ trait BuildsNodeWorkloadImage
                 $credential = IssueNodeGitCredential::run($build->workload);
                 $build->update(['commit_sha' => ResolveGitCommit::run($build->git_repository, $build->git_branch, $credential)]);
             }
+            // A build that StartQueuedNodeBuilds claimed has its builder; another one joins the queue of its cluster.
+            $node = $build->node;
+            if ($node === null) {
+                $clusterId = $build->node_cluster_id ?? collect($build->workload->clusterIds())->min()
+                    ?? throw new RuntimeException('The application is not placed on a cluster server.');
+                $node = StartQueuedNodeBuilds::run((int) $clusterId, $build);
+                if ($node === null) {
+                    $this->logQueuePosition($build->refresh());
+
+                    return;
+                }
+            }
             try {
-                $node = SelectBuilderNode::make()->claim($build);
+                $digest = RunImageBuild::run($build, $node, $this->source($build), $credential ?? IssueNodeGitCredential::run($build->workload));
             } catch (RuntimeException $exception) {
-                if ($exception->getMessage() === NodeBuild::BUILDERS_BUSY) {
-                    $this->release(15);
+                // The second guard: Sentinel runs its limit of builds already. The build waits again.
+                if (str_contains($exception->getMessage(), NodeBuild::SENTINEL_BUSY) && $build->refresh()->status !== NodeBuildStatus::CANCELLED) {
+                    StartQueuedNodeBuilds::requeue($build);
+                    $this->logLine($build, "Server {$node->name} refused the build because it runs its limit of builds. The build waits for a free builder server.");
 
                     return;
                 }
                 throw $exception;
             }
-            $digest = RunImageBuild::run($build, $node, $this->source($build), $credential ?? IssueNodeGitCredential::run($build->workload));
             // A cancel that arrives while the image is pushed wins: the image is not deployed.
             if ($build->refresh()->status === NodeBuildStatus::CANCELLED) {
+                $this->startNext($build);
+
                 return;
             }
             PublishBuiltRevision::run($build, $digest);
@@ -87,7 +99,7 @@ trait BuildsNodeWorkloadImage
         } catch (Throwable $exception) {
             $this->markFailed($build, $exception->getMessage());
         }
-        StartWaitingNodeBuild::run($build->node_workload_id);
+        $this->startNext($build);
     }
 
     public function failed(?Throwable $exception): void
@@ -95,8 +107,32 @@ trait BuildsNodeWorkloadImage
         $build = NodeBuild::query()->find($this->buildId);
         if ($build !== null) {
             $this->markFailed($build, $exception?->getMessage() ?? 'The build job failed.');
-            StartWaitingNodeBuild::run($build->node_workload_id);
+            $this->startNext($build);
         }
+    }
+
+    /** The next waiting build of the workload, then the free slots of the cluster. */
+    private function startNext(NodeBuild $build): void
+    {
+        StartWaitingNodeBuild::run($build->node_workload_id);
+        $clusterId = $build->refresh()->node_cluster_id ?? $build->node?->node_cluster_id;
+        if ($clusterId !== null) {
+            StartQueuedNodeBuilds::run((int) $clusterId);
+        }
+    }
+
+    /** The position of a build that waits for a free builder, in its build log. */
+    private function logQueuePosition(NodeBuild $build): void
+    {
+        $position = $build->builderQueuePosition();
+        if ($position !== null) {
+            $this->logLine($build, "Waiting for a free builder server (position {$position['position']} of {$position['total']}).");
+        }
+    }
+
+    private function logLine(NodeBuild $build, string $line): void
+    {
+        $build->logLines()->create(['logged_at' => now(), 'line' => $line]);
     }
 
     /** A cancelled build keeps its status. Only the change to failed sends the notification, so a retry does not send it again. */

@@ -306,6 +306,7 @@ Route::group([
     Route::get('/nodes/{uuid}', [ClustersController::class, 'node'])->middleware(['api.ability:read']);
     Route::delete('/nodes/{uuid}', [ClustersController::class, 'destroyNode'])->middleware(['api.ability:delete']);
     Route::patch('/nodes/{uuid}/roles', [ClustersController::class, 'roles'])->middleware(['api.ability:write']);
+    Route::patch('/nodes/{uuid}/builds', [ClustersController::class, 'builds'])->middleware(['api.ability:write']);
     Route::post('/nodes/{uuid}/image-cleanup', [ClustersController::class, 'cleanupImages'])->middleware(['api.ability:write']);
     Route::post('/nodes/{uuid}/sentinel/upgrade', [ClustersController::class, 'upgradeSentinel'])->middleware(['api.ability:write']);
 

@@ -93,6 +93,8 @@ class RunImageBuild
             ...$source,
             ...$credential,
             ...($build->workload->buildsUntrustedSource() ? ['untrusted_source' => true] : []),
+            // The second guard of the build slots: Sentinel refuses a build at this limit (decision 0035).
+            ...($node->supportsCapability(NodeBuild::CONCURRENT_CAPABILITY) === true ? ['max_concurrent_builds' => $node->buildSlots()] : []),
             ...$push,
             ...($imageLogin === null ? [] : ['image_username' => $imageLogin['username'], 'image_password' => $imageLogin['password']]),
             // Objects, because Flux reads maps and an empty PHP array encodes as a list.
@@ -110,6 +112,10 @@ class RunImageBuild
                 }
                 if ($build->refresh()->status === NodeBuildStatus::CANCELLED) {
                     throw new RuntimeException('The build was cancelled.');
+                }
+                // The heartbeat of the build job: RecoverStaleNodeBuilds fails a build without one.
+                if ($build->updated_at === null || $build->updated_at->lt(now()->subSeconds(30))) {
+                    $build->touch();
                 }
                 if (now()->greaterThan($deadline)) {
                     $this->lifecycle($node, $build, 'stop');
@@ -140,6 +146,7 @@ class RunImageBuild
             });
         }
         if ($storage === NodeImageStorage::LOCAL) {
+            $build->touch();
             self::flux('image.load', [
                 'server_id' => $node->uuid,
                 'command_id' => (string) Str::uuid(),

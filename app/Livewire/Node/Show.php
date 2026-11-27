@@ -16,6 +16,7 @@ use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Actions\Node\ReadImageArchitectures;
 use App\Actions\Node\RepairFluxTrust;
 use App\Actions\Node\RotateSentinelToken;
+use App\Actions\Node\SetNodeBuildLimits;
 use App\Actions\Node\UpgradeSentinel;
 use App\Actions\Node\ValidateNode;
 use App\Actions\Sentinel\FetchFluxNodeInformation;
@@ -94,6 +95,9 @@ class Show extends Component
 
     public bool $gpuEnabled = false;
 
+    /** @var array{concurrent_builds: int, memory_limit_gb: ?float, cpu_limit: ?float, cache_gb: ?int} The build slots and BuildKit limits (decision 0035). */
+    public array $buildLimits = ['concurrent_builds' => 1, 'memory_limit_gb' => null, 'cpu_limit' => null, 'cache_gb' => null];
+
     public function mount(string $node_uuid, ?string $section = null): void
     {
         abort_unless(nodesEnabled(), 404);
@@ -113,6 +117,7 @@ class Show extends Component
             'threshold' => (int) $this->node->image_cleanup_threshold,
         ];
         $this->gpuEnabled = (bool) $this->node->is_gpu_enabled;
+        $this->buildLimits = SetNodeBuildLimits::values($this->node);
         $this->section = $this->resolveSection($section);
         $this->loadSectionData();
     }
@@ -127,6 +132,19 @@ class Show extends Component
             $this->authorize('update', $this->node);
             $this->node->update(['is_gpu_enabled' => $this->gpuEnabled]);
             $this->dispatch('success', $this->gpuEnabled ? 'GPU workloads are allowed on this server.' : 'GPU workloads are not allowed on this server. Running GPU containers keep running until their next deploy.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
+    }
+
+    /** Only a team admin changes the build slots and the BuildKit limits (NodePolicy::update). */
+    public function saveBuildLimits(): void
+    {
+        try {
+            $this->authorize('update', $this->node);
+            $this->node = SetNodeBuildLimits::run($this->node, $this->buildLimits, auth()->user());
+            $this->buildLimits = SetNodeBuildLimits::values($this->node);
+            $this->dispatch('success', 'Build settings saved.');
         } catch (\Throwable $e) {
             handleError($e, $this);
         }
@@ -498,7 +516,11 @@ class Show extends Component
         return view('livewire.node.show', match ($this->section) {
             'workloads' => $this->workloadsViewData(),
             'containers' => ['orphanVolumes' => $this->orphanVolumes()],
-            'general' => ['lastImageCleanup' => $this->node->operations()->where('command_type', CleanupNodeImages::COMMAND_TYPE)->latest('id')->first()],
+            'general' => [
+                'lastImageCleanup' => $this->node->operations()->where('command_type', CleanupNodeImages::COMMAND_TYPE)->latest('id')->first(),
+                // Each running build holds a queue worker; a self-hosted Horizon has 4 by default (decision 0035).
+                'manyBuildSlots' => (int) Node::query()->sum('concurrent_builds') >= 3,
+            ],
             'danger' => ['volumeData' => DeleteNode::dataOn($this->node)],
             default => [],
         });

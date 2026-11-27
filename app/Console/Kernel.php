@@ -16,6 +16,7 @@ use App\Jobs\DeleteExpiredNodeVolumeCopiesJob;
 use App\Jobs\DistributeFluxTrustBundleJob;
 use App\Jobs\InspectNodeClusterNetworksJob;
 use App\Jobs\NotifyNodeHealthJob;
+use App\Jobs\ProcessNodeBuildQueueJob;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ReconcileGithubRunnersJob;
@@ -87,6 +88,10 @@ class Kernel extends ConsoleKernel
         $this->scheduleInstance->job(new RecoverStaleNodeOperationsJob)
             ->everyFiveMinutes()
             ->onOneServer();
+        $this->scheduleInstance->job(new ProcessNodeBuildQueueJob)
+            ->everyMinute()
+            ->onOneServer()
+            ->when(fn () => nodesInUse());
         $this->scheduleInstance->job(new DeleteExpiredNodeVolumeCopiesJob)
             ->hourly()
             ->onOneServer()

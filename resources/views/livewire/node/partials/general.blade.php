@@ -162,6 +162,43 @@
 </x-application.settings-section>
 </form>
 
+<form wire:submit="saveBuildLimits" class="application-settings-form">
+<x-unsaved-bar action="saveBuildLimits" targets="buildLimits" />
+<x-application.settings-section id="node-builds-section" title="Builds"
+    helper="The builds that this server runs at the same time, and the limits of BuildKit. All builds of the server share BuildKit. Other builds of the cluster wait in a queue of at most 50 builds. Only a team admin can change these settings.">
+    <x-slot:actions>
+        @can('update', $node)
+            <x-forms.button type="submit">Save</x-forms.button>
+        @endcan
+    </x-slot:actions>
+    <div class="grid gap-4 sm:grid-cols-2">
+        <x-forms.input id="buildLimits.concurrent_builds" label="Concurrent builds" type="number" min="1" max="16" required
+            helper="1 to 16. The default is 1. Each build uses memory and CPU of the server, and a queue worker of Coolify while it runs." canGate="update" :canResource="$node" />
+        <x-forms.input id="buildLimits.memory_limit_gb" label="BuildKit memory limit (GB)" type="number" step="0.25" min="0.25"
+            placeholder="50% of the server memory" helper="Empty: 50% of the memory of the server. At the limit, the kernel stops BuildKit, and the running builds of this server fail." canGate="update" :canResource="$node" />
+        <x-forms.input id="buildLimits.cpu_limit" label="BuildKit CPU limit" type="number" step="0.1" min="0.1"
+            placeholder="No limit" helper="Empty: no limit. BuildKit always has half of the CPU weight of a workload, so workloads get priority when the server is busy." canGate="update" :canResource="$node" />
+        <x-forms.input id="buildLimits.cache_gb" label="Build cache (GB)" type="number" min="1"
+            placeholder="20% of the root disk" helper="Empty: 20% of the root disk. BuildKit removes old cache above this size, and keeps 10% of the disk free." canGate="update" :canResource="$node" />
+    </div>
+    <div class="mt-4 space-y-1 text-sm text-neutral-500 dark:text-fg-dim">
+        @if ($node->supportsCapability(\App\Models\NodeBuild::CONCURRENT_CAPABILITY) !== true)
+            <p>Sentinel on this server is too old for concurrent builds and BuildKit limits. It runs 1 build at a time. Upgrade Sentinel to use these settings.</p>
+        @else
+            @if (filled(data_get($node->metadata, 'builder_memory_limit_bytes')))
+                <p>BuildKit memory limit now: {{ formatBytes((int) data_get($node->metadata, 'builder_memory_limit_bytes')) }}.</p>
+            @endif
+            @if (data_get($node->metadata, 'builder_replace_pending') === true)
+                <p>New BuildKit limits wait until the running builds of this server end. No new build starts here until then.</p>
+            @endif
+        @endif
+        @if ($manyBuildSlots ?? false)
+            <p class="text-amber-700 dark:text-warning">The servers of this Coolify instance allow 3 or more concurrent builds. Each running build holds a queue worker. A self-hosted Coolify has 4 queue workers by default (HORIZON_MAX_PROCESSES), so many builds can delay deploys and other jobs.</p>
+        @endif
+    </div>
+</x-application.settings-section>
+</form>
+
 <form wire:submit="saveGpu" class="application-settings-form">
 <x-application.settings-section id="node-gpu-section" title="GPU"
     helper="NVIDIA GPUs for cluster applications, through the CDI spec of the NVIDIA Container Toolkit. Coolify does not install the driver or the toolkit.">

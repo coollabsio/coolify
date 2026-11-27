@@ -2,9 +2,11 @@
 
 namespace App\Actions\Node;
 
+use App\Actions\Node\Build\StartQueuedNodeBuilds;
 use App\Actions\Sentinel\ResolveFluxPublicUrl;
 use App\Enums\NodeOperationStatus;
 use App\Models\Node;
+use App\Models\NodeBuild;
 use App\Models\NodeCluster;
 use App\Models\NodeFirewallRule;
 use App\Models\NodeOperation;
@@ -415,10 +417,38 @@ class ReconcileNodeClusterNetwork
             return;
         }
         try {
-            $this->runOperation($node, $user, $attempt, NodeImages::BUILDER_CAPABILITY, ['enabled' => $node->canBuild()]);
+            $this->runOperation($node, $user, $attempt, NodeImages::BUILDER_CAPABILITY, self::builderRequest($node));
         } catch (Throwable $exception) {
             $node->mergeMetadata(['build_error' => mb_substr($exception->getMessage(), 0, 2000)]);
+
+            return;
         }
+        // A builder that runs again, or a new limit, frees build slots (decision 0035).
+        if ($node->node_cluster_id !== null && data_get($node->refresh()->metadata, 'builder_running') === true) {
+            StartQueuedNodeBuilds::run((int) $node->node_cluster_id);
+        }
+    }
+
+    /**
+     * The builder request: the role, and the BuildKit limits of the Node (decision 0035) for a
+     * Sentinel that applies them. A limit of 0 is the default of Sentinel: 50% of the memory of
+     * the Node, no CPU limit, and 20% of the root disk for the build cache.
+     *
+     * @return array<string, bool|int>
+     */
+    public static function builderRequest(Node $node): array
+    {
+        $request = ['enabled' => $node->canBuild()];
+        if ($node->supportsCapability(NodeBuild::CONCURRENT_CAPABILITY) !== true) {
+            return $request;
+        }
+
+        return [
+            ...$request,
+            'max_used_space_bytes' => (int) ($node->build_cache_bytes ?? 0),
+            'memory_limit_bytes' => (int) ($node->build_memory_limit_bytes ?? 0),
+            'cpu_limit_millis' => (int) ($node->build_cpu_limit_millis ?? 0),
+        ];
     }
 
     /**
@@ -824,6 +854,9 @@ class ReconcileNodeClusterNetwork
                 'builder_enabled' => (bool) data_get($result, 'enabled'),
                 'builder_running' => (bool) data_get($result, 'running'),
                 'builder_apparmor_profile' => (bool) data_get($result, 'apparmor_profile'),
+                // Sentinel replaces BuildKit with new limits only while no build runs; no new build starts until then.
+                'builder_replace_pending' => (bool) data_get($result, 'replace_pending', false),
+                'builder_memory_limit_bytes' => data_get($result, 'memory_limit_bytes'),
                 'build_error' => null,
             ]),
             self::INGRESS_CAPABILITY => $node->mergeMetadata([

@@ -27,9 +27,20 @@ class CancelNodeBuild
         }
         $build->refresh();
         StartWaitingNodeBuild::run($build->node_workload_id);
-        if ($build->node === null || $build->started_at === null) {
-            return;
+        if ($build->node !== null && $build->started_at !== null) {
+            self::stopContainerOf($build);
         }
+        // A cancelled build frees its place in the queue or its build slot (decision 0035), after
+        // its container stopped, so Sentinel does not count it against the next build.
+        $clusterId = $build->node_cluster_id ?? $build->node?->node_cluster_id;
+        if ($clusterId !== null) {
+            StartQueuedNodeBuilds::run((int) $clusterId);
+        }
+    }
+
+    /** Stops the build container on its builder Node; a failure is ignored. */
+    public static function stopContainerOf(NodeBuild $build): void
+    {
         try {
             RunImageBuild::flux('workload.lifecycle', [
                 'server_id' => $build->node->uuid,

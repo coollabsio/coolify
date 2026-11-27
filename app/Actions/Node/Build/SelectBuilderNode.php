@@ -8,14 +8,13 @@ use App\Models\NodeBuild;
 use App\Models\NodeWorkload;
 use App\Models\User;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
 
 /**
  * Picks the builder Node of a build: a Node of the workload's cluster with the
- * builder role and a running BuildKit, with the fewest active builds. A
+ * builder role, a running BuildKit, and a free build slot, the least busy first. A
  * private repository also needs a Sentinel that accepts Git credentials.
  * BuildKit builds for the CPU architecture of its own Node, so the builder
  * has the architecture of the Nodes that run the workload (decision 0020).
@@ -31,26 +30,11 @@ class SelectBuilderNode
     public const NOT_ALLOWED = 'You cannot place resources on a builder server of this cluster. Ask an admin for access to a builder server, or to deploy this application.';
 
     /**
-     * Picks the builder Node of the build and claims it for the build in one transaction. The lock
-     * on the Nodes of the cluster makes a second job wait until this claim is committed, so two
-     * builds never pick the same free builder Node. The claim sets `node_id` and `started_at`;
-     * RunImageBuild then starts the build there.
+     * The builder Node with a free build slot for a build of the workload. StartQueuedNodeBuilds
+     * calls it under a lock on the Nodes, so two builds never take the same slot. It throws
+     * NodeBuild::BUILDERS_BUSY while every fitting builder is full; the build then stays in the queue.
      */
-    public function claim(NodeBuild $build): Node
-    {
-        return DB::transaction(function () use ($build): Node {
-            Node::query()->whereIn('node_cluster_id', $build->workload->clusterIds())->orderBy('id')->lockForUpdate()->pluck('id');
-            $node = $this->handle($build->workload, $build->requestedBy, $build->id);
-            NodeBuild::query()->whereKey($build->id)->update(['node_id' => $node->id, 'started_at' => now()]);
-
-            return $node;
-        });
-    }
-
-    /**
-     * @param  ?int  $exceptBuildId  A build that does not count as active: the build that a retried job claimed before.
-     */
-    public function handle(NodeWorkload $workload, ?User $requestedBy = null, ?int $exceptBuildId = null): Node
+    public function handle(NodeWorkload $workload, ?User $requestedBy = null): Node
     {
         $clusterIds = $workload->clusterIds();
         if ($clusterIds === []) {
@@ -60,8 +44,7 @@ class SelectBuilderNode
         $architecture = self::targetArchitecture($workload);
         $clusterNodes = Node::query()
             ->whereIn('node_cluster_id', $clusterIds)
-            ->withCount(['builds as active_builds_count' => fn ($query) => $query->active()->whereNotNull('started_at')
-                ->when($exceptBuildId !== null, fn ($query) => $query->whereKeyNot($exceptBuildId))])
+            ->withCount(['builds as active_builds_count' => fn ($query) => $query->active()->whereNotNull('started_at')])
             ->orderBy('active_builds_count')
             ->orderBy('id')
             ->get();
@@ -82,8 +65,14 @@ class SelectBuilderNode
             }
         }
 
-        // One build at a time on each builder Node; the job waits for a free one.
-        $node = $candidates->first(fn (Node $node): bool => $node->active_builds_count === 0);
+        // The least busy builder with a free slot (decision 0035). A builder that waits for a new
+        // BuildKit configuration, or that has memory or disk pressure, gets no new build.
+        $node = $candidates
+            ->filter(fn (Node $node): bool => $node->active_builds_count < $node->buildSlots()
+                && data_get($node->metadata, 'builder_replace_pending') !== true
+                && ! $node->hasBuildPressure())
+            ->sortBy([fn (Node $a, Node $b): int => $a->active_builds_count / $a->buildSlots() <=> $b->active_builds_count / $b->buildSlots(), ['id', 'asc']])
+            ->first();
         if ($node === null) {
             throw new RuntimeException($candidates->isEmpty() ? self::noBuilderReason($clusterNodes, $capabilities) : NodeBuild::BUILDERS_BUSY);
         }
