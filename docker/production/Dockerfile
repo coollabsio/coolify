@@ -1,13 +1,13 @@
 # Versions
 # https://hub.docker.com/r/serversideup/php/tags?name=8.4-fpm-nginx-alpine
-ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v5.1.5
+ARG SERVERSIDEUP_PHP_VERSION=8.4-fpm-nginx-alpine-v5.2.2
 # https://github.com/cloudflare/cloudflared/releases
-ARG CLOUDFLARED_VERSION=2026.11.1
+ARG CLOUDFLARED_VERSION=2026.11.2
 # https://www.postgresql.org/support/versioning/
 # Note: We are using version 18 of the postgres client (while still using postgres 15 for the postgres server) as version 15 has been removed from Alpine 3.23+ https://pkgs.alpinelinux.org/packages?name=postgresql*-client&branch=v3.23&repo=&arch=x86_64&origin=&flagged=&maintainer=
 ARG POSTGRES_VERSION=18
 # https://nginx.org/en/linux_packages.html
-ARG NGINX_VERSION=1.31.9-r1
+ARG NGINX_VERSION=1.31.10-r1
 # https://nodejs.org/en/about/previous-releases
 ARG NODE_VERSION=24.22.3
 # https://pecl.php.net/package/uv
