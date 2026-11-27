@@ -708,6 +708,18 @@
                     </x-callout>
                 @endif
                 @foreach($nodesUnavailableReason === null ? ($clusters ?? []) : [] as $cluster)
+                    @if (isset($clusterPortReasons[$cluster->uuid]))
+                        <div class="flex min-h-14 w-full items-center gap-3 px-4 py-3 opacity-70">
+                            <span class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">
+                                <x-reicon name="layers" class="size-4" />
+                            </span>
+                            <span class="min-w-0 flex-1">
+                                <span class="block truncate text-[13px] font-semibold text-black dark:text-fg">{{ $cluster->name }}</span>
+                                <span class="block text-[11px] text-amber-700 dark:text-warning">Not available on this cluster. {{ $clusterPortReasons[$cluster->uuid] }}</span>
+                            </span>
+                        </div>
+                        @continue
+                    @endif
                     <button type="button" wire:click="setCluster('{{ $cluster->uuid }}')"
                         class="group flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-white/[0.025]">
                         <span class="flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-fg-dim">

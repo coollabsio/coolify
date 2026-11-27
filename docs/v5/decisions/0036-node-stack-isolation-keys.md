@@ -302,7 +302,17 @@ the text above.
   on demand. The template needs a team admin on Nodes (`NET_ADMIN`,
   `NET_RAW`, and two tier 2 sysctls). It publishes UDP 51820, which is the
   default WireGuard port of a cluster, so it is created only on a cluster
-  with another WireGuard port. `cloudflared` is not changed. The Coolify
+  with another WireGuard port.
+- **Reserved ports in the template list.** The list and the targets step
+  check the published ports of a template against each cluster with
+  `CreateClusterStack::portConflict()`, the check of the create. A template
+  that every cluster refuses shows the reason of the first cluster, for
+  example "The service wg-easy publishes UDP 51820. UDP 51820 is reserved for
+  the WireGuard network of the cluster". On the targets step, a cluster that
+  refuses it shows the reason and has no buttons, and `setCluster`,
+  `setClusterSpread`, and `setNode` check again. The ports of the templates
+  are cached without a cluster (`node-stack-template-ports:1`), and the
+  check of each cluster is not cached, so `AVAILABILITY_VERSION` stays 4. `cloudflared` is not changed. The Coolify
   documentation of Cloudflare Tunnels on v4 points the tunnel to
   `http://localhost:80`, which needs the host network. No change is safe for
   v4, so `cloudflared` stays locked by `network_mode`.

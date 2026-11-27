@@ -288,6 +288,59 @@ class NodeStackCompose
     }
 
     /**
+     * The published ports of each one-click service template, by template and service, with the
+     * defaults of the file as values. A template without `ports:` is absent. Cached for the
+     * current template set; it does not depend on a cluster.
+     *
+     * @return array<string, array<string, list<array{protocol: string, host_port: int, container_port: int, source_cidrs: list<string>}>>>
+     */
+    public static function templatePublishedPorts(?Collection $templates = null): array
+    {
+        $templates ??= get_service_templates();
+        $composes = $templates->map(fn ($template): string => (string) data_get($template, 'compose', ''));
+
+        return Cache::remember('node-stack-template-ports:1:'.md5($composes->toJson()), now()->addDay(), function () use ($composes): array {
+            $result = [];
+            foreach ($composes as $key => $encoded) {
+                try {
+                    $ports = self::publishedPorts(self::parse((string) base64_decode($encoded)));
+                } catch (Throwable) {
+                    continue;
+                }
+                if ($ports !== []) {
+                    $result[(string) $key] = $ports;
+                }
+            }
+
+            return $result;
+        });
+    }
+
+    /**
+     * The published ports of each service of a Compose file, by service, with the defaults of the
+     * file as values (decision 0016).
+     *
+     * @param  array<string, mixed>  $yaml
+     * @return array<string, list<array{protocol: string, host_port: int, container_port: int, source_cidrs: list<string>}>>
+     */
+    public static function publishedPorts(array $yaml): array
+    {
+        $variables = NodeStackComposeMapper::defaults($yaml);
+        $ports = [];
+        foreach ($yaml['services'] ?? [] as $name => $service) {
+            if (! is_array($service) || filled($service['profiles'] ?? null)) {
+                continue;
+            }
+            $published = NodeStackComposeMapper::publishedPorts($service, $variables)['ports'];
+            if ($published !== []) {
+                $ports[(string) $name] = $published;
+            }
+        }
+
+        return $ports;
+    }
+
+    /**
      * The `build:` of a service from Git, resolved in the repository. The context is relative to
      * the directory of the Compose file, and the Dockerfile to the context, as in Compose. The
      * Node builder clones the repository and builds `context` with `dockerfile`, which must be

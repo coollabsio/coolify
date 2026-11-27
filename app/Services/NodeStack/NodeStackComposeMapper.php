@@ -828,7 +828,7 @@ class NodeStackComposeMapper
      * @param  array<string, string>  $variables
      * @return array{ports: list<array{protocol: string, host_port: int, container_port: int, source_cidrs: list<string>}>, notes: list<string>}
      */
-    private static function publishedPorts(array $service, array $variables): array
+    public static function publishedPorts(array $service, array $variables): array
     {
         $ports = [];
         $notes = [];

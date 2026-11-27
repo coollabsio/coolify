@@ -108,12 +108,13 @@ class PublishNodeWorkloadPort
      *
      * @param  array{protocol: string, host_port: int}  $spec
      * @param  list<int>  $replacedWorkloadIds  Workloads whose ports the caller replaces, so their ports are free.
+     * @param  array<int, string>|null  $reservedPorts  NodeCluster::reservedHostPorts(), when the caller checks several ports.
      */
-    public static function unavailableReason(NodeCluster $cluster, array $spec, array $replacedWorkloadIds = []): ?string
+    public static function unavailableReason(NodeCluster $cluster, array $spec, array $replacedWorkloadIds = [], ?array $reservedPorts = null): ?string
     {
-        $reserved = $cluster->reservedHostPorts()[$spec['host_port']] ?? null;
+        $reserved = ($reservedPorts ?? $cluster->reservedHostPorts())[$spec['host_port']] ?? null;
         if ($reserved !== null) {
-            return "Port {$spec['host_port']} is reserved for {$reserved}.";
+            return self::label($spec)." is reserved for {$reserved}.";
         }
         $taken = NodePublishedPort::query()
             ->with('workload:id,name')

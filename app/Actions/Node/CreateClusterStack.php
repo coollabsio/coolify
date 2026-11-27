@@ -315,6 +315,7 @@ class CreateClusterStack
     public static function portConflict(NodeCluster $cluster, array $portsByService, array $replacedWorkloadIds = []): ?string
     {
         $owners = [];
+        $reservedPorts = $portsByService === [] ? [] : $cluster->reservedHostPorts();
         foreach ($portsByService as $service => $ports) {
             foreach ($ports as $port) {
                 $label = PublishNodeWorkloadPort::label($port);
@@ -325,7 +326,7 @@ class CreateClusterStack
                         : "The services {$owner} and {$service} both publish {$label}.";
                 }
                 $owners[$port['protocol'].'/'.$port['host_port']] = (string) $service;
-                $reason = PublishNodeWorkloadPort::unavailableReason($cluster, $port, $replacedWorkloadIds);
+                $reason = PublishNodeWorkloadPort::unavailableReason($cluster, $port, $replacedWorkloadIds, $reservedPorts);
                 if ($reason !== null) {
                     return "The service {$service} publishes {$label}. {$reason}";
                 }

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\New;
 
+use App\Actions\Node\CreateClusterStack;
 use App\Enums\NodeDatabaseType;
 use App\Models\Node;
 use App\Models\NodeCluster;
@@ -78,6 +79,15 @@ class Select extends Component
     #[Locked]
     public ?string $nodesUnavailableReason = null;
 
+    /**
+     * Why the selected one-click service cannot run on a cluster because of its published ports,
+     * by cluster UUID: a port that the cluster reserves or that another application publishes.
+     *
+     * @var array<string, string>
+     */
+    #[Locked]
+    public array $clusterPortReasons = [];
+
     public ?string $existingPostgresqlUrl = null;
 
     protected $queryString = [
@@ -146,6 +156,8 @@ class Select extends Component
         $templateLastUpdatedMap = $this->serviceTemplateLastUpdatedMap($services);
         // Shown only when a cluster can be the destination (decision 0023).
         $nodeReasons = nodesEnabled() && $this->clusters?->isNotEmpty() ? NodeStackCompose::templateUnavailableReasons($services, $this->clustersSupportUnderscoreNames(), $this->clustersSupportPublishedPorts(), $this->clustersSupportContainerSocket(), $this->clustersSupportWorkloadUser(), $this->clustersSupportRuntimeOptions(), $this->clustersSupportIsolationOptions()) : [];
+
+        $nodeReasons += $this->templatePortReasons($services, $nodeReasons);
 
         $services = collect($services)->map(function ($service, $key) use ($templateLastUpdatedMap, $nodeReasons) {
             $serviceKey = (string) $key;
@@ -473,6 +485,10 @@ class Select extends Component
         if (str_starts_with($type, 'one-click-service-') && $this->clusters?->isNotEmpty()) {
             $template = resolve_service_template_key(str($type)->after('one-click-service-')->value());
             $this->nodesUnavailableReason = NodeStackCompose::templateUnavailableReasons(underscoreNames: $this->clustersSupportUnderscoreNames(), publishedPorts: $this->clustersSupportPublishedPorts(), containerSocket: $this->clustersSupportContainerSocket(), workloadUser: $this->clustersSupportWorkloadUser(), runtimeOptions: $this->clustersSupportRuntimeOptions(), isolationOptions: $this->clustersSupportIsolationOptions())[$template] ?? null;
+            $this->clusterPortReasons = $this->nodesUnavailableReason === null ? $this->clusterPortConflicts((string) $template) : [];
+            if ($this->clusterPortReasons !== [] && count($this->clusterPortReasons) === $this->clusters->count()) {
+                $this->nodesUnavailableReason = reset($this->clusterPortReasons);
+            }
         }
         // Clusters run Docker images, build Git repositories, databases, and one-click services; Docker servers keep their flow.
         if ((in_array($type, ['docker-image', ...self::CLUSTER_BUILD_TYPES], true) || NodeDatabaseType::tryFrom($type) !== null || str_starts_with($type, 'one-click-service-')) && $this->clusters?->isNotEmpty()) {
@@ -532,12 +548,16 @@ class Select extends Component
             return null;
         }
 
-        return $this->createOnCluster(['cluster' => $this->deployableCluster($clusterUuid)->uuid, 'placement' => 'spread']);
+        $cluster = $this->deployableCluster($clusterUuid);
+
+        return $this->createOnCluster(['cluster' => $cluster->uuid, 'placement' => 'spread'], $cluster);
     }
 
     public function setCluster(string $clusterUuid)
     {
-        return $this->createOnCluster(['cluster' => $this->deployableCluster($clusterUuid)->uuid]);
+        $cluster = $this->deployableCluster($clusterUuid);
+
+        return $this->createOnCluster(['cluster' => $cluster->uuid], $cluster);
     }
 
     private function deployableCluster(string $clusterUuid): NodeCluster
@@ -571,7 +591,7 @@ class Select extends Component
             ->firstOrFail();
         abort_unless(Gate::allows('placeResource', $node), 403, 'You cannot place resources on this server.');
 
-        return $this->createOnCluster(['server' => $node->uuid]);
+        return $this->createOnCluster(['server' => $node->uuid], NodeCluster::query()->findOrFail($node->node_cluster_id));
     }
 
     /**
@@ -579,12 +599,15 @@ class Select extends Component
      *
      * @param  array{cluster?: string, server?: string, placement?: string}  $target
      */
-    private function createOnCluster(array $target)
+    private function createOnCluster(array $target, NodeCluster $cluster)
     {
-        if (str_starts_with($this->type ?? '', 'one-click-service-') && $this->nodesUnavailableReason !== null) {
-            $this->dispatch('error', 'Not available on Nodes. '.$this->nodesUnavailableReason);
+        if (str_starts_with($this->type ?? '', 'one-click-service-')) {
+            $reason = $this->nodesUnavailableReason ?? $this->clusterPortConflicts(resolve_service_template_key(str($this->type)->after('one-click-service-')->value()) ?? '', $cluster)[$cluster->uuid] ?? null;
+            if ($reason !== null) {
+                $this->dispatch('error', 'Not available on this cluster. '.$reason);
 
-            return null;
+                return null;
+            }
         }
         if (($this->type ?? null) === NodeDatabaseType::POSTGRESQL->value) {
             $this->clusterTarget = $target;
@@ -682,6 +705,61 @@ class Select extends Component
     private function clustersSupportRuntimeOptions(): bool
     {
         return (bool) $this->clusters?->contains(fn (NodeCluster $cluster): bool => $cluster->supportsRuntimeOptions());
+    }
+
+    /**
+     * The port conflict of a one-click service template on each cluster, by cluster UUID, with
+     * the check of the create (CreateClusterStack::portConflict()). A spread stack and a stack
+     * on one server use the ports of the whole cluster.
+     *
+     * @return array<string, string>
+     */
+    private function clusterPortConflicts(string $template, ?NodeCluster $only = null): array
+    {
+        $ports = NodeStackCompose::templatePublishedPorts()[$template] ?? [];
+        if ($ports === []) {
+            return [];
+        }
+        $reasons = [];
+        foreach ($only !== null ? [$only] : ($this->clusters ?? []) as $cluster) {
+            if (! $cluster->supportsPublishedPorts()) {
+                $reasons[$cluster->uuid] = 'The service '.array_key_first($ports).' publishes ports, which needs Sentinel with network.firewall.published_ports.v1 on every server of the cluster.';
+
+                continue;
+            }
+            $reason = CreateClusterStack::portConflict($cluster, $ports);
+            if ($reason !== null) {
+                $reasons[$cluster->uuid] = $reason;
+            }
+        }
+
+        return $reasons;
+    }
+
+    /**
+     * Templates that every cluster refuses because of their published ports, with the reason of
+     * the first cluster. Templates that are not available for another reason are skipped.
+     *
+     * @param  array<string, string>  $nodeReasons
+     * @return array<string, string>
+     */
+    private function templatePortReasons(Collection $services, array $nodeReasons): array
+    {
+        if (! nodesEnabled() || $this->clusters === null || $this->clusters->isEmpty()) {
+            return [];
+        }
+        $reasons = [];
+        foreach (array_keys(NodeStackCompose::templatePublishedPorts($services)) as $template) {
+            if (isset($nodeReasons[$template])) {
+                continue;
+            }
+            $conflicts = $this->clusterPortConflicts($template);
+            if ($conflicts !== [] && count($conflicts) === $this->clusters->count()) {
+                $reasons[$template] = reset($conflicts);
+            }
+        }
+
+        return $reasons;
     }
 
     private function clustersSupportIsolationOptions(): bool
