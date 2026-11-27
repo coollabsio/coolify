@@ -27,6 +27,8 @@ jobs:
     permissions:
       contents: read
       actions: write # to disable this workflow after a failure
+      packages: write # to move the arch tags on ghcr.io and delete the placeholder
+      pull-requests: read # to list the open pull requests, their images are kept
     environment:
       name: cleanup
       deployment: false
@@ -40,7 +42,7 @@ jobs:
 
       - name: Remove the arch tags
         env:
-          GH_TOKEN: ${{ secrets.GHCR_CLEANUP_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_CLEANUP_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_CLEANUP_TOKEN }}
           REMOVE: ${{ inputs.remove }}
