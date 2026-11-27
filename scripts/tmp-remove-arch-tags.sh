@@ -5,7 +5,7 @@ OPTION="$*"
 LIMIT="${2:-}"
 IMAGE=coollabsio/coolify
 VARIANTS=""
-ARCH_TAG_PATTERN='-(amd64|aarch64|arm64)$'
+REMOVE_TAG_PATTERN='^sha-[0-9a-f]+$|-(amd64|aarch64|arm64)$'
 # The rules from here to MIN_AGE_DAYS are the same ones as in clean-manifests.sh
 KEEP_TAG_PATTERN='^(latest|preview|main|nightly|v?[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta|rc)\.[0-9]+)?)$'
 KEEP_TAG_EXCEPTIONS=v3,4.0.0-beta.420.1,4.0.0-beta.420.2,4.0.0-beta.420.3,4.0.0-beta.420.4,4.0.0-beta.420.5,4.0.0-beta.420.6,4.0.0-beta.420.7,4.0.0-beta.420.8,4.0.0-beta.420.9,4.0.0-beta.420.10
@@ -46,9 +46,10 @@ main() {
 	select_kept_tags
 	read_manifests
 	select_kept_manifests
-	heading "Selecting the arch tags"
+	heading "Selecting the arch and sha tags"
 	write_list
 	remove_arch_tags
+	finish_dockerhub_deletions
 	verify_removed_tags
 	verify_kept_manifests
 }
@@ -133,17 +134,22 @@ write_list() {
 	local registry cutoff
 	cutoff="$(jq -nr --argjson days "$MIN_AGE_DAYS" 'now - $days * 86400 | strftime("%Y-%m-%dT%H:%M:%SZ")')"
 	for registry in ghcr.io docker.io; do
-		awk -F '\t' -v OFS='\t' -v registry="$registry" -v arch="$ARCH_TAG_PATTERN" -v cutoff="$cutoff" 'FILENAME == ARGV[1] { kept_tag[$1]; next } FILENAME == ARGV[2] { kept[$1]; next }
-			$2 ~ arch && !($2 in kept_tag) { print registry, $2, $1, (!($1 in kept) ? "unused" : ($3 >= cutoff ? "recent" : "remove")) }' "$WORK_DIR/kept-tags.txt" "$WORK_DIR/kept.txt" "$WORK_DIR/$registry.tsv"
-	done | sort -u -t $'\t' -k2,2 -k1,1 > "$WORK_DIR/arch-tags.tsv"
+		awk -F '\t' -v OFS='\t' -v registry="$registry" -v pattern="$REMOVE_TAG_PATTERN" -v cutoff="$cutoff" 'FILENAME == ARGV[1] { kept_tag[$1]; next } FILENAME == ARGV[2] { kept[$1]; next }
+			$2 ~ pattern && !($2 in kept_tag) { print registry, $2, $1, (!($1 in kept) ? "unused" : ($3 >= cutoff ? "recent" : "remove")) }' "$WORK_DIR/kept-tags.txt" "$WORK_DIR/kept.txt" "$WORK_DIR/$registry.tsv"
+	done | sort -u -t $'\t' -k2,2 -k1,1 > "$WORK_DIR/listed-tags.tsv"
+	awk -F '\t' '$1 == "docker.io" && $4 == "unused" && !seen[$3]++ { print $3 }' "$WORK_DIR/listed-tags.tsv" > "$WORK_DIR/unused-dockerhub.txt"
+	request_manifests docker.io "$WORK_DIR/unused-dockerhub.txt" --head -o /dev/null -w '%{http_code}\t{}\n' > "$WORK_DIR/unused-dockerhub.tsv" || die "could not check the unused manifests on docker.io"
+	awk -F '\t' -v OFS='\t' 'FILENAME == ARGV[1] { if ($1 == 404) gone[$2]; next } $1 == "docker.io" && ($3 in gone) { $4 = "gone" } { print }' \
+		"$WORK_DIR/unused-dockerhub.tsv" "$WORK_DIR/listed-tags.tsv" > "$WORK_DIR/arch-tags.tsv"
 	{
 		printf 'registry\ttag\tdigest\n'
 		awk -F '\t' -v OFS='\t' '$4 == "remove" { print $1, $2, $3 }' "$WORK_DIR/arch-tags.tsv"
 	} > "$LIST_FILE"
-	ok "$(arch_tags remove) arch tags to remove ($(arch_tags remove ghcr.io) on ghcr.io, $(arch_tags remove docker.io) on docker.io), clean-manifests.sh keeps their image"
-	ok "keeping the $(arch_tags recent) arch tags pushed since $cutoff ($(arch_tags recent ghcr.io) on ghcr.io, $(arch_tags recent docker.io) on docker.io), a running build may still need them"
-	[ "$(arch_tags unused)" = 0 ] || ok "not listing $(arch_tags unused) arch tags ($(arch_tags unused ghcr.io) on ghcr.io, $(arch_tags unused docker.io) on docker.io), no kept tag uses their image, so clean-manifests.sh deletes it and the tags go with it"
-	info "$LIST_FILE lists every arch tag to remove in the order it removes them"
+	ok "$(arch_tags remove) arch and sha tags to remove ($(arch_tags remove ghcr.io) on ghcr.io, $(arch_tags remove docker.io) on docker.io), clean-manifests.sh keeps their image"
+	ok "keeping the $(arch_tags recent) arch and sha tags pushed since $cutoff ($(arch_tags recent ghcr.io) on ghcr.io, $(arch_tags recent docker.io) on docker.io), a running build may still need them"
+	[ "$(arch_tags unused)" = 0 ] || ok "not listing $(arch_tags unused) arch and sha tags ($(arch_tags unused ghcr.io) on ghcr.io, $(arch_tags unused docker.io) on docker.io), no kept tag uses their image, so clean-manifests.sh deletes it and the tags go with it"
+	[ "$(arch_tags gone)" = 0 ] || warn "docker.io still lists $(arch_tags gone) arch and sha tags on manifests that it deleted already, --remove sends that deletion again"
+	info "$LIST_FILE lists every tag to remove in the order it removes them"
 }
 
 remove_arch_tags() {
@@ -198,8 +204,24 @@ remove_arch_tags() {
 		fi
 		[ -z "$failure" ] || die "$failure"
 	done
-	ok "removed $(tail -n +2 "$REMOVED_FILE" | count) arch tags, every image they pointed at stays"
+	ok "removed $(tail -n +2 "$REMOVED_FILE" | count) arch and sha tags, every image they pointed at stays"
 	info "$REMOVED_FILE lists the removed tags with the digest each pointed at, to tag it again if needed"
+}
+
+finish_dockerhub_deletions() {
+	local digest status left
+	[ -n "$LIMIT" ] && [ "$(arch_tags gone)" != 0 ] || return 0
+	while read -r digest; do
+		status="$(delete_dockerhub_manifest "$digest")"
+		[[ "$status" == 2?? ]] || warn "docker.io answered $status to the deletion of $digest"
+	done < <(awk -F '\t' '$4 == "gone" && !seen[$3]++ { print $3 }' "$WORK_DIR/arch-tags.tsv")
+	read_dockerhub_tags
+	left="$(awk -F '\t' 'FILENAME == ARGV[1] { if ($4 == "gone") gone[$3]; next } $1 in gone' "$WORK_DIR/arch-tags.tsv" "$WORK_DIR/docker.io.tsv" | count)"
+	if [ "$left" = 0 ]; then
+		ok "docker.io no longer lists the tags of the manifests that it deleted already"
+	else
+		warn "docker.io still lists $left tags on manifests that it deleted already, delete those manifests in Image Management on Docker Hub"
+	fi
 }
 
 verify_removed_tags() {
@@ -232,7 +254,7 @@ verify_kept_manifests() {
 check_tags() {
 	awk -F '\t' '$2 == "latest" { found = 1 } END { exit !found }' "$WORK_DIR/$1.tsv" || die "$1/$IMAGE lists no latest tag, expected every tag"
 	awk -F '\t' '$1 !~ /^sha256:[0-9a-f]+$/ || length($1) != 71 || $3 == "" { exit 1 }' "$WORK_DIR/$1.tsv" || die "$1/$IMAGE lists tags without a digest or push date, expected both for each"
-	ok "$1/$IMAGE has $(count < "$WORK_DIR/$1.tsv") tags, $(awk -F '\t' -v arch="$ARCH_TAG_PATTERN" '$2 ~ arch' "$WORK_DIR/$1.tsv" | count) of them arch tags"
+	ok "$1/$IMAGE has $(count < "$WORK_DIR/$1.tsv") tags, $(awk -F '\t' -v pattern="$REMOVE_TAG_PATTERN" '$2 ~ pattern' "$WORK_DIR/$1.tsv" | count) of them arch or sha tags"
 }
 
 manifests_of_kept_tags() {
@@ -248,7 +270,7 @@ write_placeholder() {
 	jq -cnj --arg created "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg empty "$EMPTY_BLOB" '{schemaVersion: 2, mediaType: "application/vnd.oci.image.manifest.v1+json",
 		artifactType: "application/vnd.oci.empty.v1+json", config: {mediaType: "application/vnd.oci.empty.v1+json", digest: $empty, size: 2},
 		layers: [{mediaType: "application/vnd.oci.empty.v1+json", digest: $empty, size: 2}],
-		annotations: {"org.opencontainers.image.created": $created, "org.opencontainers.image.description": "Placeholder that takes arch tags off their images, deleted right after"}}' \
+		annotations: {"org.opencontainers.image.created": $created, "org.opencontainers.image.description": "Placeholder that takes arch and sha tags off their images, deleted right after"}}' \
 		> "$WORK_DIR/placeholder.json"
 	echo "sha256:$(shasum -a 256 "$WORK_DIR/placeholder.json" | cut -d ' ' -f 1)"
 }
@@ -300,13 +322,20 @@ delete_placeholder() {
 			done
 			;;
 		docker.io)
-			while status="$(curl -sS --retry 3 -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer $(registry_token docker.io pull,push,delete)" \
-				"https://registry-1.docker.io/v2/$IMAGE/manifests/$2")" && [ "$status" = 429 ]; do
-				sleep 60
-			done
+			status="$(delete_dockerhub_manifest "$2")"
 			[[ "$status" == 2?? ]] || die "could not delete the placeholder $2 from docker.io, it answered $status, it holds the moved tags until it is deleted"
 			;;
 	esac
+}
+
+delete_dockerhub_manifest() {
+	local status attempt
+	for attempt in {1..30}; do
+		status="$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE -H "Authorization: Bearer $(registry_token docker.io pull,push,delete)" "https://registry-1.docker.io/v2/$IMAGE/manifests/$1")"
+		[[ "$status" == 429 || "$status" == 5?? ]] || break
+		sleep $((status == 429 ? 60 : attempt))
+	done
+	echo "$status"
 }
 
 list_ghcr_versions() {

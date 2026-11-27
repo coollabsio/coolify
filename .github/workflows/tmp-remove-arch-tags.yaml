@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       remove:
-        description: The number of arch tags to remove from the top of the list, 0 only lists them
+        description: The number of arch and sha tags to remove from the top of the list, 0 only lists them
         type: number
         default: 0
 
