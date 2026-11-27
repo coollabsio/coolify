@@ -1506,7 +1506,8 @@ class Show extends Component
             'imageTitle' => $build->git_repository,
             'createdAt' => $build->created_at,
             'duration' => match (true) {
-                $build->started_at === null => $build->status->isFinal() ? '-' : 'Waiting',
+                // The live place in the build queue of the cluster, as in the build log (decision 0035).
+                $build->started_at === null => $build->status->isFinal() ? '-' : (($position = $build->builderQueuePosition()) === null ? 'Waiting' : "Waiting {$position['position']} of {$position['total']}"),
                 ! $build->status->isFinal() => calculateDuration($build->started_at, now()),
                 default => $build->finished_at ? calculateDuration($build->started_at, $build->finished_at) : '-',
             },

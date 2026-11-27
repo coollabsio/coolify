@@ -282,7 +282,10 @@ Built in Coolify and in Sentinel `a7a95d5` (`image.build.concurrent.v1`).
   without a free slot writes "Waiting for a free builder server (position N of
   M)." to its build log and ends its job. A build behind a running build of its
   application writes "Waiting for the running build of this application." The
-  position is the position when the build joins the queue.
+  log line has the position when the build joins the queue. The `Duration`
+  column of the deployment history shows the current position ("Waiting 1 of
+  2") from `NodeBuild::builderQueuePosition()`, the same function as the log
+  line, and updates when the page polls.
 - On "The builder is busy." from Sentinel, the job puts the build back in the
   queue at its old position and writes the refusal to the build log. The
   scheduler tries again within 1 minute, so a refusing builder does not loop.
