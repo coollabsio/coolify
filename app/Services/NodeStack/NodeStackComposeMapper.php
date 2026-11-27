@@ -170,6 +170,9 @@ class NodeStackComposeMapper
                 $command = [...$entrypoint, ...$command];
                 $notes[] = 'The entrypoint runs as the command, after the entrypoint of the image.';
             }
+            if (self::hasProxyLabels($service['labels'] ?? null)) {
+                $notes[] = 'Proxy labels are ignored on Nodes. Use the domain settings of the service.';
+            }
 
             $environment = [];
             foreach (self::environment($service) as $key => $value) {
@@ -229,6 +232,22 @@ class NodeStackComposeMapper
         }
 
         return $services;
+    }
+
+    /**
+     * Whether the Compose labels have a Traefik or Caddy label (decision 0031). Nodes do not
+     * translate them: the domain settings and the proxy options of the service replace them.
+     */
+    public static function hasProxyLabels(mixed $labels): bool
+    {
+        if (! is_array($labels)) {
+            return false;
+        }
+        $keys = array_is_list($labels)
+            ? array_map(fn (mixed $label): string => explode('=', (string) $label, 2)[0], $labels)
+            : array_map(strval(...), array_keys($labels));
+
+        return collect($keys)->contains(fn (string $key): bool => str_starts_with(strtolower(trim($key)), 'traefik.') || str_starts_with(strtolower(trim($key)), 'caddy'));
     }
 
     /**

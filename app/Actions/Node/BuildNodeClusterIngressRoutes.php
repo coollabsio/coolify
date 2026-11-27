@@ -30,14 +30,24 @@ class BuildNodeClusterIngressRoutes
     /**
      * Without `ingress.routes.v2` on every Node, each host gets one route with the old fields only.
      *
-     * @return list<array{host: string, workload_id: string, namespace: string, port: int, path?: string, redirect_host?: string, http_only?: bool, allow_http?: bool, temporary_redirect?: bool, noindex?: bool, strip_path?: bool}>
+     * The proxy options of a workload (decision 0031) are sent only when every Node reports
+     * `ingress.route_options.v1`.
+     *
+     * @return list<array<string, mixed>> host, workload_id, namespace, port, the `ingress.routes.v2` fields, and the options of NodeWorkload::ingressRouteOptions().
      */
     public function handle(NodeCluster $cluster): array
     {
         $routes = [];
         $hostOwners = [];
         $redirects = [];
+        $routeOptions = $cluster->supportsIngressRouteOptions();
         foreach (self::routedWorkloads($cluster) as $workload) {
+            // A Node without `ingress.route_options.v1` would serve the route without its protection,
+            // so the route is left out. AssignNodeToCluster refuses such a Node while this can happen.
+            if (! $routeOptions && $workload->hasProtectedIngressOptions()) {
+                continue;
+            }
+            $options = $routeOptions ? $workload->ingressRouteOptions() : [];
             $flags = ['allow_http' => ! $workload->force_https, 'temporary_redirect' => ! $workload->permanent_redirect];
             $schemes = [];
             foreach ($workload->domain_routes as $route) {
@@ -62,7 +72,8 @@ class BuildNodeClusterIngressRoutes
                     'http_only' => $schemes[$host] === 'http',
                     ...$flags,
                     'noindex' => (bool) ($route['noindex'] ?? false),
-                    'strip_path' => $path !== '',
+                    'strip_path' => $path !== '' && $workload->is_stripprefix_enabled !== false,
+                    ...$options,
                 ];
             }
             foreach (self::wwwRedirects(array_keys($schemes), $workload->www_redirect) as $from => $to) {

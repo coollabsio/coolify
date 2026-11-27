@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Node\BuildNodeClusterIngressRoutes;
 use App\Actions\Node\DispatchWorkloadDeployment;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Enums\NodeImageStorage;
@@ -35,6 +36,9 @@ class NodeCluster extends BaseModel
     public const INGRESS_TLS_CAPABILITY = 'ingress.tls.v1';
 
     public const INGRESS_ROUTES_CAPABILITY = 'ingress.routes.v2';
+
+    /** Basic auth, the IP allow list, headers, and compression of a route (decision 0031). */
+    public const INGRESS_ROUTE_OPTIONS_CAPABILITY = 'ingress.route_options.v1';
 
     protected function casts(): array
     {
@@ -385,6 +389,22 @@ class NodeCluster extends BaseModel
     public function supportsIngressRoutesV2(): bool
     {
         return $this->nodes()->get()->every(fn (Node $node): bool => $node->supportsCapability(self::INGRESS_ROUTES_CAPABILITY) === true);
+    }
+
+    /**
+     * The proxy options of decision 0031 need `ingress.route_options.v1` on every Node of the
+     * cluster: an older Sentinel ignores them and would serve a route without its basic auth or IP
+     * allow list, and an older Corrosion schema has no table for them.
+     */
+    public function supportsIngressRouteOptions(): bool
+    {
+        return $this->nodes()->get()->every(fn (Node $node): bool => $node->supportsCapability(self::INGRESS_ROUTE_OPTIONS_CAPABILITY) === true);
+    }
+
+    /** Whether a workload with domains on this cluster has basic auth or an IP allow list. */
+    public function hasProtectedIngressRoutes(): bool
+    {
+        return BuildNodeClusterIngressRoutes::routedWorkloads($this)->contains(fn (NodeWorkload $workload): bool => $workload->hasProtectedIngressOptions());
     }
 
     /** The ingress Node that orders certificates: the oldest ingress Node that can take commands now. */

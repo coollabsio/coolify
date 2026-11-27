@@ -104,9 +104,10 @@ The www redirect, the HTTP to HTTPS redirect, the redirect type, and
   the user set a new one. **Generate** makes a random password and shows it
   one time.
 - A header name is an HTTP token. A value is at most 1024 printable ASCII
-  characters. Coolify refuses these names: `Host`, `Connection`, `Upgrade`,
-  `Keep-Alive`, `Transfer-Encoding`, `Content-Length`, `TE`, `Trailer`,
-  `Proxy-*`, and `X-Forwarded-*`.
+  characters, without `{` or `}`. Coolify refuses these names: `Host`,
+  `Connection`, `Upgrade`, `Keep-Alive`, `Transfer-Encoding`,
+  `Content-Length`, `Content-Encoding`, `TE`, `Trailer`, `Forwarded`, `Via`,
+  `X-Real-IP`, `Alt-Svc`, `HTTP2-Settings`, `Proxy-*`, and `X-Forwarded-*`.
 - Sentinel writes each header value as literal text. A Caddy placeholder in a
   value does not expand, because a placeholder can read data of the ingress
   Node.
@@ -115,8 +116,8 @@ The www redirect, the HTTP to HTTPS redirect, the redirect type, and
   sends the client to the protected host.
 - The ACME challenge answers of the issuer (decision 0005) stay outside of
   the routes, so auth and the allow list do not stop a renewal.
-- Coolify validates every rule on save (`UpdateNodeWorkloadDomains`, the
-  Livewire page, and the API of decision 0029). Sentinel validates the same
+- Coolify validates every rule on save (`UpdateNodeWorkloadProxyOptions`,
+  which the Livewire page and the API of decision 0029 use). Sentinel validates the same
   rules again. `BuildNodeClusterIngressRoutes` skips a route that fails them,
   like it skips an invalid host today.
 
@@ -126,7 +127,8 @@ The www redirect, the HTTP to HTTPS redirect, the redirect type, and
   Sentinel version adds all of them, like `workload.runtime_options.v1` in
   decision 0028.
 - New fields on `IngressRoute` in `control.proto`. Sentinel stores them in
-  new columns of `ingress_http_routes`, in the same transaction as the route.
+  the new Corrosion table `ingress_route_options`, in the same transaction as
+  the route (see "Implementation notes").
 - The API never returns the hash. In the API, the password is write-only.
 
 ### Versions fail closed
@@ -177,7 +179,7 @@ So:
   do this: Sentinel renders each option inside its own route, and a host
   belongs to one workload.
 - **Hashes in Corrosion.** Every Node of the cluster replicates
-  `ingress_http_routes`. Root on any Node can read the hashes. This includes a
+  `ingress_route_options`. Root on any Node can read the hashes. This includes a
   member whose grant gives root on a workload Node. So Corrosion holds only
   hashes, never a password, and **Generate** gives a strong password by
   default.
@@ -213,6 +215,67 @@ the text above.
   without the capability. It does not take the domain offline.
 - **Free-form Caddy config.** Not for now, also not for team admins. Decide
   again after the beta.
+
+## Implementation notes (2026-11-27)
+
+Built in Sentinel `9a4deb5` and on Coolify `v5-progress`. The code showed
+four rules of this decision to be wrong or incomplete. The text above is
+changed where it was wrong.
+
+- **A separate Corrosion table, not new columns.** Sentinel stores the
+  options as JSON in `ingress_route_options` (`host`, `path`, `options`,
+  `revision`), in the same transaction as the route. The route query joins
+  the row of the same revision. Reason: a row exists only for a route with
+  options. So in a cluster with an older Sentinel, Corrosion never
+  replicates a change of a column or a table that an older schema does not
+  have while no option is set. New columns on `ingress_http_routes` would
+  change every row.
+- **Stored options fail closed.** If the stored options of a route do not
+  parse (unknown field, broken JSON, or a rule that fails), the ingress
+  answers `503` for that route. It does not serve the route without them.
+- **Header values cannot have `{` or `}`.** Caddy expands a placeholder in a
+  `headers` value, and an escape is not available for each Caddy version.
+  Coolify and Sentinel refuse the characters. The list of refused names is
+  longer than the first list: `Content-Encoding` (the `encode` handler sets
+  it), `Forwarded`, `Via`, `X-Real-IP`, `Alt-Svc`, and `HTTP2-Settings`.
+- **Only a protected option refuses a join, and on any Node.** The answer
+  "refuse the join of an ingress Node" is changed in two ways:
+  - Coolify sends the options only when every Node of the cluster has the
+    capability, because every Node writes the routes to Corrosion. So
+    `AssignNodeToCluster` refuses each Node without the capability, not only
+    an ingress Node.
+  - Only basic auth and the IP allow list refuse a join. Compression is on
+    by default, so a refusal for any option would refuse each join.
+    Headers and compression are not sent until every Node has the
+    capability. The page shows this.
+  If an old Node is in the cluster already, Coolify refuses to save a
+  protected option, and `BuildNodeClusterIngressRoutes` leaves out a
+  protected route (fail closed).
+- **Order of the handlers.** `remote_ip` (else `403`), `authentication`
+  with `http_basic` (bcrypt, hash cache), `noindex`, request headers,
+  response headers (`deferred`, so they replace a header of the upstream),
+  `encode` (`zstd`, `gzip`), the path strip, then `reverse_proxy`. Checked
+  with Caddy 2.11.7.
+- **Coolify.** Columns on `node_workloads` (migration
+  `2026_11_27_200000`): the password has an encrypted cast, and both the
+  password and the hash are hidden. `UpdateNodeWorkloadProxyOptions` saves
+  the options, makes a new bcrypt hash (cost 10) only for a new password,
+  and queues a network revision. The **Domains** page of cluster
+  applications and stack services has the options. A preview copies them.
+  The API domains endpoint takes them. It returns the password only to a
+  token with `read:sensitive`, and never returns the hash. The stack mapper
+  adds the proxy label note. `IssueFluxCredential` grants the capability.
+- **Live checks on cluster 1 (2026-11-27).** Basic auth: `401` without
+  credentials, `200` with them, `401` with a wrong password or user. IP
+  allow list: `200` from an allowed address and `403` from a blocked
+  address, from the host and from a Node. Response and request headers,
+  compression on and off, and the path strip on and off. A forbidden header
+  and a placeholder get `422`. The routes still work after a Sentinel
+  restart and after a redeploy. Corrosion replicates the options row to the
+  Node that is not an ingress. A member with a write grant on one
+  application changes it and gets `404` on another. A token of another team
+  gets `404`. A Node without the capability cannot join while a protected
+  route exists.
 
 ## Not decided here
 

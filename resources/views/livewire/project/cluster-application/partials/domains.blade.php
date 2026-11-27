@@ -184,6 +184,10 @@
 
     <livewire:project.cluster-application.domain-dns :workload="$workload" wire:key="cluster-application-domain-dns-{{ $workload->uuid }}" />
 
+    @unless ($workload->isDatabase())
+        <livewire:project.cluster-application.proxy-options :workload="$workload" wire:key="cluster-application-proxy-options-{{ $workload->uuid }}" />
+    @endunless
+
     @if ($hasRows)
         <x-application.settings-section id="cluster-application-domain-redirects" title="Redirects"
             helper="Applies to all domains of this application.">

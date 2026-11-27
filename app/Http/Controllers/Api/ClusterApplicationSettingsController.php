@@ -6,6 +6,7 @@ use App\Actions\Node\MoveNodeWorkload;
 use App\Actions\Node\PublishNodeWorkloadPort;
 use App\Actions\Node\RemoveNodePublishedPort;
 use App\Actions\Node\UpdateNodeWorkloadDomains;
+use App\Actions\Node\UpdateNodeWorkloadProxyOptions;
 use App\Actions\Node\UpdateNodeWorkloadResources;
 use App\Actions\Sentinel\FetchContainerLogs;
 use App\Http\Controllers\Api\Concerns\HandlesClusterResourcesApi;
@@ -26,7 +27,7 @@ class ClusterApplicationSettingsController extends Controller
 
     #[OA\Patch(
         summary: 'Update Domains',
-        description: 'Replace the domains of a cluster application. Ingress servers apply them without a redeploy. A domain without a scheme gets https. A port in a URL is the port of the container.',
+        description: 'Replace the domains of a cluster application, or change its redirects and proxy options. Ingress servers apply them without a redeploy. A domain without a scheme gets https. A port in a URL is the port of the container. Basic auth and the IP allow list need Sentinel with `ingress.route_options.v1` on every server of the cluster.',
         path: '/cluster-applications/{uuid}/domains',
         operationId: 'update-cluster-application-domains',
         security: [['bearerAuth' => []]],
@@ -39,6 +40,14 @@ class ClusterApplicationSettingsController extends Controller
                 'force_https' => new OA\Property(property: 'force_https', type: 'boolean'),
                 'www_redirect' => new OA\Property(property: 'www_redirect', type: 'string', enum: ['both', 'www', 'non-www']),
                 'permanent_redirect' => new OA\Property(property: 'permanent_redirect', type: 'boolean'),
+                'is_http_basic_auth_enabled' => new OA\Property(property: 'is_http_basic_auth_enabled', type: 'boolean'),
+                'http_basic_auth_username' => new OA\Property(property: 'http_basic_auth_username', type: 'string', description: '1 to 64 printable ASCII characters, without `:`.'),
+                'http_basic_auth_password' => new OA\Property(property: 'http_basic_auth_password', type: 'string', description: '8 to 72 printable ASCII characters. Coolify sends only a bcrypt hash to the servers.'),
+                'ingress_allowed_ips' => new OA\Property(property: 'ingress_allowed_ips', type: 'array', items: new OA\Items(type: 'string'), description: 'At most 32 IP addresses or CIDR ranges. Other addresses get 403. An empty list allows every address.'),
+                'ingress_request_headers' => new OA\Property(property: 'ingress_request_headers', type: 'array', items: new OA\Items(ref: '#/components/schemas/ClusterIngressHeader'), description: 'At most 16. Connection, framing, proxy, and forwarding headers are refused, and a value cannot have `{` or `}`.'),
+                'ingress_response_headers' => new OA\Property(property: 'ingress_response_headers', type: 'array', items: new OA\Items(ref: '#/components/schemas/ClusterIngressHeader'), description: 'At most 16, with the rules of the request headers.'),
+                'is_gzip_enabled' => new OA\Property(property: 'is_gzip_enabled', type: 'boolean'),
+                'is_stripprefix_enabled' => new OA\Property(property: 'is_stripprefix_enabled', type: 'boolean'),
             ],
         )),
         responses: [
@@ -61,12 +70,29 @@ class ClusterApplicationSettingsController extends Controller
             'force_https' => 'boolean',
             'www_redirect' => 'string|in:both,www,non-www',
             'permanent_redirect' => 'boolean',
+            'is_http_basic_auth_enabled' => 'boolean',
+            'http_basic_auth_username' => 'nullable|string',
+            'http_basic_auth_password' => 'nullable|string',
+            'ingress_allowed_ips' => 'nullable|array',
+            'ingress_allowed_ips.*' => 'string',
+            'ingress_request_headers' => 'nullable|array',
+            'ingress_request_headers.*.name' => 'required|string',
+            'ingress_request_headers.*.value' => 'present|nullable|string',
+            'ingress_response_headers' => 'nullable|array',
+            'ingress_response_headers.*.name' => 'required|string',
+            'ingress_response_headers.*.value' => 'present|nullable|string',
+            'is_gzip_enabled' => 'boolean',
+            'is_stripprefix_enabled' => 'boolean',
         ]);
         if ($invalid !== null) {
             return $invalid;
         }
 
         return $this->runClusterAction(function () use ($request, $workload): JsonResponse {
+            $proxyKeys = ['is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'ingress_allowed_ips', 'ingress_request_headers', 'ingress_response_headers', 'is_gzip_enabled', 'is_stripprefix_enabled'];
+            if ($request->hasAny($proxyKeys)) {
+                $workload = UpdateNodeWorkloadProxyOptions::run($workload, $request->only($proxyKeys), $request->user());
+            }
             $routes = $request->has('domains')
                 ? UpdateNodeWorkloadDomains::routesFromUrls($workload, $request->input('domains', []))
                 : ($workload->domain_routes ?? []);

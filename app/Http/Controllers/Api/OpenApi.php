@@ -206,6 +206,14 @@ use OpenApi\Attributes as OA;
             type: 'object',
         ),
         new OA\Schema(
+            schema: 'ClusterIngressHeader',
+            type: 'object',
+            properties: [
+                new OA\Property(property: 'name', type: 'string', example: 'X-Frame-Options'),
+                new OA\Property(property: 'value', type: 'string', example: 'DENY'),
+            ],
+        ),
+        new OA\Schema(
             schema: 'ClusterApplication',
             type: 'object',
             properties: [
@@ -234,6 +242,14 @@ use OpenApi\Attributes as OA;
                 new OA\Property(property: 'force_https', type: 'boolean'),
                 new OA\Property(property: 'www_redirect', type: 'string', nullable: true),
                 new OA\Property(property: 'permanent_redirect', type: 'boolean'),
+                new OA\Property(property: 'is_http_basic_auth_enabled', type: 'boolean'),
+                new OA\Property(property: 'http_basic_auth_username', type: 'string', nullable: true),
+                new OA\Property(property: 'http_basic_auth_password', type: 'string', nullable: true, description: 'Only for a token that may read sensitive data.'),
+                new OA\Property(property: 'ingress_allowed_ips', type: 'array', items: new OA\Items(type: 'string')),
+                new OA\Property(property: 'ingress_request_headers', type: 'array', items: new OA\Items(ref: '#/components/schemas/ClusterIngressHeader')),
+                new OA\Property(property: 'ingress_response_headers', type: 'array', items: new OA\Items(ref: '#/components/schemas/ClusterIngressHeader')),
+                new OA\Property(property: 'is_gzip_enabled', type: 'boolean'),
+                new OA\Property(property: 'is_stripprefix_enabled', type: 'boolean'),
                 new OA\Property(property: 'internal_hostname', type: 'string', nullable: true),
                 new OA\Property(property: 'cpu_limit', type: 'number', nullable: true),
                 new OA\Property(property: 'cpu_reservation', type: 'number', nullable: true),

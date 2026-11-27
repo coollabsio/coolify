@@ -43,6 +43,7 @@ class IssueFluxCredential
             'ingress.reconcile.v1',
             'ingress.tls.v1',
             'ingress.routes.v2',
+            'ingress.route_options.v1',
             'logs.read.v1',
             'container.logs.v1',
             'trust.bundle.update.v1',

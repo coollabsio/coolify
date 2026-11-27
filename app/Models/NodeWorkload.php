@@ -41,7 +41,7 @@ class NodeWorkload extends BaseModel
         'manual_webhook_secret_gitea',
     ];
 
-    protected $hidden = self::MANUAL_WEBHOOK_SECRETS;
+    protected $hidden = [...self::MANUAL_WEBHOOK_SECRETS, 'http_basic_auth_password', 'http_basic_auth_password_hash'];
 
     protected $attributes = [
         'www_redirect' => 'both',
@@ -55,6 +55,15 @@ class NodeWorkload extends BaseModel
         'is_auto_deploy_enabled' => true,
         'is_auto_cancel_queued_deployments_enabled' => true,
         'is_auto_cancel_building_deployments_enabled' => false,
+        'is_http_basic_auth_enabled' => false,
+        'is_gzip_enabled' => true,
+        'is_stripprefix_enabled' => true,
+    ];
+
+    /** The proxy options of the domains (decision 0031). A preview copies them from its parent. */
+    public const PROXY_OPTION_COLUMNS = [
+        'is_http_basic_auth_enabled', 'http_basic_auth_username', 'http_basic_auth_password', 'http_basic_auth_password_hash',
+        'ingress_allowed_ips', 'ingress_request_headers', 'ingress_response_headers', 'is_gzip_enabled', 'is_stripprefix_enabled',
     ];
 
     /** The v4 default: the pull request number in front of each domain of the parent. */
@@ -101,7 +110,44 @@ class NodeWorkload extends BaseModel
             'preview_deployments_enabled' => 'boolean',
             'fork_preview_deployments_enabled' => 'boolean',
             'preview_uses_production_values' => 'boolean',
+            'is_http_basic_auth_enabled' => 'boolean',
+            'http_basic_auth_password' => 'encrypted',
+            'ingress_allowed_ips' => 'array',
+            'ingress_request_headers' => 'array',
+            'ingress_response_headers' => 'array',
+            'is_gzip_enabled' => 'boolean',
+            'is_stripprefix_enabled' => 'boolean',
         ];
+    }
+
+    /**
+     * Whether a proxy option protects the domains: basic auth or an IP allow list (decision 0031).
+     * Without `ingress.route_options.v1` on every Node of the cluster, these routes are not served.
+     */
+    public function hasProtectedIngressOptions(): bool
+    {
+        return ($this->is_http_basic_auth_enabled && filled($this->http_basic_auth_password_hash))
+            || filled($this->ingress_allowed_ips);
+    }
+
+    /**
+     * The proxy options of each ingress route of this workload, as `ingress.route_options.v1`
+     * takes them. Empty fields are left out.
+     *
+     * @return array{basic_auth_username?: string, basic_auth_password_hash?: string, allowed_ips?: list<string>, request_headers?: list<array{name: string, value: string}>, response_headers?: list<array{name: string, value: string}>, compress?: bool}
+     */
+    public function ingressRouteOptions(): array
+    {
+        $headers = fn (?array $list): array => array_values(array_map(fn (array $header): array => ['name' => (string) $header['name'], 'value' => (string) $header['value']], $list ?? []));
+
+        return array_filter([
+            'basic_auth_username' => $this->is_http_basic_auth_enabled && filled($this->http_basic_auth_password_hash) ? (string) $this->http_basic_auth_username : null,
+            'basic_auth_password_hash' => $this->is_http_basic_auth_enabled ? $this->http_basic_auth_password_hash : null,
+            'allowed_ips' => array_values($this->ingress_allowed_ips ?? []),
+            'request_headers' => $headers($this->ingress_request_headers),
+            'response_headers' => $headers($this->ingress_response_headers),
+            'compress' => (bool) $this->is_gzip_enabled,
+        ], fn ($value): bool => $value !== null && $value !== [] && $value !== false && $value !== '');
     }
 
     protected static function booted(): void

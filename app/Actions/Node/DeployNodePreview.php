@@ -46,6 +46,7 @@ class DeployNodePreview
         'health_check_scheme', 'health_check_host', 'health_check_port', 'health_check_path',
         'health_check_return_code', 'health_check_response_text', 'health_check_interval',
         'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'custom_healthcheck_found',
+        ...NodeWorkload::PROXY_OPTION_COLUMNS,
     ];
 
     /** The variable columns that a preview copies from the resolved variables of its parent. */
@@ -84,7 +85,8 @@ class DeployNodePreview
             throw new RuntimeException('The cluster network is not ready.');
         }
 
-        [$preview, $created, $forkChanged] = DB::transaction(function () use ($parent, $node, $pullRequestId, $ref, $url, $fromFork, $existing, $requestedBy): array {
+        $proxyChanged = false;
+        [$preview, $created, $forkChanged] = DB::transaction(function () use ($parent, $node, $pullRequestId, $ref, $url, $fromFork, $existing, $requestedBy, &$proxyChanged): array {
             NodeWorkload::query()->withoutGlobalScopes()->lockForUpdate()->findOrFail($parent->id);
             $preview = NodeWorkload::query()->withoutGlobalScopes()
                 ->where('preview_of_id', $parent->id)
@@ -119,6 +121,10 @@ class DeployNodePreview
                 EnsureNodeWorkloadDnsNames::run($node);
             } else {
                 $preview->update($values);
+                // The routes of the preview carry the proxy options of the parent (decision 0031).
+                if ($preview->wasChanged(NodeWorkload::PROXY_OPTION_COLUMNS) && $preview->hasIngressRoutes()) {
+                    $proxyChanged = true;
+                }
             }
             $this->createMissingVolumes($parent, $preview);
             $this->writeVariables($preview, $parent->resolvedPreviewVariables($fromFork));
@@ -127,7 +133,7 @@ class DeployNodePreview
         });
 
         $domainError = $created ? $this->applyDomains($parent, $preview, $cluster, $requestedBy) : null;
-        if ($forkChanged) {
+        if ($forkChanged || $proxyChanged) {
             // The outbound allows of the parent follow the fork flag (decision 0025).
             QueueNodeClusterNetworkRevision::run($cluster, $requestedBy);
         }

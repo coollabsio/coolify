@@ -33,6 +33,12 @@ class AssignNodeToCluster
             if ($node->node_cluster_id !== null && $node->node_cluster_id !== $cluster->id) {
                 throw new DomainException('The server already belongs to another cluster. Remove it before assigning it again.');
             }
+            // Coolify sends the proxy options only when every Node has the capability (decision 0031).
+            if ($node->node_cluster_id === null
+                && $node->supportsCapability(NodeCluster::INGRESS_ROUTE_OPTIONS_CAPABILITY) !== true
+                && $cluster->hasProtectedIngressRoutes()) {
+                throw new DomainException('A domain of this cluster uses basic auth or an IP allow list, and the Sentinel of this server does not support them. Upgrade Sentinel on this server first. Otherwise the cluster cannot protect these domains.');
+            }
             $ip = $node->wireguard_ip;
             if ($node->node_cluster_id === null) {
                 $containedAddress = PrivateIpv4Cidr::firstContainedAddress($cluster->cidr, $knownAddresses);
