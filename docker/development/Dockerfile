@@ -9,8 +9,23 @@ ARG CLOUDFLARED_VERSION=2026.11.1
 ARG POSTGRES_VERSION=18
 # https://nginx.org/en/linux_packages.html
 ARG NGINX_VERSION=1.31.9-r1
+# https://hub.docker.com/r/peakimages/aube/tags?name=node26
+ARG AUBE_IMAGE=docker.io/peakimages/aube:2.11.0-node26-v0.1.0@sha256:77780eeb44d92b07585af01d089b678e2410b513014d0d136749d91dc7aa4e31
 # https://pecl.php.net/package/uv
 ARG PHP_UV_VERSION=0.3.1
+
+# =================================================================
+# Terminal dependencies (match the development Node.js ABI and libc)
+# =================================================================
+FROM ${AUBE_IMAGE} AS terminal-dependencies
+
+RUN apk add --no-cache make g++ python3
+WORKDIR /terminal
+COPY package.json aube-lock.yaml aube-workspace.yaml ./
+RUN --mount=type=cache,target=/root/.local/share/aube \
+    aube install --prod --frozen-lockfile
+COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
+COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
 
 # =================================================================
 # Get MinIO client
@@ -61,11 +76,8 @@ RUN apk upgrade --no-cache && \
 # Install system dependencies
 RUN apk add --no-cache \
     postgresql${POSTGRES_VERSION}-client \
-    nodejs \
-    npm \
-    make \
-    g++ \
-    python3 \
+    libstdc++ \
+    libatomic \
     openssh-client \
     openssl \
     git \
@@ -99,12 +111,8 @@ COPY docker/production/etc/php-fpm.d/zzzz-coolify-listen.conf /usr/local/etc/php
 ENV PHP_OPCACHE_ENABLE=0
 
 # Install terminal WebSocket server dependencies
-COPY docker/coolify-terminal/package*.json /terminal/
-RUN npm ci --prefix /terminal && \
-    npm rebuild node-pty --prefix /terminal --update-binary
-COPY docker/coolify-terminal/terminal-server.js /terminal/terminal-server.js
-COPY docker/coolify-terminal/terminal-utils.js /terminal/terminal-utils.js
-RUN chown -R www-data:www-data /terminal
+COPY --from=terminal-dependencies /usr/local/bin/node /usr/local/bin/node
+COPY --from=terminal-dependencies --chown=www-data:www-data /terminal /terminal
 
 # Configure the Nginx site of the base image
 ENV NGINX_CLIENT_MAX_BODY_SIZE=2048M
