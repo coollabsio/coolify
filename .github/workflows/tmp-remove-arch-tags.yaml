@@ -2,6 +2,11 @@ name: TMP Remove arch tags
 
 on:
   workflow_dispatch:
+    inputs:
+      remove:
+        description: The number of arch tags to remove from the top of the list, 0 only lists them
+        type: number
+        default: 0
 
 permissions: {}
 
@@ -21,6 +26,7 @@ jobs:
     if: ${{ github.repository == 'coollabsio/coolify' }}
     permissions:
       contents: read
+      actions: write # to disable this workflow after a failure
     environment:
       name: cleanup
       deployment: false
@@ -32,17 +38,32 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: List the arch tags to remove
+      - name: Remove the arch tags
         env:
+          GH_TOKEN: ${{ secrets.GHCR_CLEANUP_TOKEN }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_CLEANUP_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_CLEANUP_TOKEN }}
-        run: scripts/tmp-remove-arch-tags.sh
+          REMOVE: ${{ inputs.remove }}
+        run: |
+          if [ "$REMOVE" = 0 ]; then
+            scripts/tmp-remove-arch-tags.sh
+          else
+            scripts/tmp-remove-arch-tags.sh --remove "$REMOVE"
+          fi
 
-      - name: Upload the list of arch tags to remove
+      - name: Upload the lists of arch tags
         if: ${{ always() }}
         uses: actions/upload-artifact@v7.0.2
         with:
-          name: arch-tags-to-remove
-          path: scripts/arch-tags-to-remove.tsv
+          name: arch-tags
+          path: |
+            scripts/arch-tags-to-remove.tsv
+            scripts/removed-arch-tags.tsv
           if-no-files-found: ignore
           retention-days: 90
+
+      - name: Disable this workflow after a failure
+        if: ${{ failure() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow disable tmp-remove-arch-tags.yaml --repo "$GITHUB_REPOSITORY"
