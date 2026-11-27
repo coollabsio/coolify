@@ -13,7 +13,8 @@ use Illuminate\Support\Facades\Log;
  *
  * This function provides a centralized, cached access point for all
  * version data in the application. It reads the copy of versions.json of the CDN
- * that refresh_versions_file() keeps on this node, or the upstream.json of the image until then.
+ * that refresh_versions_file() keeps on this node. The helper, Sentinel and Traefik versions are never older than the
+ * minimum versions that upstream.json pins for their line, also before the first update check or when the CDN has older ones.
  * Data is cached in Redis for 1 hour and shared across all servers in the cluster.
  *
  * @return array{coolify: array{version: string}, helper?: array{version: string}, sentinel?: array{version: string}, traefik?: array<string, string>}
@@ -21,15 +22,28 @@ use Illuminate\Support\Facades\Log;
 function get_versions_data(): array
 {
     return Cache::remember('coolify:versions', 3600, function () {
+        $versions = ['coolify' => ['version' => config('constants.coolify.version')]];
         $versionsPath = storage_path('app/versions.json');
-        if (! File::exists($versionsPath)) {
-            return ['coolify' => ['version' => config('constants.coolify.version')]] + json_decode(File::get(base_path('upstream.json')), true);
+        if (File::exists($versionsPath)) {
+            $channels = json_decode(File::get($versionsPath), true);
+            $channel = newest_update_channel($channels);
+            $versions = $channels[$channel] + ['upgrade_script_url' => upgrade_script_url($channel)];
+            if (version_compare(config('constants.coolify.version'), $versions['coolify']['version'], '>')) {
+                $versions['coolify']['version'] = config('constants.coolify.version');
+            }
         }
-        $channels = json_decode(File::get($versionsPath), true);
-        $channel = newest_update_channel($channels);
-        $versions = $channels[$channel] + ['upgrade_script_url' => upgrade_script_url($channel)];
-        if (version_compare(config('constants.coolify.version'), $versions['coolify']['version'], '>')) {
-            $versions['coolify']['version'] = config('constants.coolify.version');
+        foreach (json_decode(File::get(base_path('upstream.json')), true) as $name => $lines) {
+            foreach ($lines as $line => $pin) {
+                $latest = (string) ($name === 'traefik' ? data_get($versions, ['traefik', $line]) : data_get($versions, [$name, 'version']));
+                if (str_starts_with($latest, substr($line, 1).'.') && version_compare($latest, $pin['version'], '>=')) {
+                    continue;
+                }
+                if ($name === 'traefik') {
+                    $versions['traefik'][$line] = $pin['version'];
+                } else {
+                    $versions[$name] = $pin;
+                }
+            }
         }
 
         return $versions;

@@ -9,8 +9,7 @@ $sshCommandTimeout = (int) env('SSH_COMMAND_TIMEOUT', 3600);
 return [
     'coolify' => [
         'version' => env('COOLIFY_VERSION') ?: $release['stable']['coolify'],
-        'helper_version' => $upstream['helper']['version'],
-        'railpack_version' => '0.43.0',
+        'helper_version' => current($upstream['helper'])['version'],
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),
         'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),

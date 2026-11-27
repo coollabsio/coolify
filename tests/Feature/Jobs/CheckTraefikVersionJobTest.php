@@ -25,10 +25,10 @@ it('upstream.json contains traefik branches with patch versions', function () {
     $versions = json_decode(File::get($versionsPath), true);
     expect($versions)->toHaveKey('traefik');
 
-    $traefikVersions = $versions['traefik'];
-    expect($traefikVersions)->toBeArray();
+    expect($versions['traefik'])->toBeArray();
+    $traefikVersions = array_map(fn (array $pin) => $pin['version'], $versions['traefik']);
 
-    // Each branch should have format like "v3.6" => "3.6.0"
+    // Each branch should have format like "v3.6" => {"version": "3.6.0"}
     foreach ($traefikVersions as $branch => $version) {
         expect($branch)->toMatch('/^v\d+\.\d+$/'); // e.g., "v3.6"
         expect($version)->toMatch('/^\d+\.\d+\.\d+$/'); // e.g., "3.6.0"

@@ -17,7 +17,7 @@ it('checks installed Traefik versions after refreshing available versions', func
     Bus::fake();
     Http::fake([
         '*' => Http::response([
-            'stable' => ['coolify' => ['version' => '4.0.10'], 'traefik' => ['v3.7' => '3.7.13']],
+            'stable' => ['coolify' => ['version' => '4.0.10'], 'traefik' => ['v3.7' => '3.7.999']],
         ]),
     ]);
     InstanceSettings::forceCreate(['id' => 0]);
@@ -31,5 +31,5 @@ it('checks installed Traefik versions after refreshing available versions', func
     (new CheckForUpdatesJob)->handle();
 
     Bus::assertDispatched(CheckTraefikVersionJob::class);
-    expect(get_traefik_versions())->toBe(['v3.7' => '3.7.13']);
+    expect(get_traefik_versions()['v3.7'])->toBe('3.7.999');
 });

@@ -195,7 +195,7 @@ The pull request workflow builds every pull request and publishes the image of a
 - The preview channel takes betas and release candidates, alphas reach the nightly channel only
 - The stable channel opens a pull request from `sync/stable-v<version>`, squash merge it. A new sync of the same version updates it, a sync of a newer version closes it
 - `CDN_TOKEN` in the environment `release` is a fine-grained token for `coollabsio/coollabs-cdn` alone, with read and write access to contents and pull requests
-- `/coolify/versions.json` has a `stable`, `preview` and `nightly` block, each with the Coolify version of its channel and the helper, Sentinel and Traefik versions of the `upstream.json` it was synced from. An instance takes the newest version of its channel and the more stable ones
+- `/coolify/versions.json` has a `stable`, `preview` and `nightly` block, each with the Coolify version of its channel, the Traefik versions of the `upstream.json` it was synced from, and the helper and Sentinel versions that their own releases set. An instance takes the newest version of its channel and the more stable ones
 - Every stable sync also sets the `coolify` and `traefik` keys, which older instances read, to the stable versions, so older instances upgrade to a version that reads the blocks
 
 Cloudflare keeps a file of the CDN for up to 10 minutes. To clear the cache sooner, for example once the pull request of the stable channel is merged and deployed, set `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ZONE_ID` in `.env` or the environment, with a token that can purge the cache of the zone:
@@ -206,7 +206,7 @@ scripts/sync-cdn.sh --purge
 
 ## Update the helper, Sentinel or Traefik
 
-`upstream.json` pins them. A change of it releases nothing, every Coolify instance reads the versions from the CDN. To ship it before the next release, sync the stable channel on `main`:
+`upstream.json` pins them. A change of it releases nothing, every Coolify instance reads the versions from the CDN. The helper and Sentinel set their versions on the CDN with their own releases. To ship a Traefik change before the next release, sync the stable channel on `main`:
 
 ```sh
 scripts/sync-cdn.sh --stable <latest version>

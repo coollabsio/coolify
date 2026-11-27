@@ -362,7 +362,7 @@ The summary reads as one sentence with the heading of its section, never in the 
 | Pull request image `pr-<number>` | PR from a branch of this repository | Automatic, on each push |
 
 - `upstream.json` pins the helper, Sentinel, and Traefik versions. A change of `upstream.json` releases nothing. `RELEASE.md` tells how to ship it.
-- The helper image is in [coollabsio/coolify-helper](https://github.com/coollabsio/coolify-helper). Change it there, not in this repository.
+- The helper image is in [coollabsio/coolify-helper](https://github.com/coollabsio/coolify-helper). Change it there, not in this repository. The releases of the helper and Sentinel set their versions on the CDN.
 
 <laravel-boost-guidelines>
 === foundation rules ===
