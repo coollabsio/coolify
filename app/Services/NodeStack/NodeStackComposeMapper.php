@@ -359,19 +359,21 @@ class NodeStackComposeMapper
      * @param  array<string, mixed>  $service
      * @param  array<string, string>  $variables
      * @param  list<string>  $usedPaths  The mount paths of the volumes, files, and sockets of the service.
+     * @param  string|null  $subject  The start of an error message. Default: "The service <name>".
      * @return array{shm_size_bytes?: int, ulimits?: list<array{name: string, soft: int, hard: int}>, tmpfs?: list<array{path: string, size_bytes: int}>, stop_timeout_seconds?: int, tty?: true, stdin_open?: true}
      *
      * @throws RuntimeException When a value breaks a rule.
      */
-    private static function runtimeOptions(string $serviceName, array $service, array $variables, ?int $memoryLimit, array $usedPaths): array
+    public static function runtimeOptions(string $serviceName, array $service, array $variables, ?int $memoryLimit, array $usedPaths, ?string $subject = null): array
     {
+        $subject ??= "{$subject}";
         $value = fn (mixed $value): mixed => is_string($value) ? trim(self::interpolate($value, $variables)) : $value;
-        $memorySize = function (string $key, int $bytes) use ($serviceName, $memoryLimit): void {
+        $memorySize = function (string $key, int $bytes) use ($subject, $memoryLimit): void {
             if ($bytes < 1 || $bytes > self::MAX_RUNTIME_MEMORY_BYTES) {
-                throw new RuntimeException("The service {$serviceName} sets {$key} to more than 16 GiB or to 0.");
+                throw new RuntimeException("{$subject} sets {$key} to more than 16 GiB or to 0.");
             }
             if ($memoryLimit !== null && $bytes > $memoryLimit) {
-                throw new RuntimeException("The service {$serviceName} sets {$key} larger than its memory limit.");
+                throw new RuntimeException("{$subject} sets {$key} larger than its memory limit.");
             }
         };
         $options = [];
@@ -380,7 +382,7 @@ class NodeStackComposeMapper
         if (filled($shm)) {
             $bytes = self::bytes($shm);
             if ($bytes === null) {
-                throw new RuntimeException("The service {$serviceName} sets shm_size: {$shm}. Use a size, for example 256m or 1g.");
+                throw new RuntimeException("{$subject} sets shm_size: {$shm}. Use a size, for example 256m or 1g.");
             }
             $memorySize('shm_size', $bytes);
             $options['shm_size_bytes'] = $bytes;
@@ -389,10 +391,10 @@ class NodeStackComposeMapper
         $ulimits = $service['ulimits'] ?? null;
         if (filled($ulimits)) {
             if (! is_array($ulimits) || array_is_list($ulimits)) {
-                throw new RuntimeException("The service {$serviceName} sets ulimits: to a value that is not a map of names.");
+                throw new RuntimeException("{$subject} sets ulimits: to a value that is not a map of names.");
             }
             if (count($ulimits) > self::MAX_ULIMITS) {
-                throw new RuntimeException("The service {$serviceName} sets more than ".self::MAX_ULIMITS.' ulimits.');
+                throw new RuntimeException("{$subject} sets more than ".self::MAX_ULIMITS.' ulimits.');
             }
             $limit = function (mixed $limit) use ($value): ?int {
                 $limit = $value($limit);
@@ -402,7 +404,7 @@ class NodeStackComposeMapper
             foreach ($ulimits as $name => $setting) {
                 $name = (string) $name;
                 if (! in_array($name, self::ULIMIT_NAMES, true)) {
-                    throw new RuntimeException("The service {$serviceName} sets the ulimit {$name}, which Nodes do not support. Use ".implode(', ', self::ULIMIT_NAMES).'.');
+                    throw new RuntimeException("{$subject} sets the ulimit {$name}, which Nodes do not support. Use ".implode(', ', self::ULIMIT_NAMES).'.');
                 }
                 [$soft, $hard] = is_array($setting)
                     ? [$limit($setting['soft'] ?? null), $limit($setting['hard'] ?? null)]
@@ -413,7 +415,7 @@ class NodeStackComposeMapper
                     default => $soft >= 0 && $hard >= 0 && $soft <= $hard,
                 };
                 if (! $valid) {
-                    throw new RuntimeException("The service {$serviceName} sets the ulimit {$name} to an invalid value. Use a number, or soft and hard with soft not above hard; -1 is unlimited.");
+                    throw new RuntimeException("{$subject} sets the ulimit {$name} to an invalid value. Use a number, or soft and hard with soft not above hard; -1 is unlimited.");
                 }
                 $options['ulimits'][] = ['name' => $name, 'soft' => $soft, 'hard' => $hard];
             }
@@ -423,28 +425,28 @@ class NodeStackComposeMapper
         if (filled($tmpfs)) {
             $entries = is_array($tmpfs) ? $tmpfs : [$tmpfs];
             if (count($entries) > self::MAX_TMPFS) {
-                throw new RuntimeException("The service {$serviceName} sets more than ".self::MAX_TMPFS.' tmpfs mounts.');
+                throw new RuntimeException("{$subject} sets more than ".self::MAX_TMPFS.' tmpfs mounts.');
             }
             $paths = [];
             foreach ($entries as $entry) {
                 if (! is_string($entry)) {
-                    throw new RuntimeException("The service {$serviceName} sets tmpfs: to a value that is not a path.");
+                    throw new RuntimeException("{$subject} sets tmpfs: to a value that is not a path.");
                 }
                 [$path, $mountOptions] = array_pad(explode(':', $value($entry), 2), 2, '');
                 $size = 0;
                 foreach (array_filter(explode(',', $mountOptions)) as $option) {
                     $bytes = str_starts_with($option, 'size=') ? self::bytes(substr($option, 5)) : null;
                     if ($bytes === null) {
-                        throw new RuntimeException("The service {$serviceName} sets the tmpfs option {$option} at {$path}. Nodes support only size=, for example /tmp:size=64m.");
+                        throw new RuntimeException("{$subject} sets the tmpfs option {$option} at {$path}. Nodes support only size=, for example /tmp:size=64m.");
                     }
                     $memorySize("the size of the tmpfs at {$path}", $bytes);
                     $size = $bytes;
                 }
                 if (! self::validMountPath($path)) {
-                    throw new RuntimeException("The service {$serviceName} mounts a tmpfs at {$path}, which cannot be a mount target on Nodes.");
+                    throw new RuntimeException("{$subject} mounts a tmpfs at {$path}, which cannot be a mount target on Nodes.");
                 }
                 if (in_array($path, $paths, true) || in_array($path, $usedPaths, true)) {
-                    throw new RuntimeException("The service {$serviceName} mounts a tmpfs and another mount at {$path}.");
+                    throw new RuntimeException("{$subject} mounts a tmpfs and another mount at {$path}.");
                 }
                 $paths[] = $path;
                 $options['tmpfs'][] = ['path' => $path, 'size_bytes' => $size];
@@ -455,7 +457,7 @@ class NodeStackComposeMapper
         if (filled($grace)) {
             $seconds = self::durationSeconds($grace);
             if ($seconds === null || $seconds < 1 || $seconds > self::MAX_STOP_TIMEOUT_SECONDS) {
-                throw new RuntimeException("The service {$serviceName} sets stop_grace_period: {$grace}. Use 1s to 10m.");
+                throw new RuntimeException("{$subject} sets stop_grace_period: {$grace}. Use 1s to 10m.");
             }
             $options['stop_timeout_seconds'] = $seconds;
         }
@@ -465,7 +467,7 @@ class NodeStackComposeMapper
             if ($flag === true || $flag === 'true') {
                 $options[$field] = true;
             } elseif ($flag !== null && $flag !== false && $flag !== 'false' && $flag !== '') {
-                throw new RuntimeException("The service {$serviceName} sets {$key}: to a value that is not true or false.");
+                throw new RuntimeException("{$subject} sets {$key}: to a value that is not true or false.");
             }
         }
 

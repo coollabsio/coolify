@@ -18,6 +18,7 @@ use App\Actions\Node\ReadImageArchitectures;
 use App\Actions\Node\RemoveNodePublishedPort;
 use App\Actions\Node\RemoveNodeVolume;
 use App\Actions\Node\RollbackNodeWorkload;
+use App\Actions\Node\RunNodeDeploymentCommand;
 use App\Actions\Node\UpdateNodeWorkloadDomains;
 use App\Actions\Node\UpdateNodeWorkloadResources;
 use App\Actions\Node\UpdateNodeWorkloadSettings;
@@ -1310,6 +1311,9 @@ class Show extends Component
                     .($size > 0 ? ': '.formatBytes((int) data_get($copy->result, 'bytes_sent', 0)).' of '.formatBytes($size).' sent.' : '.'));
             }
         }
+        foreach (RunNodeDeploymentCommand::logLines((array) $operation->result, 'pre') as [$line, $stderr]) {
+            $add($operation->dispatched_at ?? $operation->updated_at, $line, $stderr);
+        }
         if ($isMove) {
             if ($operation->started_at) {
                 $add($operation->started_at, $isRestore
@@ -1431,6 +1435,9 @@ class Show extends Component
             if ($errorLine !== '') {
                 $add($finishedAt, $errorLine, true);
             }
+        }
+        foreach (RunNodeDeploymentCommand::logLines((array) $operation->result, 'post') as [$line, $stderr]) {
+            $add($finishedAt, $line, $stderr);
         }
 
         return $lines;

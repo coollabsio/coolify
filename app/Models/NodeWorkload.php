@@ -12,6 +12,7 @@ use App\Enums\NodeWorkloadSourceType;
 use App\Services\Security\SensitiveDataRedactor;
 use App\Support\HealthCheckCommand;
 use App\Support\NodeImages;
+use App\Support\NodeRuntimeOptions;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasStars;
 use App\Traits\ReleasesManagedDnsRecords;
@@ -58,6 +59,12 @@ class NodeWorkload extends BaseModel
         'is_http_basic_auth_enabled' => false,
         'is_gzip_enabled' => true,
         'is_stripprefix_enabled' => true,
+    ];
+
+    /** The container runtime options and the deploy commands (decision 0032). A preview copies them from its parent. */
+    public const RUNTIME_OPTION_COLUMNS = [
+        'custom_docker_run_options', 'custom_labels', 'is_gpu_enabled', 'gpu_count', 'gpu_device_ids',
+        'pre_deployment_command', 'post_deployment_command', 'deployment_command_timeout',
     ];
 
     /** The proxy options of the domains (decision 0031). A preview copies them from its parent. */
@@ -117,7 +124,35 @@ class NodeWorkload extends BaseModel
             'ingress_response_headers' => 'array',
             'is_gzip_enabled' => 'boolean',
             'is_stripprefix_enabled' => 'boolean',
+            'is_gpu_enabled' => 'boolean',
+            'deployment_command_timeout' => 'integer',
         ];
+    }
+
+    /**
+     * The runtime options of the workload settings (decision 0032): the Custom Docker Options, the
+     * container labels, and the GPU, as keys of the revision configuration. A stack service keeps
+     * the options of its Compose file. A key is absent when it has no value.
+     *
+     * @return array{runtime_options?: array<string, mixed>, user_labels?: list<array{key: string, value: string}>, gpu?: array{count?: int|string, device_ids?: list<string>}}
+     *
+     * @throws RuntimeException When a setting breaks a rule, with the flag or the line.
+     */
+    public function runtimeSettings(): array
+    {
+        if ($this->node_stack_id !== null || $this->isDatabase()) {
+            return [];
+        }
+        $docker = NodeRuntimeOptions::parseDockerRunOptions($this->custom_docker_run_options);
+        $labels = NodeRuntimeOptions::parseLabels($this->custom_labels)['labels'];
+        // Like v4, the GPU settings replace a --gpus flag.
+        $gpu = $this->is_gpu_enabled ? NodeRuntimeOptions::gpuRequest($this->gpu_count, $this->gpu_device_ids) : $docker['gpu'];
+
+        return array_filter([
+            'runtime_options' => $docker['runtime_options'],
+            'user_labels' => $labels,
+            'gpu' => $gpu ?? [],
+        ], fn (array $value): bool => $value !== []);
     }
 
     /**
@@ -922,7 +957,12 @@ class NodeWorkload extends BaseModel
     public function withWorkloadSettings(array $configuration): array
     {
         // Assigned in place: the key order is part of the hash and of the revision comparison.
-        foreach (['volumes' => $this->volumeMounts(), 'health_check' => $this->healthCheck() ?? []] as $key => $value) {
+        $settings = ['volumes' => $this->volumeMounts(), 'health_check' => $this->healthCheck() ?? []];
+        if ($this->node_stack_id === null && ! $this->isDatabase()) {
+            $runtime = $this->runtimeSettings();
+            $settings += ['runtime_options' => $runtime['runtime_options'] ?? [], 'user_labels' => $runtime['user_labels'] ?? [], 'gpu' => $runtime['gpu'] ?? []];
+        }
+        foreach ($settings as $key => $value) {
             if ($value === []) {
                 unset($configuration[$key]);
             } else {

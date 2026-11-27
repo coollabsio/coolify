@@ -6,6 +6,7 @@ use App\Actions\Node\Build\CreateClusterGitApplication;
 use App\Actions\Node\Build\CreateClusterInlineDockerfileWorkload;
 use App\Actions\Node\CreateClusterDockerImageWorkload;
 use App\Actions\Node\RollbackNodeWorkload;
+use App\Actions\Node\UpdateNodeWorkloadRuntimeOptions;
 use App\Actions\Node\UpdateNodeWorkloadSettings;
 use App\Enums\NodeOperationStatus;
 use App\Enums\NodeWorkloadAction;
@@ -293,6 +294,14 @@ class ClusterApplicationsController extends Controller
                 'is_auto_deploy_enabled' => new OA\Property(property: 'is_auto_deploy_enabled', type: 'boolean'),
                 'is_auto_cancel_queued_deployments_enabled' => new OA\Property(property: 'is_auto_cancel_queued_deployments_enabled', type: 'boolean'),
                 'is_auto_cancel_building_deployments_enabled' => new OA\Property(property: 'is_auto_cancel_building_deployments_enabled', type: 'boolean'),
+                'custom_docker_run_options' => new OA\Property(property: 'custom_docker_run_options', type: 'string', nullable: true, description: 'The v4 Docker run options. Coolify refuses a flag that Nodes do not support, with the name of the flag. --cap-add and --sysctl values of the admin tier need a team admin.'),
+                'custom_labels' => new OA\Property(property: 'custom_labels', type: 'string', nullable: true, description: 'One key=value on each line. Keys that start with coolify., io.containers., or io.podman. are refused.'),
+                'is_gpu_enabled' => new OA\Property(property: 'is_gpu_enabled', type: 'boolean', description: 'Every server of the application must allow GPU workloads.'),
+                'gpu_count' => new OA\Property(property: 'gpu_count', type: 'string', nullable: true, description: 'A number or all.'),
+                'gpu_device_ids' => new OA\Property(property: 'gpu_device_ids', type: 'string', nullable: true, description: 'GPU indexes or UUIDs, separated by commas. They replace the count.'),
+                'pre_deployment_command' => new OA\Property(property: 'pre_deployment_command', type: 'string', nullable: true, description: 'Runs with sh -c in the running container of the old revision. A failure stops the deploy.'),
+                'post_deployment_command' => new OA\Property(property: 'post_deployment_command', type: 'string', nullable: true, description: 'Runs with sh -c in the new container after the deploy. A failure is a warning.'),
+                'deployment_command_timeout' => new OA\Property(property: 'deployment_command_timeout', type: 'integer', minimum: 1, maximum: 3600),
             ],
         )),
         responses: [
@@ -318,12 +327,19 @@ class ClusterApplicationsController extends Controller
             'git_branch' => 'string', 'build_pack' => 'string', 'base_directory' => 'string|nullable',
             'dockerfile_location' => 'string|nullable', 'publish_directory' => 'string|nullable', 'dockerfile' => 'string',
             'is_auto_deploy_enabled' => 'boolean', 'is_auto_cancel_queued_deployments_enabled' => 'boolean', 'is_auto_cancel_building_deployments_enabled' => 'boolean',
+            'custom_docker_run_options' => 'string|nullable', 'custom_labels' => 'string|nullable', 'is_gpu_enabled' => 'boolean',
+            'gpu_count' => 'string|nullable', 'gpu_device_ids' => 'string|nullable', 'pre_deployment_command' => 'string|nullable',
+            'post_deployment_command' => 'string|nullable', 'deployment_command_timeout' => 'integer',
         ]);
         if ($invalid !== null) {
             return $invalid;
         }
 
         return $this->runClusterAction(function () use ($request, $workload): JsonResponse {
+            // First, so a refused option saves nothing of the request (decision 0032).
+            if ($request->hasAny(UpdateNodeWorkloadRuntimeOptions::KEYS)) {
+                $workload = UpdateNodeWorkloadRuntimeOptions::run($workload, $request->only(UpdateNodeWorkloadRuntimeOptions::KEYS), $request->user());
+            }
             $settings = UpdateNodeWorkloadSettings::make();
             if ($request->hasAny(['name', 'description'])) {
                 $settings->details($workload, (string) $request->input('name', $workload->name), $request->has('description') ? $request->input('description') : $workload->description);

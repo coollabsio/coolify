@@ -121,6 +121,7 @@ class CreateDeploymentOperation
             if (filled(data_get($revision->configuration, 'runtime_options'))) {
                 $node->ensureReportedCapability(DispatchWorkloadDeployment::RUNTIME_OPTIONS_CAPABILITY);
             }
+            EnsureNodeRuntimeOptions::run($node, $revision, $requestedBy, (int) $workload->team_id);
 
             if ($workload->node_stack_id !== null) {
                 $node->ensureReportedCapability(DispatchWorkloadDeployment::DNS_SEARCH_CAPABILITY);

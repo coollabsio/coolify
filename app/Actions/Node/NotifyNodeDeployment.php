@@ -3,6 +3,7 @@
 namespace App\Actions\Node;
 
 use App\Enums\NodeOperationStatus;
+use App\Jobs\RunNodePostDeploymentCommandJob;
 use App\Models\NodeBuild;
 use App\Models\NodeOperation;
 use App\Models\NodeStack;
@@ -43,6 +44,10 @@ class NotifyNodeDeployment
                 ->update(['notified_at' => now()]);
             if ($claimed === 0) {
                 return;
+            }
+            if ($group->every(fn (NodeOperation $member): bool => $member->status === NodeOperationStatus::SUCCEEDED)
+                && filled(NodeWorkload::query()->withoutGlobalScopes()->whereKey($operation->node_workload_id)->value('post_deployment_command'))) {
+                RunNodePostDeploymentCommandJob::dispatch($operation->notification_group);
             }
             self::sendForGroup($group);
         } catch (Throwable $exception) {

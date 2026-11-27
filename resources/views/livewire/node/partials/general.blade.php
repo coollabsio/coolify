@@ -161,3 +161,33 @@
     @endisset
 </x-application.settings-section>
 </form>
+
+<form wire:submit="saveGpu" class="application-settings-form">
+<x-application.settings-section id="node-gpu-section" title="GPU"
+    helper="NVIDIA GPUs for cluster applications, through the CDI spec of the NVIDIA Container Toolkit. Coolify does not install the driver or the toolkit.">
+    <x-slot:actions>
+        @can('update', $node)
+            <x-forms.button type="submit">Save</x-forms.button>
+        @endcan
+    </x-slot:actions>
+    <x-forms.checkbox id="gpuEnabled" label="Allow GPU workloads" canGate="update" :canResource="$node"
+        helper="Only a team admin can change this. A GPU gives a container device files and driver files of the server. Applications that ask for a GPU deploy only on servers that allow it." />
+    @php
+        $gpuCheck = data_get($node->metadata, 'gpu_cdi_check');
+        $gpuDevices = (array) data_get($node->metadata, 'gpu_cdi_devices', []);
+    @endphp
+    <div class="mt-4 text-sm text-neutral-500 dark:text-fg-dim">
+        @if ($gpuCheck === null)
+            Sentinel on this server does not report GPUs yet. Upgrade Sentinel to see the CDI check.
+        @else
+            <p>CDI check: {{ $gpuCheck }}</p>
+            @if ($gpuDevices !== [])
+                <p class="mt-1 font-mono">{{ implode(', ', $gpuDevices) }}</p>
+            @endif
+        @endif
+        <p class="mt-1">To use a GPU, install the NVIDIA driver and the NVIDIA Container Toolkit, then run
+            <code>nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml</code>. See the
+            <a class="underline" href="https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/cdi-support.html" target="_blank" rel="noopener">NVIDIA CDI documentation</a>.</p>
+    </div>
+</x-application.settings-section>
+</form>

@@ -4,10 +4,13 @@ namespace App\Actions\Node;
 
 use App\Enums\NodeContainerSlot;
 use App\Enums\NodeWorkloadAction;
+use App\Models\Node;
 use App\Models\NodeOperation;
 use App\Models\NodeVolume;
 use App\Models\NodeWorkload;
 use App\Services\NodeStack\NodeStackComposeMapper;
+use App\Support\ContainerIsolation;
+use App\Support\NodeRuntimeOptions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
@@ -38,6 +41,12 @@ class DispatchWorkloadDeployment
 
     /** Sentinel sets `shm_size_bytes`, `ulimits`, `tmpfs`, `stop_timeout_seconds`, `tty`, and `stdin_open` (decision 0028). */
     public const RUNTIME_OPTIONS_CAPABILITY = 'workload.runtime_options.v1';
+
+    /** Sentinel sets the typed Docker options and the user labels of decision 0032. */
+    public const RUNTIME_OPTIONS_V2_CAPABILITY = 'workload.runtime_options.v2';
+
+    /** Sentinel reports its CDI GPU devices and gives them to a container (decision 0032). */
+    public const GPU_CAPABILITY = 'workload.gpu.v1';
 
     /** Sentinel sets the uid, gid, and mode of a secret file (decision 0008 amendment). */
     public const SECRET_OWNER_CAPABILITY = 'workload.secrets.owner.v1';
@@ -156,6 +165,11 @@ class DispatchWorkloadDeployment
             // Flux refuses the fields without the capability; check it here for a clear message.
             $operation->node->ensureReportedCapability(self::RUNTIME_OPTIONS_CAPABILITY);
         }
+        $userLabels = $configuration['user_labels'] ?? [];
+        if ($userLabels !== [] || array_intersect_key($runtimeOptions, array_flip(NodeRuntimeOptions::V2_KEYS)) !== []) {
+            $operation->node->ensureReportedCapability(self::RUNTIME_OPTIONS_V2_CAPABILITY);
+        }
+        $cdiDevices = self::cdiDevices($operation->node, $configuration['gpu'] ?? []);
         $stack = $operation->workload->stack;
         $dnsSearch = $stack === null || $operation->node->node_cluster_id === null ? [] : [$stack->searchDomain()];
         if ($dnsSearch !== []) {
@@ -208,6 +222,8 @@ class DispatchWorkloadDeployment
             ...($socketPaths === [] ? [] : ['container_socket_paths' => $socketPaths]),
             ...($user === '' ? [] : ['user' => $user]),
             ...$runtimeOptions,
+            ...($userLabels === [] ? [] : ['user_labels' => $userLabels]),
+            ...($cdiDevices === [] ? [] : ['cdi_devices' => $cdiDevices]),
             ...($dnsSearch === [] ? [] : ['dns_search' => $dnsSearch]),
             ...($login === null ? [] : ['registry_username' => $login['username'], 'registry_password' => $login['password']]),
             ...($healthCheck === null ? [] : ['health_check' => [
@@ -220,6 +236,26 @@ class DispatchWorkloadDeployment
         ];
 
         return ['payload' => $payload, 'name' => $name, 'plan' => $plan, 'network_revision' => $networkRevision];
+    }
+
+    /**
+     * The CDI names of the GPU request of a revision on a Node. The Node must allow GPU workloads
+     * (a team admin turns it on) and report the devices.
+     *
+     * @param  array{count?: int|string, device_ids?: list<string>}  $gpu
+     * @return list<string>
+     */
+    public static function cdiDevices(Node $node, array $gpu): array
+    {
+        if ($gpu === []) {
+            return [];
+        }
+        if (! $node->is_gpu_enabled) {
+            throw new RuntimeException("The application uses a GPU, and the server {$node->name} does not allow GPU workloads. A team admin can turn on Allow GPU workloads on the server page.");
+        }
+        $node->ensureReportedCapability(self::GPU_CAPABILITY);
+
+        return NodeRuntimeOptions::cdiDevices($gpu, (array) data_get($node->metadata, 'gpu_cdi_devices', []), $node->name);
     }
 
     /**
@@ -243,7 +279,9 @@ class DispatchWorkloadDeployment
         }
 
         $current = $operation->workload->containerSlotOn($operation->node);
+        // A GPU workload stops before it starts again: two copies often do not fit in the memory of the GPU (decision 0032).
         $rolling = $operation->node->node_cluster_id !== null
+            && blank(data_get($operation->revision?->configuration, 'gpu'))
             && $operation->node->supportsCapability(self::ROLLING_CAPABILITY) === true
             && ! collect($mounts)->contains(fn (array $mount): bool => ! $mount['read_only'])
             && $operation->node->containers()
@@ -350,7 +388,34 @@ class DispatchWorkloadDeployment
             'files.*.mode' => ['present', 'string', 'regex:/\\A(0?[0-7]{3})?\\z/'],
             'files.*.directory' => ['required', 'boolean'],
             'user' => ['sometimes', 'string', 'regex:'.NodeStackComposeMapper::USER_PATTERN],
-            'runtime_options' => ['sometimes', 'array:shm_size_bytes,ulimits,tmpfs,stop_timeout_seconds,tty,stdin_open'],
+            'runtime_options' => ['sometimes', 'array:shm_size_bytes,ulimits,tmpfs,stop_timeout_seconds,tty,stdin_open,'.implode(',', NodeRuntimeOptions::V2_KEYS)],
+            'runtime_options.init' => ['sometimes', 'accepted'],
+            'runtime_options.read_only' => ['sometimes', 'accepted'],
+            'runtime_options.no_new_privileges' => ['sometimes', 'accepted'],
+            'runtime_options.pids_limit' => ['sometimes', 'integer', 'between:-1,'.NodeRuntimeOptions::MAX_PIDS_LIMIT, 'not_in:0'],
+            'runtime_options.hostname' => ['sometimes', 'string', 'regex:/\\A(?!-)[A-Za-z0-9-]{1,63}(?<!-)\\z/'],
+            'runtime_options.entrypoint' => ['sometimes', 'array', 'list', 'min:1', 'max:'.NodeRuntimeOptions::MAX_ENTRYPOINT_WORDS],
+            'runtime_options.entrypoint.*' => ['string', 'max:4096'],
+            'runtime_options.extra_hosts' => ['sometimes', 'array', 'list', 'max:'.NodeRuntimeOptions::MAX_EXTRA_HOSTS],
+            'runtime_options.extra_hosts.*' => ['array:name,ip'],
+            'runtime_options.extra_hosts.*.name' => ['required', 'string', 'max:253'],
+            'runtime_options.extra_hosts.*.ip' => ['required', 'ip'],
+            'runtime_options.cap_add' => ['sometimes', 'array', 'list', 'max:32'],
+            'runtime_options.cap_add.*' => ['string', 'distinct', 'in:'.implode(',', [...ContainerIsolation::TIER1_CAP_ADD, ...ContainerIsolation::TIER2_CAP_ADD])],
+            'runtime_options.cap_drop' => ['sometimes', 'array', 'list', 'max:64'],
+            'runtime_options.cap_drop.*' => ['string', 'distinct', 'in:ALL,'.implode(',', ContainerIsolation::LINUX_CAPABILITIES)],
+            'runtime_options.sysctls' => ['sometimes', 'array', 'list', 'max:'.NodeRuntimeOptions::MAX_SYSCTLS],
+            'runtime_options.sysctls.*' => ['array:name,value'],
+            'runtime_options.sysctls.*.name' => ['required', 'string', 'distinct', 'max:128'],
+            'runtime_options.sysctls.*.value' => ['required', 'string', 'regex:'.ContainerIsolation::SYSCTL_VALUE_PATTERN],
+            'user_labels' => ['sometimes', 'array', 'list', 'max:'.NodeRuntimeOptions::MAX_LABELS],
+            'user_labels.*' => ['array:key,value'],
+            'user_labels.*.key' => ['required', 'string', 'distinct', 'regex:#\\A[A-Za-z0-9][A-Za-z0-9._/-]{0,254}\\z#', 'not_regex:/\\A(coolify\\.|io\\.containers\\.|io\\.podman\\.|podman_systemd_unit\\z)/i'],
+            'user_labels.*.value' => ['present', 'string', 'max:4096'],
+            'gpu' => ['sometimes', 'array:count,device_ids'],
+            'gpu.count' => ['sometimes'],
+            'gpu.device_ids' => ['sometimes', 'array', 'list', 'max:'.NodeRuntimeOptions::MAX_GPU_DEVICES],
+            'gpu.device_ids.*' => ['string', 'max:80'],
             'runtime_options.shm_size_bytes' => ['sometimes', 'integer', 'between:1,'.NodeStackComposeMapper::MAX_RUNTIME_MEMORY_BYTES],
             'runtime_options.ulimits' => ['sometimes', 'array', 'list', 'max:'.NodeStackComposeMapper::MAX_ULIMITS],
             'runtime_options.ulimits.*' => ['array:name,soft,hard'],

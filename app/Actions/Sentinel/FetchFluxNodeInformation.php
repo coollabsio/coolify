@@ -57,6 +57,9 @@ class FetchFluxNodeInformation
             'load_average_five' => ['nullable', 'numeric', 'min:0'],
             'load_average_fifteen' => ['nullable', 'numeric', 'min:0'],
             'ingress_certificates' => ['nullable', 'array', 'max:10000'],
+            'gpu_cdi_devices' => ['nullable', 'array', 'max:256'],
+            'gpu_cdi_devices.*' => ['string', 'max:200'],
+            'gpu_cdi_check' => ['nullable', 'string'],
         ]);
         if ($validator->fails()) {
             throw new RuntimeException('Flux returned an invalid server information response.');
@@ -106,6 +109,11 @@ class FetchFluxNodeInformation
                 'five' => $information['load_average_five'] ?? null,
                 'fifteen' => $information['load_average_fifteen'] ?? null,
             ],
+            // The CDI check of decision 0032. An older Sentinel does not report it.
+            ...(array_key_exists('gpu_cdi_check', $information) ? [
+                'gpu_cdi_devices' => array_values(array_filter($information['gpu_cdi_devices'] ?? [], fn (string $name): bool => str_starts_with($name, 'nvidia.com/gpu='))),
+                'gpu_cdi_check' => mb_substr((string) $information['gpu_cdi_check'], 0, 500),
+            ] : []),
             'collected_at' => $observedAt->toIso8601String(),
             'source' => 'flux',
             ...($certificates === [] ? [] : [

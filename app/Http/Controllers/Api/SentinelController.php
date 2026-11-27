@@ -41,7 +41,7 @@ class SentinelController extends Controller
             'sentinel_version' => ['required', 'string', 'max:100'],
             'protocol_min' => ['required', 'integer', 'min:1'],
             'protocol_max' => ['required', 'integer', 'min:1', 'gte:protocol_min'],
-            'capabilities' => ['required', 'array', 'max:64'],
+            'capabilities' => ['required', 'array', 'max:256'],
             'capabilities.*' => ['required', 'string', 'max:100', 'distinct'],
             // Sent by Sentinels that can receive trust bundles over Flux; it reports the installed bundle.
             'trust_bundle_version' => ['sometimes', 'integer', 'min:1'],

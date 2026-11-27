@@ -5525,6 +5525,31 @@ paths:
                   type: boolean
                 is_auto_cancel_building_deployments_enabled:
                   type: boolean
+                custom_docker_run_options:
+                  description: 'The v4 Docker run options. Coolify refuses a flag that Nodes do not support, with the name of the flag. --cap-add and --sysctl values of the admin tier need a team admin.'
+                  type: [string, 'null']
+                custom_labels:
+                  description: 'One key=value on each line. Keys that start with coolify., io.containers., or io.podman. are refused.'
+                  type: [string, 'null']
+                is_gpu_enabled:
+                  description: 'Every server of the application must allow GPU workloads.'
+                  type: boolean
+                gpu_count:
+                  description: 'A number or all.'
+                  type: [string, 'null']
+                gpu_device_ids:
+                  description: 'GPU indexes or UUIDs, separated by commas. They replace the count.'
+                  type: [string, 'null']
+                pre_deployment_command:
+                  description: 'Runs with sh -c in the running container of the old revision. A failure stops the deploy.'
+                  type: [string, 'null']
+                post_deployment_command:
+                  description: 'Runs with sh -c in the new container after the deploy. A failure is a warning.'
+                  type: [string, 'null']
+                deployment_command_timeout:
+                  type: integer
+                  maximum: 3600
+                  minimum: 1
               type: object
       responses:
         '200':
@@ -23786,6 +23811,34 @@ components:
           type: boolean
         is_stripprefix_enabled:
           type: boolean
+        custom_docker_run_options:
+          type:
+            - string
+            - 'null'
+        custom_labels:
+          type:
+            - string
+            - 'null'
+        is_gpu_enabled:
+          type: boolean
+        gpu_count:
+          type:
+            - string
+            - 'null'
+        gpu_device_ids:
+          type:
+            - string
+            - 'null'
+        pre_deployment_command:
+          type:
+            - string
+            - 'null'
+        post_deployment_command:
+          type:
+            - string
+            - 'null'
+        deployment_command_timeout:
+          type: integer
         internal_hostname:
           type:
             - string

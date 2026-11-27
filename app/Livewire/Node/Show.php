@@ -92,6 +92,8 @@ class Show extends Component
     /** @var array{frequency: string, threshold: int} The image cleanup settings (decision 0027). */
     public array $imageCleanup = ['frequency' => '0 0 * * *', 'threshold' => 80];
 
+    public bool $gpuEnabled = false;
+
     public function mount(string $node_uuid, ?string $section = null): void
     {
         abort_unless(nodesEnabled(), 404);
@@ -110,8 +112,24 @@ class Show extends Component
             'frequency' => (string) $this->node->image_cleanup_frequency,
             'threshold' => (int) $this->node->image_cleanup_threshold,
         ];
+        $this->gpuEnabled = (bool) $this->node->is_gpu_enabled;
         $this->section = $this->resolveSection($section);
         $this->loadSectionData();
+    }
+
+    /**
+     * Allows GPU workloads on the server (decision 0032). A CDI device gives a container device
+     * nodes and driver files of the host, so only a team admin turns it on.
+     */
+    public function saveGpu(): void
+    {
+        try {
+            $this->authorize('update', $this->node);
+            $this->node->update(['is_gpu_enabled' => $this->gpuEnabled]);
+            $this->dispatch('success', $this->gpuEnabled ? 'GPU workloads are allowed on this server.' : 'GPU workloads are not allowed on this server. Running GPU containers keep running until their next deploy.');
+        } catch (\Throwable $e) {
+            handleError($e, $this);
+        }
     }
 
     public function saveImageCleanup(): void

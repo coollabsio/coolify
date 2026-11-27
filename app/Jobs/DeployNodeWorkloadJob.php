@@ -8,8 +8,10 @@ use App\Actions\Node\ClaimOperation;
 use App\Actions\Node\DispatchWorkloadDeployment;
 use App\Actions\Node\DispatchWorkloadLifecycle;
 use App\Actions\Node\FetchContainers;
+use App\Actions\Node\RunNodeDeploymentCommand;
 use App\Actions\Node\SyncNodeWorkloadSet;
 use App\Actions\Node\TransitionOperation;
+use App\Actions\Node\UpdateNodeWorkloadRuntimeOptions;
 use App\Actions\Node\VerifyDeploymentConvergence;
 use App\Enums\NodeContainerSlot;
 use App\Enums\NodeOperationStatus;
@@ -40,8 +42,8 @@ class DeployNodeWorkloadJob implements ShouldQueue
 
     public int $tries = 1;
 
-    /** The image copy from a peer, the Flux deploy request (620 s), the health wait, and the network revision of published ports. */
-    public int $timeout = FetchNodeImage::MAX_SECONDS + 1020 + ApplyNodeClusterNetworkRevision::WAIT_SECONDS;
+    /** The image copy from a peer, the pre-deployment command, the Flux deploy request (620 s), the health wait, and the network revision of published ports. */
+    public int $timeout = FetchNodeImage::MAX_SECONDS + UpdateNodeWorkloadRuntimeOptions::MAX_COMMAND_TIMEOUT + RunNodeDeploymentCommand::LOCK_MARGIN_SECONDS + 1020 + ApplyNodeClusterNetworkRevision::WAIT_SECONDS;
 
     /** @param  Carbon|null  $waitUntil  A move that runs the job inline ends the health wait at its own deadline. */
     public function __construct(public int $operationId, public ?Carbon $waitUntil = null) {}
@@ -54,6 +56,16 @@ class DeployNodeWorkloadJob implements ShouldQueue
         }
         $fetched = $this->fetchImage($operation);
         if ($fetched === null) {
+            return;
+        }
+        // Before any container changes: a failed command leaves the old containers serving (decision 0032).
+        try {
+            $fetched = [...$fetched, ...RunNodeDeploymentCommand::pre($operation->refresh())];
+        } catch (Throwable $exception) {
+            if ($operation->refresh()->status->canTransitionTo(NodeOperationStatus::FAILED)) {
+                TransitionOperation::run($operation, NodeOperationStatus::FAILED, error: mb_substr($exception->getMessage(), 0, 2000));
+            }
+
             return;
         }
         $operation->refresh();

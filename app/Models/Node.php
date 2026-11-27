@@ -75,6 +75,7 @@ class Node extends BaseModel
             'network_next_attempt_at' => 'datetime',
             'network_pending_leave' => 'array',
             'is_ingress' => 'boolean',
+            'is_gpu_enabled' => 'boolean',
             'is_builder' => 'boolean',
             'volume_inventory' => 'array',
         ];

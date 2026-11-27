@@ -47,6 +47,7 @@ class DeployNodePreview
         'health_check_return_code', 'health_check_response_text', 'health_check_interval',
         'health_check_timeout', 'health_check_retries', 'health_check_start_period', 'custom_healthcheck_found',
         ...NodeWorkload::PROXY_OPTION_COLUMNS,
+        ...NodeWorkload::RUNTIME_OPTION_COLUMNS,
     ];
 
     /** The variable columns that a preview copies from the resolved variables of its parent. */

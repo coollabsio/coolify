@@ -164,3 +164,6 @@
             helper="Overrides the image command. Use double quotes for arguments with spaces. Leave empty to use the image default." />
     </x-application.settings-section>
 </form>
+@if ($workload->node_stack_id === null)
+    <livewire:project.cluster-application.runtime-options :workload="$workload" wire:key="cluster-application-runtime-options-{{ $workload->uuid }}" />
+@endif

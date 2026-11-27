@@ -100,15 +100,18 @@ On Nodes, these parts exist:
 | `--ip`, `--ip6` | Refused | — | — | Coolify gives each slot its address (`EnsureNodeWorkloadAddress`), and the firewall rules use it |
 | `--dns` | Refused | — | — | The container must use the discovery DNS of the cluster (`dns_server`, `dns_search`) |
 | `--runtime` | Refused | — | — | A Node has one OCI runtime. A GPU uses CDI, not the NVIDIA runtime |
-| `--privileged`, `--cap-add`, `--device`, `--sysctl`, other `--security-opt` values | Refused | — | — | They lower the isolation of the container. See "Not decided here" |
+| `--cap-add` | Typed | `repeated string cap_add` (field 40) | `--cap-add` | The allow list and the tiers of decision 0036. Tier 2 needs a team admin |
+| `--sysctl` | Typed | `repeated WorkloadSysctl sysctls` (field 43) | `--sysctl name=value` | The allow list and the tiers of decision 0036. Tier 2 needs a team admin |
+| `--privileged`, `--device`, other `--security-opt` values | Refused | — | — | They lower the isolation of the container. See "Not decided here" |
 | Every other flag (`-e`, `-v`, `-p`, `--memory`, `--network`, ...) | Refused | — | — | The error names the page that sets it: **Environment Variables**, **Storages**, **Published Ports**, **Resource Limits** |
 
 ### GPU
 
 - Sentinel reads the CDI specs that Podman reads (`/etc/cdi`, `/var/run/cdi`).
-  It reports the devices of the kind `nvidia.com/gpu` in `SystemInfoResult`,
-  with the name, the index, and the UUID. Sentinel reports
-  `workload.gpu.v1` only when it can read CDI specs.
+  It reports the device names of the kind `nvidia.com/gpu` in
+  `SystemInfoResult` (`gpu_cdi_devices`, for example `nvidia.com/gpu=0` and
+  `nvidia.com/gpu=GPU-<uuid>`) and the result of the check (`gpu_cdi_check`).
+  Sentinel always reports `workload.gpu.v1` (see "Implementation notes").
 - The admin installs the NVIDIA driver and the NVIDIA Container Toolkit and
   generates the CDI spec. `PrepareNodeHost` does not install them. The Node
   page shows the GPUs that Sentinel reports.
@@ -144,13 +147,13 @@ On Nodes, these parts exist:
 - The commands run with `workload.exec.v1`, once for each deploy, not once
   for each Node.
 - The pre-deployment command runs after the build or the image fetch and
-  before Coolify creates the Node operations. It runs in the running
-  container of the old revision, on the first Node of
+  before a Node operation changes a container (see "Implementation notes").
+  It runs in the running container of the old revision, on the first Node of
   `RunNodeWorkloadCommand::runningContainers()`. When no container runs (the
   first deploy), Coolify skips it with a log line, as in v4.
 - When the pre-deployment command exits with a code other than 0, or times
-  out, the deploy fails. Coolify creates no Node operation. The old
-  containers keep serving.
+  out, the deploy fails. Every Node operation of the deploy fails before
+  Sentinel gets it. The old containers keep serving.
 - The post-deployment command runs when every Node operation of the
   notification group succeeded, after `retireReplaced()`. It runs in the new
   container on the first Node. A failure writes a warning to the deployment
@@ -251,12 +254,82 @@ the text above.
   toolkit. The Node page shows the result of the CDI check and a link to the
   docs.
 
+## Implementation notes (2026-11-27)
+
+Built in Sentinel `725ed36` and on Coolify `v5-progress`. The code showed
+that some rules of this decision must change. The text above is changed
+where it was wrong.
+
+- **`--cap-add` and `--sysctl`.** Decision 0036 is accepted, so they are
+  typed fields with its allow list and tiers. The allow list is one module
+  in each code base: `App\Support\ContainerIsolation` and
+  `crates/control/src/isolation.rs`. Sentinel accepts tier 1 and tier 2 and
+  refuses tier 3. Coolify checks tier 2 with
+  `ContainerIsolation::ensureMayUseAdminTier()` (a team admin of the team of
+  the resource, like `ensureMayMountContainerSocket()`) on save on the page
+  and in the API (`UpdateNodeWorkloadRuntimeOptions`), at the start of a
+  build (`StartNodeBuild`), and on each deploy, rollback, build deploy, and
+  move (`EnsureNodeRuntimeOptions` in `CreateDeploymentOperation`). A member
+  cannot save the options while they have a tier 2 value. Stacks do not use
+  it yet (decision 0036).
+- **Where the pre-deployment command runs.** It runs in
+  `DeployNodeWorkloadJob`, after the image fetch and before the command or
+  the desired set goes to Sentinel, not before Coolify creates the
+  operations. Reason: a deploy, a rollback, a build deploy, and the API
+  create operations in different places, and a command of up to 3600 s
+  must run in the queue, not in a web request. The first operation of the
+  notification group runs it under a lock. The other servers of the deploy
+  wait and use its result. A failure fails each operation before Sentinel
+  gets it, so the old containers keep serving.
+- **The convergence path (decision 0026).** The commands run for each
+  deploy on both paths: the `workload.deploy` command and the desired set
+  that Sentinel converges. Coolify runs them, because only Coolify knows
+  when a deploy starts and when every server of it succeeded. A restart or a
+  new convergence by Sentinel without a deploy runs no command, as a
+  container restart in v4 runs none. A move, a restore, and the reconciler
+  run no command (they have no notification group).
+- **The post-deployment command** runs in a job after every operation of the
+  group succeeded, in the container of the slot of the first server. The
+  warning is in the deployment log. The deploy notification does not wait
+  for the command, so it has no warning.
+- **No shell switch.** Both commands run with `sh -c`, as in v4. The image
+  must have `sh`.
+- **Git stacks.** The commands are built for cluster applications only. A
+  stack service has no fields yet.
+- **`workload.gpu.v1`.** Sentinel reports it always. A capability is fixed
+  for a connection, and an admin can install the driver after Sentinel
+  starts. Coolify reads the devices from the server information and refuses
+  a GPU workload on save and on deploy when the server does not allow GPU
+  workloads, does not report the devices, or has fewer devices than the
+  count. The Node page shows the CDI check and a link to the NVIDIA CDI
+  documentation.
+- **`--gpus`.** The flag maps to the same request as the GPU settings. The
+  GPU settings replace it, as in v4.
+- **Labels.** Coolify stores them as plain text, not base64. Sentinel
+  refuses the reserved keys in `user_labels` (also `coolify.`) and in
+  `labels` (`io.containers.`, `io.podman.`, and `PODMAN_SYSTEMD_UNIT`), for
+  every caller. Sentinel adds the user labels before its own labels.
+- **Capability limit.** A Sentinel of this version reports more than 64
+  capabilities, and the assignment endpoint refused it. The limit is now
+  256.
+- **Not tested live: GPU.** The dev Nodes have no GPU. The Sentinel unit
+  tests cover the CDI parse, the refusal of an unknown device, and the
+  arguments. The live checks covered the refusals on save.
+- **Live checks on cluster 1 (2026-11-27).** `podman inspect` showed
+  `--init`, `--pids-limit`, `--shm-size`, `--ulimit`, `--hostname`,
+  `--add-host`, `--security-opt no-new-privileges`, `--cap-add NET_RAW`,
+  `--cap-drop SYS_CHROOT`, the sysctl `net.core.somaxconn`, and the user
+  labels. `--privileged`, `--device`, `--cap-add SYS_ADMIN`, a tier 3
+  sysctl, a `coolify.` label, and a GPU without an allowed server gave
+  `422`. Sentinel refused a reserved label, `SYS_ADMIN`, and an unknown GPU
+  from a direct Flux call. A member got `422` for `NET_RAW` and could not
+  deploy it. An admin could. A failed pre-deployment command stopped the
+  deploy, and the old container kept running. A failed post-deployment
+  command gave a warning. Another team got `404`.
+
 ## Not decided here
 
-- `--privileged`, `--cap-add`, `--device`, `--sysctl`, and the other
-  `--security-opt` values. Decision 0036 decides them for stacks, with an
-  allow list and a team-admin tier. When 0036 is accepted, the same allow
-  list applies to `--cap-add` and `--sysctl` of a cluster application.
+- `--privileged`, `--device`, and the other `--security-opt` values.
 - AMD and Intel GPUs (`amd.com/gpu`, other CDI kinds), MIG slices, exclusive
   GPU reservation, and GPU metrics.
 - A release phase in a one-shot container of the new image (option F).

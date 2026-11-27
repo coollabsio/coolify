@@ -10,6 +10,7 @@ use App\Models\NodeBuild;
 use App\Models\NodeWorkload;
 use App\Models\User;
 use App\Services\NodeStack\NodeStackCompose;
+use App\Support\ContainerIsolation;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 use RuntimeException;
@@ -38,6 +39,8 @@ class StartNodeBuild
             if ($workload->mountsContainerSocket()) {
                 NodeStackCompose::ensureMayMountContainerSocket($user, (int) $workload->team_id);
             }
+            // The admin tier of the Docker options (decision 0032), before the build, not after it.
+            ContainerIsolation::ensureMayUseAdminTier($user, (int) $workload->team_id, $workload->runtimeSettings()['runtime_options'] ?? []);
             if ($user !== null) {
                 SelectBuilderNode::ensureMayBuild($workload, $user);
             }
