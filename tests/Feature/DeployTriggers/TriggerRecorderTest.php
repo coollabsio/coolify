@@ -47,6 +47,20 @@ it('creates a skipped row then folds the next skip into it', function () {
         ->and(ApplicationDeploymentQueue::query()->where('application_id', $this->application->id)->count())->toBe(1);
 });
 
+it('does not fold a skip into a row that was skipped for another reason', function () {
+    $other = ApplicationDeploymentQueue::create([
+        'application_id' => $this->application->id, 'deployment_uuid' => 'other-skip', 'pull_request_id' => 0,
+        'status' => ApplicationDeploymentStatus::SKIPPED->value, 'commit' => sha('a'), 'commit_message' => 'Skipped: skip marker',
+        'server_id' => $this->application->destination->server->id,
+    ]);
+
+    $row = $this->recorder->recordSkip($this->application, null, $this->skip, sha('b'), sha('a'), true, null);
+
+    expect($row->id)->not->toBe($other->id)
+        ->and($other->refresh()->trigger_reason)->toBeNull()
+        ->and($other->commit_message)->toBe('Skipped: skip marker');
+});
+
 it('starts a new skipped row after a real deployment', function () {
     $first = $this->recorder->recordSkip($this->application, null, $this->skip, sha('b'), sha('a'), true, null);
     recorderDeployment($this->application, ['commit' => sha('c')]);

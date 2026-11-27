@@ -38,7 +38,8 @@ class TriggerRecorder
                 ->lockForUpdate()
                 ->first();
 
-            $row = $newest?->status === ApplicationDeploymentStatus::SKIPPED->value
+            // Only fold into a push that deploy triggers skipped, not into a preview skipped for another reason.
+            $row = $newest?->status === ApplicationDeploymentStatus::SKIPPED->value && is_array($newest->trigger_reason)
                 ? $newest
                 : $this->newSkippedRow($application, $pullRequestId, $after, $preview?->git_type ?? $pullRequest?->gitType);
 

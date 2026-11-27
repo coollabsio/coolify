@@ -254,6 +254,16 @@ it('does not deploy anyway a row that is not skipped', function () {
     expect(ApplicationDeploymentQueue::query()->count())->toBe(1);
 });
 
+it('does not deploy anyway a preview that was skipped for another reason', function () {
+    $row = skippedRow($this->application);
+    $row->update(['pull_request_id' => 7, 'trigger_reason' => null, 'commit_message' => 'Skipped the preview deployment: the pull request comes from a fork and public PR deployments are disabled.']);
+
+    showTriggerDeployment($this, $row)->call('deploySkippedPush')->assertDispatched('error');
+
+    expect(ApplicationDeploymentQueue::query()->count())->toBe(1)
+        ->and(ApplicationPreview::query()->count())->toBe(0);
+});
+
 it('shows what triggered a deployment', function () {
     $row = skippedRow($this->application);
     $row->update(['status' => ApplicationDeploymentStatus::FINISHED->value, 'trigger_reason' => [

@@ -20785,7 +20785,7 @@ components:
             - failed
             - cancelled-by-user
             - skipped
-          description: 'A skipped row records Git pushes that smart deploy triggers did not deploy.'
+          description: 'A skipped row records Git pushes that were not deployed, for example because no changed file affects the application. `trigger_reason` is set when deploy triggers skipped them.'
         trigger_reason:
           type: object
           nullable: true

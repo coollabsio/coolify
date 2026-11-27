@@ -30,7 +30,7 @@ use OpenApi\Attributes as OA;
         'configuration_diff' => ['type' => 'object', 'nullable' => true],
         'force_rebuild' => ['type' => 'boolean'],
         'commit' => ['type' => 'string'],
-        'status' => ['type' => 'string', 'enum' => ['queued', 'in_progress', 'finished', 'failed', 'cancelled-by-user', 'skipped'], 'description' => 'A skipped row records Git pushes that smart deploy triggers did not deploy.'],
+        'status' => ['type' => 'string', 'enum' => ['queued', 'in_progress', 'finished', 'failed', 'cancelled-by-user', 'skipped'], 'description' => 'A skipped row records Git pushes that were not deployed, for example because no changed file affects the application. `trigger_reason` is set when deploy triggers skipped them.'],
         'trigger_reason' => ['type' => 'object', 'nullable' => true, 'description' => 'Why smart deploy triggers deployed or skipped the push: reason_code, reason, matches.'],
         'skipped_count' => ['type' => 'integer', 'description' => 'How many pushes a skipped row stands for.'],
         'first_skipped_commit' => ['type' => 'string', 'nullable' => true, 'description' => 'The first commit of the pushes a skipped row stands for.'],

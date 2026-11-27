@@ -90,8 +90,9 @@ class Show extends Component
         try {
             $this->authorize('deploy', $this->application);
             $row = $this->application_deployment_queue->refresh();
-            if ($row->status !== ApplicationDeploymentStatus::SKIPPED->value) {
-                $this->dispatch('error', 'Only a skipped push can be deployed anyway.');
+            // A preview that was skipped for another reason, such as a fork pull request, is not deployed here.
+            if ($row->status !== ApplicationDeploymentStatus::SKIPPED->value || ! is_array($row->trigger_reason)) {
+                $this->dispatch('error', 'Only a push that deploy triggers skipped can be deployed anyway.');
 
                 return;
             }
@@ -104,7 +105,7 @@ class Show extends Component
             $pullRequestId = (int) $row->pull_request_id;
             $gitType = $row->git_type;
             if ($pullRequestId > 0) {
-                // Only non-fork pull requests are ever skipped; forks always deploy.
+                // Deploy triggers evaluate only pull requests from the same repository.
                 $existing = ApplicationPreview::query()->where('application_id', $this->application->id)->where('pull_request_id', $pullRequestId)->first();
                 $gitType ??= $existing?->git_type;
                 EnsurePullRequestPreview::run($this->application, new PullRequestContext(
