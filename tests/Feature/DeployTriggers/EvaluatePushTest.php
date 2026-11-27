@@ -10,11 +10,13 @@ use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Services\DeployTriggers\AffectedRunnerException;
+use App\Services\DeployTriggers\ClosedPullRequests;
 use App\Services\DeployTriggers\Contract\EvaluateRequest;
 use App\Services\DeployTriggers\EvaluationRequestBuilder;
 use App\Services\DeployTriggers\EvaluationSlots;
 use App\Services\DeployTriggers\PullRequestContext;
 use App\Services\DeployTriggers\PushContext;
+use App\Services\DeployTriggers\PushTriggerRouter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Tests\Support\FakeAffectedRunner;
@@ -243,7 +245,8 @@ it('filters watch path apps with the webhook file list while the base is unknown
     epRun(epContext(['payloadChangedFiles' => ['apps/web/a.ts']]), [$this->api]);
 
     expect(ApplicationDeploymentQueue::query()->where('application_id', $this->api->id)->sole()->status)->toBe(ApplicationDeploymentStatus::SKIPPED->value)
-        ->and($runner->requests)->toBe([]);
+        ->and($runner->requests)->toBe([])
+        ->and($this->api->refresh()->trigger_base_commit)->toBeNull();
 });
 
 it('keeps retrying after releases for half an hour', function () {
@@ -440,4 +443,56 @@ it('sends the git credential of an application only to a server of that applicat
 
     expect($runner->accesses[0]->files['id_key'] ?? null)->toBe(rtrim($key->private_key, "\n")."\n")
         ->and($runner->servers[0]->id)->toBe($webServer->id);
+});
+
+it('drops a pending pull request evaluation once the pull request closed', function () {
+    FakeAffectedRunner::unsupported();
+    $this->web->settings->update(['is_preview_deployments_enabled' => true]);
+    $context = epContext(['provider' => 'github', 'ref' => 'refs/pull/7/head', 'pullRequest' => new PullRequestContext(7, 'main', false, 'github', 'https://github.com/acme/mono/pull/7')]);
+    $context->recordArrival();
+    ClosedPullRequests::markClosed($this->web, 7);
+
+    epRun($context, [$this->web]);
+
+    expect(ApplicationPreview::query()->where('application_id', $this->web->id)->exists())->toBeFalse()
+        ->and(ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->exists())->toBeFalse();
+});
+
+it('evaluates a reopened pull request again', function () {
+    $this->web->settings->update(['is_preview_deployments_enabled' => true]);
+    ClosedPullRequests::markClosed($this->web, 7);
+    Queue::fake([EvaluatePush::class, ApplicationDeploymentJob::class]);
+    $router = PushTriggerRouter::forPush(epContext(['provider' => 'github', 'ref' => 'refs/pull/7/head', 'pullRequest' => new PullRequestContext(7, 'main', false, 'github', null)]));
+    $router->defer($this->web);
+    $router->dispatch();
+
+    expect(ClosedPullRequests::isClosed($this->web->id, 7))->toBeFalse();
+});
+
+it('deploys a push when the application changed configuration that was not deployed yet', function () {
+    $runner = FakeAffectedRunner::respondWith(epRespond([$this->web->uuid => ['skip', 'no_match']]));
+    $this->web->forceFill(['build_command' => 'pnpm build'])->save();
+    ApplicationDeploymentQueue::create(['application_id' => $this->web->id, 'deployment_uuid' => 'deployed', 'pull_request_id' => 0,
+        'status' => ApplicationDeploymentStatus::FINISHED->value, 'commit' => EP_BASE,
+        'configuration_snapshot' => $this->web->deploymentConfigurationSnapshot()]);
+    $this->web->forceFill(['build_command' => 'pnpm build:web'])->save();
+
+    epRun(epContext(), [$this->web->refresh()]);
+
+    $row = ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->latest('id')->first();
+    expect($row->status)->not->toBe(ApplicationDeploymentStatus::SKIPPED->value)
+        ->and($row->trigger_reason['reason_code'])->toBe('config_changed')
+        ->and($runner->requests)->toBe([]);
+});
+
+it('deploys a pending push when deploy triggers were turned off meanwhile', function () {
+    $runner = FakeAffectedRunner::respondWith(epRespond([$this->web->uuid => ['skip', 'no_match']]));
+    $this->web->settings->update(['is_smart_triggers_enabled' => false]);
+
+    epRun(epContext(), [$this->web->refresh()]);
+
+    $row = ApplicationDeploymentQueue::query()->where('application_id', $this->web->id)->sole();
+    expect($row->status)->not->toBe(ApplicationDeploymentStatus::SKIPPED->value)
+        ->and($row->trigger_reason['reason_code'])->toBe('triggers_off')
+        ->and($runner->requests)->toBe([]);
 });

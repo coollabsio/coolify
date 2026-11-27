@@ -37,6 +37,15 @@ it('returns null for a queued HEAD deployment', function () {
     expect(EffectiveBase::for($this->application, null))->toBe(['base' => null, 'isStored' => false]);
 });
 
+it('compares with the last finished deployment while no base is stored', function () {
+    $this->application->forceFill(['trigger_base_commit' => null])->save();
+    inFlight($this->application, ApplicationDeploymentStatus::FINISHED->value, str_repeat('d', 40));
+    inFlight($this->application, ApplicationDeploymentStatus::FAILED->value, str_repeat('e', 40));
+    inFlight($this->application, ApplicationDeploymentStatus::SKIPPED->value, str_repeat('f', 40));
+
+    expect(EffectiveBase::for($this->application, null))->toBe(['base' => str_repeat('d', 40), 'isStored' => false]);
+});
+
 it('falls back to the stored base', function () {
     inFlight($this->application, ApplicationDeploymentStatus::FINISHED->value, str_repeat('b', 40));
     inFlight($this->application, ApplicationDeploymentStatus::SKIPPED->value, str_repeat('c', 40));

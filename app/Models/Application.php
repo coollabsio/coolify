@@ -155,7 +155,7 @@ class Application extends BaseModel
     /**
      * A build or install command that selects one workspace package (spec §2.1).
      */
-    private const WORKSPACE_SELECTOR_PATTERN = '~--filter[=\s]|(?:^|\s)-F\s|--workspace[=\s]|(?:^|\s)-w\s|\byarn\s+workspace\s|\bnx\s+(?:build|run|serve)\s|(?:^|\s)(?:-p|--package)[=\s]|\bgo\s+build\b.*\s\./[^\s/]+/|gradlew?\s+:[^\s]|\bmvn\b.*\s-pl\s~m';
+    private const WORKSPACE_SELECTOR_PATTERN = '~--filter[=\s]|\bpnpm\b[^;&|\n]*\s-F\s|--workspace[=\s]|\bnpm\b[^;&|\n]*\s-w\s|\byarn\s+workspace\s|\bnx\s+(?:build|run|serve)\s|\b(?:cargo|uv)\b[^;&|\n]*\s(?:-p|--package)[=\s]|\bgo\s+build\b.*\s\./[^\s/]+/|gradlew?\s+:[^\s]|\bmvn\b.*\s-pl\s~m';
 
     /** @use HasFactory<ApplicationFactory> */
     use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasImageScans, HasMaintenancePage, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, HasStars, ReleasesManagedDnsRecords, ScopedByAccessGrants, SoftDeletes;

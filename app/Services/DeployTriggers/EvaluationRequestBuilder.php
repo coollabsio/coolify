@@ -93,6 +93,14 @@ class EvaluationRequestBuilder
             return ApplicationDecision::deployBecause($candidate->id, 'fork_no_narrowing', 'Pull requests from forks always deploy.');
         }
 
+        // The application may have changed while the push waited for its evaluation.
+        if (PushTriggerRouter::forPush($context)->route($candidate->application) !== TriggerRoute::Evaluate) {
+            return ApplicationDecision::deployBecause($candidate->id, 'triggers_off', 'Deploy triggers no longer decide the pushes of this application, so this push deploys.');
+        }
+        if ($context->pullRequest === null && $candidate->application->hasPendingDeploymentConfigurationChanges()) {
+            return ApplicationDecision::deployBecause($candidate->id, 'config_changed', 'The configuration of the application changed since its last deployment, so this push deploys.');
+        }
+
         $isNewPreview = $context->pullRequest !== null && $candidate->preview === null;
         if ($candidate->base === null && $candidate->mode === 'watch_paths' && $context->payloadChangedFiles !== null) {
             return LegacyWatchPaths::decide($candidate, $context->payloadChangedFiles);

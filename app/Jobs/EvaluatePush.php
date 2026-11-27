@@ -8,6 +8,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Services\DeployTriggers\AffectedRunner;
+use App\Services\DeployTriggers\ClosedPullRequests;
 use App\Services\DeployTriggers\Contract\ApplicationDecision;
 use App\Services\DeployTriggers\EvaluationRequestBuilder;
 use App\Services\DeployTriggers\EvaluationSlots;
@@ -173,6 +174,8 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             } else {
                 foreach ($remaining as $id => $candidate) {
                     $decisions[$id] = $this->withoutServer($candidate);
+                    // Decided from the files of this push only, so the stored base stays.
+                    $candidates[$id] = new TriggerCandidate($candidate->id, $candidate->application, $candidate->preview, $candidate->mode, $candidate->base, false, $candidate->fingerprint);
                 }
             }
         }
@@ -338,6 +341,9 @@ class EvaluatePush implements ShouldBeEncrypted, ShouldBeUnique, ShouldQueue
             ->get()
             ->filter(fn (Application $application): bool => $application->git_branch === $branch
                 && ($this->dryRun || ($this->context->pullRequest !== null ? $application->isPRDeployable() : $application->isDeployable())))
+            // The pull request closed while this push waited: its preview is gone and must not come back.
+            ->reject(fn (Application $application): bool => ! $this->dryRun && $this->context->pullRequest !== null
+                && ClosedPullRequests::isClosed($application->id, $this->context->pullRequest->number))
             // A redelivered webhook changes nothing when the newest deployment of the application already is this push.
             ->reject(fn (Application $application): bool => ! $this->dryRun && $this->context->after !== null
                 && $this->newestDeploymentIsThisPush($application))

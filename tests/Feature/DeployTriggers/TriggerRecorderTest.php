@@ -61,6 +61,14 @@ it('does not fold a skip into a row that was skipped for another reason', functi
         ->and($other->commit_message)->toBe('Skipped: skip marker');
 });
 
+it('does not store a base from a skip that compared with no base', function () {
+    $this->application->forceFill(['trigger_base_commit' => null])->save();
+
+    $this->recorder->recordSkip($this->application, null, $this->skip, sha('b'), null, true, null);
+
+    expect($this->application->refresh()->trigger_base_commit)->toBeNull();
+});
+
 it('starts a new skipped row after a real deployment', function () {
     $first = $this->recorder->recordSkip($this->application, null, $this->skip, sha('b'), sha('a'), true, null);
     recorderDeployment($this->application, ['commit' => sha('c')]);

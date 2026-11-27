@@ -28,6 +28,15 @@ it('narrows applications that use part of a repository', function (array $attrib
     'maven module' => [['build_command' => 'mvn -pl api package']],
 ]);
 
+it('does not narrow an application for a flag of another tool', function (array $attributes) {
+    expect(deployTriggerApplication($this->fixture, $attributes)->isNarrowable())->toBeFalse();
+})->with([
+    'next port' => [['start_command' => 'next start -p 3000']],
+    'gunicorn workers' => [['start_command' => 'gunicorn -w 4 app:app']],
+    'curl form field' => [['build_command' => 'curl -F file=@a.txt https://example.com']],
+    'pnpm workspace root' => [['install_command' => 'pnpm add -w typescript']],
+]);
+
 it('narrows an application that shares its repository and branch with another team application', function () {
     $first = deployTriggerApplication($this->fixture, ['git_repository' => 'acme/mono', 'git_branch' => 'main']);
     deployTriggerApplication($this->fixture, ['git_repository' => 'acme/mono', 'git_branch' => 'main']);

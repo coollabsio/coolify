@@ -27,7 +27,8 @@ class TriggerRecorder
         return DB::transaction(function () use ($application, $preview, $decision, $after, $readBase, $baseIsStored, $commitMessage, $pullRequest): ApplicationDeploymentQueue {
             $pullRequestId = $preview?->pull_request_id ?? $pullRequest?->number ?? 0;
             $baseTarget = $preview ?? ($pullRequestId > 0 ? null : $application);
-            if ($baseIsStored && $baseTarget !== null) {
+            // A skip decided without a base (from the files of the push only) does not tell what is deployed.
+            if ($baseIsStored && $readBase !== null && $baseTarget !== null) {
                 $this->advanceBase($baseTarget, $readBase, $after);
             }
 
