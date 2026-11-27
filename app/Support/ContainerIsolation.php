@@ -44,6 +44,101 @@ final class ContainerIsolation
         'SYS_TTY_CONFIG', 'WAKE_ALARM',
     ];
 
+    public const MAX_CAP_ADD = 32;
+
+    public const MAX_CAP_DROP = 64;
+
+    public const MAX_SYSCTLS = 16;
+
+    /** The `security_opt` values that Nodes allow. They all mean `--security-opt no-new-privileges`. */
+    public const NO_NEW_PRIVILEGES_VALUES = ['no-new-privileges', 'no-new-privileges:true', 'no-new-privileges=true'];
+
+    /**
+     * The typed isolation options with the rules of Sentinel, for the Custom Docker Options of an
+     * application and the Compose keys of a stack service. Tier 2 values are kept: the caller
+     * checks the role with ensureMayUseAdminTier().
+     *
+     * @param  array{cap_add?: list<string>, cap_drop?: list<string>, security_opt?: list<string>, sysctls?: list<array{name: string, value: string}>}  $values
+     * @param  array{cap_add: string, cap_drop: string, security_opt: string, sysctls: string}  $labels  How the caller names each key, for example `--cap-add` or `cap_add`.
+     * @return array{cap_add?: list<string>, cap_drop?: list<string>, no_new_privileges?: true, sysctls?: list<array{name: string, value: string}>}
+     *
+     * @throws RuntimeException With a message that follows the subject, for example "uses cap_add SYS_ADMIN, which ...".
+     */
+    public static function parse(array $values, array $labels): array
+    {
+        $options = [];
+        foreach ($values['cap_drop'] ?? [] as $capability) {
+            $name = self::normalizeCapability($capability);
+            if ($name !== 'ALL' && ! in_array($name, self::LINUX_CAPABILITIES, true)) {
+                throw new RuntimeException("uses {$labels['cap_drop']} {$capability}, which is not a Linux capability");
+            }
+            $options['cap_drop'][] = $name;
+        }
+        foreach ($values['cap_add'] ?? [] as $capability) {
+            $name = self::normalizeCapability($capability);
+            if (self::capabilityTier($name) === 3) {
+                throw new RuntimeException("uses {$labels['cap_add']} {$capability}, which Nodes do not allow, because it gives the container too much control of its server. Allowed: "
+                    .implode(', ', [...self::TIER1_CAP_ADD, ...self::TIER2_CAP_ADD]).' (the last six need a team admin)');
+            }
+            if (in_array($name, $options['cap_drop'] ?? [], true)) {
+                throw new RuntimeException("has {$name} in {$labels['cap_add']} and in {$labels['cap_drop']}");
+            }
+            $options['cap_add'][] = $name;
+        }
+        foreach ($values['security_opt'] ?? [] as $value) {
+            if (! in_array(strtolower($value), self::NO_NEW_PRIVILEGES_VALUES, true)) {
+                throw new RuntimeException("uses {$labels['security_opt']} {$value}, which Nodes do not allow. Only no-new-privileges is allowed, because other values lower the isolation of the container");
+            }
+            $options['no_new_privileges'] = true;
+        }
+        foreach ($values['sysctls'] ?? [] as ['name' => $name, 'value' => $value]) {
+            if (self::sysctlTier($name) === 3) {
+                throw new RuntimeException("uses {$labels['sysctls']} {$name}, which Nodes do not allow. Allowed: ".implode(', ', [...self::TIER1_SYSCTLS, ...self::TIER2_SYSCTLS]).', and the forwarding and src_valid_mark sysctls of an interface (net.ipv4.ip_forward and the sysctls of an interface need a team admin)');
+            }
+            if (preg_match(self::SYSCTL_VALUE_PATTERN, $value) !== 1) {
+                throw new RuntimeException("uses {$labels['sysctls']} {$name} without a value of one or two numbers, like {$name}=1");
+            }
+            if (collect($options['sysctls'] ?? [])->contains('name', $name)) {
+                throw new RuntimeException("sets {$labels['sysctls']} {$name} more than once");
+            }
+            $options['sysctls'][] = ['name' => $name, 'value' => $value];
+        }
+        foreach (['cap_add', 'cap_drop'] as $key) {
+            if (isset($options[$key])) {
+                $options[$key] = array_values(array_unique($options[$key]));
+            }
+        }
+        $limits = ['cap_add' => self::MAX_CAP_ADD, 'cap_drop' => self::MAX_CAP_DROP, 'sysctls' => self::MAX_SYSCTLS];
+        foreach ($limits as $key => $limit) {
+            if (count($options[$key] ?? []) > $limit) {
+                throw new RuntimeException("uses {$labels[$key]} more than {$limit} times");
+            }
+        }
+
+        return $options;
+    }
+
+    /**
+     * A Compose or Docker sysctl list as name and value pairs: a map, or `name=value` strings.
+     *
+     * @return list<array{name: string, value: string}>
+     */
+    public static function sysctlPairs(mixed $sysctls): array
+    {
+        if (! is_array($sysctls)) {
+            return [];
+        }
+        $pairs = [];
+        foreach ($sysctls as $key => $entry) {
+            [$name, $value] = is_string($key)
+                ? [$key, is_bool($entry) ? (string) (int) $entry : (string) $entry]
+                : array_pad(explode('=', (string) $entry, 2), 2, '');
+            $pairs[] = ['name' => trim((string) $name), 'value' => trim((string) $value)];
+        }
+
+        return $pairs;
+    }
+
     /** A capability name without `CAP_`, in upper case. */
     public static function normalizeCapability(string $name): string
     {
@@ -94,7 +189,7 @@ final class ContainerIsolation
             }
         }
 
-        return $values;
+        return array_values(array_unique($values));
     }
 
     /**

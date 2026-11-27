@@ -25,7 +25,8 @@ class EnsureNodeRuntimeOptions
         $configuration = $revision->configuration ?? [];
         $runtimeOptions = (array) ($configuration['runtime_options'] ?? []);
         // Every deploy of a user: a new or the same revision, a rollback, a build, and a move.
-        ContainerIsolation::ensureMayUseAdminTier($requestedBy, $teamId, $runtimeOptions);
+        $service = $revision->workload?->stack_service;
+        ContainerIsolation::ensureMayUseAdminTier($requestedBy, $teamId, $runtimeOptions, $service !== null ? "The service {$service}" : 'This application');
         if (filled($configuration['user_labels'] ?? null) || array_intersect_key($runtimeOptions, array_flip(NodeRuntimeOptions::V2_KEYS)) !== []) {
             $node->ensureReportedCapability(DispatchWorkloadDeployment::RUNTIME_OPTIONS_V2_CAPABILITY);
         }

@@ -5,6 +5,7 @@ namespace App\Services\NodeStack;
 use App\Actions\Node\CreateClusterDockerImageWorkload;
 use App\Actions\Node\CreateNodeVolume;
 use App\Models\NodeVolume;
+use App\Support\ContainerIsolation;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -51,8 +52,9 @@ class NodeStackComposeMapper
     /**
      * The version of the mapping that a stack stores in `compose_mapping_version`. Version 2 maps
      * `deploy.resources` (decision 0028). Before it, the services of a file got no resources.
+     * Version 3 maps `cap_drop`, which version 2 ignored, and the host paths of decision 0036.
      */
-    public const MAPPING_VERSION = 2;
+    public const MAPPING_VERSION = 3;
 
     public const ULIMIT_NAMES = ['nofile', 'nproc', 'memlock', 'core', 'stack', 'msgqueue', 'sigpending', 'rtprio'];
 
@@ -183,6 +185,15 @@ class NodeStackComposeMapper
             ['volumes' => $volumes, 'stack_volumes' => $stackVolumes, 'files' => $files, 'container_socket_paths' => $socketPaths, 'notes' => $mountNotes] = $storage[$name];
             $usedPaths = [...array_column($volumes, 'path'), ...array_column($stackVolumes, 'path'), ...array_column($files, 'path'), ...$socketPaths];
             $runtimeOptions = self::runtimeOptions($name, $service, $variables, $resources['memory_limit_bytes'] ?? null, $usedPaths);
+            try {
+                $runtimeOptions += self::isolationOptions($service, $variables);
+            } catch (RuntimeException $exception) {
+                throw new RuntimeException("The service {$name} {$exception->getMessage()}.");
+            }
+            $adminValues = ContainerIsolation::adminTierValues($runtimeOptions);
+            if ($adminValues !== []) {
+                $notes[] = implode(', ', $adminValues).(count($adminValues) === 1 ? ' needs' : ' need').' a team admin or owner to create, change, or deploy this service.';
+            }
             foreach ($files as $file) {
                 $fileBytes += (int) (strlen($file['content_base64']) * 3 / 4);
                 $fileCount++;
@@ -474,6 +485,33 @@ class NodeStackComposeMapper
         return $options;
     }
 
+    /**
+     * The isolation options of a service (decision 0036): `cap_add`, `cap_drop`, `security_opt`
+     * (only no-new-privileges), and `sysctls`, with the allow list of ContainerIsolation.
+     *
+     * @param  array<string, mixed>  $service
+     * @param  array<string, string>  $variables
+     * @return array{cap_add?: list<string>, cap_drop?: list<string>, no_new_privileges?: true, sysctls?: list<array{name: string, value: string}>}
+     *
+     * @throws RuntimeException With a message that follows "The service <name>".
+     */
+    public static function isolationOptions(array $service, array $variables): array
+    {
+        $list = fn (mixed $value): array => array_values(array_filter(
+            array_map(fn (mixed $item): string => trim(self::interpolate((string) $item, $variables)), is_array($value) ? $value : (filled($value) ? [$value] : [])),
+            fn (string $item): bool => $item !== '',
+        ));
+        $sysctls = $service['sysctls'] ?? [];
+        $sysctls = is_array($sysctls) ? array_map(fn (mixed $entry): mixed => is_string($entry) ? self::interpolate($entry, $variables) : $entry, $sysctls) : [];
+
+        return ContainerIsolation::parse([
+            'cap_add' => $list($service['cap_add'] ?? []),
+            'cap_drop' => $list($service['cap_drop'] ?? []),
+            'security_opt' => $list($service['security_opt'] ?? []),
+            'sysctls' => ContainerIsolation::sysctlPairs($sysctls),
+        ], ['cap_add' => 'cap_add', 'cap_drop' => 'cap_drop', 'security_opt' => 'security_opt', 'sysctls' => 'sysctls']);
+    }
+
     /** The rules of Sentinel for a `files` path, without `:`: absolute, normalized, and not under a forbidden path. */
     private static function validMountPath(string $path): bool
     {
@@ -658,7 +696,7 @@ class NodeStackComposeMapper
      * @param  array<string, mixed>  $yaml
      * @return array<string, string>
      */
-    private static function defaults(array $yaml): array
+    public static function defaults(array $yaml): array
     {
         $defaults = [];
         foreach ($yaml['services'] as $service) {
@@ -1015,6 +1053,23 @@ class NodeStackComposeMapper
                     break;
                 case 'socket':
                     $sockets[] = ['path' => $path, 'read_only' => (bool) $mount['read_only']];
+                    break;
+                case 'host':
+                    // Decision 0036: a host path becomes a volume of the stack, as a relative bind does.
+                    $source = (string) $mount['source'];
+                    $ignored = NodeStackCompose::ignoredHostPathNote($source);
+                    if ($ignored !== null) {
+                        $notes[] = $ignored;
+                        break;
+                    }
+                    $refusal = NodeStackCompose::hostPathRefusal($source, $service);
+                    if ($refusal !== null) {
+                        throw new RuntimeException("The service {$serviceName} {$refusal}.");
+                    }
+                    $hostPath = NodeStackCompose::hostPathKey($source);
+                    $name = trim(Str::slug(str_replace('/', '-', ltrim($hostPath, '/'))), '-');
+                    $mounts[] = ['key' => "host:{$hostPath}", 'name' => 'host-'.($name !== '' ? $name : $serviceName.'-data'), 'path' => $path, 'read_only' => (bool) $mount['read_only']];
+                    $notes[] = "The host path {$source} is a stack volume on Nodes, not a directory of the server. Copy its data into the volume when you move from v4.";
                     break;
                 default:
                     throw new RuntimeException("The service {$serviceName} mounts a host path, which Nodes do not allow.");

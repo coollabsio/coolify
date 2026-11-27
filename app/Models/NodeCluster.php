@@ -316,6 +316,18 @@ class NodeCluster extends BaseModel
     }
 
     /**
+     * Whether every usable server of the cluster sets `cap_add`, `cap_drop`, `security_opt`, and
+     * `sysctls` (decision 0036). The fields are the ones of decision 0032, so the capability is
+     * `workload.runtime_options.v2`.
+     */
+    public function supportsIsolationOptions(): bool
+    {
+        $nodes = $this->nodes()->where('is_usable', true)->get();
+
+        return $nodes->isNotEmpty() && $nodes->every(fn (Node $node): bool => $node->supportsCapability(DispatchWorkloadDeployment::RUNTIME_OPTIONS_V2_CAPABILITY) === true);
+    }
+
+    /**
      * The host ports that the Nodes of the cluster use, with what uses them (decision 0016). A
      * published port cannot take them, on TCP or UDP. Sentinel refuses the same ports, and it refuses
      * the full firewall reconcile for one of them.

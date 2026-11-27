@@ -77,8 +77,9 @@ class CreateClusterStack
         if (NodeStackCompose::mountsContainerSocket($yaml)) {
             NodeStackCompose::ensureMayMountContainerSocket($requestedBy, (int) $project->team_id, 'This stack');
         }
+        NodeStackCompose::ensureMayUseAdminIsolation($requestedBy, (int) $project->team_id, $yaml);
         $composeDirectory = $git?->composeDirectory();
-        $reason = NodeStackCompose::unavailableReason($yaml, $cluster->supportsUnderscoreNames(), $composeDirectory, $cluster->supportsPublishedPorts(), $cluster->supportsContainerSocket(), $cluster->supportsWorkloadUser(), $cluster->supportsRuntimeOptions());
+        $reason = NodeStackCompose::unavailableReason($yaml, $cluster->supportsUnderscoreNames(), $composeDirectory, $cluster->supportsPublishedPorts(), $cluster->supportsContainerSocket(), $cluster->supportsWorkloadUser(), $cluster->supportsRuntimeOptions(), $cluster->supportsIsolationOptions());
         if ($reason !== null) {
             throw new RuntimeException("This stack is not available on Nodes. {$reason}");
         }

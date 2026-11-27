@@ -41,6 +41,14 @@ class StartNodeBuild
             }
             // The admin tier of the Docker options (decision 0032), before the build, not after it.
             ContainerIsolation::ensureMayUseAdminTier($user, (int) $workload->team_id, $workload->runtimeSettings()['runtime_options'] ?? []);
+            if ($workload->node_stack_id !== null) {
+                // The isolation options of a stack service are in the Compose file (decision 0036).
+                $yaml = $workload->stack()->withoutGlobalScopes()->first()?->compose_parsed ?? [];
+                $service = $yaml['services'][$workload->stack_service] ?? null;
+                if (is_array($service)) {
+                    NodeStackCompose::ensureMayUseAdminIsolation($user, (int) $workload->team_id, ['services' => [$workload->stack_service => $service]], 'This stack');
+                }
+            }
             if ($user !== null) {
                 SelectBuilderNode::ensureMayBuild($workload, $user);
             }

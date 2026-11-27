@@ -140,11 +140,16 @@ Host bind mounts change in the mapper only. Sentinel gets no host path:
 
 ### Sentinel
 
-- One new capability, `workload.isolation_options.v1`, in
-  `STACK_CAPABILITIES`.
+- ~~One new capability, `workload.isolation_options.v1`, in
+  `STACK_CAPABILITIES`.~~ Changed on 2026-11-27: no new capability. Decision
+  0032 added the same fields to Sentinel `725ed36` under
+  `workload.runtime_options.v2`, so stacks use that capability. A second
+  capability for the same fields would let a Node report one and not the
+  other.
 - New fields in `WorkloadDeployRequest`: `repeated string cap_add`,
   `repeated string cap_drop`, `bool no_new_privileges`, and
-  `repeated WorkloadSysctl sysctls` (name, value).
+  `repeated WorkloadSysctl sysctls` (name, value). Sentinel `725ed36` has
+  them (decision 0032).
 - Sentinel has the allow list of tiers 1 and 2 and refuses other values.
   Sentinel does not know the role of the user. Coolify checks the role.
 - The fields are part of the stored desired set (decision 0026) and of the
@@ -212,14 +217,15 @@ manages:
 
 ## Consequences
 
-- 12 more templates of the catalog run on Nodes (329 of 354).
+- 12 more templates of the catalog run on Nodes (329 of 354). As built, 13
+  run, with the fixed `wireguard-easy` (330 of 354).
 - A converted host path changes where the data is. A user who moves a stack
   from v4 must copy the host directory into the volume. The note on the
   service says this.
 - `cap_drop` now has an effect. A template that drops `ALL` and adds less
   than it needs fails on a Node, as it does on Docker.
 - One Sentinel version adds every field, so a Node needs one upgrade.
-- 25 templates stay locked. Most need `privileged`, `network_mode: host`,
+- 25 templates stay locked (24 as built). Most need `privileged`, `network_mode: host`,
   `SYS_ADMIN`, or `seccomp=unconfined`.
 - Add the new fields to the server transfer (`ServerTransferCoverage`) with
   the revision configuration.
@@ -247,3 +253,82 @@ the text above.
 - The template bug in `deno-kv`: `${COOLIFY_VOLUME_APP}` is not a magic
   variable of Coolify.
 - A cluster setting that allows tier 3 for a team that wants it.
+
+## Implementation notes (2026-11-27)
+
+- **Capability.** Stacks use `workload.runtime_options.v2` of decision 0032
+  (see "Sentinel" above). `NodeCluster::supportsIsolationOptions()` is true
+  when every usable server of the cluster reports it. Without it, a service
+  with `cap_add`, `cap_drop`, `security_opt`, or `sysctls` is not available.
+  `cap_drop` is no longer ignored, so a file that only drops capabilities
+  also needs the capability.
+- **One allow list.** `App\Support\ContainerIsolation::parse()` checks the
+  four keys for the Custom Docker Options of an application (0032) and for
+  the Compose keys of a stack service. Sentinel has the copy of the list in
+  `crates/control/src/isolation.rs`. Values are interpolated with the stack
+  variables first. A sysctl can be a map or a list of `name=value`.
+- **Mapper.** `NodeStackComposeMapper::isolationOptions()` adds the four keys
+  to `runtime_options` of the revision. The diff treats `runtime_options` as
+  a key that only the file sets, so the new file always wins.
+  `MAPPING_VERSION` is 3, so a stack syncs once again with the same file and
+  gets `cap_drop`. `privileged`, `devices`, `network_mode`, and `pid` stay in
+  `UNSUPPORTED_KEYS`, and the template list shows why.
+- **Team-admin tier.** `NodeStackCompose::ensureMayUseAdminIsolation()` runs
+  next to `ensureMayMountContainerSocket()` in `CreateClusterStack`,
+  `SyncNodeStackCompose`, `DeployNodeStackJob`, and `StartNodeBuild` (for
+  the service of the build). `CreateDeploymentOperation` checks each revision
+  through `EnsureNodeRuntimeOptions`. `CreateMoveOperation` now checks the
+  revision before the move starts. Before, a move of a 0032 application with
+  a tier 2 value failed only in `MoveNodeWorkloadJob`. A call without a user
+  is allowed. The API calls the same actions. The service description shows
+  the tier 2 values, for example "--cap-add SYS_NICE needs a team admin or
+  owner to create, change, or deploy this service".
+- **Host paths.** `NodeStackCompose::hostPathRefusal()` has the rules of
+  tier 1. The mapper ignores `/etc/localtime`, `/etc/timezone`,
+  `/dev/urandom`, and `/dev/random` with a note. Another absolute path
+  becomes a stack volume with the key `host:<normalized path>` and the name
+  `host-<path slug>`. Services that mount the same host path share one
+  volume and stay on one Node (decision 0024). `:ro` stays: a shared volume
+  is read-only for that service, and an unshared volume gets the read-write
+  note. The root path `/` is also refused. A bind without `content:` is a
+  directory volume, because v4 also takes a bind without content as a
+  directory. A bind with `content:` stays a file of the `files` feature.
+- **Templates.** `wireguard-easy`: `SYS_MODULE` is removed and `NET_RAW` is
+  added. The kernel loads the WireGuard module when the container creates
+  the interface, so `SYS_MODULE` is not necessary where the module exists.
+  The Podman default set has no `NET_RAW`, and iptables in the container
+  needs it. On Docker, `NET_RAW` is in the default set, so the change does
+  nothing on a v4 server. The risk on v4: a host that cannot load the module
+  on demand. The template needs a team admin on Nodes (`NET_ADMIN`,
+  `NET_RAW`, and two tier 2 sysctls). It publishes UDP 51820, which is the
+  default WireGuard port of a cluster, so it is created only on a cluster
+  with another WireGuard port. `cloudflared` is not changed. The Coolify
+  documentation of Cloudflare Tunnels on v4 points the tunnel to
+  `http://localhost:80`, which needs the host network. No change is safe for
+  v4, so `cloudflared` stays locked by `network_mode`.
+- **Count.** The read-only count calls `unavailableReason()` with every
+  capability flag true on the 354 templates of the catalog. Before: 317 run
+  and 37 are locked. After: 330 run and 24 are locked. The 13 new templates:
+  `apprise-api`, `elasticsearch-with-kibana`, `foundryvtt`, `immich`,
+  `jupyter-notebook-python`, `metabase`, `openwa`,
+  `openwa-with-postgresql-and-redis`, `redlib`, and `stalwart` for every
+  user, and `kuzzle`, `swetrix`, and `wireguard-easy` for a team admin.
+  `AVAILABILITY_VERSION` is 4.
+- **Server transfer.** The values are in the `runtime_options` of the
+  revision configuration, which the transfer moves (decision 0032). A host
+  path volume is a stack volume and moves as one.
+- **Checks on cluster 1 (2 Nodes, Sentinel `main-725ed36`).**
+  - `openwa` (tier 1): the effective capabilities are `CHOWN`,
+    `DAC_OVERRIDE`, `FOWNER`, `SETGID`, and `SETUID`, with
+    `no-new-privileges`.
+  - `redlib`: every default capability is dropped, with
+    `no-new-privileges`.
+  - `swetrix` (tier 2): `clickhouse` has `CAP_SYS_NICE`. A member with
+    team-wide write access was refused at create.
+  - `apprise-api` (host path): `/apprise-api/config` is the stack volume at
+    `/config`. After an edit to `cap_add: NET_RAW` and
+    `net.core.somaxconn: 1024`, the member was refused for the edit, the
+    stack deploy, the deploy of the service, and a move. The admin edit and
+    deploy gave `CAP_NET_RAW`, and `/proc/sys/net/core/somaxconn` is 1024.
+  - The member edit of `redlib` with only a tier 1 sysctl was accepted.
+  - `esphome` (`privileged`) was refused for the admin.

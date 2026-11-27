@@ -11,6 +11,7 @@ use App\Models\NodeWorkloadRevision;
 use App\Models\ScheduledVolumeBackupExecution;
 use App\Models\User;
 use App\Services\NodeStack\NodeStackCompose;
+use App\Support\ContainerIsolation;
 use App\Support\CpuArchitecture;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -73,6 +74,8 @@ class CreateMoveOperation
                     // The move deploys the socket on the target server.
                     NodeStackCompose::ensureMayMountContainerSocket($requestedBy, (int) $workload->team_id, $group->count() > 1 ? "The service {$member['workload']->stack_service}" : 'This application');
                 }
+                // The move deploys the isolation options of the team-admin tier on the target server (decisions 0032 and 0036).
+                ContainerIsolation::ensureMayUseAdminTier($requestedBy, (int) $workload->team_id, (array) data_get($member['revision']->configuration, 'runtime_options', []), $member['workload']->stack_service !== null ? "The service {$member['workload']->stack_service}" : 'This application');
                 $mismatch = CpuArchitecture::mismatch($target, ReadImageArchitectures::forRevision($member['revision']));
                 if ($mismatch !== null) {
                     throw new RuntimeException(($group->count() > 1 ? "The service {$member['workload']->stack_service} cannot move. " : '').$mismatch.' Select a server with one of these architectures.');

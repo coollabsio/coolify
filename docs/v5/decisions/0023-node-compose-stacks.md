@@ -380,6 +380,18 @@ two items were open in **Not decided here**. They are decided as follows.
     as root cannot use it. A service that needs it sets `user: root`.
   - A `:ro` socket mount is read-write.
 
+### Isolation keys and host paths (decision 0036, 2026-11-27)
+
+- `cap_add`, `cap_drop`, `security_opt` (only `no-new-privileges`), and
+  `sysctls` map to the runtime options of `workload.runtime_options.v2`, with
+  the allow list of decision 0036. Values of the team-admin tier need a team
+  admin or owner, as the Docker socket does.
+- An absolute host path that is not a system path becomes a stack volume,
+  with a note on the service. `/etc/localtime` and the random devices are
+  ignored with a note.
+- With every capability, 330 of the 354 templates of the catalog run on
+  Nodes (317 before). 24 stay locked.
+
 ### User of a service
 
 - **Sentinel.** Sentinel `99c9629` adds `user` (field 25) to

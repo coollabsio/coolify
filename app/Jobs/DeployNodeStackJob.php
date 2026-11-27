@@ -101,6 +101,7 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
                 // Before the first service deploys, so a refused stack does not deploy half of it.
                 NodeStackCompose::ensureMayMountContainerSocket($requestedBy, (int) $stack->team_id, 'This stack');
             }
+            NodeStackCompose::ensureMayUseAdminIsolation($requestedBy, (int) $stack->team_id, $stack->compose_parsed ?? []);
             $dependencies = $stack->dependencies();
             $order = $stack->deployOrder($dependencies);
             // A service that left the Compose file is deleted by its own job.

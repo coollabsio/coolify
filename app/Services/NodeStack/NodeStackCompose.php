@@ -3,6 +3,7 @@
 namespace App\Services\NodeStack;
 
 use App\Models\User;
+use App\Support\ContainerIsolation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -18,19 +19,33 @@ class NodeStackCompose
 {
     /** Service keys that a workload cannot express. The first one found is the reason. */
     private const UNSUPPORTED_KEYS = [
-        'privileged' => 'runs privileged',
-        'cap_add' => 'adds Linux capabilities (cap_add)',
+        'privileged' => 'runs privileged, which Nodes do not allow, because it gives the container root on its server',
         'devices' => 'uses host devices',
-        'security_opt' => 'changes security options (security_opt)',
-        'network_mode' => 'sets network_mode',
-        'pid' => 'shares a PID namespace (pid)',
-        'sysctls' => 'sets kernel parameters (sysctls)',
+        'network_mode' => 'sets network_mode, which Nodes do not allow: each container on a Node has its own network, and the host network shares the ports and the firewall of the server',
+        'pid' => 'shares a PID namespace (pid), which Nodes do not allow, because the container then sees the processes of its server or of another container',
         'ports' => 'publishes ports, which needs Sentinel with network.firewall.published_ports.v1 on every server of the cluster',
         'build' => 'builds an image (build)',
     ];
 
     /** Part of the cache key of templateUnavailableReasons(). Change it when the rules change, so a cached result of older rules is not used. */
-    private const AVAILABILITY_VERSION = 3;
+    private const AVAILABILITY_VERSION = 4;
+
+    /** The isolation keys of decision 0036. Sentinel sets them with `workload.runtime_options.v2`. */
+    public const ISOLATION_KEYS = ['cap_add', 'cap_drop', 'security_opt', 'sysctls'];
+
+    /**
+     * Host files that a Node does not mount, with the note for the service. The container has
+     * its own: it uses `TZ` for the time zone, and its own random devices.
+     */
+    public const IGNORED_HOST_PATHS = [
+        '/etc/localtime' => 'is not mounted on Nodes. Set the TZ variable for the time zone.',
+        '/etc/timezone' => 'is not mounted on Nodes. Set the TZ variable for the time zone.',
+        '/dev/urandom' => 'is not mounted on Nodes. The container has its own random devices.',
+        '/dev/random' => 'is not mounted on Nodes. The container has its own random devices.',
+    ];
+
+    /** Host paths with content of the server. A volume does not give that content, so a mount of them stays refused. */
+    public const SYSTEM_HOST_PATHS = ['/proc', '/sys', '/dev', '/run', '/var/run', '/etc', '/var/lib/docker', '/var/lib/containers', '/var/lib/coolify', '/data/coolify'];
 
     /** Keys of `build:` that the Node builder cannot use. The first one found is the reason. */
     private const UNSUPPORTED_BUILD_KEYS = [
@@ -71,8 +86,9 @@ class NodeStackCompose
      * @param  bool  $containerSocket  Every server of the cluster mounts the Podman socket in a container, so a mount of the Docker socket can run.
      * @param  bool  $workloadUser  Every server of the cluster runs a container as the Compose `user:`.
      * @param  bool  $runtimeOptions  Every server of the cluster sets `shm_size`, `ulimits`, `tmpfs`, `stop_grace_period`, `tty`, and `stdin_open` (decision 0028).
+     * @param  bool  $isolationOptions  Every server of the cluster sets `cap_add`, `cap_drop`, `security_opt`, and `sysctls` (decision 0036, `workload.runtime_options.v2`).
      */
-    public static function unavailableReason(array $yaml, bool $underscoreNames = false, ?string $gitComposeDirectory = null, bool $publishedPorts = false, bool $containerSocket = false, bool $workloadUser = false, bool $runtimeOptions = false): ?string
+    public static function unavailableReason(array $yaml, bool $underscoreNames = false, ?string $gitComposeDirectory = null, bool $publishedPorts = false, bool $containerSocket = false, bool $workloadUser = false, bool $runtimeOptions = false, bool $isolationOptions = false): ?string
     {
         if ($gitComposeDirectory !== null && filled($yaml['include'] ?? null)) {
             return 'The Compose file includes other Compose files (include).';
@@ -80,7 +96,7 @@ class NodeStackCompose
         $services = $yaml['services'] ?? [];
         foreach ($services as $name => $service) {
             $service = is_array($service) ? $service : [];
-            $reason = self::serviceUnavailableReason((string) $name, $service, $underscoreNames, $gitComposeDirectory, $publishedPorts, $containerSocket, $workloadUser, $runtimeOptions);
+            $reason = self::serviceUnavailableReason((string) $name, $service, $underscoreNames, $gitComposeDirectory, $publishedPorts, $containerSocket, $workloadUser, $runtimeOptions, $isolationOptions);
             if ($reason !== null) {
                 return "The service {$name} {$reason}.";
             }
@@ -135,6 +151,75 @@ class NodeStackCompose
     }
 
     /**
+     * Refuses a user who is not an admin or owner of the team when a service uses a value of the
+     * team-admin tier of decision 0036 (`cap_add` NET_ADMIN, `sysctls` net.ipv4.ip_forward). As
+     * for the Docker socket, a change without a user is allowed.
+     *
+     * @param  array<string, mixed>  $yaml
+     *
+     * @throws RuntimeException
+     */
+    public static function ensureMayUseAdminIsolation(?User $user, int $teamId, array $yaml, string $subject = 'This stack'): void
+    {
+        if ($user === null || $user->isAdminOfTeam($teamId)) {
+            return;
+        }
+        $variables = NodeStackComposeMapper::defaults($yaml);
+        foreach ($yaml['services'] ?? [] as $name => $service) {
+            try {
+                $options = NodeStackComposeMapper::isolationOptions(is_array($service) ? $service : [], $variables);
+            } catch (RuntimeException) {
+                // unavailableReason() refuses the value with its reason.
+                continue;
+            }
+            ContainerIsolation::ensureMayUseAdminTier($user, $teamId, $options, "{$subject}: the service {$name}");
+        }
+    }
+
+    /**
+     * Why a Node cannot mount the host path, or null when it becomes a stack volume (decision
+     * 0036). An ignored path (IGNORED_HOST_PATHS) is not checked here.
+     *
+     * @param  array<string, mixed>  $service
+     */
+    public static function hostPathRefusal(string $source, array $service): ?string
+    {
+        if (str_starts_with($source, '~') || str_contains($source, '$')) {
+            return "mounts the host path {$source}. Nodes cannot resolve a path with ~ or a variable";
+        }
+        $path = self::normalizedPath($source);
+        if ($path === null || $path === '') {
+            return "mounts the host path {$source}, which is the root of its server";
+        }
+        $path = '/'.$path;
+        foreach (self::SYSTEM_HOST_PATHS as $prefix) {
+            if ($path === $prefix || str_starts_with($path, $prefix.'/')) {
+                return "mounts the host path {$source}, which has content of its server. A volume of the stack does not give that content";
+            }
+        }
+        if (collect(self::mounts($service))->contains('kind', 'socket')) {
+            return "mounts the host path {$source} and the Docker socket. The containers that it starts through the socket use the same host path, so a volume of the stack breaks them";
+        }
+
+        return null;
+    }
+
+    /** The note for an ignored host path, or null when the path is not ignored. */
+    public static function ignoredHostPathNote(string $source): ?string
+    {
+        $path = self::normalizedPath($source);
+        $note = $path === null ? null : (self::IGNORED_HOST_PATHS['/'.$path] ?? null);
+
+        return $note === null ? null : "The host path {$source} {$note}";
+    }
+
+    /** `/a/./b//c/` becomes `/a/b/c`, the key of a host path. */
+    public static function hostPathKey(string $source): string
+    {
+        return '/'.self::normalizedPath($source);
+    }
+
+    /**
      * The `volumes_from` entries of a service: `service`, `service:ro`, `service:rw`, or
      * `container:<name>`, which Nodes do not have.
      *
@@ -179,17 +264,17 @@ class NodeStackCompose
      *
      * @return array<string, string>
      */
-    public static function templateUnavailableReasons(?Collection $templates = null, bool $underscoreNames = false, bool $publishedPorts = false, bool $containerSocket = false, bool $workloadUser = false, bool $runtimeOptions = false): array
+    public static function templateUnavailableReasons(?Collection $templates = null, bool $underscoreNames = false, bool $publishedPorts = false, bool $containerSocket = false, bool $workloadUser = false, bool $runtimeOptions = false, bool $isolationOptions = false): array
     {
         $templates ??= get_service_templates();
         $composes = $templates->map(fn ($template): string => (string) data_get($template, 'compose', ''));
-        $features = ($underscoreNames ? 'underscore:' : '').($publishedPorts ? 'ports:' : '').($containerSocket ? 'socket:' : '').($workloadUser ? 'user:' : '').($runtimeOptions ? 'runtime:' : '');
+        $features = ($underscoreNames ? 'underscore:' : '').($publishedPorts ? 'ports:' : '').($containerSocket ? 'socket:' : '').($workloadUser ? 'user:' : '').($runtimeOptions ? 'runtime:' : '').($isolationOptions ? 'isolation:' : '');
 
-        return Cache::remember('node-stack-template-availability:'.self::AVAILABILITY_VERSION.':'.$features.md5($composes->toJson()), now()->addDay(), function () use ($composes, $underscoreNames, $publishedPorts, $containerSocket, $workloadUser, $runtimeOptions): array {
+        return Cache::remember('node-stack-template-availability:'.self::AVAILABILITY_VERSION.':'.$features.md5($composes->toJson()), now()->addDay(), function () use ($composes, $underscoreNames, $publishedPorts, $containerSocket, $workloadUser, $runtimeOptions, $isolationOptions): array {
             $reasons = [];
             foreach ($composes as $key => $encoded) {
                 try {
-                    $reason = self::unavailableReason(self::parse((string) base64_decode($encoded)), $underscoreNames, publishedPorts: $publishedPorts, containerSocket: $containerSocket, workloadUser: $workloadUser, runtimeOptions: $runtimeOptions);
+                    $reason = self::unavailableReason(self::parse((string) base64_decode($encoded)), $underscoreNames, publishedPorts: $publishedPorts, containerSocket: $containerSocket, workloadUser: $workloadUser, runtimeOptions: $runtimeOptions, isolationOptions: $isolationOptions);
                 } catch (RuntimeException $exception) {
                     $reason = $exception->getMessage();
                 }
@@ -275,7 +360,7 @@ class NodeStackCompose
     }
 
     /** @param  array<string, mixed>  $service */
-    private static function serviceUnavailableReason(string $name, array $service, bool $underscoreNames, ?string $gitComposeDirectory, bool $publishedPorts, bool $containerSocket, bool $workloadUser, bool $runtimeOptions): ?string
+    private static function serviceUnavailableReason(string $name, array $service, bool $underscoreNames, ?string $gitComposeDirectory, bool $publishedPorts, bool $containerSocket, bool $workloadUser, bool $runtimeOptions, bool $isolationOptions): ?string
     {
         if (! self::validServiceName($name, $underscoreNames)) {
             return $underscoreNames || ! self::validServiceName($name, true)
@@ -301,6 +386,17 @@ class NodeStackCompose
                 return 'sets '.implode(', ', $set).', which '.(count($set) === 1 ? 'needs' : 'need').' Sentinel with workload.runtime_options.v1 on every server of the cluster';
             }
         }
+        $isolation = array_values(array_filter(self::ISOLATION_KEYS, fn (string $key): bool => filled($service[$key] ?? null)));
+        if ($isolation !== []) {
+            if (! $isolationOptions) {
+                return 'sets '.implode(', ', $isolation).', which '.(count($isolation) === 1 ? 'needs' : 'need').' Sentinel with workload.runtime_options.v2 on every server of the cluster';
+            }
+            try {
+                NodeStackComposeMapper::isolationOptions($service, NodeStackComposeMapper::defaults(['services' => [$name => $service]]));
+            } catch (RuntimeException $exception) {
+                return $exception->getMessage();
+            }
+        }
         if ($gitComposeDirectory !== null && is_array($service['extends'] ?? null) && filled($service['extends']['file'] ?? null)) {
             return 'extends a service of another Compose file (extends.file)';
         }
@@ -317,8 +413,11 @@ class NodeStackCompose
             if ($mount['kind'] === 'socket' && ! $containerSocket) {
                 return 'mounts the Docker socket, which needs Sentinel with workload.container_socket.v1 on every server of the cluster';
             }
-            if ($mount['kind'] === 'host') {
-                return "mounts the host path {$mount['source']}";
+            if ($mount['kind'] === 'host' && self::ignoredHostPathNote((string) $mount['source']) === null) {
+                $refusal = self::hostPathRefusal((string) $mount['source'], $service);
+                if ($refusal !== null) {
+                    return $refusal;
+                }
             }
         }
 

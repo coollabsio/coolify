@@ -22,8 +22,6 @@ final class NodeRuntimeOptions
 
     public const MAX_PIDS_LIMIT = 4194304;
 
-    public const MAX_SYSCTLS = 16;
-
     public const MAX_GPU_DEVICES = 16;
 
     /** The keys of `runtime_options` that need `workload.runtime_options.v2`. */
@@ -116,53 +114,18 @@ final class NodeRuntimeOptions
         foreach ($hosts as $host) {
             $options['extra_hosts'][] = self::extraHost($host);
         }
-        foreach (self::listValues($compose['cap_drop'] ?? []) as $capability) {
-            $name = ContainerIsolation::normalizeCapability($capability);
-            if ($name !== 'ALL' && ! in_array($name, ContainerIsolation::LINUX_CAPABILITIES, true)) {
-                throw new RuntimeException("--cap-drop {$capability} is not a Linux capability.");
-            }
-            $options['cap_drop'][] = $name;
+        try {
+            $options += ContainerIsolation::parse([
+                'cap_add' => self::listValues($compose['cap_add'] ?? []),
+                'cap_drop' => self::listValues($compose['cap_drop'] ?? []),
+                'security_opt' => self::listValues($compose['security_opt'] ?? []),
+                'sysctls' => ContainerIsolation::sysctlPairs(self::listValues($compose['sysctls'] ?? [])),
+            ], ['cap_add' => '--cap-add', 'cap_drop' => '--cap-drop', 'security_opt' => '--security-opt', 'sysctls' => '--sysctl']);
+        } catch (RuntimeException $exception) {
+            throw new RuntimeException('Custom Docker Options '.$exception->getMessage().'.');
         }
-        foreach (self::listValues($compose['cap_add'] ?? []) as $capability) {
-            $name = ContainerIsolation::normalizeCapability($capability);
-            if (ContainerIsolation::capabilityTier($name) === 3) {
-                throw new RuntimeException("Nodes do not support --cap-add {$capability}. It gives the container too much control of its server. Allowed: "
-                    .implode(', ', [...ContainerIsolation::TIER1_CAP_ADD, ...ContainerIsolation::TIER2_CAP_ADD]).' (the last six need a team admin).');
-            }
-            if (in_array($name, $options['cap_drop'] ?? [], true)) {
-                throw new RuntimeException("{$name} is in --cap-add and in --cap-drop.");
-            }
-            $options['cap_add'][] = $name;
-        }
-        foreach (self::listValues($compose['security_opt'] ?? []) as $value) {
-            if (! in_array($value, ['no-new-privileges', 'no-new-privileges:true', 'no-new-privileges=true'], true)) {
-                throw new RuntimeException("Nodes do not support --security-opt {$value}. Only no-new-privileges is allowed, because other values lower the isolation of the container.");
-            }
-            $options['no_new_privileges'] = true;
-        }
-        $sysctls = self::listValues($compose['sysctls'] ?? []);
-        if (count($sysctls) > self::MAX_SYSCTLS) {
-            throw new RuntimeException('Use --sysctl at most '.self::MAX_SYSCTLS.' times.');
-        }
-        foreach ($sysctls as $sysctl) {
-            [$name, $value] = array_pad(explode('=', $sysctl, 2), 2, null);
-            $name = trim((string) $name);
-            $value = trim((string) $value);
-            if (ContainerIsolation::sysctlTier($name) === 3) {
-                throw new RuntimeException("Nodes do not support --sysctl {$name}. Allowed: ".implode(', ', [...ContainerIsolation::TIER1_SYSCTLS, ...ContainerIsolation::TIER2_SYSCTLS]).', and the forwarding and src_valid_mark sysctls of an interface (a team admin only for the last ones).');
-            }
-            if (preg_match(ContainerIsolation::SYSCTL_VALUE_PATTERN, $value) !== 1) {
-                throw new RuntimeException("--sysctl {$name} needs a value of one or two numbers, like {$name}=1.");
-            }
-            if (collect($options['sysctls'] ?? [])->contains('name', $name)) {
-                throw new RuntimeException("--sysctl {$name} is set more than once.");
-            }
-            $options['sysctls'][] = ['name' => $name, 'value' => $value];
-        }
-        foreach (['extra_hosts', 'cap_add', 'cap_drop'] as $key) {
-            if (isset($options[$key])) {
-                $options[$key] = array_values(array_unique($options[$key], SORT_REGULAR));
-            }
+        if (isset($options['extra_hosts'])) {
+            $options['extra_hosts'] = array_values(array_unique($options['extra_hosts'], SORT_REGULAR));
         }
 
         $gpu = null;
