@@ -157,7 +157,13 @@ On Nodes, these parts exist:
 - The post-deployment command runs when every Node operation of the
   notification group succeeded, after `retireReplaced()`. It runs in the new
   container on the first Node. A failure writes a warning to the deployment
-  log and in the notification. The deploy stays successful, as in v4.
+  log. The deploy stays successful, as in v4.
+- The deploy notification does not wait for the post-deployment command and
+  has no warning. v4 does the same: `ApplicationDeploymentJob::post_deployment()`
+  sends `DeploymentSuccess` in `completeDeployment()`, before
+  `run_post_deployment_command()`, and writes a failure to the log only.
+  Coolify sends exactly 1 notification for each deploy (the `notified_at`
+  claim), also when the command fails or times out.
 - The output goes to the deployment log, with the redaction of scheduled
   tasks. Output above 1 MiB is truncated.
 - A preview runs the commands in its own containers.
@@ -291,7 +297,9 @@ where it was wrong.
 - **The post-deployment command** runs in a job after every operation of the
   group succeeded, in the container of the slot of the first server. The
   warning is in the deployment log. The deploy notification does not wait
-  for the command, so it has no warning.
+  for the command, so it has no warning, as in v4. An earlier rule put the
+  warning in the notification. v4 sends its success notification before the
+  command, so the rule changed to match v4.
 - **No shell switch.** Both commands run with `sh -c`, as in v4. The image
   must have `sh`.
 - **Git stacks.** The commands are built for cluster applications only. A
