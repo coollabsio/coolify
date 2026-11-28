@@ -16,7 +16,7 @@ use Illuminate\Queue\SerializesModels;
 
 /**
  * Reads the container inventory of a Node. The lock is released when the job starts, so a status
- * event during a run queues one more refresh. A refresh for a status event has its own key, so the
+ * event during a run queues one more refresh. A refresh for a status event or a Podman event (`runtime_changed`) has its own key, so the
  * delayed refresh of each minute does not hide it. Runs for the same Node never overlap: a waiting
  * run is released again, which is not a failure.
  */

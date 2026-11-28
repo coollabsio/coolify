@@ -70,7 +70,8 @@ class FluxConnectionEventController extends Controller
         if ($data['event'] === 'runtime_changed') {
             if (data_get($current, 'status') === 'connected'
                 && data_get($current, 'connection_id') === $data['connection_id']) {
-                RefreshNodeContainersJob::dispatch($node->id);
+                // A Podman event, for example a crash: the delayed refresh of each minute must not hide it.
+                RefreshNodeContainersJob::dispatch($node->id, forStatusEvent: true);
             }
 
             return response()->noContent();
