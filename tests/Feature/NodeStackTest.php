@@ -569,7 +569,9 @@ describe('authorization', function () {
         $this->get(route('project.cluster-stack.show', ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid, 'stack_uuid' => $stack->uuid]))
             ->assertSuccessful()
             ->assertSee('docker.io/library/nginx')
-            ->assertSee('shop.coolify.internal')
+            ->assertSee('shop.coolify.internal');
+        $this->get(route('project.cluster-stack.danger', ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid, 'stack_uuid' => $stack->uuid]))
+            ->assertSuccessful()
             ->assertSee('Delete stack');
 
         Livewire::test(ClusterStackShow::class, ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid, 'stack_uuid' => $stack->uuid])
@@ -589,7 +591,7 @@ describe('authorization', function () {
         Cache::flush();
         $parameters = ['project_uuid' => $this->project->uuid, 'environment_uuid' => $this->environment->uuid, 'stack_uuid' => $stack->uuid];
 
-        $this->get(route('project.cluster-stack.show', $parameters))->assertSuccessful()->assertDontSee('Delete stack');
+        $this->get(route('project.cluster-stack.danger', $parameters))->assertSuccessful()->assertDontSee('Delete stack');
         Livewire::test(ClusterStackShow::class, $parameters)->call('deploy')->assertForbidden();
         Livewire::test(ClusterStackShow::class, $parameters)->call('delete')->assertForbidden();
         $this->get(route('project.resource.create', [
@@ -1025,7 +1027,7 @@ YAML);
 
         $this->actingAs($this->user);
         Cache::flush();
-        $this->get(route('project.cluster-stack.show', $parameters))->assertSuccessful()->assertSee('Shared volumes')->assertSee('No service mounts this volume.');
+        $this->get(route('project.cluster-stack.storages', $parameters))->assertSuccessful()->assertSee('Shared volumes')->assertSee('No service mounts this volume.');
         Livewire::test(ClusterStackShow::class, $parameters)->call('deleteVolume', $data->uuid)->assertDispatched('success');
         expect($data->fresh())->toBeNull();
     });

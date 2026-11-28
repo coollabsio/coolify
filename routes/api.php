@@ -285,6 +285,7 @@ Route::group([
     Route::post('/cluster-stacks/git', [ClusterStacksController::class, 'createGit'])->middleware(['api.ability:write']);
     Route::patch('/cluster-stacks/{uuid}', [ClusterStacksController::class, 'update'])->middleware(['api.ability:write']);
     Route::delete('/cluster-stacks/{uuid}', [ClusterStacksController::class, 'destroy'])->middleware(['api.ability:delete']);
+    Route::get('/cluster-stacks/{uuid}/deployments', [ClusterStacksController::class, 'deployments'])->middleware(['api.ability:read']);
     Route::post('/cluster-stacks/{uuid}/deploy', [ClusterStacksController::class, 'deploy'])->middleware(['api.ability:deploy']);
     Route::post('/cluster-stacks/{uuid}/start', [ClusterStacksController::class, 'start'])->middleware(['api.ability:deploy']);
     Route::post('/cluster-stacks/{uuid}/stop', [ClusterStacksController::class, 'stop'])->middleware(['api.ability:deploy']);

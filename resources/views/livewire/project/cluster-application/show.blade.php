@@ -74,10 +74,10 @@
             {{-- Keyed by state: the wire:ignore confirmations must render again when the state changes. --}}
             <div class="hidden" aria-hidden="true" wire:key="cluster-application-confirmations-{{ $isRunning ? 'running' : 'exited' }}">
                 <x-modal-confirmation canGate="update" :canResource="$workload"
-                    title="{{ $isRunning ? 'Confirm Application Stopping?' : 'Confirm Container Removal?' }}"
+                    title="{{ $isRunning ? ($workload->node_stack_id !== null ? 'Confirm Stack Stopping?' : 'Confirm Application Stopping?') : 'Confirm Container Removal?' }}"
                     buttonTitle="{{ $isRunning ? 'Stop' : 'Remove container' }}"
                     submitAction="{{ $isRunning ? 'stop' : 'removeContainer' }}" :actions="$isRunning
-                        ? ['This application will be stopped.', 'Its container is stopped on every server it runs on.']
+                        ? ($workload->node_stack_id !== null ? ['Every service of this stack will be stopped.'] : ['This application will be stopped.', 'Its container is stopped on every server it runs on.'])
                         : ['The exited application container will be removed.', 'The container is removed on every server it runs on. Deploy the application to create it again.']"
                     :confirmWithText="false" :confirmWithPassword="false"
                     step1ButtonText="Continue" step2ButtonText="Confirm">
@@ -86,9 +86,9 @@
                     </x-slot:trigger>
                 </x-modal-confirmation>
                 <x-modal-confirmation canGate="update" :canResource="$workload"
-                    title="Confirm Application Restart?" buttonTitle="Restart"
+                    title="{{ $workload->node_stack_id !== null ? 'Confirm Stack Restart?' : 'Confirm Application Restart?' }}" buttonTitle="Restart"
                     submitAction="restart" :actions="[
-                        'This application will be restarted without rebuilding.',
+                        $workload->node_stack_id !== null ? 'Every service of this stack will be restarted without a new deploy.' : 'This application will be restarted without rebuilding.',
                     ]" :confirmWithText="false" :confirmWithPassword="false"
                     step2ButtonText="Confirm">
                     <x-slot:trigger>

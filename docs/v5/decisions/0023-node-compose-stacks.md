@@ -114,8 +114,11 @@ port publishing.
 
 ## Not decided here
 
-- Rollback of a whole stack to one point in time.
-- Conversion of a v4 service on a legacy server to a stack.
+- Rollback of a whole stack to one point in time. (Not in the first release,
+  2026-11-27. Each service rolls back on its own page, like a cluster
+  application.)
+- Conversion of a v4 service on a legacy server to a stack. (Postponed until
+  after the first release.)
 
 ## Implementation (step 1, 2026-11-14)
 
@@ -457,3 +460,18 @@ two items were open in **Not decided here**. They are decided as follows.
   `chibisafe-server` and `caddy` (shared volume `chibisafe-uploads`) on
   Node 3. All 3 services are healthy, and `caddy` on Node 3 serves the
   frontend of `chibisafe` on Node 1 and the API of `chibisafe-server`.
+
+## Amendment: stack pages like a v4 service (2026-11-27)
+
+The stack has the pages of a v4 service, each on its own route
+(`project.cluster-stack.<section>`): General (with the Compose resources),
+Domains, Environment Variables, Persistent Storage, Runtime Logs, Deployment
+Logs, Terminal, Scheduled Tasks, Webhooks, Backups, and Danger Zone. The
+heading has Deploy, Restart, and Stop for the whole stack. A service page
+links back to its stack, and Deploy, Restart, and Stop on a service page act on the whole stack.
+
+Each run of `DeployNodeStackJob` is a `node_stack_deployments` row
+(`deploying`, `deployed`, or `failed`, the user, the commit of a Git stack,
+and the error) for the Deployment Logs page and
+`GET /cluster-stacks/{uuid}/deployments`. A rollback of the whole stack is not
+in the first release.

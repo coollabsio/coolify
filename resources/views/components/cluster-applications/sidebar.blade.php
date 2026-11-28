@@ -134,9 +134,25 @@
     );
 @endphp
 
-<x-main-nav-menu back-label="Dashboard" :name="$workload->name">
+@php
+    // A service of a stack is one level below its stack, like a resource of a v4 service.
+    $stack = $workload->node_stack_id === null ? null : $workload->stack;
+    $stackRouteParameters = $stack === null ? [] : ['project_uuid' => $routeParameters['project_uuid'], 'environment_uuid' => $routeParameters['environment_uuid'], 'stack_uuid' => $stack->uuid];
+@endphp
+@if ($stack !== null)
+    <x-cluster-stacks.sidebar section="" :route-parameters="$stackRouteParameters" :stack="$stack" nav-only />
+@endif
+<x-main-nav-menu :depth="$stack === null ? 0 : 1" :back-label="$stack === null ? 'Dashboard' : 'Stack'"
+    :back-title="$stack === null ? 'Back to the main menu' : 'Back to the stack menu'" :name="$workload->name">
     <nav aria-label="{{ $workload->isDatabase() ? 'Cluster database sections' : 'Cluster application sections' }}"
         class="grid grid-cols-1 gap-0.5">
+        @if ($stack !== null)
+            <a class="menu-item" data-page-only {{ wireNavigate() }} href="{{ route('project.cluster-stack.show', $stackRouteParameters) }}">
+                <x-reicon name="logout" class="menu-item-icon rotate-180" />
+                <span class="menu-item-label">Back to stack</span>
+            </a>
+            <div class="my-2 border-t border-neutral-200 dark:border-white/[0.06]" aria-hidden="true"></div>
+        @endif
         <div hidden data-settings-search-items="{{ json_encode($settingsSearchItems) }}"></div>
         @foreach ($groupedMenuItems as $groupLabel => $groupItems)
             @unless ($loop->first)

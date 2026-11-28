@@ -8,6 +8,7 @@ use App\Actions\Node\CreateMoveOperation;
 use App\Actions\Node\CreateNodeVolume;
 use App\Actions\Node\DeleteNodeVolumeCopy;
 use App\Actions\Node\DeleteNodeVolumeData;
+use App\Actions\Node\DeployNodeStack;
 use App\Actions\Node\DeployNodeWorkload;
 use App\Actions\Node\DetermineWorkloadState;
 use App\Actions\Node\MoveNodeWorkload;
@@ -237,6 +238,11 @@ class Show extends Component
      */
     public function deploy(): void
     {
+        if ($this->workload->node_stack_id !== null) {
+            $this->deployStack();
+
+            return;
+        }
         $operation = null;
         try {
             $this->authorize('deploy', $this->workload);
@@ -276,15 +282,21 @@ class Show extends Component
     }
 
     /**
-     * Rolls back to the image of an earlier revision of this application (decision 0017) and opens
+     * Rolls back to the image of an earlier deployment of this application (decision 0017) and opens
      * its deployment log, or the log of the build when the image must be built again.
      */
-    public function rollback(string $revisionUuid): void
+    public function rollback(string $deploymentUuid): void
     {
         $this->authorize('deploy', $this->workload);
-        $revision = $this->workload->revisions()->where('uuid', $revisionUuid)->firstOrFail();
+        $deployment = NodeOperation::query()
+            ->where('node_workload_id', $this->workload->id)
+            ->where('command_type', 'workload.deploy.v1')
+            ->where('uuid', $deploymentUuid)
+            ->whereNotNull('node_workload_revision_id')
+            ->with('revision')
+            ->firstOrFail();
         try {
-            $rollback = RollbackNodeWorkload::run($this->workload, $revision, auth()->user());
+            $rollback = RollbackNodeWorkload::run($this->workload, $deployment->revision, auth()->user(), $deployment);
         } catch (Throwable $exception) {
             handleError($exception, $this);
             $this->loadData();
@@ -708,6 +720,26 @@ class Show extends Component
         $this->dispatch('success', 'Database updated. Redeploy the database to apply the changes.');
     }
 
+    /** A stack service deploys with its whole stack, like a v4 service application. */
+    private function deployStack(): void
+    {
+        $stack = $this->workload->stack;
+        try {
+            $this->authorize('deploy', $stack);
+            DeployNodeStack::run($stack, auth()->user());
+        } catch (Throwable $exception) {
+            handleError($exception, $this);
+
+            return;
+        }
+
+        redirectRoute($this, 'project.cluster-stack.deployments', [
+            'project_uuid' => $this->project->uuid,
+            'environment_uuid' => $this->environment->uuid,
+            'stack_uuid' => $stack->uuid,
+        ]);
+    }
+
     public function restart(): void
     {
         $this->queueLifecycle(NodeWorkloadAction::RESTART);
@@ -976,6 +1008,12 @@ class Show extends Component
 
     private function queueLifecycle(NodeWorkloadAction $action): void
     {
+        // A stack service restarts and stops with its whole stack, like a v4 service application.
+        if ($this->workload->node_stack_id !== null && $action !== NodeWorkloadAction::REMOVE) {
+            $this->queueStackLifecycle($action);
+
+            return;
+        }
         try {
             $this->authorize('deploy', $this->workload);
             if (! $this->ensureHasServer()) {
@@ -991,6 +1029,24 @@ class Show extends Component
             }
             if ($failures !== []) {
                 $this->dispatch('error', 'Failed to '.$action->value.' the application on every server.', implode('<br>', array_map('e', $failures)));
+            }
+        } catch (Throwable $exception) {
+            handleError($exception, $this);
+        }
+        $this->loadData();
+    }
+
+    private function queueStackLifecycle(NodeWorkloadAction $action): void
+    {
+        $stack = $this->workload->stack;
+        try {
+            $this->authorize('deploy', $stack);
+            ['queued' => $queued, 'failures' => $failures] = QueueNodeWorkloadLifecycle::forStack($stack, $action, auth()->user());
+            if ($queued) {
+                $this->dispatch('success', str($action->value)->title()." of {$stack->name} queued.");
+            }
+            if ($failures !== []) {
+                $this->dispatch('error', $queued ? 'Some services refused the '.$action->value.'.' : "No service accepted the {$action->value}.", implode('<br>', array_map('e', $failures)));
             }
         } catch (Throwable $exception) {
             handleError($exception, $this);
@@ -1139,12 +1195,12 @@ class Show extends Component
             ->findMany($page->where('kind', 'build')->pluck('id'))->keyBy('id');
         $eventRows = NodeWorkloadEvent::query()->with(['node', 'revision'])
             ->findMany($page->where('kind', 'event')->pluck('id'))->keyBy('id');
-        $latestImage = $this->workload->revisions()->latest('id')->value('image');
+        $runningImages = RollbackNodeWorkload::runningImages($this->workload);
         $rows = $page
             ->map(fn (object $row): array => match ($row->kind) {
                 'build' => $this->buildTimelineRow($buildRows[$row->id]),
                 'event' => $this->eventTimelineRow($eventRows[$row->id]),
-                default => $this->deploymentTimelineRow($operations[$row->id], $latestImage),
+                default => $this->deploymentTimelineRow($operations[$row->id], $runningImages),
             })
             ->values()
             ->all();
@@ -1443,16 +1499,20 @@ class Show extends Component
         return $lines;
     }
 
-    /** @return array<string, mixed> */
-    private function deploymentTimelineRow(NodeOperation $operation, ?string $latestImage): array
+    /**
+     * @param  list<string>  $runningImages
+     * @return array<string, mixed>
+     */
+    private function deploymentTimelineRow(NodeOperation $operation, array $runningImages): array
     {
         $build = $operation->revision?->build;
-        // A rollback target: an earlier image that deployed successfully. A database is not rolled back.
+        // A rollback target: an earlier image that deployed successfully, also the same tag with another digest. A database is not rolled back.
         $canRollBack = $operation->command_type === 'workload.deploy.v1'
             && $operation->status === NodeOperationStatus::SUCCEEDED
             && $operation->revision !== null
-            && $operation->revision->image !== $latestImage
-            && ! $this->workload->isDatabase();
+            && ! $this->workload->isDatabase()
+            && $runningImages !== []
+            && ! in_array(RollbackNodeWorkload::targetImage($operation->revision, $operation), $runningImages, true);
 
         return [
             'kind' => 'deployment',
@@ -1474,7 +1534,7 @@ class Show extends Component
                 ? substr($build->commit_sha, 0, 8)
                 : ($operation->revision ? substr($operation->revision->uuid, 0, 7) : null),
             'image' => $build ? $build->sourceLabel() : $operation->revision?->image,
-            'imageTitle' => $operation->revision?->image,
+            'imageTitle' => $operation->deployedImage(),
             'createdAt' => $operation->created_at,
             'duration' => match ($operation->status) {
                 NodeOperationStatus::QUEUED, NodeOperationStatus::DISPATCHED => 'Waiting',
@@ -1482,7 +1542,7 @@ class Show extends Component
                 default => $operation->completed_at ? calculateDuration($operation->created_at, $operation->completed_at) : '-',
             },
             'node' => $operation->node?->name,
-            'rollbackRevisionUuid' => $canRollBack ? $operation->revision->uuid : null,
+            'rollbackDeploymentUuid' => $canRollBack ? $operation->uuid : null,
         ];
     }
 

@@ -5,6 +5,7 @@ namespace App\Actions\Node;
 use App\Enums\NodeWorkloadAction;
 use App\Jobs\ManageNodeWorkloadJob;
 use App\Models\NodeOperation;
+use App\Models\NodeStack;
 use App\Models\NodeWorkload;
 use App\Models\User;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -41,5 +42,30 @@ class QueueNodeWorkloadLifecycle
         }
 
         return ['operations' => $operations, 'failures' => $failures];
+    }
+
+    /**
+     * Queues the action on every service of a stack, like a v4 service. The caller authorizes
+     * `deploy` on the stack.
+     *
+     * @return array{queued: bool, failures: list<string>} The failures are `<service>: <reason>`.
+     */
+    public static function forStack(NodeStack $stack, NodeWorkloadAction $action, User $user): array
+    {
+        $queued = false;
+        $failures = [];
+        foreach ($stack->workloads()->get() as $workload) {
+            try {
+                $result = self::run($workload, $action, $user);
+            } catch (RuntimeException $exception) {
+                $failures[] = "{$workload->stack_service}: {$exception->getMessage()}";
+
+                continue;
+            }
+            $queued = $queued || $result['operations'] !== [];
+            $failures = [...$failures, ...array_map(fn (string $failure): string => "{$workload->stack_service}: {$failure}", $result['failures'])];
+        }
+
+        return ['queued' => $queued, 'failures' => $failures];
     }
 }

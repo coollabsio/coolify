@@ -442,7 +442,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}')->group(function () {
         Route::get('/', ResourceIndex::class)->name('project.resource.index');
-        Route::get('cluster-stack/{stack_uuid}', ClusterStackShow::class)->name('project.cluster-stack.show');
+        Route::prefix('cluster-stack/{stack_uuid}')->group(function () {
+            Route::get('/', ClusterStackShow::class)->name('project.cluster-stack.show');
+            Route::get('/domains', ClusterStackShow::class)->name('project.cluster-stack.domains');
+            Route::get('/environment-variables', ClusterStackShow::class)->name('project.cluster-stack.environment-variables');
+            Route::get('/storages', ClusterStackShow::class)->name('project.cluster-stack.storages');
+            Route::get('/backups', ClusterStackShow::class)->name('project.cluster-stack.backups');
+            Route::get('/logs', ClusterStackShow::class)->name('project.cluster-stack.logs');
+            Route::get('/terminal', ClusterStackShow::class)->name('project.cluster-stack.terminal')->middleware('can.access.terminal');
+            Route::get('/scheduled-tasks', ClusterStackShow::class)->name('project.cluster-stack.scheduled-tasks');
+            Route::get('/webhooks', ClusterStackShow::class)->name('project.cluster-stack.webhooks');
+            Route::get('/deployments', ClusterStackShow::class)->name('project.cluster-stack.deployments');
+            Route::get('/danger', ClusterStackShow::class)->name('project.cluster-stack.danger');
+        });
         Route::prefix('cluster-application/{workload_uuid}')->group(function () {
             Route::get('/', ClusterApplicationShow::class)->name('project.cluster-application.show');
             Route::get('/domains', ClusterApplicationShow::class)->name('project.cluster-application.domains');

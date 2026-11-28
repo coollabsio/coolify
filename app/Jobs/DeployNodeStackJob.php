@@ -16,6 +16,7 @@ use App\Enums\NodeWorkloadSourceType;
 use App\Models\NodeBuild;
 use App\Models\NodeOperation;
 use App\Models\NodeStack;
+use App\Models\NodeStackDeployment;
 use App\Models\NodeWorkload;
 use App\Models\User;
 use App\Services\NodeStack\NodeStackCompose;
@@ -44,6 +45,8 @@ use Throwable;
  * webhook commit only starts the deploy, and the head is the same commit or a newer one. Then it
  * builds every service with `build:` at that commit, without deploying them. Each build is a
  * normal build of its service, with its logs on the service page. When one fails, nothing deploys.
+ *
+ * Each run is a NodeStackDeployment, for the deployment history of the stack.
  */
 class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
 {
@@ -93,6 +96,11 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
         }
         $requestedBy = $this->requestedById === null ? null : User::query()->find($this->requestedById);
         $stack->update(['deploy_status' => 'deploying', 'deploy_error' => null, 'deploy_notified_at' => null]);
+        $deployment = NodeStackDeployment::query()->create([
+            'node_stack_id' => $stack->id,
+            'requested_by_id' => $requestedBy?->id,
+            'status' => NodeStackDeployment::DEPLOYING,
+        ]);
 
         try {
             $deadline = now()->addSeconds($this->timeout - 60);
@@ -125,8 +133,15 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
                 }
             }
             $stack->update(['deploy_status' => 'deployed', 'deploy_error' => null]);
+            $deployment->update([
+                'status' => NodeStackDeployment::DEPLOYED,
+                'commit_sha' => $stack->hasGitSource() ? $stack->commit_sha : null,
+                'finished_at' => now(),
+            ]);
         } catch (Throwable $exception) {
-            $stack->update(['deploy_status' => 'failed', 'deploy_error' => mb_substr($exception->getMessage(), 0, 2000)]);
+            $error = mb_substr($exception->getMessage(), 0, 2000);
+            $stack->update(['deploy_status' => 'failed', 'deploy_error' => $error]);
+            $deployment->update(['status' => NodeStackDeployment::FAILED, 'error' => $error, 'finished_at' => now()]);
         }
         NotifyNodeDeployment::forStack($stack);
     }
@@ -233,10 +248,10 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        NodeStack::query()->withoutGlobalScopes()->whereKey($this->stackId)->update([
-            'deploy_status' => 'failed',
-            'deploy_error' => mb_substr('The stack deployment worker stopped: '.($exception?->getMessage() ?? ''), 0, 2000),
-        ]);
+        $error = mb_substr('The stack deployment worker stopped: '.($exception?->getMessage() ?? ''), 0, 2000);
+        NodeStack::query()->withoutGlobalScopes()->whereKey($this->stackId)->update(['deploy_status' => 'failed', 'deploy_error' => $error]);
+        NodeStackDeployment::query()->where('node_stack_id', $this->stackId)->where('status', NodeStackDeployment::DEPLOYING)
+            ->update(['status' => NodeStackDeployment::FAILED, 'error' => $error, 'finished_at' => now()]);
         $stack = NodeStack::query()->withoutGlobalScopes()->find($this->stackId);
         if ($stack !== null) {
             NotifyNodeDeployment::forStack($stack);

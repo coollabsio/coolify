@@ -9301,7 +9301,7 @@
                     "Cluster Applications"
                 ],
                 "summary": "Roll Back",
-                "description": "Roll a cluster application back to the image of an earlier revision. Environment variables, secrets, and settings keep their current values, and volume data is not rolled back. When no server keeps the image anymore, Coolify builds the same commit again and deploys the result.",
+                "description": "Roll a cluster application back to the image of an earlier revision or deployment. Environment variables, secrets, and settings keep their current values, and volume data is not rolled back. When no server keeps the image anymore, Coolify builds the same commit again and deploys the result.",
                 "operationId": "rollback-cluster-application",
                 "parameters": [
                     {
@@ -9319,12 +9319,13 @@
                     "content": {
                         "application\/json": {
                             "schema": {
-                                "required": [
-                                    "revision_uuid"
-                                ],
                                 "properties": {
                                     "revision_uuid": {
-                                        "description": "UUID of the revision to roll back to, from List Revisions.",
+                                        "description": "UUID of the revision to roll back to, from List Revisions. A tag deploys at the digest of the last deployment of the revision whose digest Coolify knows. Required without deployment_uuid.",
+                                        "type": "string"
+                                    },
+                                    "deployment_uuid": {
+                                        "description": "UUID of a successful deployment to roll back to. A tag deploys at the digest that it pointed to at that deployment. Required without revision_uuid.",
                                         "type": "string"
                                     }
                                 },
@@ -11979,6 +11980,87 @@
                     },
                     "403": {
                         "description": "The user may not create or place the resource on this environment or server, or may not build on a builder server."
+                    },
+                    "404": {
+                        "$ref": "#\/components\/responses\/404"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "\/cluster-stacks\/{uuid}\/deployments": {
+            "get": {
+                "tags": [
+                    "Cluster Stacks"
+                ],
+                "summary": "List Deployments",
+                "description": "List the last 50 deploys of a cluster stack, the newest first.",
+                "operationId": "list-cluster-stack-deployments",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID of the cluster stack.",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The deployments.",
+                        "content": {
+                            "application\/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "uuid": {
+                                                "type": "string"
+                                            },
+                                            "status": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "deploying",
+                                                    "deployed",
+                                                    "failed"
+                                                ]
+                                            },
+                                            "commit_sha": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "error": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            },
+                                            "created_at": {
+                                                "type": "string"
+                                            },
+                                            "finished_at": {
+                                                "type": [
+                                                    "string",
+                                                    "null"
+                                                ]
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#\/components\/responses\/401"
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"

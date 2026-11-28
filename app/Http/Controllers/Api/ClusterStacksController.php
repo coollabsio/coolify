@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\Concerns\HandlesClusterResourcesApi;
 use App\Http\Controllers\Controller;
 use App\Jobs\DeleteNodeStackJob;
 use App\Models\NodeStack;
+use App\Models\NodeStackDeployment;
 use App\Models\NodeWorkload;
 use App\Policies\NodeWorkloadPolicy;
 use App\Rules\ValidGitBranch;
@@ -373,6 +374,45 @@ class ClusterStacksController extends Controller
 
             return response()->json(['message' => "Deployment of {$stack->name} queued."]);
         });
+    }
+
+    #[OA\Get(
+        summary: 'List Deployments',
+        description: 'List the last 50 deploys of a cluster stack, the newest first.',
+        path: '/cluster-stacks/{uuid}/deployments',
+        operationId: 'list-cluster-stack-deployments',
+        security: [['bearerAuth' => []]],
+        tags: ['Cluster Stacks'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', description: 'UUID of the cluster stack.', required: true, schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The deployments.', content: new OA\JsonContent(type: 'array', items: new OA\Items(type: 'object', properties: [
+                new OA\Property(property: 'uuid', type: 'string'),
+                new OA\Property(property: 'status', type: 'string', enum: ['deploying', 'deployed', 'failed']),
+                new OA\Property(property: 'commit_sha', type: 'string', nullable: true),
+                new OA\Property(property: 'error', type: 'string', nullable: true),
+                new OA\Property(property: 'created_at', type: 'string'),
+                new OA\Property(property: 'finished_at', type: 'string', nullable: true),
+            ]))),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function deployments(Request $request): JsonResponse
+    {
+        $stack = $this->clusterStack($request);
+        if ($stack === null) {
+            return response()->json(['message' => 'Cluster stack not found.'], 404);
+        }
+        $this->authorize('view', $stack);
+
+        return response()->json($stack->deployments()->limit(50)->get()->map(fn (NodeStackDeployment $deployment): array => [
+            'uuid' => $deployment->uuid,
+            'status' => $deployment->status,
+            'commit_sha' => $deployment->commit_sha,
+            'error' => $deployment->error,
+            'created_at' => $deployment->created_at?->toIso8601String(),
+            'finished_at' => $deployment->finished_at?->toIso8601String(),
+        ])->values());
     }
 
     #[OA\Post(

@@ -25,7 +25,14 @@
     $currentWorkload = $currentEnvironment && $workloadUuid
         ? \App\Models\NodeWorkload::query()->where('environment_id', $currentEnvironment->id)->where('uuid', $workloadUuid)->first()
         : null;
-    $currentResource = $currentApplication ?? $currentDatabase ?? $currentService ?? $currentWorkload;
+    // A stack is the resource of its pages and of the pages of its services, like a v4 service.
+    $stackUuid = request()->route('stack_uuid');
+    $currentStack = match (true) {
+        $currentEnvironment && $stackUuid => \App\Models\NodeStack::query()->where('environment_id', $currentEnvironment->id)->where('uuid', $stackUuid)->first(),
+        $currentWorkload?->node_stack_id !== null => $currentWorkload->stack,
+        default => null,
+    };
+    $currentResource = $currentApplication ?? $currentDatabase ?? $currentService ?? $currentStack ?? $currentWorkload;
     $resourceItems = $currentEnvironment
         ? collect()
             ->concat($currentEnvironment->applications->map(fn ($application) => [
@@ -40,9 +47,13 @@
                 'type' => 'service',
                 'resource' => $service,
             ]))
-            ->concat($currentEnvironment->nodeWorkloads->map(fn ($workload) => [
+            ->concat($currentEnvironment->nodeWorkloads->whereNull('node_stack_id')->map(fn ($workload) => [
                 'type' => 'cluster-application',
                 'resource' => $workload,
+            ]))
+            ->concat(\App\Models\NodeStack::query()->where('environment_id', $currentEnvironment->id)->get()->map(fn ($stack) => [
+                'type' => 'cluster-stack',
+                'resource' => $stack,
             ]))
             ->sortBy(fn ($item) => strtolower($item['resource']->name))
             ->map(fn ($item) => [
@@ -68,6 +79,11 @@
                         'project_uuid' => $currentProject->uuid,
                         'environment_uuid' => $currentEnvironment->uuid,
                         'workload_uuid' => $item['resource']->uuid,
+                    ]),
+                    'cluster-stack' => route('project.cluster-stack.show', [
+                        'project_uuid' => $currentProject->uuid,
+                        'environment_uuid' => $currentEnvironment->uuid,
+                        'stack_uuid' => $item['resource']->uuid,
                     ]),
                 },
                 'active' => $item['resource']->uuid === $currentResource?->uuid,
@@ -300,6 +316,8 @@
                     @elseif ($currentDatabase)
                         <livewire:project.database.status :database="$currentDatabase"
                             :wire:key="'database-status-'.$currentDatabase->uuid" />
+                    @elseif ($currentStack)
+                        <x-status-summary :status="$currentStack->statusSummary()" title="Stack status" />
                     @elseif ($currentWorkload)
                         @php
                             $workloadNode = $currentWorkload->nodes()->first();
@@ -313,8 +331,10 @@
                             :wire:key="'service-status-'.$currentService->uuid" />
                     @endif
                 </div>
-                <livewire:star-toggle :resource="$currentResource"
-                    :wire:key="'star-'.$currentResource->getMorphClass().'-'.$currentResource->uuid" />
+                @unless ($currentStack)
+                    <livewire:star-toggle :resource="$currentResource"
+                        :wire:key="'star-'.$currentResource->getMorphClass().'-'.$currentResource->uuid" />
+                @endunless
             </x-slot:meta>
         </x-breadcrumb-switcher>
     @endif

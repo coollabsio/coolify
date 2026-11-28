@@ -171,6 +171,50 @@ class NodeStack extends BaseModel
         return $this->hasMany(NodeWorkload::class)->orderBy('id');
     }
 
+    /**
+     * The status of the stack in the v4 service format, for `x-status-summary`: `running:<health>`
+     * when every service runs (a one-time service that exited with 0 counts as done), `degraded:unhealthy`
+     * when only some do, and `exited` when none does.
+     */
+    public function statusSummary(): string
+    {
+        $workloads = $this->workloads()->get(['id']);
+        if ($workloads->isEmpty()) {
+            return 'exited';
+        }
+        $containers = NodeContainer::query()
+            ->whereIn('node_workload_id', $workloads->pluck('id'))
+            ->where('is_managed', true)
+            ->get(['node_workload_id', 'state', 'health_status', 'exit_code'])
+            ->groupBy('node_workload_id');
+        $running = 0;
+        $health = collect();
+        foreach ($workloads as $workload) {
+            $serviceContainers = $containers->get($workload->id, collect());
+            $runningContainer = $serviceContainers->firstWhere('state', 'running');
+            if ($runningContainer !== null) {
+                $running++;
+                $health->push($runningContainer->health_status);
+            } elseif ($serviceContainers->contains(fn (NodeContainer $container): bool => $container->exit_code === 0)) {
+                $running++;
+            }
+        }
+        if ($running === 0) {
+            return 'exited';
+        }
+        if ($running < $workloads->count() || $health->contains('unhealthy')) {
+            return 'degraded:unhealthy';
+        }
+
+        return 'running:'.($health->contains('starting') ? 'starting' : ($health->contains('healthy') ? 'healthy' : 'unknown'));
+    }
+
+    /** The deploys and rollbacks of the stack, the newest first. */
+    public function deployments(): HasMany
+    {
+        return $this->hasMany(NodeStackDeployment::class)->latest('id');
+    }
+
     /** The volumes that services of the stack share (decision 0024). */
     public function volumes(): HasMany
     {
