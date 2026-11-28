@@ -7,6 +7,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandaloneDocker;
+use App\Models\Tag;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -141,4 +142,39 @@ test('restart ignores a stale run of the service', function () {
     $this->withHeaders($this->headers)->postJson("/api/v1/services/{$this->service->uuid}/restart")
         ->assertOk()
         ->assertJson(['activity_id' => $activity->id]);
+});
+
+test('deploy by uuid returns the activity id of the service start', function () {
+    $activity = Activity::create(['log_name' => 'default', 'description' => '[]', 'properties' => ['status' => 'queued']]);
+    mockStartService($activity, fn ($service, $pullLatestImages) => $service->is($this->service) && $pullLatestImages === true);
+
+    $this->withHeaders($this->headers)->postJson("/api/v1/deploy?uuid={$this->service->uuid}")
+        ->assertOk()
+        ->assertExactJson(['deployments' => [[
+            'message' => "Service {$this->service->name} started. It could take a while, be patient.",
+            'resource_uuid' => $this->service->uuid,
+            'activity_id' => $activity->id,
+        ]]]);
+});
+
+test('deploy by tag lists the activity id of each service start', function () {
+    $tag = Tag::create(['name' => 'ci', 'team_id' => $this->team->id]);
+    $this->service->tags()->attach($tag->id);
+    $activity = Activity::create(['log_name' => 'default', 'description' => '[]', 'properties' => ['status' => 'queued']]);
+    mockStartService($activity);
+
+    $this->withHeaders($this->headers)->postJson('/api/v1/deploy?tag=ci')
+        ->assertOk()
+        ->assertJsonPath('details', [['resource_uuid' => $this->service->uuid, 'activity_id' => $activity->id]]);
+});
+
+test('deploy refuses a service start while another run of the service is in progress', function () {
+    Activity::create(['log_name' => 'default', 'description' => '[]', 'properties' => ['team_id' => $this->team->id, 'type_uuid' => $this->service->uuid, 'status' => 'in_progress']]);
+    $startService = Mockery::mock(StartService::class);
+    $startService->shouldNotReceive('handle');
+    app()->instance(StartService::class, $startService);
+
+    $this->withHeaders($this->headers)->postJson("/api/v1/deploy?uuid={$this->service->uuid}")
+        ->assertOk()
+        ->assertExactJson(['deployments' => [['message' => 'There is a deployment in progress.', 'resource_uuid' => $this->service->uuid]]]);
 });
