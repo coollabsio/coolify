@@ -7,6 +7,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use App\Services\Access\AccessResolver;
 use App\Services\ProjectConfig\Adapters\ResourceAdapter;
+use App\Services\ProjectConfig\Children\EnvironmentVariables;
 use App\Services\ProjectConfig\Children\SecretManager;
 use App\Services\ProjectConfig\Children\StorageBackups;
 use Illuminate\Database\Eloquent\Model;
@@ -83,7 +84,7 @@ class ConfigPlanner
         }
 
         $missingRequired = [];
-        $volumeWarnings = [];
+        $pendingWarnings = [];
         foreach ($env->resources as $key => $desired) {
             $type = $desired['type'];
             if (! $this->registry->has($type)) {
@@ -101,7 +102,11 @@ class ConfigPlanner
                 ...$adapter->validate($key, $desired, $ctx, $current[1] ?? null),
             ];
 
-            $volumeWarnings = [...$volumeWarnings, ...(new StorageBackups)->pendingVolumeWarnings($key, $desired, $current[1] ?? null)];
+            $pendingWarnings = [
+                ...$pendingWarnings,
+                ...(new StorageBackups)->pendingVolumeWarnings($key, $desired, $current[1] ?? null),
+                ...EnvironmentVariables::pendingContainerWarnings($key, $desired, $current[1] ?? null),
+            ];
 
             $missing = $this->missingRequired($desired, $current[1] ?? null);
             if ($missing !== []) {
@@ -152,7 +157,7 @@ class ConfigPlanner
         return new ConfigPlan(
             changes: $changes,
             errors: $errors,
-            warnings: $ctx->template ? [] : [...$this->moveWarnings($changes), ...$this->unmanagedWarnings($ctx, $importedIds), ...$volumeWarnings],
+            warnings: $ctx->template ? [] : [...$this->moveWarnings($changes), ...$this->unmanagedWarnings($ctx, $importedIds), ...$pendingWarnings],
             stateHash: $stateHash,
             missingRequired: $missingRequired,
             removesAll: $env->resources === [],

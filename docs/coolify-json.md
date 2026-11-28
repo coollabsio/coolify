@@ -77,7 +77,18 @@ A variable never holds a secret value. Each variable uses exactly one form:
 | `generate` | Coolify generates `password`, `base64`, or `uuid` once. Increase `rotation` to generate a new one. |
 | `ref` | `team.X`, `project.X`, `environment.X`, `server.X`, `vault.X` (secret manager), or `resource.<key>.internal_url`, `host`, or `port`. |
 
-Flags: `buildtime`, `runtime`, `literal`, `multiline`. For a Docker Compose application or service, `containers` (for example `["app", "worker"]`) limits the variable to these Compose services. Without it, every container gets the variable. A `preview` object sets the value for preview deployments. Without it, previews follow production. Variables that are not in the file are removed after approval.
+Flags: `buildtime`, `runtime`, `literal`, `multiline`. For a Docker Compose application or service, `containers` (for example `["app", "worker"]`) limits the variable to these Compose services. Without it, every container gets the variable. The plan fails when a service has no Compose service with that name, and when the resource is not Docker Compose. For a Compose application, the plan warns when the Compose file that Coolify loaded last has no service with that name. A `preview` object sets the value for preview deployments. Without it, previews follow production. Variables that are not in the file are removed after approval.
+
+### Secret manager
+
+`secret_manager` links an integration token by name (`token`) with the `settings` of its provider. The plan fails when a setting is unknown for the provider, or when a required setting is missing.
+
+| Provider | Settings |
+| --- | --- |
+| Infisical | `project_id` and `environment` (required), `secret_path` (default `/`) |
+| HashiCorp Vault | `mount` and `path` (required) |
+| Doppler service account token | `project` and `config` (required) |
+| Doppler service token, other providers | None |
 
 ### Resource limits
 

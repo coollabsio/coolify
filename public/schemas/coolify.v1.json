@@ -763,7 +763,31 @@
                                     "type": "string"
                                 },
                                 "settings": {
-                                    "type": "object"
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "project": {
+                                            "type": "string"
+                                        },
+                                        "config": {
+                                            "type": "string"
+                                        },
+                                        "project_id": {
+                                            "type": "string"
+                                        },
+                                        "environment": {
+                                            "type": "string"
+                                        },
+                                        "secret_path": {
+                                            "type": "string"
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "path": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -785,7 +809,31 @@
                                         "type": "string"
                                     },
                                     "settings": {
-                                        "type": "object"
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "project": {
+                                                "type": "string"
+                                            },
+                                            "config": {
+                                                "type": "string"
+                                            },
+                                            "project_id": {
+                                                "type": "string"
+                                            },
+                                            "environment": {
+                                                "type": "string"
+                                            },
+                                            "secret_path": {
+                                                "type": "string"
+                                            },
+                                            "mount": {
+                                                "type": "string"
+                                            },
+                                            "path": {
+                                                "type": "string"
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1374,7 +1422,31 @@
                                     "type": "string"
                                 },
                                 "settings": {
-                                    "type": "object"
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "project": {
+                                            "type": "string"
+                                        },
+                                        "config": {
+                                            "type": "string"
+                                        },
+                                        "project_id": {
+                                            "type": "string"
+                                        },
+                                        "environment": {
+                                            "type": "string"
+                                        },
+                                        "secret_path": {
+                                            "type": "string"
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "path": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -1396,7 +1468,31 @@
                                         "type": "string"
                                     },
                                     "settings": {
-                                        "type": "object"
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "project": {
+                                                "type": "string"
+                                            },
+                                            "config": {
+                                                "type": "string"
+                                            },
+                                            "project_id": {
+                                                "type": "string"
+                                            },
+                                            "environment": {
+                                                "type": "string"
+                                            },
+                                            "secret_path": {
+                                                "type": "string"
+                                            },
+                                            "mount": {
+                                                "type": "string"
+                                            },
+                                            "path": {
+                                                "type": "string"
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1977,7 +2073,31 @@
                                     "type": "string"
                                 },
                                 "settings": {
-                                    "type": "object"
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "project": {
+                                            "type": "string"
+                                        },
+                                        "config": {
+                                            "type": "string"
+                                        },
+                                        "project_id": {
+                                            "type": "string"
+                                        },
+                                        "environment": {
+                                            "type": "string"
+                                        },
+                                        "secret_path": {
+                                            "type": "string"
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "path": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -1999,7 +2119,31 @@
                                         "type": "string"
                                     },
                                     "settings": {
-                                        "type": "object"
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "project": {
+                                                "type": "string"
+                                            },
+                                            "config": {
+                                                "type": "string"
+                                            },
+                                            "project_id": {
+                                                "type": "string"
+                                            },
+                                            "environment": {
+                                                "type": "string"
+                                            },
+                                            "secret_path": {
+                                                "type": "string"
+                                            },
+                                            "mount": {
+                                                "type": "string"
+                                            },
+                                            "path": {
+                                                "type": "string"
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -2494,7 +2638,31 @@
                                     "type": "string"
                                 },
                                 "settings": {
-                                    "type": "object"
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "project": {
+                                            "type": "string"
+                                        },
+                                        "config": {
+                                            "type": "string"
+                                        },
+                                        "project_id": {
+                                            "type": "string"
+                                        },
+                                        "environment": {
+                                            "type": "string"
+                                        },
+                                        "secret_path": {
+                                            "type": "string"
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "path": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -2516,7 +2684,31 @@
                                         "type": "string"
                                     },
                                     "settings": {
-                                        "type": "object"
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "project": {
+                                                "type": "string"
+                                            },
+                                            "config": {
+                                                "type": "string"
+                                            },
+                                            "project_id": {
+                                                "type": "string"
+                                            },
+                                            "environment": {
+                                                "type": "string"
+                                            },
+                                            "secret_path": {
+                                                "type": "string"
+                                            },
+                                            "mount": {
+                                                "type": "string"
+                                            },
+                                            "path": {
+                                                "type": "string"
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -3011,7 +3203,31 @@
                                     "type": "string"
                                 },
                                 "settings": {
-                                    "type": "object"
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "project": {
+                                            "type": "string"
+                                        },
+                                        "config": {
+                                            "type": "string"
+                                        },
+                                        "project_id": {
+                                            "type": "string"
+                                        },
+                                        "environment": {
+                                            "type": "string"
+                                        },
+                                        "secret_path": {
+                                            "type": "string"
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "path": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -3033,7 +3249,31 @@
                                         "type": "string"
                                     },
                                     "settings": {
-                                        "type": "object"
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "project": {
+                                                "type": "string"
+                                            },
+                                            "config": {
+                                                "type": "string"
+                                            },
+                                            "project_id": {
+                                                "type": "string"
+                                            },
+                                            "environment": {
+                                                "type": "string"
+                                            },
+                                            "secret_path": {
+                                                "type": "string"
+                                            },
+                                            "mount": {
+                                                "type": "string"
+                                            },
+                                            "path": {
+                                                "type": "string"
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -3516,7 +3756,31 @@
                                     "type": "string"
                                 },
                                 "settings": {
-                                    "type": "object"
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "project": {
+                                            "type": "string"
+                                        },
+                                        "config": {
+                                            "type": "string"
+                                        },
+                                        "project_id": {
+                                            "type": "string"
+                                        },
+                                        "environment": {
+                                            "type": "string"
+                                        },
+                                        "secret_path": {
+                                            "type": "string"
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "path": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -3538,7 +3802,31 @@
                                         "type": "string"
                                     },
                                     "settings": {
-                                        "type": "object"
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "project": {
+                                                "type": "string"
+                                            },
+                                            "config": {
+                                                "type": "string"
+                                            },
+                                            "project_id": {
+                                                "type": "string"
+                                            },
+                                            "environment": {
+                                                "type": "string"
+                                            },
+                                            "secret_path": {
+                                                "type": "string"
+                                            },
+                                            "mount": {
+                                                "type": "string"
+                                            },
+                                            "path": {
+                                                "type": "string"
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -4015,7 +4303,31 @@
                                     "type": "string"
                                 },
                                 "settings": {
-                                    "type": "object"
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "project": {
+                                            "type": "string"
+                                        },
+                                        "config": {
+                                            "type": "string"
+                                        },
+                                        "project_id": {
+                                            "type": "string"
+                                        },
+                                        "environment": {
+                                            "type": "string"
+                                        },
+                                        "secret_path": {
+                                            "type": "string"
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "path": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -4037,7 +4349,31 @@
                                         "type": "string"
                                     },
                                     "settings": {
-                                        "type": "object"
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "project": {
+                                                "type": "string"
+                                            },
+                                            "config": {
+                                                "type": "string"
+                                            },
+                                            "project_id": {
+                                                "type": "string"
+                                            },
+                                            "environment": {
+                                                "type": "string"
+                                            },
+                                            "secret_path": {
+                                                "type": "string"
+                                            },
+                                            "mount": {
+                                                "type": "string"
+                                            },
+                                            "path": {
+                                                "type": "string"
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -4508,7 +4844,31 @@
                                     "type": "string"
                                 },
                                 "settings": {
-                                    "type": "object"
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "project": {
+                                            "type": "string"
+                                        },
+                                        "config": {
+                                            "type": "string"
+                                        },
+                                        "project_id": {
+                                            "type": "string"
+                                        },
+                                        "environment": {
+                                            "type": "string"
+                                        },
+                                        "secret_path": {
+                                            "type": "string"
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "path": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -4530,7 +4890,31 @@
                                         "type": "string"
                                     },
                                     "settings": {
-                                        "type": "object"
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "project": {
+                                                "type": "string"
+                                            },
+                                            "config": {
+                                                "type": "string"
+                                            },
+                                            "project_id": {
+                                                "type": "string"
+                                            },
+                                            "environment": {
+                                                "type": "string"
+                                            },
+                                            "secret_path": {
+                                                "type": "string"
+                                            },
+                                            "mount": {
+                                                "type": "string"
+                                            },
+                                            "path": {
+                                                "type": "string"
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -4989,7 +5373,31 @@
                                     "type": "string"
                                 },
                                 "settings": {
-                                    "type": "object"
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "project": {
+                                            "type": "string"
+                                        },
+                                        "config": {
+                                            "type": "string"
+                                        },
+                                        "project_id": {
+                                            "type": "string"
+                                        },
+                                        "environment": {
+                                            "type": "string"
+                                        },
+                                        "secret_path": {
+                                            "type": "string"
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "path": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -5011,7 +5419,31 @@
                                         "type": "string"
                                     },
                                     "settings": {
-                                        "type": "object"
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "project": {
+                                                "type": "string"
+                                            },
+                                            "config": {
+                                                "type": "string"
+                                            },
+                                            "project_id": {
+                                                "type": "string"
+                                            },
+                                            "environment": {
+                                                "type": "string"
+                                            },
+                                            "secret_path": {
+                                                "type": "string"
+                                            },
+                                            "mount": {
+                                                "type": "string"
+                                            },
+                                            "path": {
+                                                "type": "string"
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -5488,7 +5920,31 @@
                                     "type": "string"
                                 },
                                 "settings": {
-                                    "type": "object"
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "project": {
+                                            "type": "string"
+                                        },
+                                        "config": {
+                                            "type": "string"
+                                        },
+                                        "project_id": {
+                                            "type": "string"
+                                        },
+                                        "environment": {
+                                            "type": "string"
+                                        },
+                                        "secret_path": {
+                                            "type": "string"
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "path": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -5510,7 +5966,31 @@
                                         "type": "string"
                                     },
                                     "settings": {
-                                        "type": "object"
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "project": {
+                                                "type": "string"
+                                            },
+                                            "config": {
+                                                "type": "string"
+                                            },
+                                            "project_id": {
+                                                "type": "string"
+                                            },
+                                            "environment": {
+                                                "type": "string"
+                                            },
+                                            "secret_path": {
+                                                "type": "string"
+                                            },
+                                            "mount": {
+                                                "type": "string"
+                                            },
+                                            "path": {
+                                                "type": "string"
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -5945,7 +6425,31 @@
                                     "type": "string"
                                 },
                                 "settings": {
-                                    "type": "object"
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "properties": {
+                                        "project": {
+                                            "type": "string"
+                                        },
+                                        "config": {
+                                            "type": "string"
+                                        },
+                                        "project_id": {
+                                            "type": "string"
+                                        },
+                                        "environment": {
+                                            "type": "string"
+                                        },
+                                        "secret_path": {
+                                            "type": "string"
+                                        },
+                                        "mount": {
+                                            "type": "string"
+                                        },
+                                        "path": {
+                                            "type": "string"
+                                        }
+                                    }
                                 }
                             }
                         },
@@ -5967,7 +6471,31 @@
                                         "type": "string"
                                     },
                                     "settings": {
-                                        "type": "object"
+                                        "type": "object",
+                                        "additionalProperties": false,
+                                        "properties": {
+                                            "project": {
+                                                "type": "string"
+                                            },
+                                            "config": {
+                                                "type": "string"
+                                            },
+                                            "project_id": {
+                                                "type": "string"
+                                            },
+                                            "environment": {
+                                                "type": "string"
+                                            },
+                                            "secret_path": {
+                                                "type": "string"
+                                            },
+                                            "mount": {
+                                                "type": "string"
+                                            },
+                                            "path": {
+                                                "type": "string"
+                                            }
+                                        }
                                     }
                                 }
                             }

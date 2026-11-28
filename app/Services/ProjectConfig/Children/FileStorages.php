@@ -33,6 +33,7 @@ class FileStorages implements ChildRecords
             Field::managed('chmod', 'files.*.chmod'),
             Field::managed('is_preview_suffix_enabled', 'files.*.preview_suffix', true, 'boolean'),
             Field::derived('fs_path', 'Coolify chooses the path on the server from the resource.'),
+            Field::derived('variable_fs_path', 'The Compose parser sets it from the variable of a short-syntax bind.'),
             Field::derived('is_based_on_git', 'Coolify sets it for files that come from the repository.'),
         ], ['local_file_volumes' => ['resource_type', 'resource_id']]);
     }

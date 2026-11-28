@@ -101,6 +101,16 @@ it('rejects a compose file with an injection payload', function () {
         ->toContain('resources.stack.compose');
 });
 
+it('rejects containers that the Compose file does not have', function () {
+    $plan = fn (array $containers) => array_map(fn ($e) => $e->path, servicePlan(['stack' => [
+        'type' => 'service', 'server' => 'prod-1', 'compose' => SERVICE_TEST_COMPOSE,
+        'env' => ['QUEUE_URL' => ['value' => 'redis', 'containers' => $containers]],
+    ]])->errors);
+
+    expect($plan(['wroker']))->toContain('resources.stack.env.QUEUE_URL.containers')
+        ->and($plan(['web', 'worker']))->not->toContain('resources.stack.env.QUEUE_URL.containers');
+});
+
 it('needs exactly one of template and compose, and a known template', function () {
     expect(array_map(fn ($e) => $e->path, servicePlan(['s' => ['type' => 'service', 'server' => 'prod-1']])->errors))->toContain('resources.s.template')
         ->and(array_map(fn ($e) => $e->path, servicePlan(['s' => ['type' => 'service', 'server' => 'prod-1', 'template' => 'uptime-kuma', 'compose' => SERVICE_TEST_COMPOSE]])->errors))->toContain('resources.s.template')

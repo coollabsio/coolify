@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use App\Models\Service;
 use App\Services\ProjectConfig\ApplyContext;
+use App\Services\ProjectConfig\ConfigError;
 use App\Services\ProjectConfig\Field;
 use App\Services\ProjectConfig\FieldMap;
 use Illuminate\Database\Eloquent\Model;
@@ -368,5 +369,71 @@ class EnvironmentVariables implements ChildRecords
         ksort($entry);
 
         return $entry;
+    }
+
+    /**
+     * Variables whose `containers` name a service that the Compose file does not have, or that limit a resource
+     * which is not Docker Compose. The deployment would give such a variable to no container.
+     *
+     * @param  list<string>|null  $services  The Compose services of the resource, or null when it is not Docker Compose
+     * @return list<ConfigError>
+     */
+    public static function containerErrors(string $base, mixed $env, ?array $services): array
+    {
+        $errors = [];
+        foreach (self::containerLists($base, $env) as $path => $containers) {
+            if ($services === null) {
+                $errors[] = new ConfigError($path, 'Only Docker Compose applications and services can limit a variable to Compose services.');
+            } elseif (($unknown = array_values(array_diff($containers, $services))) !== []) {
+                $errors[] = new ConfigError($path, 'Unknown Compose services: '.implode(', ', $unknown).'. Available services: '.(implode(', ', $services) ?: 'none').'.');
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Plan warnings for the `containers` of a Compose application. Its Compose file comes from the repository at
+     * the deployment, so the names are checked against the file that Coolify loaded last, when there is one.
+     *
+     * @return list<string>
+     */
+    public static function pendingContainerWarnings(string $key, array $desired, ?Model $current): array
+    {
+        if (($desired['type'] ?? null) !== 'application' || ($desired['build']['pack'] ?? null) !== 'dockercompose') {
+            return [];
+        }
+        $services = $current instanceof Application ? composeServiceNamesForEnvironmentScope($current) : [];
+        if ($services === []) {
+            return [];
+        }
+
+        $warnings = [];
+        foreach (self::containerLists("resources.{$key}", $desired['env'] ?? null) as $path => $containers) {
+            foreach (array_diff($containers, $services) as $name) {
+                $warnings[] = "{$path}: the loaded Compose file has no service \"{$name}\". If the file in the repository does not add it, no container gets the variable.";
+            }
+        }
+
+        return $warnings;
+    }
+
+    /**
+     * The `containers` lists of the variables and their previews, by file path.
+     *
+     * @return array<string, list<string>>
+     */
+    private static function containerLists(string $base, mixed $env): array
+    {
+        $lists = [];
+        foreach ((array) $env as $name => $entry) {
+            foreach (['' => $entry, '.preview' => is_array($entry) ? ($entry['preview'] ?? null) : null] as $suffix => $variant) {
+                if (is_array($variant) && is_array($variant['containers'] ?? null) && $variant['containers'] !== []) {
+                    $lists["{$base}.env.{$name}{$suffix}.containers"] = array_values(array_map('strval', $variant['containers']));
+                }
+            }
+        }
+
+        return $lists;
     }
 }

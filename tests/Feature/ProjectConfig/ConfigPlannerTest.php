@@ -3,6 +3,7 @@
 use App\Models\Application;
 use App\Models\EnvironmentConfigLink;
 use App\Models\EnvironmentVariable;
+use App\Models\IntegrationToken;
 use App\Models\Server;
 use App\Services\ProjectConfig\AdapterRegistry;
 use App\Services\ProjectConfig\ApplyContext;
@@ -233,4 +234,39 @@ it('reports unknown keys in a list of secret manager sources', function () {
     $plan = plannerPlan(['api' => plannerResource(['secret_manager' => [['name' => 'urls', 'token' => 'x', 'extra' => true]]])]);
 
     expect(array_map(fn ($error) => $error->path, $plan->errors))->toContain('resources.api.secret_manager.0.extra');
+});
+
+it('checks the secret manager settings with the rules of the token provider', function () {
+    plannerApp();
+    IntegrationToken::factory()->create(['team_id' => $this->fx['team']->id, 'provider' => 'infisical', 'name' => 'infisical', 'capabilities' => ['secrets']]);
+
+    $errors = fn (array $settings) => collect(plannerPlan(['api' => plannerResource(['secret_manager' => ['token' => 'infisical', 'settings' => $settings]])])->errors)
+        ->filter(fn ($error) => str_contains($error->path, 'secret_manager'))
+        ->map(fn ($error) => $error->path)
+        ->sort()->values()->all();
+
+    expect($errors(['project_id' => 'p1', 'environment' => 'prod', 'secretPath' => '/app']))->toBe(['resources.api.secret_manager.settings.secretPath'])
+        ->and($errors(['project_id' => 'p1', 'environment' => 'prod', 'mount' => 'kv']))->toBe(['resources.api.secret_manager.settings.mount'])
+        ->and($errors(['secret_path' => '/app']))->toBe(['resources.api.secret_manager.settings.environment', 'resources.api.secret_manager.settings.project_id'])
+        ->and($errors(['project_id' => 'p1', 'environment' => 'prod', 'secret_path' => '/app']))->toBe([]);
+});
+
+it('rejects containers on an application that is not Docker Compose', function () {
+    plannerApp();
+    $plan = plannerPlan(['api' => plannerResource(['env' => ['QUEUE_URL' => ['value' => 'redis', 'containers' => ['worker']]]])]);
+
+    expect(array_map(fn ($error) => $error->path, $plan->errors))->toContain('resources.api.env.QUEUE_URL.containers');
+});
+
+it('warns about containers that the loaded Compose file of an application does not have', function () {
+    plannerApp(['build_pack' => 'dockercompose', 'docker_compose_raw' => "services:\n  app:\n    image: nginx\n  worker:\n    image: nginx\n"]);
+    $plan = plannerPlan(['api' => plannerResource([
+        'build' => ['pack' => 'dockercompose'],
+        'env' => ['QUEUE_URL' => ['value' => 'redis', 'containers' => ['worker', 'wroker']]],
+    ])]);
+
+    expect(array_map(fn ($error) => $error->path, $plan->errors))->not->toContain('resources.api.env.QUEUE_URL.containers')
+        ->and(collect($plan->warnings)->filter(fn (string $warning) => str_starts_with($warning, 'resources.api.env.QUEUE_URL.containers'))->values()->all())
+        ->toHaveCount(1)
+        ->and(implode("\n", $plan->warnings))->toContain('"wroker"')->not->toContain('"worker"');
 });
