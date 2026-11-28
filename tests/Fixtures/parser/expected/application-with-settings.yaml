@@ -14,6 +14,7 @@
   volumes:
     - 'referenceapplication0001_db-data:/var/lib/postgresql/data'
     - 'referenceapplication0001_web-data:/app/data'
+    - 'shared-external:/shared'
   files:
     -
       fs_path: /data/coolify/applications/referenceapplication0001/config
@@ -925,6 +926,7 @@
   volumes:
     - 'referenceapplication0001_db-data:/var/lib/postgresql/data'
     - 'referenceapplication0001_web-data:/app/data'
+    - 'shared-external:/shared'
   files:
     -
       fs_path: /data/coolify/applications/referenceapplication0001/config
@@ -1942,6 +1944,7 @@
     - 'referenceapplication0001_shared-external-pr-7:/shared'
     - 'referenceapplication0001_web-data:/app/data'
     - 'referenceapplication0001_web-data-pr-7:/app/data'
+    - 'shared-external:/shared'
   files:
     -
       fs_path: /data/coolify/applications/referenceapplication0001/config
@@ -2989,6 +2992,7 @@
     - 'referenceapplication0001_web-data:/app/data'
     - 'referenceapplication0001_web-data-pr-7:/app/data'
     - 'referenceapplication0001_web-data-pr-8:/app/data'
+    - 'shared-external:/shared'
   files:
     -
       fs_path: /data/coolify/applications/referenceapplication0001/config

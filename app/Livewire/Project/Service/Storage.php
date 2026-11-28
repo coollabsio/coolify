@@ -68,7 +68,7 @@ class Storage extends Component
     public int $cachedDirectoryCount = 0;
 
     /**
-     * External Compose volumes that this resource mounts as written. They have no storage entry,
+     * External Compose volumes that this resource mounts as written and that have no storage entry yet,
      * so the page shows them read-only (see loadExternalVolumes()).
      *
      * @var list<array{key: string, dockerName: string, service: string, mountPaths: list<string>}>
@@ -168,7 +168,8 @@ class Storage extends Component
 
     /**
      * Loads the external volumes that the current Compose file of the resource declares and that the
-     * resource mounts as written. Coolify does not manage these volumes, so they have no storage entry.
+     * resource mounts as written and that have no storage entry yet. A deployment gives them an external
+     * storage entry (see saveComposeExternalVolumeStorage()), and the volume list shows it.
      *
      * Not included:
      * - an external volume for which the resource still has the old storage entry with the generated
@@ -198,10 +199,14 @@ class Storage extends Component
             return;
         }
 
-        $storageNames = $this->resource->persistentStorages()->pluck('name')->all();
+        $storages = $this->resource->persistentStorages()->get(['name', 'mount_path', 'is_external']);
+        $storageNames = $storages->pluck('name')->all();
+        $externalMountPaths = $storages->where('is_external', true)->pluck('mount_path')->all();
         $this->externalVolumes = collect(composeExternalVolumeMounts($compose))
             ->when($serviceName !== null, fn ($mounts) => $mounts->where('service', $serviceName))
             ->reject(fn (array $mount): bool => in_array("{$uuid}_".Str::slug($mount['key'], '-'), $storageNames, true))
+            // A deployment gives the volume an external storage entry, which the volume list shows with its backup.
+            ->reject(fn (array $mount): bool => array_diff(array_map(fn (string $path): string => str($path)->start('/')->value(), $mount['mountPaths']), $externalMountPaths) === [])
             ->values()
             ->all();
     }

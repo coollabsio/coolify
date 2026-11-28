@@ -256,9 +256,17 @@ class LocalPersistentVolume extends BaseModel
                         : null);
                     $source = data_get($parsedVolume, 'source');
                     $target = data_get($parsedVolume, 'target');
-                    if ($source && isComposeExternalVolume($topLevelVolumes->get((string) $source))) {
-                        // The parsers use an external volume as written. A storage entry with the generated
-                        // name is an old entry that the user can delete (see replacedExternalComposeVolume()).
+                    $declaration = $source ? $topLevelVolumes->get((string) $source) : null;
+                    if (isComposeExternalVolume($declaration)) {
+                        // The parsers use an external volume as written and give it an external entry with the
+                        // Docker volume name (see saveComposeExternalVolumeStorage()). A storage entry with the
+                        // generated name is an old entry that the user can delete (see replacedExternalComposeVolume()).
+                        $dockerName = composeExternalVolumeDockerName((string) $source, $declaration);
+                        if ($this->is_external && $target && str($target)->start('/')->value() === $this->mount_path
+                            && ($dockerName === $this->name || isComposeVolumeNameWithVariables($dockerName))) {
+                            return true;
+                        }
+
                         continue;
                     }
                     $resourceUuid = $resource instanceof Application ? $resource->uuid : data_get($resource, 'service.uuid');
