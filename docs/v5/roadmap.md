@@ -41,8 +41,8 @@ stable need.
 ## Sentinel versions
 
 Until the first release, Coolify uses Sentinel `main-<sha>` images, not
-releases: `FLUX_IMAGE` and `constants.node.builder_image` pin `main-78b11ae`
-by digest. Nodes 1 and 2 of the dev cluster run `sentinel-host` `main-78b11ae`. The release v1.1.8 does not contain these changes. `upstream.json` takes only release versions, so a
+releases: `FLUX_IMAGE` and `constants.node.builder_image` pin `main-b24863e`
+by digest. Nodes 1, 2, and 3 of the dev cluster run `sentinel-host` `main-78b11ae` (`b24863e` changes only Flux). The release v1.1.8 does not contain these changes. `upstream.json` takes only release versions, so a
 new Node gets `sentinel-host` 1.1.7 from it. Such a Node has no
 `image.build.target.v1`, no read lane for fast commands (Sentinel
 `0d256e1`), no published ports (Sentinel `525e3be`), and no owner or mode of secret files (Sentinel `dd12f4d`), no Static builds (Sentinel `be0c977`), no Docker socket for stack services (Sentinel `b0a04a5`), no external image storage (Sentinel `8e040d0`), no `user:` for stack services (Sentinel `99c9629`), no image cleanup (Sentinel `5d8337f`), no workload convergence in Sentinel (`workload.reconcile.v1`, Sentinel `6774450`), no proxy options for domains (`ingress.route_options.v1`, Sentinel `9a4deb5`), no runtime options of decision 0032 (`workload.runtime_options.v2`, `workload.gpu.v1`, Sentinel `725ed36`), no concurrent builds or BuildKit limits (`image.build.concurrent.v1`, Sentinel `a7a95d5`), no Git options or LFS failure (`image.build.git_options.v1`, Sentinel `db2612c`), and no published ports in the convergence (`network.published_ports.local.v1`, Sentinel `78b11ae`). Install the `main-<sha>` `sentinel-host` on it by hand with

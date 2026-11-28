@@ -258,6 +258,13 @@ Built in Coolify and in Sentinel `ce6e4a8`, `13b243d`, and `78b11ae`
   power-off of Node 1 moved Node 3 to Node 2 after 21 s (the heartbeat
   timeout), and the start of Node 1 moved it back with 0 failures. Before the
   fix for unreachable Nodes, Node 3 kept forwarding to the powered-off Node.
+- **A network run waited 11 minutes.** A `builder.reconcile.v1` reached Node 2
+  in the same second as a refresh of its Flux credential. Flux kept the
+  command until its timeout (660 s), and the network lock of the cluster
+  blocked each revision, also a failover. Flux `b24863e` now fails a command
+  with 504 when the connection that got it closes. On dev, a command to a
+  killed Sentinel failed in the same second, and the next run converged
+  8 s later.
 - **Source CIDRs.** With `10.221.5.1/32`, the host connected through both
   Nodes, and a connection from another address was dropped on the entry Node.
 - **Reboot without Flux.** With Flux stopped, Node 1 rebooted. Its local rule
