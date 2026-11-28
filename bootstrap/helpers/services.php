@@ -512,18 +512,20 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         }
 
         if ($resource->fqdn) {
-            $firstFqdn = firstDomainFromList($resource->fqdn);
-            $url = Url::fromString($firstFqdn);
-            $port = $url->getPort();
-
-            // Same helpers as application/service parsers (COOLIFY_URL / COOLIFY_FQDN).
-            $urlValue = getFqdnWithoutPort($firstFqdn);
-            $fqdnValue = getHostWithoutPort($firstFqdn);
-
             // For each service name found in template, create BOTH SERVICE_URL and SERVICE_FQDN pairs
             foreach ($serviceNamesToProcess as $serviceInfo) {
                 $serviceName = $serviceInfo['base'];
                 $ports = array_unique($serviceInfo['ports']);
+
+                // A name with its own endpoint takes its domain, the others the first domain.
+                $firstFqdn = ($resource instanceof ServiceApplication ? $resource->endpointUrl($serviceName) : null)
+                    ?? firstDomainFromList($resource->fqdn);
+                $url = Url::fromString($firstFqdn);
+                $port = $url->getPort();
+
+                // Same helpers as application/service parsers (COOLIFY_URL / COOLIFY_FQDN).
+                $urlValue = getFqdnWithoutPort($firstFqdn);
+                $fqdnValue = getHostWithoutPort($firstFqdn);
 
                 // ALWAYS create base pair (without port)
                 $resource->service->environment_variables()->updateOrCreate([

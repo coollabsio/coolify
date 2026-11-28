@@ -52,6 +52,7 @@ class ServiceAdapter implements ResourceAdapter
         'traefik_certificate_resolver' => ['traefik_certificate_resolver', null, 'string'],
         'is_permanent_redirect_enabled' => ['is_permanent_redirect_enabled', false, 'boolean'],
         'domain_port_overrides' => ['domain_port_overrides', null, 'object'],
+        'domain_endpoints' => ['domain_endpoints', null, 'object'],
         'noindex_domains' => ['noindex_domains', null, 'array'],
     ];
 

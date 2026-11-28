@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
+use App\Support\ServiceEndpoint;
+use App\Support\ServiceEndpoints;
 use App\Traits\HasImageScans;
 use App\Traits\HasNoindexDomains;
 use App\Traits\HasRestartLimit;
@@ -29,6 +31,7 @@ class ServiceApplication extends BaseModel
         'redirect',
         'domain_dns_statuses',
         'domain_port_overrides',
+        'domain_endpoints',
         'ports',
         'exposes',
         'status',
@@ -54,6 +57,7 @@ class ServiceApplication extends BaseModel
     protected $hidden = [
         'domain_dns_statuses',
         'domain_port_overrides',
+        'domain_endpoints',
     ];
 
     protected $attributes = [
@@ -66,6 +70,7 @@ class ServiceApplication extends BaseModel
         return [
             'domain_dns_statuses' => 'array',
             'domain_port_overrides' => 'array',
+            'domain_endpoints' => 'array',
             'noindex_domains' => 'array',
             'is_force_https_enabled' => 'boolean',
             'is_permanent_redirect_enabled' => 'boolean',
@@ -88,6 +93,7 @@ class ServiceApplication extends BaseModel
                 $service->normalizeDomainPortOverrides();
                 $service->syncNoindexDomains();
             }
+            $service->normalizeDomainEndpoints();
         });
     }
 
@@ -308,6 +314,266 @@ class ServiceApplication extends BaseModel
         $normalized = DomainPortOverrides::normalize($this->fqdn, $this->domain_port_overrides);
         $this->fqdn = $normalized['fqdn'];
         $this->domain_port_overrides = $normalized['overrides'];
+    }
+
+    /**
+     * Images with endpoints of their own (Garage, MinIO, Logto), else the magic URL names of the container.
+     * Only the first application of the service with such an image owns the endpoints, because their
+     * environment variables are shared by the whole service (for example a MinIO bucket setup container).
+     * A stack that embeds the image without all endpoint variables (for example a MinIO with only a
+     * SERVICE_URL) is a normal application.
+     *
+     * @return list<ServiceEndpoint>
+     */
+    public function serviceEndpoints(): array
+    {
+        $endpoints = ServiceEndpoints::for($this);
+        if ($this->service === null) {
+            return $endpoints;
+        }
+        if ($endpoints === []) {
+            return (int) $this->service->compose_parsing_version >= 3 ? ServiceEndpoints::fromCompose($this) : [];
+        }
+        if ($this->hasLegacyServiceSpecificRouting()) {
+            return [];
+        }
+
+        $envKeys = array_map(fn (ServiceEndpoint $endpoint): string => $endpoint->envKey, $endpoints);
+        if ($this->service->environment_variables()->whereIn('key', $envKeys)->distinct()->count('key') !== count($envKeys)) {
+            return [];
+        }
+
+        $ownerId = $this->service->applications()->orderBy('id')->get(['id', 'image'])
+            ->first(fn (ServiceApplication $application): bool => ServiceEndpoints::for($application) !== [])?->id;
+
+        return $ownerId === $this->id ? $endpoints : [];
+    }
+
+    /**
+     * The legacy Compose parser still routes these images from their URL variables, so their domains stay unused.
+     */
+    public function hasLegacyServiceSpecificRouting(): bool
+    {
+        return $this->serviceType() !== null && (int) $this->service?->compose_parsing_version < 3;
+    }
+
+    public function endpointForUrl(string $url): ?ServiceEndpoint
+    {
+        $key = ($this->domain_endpoints ?? [])[DomainPortOverrides::withoutPort($url)] ?? null;
+
+        return collect($this->serviceEndpoints())->firstWhere('key', $key);
+    }
+
+    /**
+     * The first domain of the endpoint of a magic URL name (SERVICE_URL_<name>), or null without one.
+     */
+    public function endpointUrl(string $composeName): ?string
+    {
+        if ($this->domain_endpoints === null) {
+            return null;
+        }
+        $endpoint = collect($this->serviceEndpoints())
+            ->first(fn (ServiceEndpoint $endpoint): bool => strcasecmp($endpoint->envKey, "SERVICE_URL_{$composeName}") === 0);
+        $url = $endpoint ? array_search($endpoint->key, $this->domain_endpoints, true) : false;
+
+        return $url === false ? null : (string) $url;
+    }
+
+    /**
+     * Takes over the endpoint URLs from their environment variables once, generating the empty ones.
+     * The fqdn is replaced because only the environment variables were routed before.
+     */
+    public function importServiceEndpoints(): void
+    {
+        $endpoints = $this->serviceEndpoints();
+        $server = $this->service?->server;
+        if ($endpoints === [] || $this->domain_endpoints !== null || $server === null) {
+            return;
+        }
+        if (ServiceEndpoints::for($this) === []) {
+            $this->importComposeEndpoints($endpoints, $server);
+
+            return;
+        }
+
+        $variables = $this->service->environment_variables()
+            ->whereIn('key', array_map(fn (ServiceEndpoint $endpoint) => $endpoint->envKey, $endpoints))
+            ->get()
+            ->keyBy('key');
+
+        $map = [];
+        foreach ($endpoints as $endpoint) {
+            $variable = $variables->get($endpoint->envKey);
+            if ($variable === null) {
+                continue;
+            }
+
+            $url = filled($variable->value)
+                ? DomainPortOverrides::withoutPort(trim($variable->value))
+                : generateUrl(server: $server, random: $endpoint->urlPrefix.$this->uuid, forceHttps: $endpoint->forceHttps);
+            if (blank($variable->value)) {
+                $variable->update(['value' => $url]);
+            }
+            $map[$url] ??= $endpoint->key;
+        }
+
+        $this->fqdn = $map === [] ? null : implode(',', array_keys($map));
+        $this->domain_port_overrides = null;
+        $this->domain_endpoints = $map;
+        $this->save();
+    }
+
+    /**
+     * The domains routed the port of the container before, so they stay on the endpoint of their port, or of the
+     * required port without one. Each endpoint without a domain gets a generated one. A domain with a port of no
+     * endpoint keeps its route, so the application stays without endpoints.
+     *
+     * @param  list<ServiceEndpoint>  $endpoints
+     */
+    protected function importComposeEndpoints(array $endpoints, Server $server): void
+    {
+        $byPort = collect($endpoints)->keyBy('port');
+        $primary = $byPort->get($this->getRequiredPort() ?? 0) ?? $endpoints[0];
+        $overrides = $this->domain_port_overrides ?? [];
+        $map = [];
+        foreach ($this->fqdns as $url) {
+            $url = trim($url);
+            if ($url === '') {
+                continue;
+            }
+            $withoutPort = DomainPortOverrides::withoutPort($url);
+            $port = DomainUrlParts::split($url)['port'] ?: ($overrides[$withoutPort] ?? null);
+            if (filled($port) && ! $byPort->has((int) $port)) {
+                return;
+            }
+            $map[$withoutPort] = (filled($port) ? $byPort->get((int) $port) : $primary)->key;
+        }
+        foreach ($endpoints as $endpoint) {
+            if (! in_array($endpoint->key, $map, true)) {
+                $map[generateUrl(server: $server, random: $endpoint->urlPrefix.$this->service->uuid).$endpoint->path] ??= $endpoint->key;
+            }
+        }
+
+        $this->fqdn = implode(',', array_keys($map));
+        $this->domain_port_overrides = null;
+        $this->domain_endpoints = $map;
+        $this->save();
+    }
+
+    /**
+     * Writes the first URL of each endpoint to its environment variable, or an empty value when it has none.
+     *
+     * @return array<string, string> the synced values by variable key
+     */
+    public function syncServiceEndpointVariables(): array
+    {
+        // The parser writes the magic URL variables of Compose endpoints itself.
+        $endpoints = ServiceEndpoints::for($this) === [] ? [] : $this->serviceEndpoints();
+        if ($endpoints === [] || $this->domain_endpoints === null) {
+            return [];
+        }
+
+        $variables = $this->service->environment_variables()
+            ->whereIn('key', array_map(fn (ServiceEndpoint $endpoint) => $endpoint->envKey, $endpoints))
+            ->get()
+            ->keyBy('key');
+
+        $synced = [];
+        foreach ($endpoints as $endpoint) {
+            $variable = $variables->get($endpoint->envKey);
+            if ($variable === null) {
+                continue;
+            }
+
+            $url = array_search($endpoint->key, $this->domain_endpoints, true);
+            $value = $url === false ? '' : (string) $url;
+            if ((string) $variable->value !== $value) {
+                $variable->update(['value' => $value]);
+            }
+            $synced[$endpoint->envKey] = $value;
+        }
+
+        return $synced;
+    }
+
+    /**
+     * Replaces the first domain of the endpoint of a changed variable (for example from the API) with its new
+     * value, or removes it for an empty value, so the next sync keeps the value. An invalid URL changes nothing.
+     */
+    public function applyServiceEndpointVariable(string $key, ?string $value): void
+    {
+        $endpoint = collect($this->serviceEndpoints())->firstWhere('envKey', $key);
+        $value = trim((string) $value);
+        if ($endpoint === null || $this->domain_endpoints === null || (filled($value) && ! isValidDomainUrl($value))) {
+            return;
+        }
+
+        $url = filled($value) ? DomainPortOverrides::withoutPort($value) : null;
+        $current = array_search($endpoint->key, $this->domain_endpoints, true);
+        if ($current === ($url ?? false)) {
+            return;
+        }
+
+        $replacement = null;
+        if ($url !== null) {
+            $parts = DomainUrlParts::split($url);
+            $parts['port'] = (string) $endpoint->port;
+            $replacement = DomainUrlParts::compose(...$parts);
+        }
+        $urls = [];
+        foreach ($this->fqdns as $existing) {
+            $existing = DomainPortOverrides::withoutPort(trim($existing));
+            if ($existing === $url) {
+                continue;
+            }
+            if ($existing === $current) {
+                $existing = $replacement;
+                $replacement = null;
+            }
+            if (filled($existing)) {
+                $urls[] = $existing;
+            }
+        }
+        if ($replacement !== null) {
+            $urls[] = $replacement;
+        }
+
+        $this->fqdn = $urls === [] ? null : implode(',', $urls);
+        $this->save();
+    }
+
+    /**
+     * Maps each domain to an endpoint and gives it that endpoint's port. A domain takes the endpoint of its
+     * port (the port always matches the stored endpoint unless it was just entered), then its stored endpoint.
+     * The other domains take the endpoint of their www counterpart, then an endpoint without a domain, then
+     * the primary endpoint, so a list of new domains without ports (for example from the API) keeps every endpoint.
+     */
+    protected function normalizeDomainEndpoints(): void
+    {
+        $endpoints = collect($this->serviceEndpoints())->keyBy('key');
+        if ($endpoints->isEmpty() || $this->domain_endpoints === null) {
+            return;
+        }
+
+        $previous = $this->domain_endpoints;
+        $overrides = $this->domain_port_overrides ?? [];
+        $map = [];
+        foreach ($this->fqdns as $url) {
+            $url = DomainPortOverrides::withoutPort(trim($url));
+            if ($url !== '') {
+                $map[$url] = ($endpoints->first(fn (ServiceEndpoint $endpoint): bool => $endpoint->port === (int) ($overrides[$url] ?? 0))
+                    ?? $endpoints->get($previous[$url] ?? ''))?->key;
+            }
+        }
+        foreach (array_keys($map, null, true) as $url) {
+            $counterpart = DomainPortOverrides::wwwCounterpart($url) ?? '';
+            $map[$url] = $map[$counterpart] ?? $endpoints->get($previous[$counterpart] ?? '')?->key
+                ?? $endpoints->keys()->first(fn (string $key): bool => ! in_array($key, $map, true))
+                ?? $endpoints->keys()->first();
+        }
+
+        $this->domain_endpoints = $map;
+        $this->domain_port_overrides = array_map(fn (string $key): int => $endpoints[$key]->port, $map) ?: null;
     }
 
     /**

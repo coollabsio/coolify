@@ -13,6 +13,7 @@ use App\Models\ServiceApplication;
 use App\Services\Dns\ServerDnsAddresses;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
+use App\Support\ServiceEndpoint;
 use App\Support\ValidationPatterns;
 use App\Traits\ListensToTeamChannel;
 use Illuminate\Database\Eloquent\Model;
@@ -33,7 +34,7 @@ class Domains extends Component
 
     public Service $service;
 
-    /** @var array<int, array{id: int, name: string, image: ?string, required_port: ?int}> */
+    /** @var array<int, array{id: int, name: string, image: ?string, required_port: ?int, endpoints: list<array{value: string, label: string}>}> */
     public array $serviceApps = [];
 
     /**
@@ -57,6 +58,10 @@ class Domains extends Component
     public array $domainRows = [];
 
     public ?int $newServiceApplicationId = null;
+
+    public ?string $newEndpoint = null;
+
+    public ?string $editingEndpoint = null;
 
     public string $newDomain = '';
 
@@ -293,6 +298,10 @@ class Domains extends Component
                 'name' => $app->human_name ?: $app->name,
                 'image' => $app->image,
                 'required_port' => $app->getRequiredPort(),
+                'endpoints' => array_map(fn (ServiceEndpoint $endpoint): array => [
+                    'value' => $endpoint->key,
+                    'label' => "{$endpoint->label} (port {$endpoint->port})",
+                ], $app->serviceEndpoints()),
             ])
             ->all();
 
@@ -309,6 +318,7 @@ class Domains extends Component
         if ($this->newServiceApplicationId === null && count($this->serviceApps) > 0) {
             $this->newServiceApplicationId = $this->serviceApps[0]['id'];
         }
+        $this->newEndpoint ??= collect($this->serviceApps)->firstWhere('id', $this->newServiceApplicationId)['endpoints'][0]['value'] ?? null;
 
         // Do not auto-promote www/non-www pairs here: load/refresh also runs after
         // removeDomain, and re-adding counterparts would undo intentional deletes.
@@ -370,6 +380,7 @@ class Domains extends Component
         $entry = $stored[$url] ?? null;
         $displayName = $app->human_name ?: $app->name;
         $port = $this->effectiveDomainInternalPort($url, $app);
+        $endpoint = $app->endpointForUrl($url);
 
         $row = [
             'service_application_id' => $app->id,
@@ -378,6 +389,8 @@ class Domains extends Component
             'url' => $url,
             'internal_port' => $port['internal_port'],
             'has_port_override' => $port['has_port_override'],
+            'endpoint_key' => $endpoint?->key,
+            'endpoint_label' => $endpoint?->label,
             'dns_status' => 'pending',
             'dns_message' => 'Not checked yet.',
             'expected_ip' => $this->serverIp,
@@ -685,6 +698,11 @@ class Domains extends Component
     {
         $this->refreshDomains();
         $this->persistAllDomainDnsStatuses();
+    }
+
+    public function updatedNewServiceApplicationId(): void
+    {
+        $this->newEndpoint = collect($this->serviceApps)->firstWhere('id', $this->newServiceApplicationId)['endpoints'][0]['value'] ?? null;
     }
 
     public function updatedNewDomain(): void
@@ -1064,9 +1082,15 @@ class Domains extends Component
             if ($this->newDomainPartsChanged) {
                 $this->newDomain = DomainUrlParts::compose(...$this->newDomainParts);
             }
+            $app = $this->findServiceApp($this->newServiceApplicationId);
+            $endpoint = $app ? $this->selectedEndpoint($app, $this->newEndpoint) : null;
+            $parts = DomainUrlParts::split($this->newDomain);
+            if ($endpoint && filled($parts['host'])) {
+                $parts['port'] = (string) $endpoint->port;
+                $this->newDomain = DomainUrlParts::compose(...$parts);
+            }
             $this->validateOnly('newDomain');
 
-            $app = $this->findServiceApp($this->newServiceApplicationId);
             if (! $app) {
                 $this->dispatch('error', 'Select a service application.');
 
@@ -1110,6 +1134,7 @@ class Domains extends Component
             $this->newDomain = '';
             $this->newDomainParts = DomainUrlParts::empty();
             $this->newDomainPartsChanged = false;
+            $this->newEndpoint = null;
             $this->addDomainDnsFailed = false;
             $this->addDomainDnsMessage = '';
             $this->forceSaveDns = false;
@@ -1225,6 +1250,7 @@ class Domains extends Component
         }
         $this->editingDomainPartsChanged = false;
         $this->editingServiceApplicationId = (int) $this->domainRows[$index]['service_application_id'];
+        $this->editingEndpoint = $this->domainRows[$index]['endpoint_key'] ?? null;
         $app = $this->findServiceApp($this->editingServiceApplicationId);
         $this->editingIndexing = $app?->isDomainNoindexed($this->editingDomain) ? 'noindex' : 'index';
         $this->editingRedirect = $this->serviceRedirectFor($this->editingServiceApplicationId);
@@ -1247,6 +1273,7 @@ class Domains extends Component
         $this->editingDomainParts = DomainUrlParts::empty();
         $this->editingDomainPartsChanged = false;
         $this->editingServiceApplicationId = null;
+        $this->editingEndpoint = null;
         $this->editingIndexing = 'index';
         $this->editingRedirect = 'both';
         $this->editingOriginalRedirect = 'both';
@@ -1275,6 +1302,11 @@ class Domains extends Component
             ) {
                 $editingDomainParts['port'] = '';
             }
+            $app = $this->findServiceApp($this->editingServiceApplicationId);
+            $endpoint = $app ? $this->selectedEndpoint($app, $this->editingEndpoint) : null;
+            if ($endpoint) {
+                $editingDomainParts['port'] = (string) $endpoint->port;
+            }
             if ($this->editingDomainPartsChanged || filled($editingDomainParts['host'] ?? null)) {
                 $this->editingDomain = DomainUrlParts::compose(...$editingDomainParts);
             }
@@ -1282,7 +1314,6 @@ class Domains extends Component
             $this->validateOnly('editingIndexing');
             $this->validateOnly('editingRedirect');
 
-            $app = $this->findServiceApp($this->editingServiceApplicationId);
             if (! $app) {
                 return;
             }
@@ -1602,7 +1633,7 @@ class Domains extends Component
             }
         }
 
-        if ($checkPorts && ! $this->forceRemovePort) {
+        if ($checkPorts && ! $this->forceRemovePort && $app->serviceEndpoints() === []) {
             $requiredPort = $app->getRequiredPort();
             if ($requiredPort !== null && $domainString) {
                 foreach ($this->splitDomains($domainString) as $fqdn) {
@@ -1764,6 +1795,13 @@ class Domains extends Component
             'service_application_name' => $application->name,
             'changed_fields' => $changedFields,
         ]);
+    }
+
+    protected function selectedEndpoint(ServiceApplication $app, ?string $key): ?ServiceEndpoint
+    {
+        $endpoints = collect($app->serviceEndpoints());
+
+        return $endpoints->firstWhere('key', $key) ?? $endpoints->first();
     }
 
     protected function findServiceApp(?int $id): ?ServiceApplication

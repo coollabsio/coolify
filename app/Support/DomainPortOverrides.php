@@ -74,7 +74,7 @@ class DomainPortOverrides
         ];
     }
 
-    private static function wwwCounterpart(string $url): ?string
+    public static function wwwCounterpart(string $url): ?string
     {
         $parts = DomainUrlParts::split($url);
         $host = $parts['host'];

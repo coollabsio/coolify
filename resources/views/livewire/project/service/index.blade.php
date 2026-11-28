@@ -45,7 +45,7 @@
                                     id="description"></x-forms.input>
                             </div>
                             <div class="grid gap-4 sm:grid-cols-2">
-                                @if (!$serviceApplication->serviceType()?->contains(str($serviceApplication->image)->before(':')))
+                                @unless ($serviceApplication->hasLegacyServiceSpecificRouting())
                                     <div data-domain-summary
                                         class="rounded-lg border border-neutral-200 p-4 dark:border-white/[0.08]">
                                         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -66,7 +66,7 @@
                                             </a>
                                         </div>
                                     </div>
-                                @endif
+                                @endunless
                                 <x-forms.input canGate="update" :canResource="$serviceApplication"
                                     helper="You can change the image you would like to deploy.<br><br><span class='dark:text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
                                     label="Image" id="image"></x-forms.input>

@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
+use App\Models\Service;
 use App\Services\ProjectConfig\ManagedResources;
 use App\Support\ValidationPatterns;
 use App\Traits\AuditsApplicationSettings;
@@ -75,6 +76,9 @@ class All extends Component
     private ?Collection $composeEnvironmentAssignments = null;
 
     private ?bool $canViewComposeContent = null;
+
+    /** @var list<string>|null */
+    private ?array $serviceEndpointVariableKeys = null;
 
     protected $listeners = [
         'saveKey' => 'submit',
@@ -717,6 +721,11 @@ class All extends Component
             $query->whereNotIn('key', $hardcodedKeys);
         }
 
+        $endpointKeys = $this->serviceEndpointVariableKeys();
+        if ($endpointKeys !== []) {
+            $query->whereNotIn('key', $endpointKeys);
+        }
+
         if ($this->serviceFilters !== []) {
             $query->whereRaw('1 = 0');
         }
@@ -954,7 +963,8 @@ class All extends Component
         $hardcodedVars = $hardcodedVars->filter(function ($var) {
             $key = $var['key'];
 
-            return ! str($key)->startsWith(['SERVICE_FQDN_', 'SERVICE_URL_', 'SERVICE_NAME_']);
+            return ! str($key)->startsWith(['SERVICE_FQDN_', 'SERVICE_URL_', 'SERVICE_NAME_'])
+                && ! in_array($key, $this->serviceEndpointVariableKeys(), true);
         });
 
         if ($this->searchTerm() !== '') {
@@ -1006,10 +1016,25 @@ class All extends Component
         return $assignments
             ->reject(fn (array $variable): bool => $editableKeys->contains($variable['key']))
             ->pluck('key')
-            ->reject(fn (string $key): bool => str($key)->startsWith(['SERVICE_FQDN_', 'SERVICE_URL_', 'SERVICE_NAME_']))
+            ->reject(fn (string $key): bool => str($key)->startsWith(['SERVICE_FQDN_', 'SERVICE_URL_', 'SERVICE_NAME_'])
+                || in_array($key, $this->serviceEndpointVariableKeys(), true))
             ->unique()
             ->values()
             ->all();
+    }
+
+    /**
+     * Endpoint URLs are edited on the Domains page, which overwrites these variables.
+     *
+     * @return list<string>
+     */
+    private function serviceEndpointVariableKeys(): array
+    {
+        if (! $this->resource instanceof Service) {
+            return [];
+        }
+
+        return $this->serviceEndpointVariableKeys ??= $this->resource->endpointVariableKeys();
     }
 
     private function isSelfReferencingComposeVariable(array $variable): bool
@@ -1117,7 +1142,7 @@ class All extends Component
         $withContainers = composeServiceNamesForEnvironmentScope($this->resource) !== [];
 
         return $variables
-            ->reject(fn ($item): bool => $this->isProtectedEnvironmentVariable($item->key))
+            ->reject(fn ($item): bool => $this->isProtectedEnvironmentVariable($item->key) || in_array($item->key, $this->serviceEndpointVariableKeys(), true))
             ->map(fn ($item) => $this->composeDefaultHint($item).formatEnvVariableForDevView($item, $canViewValues, $withContainers))
             ->join("\n");
     }
@@ -1338,6 +1363,7 @@ class All extends Component
         // replacement even when they are omitted from the pasted environment file.
         $variablesToDelete = $variablesToDelete->reject(
             fn (EnvironmentVariable $environmentVariable): bool => $this->isProtectedEnvironmentVariable($environmentVariable->key)
+                || in_array($environmentVariable->key, $this->serviceEndpointVariableKeys(), true)
         );
 
         // If there are no variables to delete, return 0

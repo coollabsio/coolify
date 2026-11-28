@@ -9,6 +9,8 @@ use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use App\Rules\ValidIpAllowlist;
 use App\Support\DomainPortOverrides;
+use App\Support\ServiceEndpoint;
+use App\Support\ServiceEndpoints;
 use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -782,101 +784,32 @@ function defaultLabels(string $uuid, $name, string $projectName, string $resourc
 function generateServiceSpecificFqdns(ServiceApplication|Application $resource)
 {
     if ($resource->getMorphClass() === ServiceApplication::class) {
-        $uuid = data_get($resource, 'uuid');
         $server = data_get($resource, 'service.server');
         $environment_variables = data_get($resource, 'service.environment_variables');
-        $type = $resource->serviceType();
-    } elseif ($resource->getMorphClass() === Application::class) {
-        $uuid = data_get($resource, 'uuid');
+    } else {
         $server = data_get($resource, 'destination.server');
         $environment_variables = data_get($resource, 'environment_variables');
-        $type = $resource->serviceType();
     }
-    if (is_null($server) || is_null($type)) {
+    $endpoints = collect(ServiceEndpoints::for($resource));
+    if (is_null($server) || $endpoints->isEmpty()) {
         return collect([]);
     }
     $variables = collect($environment_variables);
-    $payload = collect([]);
-    switch ($type) {
-        case $type?->contains(['minio', 'pgsty/silo']):
-            $MINIO_BROWSER_REDIRECT_URL = $variables->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
-            $MINIO_SERVER_URL = $variables->where('key', 'MINIO_SERVER_URL')->first();
-
-            if (is_null($MINIO_BROWSER_REDIRECT_URL) || is_null($MINIO_SERVER_URL)) {
-                return collect([]);
-            }
-
-            if (str($MINIO_BROWSER_REDIRECT_URL->value ?? '')->isEmpty()) {
-                $MINIO_BROWSER_REDIRECT_URL->update([
-                    'value' => generateUrl(server: $server, random: 'console-'.$uuid, forceHttps: true),
-                ]);
-            }
-            if (str($MINIO_SERVER_URL->value ?? '')->isEmpty()) {
-                $MINIO_SERVER_URL->update([
-                    'value' => generateUrl(server: $server, random: 'minio-'.$uuid, forceHttps: true),
-                ]);
-            }
-            $payload = collect([
-                $MINIO_BROWSER_REDIRECT_URL->value.':9001',
-                $MINIO_SERVER_URL->value.':9000',
-            ]);
-            break;
-        case $type?->contains('logto'):
-            $LOGTO_ENDPOINT = $variables->where('key', 'LOGTO_ENDPOINT')->first();
-            $LOGTO_ADMIN_ENDPOINT = $variables->where('key', 'LOGTO_ADMIN_ENDPOINT')->first();
-
-            if (is_null($LOGTO_ENDPOINT) || is_null($LOGTO_ADMIN_ENDPOINT)) {
-                return collect([]);
-            }
-
-            if (str($LOGTO_ENDPOINT->value ?? '')->isEmpty()) {
-                $LOGTO_ENDPOINT->update([
-                    'value' => generateUrl(server: $server, random: 'logto-'.$uuid),
-                ]);
-            }
-            if (str($LOGTO_ADMIN_ENDPOINT->value ?? '')->isEmpty()) {
-                $LOGTO_ADMIN_ENDPOINT->update([
-                    'value' => generateUrl(server: $server, random: 'logto-admin-'.$uuid),
-                ]);
-            }
-            $payload = collect([
-                $LOGTO_ENDPOINT->value.':3001',
-                $LOGTO_ADMIN_ENDPOINT->value.':3002',
-            ]);
-            break;
-        case $type?->contains('garage'):
-            $GARAGE_S3_API_URL = $variables->where('key', 'GARAGE_S3_API_URL')->first();
-            $GARAGE_WEB_URL = $variables->where('key', 'GARAGE_WEB_URL')->first();
-            $GARAGE_ADMIN_URL = $variables->where('key', 'GARAGE_ADMIN_URL')->first();
-
-            if (is_null($GARAGE_S3_API_URL) || is_null($GARAGE_WEB_URL) || is_null($GARAGE_ADMIN_URL)) {
-                return collect([]);
-            }
-
-            if (str($GARAGE_S3_API_URL->value ?? '')->isEmpty()) {
-                $GARAGE_S3_API_URL->update([
-                    'value' => generateUrl(server: $server, random: 's3-'.$uuid, forceHttps: true),
-                ]);
-            }
-            if (str($GARAGE_WEB_URL->value ?? '')->isEmpty()) {
-                $GARAGE_WEB_URL->update([
-                    'value' => generateUrl(server: $server, random: 'web-'.$uuid, forceHttps: true),
-                ]);
-            }
-            if (str($GARAGE_ADMIN_URL->value ?? '')->isEmpty()) {
-                $GARAGE_ADMIN_URL->update([
-                    'value' => generateUrl(server: $server, random: 'admin-'.$uuid, forceHttps: true),
-                ]);
-            }
-            $payload = collect([
-                $GARAGE_S3_API_URL->value.':3900',
-                $GARAGE_WEB_URL->value.':3902',
-                $GARAGE_ADMIN_URL->value.':3903',
-            ]);
-            break;
+    $endpointVariables = $endpoints->map(fn (ServiceEndpoint $endpoint) => $variables->where('key', $endpoint->envKey)->first());
+    if ($endpointVariables->contains(null)) {
+        return collect([]);
     }
 
-    return $payload;
+    return $endpoints->map(function (ServiceEndpoint $endpoint, int $index) use ($endpointVariables, $server, $resource): string {
+        $variable = $endpointVariables[$index];
+        if (str($variable->value ?? '')->isEmpty()) {
+            $variable->update([
+                'value' => generateUrl(server: $server, random: $endpoint->urlPrefix.$resource->uuid, forceHttps: $endpoint->forceHttps),
+            ]);
+        }
+
+        return $variable->value.':'.$endpoint->port;
+    });
 }
 
 /**

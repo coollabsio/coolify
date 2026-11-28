@@ -785,6 +785,7 @@ test('service nested apps dbs volumes backups and db file storages round-trip', 
         'human_name' => 'Whoami',
         'description' => 'demo nested app',
         'fqdn' => 'https://whoami.example.com',
+        'domain_endpoints' => ['https://whoami.example.com' => 'web'],
         'ports' => '80:80',
         'exposes' => '80',
         'image' => 'traefik/whoami:latest',
@@ -1006,6 +1007,7 @@ test('service nested apps dbs volumes backups and db file storages round-trip', 
     $importedSvcApp = ServiceApplication::where('uuid', 'svc-app-whoami')->first();
     expect($importedSvcApp)->not->toBeNull()
         ->and($importedSvcApp->ports)->toBe('80:80')
+        ->and($importedSvcApp->domain_endpoints)->toBe(['https://whoami.example.com' => 'web'])
         ->and($importedSvcApp->exposes)->toBe('80')
         ->and((bool) $importedSvcApp->is_gzip_enabled)->toBeFalse()
         ->and((bool) $importedSvcApp->is_stripprefix_enabled)->toBeFalse()

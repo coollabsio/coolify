@@ -2897,6 +2897,11 @@ function serviceParser(Service $resource): Collection
         // convert environment variables to one format
         $environment = convertToKeyValueCollection($environment);
 
+        // Each magic URL name with its own endpoint takes its domain from it below.
+        if ($savedService instanceof ServiceApplication) {
+            $savedService->importServiceEndpoints();
+        }
+
         // Add Coolify defined environments
         $allEnvironments = $resource->environment_variables()->get(['key', 'value']);
 
@@ -2961,8 +2966,8 @@ function serviceParser(Service $resource): Collection
                     $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
                     $url = generateUrl($server, "$fqdnFor-$uuid");
                 } elseif ($isServiceApplication) {
-                    // FQDN may be a comma-separated list; use the first entry (same as updateCompose).
-                    $firstFqdn = firstDomainFromList($savedService->fqdn);
+                    // FQDN may be a comma-separated list; use the endpoint of the name, else the first entry (same as updateCompose).
+                    $firstFqdn = $savedService->endpointUrl($serviceName) ?? firstDomainFromList($savedService->fqdn);
                     $fqdn = getFqdnWithoutPort($firstFqdn);
                     $url = $fqdn;
                 } else {
@@ -3676,11 +3681,14 @@ function serviceParser(Service $resource): Collection
             $coolifyEnvironments->put('COOLIFY_CONTAINER_NAME', "{$containerName}");
         }
 
-        if ($savedService->serviceType()) {
-            $fqdns = generateServiceSpecificFqdns($savedService);
-        } else {
-            $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
+        if ($savedService instanceof ServiceApplication) {
+            $savedService->importServiceEndpoints();
+            // The environment above holds the values from before the sync; references stay references.
+            $syncedEndpointValues = collect($savedService->syncServiceEndpointVariables())
+                ->filter(fn (string $value, string $key): bool => $environment->has($key) && ! str((string) $environment->get($key))->startsWith('$'));
+            $environment = $environment->merge($syncedEndpointValues);
         }
+        $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
         // Flags live on the ServiceApplication; a ServiceDatabase has no domains.
         $noindexDomains = $savedService instanceof ServiceApplication
             ? $savedService->noindexDomains()

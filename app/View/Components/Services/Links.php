@@ -3,6 +3,7 @@
 namespace App\View\Components\Services;
 
 use App\Models\Service;
+use App\Support\ServiceEndpoints;
 use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -16,8 +17,7 @@ class Links extends Component
     {
         $this->links = collect([]);
         $service->applications()->get()->map(function ($application) {
-            $type = $application->serviceType();
-            if ($type) {
+            if ($application->hasLegacyServiceSpecificRouting() || (ServiceEndpoints::for($application) !== [] && $application->serviceEndpoints() !== [] && $application->domain_endpoints === null)) {
                 $links = generateServiceSpecificFqdns($application);
                 $links = $links->map(function ($link) {
                     return getFqdnWithoutPort($link);
