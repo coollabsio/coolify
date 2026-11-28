@@ -17,9 +17,9 @@
                     canGate="manageEnvironment" :canResource="$resource"
                     :availableVars="$shared ? [] : $this->availableSharedVariables"
                     :hasVaultSource="$this->hasSecretManagerSource()"
-                    :projectUuid="data_get($parameters, 'project_uuid')"
-                    :environmentUuid="data_get($parameters, 'environment_uuid')"
-                    :serverUuid="data_get($parameters, 'server_uuid')" />
+                    :projectUuid="$this->sharedVariableScopes['project']?->uuid"
+                    :environmentUuid="$this->sharedVariableScopes['environment']?->uuid"
+                    :serverUuid="$this->sharedVariableScopes['server']?->uuid" />
             </div>
         </template>
         @if (!$shared)

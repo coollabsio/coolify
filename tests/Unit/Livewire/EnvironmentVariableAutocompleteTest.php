@@ -9,7 +9,6 @@ it('returns empty arrays when currentTeam returns null', function () {
         ->andReturn(null);
 
     $component = new Add;
-    $component->parameters = [];
 
     $result = $component->availableSharedVariables();
 

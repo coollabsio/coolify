@@ -171,9 +171,9 @@
                                             :placeholder="$composeInfo['default'] ?? null"
                                             :availableVars="$isSharedVariable ? [] : $this->availableSharedVariables"
                                             :hasVaultSource="$this->hasSecretManagerSource()"
-                                            :projectUuid="data_get($parameters, 'project_uuid')"
-                                            :environmentUuid="data_get($parameters, 'environment_uuid')"
-                                            :serverUuid="data_get($parameters, 'server_uuid')" />
+                                            :projectUuid="$this->sharedVariableScopes['project']?->uuid"
+                                            :environmentUuid="$this->sharedVariableScopes['environment']?->uuid"
+                                            :serverUuid="$this->sharedVariableScopes['server']?->uuid" />
                                     @endif
                                 </div>
                             </div>

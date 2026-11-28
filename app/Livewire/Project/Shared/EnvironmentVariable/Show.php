@@ -4,10 +4,7 @@ namespace App\Livewire\Project\Shared\EnvironmentVariable;
 
 use App\Events\ApplicationConfigurationChanged;
 use App\Models\Application;
-use App\Models\Environment;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
-use App\Models\Project;
-use App\Models\Server;
 use App\Models\Service;
 use App\Models\SharedEnvironmentVariable;
 use App\Services\SharedVariableCanvas;
@@ -15,12 +12,11 @@ use App\Support\ValidationPatterns;
 use App\Traits\EnvironmentVariableAnalyzer;
 use App\Traits\EnvironmentVariableProtection;
 use App\Traits\HasSecretManagerAutocomplete;
-use Illuminate\Auth\Access\AuthorizationException;
+use App\Traits\HasSharedVariableAutocomplete;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
-use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Show extends Component
@@ -30,15 +26,17 @@ class Show extends Component
     /** @var array{services: list<string>, default: ?string, operator: ?string, required: bool}|null */
     public ?array $composeInfo = null;
 
-    use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection, HasSecretManagerAutocomplete;
+    use AuthorizesRequests, EnvironmentVariableAnalyzer, EnvironmentVariableProtection, HasSecretManagerAutocomplete, HasSharedVariableAutocomplete;
 
     protected function secretManagerResource(): ?Model
     {
         return $this->isSharedVariable ? null : $this->env->resourceable;
     }
 
-    #[Locked]
-    public $parameters;
+    protected function sharedVariableResource(): ?Model
+    {
+        return $this->secretManagerResource();
+    }
 
     public ModelsEnvironmentVariable|SharedEnvironmentVariable $env;
 
@@ -144,7 +142,6 @@ class Show extends Component
         if ($this->env->getMorphClass() === SharedEnvironmentVariable::class) {
             $this->isSharedVariable = true;
         }
-        $this->parameters = get_route_parameters();
         $this->checkEnvs();
         if ($this->type === 'standalone-redis' && ($this->env->key === 'REDIS_PASSWORD' || $this->env->key === 'REDIS_USERNAME')) {
             $this->is_redis_credential = true;
@@ -452,149 +449,6 @@ class Show extends Component
     public function connectLink(): ?string
     {
         return $this->isSharedVariable ? app(SharedVariableCanvas::class)->connectLink($this->env) : null;
-    }
-
-    #[Computed]
-    public function availableSharedVariables(): array
-    {
-        // Shared across all Show row components in the same request (edit modals).
-        static $requestCache = [];
-
-        $team = $this->isSharedVariable ? $this->env->team : $this->env->resourceable?->team();
-        $cacheKey = implode('|', [
-            $team?->id ?? 'none',
-            data_get($this->parameters, 'project_uuid', ''),
-            data_get($this->parameters, 'environment_uuid', ''),
-            data_get($this->parameters, 'server_uuid', ''),
-            data_get($this->parameters, 'application_uuid', ''),
-            data_get($this->parameters, 'service_uuid', ''),
-        ]);
-
-        if (array_key_exists($cacheKey, $requestCache)) {
-            return $requestCache[$cacheKey];
-        }
-
-        $result = [
-            'team' => [],
-            'project' => [],
-            'environment' => [],
-            'server' => [],
-        ];
-
-        // Early return if no team
-        if (! $team) {
-            return $requestCache[$cacheKey] = $result;
-        }
-
-        // Check if user can view team variables
-        try {
-            $this->authorize('viewSharedVariables', $team);
-            $result['team'] = $team->environment_variables()
-                ->pluck('key')
-                ->toArray();
-        } catch (AuthorizationException $e) {
-            // User not authorized to view team variables
-        }
-
-        // Get project variables if we have a project_uuid in route
-        $projectUuid = data_get($this->parameters, 'project_uuid');
-        if ($projectUuid) {
-            $project = Project::where('team_id', $team->id)
-                ->where('uuid', $projectUuid)
-                ->first();
-
-            if ($project) {
-                try {
-                    $this->authorize('viewSharedVariables', $project);
-                    $result['project'] = $project->environment_variables()
-                        ->pluck('key')
-                        ->toArray();
-                } catch (AuthorizationException $e) {
-                    // User not authorized to view project variables
-                }
-
-                // Get environment variables if we have an environment_uuid in route
-                $environmentUuid = data_get($this->parameters, 'environment_uuid');
-                if ($environmentUuid) {
-                    $environment = $project->environments()
-                        ->where('uuid', $environmentUuid)
-                        ->first();
-
-                    if ($environment) {
-                        try {
-                            $this->authorize('viewSharedVariables', $environment);
-                            $result['environment'] = $environment->environment_variables()
-                                ->pluck('key')
-                                ->toArray();
-                        } catch (AuthorizationException $e) {
-                            // User not authorized to view environment variables
-                        }
-                    }
-                }
-            }
-        }
-
-        // Get server variables
-        $serverUuid = data_get($this->parameters, 'server_uuid');
-        if ($serverUuid) {
-            // If we have a specific server_uuid, show variables for that server
-            $server = Server::where('team_id', $team->id)
-                ->where('uuid', $serverUuid)
-                ->first();
-
-            if ($server) {
-                try {
-                    $this->authorize('viewSharedVariables', $server);
-                    $result['server'] = $server->environment_variables()
-                        ->pluck('key')
-                        ->toArray();
-                } catch (AuthorizationException $e) {
-                    // User not authorized to view server variables
-                }
-            }
-        } else {
-            // For application environment variables, try to use the application's destination server
-            $applicationUuid = data_get($this->parameters, 'application_uuid');
-            if ($applicationUuid) {
-                $application = Application::whereRelation('environment.project.team', 'id', $team->id)
-                    ->where('uuid', $applicationUuid)
-                    ->with('destination.server')
-                    ->first();
-
-                if ($application && $application->destination && $application->destination->server) {
-                    try {
-                        $this->authorize('viewSharedVariables', $application->destination->server);
-                        $result['server'] = $application->destination->server->environment_variables()
-                            ->pluck('key')
-                            ->toArray();
-                    } catch (AuthorizationException $e) {
-                        // User not authorized to view server variables
-                    }
-                }
-            } else {
-                // For service environment variables, try to use the service's server
-                $serviceUuid = data_get($this->parameters, 'service_uuid');
-                if ($serviceUuid) {
-                    $service = Service::whereRelation('environment.project.team', 'id', $team->id)
-                        ->where('uuid', $serviceUuid)
-                        ->with('server')
-                        ->first();
-
-                    if ($service && $service->server) {
-                        try {
-                            $this->authorize('viewSharedVariables', $service->server);
-                            $result['server'] = $service->server->environment_variables()
-                                ->pluck('key')
-                                ->toArray();
-                        } catch (AuthorizationException $e) {
-                            // User not authorized to view server variables
-                        }
-                    }
-                }
-            }
-        }
-
-        return $requestCache[$cacheKey] = $result;
     }
 
     public function delete()
