@@ -53,7 +53,7 @@ class Rollback extends Component
         $this->authorize('deploy', $this->application);
 
         $commit = validateGitRef($commit, 'rollback commit');
-        if (! GetRollbackImages::allows($this->application, $commit)) {
+        if (! GetRollbackImages::allowsRollbackTo($this->application, $commit)) {
             $this->dispatch('error', 'Rollback did not start.', 'The commit is not a rollback image or a successful deployment of this application.');
 
             return;

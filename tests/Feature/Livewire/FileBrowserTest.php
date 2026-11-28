@@ -50,7 +50,12 @@ beforeEach(function () {
         'team_id' => $this->team->id,
         'private_key_id' => $privateKey->id,
     ]);
-    $this->server->settings()->update(['is_reachable' => true, 'is_usable' => true]);
+    // A pinned host key, as a server has once its key is learned. Otherwise the first command first reads the host key.
+    $this->server->settings()->update([
+        'is_reachable' => true,
+        'is_usable' => true,
+        'ssh_host_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl',
+    ]);
 
     StandaloneDocker::withoutEvents(function () {
         $this->destination = StandaloneDocker::firstOrCreate(

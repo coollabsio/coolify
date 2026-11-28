@@ -154,6 +154,8 @@ beforeEach(function () {
         'team_id' => $this->team->id,
         'private_key_id' => PrivateKey::factory()->create(['team_id' => $this->team->id])->id,
     ]);
+    // A pinned host key, as a server has once its key is learned. Otherwise the first command first reads the host key.
+    $this->server->settings()->update(['ssh_host_key' => 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl']);
     $this->destination = StandaloneDocker::query()->where('server_id', $this->server->id)->firstOrFail();
     $project = Project::factory()->create(['team_id' => $this->team->id]);
     $this->environment = Environment::factory()->create(['project_id' => $project->id]);

@@ -6674,7 +6674,7 @@ class ApplicationsController extends Controller
             ], 422);
         }
 
-        if (! GetRollbackImages::allows($application, $commit)) {
+        if (! GetRollbackImages::allowsRollbackTo($application, $commit)) {
             return response()->json([
                 'message' => 'Validation failed.',
                 'errors' => ['commit' => ['The commit is not a rollback image or a successful deployment of this application.']],

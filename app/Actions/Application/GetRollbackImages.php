@@ -68,7 +68,7 @@ class GetRollbackImages
      * a successful production deployment. Any other commit (for example a commit of an unmerged pull
      * request) is rejected, because a rollback builds a missing image from source.
      */
-    public static function allows(Application $application, string $tag): bool
+    public static function allowsRollbackTo(Application $application, string $tag): bool
     {
         $deployed = $application->deployment_queue()
             ->where('status', ApplicationDeploymentStatus::FINISHED->value)
