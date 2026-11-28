@@ -147,9 +147,16 @@ it('manages backups and rejects an S3 storage of another team', function () {
         ->and(dbPlan($desired)->changes)->toBe([]);
 });
 
-it('rejects vault references on databases', function () {
-    expect(array_map(fn ($e) => $e->path, dbPlan(['db' => ['type' => 'postgresql', 'server' => 'prod-1', 'env' => ['X' => ['ref' => 'vault.X']]]])->errors))
-        ->toContain('resources.db.env.X');
+it('stores a vault reference on a database variable and plans nothing afterwards', function () {
+    $desired = ['db' => ['type' => 'postgresql', 'server' => 'prod-1', 'env' => ['X' => ['ref' => 'vault.X']]]];
+    $revision = dbApply($desired);
+    $db = StandalonePostgresql::where('config_key', 'db')->first();
+    $plan = dbPlan($desired);
+
+    expect($revision->status->value)->toBe('applied', (string) $revision->error)
+        ->and(EnvironmentVariable::where('resourceable_id', $db->id)->where('resourceable_type', $db->getMorphClass())->where('key', 'X')->value('value'))->toBe('{{vault.X}}')
+        ->and($plan->errors)->toBe([])
+        ->and($plan->changes)->toBe([]);
 });
 
 it('explains a missing, ambiguous, or unknown destination', function () {

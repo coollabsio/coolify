@@ -348,15 +348,20 @@ it('rejects vault references in values that read a source the file does not link
     ]);
 });
 
-it('rejects vault references in service and database values that read a source the file does not link', function (string $type, array $desired) {
+it('accepts service and database vault references in values and refs, and rejects the ones that read a source the file does not link', function (string $type, array $desired) {
     $errors = app(AdapterRegistry::class)->for($type)->validate('res', [
         ...$desired,
         'type' => $type,
         'server' => 'prod-1',
-        'env' => ['URL' => ['value' => '{{vault.urls.URL}}'], 'KEY' => ['value' => '{{vault.KEY}}']],
+        'env' => [
+            'URL' => ['value' => '{{vault.urls.URL}}'],
+            'KEY' => ['value' => '{{vault.KEY}}'],
+            'REF_URL' => ['ref' => 'vault.urls.URL'],
+            'REF_KEY' => ['ref' => 'vault.KEY'],
+        ],
     ], $this->ctx);
 
-    expect(array_map(fn ($e) => $e->path, $errors))->toBe(['resources.res.env.URL.value']);
+    expect(array_map(fn ($e) => $e->path, $errors))->toBe(['resources.res.env.URL.value', 'resources.res.env.REF_URL.ref']);
 })->with([
     'service' => ['service', ['compose' => "services:\n  web:\n    image: 'nginx:alpine'\n"]],
     'database' => ['postgresql', []],

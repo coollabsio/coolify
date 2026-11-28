@@ -136,12 +136,13 @@ it('treats removing a compose service as destructive', function () {
     expect($plan->isDestructive())->toBeTrue();
 });
 
-it('stores a server reference on a service variable and rejects vault references', function () {
-    serviceApply(['stack' => ['type' => 'service', 'server' => 'prod-1', 'compose' => SERVICE_TEST_COMPOSE, 'env' => ['REGION' => ['ref' => 'server.REGION']]]]);
+it('stores server and vault references on service variables', function () {
+    serviceApply(['stack' => ['type' => 'service', 'server' => 'prod-1', 'compose' => SERVICE_TEST_COMPOSE, 'env' => ['REGION' => ['ref' => 'server.REGION'], 'X' => ['ref' => 'vault.X']]]]);
     $service = Service::where('config_key', 'stack')->first();
+    $values = EnvironmentVariable::where('resourceable_id', $service->id)->where('resourceable_type', $service->getMorphClass())->pluck('value', 'key');
 
-    expect(EnvironmentVariable::where('resourceable_id', $service->id)->where('resourceable_type', $service->getMorphClass())->where('key', 'REGION')->value('value'))->toBe('{{server.REGION}}')
-        ->and(array_map(fn ($e) => $e->path, servicePlan(['stack' => ['type' => 'service', 'server' => 'prod-1', 'compose' => SERVICE_TEST_COMPOSE, 'env' => ['X' => ['ref' => 'vault.X']]]])->errors))->toContain('resources.stack.env.X');
+    expect($values['REGION'])->toBe('{{server.REGION}}')
+        ->and($values['X'])->toBe('{{vault.X}}');
 });
 
 it('is registered and covered', function () {

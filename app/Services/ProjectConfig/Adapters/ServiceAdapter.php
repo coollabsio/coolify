@@ -334,7 +334,7 @@ class ServiceAdapter implements ResourceAdapter
     {
         $base = "resources.{$key}";
         $errors = SecretManager::errors($base, $desired['secret_manager'] ?? null, $ctx->teamId);
-        $errors = [...$errors, ...SecretManager::referenceErrors($base, $desired['secret_manager'] ?? null, $desired['env'] ?? null, checkRefs: false)];
+        $errors = [...$errors, ...SecretManager::referenceErrors($base, $desired['secret_manager'] ?? null, $desired['env'] ?? null)];
 
         $hasTemplate = isset($desired['template']);
         $hasCompose = isset($desired['compose']);
@@ -364,12 +364,6 @@ class ServiceAdapter implements ResourceAdapter
         $server = $this->server($desired, $ctx);
         if ($server !== null && ($message = $this->destinationError($server, $desired['destination'] ?? null)) !== null) {
             $errors[] = new ConfigError("{$base}.destination", $message);
-        }
-
-        foreach (($desired['env'] ?? []) as $name => $entry) {
-            if (str_starts_with((string) ($entry['ref'] ?? ''), 'vault.')) {
-                $errors[] = new ConfigError("{$base}.env.{$name}", 'vault references work on applications only.');
-            }
         }
 
         foreach ((array) ($desired['services'] ?? []) as $name => $entry) {
