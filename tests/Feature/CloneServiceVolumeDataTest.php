@@ -245,3 +245,46 @@ YAML]);
             ["{$this->service->uuid}_mariadb-data", "{$clone->uuid}_mariadb-data"],
         ]);
 });
+
+test('cloning a service keeps its bind-mounted configuration files as files with their content', function () {
+    $this->service->update(['docker_compose_raw' => <<<'YAML'
+services:
+  searxng:
+    image: searxng/searxng:latest
+    volumes:
+      - type: bind
+        source: ./settings.yml
+        target: /etc/searxng/settings.yml
+        content: |
+          use_default_settings: true
+      - type: bind
+        source: ./limiter.toml
+        target: /etc/searxng/limiter.toml
+        is_directory: false
+      - type: bind
+        source: ./data
+        target: /var/data
+YAML]);
+    $this->service->parse();
+    $sourceSettings = $this->service->applications()->where('name', 'searxng')->sole()->fileStorages()->where('mount_path', '/etc/searxng/settings.yml')->sole();
+    $sourceSettings->content = "use_default_settings: true\nserver:\n  limiter: true\n";
+    $sourceSettings->chown = '977:977';
+    $sourceSettings->chmod = '644';
+    $sourceSettings->save();
+
+    Livewire::test(ResourceOperations::class, ['resource' => $this->service])
+        ->call('cloneTo', $this->destination->uuid)
+        ->assertHasNoErrors();
+
+    $clone = Service::query()->whereKeyNot($this->service->id)->sole();
+    $storages = $clone->applications()->where('name', 'searxng')->sole()->fileStorages()->get()->keyBy('mount_path');
+
+    expect($storages->get('/etc/searxng/settings.yml'))
+        ->is_directory->toBeFalse()
+        ->content->toBe("use_default_settings: true\nserver:\n  limiter: true\n")
+        ->chown->toBe('977:977')
+        ->chmod->toBe('644')
+        ->fs_path->toContain($clone->uuid)
+        ->and($storages->get('/etc/searxng/limiter.toml')->is_directory)->toBeFalse()
+        ->and($storages->get('/var/data')->is_directory)->toBeTrue();
+});

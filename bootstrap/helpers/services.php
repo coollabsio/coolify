@@ -752,7 +752,20 @@ function clone_service(Service $source, StandaloneDocker|SwarmDocker $destinatio
             $newResource->fill(['status' => 'exited'])->save();
 
             $sourceResource = $sourcesByName->get($newResource->name);
-            if (! $sourceResource || ! $cloneVolumeData) {
+            if (! $sourceResource) {
+                continue;
+            }
+
+            // The saved Compose file has no `content:` anymore, so parse() makes each bind a directory.
+            $sourceFilesByMount = $sourceResource->fileStorages()->get()->keyBy('mount_path');
+            foreach ($newResource->fileStorages()->get() as $fileStorage) {
+                $sourceFile = $sourceFilesByMount->get($fileStorage->mount_path);
+                if ($sourceFile) {
+                    $fileStorage->forceFill($sourceFile->only(['content', 'is_directory', 'chown', 'chmod']))->save();
+                }
+            }
+
+            if (! $cloneVolumeData) {
                 continue;
             }
 
