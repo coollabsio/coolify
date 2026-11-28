@@ -47,9 +47,9 @@ class ServicesController extends Controller
         return 'Service not found.';
     }
 
-    private function exposeFileStorageContentIfAllowed(LocalFileVolume|LocalPersistentVolume $storage): LocalFileVolume|LocalPersistentVolume
+    private function exposeFileStorageContentIfAllowed(LocalFileVolume|LocalPersistentVolume $storage, ?Model $resource = null): LocalFileVolume|LocalPersistentVolume
     {
-        if (canReadResourceSecretsFromApi($storage->resource)) {
+        if (canReadResourceSecretsFromApi($resource ?? $storage->resource)) {
             $storage->makeVisible(['content']);
         }
 
@@ -2484,7 +2484,7 @@ class ServicesController extends Controller
                 $app->persistentStorages->map(fn ($s) => $s->setAttribute('resource_uuid', $app->uuid)->setAttribute('resource_type', 'application'))
             );
             $fileStorages = $fileStorages->merge(
-                $app->fileStorages->map(fn ($s) => $s->setAttribute('resource_uuid', $app->uuid)->setAttribute('resource_type', 'application'))
+                $app->fileStorages->map(fn ($s) => $this->exposeFileStorageContentIfAllowed($s, $app)->setAttribute('resource_uuid', $app->uuid)->setAttribute('resource_type', 'application'))
             );
         }
         foreach ($service->databases as $db) {
@@ -2492,11 +2492,9 @@ class ServicesController extends Controller
                 $db->persistentStorages->map(fn ($s) => $s->setAttribute('resource_uuid', $db->uuid)->setAttribute('resource_type', 'database'))
             );
             $fileStorages = $fileStorages->merge(
-                $db->fileStorages->map(fn ($s) => $s->setAttribute('resource_uuid', $db->uuid)->setAttribute('resource_type', 'database'))
+                $db->fileStorages->map(fn ($s) => $this->exposeFileStorageContentIfAllowed($s, $db)->setAttribute('resource_uuid', $db->uuid)->setAttribute('resource_type', 'database'))
             );
         }
-
-        $fileStorages->each(fn (LocalFileVolume $storage) => $this->exposeFileStorageContentIfAllowed($storage));
 
         return response()->json([
             'persistent_storages' => $persistentStorages->sortBy('id')->values(),

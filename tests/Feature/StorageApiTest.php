@@ -561,6 +561,30 @@ describe('POST /api/v1/databases/{uuid}/storages', function () {
     });
 });
 
+describe('GET /api/v1/services/{uuid}/storages', function () {
+    test('lists file storages of service resources with their content', function () {
+        [$service, $serviceApplication] = createTestServiceApplication($this);
+
+        LocalFileVolume::create([
+            'fs_path' => service_configuration_dir().'/'.$service->uuid.'/nginx.conf',
+            'mount_path' => '/etc/nginx/nginx.conf',
+            'content' => 'server {}',
+            'is_directory' => false,
+            'resource_id' => $serviceApplication->id,
+            'resource_type' => $serviceApplication->getMorphClass(),
+        ]);
+
+        $response = $this->withHeaders([
+            'Authorization' => 'Bearer '.$this->bearerToken,
+        ])->getJson("/api/v1/services/{$service->uuid}/storages");
+
+        $response->assertOk()
+            ->assertJsonPath('file_storages.0.resource_uuid', $serviceApplication->uuid)
+            ->assertJsonPath('file_storages.0.resource_type', 'application')
+            ->assertJsonPath('file_storages.0.content', 'server {}');
+    });
+});
+
 describe('POST /api/v1/services/{uuid}/storages', function () {
     test('creates a file storage for a service resource under the service configuration root', function () {
         [$service, $serviceApplication] = createTestServiceApplication($this);
