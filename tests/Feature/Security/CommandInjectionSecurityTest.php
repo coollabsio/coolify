@@ -1043,7 +1043,7 @@ describe('service application lifecycle command escaping', function () {
         }
 
         (new ReflectionMethod(ApplicationDeploymentJob::class, 'health_check'))->invoke($job);
-        (new ReflectionMethod(ApplicationDeploymentJob::class, 'query_logs'))->invoke($job);
+        (new ReflectionMethod(ApplicationDeploymentJob::class, 'query_logs'))->invoke($job, $containerName);
         (new ReflectionMethod(ApplicationDeploymentJob::class, 'graceful_shutdown_container'))->invoke($job, $containerName);
 
         expect($commands->all())

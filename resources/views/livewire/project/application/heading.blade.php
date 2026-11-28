@@ -28,7 +28,8 @@
                     </h1>
                     <div class="relative flex w-full min-w-0 items-center gap-2">
                         <x-status-summary :status="$application->status"
-                            :healthcheck-url="route('project.application.healthcheck', $parameters)" />
+                            :healthcheck-url="route('project.application.healthcheck', $parameters)"
+                            :container-name="$application->statusContainerName()" />
                         <x-applications.links :application="$application" compact />
                         @if ($this->runningDeploymentUrl)
                             <x-deploying-indicator :href="$this->runningDeploymentUrl" />
