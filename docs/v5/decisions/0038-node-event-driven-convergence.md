@@ -1,6 +1,6 @@
 # Decision 0038: Podman events wake the Sentinel convergence
 
-**Status: Proposed**
+**Status: Accepted**
 
 **Date: 2026-11-28**
 
@@ -49,8 +49,8 @@ How Sentinel sees a container change today:
 5. **No change to the backoff.** A woken pass uses the same start backoff,
    settle time, and health rules. A container in a crash loop is not started
    faster than the backoff allows. Only the detection is faster.
-6. **No new capability.** The protocol does not change. A Sentinel without
-   this change works as today.
+6. **No new capability.** The only protocol change is an optional field in
+   `system.info` (answer 3). A Sentinel without this change works as today.
 
 ### Before and after (crash of a container on Node 1, published port)
 
@@ -78,17 +78,24 @@ How Sentinel sees a container change today:
 - A Node with many short-lived containers gets more passes. The coalescing and
   the label filter limit this.
 
-## Open questions
+## Answers to the open questions (2026-11-28)
 
-1. Should `health_status` wake the converger for each health check, or only
-   when the status changes? Podman sends an event for each check, so a check
-   each 5 s means a pass each 5 s for each container.
-2. Should the watcher also wake the converger for containers without Coolify
-   labels, so that a container that a user starts by hand on the Node is seen
-   at once? The converger ignores such containers today.
-3. When `podman events` cannot start (an old Podman, or a broken events
-   backend), should Sentinel report it in `system.info`, so the Node page shows
-   that the crash detection is slow?
+1. **`health_status` wakes the converger only on a change.** Podman sends an
+   event for each health check. Sentinel keeps the last health status of each
+   container and wakes the converger only when the new status differs, for
+   example `starting` to `healthy`, or `healthy` to `unhealthy`. If the Podman
+   version of the Nodes does not send `health_status` events, the pass of each
+   15 s sees the health, as today. The build checks this on the Podman version
+   of the Nodes first.
+2. **Only containers with the Coolify labels wake the converger.** The
+   converger ignores other containers. `RuntimeChanged` still goes to Flux for
+   every container event, coalesced, so the container list of Coolify stays
+   current.
+3. **Sentinel reports when it cannot watch the events.** `system.info` gets an
+   optional field `runtime_events` (`watching` or `unavailable`), and Sentinel
+   logs the reason. The Node page shows a warning: "Crash detection is slow:
+   Podman events are not available". An older Coolify or Flux ignores the
+   field.
 
 ## Not decided here
 
