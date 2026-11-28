@@ -23,8 +23,6 @@
                                     class="rounded-sm bg-coollabs/10 px-1.5 py-0.5 text-[11px] font-medium text-coollabs dark:bg-brand/15 dark:text-brand-light">
                                     Primary
                                 </span>
-                                <x-status-summary :status="$resource->status"
-                                    :container-name="$resource instanceof \App\Models\Application ? $resource->statusContainerName() : 'Container'" />
                             </div>
                             <p class="mt-1 flex flex-wrap items-center gap-1.5 text-[13px] text-neutral-500 dark:text-fg-dim">
                                 <span>Address</span>
