@@ -93,6 +93,7 @@ class RunImageBuild
             ...$source,
             ...$credential,
             ...($build->workload->buildsUntrustedSource() ? ['untrusted_source' => true] : []),
+            ...$build->workload->gitOptionBuildFields(),
             // The second guard of the build slots: Sentinel refuses a build at this limit (decision 0035).
             ...($node->supportsCapability(NodeBuild::CONCURRENT_CAPABILITY) === true ? ['max_concurrent_builds' => $node->buildSlots()] : []),
             ...$push,

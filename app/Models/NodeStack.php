@@ -27,9 +27,19 @@ class NodeStack extends BaseModel
 
     protected $hidden = ['variables'];
 
+    /** The v4 Git options of a Git stack (decision 0033). Its services build with them. */
+    protected $attributes = [
+        'is_git_submodules_enabled' => true,
+        'is_git_lfs_enabled' => true,
+        'is_git_shallow_clone_enabled' => true,
+    ];
+
     protected function casts(): array
     {
         return [
+            'is_git_submodules_enabled' => 'boolean',
+            'is_git_lfs_enabled' => 'boolean',
+            'is_git_shallow_clone_enabled' => 'boolean',
             'compose_parsed' => 'array',
             // The summary of the last change of the Compose file from Git; see SyncNodeStackCompose.
             'compose_changes' => 'array',

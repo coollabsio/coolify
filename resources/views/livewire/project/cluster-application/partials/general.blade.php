@@ -124,6 +124,9 @@
                     </div>
                 </div>
             </x-application.settings-subsection>
+            @if (! $workload->isPreview() && $workload->node_stack_id === null)
+                @include('livewire.project.shared.partials.cluster-git-options', ['resource' => $workload])
+            @endif
         @endif
         @if ($workload->buildsFromSource())
             <x-application.settings-subsection title="Image registry"

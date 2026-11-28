@@ -25,6 +25,16 @@
                     ['value' => true, 'label' => 'Stop the build when a newer push arrives'],
                 ]" />
         </div>
+        <form wire:submit="saveWatchPaths" class="mt-4 flex flex-col gap-2">
+            <x-forms.textarea id="watchPaths" label="Watch paths" placeholder="services/api/**" rows="4"
+                canGate="update" :canResource="$workload"
+                helper="Order-based pattern matching to filter Git webhook deployments, also of previews. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins. When the provider does not send every changed file, the push deploys. Manual and API deployments ignore watch paths." />
+            @can('update', $workload)
+                <div>
+                    <x-forms.button type="submit">Save</x-forms.button>
+                </div>
+            @endcan
+        </form>
     </x-application.settings-subsection>
 @endif
 <livewire:project.shared.webhooks :resource="$workload" :key="'cluster-application-webhooks-'.$workload->uuid" />

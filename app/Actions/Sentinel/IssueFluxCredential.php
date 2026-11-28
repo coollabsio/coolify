@@ -88,6 +88,7 @@ class IssueFluxCredential
             'image.build.static.v1',
             'image.build.untrusted_source.v1',
             'image.build.concurrent.v1',
+            'image.build.git_options.v1',
             'workload.registry_auth.v1',
             'builder.reconcile.v1',
             'workload.exec.v1',

@@ -423,7 +423,7 @@ class Gitea extends Controller
             if ($x_gitea_event === 'push') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
                 $return_payloads = $this->startManualWebhookClusterBuilds('gitea', $full_name, $branch, $commit, $skip_deploy_commits,
-                    fn (string $secret): bool => hash_equals($x_hub_signature_256, hash_hmac('sha256', $request->getContent(), $secret)));
+                    fn (string $secret): bool => hash_equals($x_hub_signature_256, hash_hmac('sha256', $request->getContent(), $secret)), $payload);
                 if ($applications->isEmpty()) {
                     return $this->clusterOnlyManualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
                 }

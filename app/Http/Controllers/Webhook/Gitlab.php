@@ -448,7 +448,7 @@ class Gitlab extends Controller
             if ($x_gitlab_event === 'push') {
                 $applications = $this->manualWebhookApplications($applications->where('git_branch', $branch), $full_name);
                 $return_payloads = $return_payloads->merge($this->startManualWebhookClusterBuilds('gitlab', $full_name, $branch, $commit, $skip_deploy_commits,
-                    fn (string $secret): bool => hash_equals($secret, $x_gitlab_token)));
+                    fn (string $secret): bool => hash_equals($secret, $x_gitlab_token), $payload));
                 if ($applications->isEmpty()) {
                     return $this->clusterOnlyManualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
                 }

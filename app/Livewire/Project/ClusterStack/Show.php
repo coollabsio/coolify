@@ -7,6 +7,7 @@ use App\Actions\Node\DeployNodeStack;
 use App\Actions\Node\ManageNodeDatabaseBackups;
 use App\Actions\Node\QueueNodeWorkloadLifecycle;
 use App\Actions\Node\SyncNodeStackCompose;
+use App\Actions\Node\UpdateNodeWorkloadSettings;
 use App\Enums\NodeVolumeCopyState;
 use App\Enums\NodeWorkloadAction;
 use App\Jobs\DeleteNodeStackJob;
@@ -55,6 +56,13 @@ class Show extends Component
 
     public string $composeRaw = '';
 
+    /** The v4 Git options of a Git stack (decision 0033). Its services build with them. */
+    public bool $isGitSubmodulesEnabled = true;
+
+    public bool $isGitLfsEnabled = true;
+
+    public bool $isGitShallowCloneEnabled = true;
+
     public function mount(string $project_uuid, string $environment_uuid, string $stack_uuid): void
     {
         abort_unless(nodesEnabled(), 404);
@@ -71,6 +79,7 @@ class Show extends Component
         $section = str((string) request()->route()?->getName())->after('project.cluster-stack.')->toString();
         $this->section = in_array($section, self::SECTIONS, true) ? $section : 'general';
         $this->name = $this->stack->name;
+        $this->loadGitOptions();
         // The Compose file can hold secrets, like a v4 service: only users who may change the stack see it.
         $this->composeRaw = auth()->user()->can('update', $this->stack) ? (string) $this->stack->compose_raw : '';
     }
@@ -121,6 +130,31 @@ class Show extends Component
         $this->validate(['name' => ['required', 'string', 'min:1', 'max:255']]);
         $this->stack->update(['name' => trim($this->name)]);
         $this->dispatch('success', 'Stack saved.');
+    }
+
+    /** Saves the Git options of a Git stack, like the v4 Advanced > Git settings. */
+    public function saveGitOptions(): void
+    {
+        try {
+            $this->authorize('update', $this->stack);
+            UpdateNodeWorkloadSettings::make()->gitOptions($this->stack, [
+                'is_git_submodules_enabled' => $this->isGitSubmodulesEnabled,
+                'is_git_lfs_enabled' => $this->isGitLfsEnabled,
+                'is_git_shallow_clone_enabled' => $this->isGitShallowCloneEnabled,
+            ]);
+            $this->dispatch('success', 'Git settings saved. The next deploy uses them.');
+        } catch (Throwable $exception) {
+            handleError($exception, $this);
+        } finally {
+            $this->loadGitOptions();
+        }
+    }
+
+    private function loadGitOptions(): void
+    {
+        $this->isGitSubmodulesEnabled = (bool) $this->stack->is_git_submodules_enabled;
+        $this->isGitLfsEnabled = (bool) $this->stack->is_git_lfs_enabled;
+        $this->isGitShallowCloneEnabled = (bool) $this->stack->is_git_shallow_clone_enabled;
     }
 
     /** Saves a new Compose file of a stack without Git (decision 0029); the next deploy applies it. */

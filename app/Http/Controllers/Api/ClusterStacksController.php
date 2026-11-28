@@ -7,6 +7,7 @@ use App\Actions\Node\CreateClusterStack;
 use App\Actions\Node\DeployNodeStack;
 use App\Actions\Node\QueueNodeWorkloadLifecycle;
 use App\Actions\Node\SyncNodeStackCompose;
+use App\Actions\Node\UpdateNodeWorkloadSettings;
 use App\Enums\AccessLevel;
 use App\Enums\NodeWorkloadAction;
 use App\Enums\NodeWorkloadSourceType;
@@ -255,7 +256,7 @@ class ClusterStacksController extends Controller
 
     #[OA\Patch(
         summary: 'Update',
-        description: 'Change the name of a cluster stack, or give a stack without Git a new Compose file. The services change as for a Git sync: added services are created, changed services get the new settings, and removed services are deleted. Deploy the stack to apply the changes.',
+        description: 'Change the name or the Git options of a cluster stack, or give a stack without Git a new Compose file. The services change as for a Git sync: added services are created, changed services get the new settings, and removed services are deleted. Deploy the stack to apply the changes.',
         path: '/cluster-stacks/{uuid}',
         operationId: 'update-cluster-stack-by-uuid',
         security: [['bearerAuth' => []]],
@@ -266,6 +267,9 @@ class ClusterStacksController extends Controller
             properties: [
                 'name' => new OA\Property(property: 'name', type: 'string'),
                 'docker_compose_raw' => new OA\Property(property: 'docker_compose_raw', type: 'string', description: 'The Compose file, as plain text or base64.'),
+                'is_git_submodules_enabled' => new OA\Property(property: 'is_git_submodules_enabled', type: 'boolean', description: 'Fetch the Git submodules for the builds of the services. Only for a Git stack. Default: true.'),
+                'is_git_lfs_enabled' => new OA\Property(property: 'is_git_lfs_enabled', type: 'boolean', description: 'Pull the Git LFS objects. A failed pull fails the build. Only for a Git stack. Default: true.'),
+                'is_git_shallow_clone_enabled' => new OA\Property(property: 'is_git_shallow_clone_enabled', type: 'boolean', description: 'Fetch only the commit (--depth=1). Only for a Git stack. Default: true.'),
             ],
         )),
         responses: [
@@ -297,6 +301,7 @@ class ClusterStacksController extends Controller
         $invalid = $this->validateRequest($request, [
             'name' => 'sometimes|string|min:1|max:255',
             'docker_compose_raw' => 'sometimes|string|min:1|max:262144',
+            ...array_fill_keys(UpdateNodeWorkloadSettings::GIT_OPTION_KEYS, 'sometimes|boolean'),
         ]);
         if ($invalid !== null) {
             return $invalid;
@@ -306,6 +311,9 @@ class ClusterStacksController extends Controller
             $changes = $request->has('docker_compose_raw')
                 ? SyncNodeStackCompose::make()->edit($stack, (string) $request->input('docker_compose_raw'), $request->user())
                 : null;
+            if ($request->hasAny(UpdateNodeWorkloadSettings::GIT_OPTION_KEYS)) {
+                UpdateNodeWorkloadSettings::make()->gitOptions($stack, $request->only(UpdateNodeWorkloadSettings::GIT_OPTION_KEYS));
+            }
             if ($request->has('name')) {
                 $stack->update(['name' => trim((string) $request->input('name'))]);
             }
@@ -545,6 +553,9 @@ class ClusterStacksController extends Controller
             'base_directory' => $stack->base_directory,
             'docker_compose_location' => $stack->compose_location,
             'commit_sha' => $stack->commit_sha,
+            'is_git_submodules_enabled' => $stack->is_git_submodules_enabled !== false,
+            'is_git_lfs_enabled' => $stack->is_git_lfs_enabled !== false,
+            'is_git_shallow_clone_enabled' => $stack->is_git_shallow_clone_enabled !== false,
             'github_app_uuid' => $stack->githubApp?->uuid,
             'private_key_uuid' => $stack->privateKey?->uuid,
             'docker_compose_raw' => $sensitive ? $stack->compose_raw : null,

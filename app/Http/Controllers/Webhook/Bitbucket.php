@@ -116,7 +116,7 @@ class Bitbucket extends Controller
                 }
             }
             if ($x_bitbucket_event === 'repo:push') {
-                $return_payloads = $this->startManualWebhookClusterBuilds('bitbucket', $full_name, $branch, $commit, $skip_deploy_commits, $bitbucket_secret_matches);
+                $return_payloads = $this->startManualWebhookClusterBuilds('bitbucket', $full_name, $branch, $commit, $skip_deploy_commits, $bitbucket_secret_matches, $payload);
             }
             if ($applications->isEmpty()) {
                 return $this->clusterOnlyManualWebhookResponse($return_payloads, $failure_key, $failure_attempt);

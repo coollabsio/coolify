@@ -66,6 +66,9 @@
                 <x-forms.button type="submit">Save</x-forms.button>
             </div>
         @endcan
+        @if ($stack->hasGitSource())
+            @include('livewire.project.shared.partials.cluster-git-options', ['resource' => $stack])
+        @endif
     </x-application.settings-section>
 
     <x-application.settings-section id="compose-resources-section" title="Compose resources"

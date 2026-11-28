@@ -51,6 +51,13 @@ final class NodeImages
      */
     public const UNTRUSTED_SOURCE_BUILD_CAPABILITY = 'image.build.untrusted_source.v1';
 
+    /**
+     * `skip_submodules`, `skip_lfs`, and `full_history` of `image.build` (decision 0033). Only a
+     * build with a Git option off needs it. A Sentinel with it also fails a build when the Git LFS
+     * pull fails.
+     */
+    public const GIT_OPTIONS_BUILD_CAPABILITY = 'image.build.git_options.v1';
+
     public static function isLocalImage(?string $image): bool
     {
         return is_string($image) && str_starts_with($image, self::LOCAL_PREFIX);

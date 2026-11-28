@@ -59,6 +59,9 @@ class NodeWorkload extends BaseModel
         'is_http_basic_auth_enabled' => false,
         'is_gzip_enabled' => true,
         'is_stripprefix_enabled' => true,
+        'is_git_submodules_enabled' => true,
+        'is_git_lfs_enabled' => true,
+        'is_git_shallow_clone_enabled' => true,
     ];
 
     /** The container runtime options and the deploy commands (decision 0032). A preview copies them from its parent. */
@@ -126,6 +129,9 @@ class NodeWorkload extends BaseModel
             'is_stripprefix_enabled' => 'boolean',
             'is_gpu_enabled' => 'boolean',
             'deployment_command_timeout' => 'integer',
+            'is_git_submodules_enabled' => 'boolean',
+            'is_git_lfs_enabled' => 'boolean',
+            'is_git_shallow_clone_enabled' => 'boolean',
         ];
     }
 
@@ -469,7 +475,33 @@ class NodeWorkload extends BaseModel
             filled($this->build_target) ? NodeImages::BUILD_TARGET_CAPABILITY : null,
             $this->source_type === NodeWorkloadSourceType::STATIC ? NodeImages::STATIC_BUILD_CAPABILITY : null,
             $this->buildsUntrustedSource() ? NodeImages::UNTRUSTED_SOURCE_BUILD_CAPABILITY : null,
+            $this->gitOptionBuildFields() !== [] ? NodeImages::GIT_OPTIONS_BUILD_CAPABILITY : null,
         ]));
+    }
+
+    /**
+     * The fields of `image.build` for the Git options that are off (decision 0033). A preview uses
+     * the options of its parent, and a stack service the options of its stack. Empty for the v4
+     * defaults and for a build without Git, so that such a build needs no new Sentinel.
+     *
+     * @return array{skip_submodules?: true, skip_lfs?: true, full_history?: true}
+     */
+    public function gitOptionBuildFields(): array
+    {
+        if (! $this->buildsFromGit()) {
+            return [];
+        }
+        $owner = match (true) {
+            $this->isPreview() => $this->previewOf,
+            $this->node_stack_id !== null => $this->stack,
+            default => $this,
+        } ?? $this;
+
+        return array_filter([
+            'skip_submodules' => $owner->is_git_submodules_enabled === false,
+            'skip_lfs' => $owner->is_git_lfs_enabled === false,
+            'full_history' => $owner->is_git_shallow_clone_enabled === false,
+        ]);
     }
 
     /**

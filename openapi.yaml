@@ -5525,6 +5525,18 @@ paths:
                   type: boolean
                 is_auto_cancel_building_deployments_enabled:
                   type: boolean
+                watch_paths:
+                  description: 'One glob for each line. A line that starts with ! excludes. The last matching pattern wins. A webhook skips the build, also of a preview, only when the provider lists every changed file and no file matches. Only for a Git application.'
+                  type: [string, 'null']
+                is_git_submodules_enabled:
+                  description: 'Fetch the Git submodules. Only for a Git application. Default: true.'
+                  type: boolean
+                is_git_lfs_enabled:
+                  description: 'Pull the Git LFS objects. A failed pull fails the build. Only for a Git application. Default: true.'
+                  type: boolean
+                is_git_shallow_clone_enabled:
+                  description: 'Fetch only the commit (--depth=1), not the history. Only for a Git application. Default: true.'
+                  type: boolean
                 custom_docker_run_options:
                   description: 'The v4 Docker run options. Coolify refuses a flag that Nodes do not support, with the name of the flag. --cap-add and --sysctl values of the admin tier need a team admin.'
                   type: [string, 'null']
@@ -7437,7 +7449,7 @@ paths:
       tags:
         - 'Cluster Stacks'
       summary: Update
-      description: 'Change the name of a cluster stack, or give a stack without Git a new Compose file. The services change as for a Git sync: added services are created, changed services get the new settings, and removed services are deleted. Deploy the stack to apply the changes.'
+      description: 'Change the name or the Git options of a cluster stack, or give a stack without Git a new Compose file. The services change as for a Git sync: added services are created, changed services get the new settings, and removed services are deleted. Deploy the stack to apply the changes.'
       operationId: update-cluster-stack-by-uuid
       parameters:
         -
@@ -7458,6 +7470,15 @@ paths:
                 docker_compose_raw:
                   description: 'The Compose file, as plain text or base64.'
                   type: string
+                is_git_submodules_enabled:
+                  description: 'Fetch the Git submodules for the builds of the services. Only for a Git stack. Default: true.'
+                  type: boolean
+                is_git_lfs_enabled:
+                  description: 'Pull the Git LFS objects. A failed pull fails the build. Only for a Git stack. Default: true.'
+                  type: boolean
+                is_git_shallow_clone_enabled:
+                  description: 'Fetch only the commit (--depth=1). Only for a Git stack. Default: true.'
+                  type: boolean
               type: object
       responses:
         '200':
@@ -23954,6 +23975,17 @@ components:
           type: boolean
         is_auto_cancel_building_deployments_enabled:
           type: boolean
+        watch_paths:
+          type:
+            - string
+            - 'null'
+        is_git_submodules_enabled:
+          description: 'For a preview or a service of a stack, the build uses the value of its application or stack.'
+          type: boolean
+        is_git_lfs_enabled:
+          type: boolean
+        is_git_shallow_clone_enabled:
+          type: boolean
         preview_deployments_enabled:
           type: boolean
         stack_uuid:
@@ -24117,6 +24149,17 @@ components:
           type: boolean
         is_auto_cancel_building_deployments_enabled:
           type: boolean
+        watch_paths:
+          type:
+            - string
+            - 'null'
+        is_git_submodules_enabled:
+          description: 'For a preview or a service of a stack, the build uses the value of its application or stack.'
+          type: boolean
+        is_git_lfs_enabled:
+          type: boolean
+        is_git_shallow_clone_enabled:
+          type: boolean
         preview_deployments_enabled:
           type: boolean
         stack_uuid:
@@ -24201,6 +24244,12 @@ components:
           type:
             - string
             - 'null'
+        is_git_submodules_enabled:
+          type: boolean
+        is_git_lfs_enabled:
+          type: boolean
+        is_git_shallow_clone_enabled:
+          type: boolean
         github_app_uuid:
           type:
             - string

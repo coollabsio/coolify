@@ -108,7 +108,7 @@ class Github extends Controller
             $applications = $this->manualWebhookApplications($applications, $full_name);
             $secret_matches = fn (string $secret): bool => hash_equals($x_hub_signature_256, hash_hmac('sha256', $request->getContent(), $secret));
             if ($x_github_event === 'push') {
-                $return_payloads = $this->startManualWebhookClusterBuilds('github', $full_name, $branch, $commit, $skip_deploy_commits, $secret_matches);
+                $return_payloads = $this->startManualWebhookClusterBuilds('github', $full_name, $branch, $commit, $skip_deploy_commits, $secret_matches, $payload);
             }
             if ($x_github_event === 'pull_request') {
                 $pull_request = $this->clusterPullRequest($action, $pull_request_id, $base_branch, $commit_sha, $pull_request_html_url, $is_fork_pull_request, $pull_request_title);
@@ -500,7 +500,9 @@ class Github extends Controller
                 ->where('source_type', GithubApp::class)
                 ->whereRelation('source', 'is_public', false);
             if ($x_github_event === 'push') {
-                $return_payloads = $this->startGithubAppClusterBuilds($github_app, data_get($payload, 'repository.full_name'), $branch, $commit, $skip_deploy_commits);
+                // One compare for the webhook, only when an application has watch paths (decision 0033).
+                $compared_files = self::onceOnly(fn (): ?Collection => $this->githubPushComparedFiles($github_app, $payload));
+                $return_payloads = $this->startGithubAppClusterBuilds($github_app, data_get($payload, 'repository.full_name'), $branch, $commit, $skip_deploy_commits, $compared_files);
                 $applications = $applications->where('git_branch', $branch)->get();
                 if ($applications->isEmpty()) {
                     return $return_payloads->isEmpty()
@@ -508,11 +510,11 @@ class Github extends Controller
                         : response($return_payloads);
                 }
                 if ($applications->contains(fn (Application $application): bool => filled($application->watch_paths))) {
-                    $changed_files = $this->githubPushComparedFiles($github_app, $payload) ?? $changed_files;
+                    $changed_files = $compared_files() ?? $changed_files;
                 }
             }
             if ($x_github_event === 'pull_request') {
-                $pull_request = $this->clusterPullRequest($action, $pull_request_id, $base_branch, $commit_sha, $pull_request_html_url, $is_fork_pull_request, $pull_request_title);
+                $pull_request = $this->clusterPullRequest($action, $pull_request_id, $base_branch, $commit_sha, $pull_request_html_url, $is_fork_pull_request, $pull_request_title, $before_sha, $after_sha);
                 if ($pull_request !== null) {
                     $return_payloads = $this->startGithubAppClusterPreviews($github_app, $full_name, $pull_request);
                 }
@@ -706,10 +708,10 @@ class Github extends Controller
     }
 
     /** The pull request for the previews of cluster applications, or null for an action without a preview change. */
-    private function clusterPullRequest(string $action, int $pullRequestId, ?string $baseBranch, string $commitSha, string $url, bool $fromFork, ?string $title): ?PullRequestWebhook
+    private function clusterPullRequest(string $action, int $pullRequestId, ?string $baseBranch, string $commitSha, string $url, bool $fromFork, ?string $title, ?string $beforeSha = null, ?string $afterSha = null): ?PullRequestWebhook
     {
         return PullRequestWebhook::forAction('github', $action, $pullRequestId, $baseBranch, $commitSha === 'HEAD' ? null : $commitSha,
-            "refs/pull/{$pullRequestId}/head", $url, $fromFork, self::shouldSkipDeployAny([$title]));
+            "refs/pull/{$pullRequestId}/head", $url, $fromFork, self::shouldSkipDeployAny([$title]), beforeSha: $beforeSha, afterSha: $afterSha);
     }
 
     /**

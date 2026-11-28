@@ -1,16 +1,16 @@
 <?php
 
-use App\Models\Application;
+use App\Support\WatchPaths;
 
 /**
- * Use the shared implementation from Application model
+ * Uses the shared matcher of v4 and cluster applications.
  */
 function matchWatchPaths(array $changed_files, ?array $watch_paths): array
 {
     $modifiedFiles = collect($changed_files);
     $watchPaths = is_null($watch_paths) ? null : collect($watch_paths);
 
-    $result = Application::matchPaths($modifiedFiles, $watchPaths);
+    $result = WatchPaths::matchPaths($modifiedFiles, $watchPaths);
 
     return $result->toArray();
 }

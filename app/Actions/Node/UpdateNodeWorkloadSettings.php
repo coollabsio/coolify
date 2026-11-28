@@ -5,6 +5,7 @@ namespace App\Actions\Node;
 use App\Actions\Node\Build\CreateClusterGitWorkload;
 use App\Actions\Node\Build\CreateClusterInlineDockerfileWorkload;
 use App\Enums\NodeWorkloadSourceType;
+use App\Models\NodeStack;
 use App\Models\NodeWorkload;
 use App\Models\RegistryCredential;
 use App\Models\User;
@@ -12,6 +13,7 @@ use App\Rules\DockerImageFormat;
 use App\Rules\ValidGitBranch;
 use App\Services\DockerRegistryLogins;
 use App\Support\ValidationPatterns;
+use App\Support\WatchPaths;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\MessageBag;
@@ -131,6 +133,49 @@ class UpdateNodeWorkloadSettings
         } elseif ($revision === null && $command !== []) {
             throw ValidationException::withMessages(['start_command' => 'Deploy the application once before you set a start command.']);
         }
+
+        return $workload;
+    }
+
+    /** The v4 Git options of a cluster application or a Git stack (decision 0033). */
+    public const GIT_OPTION_KEYS = ['is_git_submodules_enabled', 'is_git_lfs_enabled', 'is_git_shallow_clone_enabled'];
+
+    /**
+     * The Git options of a Git application or a Git stack (decision 0033). The next build uses
+     * them. A preview uses the options of its parent, and a service of a stack the options of its
+     * stack, so they have none of their own.
+     *
+     * @param  array<string, mixed>  $input  Only the keys of GIT_OPTION_KEYS that change.
+     */
+    public function gitOptions(NodeWorkload|NodeStack $target, array $input): NodeWorkload|NodeStack
+    {
+        $error = match (true) {
+            $target instanceof NodeStack => $target->hasGitSource() ? null : 'This stack has no Git repository.',
+            ! $target->buildsFromGit() => 'This application has no Git repository.',
+            $target->isPreview() => 'A preview uses the Git options of its application.',
+            $target->node_stack_id !== null => 'A service of a stack uses the Git options of its stack.',
+            default => null,
+        };
+        if ($error !== null) {
+            throw ValidationException::withMessages([self::GIT_OPTION_KEYS[0] => $error]);
+        }
+        $validated = Validator::make($input, array_fill_keys(self::GIT_OPTION_KEYS, ['sometimes', 'boolean']))->validate();
+        $target->update(array_map(fn (mixed $value): bool => (bool) $value, $validated));
+
+        return $target;
+    }
+
+    /**
+     * The watch paths of a Git application (decision 0033): one glob for each line, `!` excludes.
+     * Empty builds each push.
+     */
+    public function watchPaths(NodeWorkload $workload, ?string $watchPaths): NodeWorkload
+    {
+        Validator::make(['watch_paths' => $watchPaths], ['watch_paths' => ['nullable', 'string', 'max:65535']])->validate();
+        if (! $workload->canHavePreviews()) {
+            throw ValidationException::withMessages(['watch_paths' => 'Only a Git application has watch paths.']);
+        }
+        $workload->update(['watch_paths' => WatchPaths::normalize($watchPaths)]);
 
         return $workload;
     }

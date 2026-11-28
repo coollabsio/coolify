@@ -294,6 +294,10 @@ class ClusterApplicationsController extends Controller
                 'is_auto_deploy_enabled' => new OA\Property(property: 'is_auto_deploy_enabled', type: 'boolean'),
                 'is_auto_cancel_queued_deployments_enabled' => new OA\Property(property: 'is_auto_cancel_queued_deployments_enabled', type: 'boolean'),
                 'is_auto_cancel_building_deployments_enabled' => new OA\Property(property: 'is_auto_cancel_building_deployments_enabled', type: 'boolean'),
+                'watch_paths' => new OA\Property(property: 'watch_paths', type: 'string', nullable: true, description: 'One glob for each line. A line that starts with ! excludes. The last matching pattern wins. A webhook skips the build, also of a preview, only when the provider lists every changed file and no file matches. Only for a Git application.'),
+                'is_git_submodules_enabled' => new OA\Property(property: 'is_git_submodules_enabled', type: 'boolean', description: 'Fetch the Git submodules. Only for a Git application. Default: true.'),
+                'is_git_lfs_enabled' => new OA\Property(property: 'is_git_lfs_enabled', type: 'boolean', description: 'Pull the Git LFS objects. A failed pull fails the build. Only for a Git application. Default: true.'),
+                'is_git_shallow_clone_enabled' => new OA\Property(property: 'is_git_shallow_clone_enabled', type: 'boolean', description: 'Fetch only the commit (--depth=1), not the history. Only for a Git application. Default: true.'),
                 'custom_docker_run_options' => new OA\Property(property: 'custom_docker_run_options', type: 'string', nullable: true, description: 'The v4 Docker run options. Coolify refuses a flag that Nodes do not support, with the name of the flag. --cap-add and --sysctl values of the admin tier need a team admin.'),
                 'custom_labels' => new OA\Property(property: 'custom_labels', type: 'string', nullable: true, description: 'One key=value on each line. Keys that start with coolify., io.containers., or io.podman. are refused.'),
                 'is_gpu_enabled' => new OA\Property(property: 'is_gpu_enabled', type: 'boolean', description: 'Every server of the application must allow GPU workloads.'),
@@ -330,6 +334,7 @@ class ClusterApplicationsController extends Controller
             'custom_docker_run_options' => 'string|nullable', 'custom_labels' => 'string|nullable', 'is_gpu_enabled' => 'boolean',
             'gpu_count' => 'string|nullable', 'gpu_device_ids' => 'string|nullable', 'pre_deployment_command' => 'string|nullable',
             'post_deployment_command' => 'string|nullable', 'deployment_command_timeout' => 'integer',
+            'watch_paths' => 'string|nullable', 'is_git_submodules_enabled' => 'boolean', 'is_git_lfs_enabled' => 'boolean', 'is_git_shallow_clone_enabled' => 'boolean',
         ]);
         if ($invalid !== null) {
             return $invalid;
@@ -376,6 +381,12 @@ class ClusterApplicationsController extends Controller
                     $credential,
                     $request->user(),
                 );
+            }
+            if ($request->hasAny(UpdateNodeWorkloadSettings::GIT_OPTION_KEYS)) {
+                $settings->gitOptions($workload, $request->only(UpdateNodeWorkloadSettings::GIT_OPTION_KEYS));
+            }
+            if ($request->has('watch_paths')) {
+                $settings->watchPaths($workload, $request->input('watch_paths'));
             }
             if ($request->hasAny(['is_auto_deploy_enabled', 'is_auto_cancel_queued_deployments_enabled', 'is_auto_cancel_building_deployments_enabled'])) {
                 $settings->deploymentSettings(

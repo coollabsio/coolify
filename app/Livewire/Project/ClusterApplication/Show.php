@@ -137,6 +137,16 @@ class Show extends Component
 
     public bool $isAutoCancelBuildingDeploymentsEnabled = false;
 
+    /** The v4 watch paths of the Webhooks tab (decision 0033). */
+    public string $watchPaths = '';
+
+    /** The v4 Git options of the General page (decision 0033). */
+    public bool $isGitSubmodulesEnabled = true;
+
+    public bool $isGitLfsEnabled = true;
+
+    public bool $isGitShallowCloneEnabled = true;
+
     /** The Dockerfile of an application without Git. */
     public string $dockerfile = '';
 
@@ -370,6 +380,40 @@ class Show extends Component
             ]);
             UpdateNodeWorkloadSettings::make()->deploymentSettings($this->workload, $this->isAutoDeployEnabled, $this->isAutoCancelQueuedDeploymentsEnabled, $this->isAutoCancelBuildingDeploymentsEnabled);
             $this->dispatch('success', 'Deployment settings updated.');
+        } catch (Throwable $exception) {
+            handleError($exception, $this);
+        } finally {
+            $this->loadConfiguration();
+        }
+    }
+
+    /** Saves the watch paths of the Webhooks tab. */
+    public function saveWatchPaths(): void
+    {
+        try {
+            $this->authorize('update', $this->workload);
+            $this->resetErrorBag('watchPaths');
+            UpdateNodeWorkloadSettings::make()->watchPaths($this->workload, $this->watchPaths);
+            $this->watchPaths = (string) $this->workload->watch_paths;
+            $this->dispatch('success', 'Watch paths saved.');
+        } catch (ValidationException $exception) {
+            $this->addError('watchPaths', $exception->validator->errors()->first());
+        } catch (Throwable $exception) {
+            handleError($exception, $this);
+        }
+    }
+
+    /** Saves the Git options of the General page, like the v4 Advanced > Git settings. */
+    public function saveGitOptions(): void
+    {
+        try {
+            $this->authorize('update', $this->workload);
+            UpdateNodeWorkloadSettings::make()->gitOptions($this->workload, [
+                'is_git_submodules_enabled' => $this->isGitSubmodulesEnabled,
+                'is_git_lfs_enabled' => $this->isGitLfsEnabled,
+                'is_git_shallow_clone_enabled' => $this->isGitShallowCloneEnabled,
+            ]);
+            $this->dispatch('success', 'Git settings saved. The next build uses them.');
         } catch (Throwable $exception) {
             handleError($exception, $this);
         } finally {
@@ -1855,6 +1899,10 @@ class Show extends Component
         $this->isAutoDeployEnabled = (bool) $this->workload->is_auto_deploy_enabled;
         $this->isAutoCancelQueuedDeploymentsEnabled = (bool) $this->workload->is_auto_cancel_queued_deployments_enabled;
         $this->isAutoCancelBuildingDeploymentsEnabled = (bool) $this->workload->is_auto_cancel_building_deployments_enabled;
+        $this->watchPaths = (string) $this->workload->watch_paths;
+        $this->isGitSubmodulesEnabled = (bool) $this->workload->is_git_submodules_enabled;
+        $this->isGitLfsEnabled = (bool) $this->workload->is_git_lfs_enabled;
+        $this->isGitShallowCloneEnabled = (bool) $this->workload->is_git_shallow_clone_enabled;
         $this->dockerfile = (string) $this->workload->dockerfile;
         $this->buildPack = (string) $this->workload->source_type?->value;
         $revision = $this->workload->revisions->first();

@@ -88,10 +88,13 @@ commit." The code follows the notes.
 
 | Field | Builder |
 | --- | --- |
-| `bool skip_submodules = 22` | No submodule step |
-| `bool skip_lfs = 23` | `GIT_LFS_SKIP_SMUDGE=1`, no `git lfs pull` |
-| `bool full_history = 24` | `git fetch origin <commit>` without `--depth`; submodules without `--depth=1` |
+| `bool skip_submodules = 23` | No submodule step |
+| `bool skip_lfs = 24` | `GIT_LFS_SKIP_SMUDGE=1`, no `git lfs pull` |
+| `bool full_history = 25` | `git fetch origin <commit>` without `--depth`; submodules without `--depth=1` |
 | `bool untrusted_source = 21` | Built already, with its own capability `image.build.untrusted_source.v1` (see "Security") |
+
+Field 22 is `max_concurrent_builds` of decision 0035, so the Git options use 23
+to 25 (see "Implementation notes").
 
 - Coolify sends a field only when it is `true`. A build with a field set
   needs the capability on the builder Node. Else the build fails with "Upgrade
@@ -240,3 +243,102 @@ the text above.
 - The file list of GitLab and Gitea pull requests through their APIs.
 - The fix of the same fork gap in v4.
 - `StrictHostKeyChecking=no` of the deploy key in the builder.
+
+## Implementation notes (2026-11-28)
+
+Built in Coolify and in Sentinel `db2612c` (`image.build.git_options.v1`), on
+top of the fork credential fix (Sentinel `57e889c`).
+
+### Changes to the decision
+
+- **Field numbers 23 to 25.** Decision 0035 took field 22 for
+  `max_concurrent_builds` before this decision was built.
+- **The checkout always keeps the LFS pointer files.** The builder sets
+  `GIT_LFS_SKIP_SMUDGE=1` for the fetch, the checkout, and the submodules, also
+  when LFS is on. The LFS step then runs `git lfs pull` as its own step, so
+  that its error shows in the build log under "Fetching Git LFS objects". The
+  result with LFS on and off is the same as in the table.
+- **The LFS objects of an untrusted SSH source are not pulled, with a log
+  line.** The deploy key fetches only the commit (fix of 2026-11-23), so
+  `git lfs pull` of a fork preview from an SSH repository cannot
+  authenticate. With the new LFS failure, such a build would fail each time.
+  The builder skips the step and logs "Skipping Git LFS objects (the source is
+  not trusted, and the SSH key fetches only the commit)". An untrusted HTTPS
+  source pulls LFS objects, because the token answers for the LFS endpoint of
+  the repository.
+- **A stack service and a preview have no Git options of their own.** The
+  build reads the options of the stack or of the parent
+  (`NodeWorkload::gitOptionBuildFields()`). The settings and the API refuse
+  them on a preview or a stack service. The API lists the stored values of the
+  workload.
+- **"Unknown" for GitHub manual pushes also includes `created`.** A new branch
+  is unknown for each provider: `before` is all zeros, or GitHub sets
+  `created`.
+
+### Coolify
+
+- Migration `2026_11_28_140000`: `is_git_submodules_enabled`,
+  `is_git_lfs_enabled`, and `is_git_shallow_clone_enabled` (default `true`) on
+  `node_workloads` and `node_stacks`, and `node_workloads.watch_paths`.
+- `NodeWorkload::gitOptionBuildFields()` gives the `image.build` fields of the
+  options that are off. `RunImageBuild` sends them. `buildCapabilities()`
+  adds `image.build.git_options.v1` only when a field is set, so
+  `SelectBuilderNode` gives the "Upgrade Sentinel" reason only for a build
+  with an option off. `IssueFluxCredential` grants the capability.
+- `UpdateNodeWorkloadSettings::gitOptions()` (application or stack) and
+  `watchPaths()`. The **Git** subsection with the v4 labels is on the General
+  page of a Git application (not of a preview or a stack service) and of a Git
+  stack. **Watch paths** is in the **Deployment** subsection of the
+  **Webhooks** tab.
+- API: `PATCH /cluster-applications/{uuid}` accepts `watch_paths` and the 3
+  options, and `PATCH /cluster-stacks/{uuid}` the 3 options. The responses
+  show them. Both need the `update` policy, like the other settings.
+- `App\Support\WatchPaths` is the shared matcher (`normalize`, `triggers`,
+  `matchPaths`, `globMatch`). `Application` uses it for its `watch_paths`
+  setter and `isWatchPathsTriggered()`. The old static methods of
+  `Application` are removed, and `ApplicationWatchPathsTest` calls
+  `WatchPaths::matchPaths`.
+- `StartsClusterWebhookBuilds`:
+  - `clusterPushChangedFiles()` reads the files of a manual push with the
+    rules of the table. Bitbucket is always unknown.
+  - A GitHub App push reads the compare API once for the webhook
+    (`onceOnly`), only when a v4 or a cluster application has watch paths.
+  - A GitHub App preview reads the compare API for `synchronize` (`before`
+    and `after` are now in `PullRequestWebhook`) and the files of the pull
+    request for `opened` and `reopened`.
+  - A skip gives `status: skipped` and "Changed files do not match watch
+    paths." and creates no build row. A stack service has no watch paths.
+
+### Sentinel `db2612c`
+
+- `ImageBuildRequest` fields 23 to 25, the capability, the Flux mapping, and
+  `--skip-submodules`, `--skip-lfs`, and `--full-history` for the builder.
+- `builder-entrypoint.sh`: the `https`/`ssh` allow-list
+  (`protocol.allow=never`) for the fetch, the submodules, and LFS; the depth
+  in the step line ("depth 1" or "full history"); "Skipping submodules (turned
+  off)"; and `git lfs pull` only when `git lfs ls-files -n` lists a file,
+  without `2>/dev/null || true`.
+- Unit tests with a fake `git`: the arguments of each option, the steps with
+  and without the options, and the LFS skip for an untrusted SSH source.
+
+### Verified on dev (2026-11-28)
+
+With Nodes 1 and 2 on `sentinel-host` `main-db2612c`, the Flux override of
+`main-db2612c`, and private repositories on the local Gitea over SSH with a
+deploy key (a submodule `../g33-sub.git`, an LFS file, LFS turned on for the
+test):
+
+| Check | Result |
+| --- | --- |
+| Defaults | "(depth 1)", "Fetching submodules (depth 1)", "Fetching Git LFS objects"; the build saw the submodule file, the real LFS content, and a shallow repository |
+| All 3 options off | "(full history)", "Skipping submodules (turned off)", "Skipping Git LFS objects (turned off)"; no submodule file, the LFS pointer file, no `.git/shallow` |
+| A missing LFS object | The build failed: `[961ecc…] Not Found: [404] Not Found`, "Failed to fetch some objects" |
+| A fork preview of the SSH repository (submodules off on the parent) | The preview took `skip_submodules` from the parent, and the builder logged the untrusted LFS skip; the build passed with the pointer file |
+| Watch paths `app/**` and `!app/skip.txt` from the Gitea webhook | A push of `docs/readme.md` and a push of `app/skip.txt` gave "Changed files do not match watch paths." and no build row; a push of `app/index.html` queued a build |
+| A Git stack with LFS off and a full history | The service build logged "(full history)", "Fetching submodules (full history)", and "Skipping Git LFS objects (turned off)" |
+| API | A read token of a member: `403` on `PATCH`, and the fields on `GET`. A write token of a member: `403`. A token of another team: `404` for the application and the stack. An admin token: `200`, normalized `watch_paths`; `422` for a value that is not a boolean |
+| Pages | The **Git** subsection on the General pages of the application and the stack, not on the preview; **Watch paths** on the **Webhooks** tab |
+
+The GitHub App compare and pull request file paths, and the GitLab, GitHub,
+and Bitbucket manual payloads, are checked by code reading only.
+

@@ -12,6 +12,7 @@ use App\Models\NodeStack;
 use App\Models\NodeWorkload;
 use App\Models\Scopes\VisibleThroughAccessGrants;
 use App\Support\PullRequestWebhook;
+use App\Support\WatchPaths;
 use Closure;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
@@ -22,10 +23,13 @@ use Throwable;
  * removes their previews from pull request events (decision 0025). The matching rules and secret
  * checks are the v4 ones. The controller also uses MatchesManualWebhookApplications. A matched
  * service of a stack from Git deploys its whole stack at the pushed commit, once for each stack
- * (decision 0023).
+ * (decision 0023). The watch paths of an application skip a build only when Coolify knows every
+ * changed file of the event and no file matches (decision 0033). Null changed files are unknown.
  */
 trait StartsClusterWebhookBuilds
 {
+    private const WATCH_PATHS_SKIPPED = 'Changed files do not match watch paths.';
+
     /**
      * Builds the cluster applications of the repository and branch whose manual webhook
      * secret of the provider passes the check. A failed check gives the unauthenticated
@@ -33,13 +37,42 @@ trait StartsClusterWebhookBuilds
      *
      * @param  'github'|'gitlab'|'bitbucket'|'gitea'  $provider
      * @param  Closure(string): bool  $secretMatches
+     * @param  mixed  $payload  The push payload, for the changed files.
      * @return Collection<int, array<string, mixed>>
      */
-    protected function startManualWebhookClusterBuilds(string $provider, string $fullName, string $branch, ?string $commit, bool $skipDeploy, Closure $secretMatches): Collection
+    protected function startManualWebhookClusterBuilds(string $provider, string $fullName, string $branch, ?string $commit, bool $skipDeploy, Closure $secretMatches, mixed $payload): Collection
     {
+        $changedFiles = $this->clusterPushChangedFiles($provider, $payload);
+
         return $this->clusterWebhookWorkloads($fullName, $branch, null)->map(
             fn (NodeWorkload $workload): array => $this->manualClusterWebhookSecretFailure($provider, $workload, $fullName, $secretMatches)
-                ?? $this->startClusterWebhookBuild($workload, $commit, $skipDeploy, $provider, 'manual'));
+                ?? $this->startClusterWebhookBuild($workload, $commit, $skipDeploy, $provider, 'manual', fn (): ?Collection => $changedFiles));
+    }
+
+    /**
+     * The changed files of a manual push webhook, or null when the payload does not list every
+     * changed file: no commit list, a new branch, a forced push (GitHub), or fewer commits than the
+     * push has (GitLab sends at most 20, Gitea a page). Bitbucket sends no file list.
+     *
+     * @param  'github'|'gitlab'|'bitbucket'|'gitea'  $provider
+     * @return Collection<int, string>|null
+     */
+    protected function clusterPushChangedFiles(string $provider, mixed $payload): ?Collection
+    {
+        $commits = data_get($payload, 'commits');
+        $before = data_get($payload, 'before');
+        $total = data_get($payload, match ($provider) {
+            'gitlab' => 'total_commits_count',
+            'gitea' => 'total_commits',
+            default => null,
+        });
+        $unknown = $provider === 'bitbucket'
+            || ! is_array($commits)
+            || ! is_string($before) || preg_match('/\A0+\z/', $before) === 1
+            || ($provider === 'github' && (data_get($payload, 'forced') === true || data_get($payload, 'created') === true))
+            || (in_array($provider, ['gitlab', 'gitea'], true) && (! is_int($total) || $total > count($commits)));
+
+        return $unknown ? null : $this->webhookPushChangedFiles($payload);
     }
 
     /**
@@ -55,7 +88,7 @@ trait StartsClusterWebhookBuilds
     {
         return $this->clusterWebhookWorkloads($fullName, $pullRequest->closes ? null : $pullRequest->baseBranch, null)->map(
             fn (NodeWorkload $workload): array => $this->manualClusterWebhookSecretFailure($provider, $workload, $fullName, $secretMatches)
-                ?? $this->handleClusterPullRequest($workload, $pullRequest, $pullRequest->skipDeploy, $provider, 'manual'));
+                ?? $this->handleClusterPullRequest($workload, $pullRequest, $pullRequest->skipDeploy, $provider, 'manual', fn (): ?Collection => null));
     }
 
     /**
@@ -72,17 +105,30 @@ trait StartsClusterWebhookBuilds
             [$owner, $repo] = explode('/', $fullName, 2);
             $skipDeploy = self::shouldSkipDeployAny([getGithubCommitMessage($githubApp, $owner, $repo, $pullRequest->commitSha)]);
         }
+        $changedFiles = self::onceOnly(function () use ($githubApp, $fullName, $pullRequest): ?Collection {
+            [$owner, $repo] = explode('/', $fullName, 2);
+            $files = match ($pullRequest->action) {
+                'synchronize' => $pullRequest->beforeSha !== null && $pullRequest->afterSha !== null
+                    ? getGithubCommitRangeFiles($githubApp, $owner, $repo, $pullRequest->beforeSha, $pullRequest->afterSha)
+                    : null,
+                'opened', 'reopened' => getGithubPullRequestFiles($githubApp, $owner, $repo, $pullRequest->number),
+                default => null,
+            };
 
-        return $workloads->map(fn (NodeWorkload $workload): array => $this->handleClusterPullRequest($workload, $pullRequest, $skipDeploy, 'github', 'app'));
+            return $files === null ? null : collect($files);
+        });
+
+        return $workloads->map(fn (NodeWorkload $workload): array => $this->handleClusterPullRequest($workload, $pullRequest, $skipDeploy, 'github', 'app', $changedFiles));
     }
 
     /**
      * Builds the cluster applications that read the repository through this GitHub App.
      * The caller has verified the signature of the App.
      *
+     * @param  Closure(): ?Collection<int, string>  $changedFiles  The files of the compare API, read once for the webhook.
      * @return Collection<int, array<string, mixed>>
      */
-    protected function startGithubAppClusterBuilds(GithubApp $githubApp, mixed $fullName, string $branch, ?string $commit, bool $skipDeploy): Collection
+    protected function startGithubAppClusterBuilds(GithubApp $githubApp, mixed $fullName, string $branch, ?string $commit, bool $skipDeploy, Closure $changedFiles): Collection
     {
         $fullName = $this->manualWebhookRepositoryFullName($fullName);
         if ($fullName === null) {
@@ -90,7 +136,31 @@ trait StartsClusterWebhookBuilds
         }
 
         return $this->clusterWebhookWorkloads($fullName, $branch, $githubApp->id)
-            ->map(fn (NodeWorkload $workload): array => $this->startClusterWebhookBuild($workload, $commit, $skipDeploy, 'github', 'app'));
+            ->map(fn (NodeWorkload $workload): array => $this->startClusterWebhookBuild($workload, $commit, $skipDeploy, 'github', 'app', $changedFiles));
+    }
+
+    /**
+     * The closure calls the reader at most once and then returns the same result, so a webhook
+     * reads the changed files from the provider API only when an application has watch paths.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $reader
+     * @return Closure(): T
+     */
+    protected static function onceOnly(Closure $reader): Closure
+    {
+        $read = false;
+        $value = null;
+
+        return function () use ($reader, &$read, &$value): mixed {
+            if (! $read) {
+                $value = $reader();
+                $read = true;
+            }
+
+            return $value;
+        };
     }
 
     /**
@@ -154,11 +224,13 @@ trait StartsClusterWebhookBuilds
 
     /**
      * A close removes the preview also when previews are off. A deploy follows the settings of
-     * the parent and the fork checks of the provider (decision 0025).
+     * the parent, the fork checks of the provider (decision 0025), and the watch paths of the
+     * parent (decision 0033).
      *
+     * @param  Closure(): ?Collection<int, string>  $changedFiles
      * @return array<string, mixed>
      */
-    private function handleClusterPullRequest(NodeWorkload $parent, PullRequestWebhook $pullRequest, bool $skipDeploy, string $provider, string $mode): array
+    private function handleClusterPullRequest(NodeWorkload $parent, PullRequestWebhook $pullRequest, bool $skipDeploy, string $provider, string $mode, Closure $changedFiles): array
     {
         $result = ['application_uuid' => $parent->uuid, 'application_name' => $parent->name, 'pull_request_id' => $pullRequest->number];
         $context = ['provider' => $provider, 'mode' => $mode, 'workload_uuid' => $parent->uuid, 'pull_request_id' => $pullRequest->number];
@@ -182,6 +254,7 @@ trait StartsClusterWebhookBuilds
             $pullRequest->refusal !== null => $pullRequest->refusal,
             $pullRequest->fromFork && ! $parent->fork_preview_deployments_enabled => 'The pull request is from a fork, and preview deployments of forks are off for this application.',
             $skipDeploy => 'The pull request title or its head commit contains [skip cd] or [skip ci].',
+            filled($parent->watch_paths) && ! WatchPaths::triggers($parent->watch_paths, $changedFiles()) => self::WATCH_PATHS_SKIPPED,
             default => null,
         };
         if ($skipReason !== null) {
@@ -205,9 +278,10 @@ trait StartsClusterWebhookBuilds
     }
 
     /**
+     * @param  Closure(): ?Collection<int, string>  $changedFiles
      * @return array<string, mixed>
      */
-    private function startClusterWebhookBuild(NodeWorkload $workload, ?string $commit, bool $skipDeploy, string $provider, string $mode): array
+    private function startClusterWebhookBuild(NodeWorkload $workload, ?string $commit, bool $skipDeploy, string $provider, string $mode, Closure $changedFiles): array
     {
         $result = ['application_uuid' => $workload->uuid, 'application_name' => $workload->name];
         if ($skipDeploy) {
@@ -223,6 +297,9 @@ trait StartsClusterWebhookBuilds
 
         if (! $workload->is_auto_deploy_enabled) {
             return [...$result, 'status' => 'skipped', 'message' => 'Deployments disabled.'];
+        }
+        if (filled($workload->watch_paths) && ! WatchPaths::triggers($workload->watch_paths, $changedFiles())) {
+            return [...$result, 'status' => 'skipped', 'message' => self::WATCH_PATHS_SKIPPED];
         }
 
         try {

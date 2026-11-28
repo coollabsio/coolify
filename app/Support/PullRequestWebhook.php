@@ -20,6 +20,7 @@ final readonly class PullRequestWebhook
     /**
      * @param  string  $ref  The ref with the head commit in the base repository, or the source branch of Bitbucket.
      * @param  ?string  $refusal  Why the provider cannot deploy this pull request, like a Bitbucket fork.
+     * @param  ?string  $beforeSha  The head before a GitHub `synchronize`, for the changed files (decision 0033).
      */
     public function __construct(
         public bool $closes,
@@ -31,6 +32,9 @@ final readonly class PullRequestWebhook
         public bool $fromFork,
         public bool $skipDeploy,
         public ?string $refusal = null,
+        public ?string $action = null,
+        public ?string $beforeSha = null,
+        public ?string $afterSha = null,
     ) {}
 
     /**
@@ -38,13 +42,13 @@ final readonly class PullRequestWebhook
      *
      * @param  'github'|'gitlab'|'gitea'|'bitbucket'  $provider
      */
-    public static function forAction(string $provider, ?string $action, int $number, ?string $baseBranch, ?string $commitSha, string $ref, ?string $url, bool $fromFork, bool $skipDeploy, ?string $refusal = null): ?self
+    public static function forAction(string $provider, ?string $action, int $number, ?string $baseBranch, ?string $commitSha, string $ref, ?string $url, bool $fromFork, bool $skipDeploy, ?string $refusal = null, ?string $beforeSha = null, ?string $afterSha = null): ?self
     {
         $closes = in_array($action, self::ACTIONS[$provider]['close'], true);
         if (! $closes && ! in_array($action, self::ACTIONS[$provider]['deploy'], true)) {
             return null;
         }
 
-        return new self($closes, $number, $baseBranch, $commitSha, $ref, $url, $fromFork, $skipDeploy, $refusal);
+        return new self($closes, $number, $baseBranch, $commitSha, $ref, $url, $fromFork, $skipDeploy, $refusal, $action, $beforeSha, $afterSha);
     }
 }
