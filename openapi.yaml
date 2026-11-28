@@ -8168,7 +8168,7 @@ paths:
             application/json:
               schema:
                 properties:
-                  deployments: { type: array, items: { properties: { message: { type: string }, resource_uuid: { type: string }, deployment_uuid: { type: string } }, type: object } }
+                  deployments: { type: array, items: { properties: { message: { type: string }, resource_uuid: { type: string }, deployment_uuid: { type: string, description: 'Application deployment. Poll it with GET /deployments/{uuid}.' }, activity_id: { type: integer, description: 'Service start. Poll it with GET /services/{uuid}/activities/{activity_id}.', example: 1234 } }, type: object } }
                 type: object
         '401':
           $ref: '#/components/responses/401'

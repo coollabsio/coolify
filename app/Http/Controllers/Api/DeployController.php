@@ -359,7 +359,8 @@ class DeployController extends Controller
                                         properties: [
                                             'message' => ['type' => 'string'],
                                             'resource_uuid' => ['type' => 'string'],
-                                            'deployment_uuid' => ['type' => 'string'],
+                                            'deployment_uuid' => ['type' => 'string', 'description' => 'Application deployment. Poll it with GET /deployments/{uuid}.'],
+                                            'activity_id' => ['type' => 'integer', 'description' => 'Service start. Poll it with GET /services/{uuid}/activities/{activity_id}.', 'example' => 1234],
                                         ]
                                     ),
                                 ),
@@ -468,12 +469,12 @@ class DeployController extends Controller
                 if (isset($result['status']) && $result['status'] === 429) {
                     return response()->json(['message' => $result['message']], 429)->header('Retry-After', 60);
                 }
-                ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $result;
-                if ($deployment_uuid) {
-                    $deployments->push(['message' => $return_message, 'resource_uuid' => $uuid, 'deployment_uuid' => $deployment_uuid]);
-                } else {
-                    $deployments->push(['message' => $return_message, 'resource_uuid' => $uuid]);
-                }
+                $deployments->push(array_filter([
+                    'message' => $result['message'],
+                    'resource_uuid' => $uuid,
+                    'deployment_uuid' => $result['deployment_uuid'],
+                    'activity_id' => $result['activity_id'] ?? null,
+                ], fn ($value) => $value !== null));
             }
         }
         if ($deployments->count() > 0) {
@@ -521,8 +522,11 @@ class DeployController extends Controller
                 $message = $message->merge($return_message);
             }
             foreach ($services as $resource) {
-                ['message' => $return_message] = $this->deploy_resource($resource, $force);
-                $message = $message->merge($return_message);
+                $result = $this->deploy_resource($resource, $force);
+                if ($result['activity_id'] ?? null) {
+                    $deployments->push(['resource_uuid' => $resource->uuid, 'activity_id' => $result['activity_id']]);
+                }
+                $message = $message->merge($result['message']);
             }
         }
         if ($message->count() > 0) {
@@ -589,13 +593,21 @@ class DeployController extends Controller
                 } catch (AuthorizationException $e) {
                     return ['message' => 'Unauthorized to deploy this service.', 'deployment_uuid' => null];
                 }
-                StartService::run($resource, pullLatestImages: true);
-                $message = "Service {$resource->name} started. It could take a while, be patient.";
+                if ($resource->isStarting()) {
+                    return ['message' => 'There is a deployment in progress.', 'deployment_uuid' => null];
+                }
+                $activity = StartService::run($resource, pullLatestImages: true);
                 auditLog('api.service.deployed', [
                     'service_uuid' => $resource->uuid,
                     'service_name' => $resource->name,
+                    'activity_id' => $activity->id,
                 ]);
-                break;
+
+                return [
+                    'message' => "Service {$resource->name} started. It could take a while, be patient.",
+                    'deployment_uuid' => null,
+                    'activity_id' => $activity->id,
+                ];
             default:
                 // Database resource - check authorization
                 try {
