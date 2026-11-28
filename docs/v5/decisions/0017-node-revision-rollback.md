@@ -58,11 +58,22 @@ cluster registry; local images now stay in the Podman store of the Nodes.
   the deployment with the pull error.
 - (History: until decision 0030, Coolify asked the registry Node with
   `registry.inspect.v1` for the digest. That command is removed.)
-- An image application keeps the tag that the user entered. Coolify does not
-  resolve it to a digest at deploy time: the Coolify container has no access
-  to the registries of the Nodes, and Sentinel does not report the repository
-  digest that it pulled. A rollback to a tag that was pushed again runs the
-  build that the Node has for the tag, or pulls the current one.
+- An image application keeps the tag that the user entered. Each deploy that
+  pulls a newer image (a user Deploy, a stack deploy) reads the digest of the
+  tag from the registry with a `HEAD` request (the registry login of the
+  workload, no cache) and records it in the request of the deployment
+  (`image_digest`). **Rollback** is on a deployment: a tag rolls back to
+  `<repository>@<digest>` of that deployment, so a tag that was pushed again
+  does not run the newer image. The rolled-back image shows the digest on the
+  Configuration page. The history offers a rollback also to an earlier
+  deployment of the same tag when its digest differs. A deployment without a
+  known digest (before this change, or the registry did not answer) rolls back
+  to the tag, which runs the image that the Node has for it. The digest is read
+  just before the Node pulls, so a push in that short window can record the
+  next digest. The API takes `deployment_uuid`, or `revision_uuid` for the last
+  deployment of the revision with a known digest. (History: until 2026-11-27,
+  Coolify did not resolve tags, because Sentinel does not report the digest
+  that it pulled.)
 - Coolify finds the Nodes that keep a local image from the deploys and the
   keep list of the image cleanup (decision 0027). It does not ask Podman.
 - A database cannot be rolled back: an older engine can fail to read the data

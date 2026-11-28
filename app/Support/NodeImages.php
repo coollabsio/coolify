@@ -55,4 +55,17 @@ final class NodeImages
     {
         return is_string($image) && str_starts_with($image, self::LOCAL_PREFIX);
     }
+
+    /** The image pinned to a digest without its tag: `docker.io/library/nginx:1.27` gives `docker.io/library/nginx@sha256:…`. */
+    public static function withDigest(string $image, string $digest): string
+    {
+        $name = str($image)->before('@')->toString();
+        $lastSlash = strrpos($name, '/');
+        $lastColon = strrpos($name, ':');
+        if ($lastColon !== false && ($lastSlash === false || $lastColon > $lastSlash)) {
+            $name = substr($name, 0, $lastColon);
+        }
+
+        return "{$name}@{$digest}";
+    }
 }

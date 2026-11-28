@@ -583,7 +583,7 @@ class ClusterApplicationsController extends Controller
 
     #[OA\Post(
         summary: 'Roll Back',
-        description: 'Roll a cluster application back to the image of an earlier revision. Environment variables, secrets, and settings keep their current values, and volume data is not rolled back. When no server keeps the image anymore, Coolify builds the same commit again and deploys the result.',
+        description: 'Roll a cluster application back to the image of an earlier revision or deployment. Environment variables, secrets, and settings keep their current values, and volume data is not rolled back. When no server keeps the image anymore, Coolify builds the same commit again and deploys the result.',
         path: '/cluster-applications/{uuid}/rollback',
         operationId: 'rollback-cluster-application',
         security: [
@@ -597,9 +597,9 @@ class ClusterApplicationsController extends Controller
             required: true,
             content: new OA\JsonContent(
                 type: 'object',
-                required: ['revision_uuid'],
                 properties: [
-                    'revision_uuid' => new OA\Property(property: 'revision_uuid', type: 'string', description: 'UUID of the revision to roll back to, from List Revisions.'),
+                    'revision_uuid' => new OA\Property(property: 'revision_uuid', type: 'string', description: 'UUID of the revision to roll back to, from List Revisions. A tag deploys at the digest of the last deployment of the revision whose digest Coolify knows. Required without deployment_uuid.'),
+                    'deployment_uuid' => new OA\Property(property: 'deployment_uuid', type: 'string', description: 'UUID of a successful deployment to roll back to. A tag deploys at the digest that it pointed to at that deployment. Required without revision_uuid.'),
                 ],
             ),
         ),
@@ -630,8 +630,11 @@ class ClusterApplicationsController extends Controller
         }
         $this->authorize('deploy', $workload);
 
-        $validator = customApiValidator($request->all(), ['revision_uuid' => 'required|string']);
-        $extraFields = array_diff(array_keys($request->all()), ['revision_uuid']);
+        $validator = customApiValidator($request->all(), [
+            'revision_uuid' => 'required_without:deployment_uuid|string',
+            'deployment_uuid' => 'required_without:revision_uuid|string',
+        ]);
+        $extraFields = array_diff(array_keys($request->all()), ['revision_uuid', 'deployment_uuid']);
         if ($validator->fails() || $extraFields !== []) {
             $errors = $validator->errors();
             foreach ($extraFields as $field) {
@@ -640,13 +643,24 @@ class ClusterApplicationsController extends Controller
 
             return response()->json(['message' => 'Validation failed.', 'errors' => $errors], 422);
         }
-        $revision = $workload->revisions()->where('uuid', $request->input('revision_uuid'))->first();
-        if ($revision === null) {
+        $deployment = null;
+        if ($request->filled('deployment_uuid')) {
+            $deployment = NodeOperation::query()
+                ->where('node_workload_id', $workload->id)
+                ->where('command_type', 'workload.deploy.v1')
+                ->where('uuid', $request->input('deployment_uuid'))
+                ->first();
+            if ($deployment === null) {
+                return response()->json(['message' => 'Deployment not found.'], 404);
+            }
+        }
+        $revision = $deployment?->revision ?? $workload->revisions()->where('uuid', $request->input('revision_uuid'))->first();
+        if ($revision === null || ($deployment !== null && $request->filled('revision_uuid') && $revision->uuid !== $request->input('revision_uuid'))) {
             return response()->json(['message' => 'Revision not found.'], 404);
         }
 
         try {
-            $result = RollbackNodeWorkload::run($workload, $revision, auth()->user());
+            $result = RollbackNodeWorkload::run($workload, $revision, auth()->user(), $deployment);
         } catch (RuntimeException|DomainException|InvalidArgumentException $exception) {
             // Every one of these says what blocks the rollback: the revision, the build, or a server.
             return response()->json(['message' => $exception->getMessage()], 400);

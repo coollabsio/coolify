@@ -128,6 +128,37 @@ class ReadImageArchitectures
     }
 
     /**
+     * The digest that the tag of a registry image points to now, read with the registry login of
+     * the workload. Null for a local or built image, an image with a digest, or when the registry
+     * does not answer. Not cached: a deploy records what its tag pointed to then (decision 0017).
+     */
+    public static function currentDigest(NodeWorkloadRevision $revision): ?string
+    {
+        $workload = $revision->workload;
+        $image = $revision->image;
+        if ($workload === null || $workload->buildsFromSource() || ! is_string($image) || NodeImages::isLocalImage($image) || str_contains($image, '@')) {
+            return null;
+        }
+        try {
+            $login = IssueNodeRegistryCredential::run($workload, $image);
+        } catch (RuntimeException) {
+            $login = null;
+        }
+        $reader = app(self::class);
+        [$reader->registry, $reader->repository, $reference] = self::parse(CreateClusterDockerImageWorkload::qualifiedImage(trim($image)));
+        $reader->login = $login;
+        $reader->authorization = null;
+        try {
+            $head = $reader->request('HEAD', "manifests/{$reference}", ['Accept' => self::ACCEPT]);
+        } catch (Throwable) {
+            return null;
+        }
+        $digest = $head->successful() ? (string) $head->header('Docker-Content-Digest') : '';
+
+        return preg_match('/\Asha256:[a-f0-9]{64}\z/', $digest) === 1 ? $digest : null;
+    }
+
+    /**
      * Why Coolify could not read the CPU architectures of the image of the workload at the last
      * check, for the warning on the application page. Reads only the cache.
      *

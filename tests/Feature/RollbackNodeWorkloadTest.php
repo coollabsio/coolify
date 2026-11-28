@@ -90,19 +90,29 @@ function rollbackGitWorkload(object $test, ?string $commit = 'c0ffee1'): void
 }
 
 /** Records that the server ran the old revision, so that the image cleanup keeps its image there. */
-function rollbackKeptOnServer(object $test): void
+function rollbackKeptOnServer(object $test): NodeOperation
 {
-    NodeOperation::factory()->create(['node_id' => $test->node->id, 'node_workload_id' => $test->workload->id, 'node_workload_revision_id' => $test->old->id, 'status' => NodeOperationStatus::SUCCEEDED]);
+    return NodeOperation::factory()->create(['node_id' => $test->node->id, 'node_workload_id' => $test->workload->id, 'node_workload_revision_id' => $test->old->id, 'status' => NodeOperationStatus::SUCCEEDED]);
+}
+
+/** A successful deployment of the old revision on a server outside the cluster, which keeps no image for it. */
+function rollbackDeploymentElsewhere(object $test): NodeOperation
+{
+    $elsewhere = Node::factory()->create(['team_id' => $test->team->id]);
+
+    return NodeOperation::factory()->create(['node_id' => $elsewhere->id, 'node_workload_id' => $test->workload->id, 'node_workload_revision_id' => $test->old->id, 'status' => NodeOperationStatus::SUCCEEDED]);
 }
 
 it('rolls back to the image of an earlier revision with the current settings and environment', function () {
+    $deployment = rollbackKeptOnServer($this);
+
     Livewire::test(Show::class, rollbackPage($this))
-        ->call('rollback', $this->old->uuid)
+        ->call('rollback', $deployment->uuid)
         ->assertHasNoErrors()
         ->assertRedirectContains('/deployments/');
 
     $rollback = $this->workload->revisions()->latest('id')->first();
-    $operation = NodeOperation::query()->where('node_workload_id', $this->workload->id)->sole();
+    $operation = NodeOperation::query()->where('node_workload_id', $this->workload->id)->whereKeyNot($deployment->id)->sole();
     expect($rollback->id)->not->toBe($this->old->id)
         ->and($rollback->image)->toBe('docker.io/library/nginx:1.26')
         ->and($rollback->configuration['command'])->toBe(['nginx', '-g', 'daemon off;'])
@@ -113,15 +123,15 @@ it('rolls back to the image of an earlier revision with the current settings and
 });
 
 it('offers a rollback only on earlier successful deployments', function () {
-    foreach ([[$this->old, NodeOperationStatus::SUCCEEDED], [$this->current, NodeOperationStatus::SUCCEEDED]] as [$revision, $status]) {
-        NodeOperation::factory()->create(['node_id' => $this->node->id, 'node_workload_id' => $this->workload->id, 'node_workload_revision_id' => $revision->id, 'status' => $status]);
-    }
+    [$old, $current] = collect([$this->old, $this->current])->map(fn (NodeWorkloadRevision $revision): NodeOperation => NodeOperation::factory()->create([
+        'node_id' => $this->node->id, 'node_workload_id' => $this->workload->id, 'node_workload_revision_id' => $revision->id, 'status' => NodeOperationStatus::SUCCEEDED,
+    ]))->all();
 
     // The confirmation modal writes its submit action as JSON.
     $this->get(route('project.cluster-application.deployments', rollbackPage($this)))
         ->assertOk()
-        ->assertSee("rollback(\\u0027{$this->old->uuid}\\u0027)", false)
-        ->assertDontSee($this->current->uuid.'\\u0027', false);
+        ->assertSee("rollback(\\u0027{$old->uuid}\\u0027)", false)
+        ->assertDontSee($current->uuid.'\\u0027', false);
 });
 
 it('denies a rollback to a member', function () {
@@ -130,7 +140,7 @@ it('denies a rollback to a member', function () {
     $this->actingAs($member);
 
     Livewire::test(Show::class, rollbackPage($this))
-        ->call('rollback', $this->old->uuid)
+        ->call('rollback', rollbackKeptOnServer($this)->uuid)
         ->assertForbidden();
 
     expect($this->workload->revisions()->count())->toBe(2);
@@ -151,8 +161,9 @@ it('hides the application of another team', function () {
 it('rejects a revision of another workload', function () {
     $otherWorkload = NodeWorkload::factory()->create(['team_id' => $this->team->id, 'project_id' => $this->project->id, 'environment_id' => $this->environment->id]);
     $foreign = NodeWorkloadRevision::factory()->create(['node_workload_id' => $otherWorkload->id, 'image' => 'docker.io/library/redis:7']);
+    $deployment = NodeOperation::factory()->create(['node_id' => $this->node->id, 'node_workload_id' => $otherWorkload->id, 'node_workload_revision_id' => $foreign->id, 'status' => NodeOperationStatus::SUCCEEDED]);
 
-    expect(fn () => Livewire::test(Show::class, rollbackPage($this))->call('rollback', $foreign->uuid))
+    expect(fn () => Livewire::test(Show::class, rollbackPage($this))->call('rollback', $deployment->uuid))
         ->toThrow(ModelNotFoundException::class);
 
     expect($this->workload->revisions()->count())->toBe(2);
@@ -161,9 +172,9 @@ it('rejects a revision of another workload', function () {
 
 it('deploys a local image that a server still keeps', function () {
     rollbackGitWorkload($this);
-    rollbackKeptOnServer($this);
+    $deployment = rollbackKeptOnServer($this);
 
-    Livewire::test(Show::class, rollbackPage($this))->call('rollback', $this->old->uuid)->assertRedirectContains('/deployments/');
+    Livewire::test(Show::class, rollbackPage($this))->call('rollback', $deployment->uuid)->assertRedirectContains('/deployments/');
 
     expect($this->workload->revisions()->latest('id')->value('image'))->toBe($this->old->image)
         ->and($this->workload->builds()->count())->toBe(1);
@@ -173,7 +184,7 @@ it('deploys a local image that a server still keeps', function () {
 it('builds the same commit again when no server keeps the local image', function () {
     rollbackGitWorkload($this);
 
-    Livewire::test(Show::class, rollbackPage($this))->call('rollback', $this->old->uuid)->assertRedirectContains('/builds/');
+    Livewire::test(Show::class, rollbackPage($this))->call('rollback', rollbackDeploymentElsewhere($this)->uuid)->assertRedirectContains('/builds/');
 
     $build = $this->workload->builds()->latest('id')->first();
     expect($build->status)->toBe(NodeBuildStatus::QUEUED)
@@ -192,7 +203,7 @@ it('fails with a clear error when the image is gone and the commit is unknown', 
     rollbackGitWorkload($this, commit: null);
 
     Livewire::test(Show::class, rollbackPage($this))
-        ->call('rollback', $this->old->uuid)
+        ->call('rollback', rollbackDeploymentElsewhere($this)->uuid)
         ->assertDispatched('error', 'No server keeps the image of this revision anymore, and Coolify cannot build it again because it does not know the commit that it was built from.')
         ->assertNoRedirect();
 

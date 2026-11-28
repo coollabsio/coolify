@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\NodeOperationStatus;
+use App\Support\NodeImages;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -149,6 +150,18 @@ class NodeOperation extends BaseModel
         return $query->where(fn (Builder $query) => $query
             ->whereNotIn('command_type', self::BACKGROUND_COMMAND_TYPES)
             ->orWhereIn('status', [NodeOperationStatus::FAILED, NodeOperationStatus::TIMED_OUT, NodeOperationStatus::UNCERTAIN]));
+    }
+
+    /**
+     * The image that this deployment ran: the image of its revision, pinned to the digest that its
+     * tag pointed to when the deploy started, if Coolify could read it (decision 0017).
+     */
+    public function deployedImage(): ?string
+    {
+        $image = $this->revision?->image;
+        $digest = data_get($this->request, 'image_digest');
+
+        return is_string($image) && is_string($digest) && ! str_contains($image, '@') ? NodeImages::withDigest($image, $digest) : $image;
     }
 
     public function isDeployment(): bool

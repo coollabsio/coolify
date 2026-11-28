@@ -24,7 +24,8 @@ use RuntimeException;
  * variables, and secrets of the workload, and deploys it like Deploy does, so rolling deploys
  * apply. A local image (decision 0030) is copied from a Node that still keeps it. When no Node
  * keeps it, the build of that image runs again from the same commit, and its job deploys the result.
- * An image in a registry is pulled by digest.
+ * An image in a registry is pulled by digest: the digest of the revision, or the digest that the tag
+ * pointed to at the selected deployment. Without a known digest, the tag deploys again.
  */
 class RollbackNodeWorkload
 {
@@ -33,17 +34,22 @@ class RollbackNodeWorkload
     /**
      * @return array{operation: ?NodeOperation, build: ?NodeBuild}
      */
-    public function handle(NodeWorkload $workload, NodeWorkloadRevision $revision, ?User $user): array
+    public function handle(NodeWorkload $workload, NodeWorkloadRevision $revision, ?User $user, ?NodeOperation $deployment = null): array
     {
         if ($revision->node_workload_id !== $workload->id) {
             throw new RuntimeException('This revision does not belong to this application.');
+        }
+        if ($deployment !== null && ($deployment->node_workload_id !== $workload->id || $deployment->node_workload_revision_id !== $revision->id
+            || $deployment->command_type !== 'workload.deploy.v1' || $deployment->status !== NodeOperationStatus::SUCCEEDED)) {
+            throw new RuntimeException('Only a successful deployment of this application can be rolled back to.');
         }
         // An older database image can fail to read data that a newer one wrote, and volume data is not rolled back.
         if ($workload->isDatabase()) {
             throw new RuntimeException('A database cannot be rolled back. Restore a backup instead.');
         }
         $current = $workload->revisions()->latest('id')->firstOrFail();
-        if ($revision->image === $current->image) {
+        $image = self::targetImage($revision, $deployment);
+        if (! self::changesImage($workload, $image)) {
             throw new RuntimeException('This revision runs the current image. Deploy the application to apply other changes.');
         }
         $nodes = $workload->nodes()->orderBy('nodes.id')->get();
@@ -57,11 +63,11 @@ class RollbackNodeWorkload
             EnsureNodeAcceptsDeployment::run($node->fresh(['cluster']), $current);
         }
 
-        if (NodeImages::isLocalImage($revision->image) && ! $this->keptOnEveryNode($workload, $nodes, $revision->image) && ! $this->keptOnAnyNode($workload, $nodes->first(), $revision->image)) {
+        if (NodeImages::isLocalImage($revision->image) && ! self::localImageAvailable($workload, $revision->image)) {
             return ['operation' => null, 'build' => StartNodeBuild::run($workload, $user, rebuildOf: $this->buildOf($workload, $revision))];
         }
 
-        $rollback = PrepareNodeWorkloadRevision::run($workload, $revision->image);
+        $rollback = PrepareNodeWorkloadRevision::run($workload, $image);
         $operation = null;
         $notificationGroup = (string) Str::uuid();
         try {
@@ -84,12 +90,84 @@ class RollbackNodeWorkload
     }
 
     /**
+     * The image that a rollback deploys. A registry tag is pinned to the digest that it pointed to at
+     * the deployment (decision 0017): the selected one, or else the last one of the revision with a
+     * known digest. A tag pushed again then does not run the newer image.
+     */
+    public static function targetImage(NodeWorkloadRevision $revision, ?NodeOperation $deployment = null): string
+    {
+        if ($deployment !== null) {
+            return $deployment->setRelation('revision', $revision)->deployedImage() ?? $revision->image;
+        }
+        $pinned = NodeOperation::query()
+            ->where('node_workload_revision_id', $revision->id)
+            ->where('command_type', 'workload.deploy.v1')
+            ->where('status', NodeOperationStatus::SUCCEEDED)
+            ->whereNotNull('request->image_digest')
+            ->latest('id')
+            ->first();
+
+        return $pinned?->setRelation('revision', $revision)->deployedImage() ?? $revision->image;
+    }
+
+    /** Whether a rollback to the image changes what the application runs. */
+    public static function changesImage(NodeWorkload $workload, string $image): bool
+    {
+        $running = self::runningImages($workload);
+
+        return $running !== [] && ! in_array($image, $running, true);
+    }
+
+    /**
+     * The images that the application runs now: the image of the latest revision, and the image
+     * that the last successful deployment of that revision ran. Empty without a revision.
+     *
+     * @return list<string>
+     */
+    public static function runningImages(NodeWorkload $workload): array
+    {
+        $current = $workload->revisions()->latest('id')->first();
+        if ($current === null) {
+            return [];
+        }
+        $running = NodeOperation::query()
+            ->where('node_workload_revision_id', $current->id)
+            ->where('command_type', 'workload.deploy.v1')
+            ->where('status', NodeOperationStatus::SUCCEEDED)
+            ->latest('id')
+            ->first()
+            ?->setRelation('revision', $current)
+            ->deployedImage();
+
+        return array_values(array_unique(array_filter([$current->image, $running])));
+    }
+
+    /** The image that the application runs now, pinned to its digest when Coolify knows it. */
+    public static function runningImage(NodeWorkload $workload): ?string
+    {
+        $images = self::runningImages($workload);
+
+        return $images === [] ? null : $images[array_key_last($images)];
+    }
+
+    /**
+     * Whether a deploy of the local image finds it: every server of the application keeps it, or
+     * an online server of the cluster keeps it and serves it to the others (decision 0030).
+     */
+    public static function localImageAvailable(NodeWorkload $workload, string $image): bool
+    {
+        $nodes = $workload->nodes()->orderBy('nodes.id')->get();
+
+        return $nodes->isNotEmpty() && (self::keptOnEveryNode($workload, $nodes, $image) || self::keptOnAnyNode($workload, $nodes->first(), $image));
+    }
+
+    /**
      * Whether every server ran the image and the image cleanup keeps it there (decision 0027). Then the
      * deploy starts it without a pull, also when the registry no longer has it.
      *
      * @param  Collection<int, Node>  $nodes
      */
-    private function keptOnEveryNode(NodeWorkload $workload, Collection $nodes, string $image): bool
+    private static function keptOnEveryNode(NodeWorkload $workload, Collection $nodes, string $image): bool
     {
         return $nodes->every(fn (Node $node): bool => $node->operations()
             ->where('node_workload_id', $workload->id)
@@ -123,7 +201,7 @@ class RollbackNodeWorkload
      * Whether an online Node of the cluster keeps the local image, so that the other Nodes can copy
      * it (decision 0030): the build Node or a Node that ran it, when the image cleanup keeps it there.
      */
-    private function keptOnAnyNode(NodeWorkload $workload, Node $node, string $image): bool
+    private static function keptOnAnyNode(NodeWorkload $workload, Node $node, string $image): bool
     {
         $nodeIds = $workload->builds()->where('status', NodeBuildStatus::SUCCEEDED)->where('image', $image)->pluck('node_id')
             ->merge(NodeOperation::query()

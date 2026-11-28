@@ -44,7 +44,7 @@ class CreateDeploymentOperation
             $pullPolicy = 'missing';
         }
 
-        return DB::transaction(function () use ($node, $revision, $requestedBy, $pullPolicy, $partOfMove, $notificationGroup, $notificationGroupSize): array {
+        $deployment = DB::transaction(function () use ($node, $revision, $requestedBy, $pullPolicy, $partOfMove, $notificationGroup, $notificationGroupSize): array {
             $workload = NodeWorkload::query()
                 ->whereKey($revision->node_workload_id)
                 ->where('team_id', $node->team_id)
@@ -146,5 +146,15 @@ class CreateDeploymentOperation
 
             return ['operation' => $operation, 'created' => true];
         });
+
+        // What a mutable tag points to now, so a rollback to this deployment runs the same image (decision 0017).
+        // A deploy that does not pull a newer image can run an older copy of the tag, so only `newer` records it.
+        // The caller dispatches the operation after this, so the Node pulls after the read.
+        $imageDigest = $deployment['created'] && $pullPolicy === 'newer' ? ReadImageArchitectures::currentDigest($revision) : null;
+        if ($imageDigest !== null) {
+            $deployment['operation']->update(['request' => [...$deployment['operation']->request, 'image_digest' => $imageDigest]]);
+        }
+
+        return $deployment;
     }
 }
