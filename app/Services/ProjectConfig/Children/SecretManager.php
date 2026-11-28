@@ -221,10 +221,9 @@ class SecretManager implements ChildRecords
      * but is not one. Without this check, the plan passes and the next deployment fails or keeps the text.
      * `vault.KEY` needs the `default` source once the file links any source.
      *
-     * @param  bool  $checkRefs  False for resources that reject vault refs with their own error
      * @return list<ConfigError>
      */
-    public static function referenceErrors(string $base, mixed $desired, mixed $env, bool $checkRefs = true): array
+    public static function referenceErrors(string $base, mixed $desired, mixed $env): array
     {
         $names = array_column(self::sources($desired), 'name');
         $errors = [];
@@ -237,7 +236,7 @@ class SecretManager implements ChildRecords
                     continue;
                 }
                 $texts = ['value' => is_string($variant['value'] ?? null) ? $variant['value'] : null];
-                if ($checkRefs && is_string($variant['ref'] ?? null)) {
+                if (is_string($variant['ref'] ?? null)) {
                     $texts['ref'] = '{{'.$variant['ref'].'}}';
                 }
                 foreach ($texts as $field => $text) {

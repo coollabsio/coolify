@@ -335,7 +335,7 @@ class StandaloneDatabaseAdapter implements ResourceAdapter
     {
         $base = "resources.{$key}";
         $errors = SecretManager::errors($base, $desired['secret_manager'] ?? null, $ctx->teamId);
-        $errors = [...$errors, ...SecretManager::referenceErrors($base, $desired['secret_manager'] ?? null, $desired['env'] ?? null, checkRefs: false)];
+        $errors = [...$errors, ...SecretManager::referenceErrors($base, $desired['secret_manager'] ?? null, $desired['env'] ?? null)];
         $errors = [...$errors, ...EnvironmentVariables::containerErrors($base, $desired['env'] ?? null, null)];
 
         $server = $this->server($desired, $ctx);
@@ -353,11 +353,6 @@ class StandaloneDatabaseAdapter implements ResourceAdapter
             $errors[] = new ConfigError("{$base}.{$path}", $messages[0]);
         }
 
-        foreach (($desired['env'] ?? []) as $name => $entry) {
-            if (str_starts_with((string) ($entry['ref'] ?? ''), 'vault.')) {
-                $errors[] = new ConfigError("{$base}.env.{$name}", 'vault references work on applications only.');
-            }
-        }
         $volumes = [...$this->config('volumes'), ...array_map('strval', array_keys((array) ($desired['storages'] ?? [])))];
         $errors = [...$errors, ...StorageBackups::errors($base, $desired['storage_backups'] ?? null, $ctx->teamId, $volumes)];
         foreach (array_values((array) ($desired['backups'] ?? [])) as $index => $backup) {
