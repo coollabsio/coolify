@@ -307,10 +307,10 @@ final class ResourceScans
     }
 
     /**
-     * The images that Compose services of an application start, keyed like `$images`. A variable that sets the image
-     * (`${APP_IMAGE:-app:1.0}`, `app:${APP_VERSION}`) gets the value of the environment variable of the application,
-     * else its default, as the deploy resolves it. A preview takes its preview variable, else the variable of the
-     * application. Images with a variable in another form, or without a value and default, are left out.
+     * The images that Compose services of an application start, keyed like `$images`. Each variable in an image
+     * (`${APP_IMAGE:-app:1.0}`, `${REPO:-app}:${APP_VERSION}`) gets the value of the environment variable of the
+     * application, else its default, as the deploy resolves it. A preview takes its preview variable, else the variable
+     * of the application. Images with a variable without a value and default are left out.
      *
      * @template TKey of array-key
      *
@@ -319,10 +319,9 @@ final class ResourceScans
      */
     public static function resolveComposeImages(Application $application, array $images, bool $preview = false): array
     {
-        $variables = array_filter(array_map(fn (string $image): ?ComposeImageVariable => ComposeImageVariable::parse($image), $images));
+        $keys = array_values(array_unique(array_merge(...array_map(fn (string $image): array => ComposeImageVariable::keys($image), array_values($images)))));
         $values = [];
-        if ($variables !== [] && $application->exists) {
-            $keys = array_values(array_unique(array_map(fn (ComposeImageVariable $variable): string => $variable->key, $variables)));
+        if ($keys !== [] && $application->exists) {
             // The preview value comes last, so it replaces the value of the application.
             $application->morphMany(EnvironmentVariable::class, 'resourceable')
                 ->whereIn('key', $keys)
@@ -336,8 +335,7 @@ final class ResourceScans
 
         $resolved = [];
         foreach ($images as $name => $image) {
-            $ref = isset($variables[$name]) ? $variables[$name]->resolve($values[$variables[$name]->key] ?? null) : $image;
-            $ref = trim((string) $ref);
+            $ref = trim((string) ComposeImageVariable::interpolate($image, $values));
             if ($ref !== '' && ! ComposeImageVariable::hasVariable($ref)) {
                 $resolved[$name] = $ref;
             }
@@ -593,21 +591,25 @@ final class ResourceScans
     }
 
     /**
-     * The image of a database or a service application or database, with the Coolify variable of the service resolved
-     * when one sets it (`${N8N_IMAGE}`, `n8nio/n8n:${N8N_VERSION}`).
+     * The image of a database or a service application or database, with the Coolify variables of the service resolved
+     * when they set it (`${N8N_IMAGE}`, `${N8N_REPO:-n8nio/n8n}:${N8N_VERSION}`).
      */
     public static function configuredImage(Model $owner): string
     {
         $image = trim((string) $owner->getAttribute('image'));
-        $variable = ComposeImageVariable::parse($image);
         $service = $owner instanceof ServiceApplication || $owner instanceof ServiceDatabase ? $owner->service : null;
-        if ($variable === null || ! $service instanceof Service) {
+        if (! ComposeImageVariable::hasVariable($image) || ! $service instanceof Service) {
             return $image;
         }
 
-        $value = $service->environment_variables()->where('key', $variable->key)->where('is_preview', false)->value('value');
+        $values = $service->environment_variables()
+            ->whereIn('key', ComposeImageVariable::keys($image))
+            ->where('is_preview', false)
+            ->get(['key', 'value'])
+            ->mapWithKeys(fn (EnvironmentVariable $variable): array => [$variable->key => $variable->value])
+            ->all();
 
-        return $variable->resolve(is_string($value) ? $value : null) ?? $image;
+        return ComposeImageVariable::interpolate($image, $values) ?? $image;
     }
 
     /**

@@ -1647,6 +1647,7 @@ describe('Compose images set with a variable', function () {
             'app' => ['image' => '${APP_IMAGE:-ghcr.io/example/app:1.0}'],
             'db' => ['image' => '${DB_IMAGE:-mariadb:13}'],
             'cache' => ['image' => 'redis:${CACHE_VERSION}'],
+            'zammad' => ['image' => '${IMAGE_REPO:-ghcr.io/zammad/zammad}:${VERSION:-7.2.2-0000}'],
         ]], 10);
     });
 
@@ -1672,6 +1673,7 @@ describe('Compose images set with a variable', function () {
             'ghcr.io/example/app:2.0@sha256:'.str_repeat('a', 64),
             'mariadb:13',
             'redis:7',
+            'ghcr.io/zammad/zammad:7.2.2-0000',
         ]);
     });
 
@@ -1691,7 +1693,7 @@ describe('Compose images set with a variable', function () {
         deployGatePolicy();
         deployGateVariable('CACHE_VERSION', '7');
         $scanned = [];
-        ScanImage::shouldRun()->times(3)
+        ScanImage::shouldRun()->times(4)
             ->withArgs(function ($server, $resource, $ref) use (&$scanned) {
                 $scanned[] = $ref;
 
@@ -1703,8 +1705,8 @@ describe('Compose images set with a variable', function () {
         deployGateImageScan($job)->checkComposeGate();
 
         $services = Yaml::parse((new ReflectionProperty(ApplicationDeploymentJob::class, 'generated_docker_compose'))->getValue($job))['services'];
-        expect($scanned)->toBe(['ghcr.io/example/app:1.0', 'mariadb:13', 'redis:7'])
-            ->and(collect($services)->pluck('pull_policy')->all())->toBe(['never', 'never', 'never'])
+        expect($scanned)->toBe(['ghcr.io/example/app:1.0', 'mariadb:13', 'redis:7', 'ghcr.io/zammad/zammad:7.2.2-0000'])
+            ->and(collect($services)->pluck('pull_policy')->all())->toBe(['never', 'never', 'never', 'never'])
             ->and($services['app']['image'])->toBe('${APP_IMAGE:-ghcr.io/example/app:1.0}')
             ->and(test()->queue->fresh()->scan_gate_result)->toMatchArray(['blocked' => false]);
     });

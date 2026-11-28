@@ -174,13 +174,15 @@ describe('service start', function () {
         ]);
     });
 
-    it('scans the image that a variable of the service sets, with its value or its default', function () {
+    it('scans the image that the variables of the service set, with their values or their defaults', function () {
         $service = startScansService();
         $service->environment_variables()->create(['key' => 'APP_RELEASE', 'value' => 'v1.4.3', 'is_preview' => false]);
+        $service->environment_variables()->create(['key' => 'VERSION', 'value' => '7.3.0-0001', 'is_preview' => false]);
         $proxy = startScansServiceApplication($service, 'artifacts.plane.so/makeplane/plane-proxy:${APP_RELEASE:-v1.0.0}');
+        $zammad = startScansServiceApplication($service, '${IMAGE_REPO:-ghcr.io/zammad/zammad}:${VERSION:-7.2.2-0000}');
         $cache = startScansServiceDatabase($service, 'valkey/valkey:${CACHE_VERSION:-7.2.15-alpine}');
         $scanned = [];
-        ScanImage::shouldRun()->twice()
+        ScanImage::shouldRun()->times(3)
             ->withArgs(function ($server, $resource, $ref) use (&$scanned) {
                 $scanned[] = [$resource::class, $resource->getKey(), $ref];
 
@@ -192,6 +194,7 @@ describe('service start', function () {
 
         expect($scanned)->toBe([
             [ServiceApplication::class, $proxy->id, 'artifacts.plane.so/makeplane/plane-proxy:v1.4.3'],
+            [ServiceApplication::class, $zammad->id, 'ghcr.io/zammad/zammad:7.3.0-0001'],
             [ServiceDatabase::class, $cache->id, 'valkey/valkey:7.2.15-alpine'],
         ]);
     });

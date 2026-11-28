@@ -5,11 +5,12 @@ namespace App\Services\ImageScan;
 /**
  * An image of a compose file that a variable sets, in one of the two forms that a security update can change through
  * the Coolify environment variable: the whole image (`${N8N_IMAGE}`, `${N8N_IMAGE:-n8nio/n8n:1.0}`) or the tag only
- * (`n8nio/n8n:${N8N_VERSION:-1.0}`). Other forms (two variables, a variable in the name) are not supported.
+ * (`n8nio/n8n:${N8N_VERSION:-1.0}`). Other forms (two variables, a variable in the name) cannot be changed, but
+ * `interpolate()` resolves them for scans.
  */
 final readonly class ComposeImageVariable
 {
-    private const VARIABLE = '\$\{(?<key>[A-Za-z_][A-Za-z0-9_]*)(?:(?<op>:?[-?])(?<default>[^}]*))?\}|\$(?<bare>[A-Za-z_][A-Za-z0-9_]*)';
+    private const VARIABLE = '\$\{(?<key>[A-Za-z_][A-Za-z0-9_]*)(?:(?<op>:?[-?+])(?<default>[^}]*))?\}|\$(?<bare>[A-Za-z_][A-Za-z0-9_]*)';
 
     private function __construct(
         public string $key,
@@ -24,14 +25,62 @@ final readonly class ComposeImageVariable
     public static function parse(string $image): ?self
     {
         $image = trim($image);
-        if (preg_match('/\A(?:'.self::VARIABLE.')\z/', $image, $match) === 1) {
-            return self::from($match, false, '');
-        }
-        if (preg_match('/\A(?<prefix>[^$:@\s]+(?::[0-9]+)?(?:\/[^$:@\s]+)*):(?:'.self::VARIABLE.')\z/', $image, $match) === 1) {
-            return self::from($match, true, $match['prefix']);
-        }
+        $variable = match (true) {
+            preg_match('/\A(?:'.self::VARIABLE.')\z/', $image, $match) === 1 => self::from($match, false, ''),
+            preg_match('/\A(?<prefix>[^$:@\s]+(?::[0-9]+)?(?:\/[^$:@\s]+)*):(?:'.self::VARIABLE.')\z/', $image, $match) === 1 => self::from($match, true, $match['prefix']),
+            default => null,
+        };
 
-        return null;
+        // `${TAG:+value}` sets no value that Coolify can change.
+        return $variable !== null && str_ends_with($match['op'] ?? '', '+') ? null : $variable;
+    }
+
+    /**
+     * The names of the variables in the image.
+     *
+     * @return list<string>
+     */
+    public static function keys(string $image): array
+    {
+        preg_match_all('/'.self::VARIABLE.'/', $image, $matches, PREG_SET_ORDER);
+
+        return array_values(array_unique(array_map(fn (array $match): string => ($match['bare'] ?? '') !== '' ? $match['bare'] : $match['key'], $matches)));
+    }
+
+    /**
+     * The image that Compose starts with these variable values, with every variable of the image resolved
+     * (`${REPO:-ghcr.io/org/app}:${TAG:-1.0}`). An empty value counts as not set, as in `resolve()`. Null when a
+     * variable has no value and no default, or requires one (`${TAG:?}`).
+     *
+     * @param  array<string, ?string>  $values
+     */
+    public static function interpolate(string $image, array $values): ?string
+    {
+        $unresolved = false;
+        $ref = preg_replace_callback('/\$\$|'.self::VARIABLE.'/', function (array $match) use ($values, &$unresolved): string {
+            if ($match[0] === '$$') {
+                return '$';
+            }
+
+            $key = ($match['bare'] ?? '') !== '' ? $match['bare'] : $match['key'];
+            $op = $match['op'] ?? '';
+            $value = $values[$key] ?? null;
+            $isSet = $value !== null && $value !== '';
+            if (str_ends_with($op, '+')) {
+                return $isSet ? $match['default'] : '';
+            }
+            if ($isSet) {
+                return $value;
+            }
+            if (str_ends_with($op, '-')) {
+                return $match['default'];
+            }
+            $unresolved = true;
+
+            return '';
+        }, trim($image));
+
+        return $unresolved || $ref === null ? null : $ref;
     }
 
     /**
