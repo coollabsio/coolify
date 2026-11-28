@@ -14,6 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
@@ -70,29 +71,29 @@ function parseShortVolumeWithVariables(string $kind, string $volume, array $vari
 it('splits a short-syntax volume at the colon after a variable in the middle of the host path', function () {
     $result = parseDockerVolumeString('/volumes/app/${STAGE:-default}/data:/data:ro');
 
-    expect($result['source']->value())->toBe('/volumes/app/default/data')
+    expect($result['source']->value())->toBe('/volumes/app/${STAGE:-default}/data')
         ->and($result['target']->value())->toBe('/data')
         ->and($result['mode']->value())->toBe('ro');
 });
 
-it('uses the default of a variable in the middle of a short-syntax host path', function (string $kind) {
+it('keeps a variable in the middle of a short-syntax host path for Docker Compose', function (string $kind) {
     $result = parseShortVolumeWithVariables($kind, '/volumes/app/${STAGE:-default}/data:/data');
 
-    expect($result['volume'])->toBe('/volumes/app/default/data:/data')
-        ->and($result['owner']->fileStorages()->pluck('fs_path')->all())->toBe(['/volumes/app/default/data']);
+    expect($result['volume'])->toBe('/volumes/app/${STAGE:-default}/data:/data')
+        ->and($result['owner']->fileStorages()->pluck('fs_path')->all())->toBe(['/volumes/app/${STAGE:-default}/data']);
 })->with(['service', 'application']);
 
-it('uses the value that the resource sets for a variable in a short-syntax host path', function (string $kind, string $volume, string $expected) {
+it('leaves the variables of a short-syntax host path to Docker Compose', function (string $kind, string $volume, string $expected) {
     $result = parseShortVolumeWithVariables($kind, $volume, ['DATA' => '/media/data', 'STAGE' => 'production']);
 
     expect($result['volume'])->toBe("{$expected}:/fixture")
         ->and($result['owner']->fileStorages()->pluck('fs_path')->all())->toBe([$expected])
         ->and($result['owner']->persistentStorages()->count())->toBe(0);
 })->with(['service', 'application'])->with([
-    'variable before the path' => ['${DATA}/wireguard:/fixture', '/media/data/wireguard'],
-    'variable with a host path default' => ['${DATA:-/srv/data}:/fixture', '/media/data'],
-    'variable with a volume name default' => ['${DATA:-wireguard}:/fixture', '/media/data'],
-    'variable in the middle of the path' => ['/volumes/app/${STAGE:-default}/data:/fixture', '/volumes/app/production/data'],
+    'variable before the path' => ['${DATA}/wireguard:/fixture', '${DATA}/wireguard'],
+    'variable with a host path default' => ['${DATA:-/srv/data}:/fixture', '${DATA:-/srv/data}'],
+    'variable with a volume name default and a host path value' => ['${DATA:-wireguard}:/fixture', '/media/data'],
+    'variable in the middle of the path' => ['/volumes/app/${STAGE:-default}/data:/fixture', '/volumes/app/${STAGE:-default}/data'],
 ]);
 
 it('keeps the name of a named volume when the value of its variable is not a host path', function (string $kind) {
@@ -110,16 +111,14 @@ it('rejects an unsafe value for a variable in a short-syntax host path', functio
     parseShortVolumeWithVariables($kind, '${DATA}/wireguard:/fixture', ['DATA' => '/opt/x;touch /tmp/pwned']);
 })->with(['service', 'application'])->throws(Exception::class, "forbidden character ';'");
 
-it('keeps the named volume that an earlier parse made from a host path with a variable until the user deletes it', function (string $kind) {
-    $result = parseShortVolumeWithVariables($kind, '${DATA}/wireguard:/fixture');
-    $oldVolume = $result['owner']->persistentStorages()->firstOrFail();
-    expect($oldVolume->isDeclaredInCompose())->toBeTrue()
-        ->and($oldVolume->replacedComposeHostPath())->toBeNull();
-
+it('keeps the named volume of an older version for a host path with a variable until the user deletes it', function (string $kind) {
+    $result = parseShortVolumeWithVariables($kind, '${DATA}/wireguard:/fixture', ['DATA' => '/media/data']);
     $resource = $kind === 'service' ? $result['owner']->service : $result['owner'];
-    $resource->environment_variables()->create(['key' => 'DATA', 'value' => '/media/data']);
-    // v4.7.7 mounted the host path and saved a file storage for it.
-    $result['owner']->fileStorages()->create(['fs_path' => '/media/data/wireguard', 'mount_path' => '/fixture', 'is_directory' => true]);
+    // v4.7.6 made a named volume from the host path. v4.7.7 saved a file storage for it, as the parse above did.
+    $oldVolume = $result['owner']->persistentStorages()->create([
+        'name' => $resource->uuid.'_'.Str::slug('${DATA}/wireguard', '-'),
+        'mount_path' => '/fixture',
+    ]);
     $parse = fn (): string => ($kind === 'service' ? serviceParser($resource->fresh()) : applicationParser($resource->fresh()))
         ->toArray()['services']['probe']['volumes'][0];
 
@@ -130,6 +129,6 @@ it('keeps the named volume that an earlier parse made from a host path with a va
 
     $oldVolume->delete();
 
-    expect($parse())->toBe('/media/data/wireguard:/fixture')
-        ->and($result['owner']->fileStorages()->pluck('fs_path')->all())->toBe(['/media/data/wireguard']);
+    expect($parse())->toBe('${DATA}/wireguard:/fixture')
+        ->and($result['owner']->fileStorages()->pluck('fs_path')->all())->toBe(['${DATA}/wireguard']);
 })->with(['service', 'application']);

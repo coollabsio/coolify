@@ -830,6 +830,7 @@ test('service nested apps dbs volumes backups and db file storages round-trip', 
             'mount_path' => '/app/config.json',
             'content' => '{"nested":true}',
             'is_directory' => false,
+            'pending_initialization' => true,
             'resource_type' => $serviceApp->getMorphClass(),
             'resource_id' => $serviceApp->id,
         ]);
@@ -1013,7 +1014,8 @@ test('service nested apps dbs volumes backups and db file storages round-trip', 
         ->and($importedSvcApp->environment_variables()->where('key', 'WHOAMI_NAME')->first()?->value)->toBe('nested-secret')
         ->and($importedSvcApp->persistentStorages)->toHaveCount(1)
         ->and($importedSvcApp->fileStorages)->toHaveCount(1)
-        ->and($importedSvcApp->fileStorages->first()->content)->toBe('{"nested":true}');
+        ->and($importedSvcApp->fileStorages->first()->content)->toBe('{"nested":true}')
+        ->and($importedSvcApp->fileStorages->first()->pending_initialization)->toBeTrue();
 
     $importedSvcDb = ServiceDatabase::where('uuid', 'svc-db-postgres')->first();
     expect($importedSvcDb)->not->toBeNull()

@@ -97,8 +97,21 @@ function fakeContentFilesServer(array $states): void
     ContentFilesUpRecorder::$commands = [];
 
     Process::fake(function ($process) use ($states) {
-        $command = is_array(remoteProcessScript($process)) ? implode(' ', remoteProcessScript($process)) : remoteProcessScript($process);
+        $command = remoteProcessScript($process);
         ContentFilesUpRecorder::$commands[] = ['ssh', $command];
+
+        if (str_contains(remoteProcessScript($process), 'config --format json')) {
+            $services = [];
+            foreach (LocalFileVolume::query()->get() as $volume) {
+                $owner = $volume->resource;
+                $name = data_get($owner, 'service') ? $owner->name : 'app';
+                $workdir = data_get($owner, 'service') ? $owner->service->workdir() : $owner->workdir();
+                $path = str_starts_with($volume->fs_path, '/') ? $volume->fs_path : $workdir.'/'.ltrim($volume->fs_path, './');
+                $services[$name]['volumes'][] = ['type' => 'bind', 'source' => $path, 'target' => $volume->mount_path];
+            }
+
+            return Process::result(output: json_encode(['services' => $services]));
+        }
 
         if (str_contains($command, 'empty-directory')) {
             $positions = collect($states)
@@ -197,6 +210,7 @@ function runComposeStart(object $test, array $properties = []): ContentFilesUpDe
 {
     $job = new ContentFilesUpDeploymentJob;
     $queue = Mockery::mock(ApplicationDeploymentQueue::class)->makePartial();
+    $queue->updated_at = now();
     $queue->shouldReceive('addLogEntry')->andReturnUsing(function (string $message, string $type = 'stdout') use ($test) {
         $test->logEntries[] = [$message, $type];
     });
@@ -217,6 +231,10 @@ function runComposeStart(object $test, array $properties = []): ContentFilesUpDe
         ...$properties,
     ] as $property => $value) {
         (new ReflectionProperty(ApplicationDeploymentJob::class, $property))->setValue($job, $value);
+    }
+
+    if ($properties['preserveRepository'] ?? false) {
+        (new ReflectionProperty(ApplicationDeploymentJob::class, 'generated_docker_compose'))->setValue($job, "services:\n  app:\n    image: nginx:alpine\n");
     }
 
     (new ReflectionMethod(ApplicationDeploymentJob::class, 'start_docker_compose_services'))->invoke($job);
@@ -360,6 +378,50 @@ test('a pull request deployment writes the preview content file path', function 
         ->and($volume->fresh()->fs_path)->toBe($this->application->workdir().'/config/app.conf');
 });
 
+test('a pull request deployment keeps a preview file that is on the server', function () {
+    $volume = contentFilesVolume($this->application, 'config/app.conf');
+    $previewPath = $volume->fs_path.'-pr-7';
+    fakeContentFilesServer([$volume->fs_path => 'file', $previewPath => 'file']);
+
+    runComposeStart($this, [
+        'pull_request_id' => 7,
+        'generated_docker_compose' => "services:\n  app:\n    image: nginx:alpine\n",
+    ]);
+
+    expect(ContentFilesUpRecorder::indexOf('ssh', 'tee '.escapeshellarg($previewPath)))->toBeNull();
+});
+
+test('a preserve-repository deployment writes file storages again after the repository copy', function () {
+    $this->application->settings()->update(['is_preserve_repository_enabled' => true]);
+    $volume = contentFilesVolume($this->application, 'config/app.conf');
+    fakeContentFilesServer([$volume->fs_path => 'file']);
+    $job = new ContentFilesUpDeploymentJob;
+    $queue = Mockery::mock(ApplicationDeploymentQueue::class)->makePartial();
+    $queue->shouldReceive('addLogEntry');
+    foreach ([
+        'application' => $this->application->fresh(),
+        'application_deployment_queue' => $queue,
+        'server' => $this->server->fresh(),
+        'mainServer' => $this->server->fresh(),
+        'deployment_uuid' => 'deployment-uuid',
+        'workdir' => '/artifacts/deployment-uuid',
+        'configuration_dir' => $this->application->workdir(),
+        'pull_request_id' => 0,
+        'preserveRepository' => true,
+        'use_build_server' => false,
+    ] as $property => $value) {
+        (new ReflectionProperty(ApplicationDeploymentJob::class, $property))->setValue($job, $value);
+    }
+
+    (new ReflectionMethod(ApplicationDeploymentJob::class, 'write_deployment_configurations'))->invoke($job);
+
+    $copy = ContentFilesUpRecorder::indexOf('deployment', 'docker cp');
+    $write = ContentFilesUpRecorder::indexOf('ssh', 'tee '.escapeshellarg($volume->fs_path));
+    expect($copy)->not->toBeNull()
+        ->and($write)->not->toBeNull()
+        ->and($write)->toBeGreaterThan($copy);
+});
+
 test('a pull request deployment of the legacy compose parser writes the content file path of the application', function () {
     $this->application->update(['compose_parsing_version' => '2']);
     $volume = contentFilesVolume($this->application, 'config/app.conf');
@@ -484,6 +546,7 @@ test('starting a service writes missing content files before docker compose up',
     $service->parse();
     $appConf = LocalFileVolume::query()->where('mount_path', '/etc/app.conf')->firstOrFail();
     $workerConf = LocalFileVolume::query()->where('mount_path', '/etc/worker.conf')->firstOrFail();
+    LocalFileVolume::query()->update(['pending_initialization' => false]);
     fakeContentFilesServer([$appConf->fs_path => 'missing', $workerConf->fs_path => 'directory']);
 
     $activity = StartService::run($service->fresh());
@@ -512,6 +575,7 @@ test('deploying one service application writes only its missing content files', 
     $service->parse();
     $appConf = LocalFileVolume::query()->where('mount_path', '/etc/app.conf')->firstOrFail();
     $workerConf = LocalFileVolume::query()->where('mount_path', '/etc/worker.conf')->firstOrFail();
+    LocalFileVolume::query()->update(['pending_initialization' => false]);
     fakeContentFilesServer([$appConf->fs_path => 'missing', $workerConf->fs_path => 'missing']);
 
     $activity = DeployServiceApplication::run($service->applications()->where('name', 'app')->firstOrFail());
@@ -633,7 +697,9 @@ test('the server file sync checks all file storages with one server command', fu
 
     getFilesystemVolumesFromServer($this->application->fresh());
 
-    expect(ContentFilesUpRecorder::ssh())->toHaveCount(1)
+    $serverCommands = collect(ContentFilesUpRecorder::ssh())
+        ->reject(fn (string $command) => str_contains($command, 'StrictHostKeyChecking=accept-new'));
+    expect($serverCommands)->toHaveCount(1)
         ->and(contentFilesStateChecks())->toHaveCount(1)
         ->and($directory->fresh()->is_directory)->toBeTruthy()
         ->and($first->fresh()->is_directory)->toBeFalsy();
@@ -666,3 +732,25 @@ test('starting a service runs its commands on the deployment queue', function (b
     'cloud' => [false, 'deployments'],
     'self-hosted' => [true, 'high'],
 ]);
+
+test('a preserve-repository deployment keeps a Git file that a new storage mounts', function () {
+    $this->application->settings()->update(['is_preserve_repository_enabled' => true]);
+    $volume = contentFilesVolume($this->application, 'config/from-git.conf', ['content' => null, 'is_directory' => true]);
+    $volume->forceFill(['pending_initialization' => true])->saveQuietly();
+    fakeContentFilesServer([$volume->fs_path => 'file']);
+
+    runComposeStart($this, [
+        'preserveRepository' => true,
+        'saved_outputs' => collect(['file_stat_'.$volume->id => 'regular file']),
+    ]);
+
+    $escapedPath = escapeshellarg($volume->fs_path);
+    $changesGitFile = fn (string $command) => str_contains($command, "rm -rf {$escapedPath}")
+        || str_contains($command, "touch {$escapedPath}")
+        || str_contains($command, "tee {$escapedPath}");
+    expect(array_filter(ContentFilesUpRecorder::ssh(), $changesGitFile))->toBeEmpty();
+    $volume = $volume->fresh();
+    expect($volume->is_directory)->toBeFalse()
+        ->and((bool) $volume->is_based_on_git)->toBeTrue()
+        ->and($volume->pending_initialization)->toBeFalse();
+});

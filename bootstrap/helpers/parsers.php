@@ -103,7 +103,7 @@ function validateDockerComposeForInjection(string $composeYaml): void
                     if (isset($volume['source'])) {
                         $source = $volume['source'];
                         if (is_string($source)) {
-                            validateComposeArrayVolumeSource($source);
+                            validateComposeBindSource($source);
                         }
                     }
                     if (isset($volume['target'])) {
@@ -432,25 +432,37 @@ function validateComposeContentVolumeSource(array $volume): void
         throw new Exception('Invalid Docker volume definition (array syntax): A bind volume with content needs a source path.');
     }
 
-    validateComposeArrayVolumeSource($source);
+    validateComposeBindSource($source);
 }
 
 /**
- * Resolves the Compose variables in a volume source as Docker Compose does: `${VAR}` is the value of VAR,
- * and `${VAR:-default}` or `${VAR-default}` is the value of VAR or else the default. Only non-empty values count.
- *
- * Without $variables, or when the result with them is not a host path, a variable with a default becomes the
- * default and a variable without one stays as written. So a named volume keeps the name that it always had,
- * and an empty default gives `${VAR}`.
- *
- * @param  array<string, string>|null  $variables  The plain values that the resource sets (composeVolumeSourceVariables())
+ * Replaces a `${VAR:-default}` volume source with its default, as the short volume syntax does.
+ * An empty default becomes `${VAR}`. Other sources do not change.
  */
-function resolveComposeVolumeSourceVariables(string $source, ?array $variables = null): string
+function resolveComposeVolumeSourceDefault(string $source): string
 {
-    $resolve = fn (array $values): string => preg_replace_callback(
-        '/\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?-([^}]*))?\}/',
-        function (array $match) use ($values): string {
-            $value = $values[$match[1]] ?? '';
+    if (! preg_match('/^\$\{([^}]+)\}$/', $source, $matches) || ! str_contains($matches[1], ':-')) {
+        return $source;
+    }
+
+    [$varName, $defaultValue] = explode(':-', $matches[1], 2);
+
+    return $defaultValue !== '' ? $defaultValue : '${'.$varName.'}';
+}
+
+/**
+ * Resolves the flat Compose variables in a volume source with the plain values of the resource, as Docker Compose does:
+ * `${VAR}` is the value of VAR, and `${VAR:-default}` or `${VAR-default}` is the value of VAR or else the default.
+ * Only non-empty values count. Coolify uses the result only to compare and show paths; Docker Compose mounts the source.
+ *
+ * @param  array<string, string>  $variables  The plain values that the resource sets (composeVolumeSourceVariables())
+ */
+function resolveComposeVolumeSourceVariables(string $source, array $variables = []): string
+{
+    return preg_replace_callback(
+        '/\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?-([^${}]*))?\}/',
+        function (array $match) use ($variables): string {
+            $value = $variables[$match[1]] ?? '';
             if ($value !== '') {
                 return $value;
             }
@@ -459,105 +471,134 @@ function resolveComposeVolumeSourceVariables(string $source, ?array $variables =
         },
         $source
     );
-
-    $withoutValues = $resolve([]);
-    if ($variables === null) {
-        return $withoutValues;
-    }
-    $withValues = $resolve($variables);
-
-    return sourceIsLocal(str($withValues)) ? $withValues : $withoutValues;
 }
 
 /**
- * Before v4.7.6, a short-syntax host path such as `${DATA:-./data}` always used the default, also when the resource
- * set DATA. A storage that Coolify saved with that path keeps it, so its data does not move after the upgrade. The
- * storage keeps the path of the variable in `variable_fs_path`, and the user switches to it on the storage.
+ * Checks the variables of a short-syntax host path before Docker Compose resolves it. Without a value, Docker Compose
+ * replaces `${VAR}` with an empty string and mounts a path under `/`. A plain value must be a shell-safe path.
+ * Values with a variable or vault reference stay for Docker Compose to resolve.
  *
- * @return array{0: Stringable, 1: ?string} The host path, and the path of the variable while the saved path is kept
+ * @throws Exception If a variable without a default is not set, or a plain value is not a safe path
  */
-function keepSavedComposeBindSource(Stringable $source, ?string $volume, Stringable $mainDirectory, ?LocalFileVolume $savedStorage, Application|Service $resource): array
+function validateComposeShortBindVariables(Stringable $source, Application|Service $resource, bool $isPreview = false): void
 {
-    if ($volume === null || $savedStorage === null || ! str_contains($volume, '${')) {
-        return [$source, null];
+    if (! $source->contains('${')) {
+        return;
     }
-    try {
-        $defaultSource = parseDockerVolumeString($volume)['source'];
-    } catch (Exception) {
-        return [$source, null];
+    $values = composeEnvironmentVariablesQuery($resource, $isPreview)->get()
+        ->mapWithKeys(fn ($variable) => [$variable->key => (string) $variable->real_value]);
+    preg_match_all('/\$\{([A-Za-z_][A-Za-z0-9_]*)(\}|:?[-?+])/', $source->value(), $matches, PREG_SET_ORDER);
+    foreach ($matches as [, $name, $operator]) {
+        $value = $values->get($name);
+        if ($operator === '}' && blank($value) && ! str_starts_with($name, 'COOLIFY_') && ! str_starts_with($name, 'SERVICE_')) {
+            throw new Exception(
+                "Invalid Docker volume definition: the host path {$source} uses the variable {$name}, which has no value. ".
+                "Set {$name} in the environment variables of the resource, or add a default, for example \${{$name}:-/data}."
+            );
+        }
+        if (blank($value) || str_contains($value, '$') || RemoteSecretReferences::containsReference($value)) {
+            continue;
+        }
+        try {
+            validateShellSafePath($value, 'volume source');
+        } catch (Exception $e) {
+            throw new Exception("Invalid Docker volume definition: the value of {$name} is not a safe path. ".$e->getMessage(), 0, $e);
+        }
     }
-    if ($defaultSource === null || ! sourceIsLocal($defaultSource)) {
-        return [$source, null];
-    }
-    $defaultSource = resolveComposeBindSource($defaultSource, $mainDirectory, $savedStorage->fs_path);
-    if ($defaultSource->value() === $source->value() || $savedStorage->fs_path !== $defaultSource->value()) {
-        return [$source, null];
-    }
-    $resource->addComposeVolumeWarning("The storage {$savedStorage->mount_path} keeps its saved host path {$defaultSource}. Its variable gives {$source}. To use that path, open the storage and click Use the variable path.");
-
-    return [$defaultSource, $source->value()];
 }
 
 /**
- * The name of the Docker volume that v4.7.6 and older gave a short-syntax volume with a variable, such as
- * `${DATA}/config:/config` or `${DATA:-name}:/data`. Those versions ignored the values of the resource, so the
- * source was a volume name. Null when the source without those values is a host path.
- */
-function composeShortVolumeSavedName(string $volume, string $uuid): ?string
-{
-    if (! str_contains($volume, '${')) {
-        return null;
-    }
-    try {
-        $source = parseDockerVolumeString($volume)['source'];
-    } catch (Exception) {
-        return null;
-    }
-    if ($source === null || sourceIsLocal($source)) {
-        return null;
-    }
-
-    return "{$uuid}_".Str::slug($source, '-');
-}
-
-/**
- * The host path that the values of the resource give a short-syntax volume, or null when they give a volume name
- * or a value that is not valid.
+ * A Compose source with a variable, such as `${DATA}/config`, can give another host path after a change of the
+ * variable or of the Compose file. A storage that has a host path already (saved by an older version, or pinned
+ * by a deployment, see LocalFileVolume::pinComposeHostPath()) keeps it, so its data does not move. The storage
+ * keeps the new source in `variable_fs_path`, and the user switches to it on the storage page.
  *
- * @param  array<string, string>  $variables  The plain values that the resource sets (composeVolumeSourceVariables())
+ * @return array{0: Stringable, 1: ?string} The host path, and the new source while the host path is kept
  */
-function composeShortVolumeVariableHostPath(string $volume, array $variables): ?string
+function keepSavedComposeBindSource(Stringable $source, ?string $writtenSource, ?LocalFileVolume $savedStorage, Application|Service $resource): array
 {
-    try {
-        $source = parseDockerVolumeString($volume, $variables)['source'];
-    } catch (Exception) {
-        return null;
+    $savedPath = $savedStorage?->fs_path;
+    if ($writtenSource === null || ! str_contains($writtenSource, '${') || ! is_string($savedPath)
+        || ! str_starts_with($savedPath, '/') || str_contains($savedPath, '$') || $savedPath === $source->value()) {
+        return [$source, null];
     }
+    $newPath = str_contains($source->value(), '$')
+        ? composeShortVolumeVariableHostPath($source, composeVolumeSourceVariables($resource))
+        : $source->value();
+    if ($newPath === $savedPath) {
+        return [str($savedPath), null];
+    }
+    $resource->addComposeVolumeWarning($newPath === null
+        ? "The storage {$savedStorage->mount_path} keeps its host path {$savedPath}, so its data does not move. Its Compose source is now {$source}, which Docker Compose resolves. To use it, open the storage and click Use the new path."
+        : "The storage {$savedStorage->mount_path} keeps its host path {$savedPath}, so its data does not move. Its Compose source now gives {$newPath}. To use that path, move the data, then open the storage and click Use the new path.");
 
-    return $source !== null && sourceIsLocal($source) ? $source->value() : null;
+    return [str($savedPath), $source->value()];
 }
 
 /**
- * Like keepSavedComposeBindSource() for a named volume: a short-syntax volume that v4.7.6 and older saved as a
- * Docker volume stays that volume while its storage entry exists, also when its variable now gives a host path.
- * So the data does not move after the upgrade. To use the host path, the user deletes the storage entry
- * (LocalPersistentVolume::replacedComposeHostPath()).
+ * The name of the Docker volume that v4.7.6 and older gave a short-syntax source that starts with a variable,
+ * such as `${DATA}/config` or `${DATA:-name}`. Null for other sources.
+ */
+function composeShortVolumeSavedName(Stringable $source, string $uuid): ?string
+{
+    if (! $source->startsWith('$')) {
+        return null;
+    }
+
+    return "{$uuid}_".Str::slug(composeNamedVolumeSource($source), '-');
+}
+
+/**
+ * The host path that the plain values of the resource give a short-syntax source, or null when a variable stays.
  *
  * @param  array<string, string>  $variables  The plain values that the resource sets (composeVolumeSourceVariables())
- * @return bool Whether the parser must use the volume without the values of the resource
  */
-function keepSavedComposeNamedVolume(string $volume, string $uuid, array $variables, Application|ServiceApplication|ServiceDatabase $owner, Application|Service $resource): bool
+function composeShortVolumeVariableHostPath(Stringable $source, array $variables): ?string
 {
-    $name = composeShortVolumeSavedName($volume, $uuid);
-    if ($name === null || ! $owner->persistentStorages()->where('name', $name)->exists()) {
-        return false;
-    }
-    $hostPath = composeShortVolumeVariableHostPath($volume, $variables);
-    if ($hostPath !== null) {
-        $resource->addComposeVolumeWarning("The volume {$name} stays in use, so its data does not move. Its variable gives the host path {$hostPath}. To use that path, copy the data, delete the storage entry {$name} in Persistent Storage, and redeploy.");
-    }
+    $path = resolveComposeVolumeSourceVariables($source->value(), $variables);
 
-    return true;
+    return ! str_contains($path, '${') && sourceIsLocal(str($path)) ? $path : null;
+}
+
+/**
+ * A short-syntax source such as `${DATA:-name}` is a named volume, but Docker Compose mounts a host path when the
+ * resource sets DATA to one. Then the source is that host path, unless the named volume of v4.7.6 and older still
+ * exists (keepSavedComposeNamedVolume()).
+ *
+ * @throws Exception If the value of the variable is not a safe path
+ */
+function composeShortVolumeVariableSource(Stringable $source, string $uuid, Application|ServiceApplication|ServiceDatabase $owner, Application|Service $resource, bool $isPreview = false): Stringable
+{
+    if (sourceIsLocal($source) || ! $source->startsWith('${')) {
+        return $source;
+    }
+    $hostPath = composeShortVolumeVariableHostPath($source, composeVolumeSourceVariables($resource, $isPreview));
+    if ($hostPath === null || $owner->persistentStorages()->where('name', composeShortVolumeSavedName($source, $uuid))->exists()) {
+        return $source;
+    }
+    validateComposeBindSource($hostPath);
+    validateShellSafePath($hostPath, 'volume source');
+
+    return str($hostPath);
+}
+
+/**
+ * The named volume that v4.7.6 and older gave a short-syntax source with a variable, such as `${DATA}/config`, stays
+ * while its storage entry exists, also when the variable now gives a host path. So the data does not move. This
+ * removes the file storage that a later parse saved for the host path, and tells the user how to switch. To use
+ * the host path, the user deletes the storage entry (LocalPersistentVolume::replacedComposeHostPath()).
+ */
+function keepSavedComposeNamedVolume(Stringable $source, string $mountPath, string $uuid, Application|ServiceApplication|ServiceDatabase $owner, Application|Service $resource, bool $isPreview = false): void
+{
+    $name = composeShortVolumeSavedName($source, $uuid);
+    $hostPath = $name === null ? null : composeShortVolumeVariableHostPath($source, composeVolumeSourceVariables($resource, $isPreview));
+    if ($hostPath === null) {
+        return;
+    }
+    if (! $isPreview) {
+        forgetComposeBindStorage($owner, $mountPath);
+    }
+    $resource->addComposeVolumeWarning("The volume {$name} stays in use, so its data does not move. Its variable gives the host path {$hostPath}. To use that path, copy the data, delete the storage entry {$name} in Persistent Storage, and redeploy.");
 }
 
 /**
@@ -573,7 +614,7 @@ function composeEnvironmentVariablesQuery(Application|Service $resource, bool $i
 }
 
 /**
- * The values for resolveComposeVolumeSourceVariables(). A value with a variable or vault reference is left out,
+ * The plain values for resolveComposeVolumeSourceVariables(). A value with a variable or vault reference is left out,
  * because only Docker Compose can resolve it.
  *
  * @return array<string, string>
@@ -596,12 +637,12 @@ function composeVolumeSourceVariables(Application|Service $resource, bool $isPre
 function resolveComposeLongBindSource(string $source, Application|Service $resource, bool $isPreview = false): string
 {
     if (! preg_match('/^\$\{([A-Za-z_][A-Za-z0-9_]*):-[^}]*\}$/', $source, $matches)) {
-        return resolveComposeVolumeSourceVariables($source);
+        return resolveComposeVolumeSourceDefault($source);
     }
 
     $value = composeEnvironmentVariablesQuery($resource, $isPreview)->where('key', $matches[1])->first()?->real_value;
     if (blank($value)) {
-        return resolveComposeVolumeSourceVariables($source);
+        return resolveComposeVolumeSourceDefault($source);
     }
     // Docker Compose expands variable references in the `.env` file, and Coolify writes vault secrets to it.
     if (str_contains($value, '$') || RemoteSecretReferences::containsReference($value)) {
@@ -615,37 +656,6 @@ function resolveComposeLongBindSource(string $source, Application|Service $resou
     }
 
     return $value;
-}
-
-/**
- * Keep the existing array-source forms, but inspect the default that was previously skipped.
- */
-function validateComposeArrayVolumeSource(string $source): void
-{
-    try {
-        if (preg_match('/[\x00-\x1F\x7F]/', $source)) {
-            throw new Exception('Invalid volume source: contains a control character.');
-        }
-
-        if (preg_match('/^\$\{[A-Za-z_][A-Za-z0-9_]*\}[\/\w.\-]*$/', $source)) {
-            return;
-        }
-
-        if (preg_match('/^\$\{[A-Za-z_][A-Za-z0-9_]*:-([^}]*)\}$/', $source, $matches)) {
-            validateShellSafePath($matches[1], 'volume source');
-
-            return;
-        }
-
-        validateShellSafePath($source, 'volume source');
-    } catch (Exception $e) {
-        throw new Exception(
-            'Invalid Docker volume definition (array syntax): '.$e->getMessage().
-            ' Please use safe path names without shell metacharacters.',
-            0,
-            $e
-        );
-    }
 }
 
 /**
@@ -1166,6 +1176,77 @@ function validateVolumeStringForInjection(string $volumeString): void
     parseDockerVolumeString($volumeString);
 }
 
+function validateComposeBindSource(string $source): void
+{
+    if (str_contains($source, '`')) {
+        throw new Exception('Invalid Docker volume definition: volume source contains backtick.');
+    }
+    if (str_contains($source, '$(')) {
+        throw new Exception('Invalid Docker volume definition: volume source contains command substitution.');
+    }
+    if ($source === '') {
+        throw new Exception('Invalid Docker volume definition: volume source is empty.');
+    }
+    if (preg_match('/[\x00-\x1F\x7F]|[\x60;|&<>]/', $source, $matches)) {
+        $character = ctype_print($matches[0]) ? "'{$matches[0]}'" : sprintf('0x%02X', ord($matches[0]));
+        throw new Exception("Invalid Docker volume definition: volume source contains the forbidden character {$character}.");
+    }
+
+    $length = strlen($source);
+    for ($i = 0; $i < $length; $i++) {
+        /** Docker Compose keeps `{` and `}` outside of `${...}` as literal path characters. */
+        if ($source[$i] !== '$') {
+            continue;
+        }
+        if ($i + 1 >= $length) {
+            throw new Exception('Invalid Docker volume source: malformed interpolation.');
+        }
+        if ($source[$i + 1] === '$') {
+            $i++;
+
+            continue;
+        }
+        if ($source[$i + 1] === '{') {
+            $start = $i + 2;
+            $depth = 1;
+            $j = $start;
+            while ($j < $length && $depth > 0) {
+                if ($source[$j] === '$' && ($source[$j + 1] ?? '') === '{') {
+                    $depth++;
+                    $j += 2;
+
+                    continue;
+                }
+                if ($source[$j] === '}') {
+                    $depth--;
+                }
+                $j++;
+            }
+            if ($depth !== 0) {
+                throw new Exception('Invalid Docker volume source: malformed interpolation.');
+            }
+            $expression = substr($source, $start, $j - $start - 1);
+            if (! preg_match('/^[A-Za-z_][A-Za-z0-9_]*(?:(:-|-|:\\+|\\+|:\\?|\\?)([\\s\\S]*))?$/', $expression, $parts)) {
+                throw new Exception('Invalid Docker volume source: malformed interpolation.');
+            }
+            if (isset($parts[2]) && $parts[2] !== '') {
+                validateComposeBindSource($parts[2]);
+            }
+            $i = $j - 1;
+
+            continue;
+        }
+        if (preg_match('/[A-Za-z_]/', $source[$i + 1])) {
+            while ($i + 1 < $length && preg_match('/[A-Za-z0-9_]/', $source[$i + 1])) {
+                $i++;
+            }
+
+            continue;
+        }
+        throw new Exception('Invalid Docker volume source: malformed interpolation.');
+    }
+}
+
 /**
  * Rejects a Compose variable in the container path of a volume with a message that tells the user what to do.
  * Coolify stores the container path and uses it in backups, file storages, and transfers, so it must be a literal path.
@@ -1181,193 +1262,52 @@ function rejectComposeVolumeTargetVariable(string $target, string $prefix): void
     }
 }
 
-function parseDockerVolumeString(string $volumeString, ?array $variables = null): array
+/**
+ * Splits a short-syntax volume. The source keeps its Compose variables as written: Docker Compose resolves them
+ * (see ComposeBindPathResolver).
+ *
+ * @return array{source: Stringable, target: Stringable, mode: ?Stringable}
+ */
+function parseDockerVolumeString(string $volumeString): array
 {
     $volumeString = trim($volumeString);
-    $source = null;
-    $target = null;
-    $mode = null;
+    $parts = [];
+    $start = 0;
+    $depth = 0;
+    $length = strlen($volumeString);
+    for ($i = 0; $i < $length; $i++) {
+        if ($volumeString[$i] === '$' && ($volumeString[$i + 1] ?? '') === '{') {
+            $depth++;
+            $i++;
 
-    // A Compose variable such as ${VAR:-/data} can contain a colon, so the split does not look inside variables.
-    $variableTexts = [];
-    $volumeString = preg_replace_callback('/\$\{[^}]*\}/', function (array $match) use (&$variableTexts): string {
-        $variableTexts[] = $match[0];
-
-        return "\0".(count($variableTexts) - 1)."\0";
-    }, $volumeString);
-    $restoreVariables = fn (?string $part): ?string => $part === null ? null : preg_replace_callback(
-        '/\0(\d+)\0/',
-        fn (array $match): string => $variableTexts[(int) $match[1]] ?? $match[0],
-        $part
-    );
-
-    $colonCount = substr_count($volumeString, ':');
-
-    if ($colonCount === 0) {
-        // Named volume without target (unusual but valid)
-        // Example: "myvolume"
-        $source = $volumeString;
-        $target = $volumeString;
-    } elseif ($colonCount === 1) {
-        // Simple volume mapping
-        // Examples: "gitea:/data" or "./data:/app/data" or "${VAR:-default}:/data"
-        $parts = explode(':', $volumeString);
-        $source = $parts[0];
-        $target = $parts[1];
-    } elseif ($colonCount === 2) {
-        // Volume with mode OR Windows path
-        if (preg_match('/^[A-Za-z]:/', $volumeString)) {
-            // Windows path as source (C:/, D:/, etc.)
-            // Find the second colon which is the real separator
-            $secondColon = strpos($volumeString, ':', 2);
-            if ($secondColon !== false) {
-                $source = substr($volumeString, 0, $secondColon);
-                $target = substr($volumeString, $secondColon + 1);
-            } else {
-                // Malformed, treat as is
-                $source = $volumeString;
-                $target = $volumeString;
-            }
-        } else {
-            // Not a Windows path, check for mode
-            $lastColon = strrpos($volumeString, ':');
-            $possibleMode = substr($volumeString, $lastColon + 1);
-
-            // Check if the last part is a valid Docker volume mode
-            $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
-
-            if (in_array($possibleMode, $validModes)) {
-                // It's a mode
-                // Examples: "gitea:/data:ro" or "./data:/app/data:rw"
-                $mode = $possibleMode;
-                $volumeWithoutMode = substr($volumeString, 0, $lastColon);
-                $colonPos = strpos($volumeWithoutMode, ':');
-
-                if ($colonPos !== false) {
-                    $source = substr($volumeWithoutMode, 0, $colonPos);
-                    $target = substr($volumeWithoutMode, $colonPos + 1);
-                } else {
-                    // Shouldn't happen for valid volume strings
-                    $source = $volumeWithoutMode;
-                    $target = $volumeWithoutMode;
-                }
-            } else {
-                // The last colon is part of the path
-                // For now, treat the first occurrence of : as the separator
-                $firstColon = strpos($volumeString, ':');
-                $source = substr($volumeString, 0, $firstColon);
-                $target = substr($volumeString, $firstColon + 1);
-            }
+            continue;
         }
-    } else {
-        // More than 2 colons - likely Windows paths or complex cases
-        // Use a heuristic: find the most likely separator colon
-        // Look for patterns like "C:" at the beginning (Windows drive)
-        if (preg_match('/^[A-Za-z]:/', $volumeString)) {
-            // Windows path as source
-            // Find the next colon after the drive letter
-            $secondColon = strpos($volumeString, ':', 2);
-            if ($secondColon !== false) {
-                $source = substr($volumeString, 0, $secondColon);
-                $remaining = substr($volumeString, $secondColon + 1);
+        if ($volumeString[$i] === '}' && $depth > 0) {
+            $depth--;
 
-                // Check if there's a mode at the end
-                $lastColon = strrpos($remaining, ':');
-                if ($lastColon !== false) {
-                    $possibleMode = substr($remaining, $lastColon + 1);
-                    $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
-
-                    if (in_array($possibleMode, $validModes)) {
-                        $mode = $possibleMode;
-                        $target = substr($remaining, 0, $lastColon);
-                    } else {
-                        $target = $remaining;
-                    }
-                } else {
-                    $target = $remaining;
-                }
-            } else {
-                // Malformed, treat as is
-                $source = $volumeString;
-                $target = $volumeString;
-            }
-        } else {
-            // Try to parse normally, treating first : as separator
-            $firstColon = strpos($volumeString, ':');
-            $source = substr($volumeString, 0, $firstColon);
-            $remaining = substr($volumeString, $firstColon + 1);
-
-            // Check for mode at the end
-            $lastColon = strrpos($remaining, ':');
-            if ($lastColon !== false) {
-                $possibleMode = substr($remaining, $lastColon + 1);
-                $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
-
-                if (in_array($possibleMode, $validModes)) {
-                    $mode = $possibleMode;
-                    $target = substr($remaining, 0, $lastColon);
-                } else {
-                    $target = $remaining;
-                }
-            } else {
-                $target = $remaining;
-            }
+            continue;
+        }
+        if ($volumeString[$i] === ':' && $depth === 0 && ! ($i === 1 && preg_match('/^[A-Za-z]:/', $volumeString))) {
+            $parts[] = substr($volumeString, $start, $i - $start);
+            $start = $i + 1;
         }
     }
-
-    $source = $restoreVariables($source);
-    $target = $restoreVariables($target);
-    $mode = $restoreVariables($mode);
-
-    if ($source) {
-        $source = resolveComposeVolumeSourceVariables((string) $source, $variables);
+    $parts[] = substr($volumeString, $start);
+    if (count($parts) > 3 || in_array('', $parts, true)) {
+        throw new Exception('Invalid Docker volume definition.');
+    }
+    $source = $parts[0];
+    $target = $parts[1] ?? $source;
+    $mode = $parts[2] ?? null;
+    validateComposeBindSource($source);
+    rejectComposeVolumeTargetVariable($target, 'Invalid Docker volume definition');
+    validateShellSafePath($target, 'volume target');
+    /** Compose accepts options such as `ro`, `z`, and `nocopy`, and ignores unknown ones. */
+    if ($mode !== null && preg_match('/^[A-Za-z]+(?:,[A-Za-z]+)*$/', $mode) !== 1) {
+        throw new Exception('Invalid Docker volume mode.');
     }
 
-    // Validate source path for command injection attempts
-    // We validate the final source value after environment variable processing
-    if ($source !== null) {
-        // A ${VAR} that is left is resolved by Docker Compose, not by a shell. The text around it must be safe.
-        try {
-            validateShellSafePath(preg_replace('/\$\{[A-Za-z_][A-Za-z0-9_]*\}/', '', $source), 'volume source');
-        } catch (Exception $e) {
-            // Re-throw with more context about the volume string
-            throw new Exception(
-                'Invalid Docker volume definition: '.$e->getMessage().
-                ' Please use safe path names without shell metacharacters.'
-            );
-        }
-
-        // Coolify creates and manages the host path, so it must know the value of each variable in it.
-        if ($variables !== null && sourceIsLocal(str($source)) && preg_match('/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/', $source, $matches)) {
-            throw new Exception(
-                "Invalid Docker volume definition: the host path {$source} uses the variable {$matches[1]}, which has no value. ".
-                "Set {$matches[1]} in the environment variables of the resource, or add a default, for example \${{$matches[1]}:-/data}."
-            );
-        }
-    }
-
-    // Also validate target path
-    if ($target !== null) {
-        $targetStr = is_string($target) ? $target : $target;
-        // Target paths in containers are typically absolute paths, so we validate them too
-        // but they're less likely to be dangerous since they're not used in host commands
-        // Still, defense in depth is important
-        rejectComposeVolumeTargetVariable($targetStr, 'Invalid Docker volume definition');
-        try {
-            validateShellSafePath($targetStr, 'volume target');
-        } catch (Exception $e) {
-            throw new Exception(
-                'Invalid Docker volume definition: '.$e->getMessage().
-                ' Please use safe path names without shell metacharacters.'
-            );
-        }
-    }
-
-    return [
-        'source' => $source !== null ? str($source) : null,
-        'target' => $target !== null ? str($target) : null,
-        'mode' => $mode !== null ? str($mode) : null,
-    ];
+    return ['source' => str($source), 'target' => str($target), 'mode' => $mode === null ? null : str($mode)];
 }
 
 function addTraefikDockerNetworkLabel(Collection $labels, string $network): Collection
@@ -1860,22 +1800,17 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                 $target = null;
                 $content = null;
                 $isDirectory = false;
+                $writtenSource = null;
                 if (is_string($volume)) {
-                    $volumeVariables = str_contains($volume, '${')
-                        ? $volumeSourceVariables ??= composeVolumeSourceVariables($resource, $isPullRequest)
-                        : null;
-                    $keepsSavedVolume = $volumeVariables !== null
-                        && keepSavedComposeNamedVolume($volume, $uuid, $volumeVariables, $originalResource, $resource);
-                    $parsed = parseDockerVolumeString($volume, $keepsSavedVolume ? null : $volumeVariables);
+                    $parsed = parseDockerVolumeString($volume);
                     $source = $parsed['source'];
+                    $writtenSource = $source->value();
                     $target = $parsed['target'];
-                    if ($keepsSavedVolume && ! $isPullRequest) {
-                        // An earlier parse of this version mounted the host path. That bind is not mounted anymore.
-                        forgetComposeBindStorage($originalResource, $target->value());
-                    }
+                    $source = composeShortVolumeVariableSource($source, $uuid, $originalResource, $resource, $isPullRequest);
                     // Mode is available in $parsed['mode'] if needed
                     $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
-                    if (sourceIsLocal($source)) {
+                    if (composeShortSyntaxIsBind($source, $originalResource, $uuid)) {
+                        validateComposeShortBindVariables($source, $resource, $isPullRequest);
                         $type = str('bind');
                         if ($foundConfig) {
                             $content = data_get($foundConfig, 'content');
@@ -1885,18 +1820,20 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             $isDirectory = true;
                         }
                     } else {
+                        keepSavedComposeNamedVolume($source, $target->value(), $uuid, $originalResource, $resource, $isPullRequest);
                         $type = str('volume');
                     }
                 } elseif (is_array($volume)) {
                     $type = data_get_str($volume, 'type');
                     $source = data_get_str($volume, 'source');
+                    $writtenSource = $source->value();
                     $target = data_get_str($volume, 'target');
                     $content = data_get($volume, 'content');
                     $isDirectory = data_get($volume, 'is_directory') ?? data_get($volume, 'isDirectory');
 
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
-                        validateComposeArrayVolumeSource($source->value());
+                        validateComposeBindSource($source->value());
                         // A named volume keeps its source as written, so its volume name does not change.
                         if ($type->value() === 'bind') {
                             $source = str(resolveComposeLongBindSource($source->value(), $resource, $isPullRequest));
@@ -1940,7 +1877,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
                         $source = resolveComposeBindSource($source, $mainDirectory, $foundConfig?->fs_path);
-                        [$source, $variableSource] = keepSavedComposeBindSource($source, is_string($volume) ? $volume : null, $mainDirectory, $foundConfig, $resource);
+                        [$source, $variableSource] = keepSavedComposeBindSource($source, $writtenSource, $foundConfig, $resource);
                         // The file storage keeps the path of the application; a preview deployment adds the suffix (LocalFileVolume::forPullRequest()).
                         $storedSource = $source;
                         $isPreviewSuffixEnabled = $foundConfig
@@ -1984,6 +1921,9 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
                 } elseif ($type->value() === 'volume') {
+                    if (is_string($volume)) {
+                        $source = composeNamedVolumeSource($source);
+                    }
                     // A preview never mounts an external or network (NFS, CIFS) volume: two deployments
                     // that write into the same data directory (for example two databases) can corrupt it.
                     // The preview gets its own volume with the name that older Coolify versions gave
@@ -3232,22 +3172,17 @@ function serviceParser(Service $resource): Collection
                 $target = null;
                 $content = null;
                 $isDirectory = false;
+                $writtenSource = null;
                 if (is_string($volume)) {
-                    $volumeVariables = str_contains($volume, '${')
-                        ? $volumeSourceVariables ??= composeVolumeSourceVariables($resource)
-                        : null;
-                    $keepsSavedVolume = $volumeVariables !== null
-                        && keepSavedComposeNamedVolume($volume, $uuid, $volumeVariables, $originalResource, $resource);
-                    $parsed = parseDockerVolumeString($volume, $keepsSavedVolume ? null : $volumeVariables);
+                    $parsed = parseDockerVolumeString($volume);
                     $source = $parsed['source'];
+                    $writtenSource = $source->value();
                     $target = $parsed['target'];
-                    if ($keepsSavedVolume) {
-                        // An earlier parse of this version mounted the host path. That bind is not mounted anymore.
-                        forgetComposeBindStorage($originalResource, $target->value());
-                    }
+                    $source = composeShortVolumeVariableSource($source, $uuid, $originalResource, $resource, false);
                     // Mode is available in $parsed['mode'] if needed
                     $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
-                    if (sourceIsLocal($source)) {
+                    if (composeShortSyntaxIsBind($source, $originalResource, $uuid)) {
+                        validateComposeShortBindVariables($source, $resource, false);
                         $type = str('bind');
                         if ($foundConfig) {
                             $content = data_get($foundConfig, 'content');
@@ -3257,18 +3192,20 @@ function serviceParser(Service $resource): Collection
                             $isDirectory = true;
                         }
                     } else {
+                        keepSavedComposeNamedVolume($source, $target->value(), $uuid, $originalResource, $resource, false);
                         $type = str('volume');
                     }
                 } elseif (is_array($volume)) {
                     $type = data_get_str($volume, 'type');
                     $source = data_get_str($volume, 'source');
+                    $writtenSource = $source->value();
                     $target = data_get_str($volume, 'target');
                     $content = data_get($volume, 'content');
                     $isDirectory = data_get($volume, 'is_directory') ?? data_get($volume, 'isDirectory');
 
                     // Validate source and target for command injection (array/long syntax)
                     if ($source !== null && ! empty($source->value())) {
-                        validateComposeArrayVolumeSource($source->value());
+                        validateComposeBindSource($source->value());
                         // A named volume keeps its source as written, so its volume name does not change.
                         if ($type->value() === 'bind') {
                             $source = str(resolveComposeLongBindSource($source->value(), $resource));
@@ -3312,7 +3249,7 @@ function serviceParser(Service $resource): Collection
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
                         $source = resolveComposeBindSource($source, $mainDirectory, $foundConfig?->fs_path);
-                        [$source, $variableSource] = keepSavedComposeBindSource($source, is_string($volume) ? $volume : null, $mainDirectory, $foundConfig, $resource);
+                        [$source, $variableSource] = keepSavedComposeBindSource($source, $writtenSource, $foundConfig, $resource);
                         // With `bind.create_host_path: false`, the host path must exist already: Coolify does not create or manage it.
                         if (! composeBindKeepsMissingHostPath($volume)) {
                             LocalFileVolume::updateOrCreate(
@@ -3346,6 +3283,9 @@ function serviceParser(Service $resource): Collection
                         }
                     }
                 } elseif ($type->value() === 'volume') {
+                    if (is_string($volume)) {
+                        $source = composeNamedVolumeSource($source);
+                    }
                     if (useComposeExternalVolumeAsWritten($resource, $originalResource, $topLevel->get('volumes'), $source->value(), "{$uuid}_".Str::slug($source, '-'))) {
                         // The external volume gets no row, so Coolify never removes it.
                         $volumesParsed->put($index, $volume);

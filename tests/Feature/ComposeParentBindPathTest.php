@@ -273,9 +273,7 @@ describe('storage', function () {
             'resource_type' => $web->getMorphClass(),
         ]);
 
-        $method = new ReflectionMethod(LocalFileVolume::class, 'isAdminControlledComposeMount');
-
-        expect($method->invoke($volume->fresh()))->toBeTrue();
+        expect($volume->fresh()->usesComposeBindSource())->toBeTrue();
     })->with([
         'resolved path' => [base_configuration_dir().'/services/outside'],
         'old path' => [base_configuration_dir().'/services/{uuid}./outside'],

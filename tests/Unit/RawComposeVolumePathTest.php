@@ -170,7 +170,7 @@ it('quotes quotes and backslashes so they cannot change the mkdir command', func
         ->and(rawComposeBindMkdirCommand('/tmp/foo\\bar'))
         ->toBe("mkdir -p -- '/tmp/foo\\bar' > /dev/null 2>&1 || true")
         ->and(rawComposeBindMkdirCommand('$HOME'))
-        ->toBe("mkdir -p -- '\$HOME' > /dev/null 2>&1 || true");
+        ->toBeNull();
 });
 
 it('does not expand compose environment interpolations through the server shell', function () {

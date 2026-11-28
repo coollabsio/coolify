@@ -18,7 +18,6 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\Process\Process as SymfonyProcess;
 use Tests\TestCase;
 
 uses(TestCase::class, RefreshDatabase::class);
@@ -75,7 +74,8 @@ it('does not read regular bind-mounted file contents while loading service setti
     ]);
 
     $volume = Mockery::mock(LocalFileVolume::class)->makePartial();
-    $volume->fs_path = '/data/large.bin';
+    $volume->fs_path = '/data/application/large.bin';
+    $volume->shouldReceive('contentPathOnServer')->once()->andReturn('/data/application/large.bin');
     $volume->is_based_on_git = false;
     $volume->shouldReceive('save')->once();
     $volume->shouldNotReceive('loadStorageOnServer');
@@ -96,7 +96,9 @@ it('does not read regular bind-mounted file contents while loading service setti
     getFilesystemVolumesFromServer($application);
 
     expect($volume->is_directory)->toBeFalse();
-    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'cat /data/large.bin') || str_contains(remoteProcessScript($process), 'head -c'));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'empty-directory')
+        && str_contains(remoteProcessScript($process), "'/data/application/large.bin'"));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'cat /data/application/large.bin') || str_contains(remoteProcessScript($process), 'head -c'));
 });
 
 it('does not interpolate unsafe persisted file-storage paths into remote commands', function (string $path) {
@@ -110,6 +112,7 @@ it('does not interpolate unsafe persisted file-storage paths into remote command
 
     $volume = Mockery::mock(LocalFileVolume::class)->makePartial();
     $volume->fs_path = $path;
+    $volume->setRelation('resource', (object) ['docker_compose_raw' => 'services: {}']);
 
     $fileStorages = Mockery::mock(MorphMany::class);
     $fileStorages->shouldReceive('get')->once()->andReturn(collect([$volume]));
@@ -121,35 +124,12 @@ it('does not interpolate unsafe persisted file-storage paths into remote command
     $application->setRelation('destination', (object) ['server' => $server]);
 
     Process::fake();
-    expect(fn () => getFilesystemVolumesFromServer($application, true))->toThrow(Exception::class);
+    getFilesystemVolumesFromServer($application, true);
 
     Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), $path));
 })->with(['/tmp/evil`id`', '/tmp/evil$(id)', '/tmp/evil;id', '/tmp/evil|id', '${DATA:-/tmp/evil$(id)}', '/srv/$HOME;id', '${DATA:-/srv/app;id}/config.yml', '${DATA:-${HOME:-$(id)}}', '${DATA:+/srv/app;id}/config.yml']);
 
-it('preserves safe remote-shell path expansion', function (string $path, array $environment, string $expected) {
-    $argument = filesystemVolumeShellArgument($path);
-    $process = new SymfonyProcess(['bash', '-c', "printf '%s' {$argument}"], env: $environment);
-    $process->mustRun();
-
-    expect($process->getOutput())->toBe($expected);
-})->with([
-    'bare variable' => ['$HOME/config.yml', ['HOME' => '/tmp/test-home'], '/tmp/test-home/config.yml'],
-    'variable within absolute path' => ['/srv/$HOME/config.yml', ['HOME' => 'tenant'], '/srv/tenant/config.yml'],
-    'multiple variables' => ['$HOME/$FILE', ['HOME' => '/tmp/test-home', 'FILE' => 'config.yml'], '/tmp/test-home/config.yml'],
-    'home shortcut' => ['~/config.yml', ['HOME' => '/tmp/test-home'], '/tmp/test-home/config.yml'],
-    'braced variable' => ['${DATA_PATH}/config.yml', ['DATA_PATH' => '/srv/my data'], '/srv/my data/config.yml'],
-    'default when unset' => ['${DATA_PATH:-/srv/app/config.yml}', ['DATA_PATH' => ''], '/srv/app/config.yml'],
-    'set value over default' => ['${DATA_PATH:-/srv/app/config.yml}', ['DATA_PATH' => '/mnt/config.yml'], '/mnt/config.yml'],
-    'variable in default' => ['${DATA:-/srv/$HOME/config.yml}', ['DATA' => '', 'HOME' => 'tenant'], '/srv/tenant/config.yml'],
-    'quotes in default' => ['${DATA:-/srv/my "data"/config.yml}', ['DATA' => ''], '/srv/my "data"/config.yml'],
-    'expanded value is not shell code' => ['$DATA_PATH/config.yml', ['DATA_PATH' => '$(printf injected)'], '$(printf injected)/config.yml'],
-]);
-
-it('rejects unsupported persisted Compose expressions before shell use', function (string $path) {
-    expect(fn () => filesystemVolumeShellArgument($path))->toThrow(Exception::class);
-})->with(['${DATA:+/srv/app}', '${DATA:-${HOME}/config.yml}', '${DATA:-/srv/app}/file', '${DATA:?missing}', '${DATA?missing}', '${DATA-/srv/app}', '${DATA+/srv/app}']);
-
-it('quotes literal file-storage paths and safely expands persisted expressions', function () {
+it('quotes resolved file-storage paths in remote commands', function () {
     $user = User::factory()->create();
     $privateKey = PrivateKey::factory()->create(['team_id' => $user->teams()->first()->id]);
     Storage::fake('ssh-keys');
@@ -158,22 +138,23 @@ it('quotes literal file-storage paths and safely expands persisted expressions',
         'private_key_id' => $privateKey->id,
     ]);
 
-    $literal = Mockery::mock(LocalFileVolume::class)->makePartial();
-    $literal->fs_path = '/data/application/my files/config.yaml';
-    $literal->is_directory = true;
-    $literal->shouldReceive('save')->once();
+    $directory = Mockery::mock(LocalFileVolume::class)->makePartial();
+    $directory->shouldReceive('contentPathOnServer')->once()->andReturn('/data/my files/config.yaml');
+    $directory->is_directory = true;
+    $directory->shouldReceive('save')->once();
     $file = Mockery::mock(LocalFileVolume::class)->makePartial();
-    $file->fs_path = '/data/application/my files/settings.json';
+    $file->shouldReceive('contentPathOnServer')->once()->andReturn('/data/my files/settings.json');
     $file->content = '{}';
     $file->is_directory = false;
     $file->shouldReceive('save')->once();
     $expression = Mockery::mock(LocalFileVolume::class)->makePartial();
     $expression->fs_path = '${DATA_PATH:-/srv/app/config.yaml}';
+    $expression->shouldReceive('contentPathOnServer')->once()->andReturn('/srv/app/config.yaml');
     $expression->is_directory = true;
     $expression->shouldReceive('save')->once();
 
     $fileStorages = Mockery::mock(MorphMany::class);
-    $fileStorages->shouldReceive('get')->once()->andReturn(collect([$literal, $file, $expression]));
+    $fileStorages->shouldReceive('get')->once()->andReturn(collect([$directory, $file, $expression]));
 
     $application = Mockery::mock(Application::class)->makePartial();
     $application->shouldReceive('getMorphClass')->andReturn(Application::class);
@@ -181,7 +162,7 @@ it('quotes literal file-storage paths and safely expands persisted expressions',
     $application->shouldReceive('fileStorages')->once()->andReturn($fileStorages);
     $application->setRelation('destination', (object) ['server' => $server]);
     $file->setRelation('resource', $application);
-    $literal->setRelation('resource', $application);
+    $directory->setRelation('resource', $application);
     $expression->setRelation('resource', $application);
 
     Process::fake(fn ($process) => Process::result(output: match (true) {
@@ -192,12 +173,12 @@ it('quotes literal file-storage paths and safely expands persisted expressions',
     getFilesystemVolumesFromServer($application, true);
 
     Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), 'empty-directory')
-        && str_contains(remoteProcessScript($process), 'my files/config.yaml')
-        && str_contains(remoteProcessScript($process), '"${DATA_PATH:-/srv/app/config.yaml}"'));
-    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "mkdir -p -- '/data/application/my files/config.yaml'"));
-    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "dirname -- '/data/application/my files/settings.json'"));
-    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "tee -- '/data/application/my files/settings.json'"));
-    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), '${DATA_PATH:-/srv/app/config.yaml}'));
+        && str_contains(remoteProcessScript($process), "'/data/my files/config.yaml'")
+        && str_contains(remoteProcessScript($process), "'/srv/app/config.yaml'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "mkdir -p -- '/data/my files/config.yaml'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "mkdir -p -- '/data/my files'"));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "tee -- '/data/my files/settings.json'"));
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), '${DATA_PATH'));
 });
 
 it('bounds the remote file read itself to prevent a size-check race', function () {
@@ -237,4 +218,38 @@ it('keeps a bounded remote read that fits the limit', function () {
         ->toBe($maximumSizedContent)
         ->and(LocalFileVolume::contentFromBoundedRead(null))
         ->toBe('');
+});
+
+it('skips pending and unresolved storages and still syncs the others', function () {
+    $user = User::factory()->create();
+    $privateKey = PrivateKey::factory()->create(['team_id' => $user->teams()->first()->id]);
+    Storage::fake('ssh-keys');
+    $server = Server::factory()->create([
+        'team_id' => $user->teams()->first()->id,
+        'private_key_id' => $privateKey->id,
+    ]);
+
+    $pending = Mockery::mock(LocalFileVolume::class)->makePartial();
+    $pending->pending_initialization = true;
+    $pending->shouldNotReceive('contentPathOnServer');
+    $unresolved = Mockery::mock(LocalFileVolume::class)->makePartial();
+    $unresolved->shouldReceive('contentPathOnServer')->once()->andThrow(new RuntimeException('compose file is missing'));
+    $resolved = Mockery::mock(LocalFileVolume::class)->makePartial();
+    $resolved->shouldReceive('contentPathOnServer')->once()->andReturn('/data/application/data');
+    $resolved->is_directory = true;
+    $resolved->shouldReceive('save')->once();
+
+    $fileStorages = Mockery::mock(MorphMany::class);
+    $fileStorages->shouldReceive('get')->once()->andReturn(collect([$pending, $unresolved, $resolved]));
+    $application = Mockery::mock(Application::class)->makePartial();
+    $application->shouldReceive('getMorphClass')->andReturn(Application::class);
+    $application->shouldReceive('workdir')->andReturn('/data/application');
+    $application->shouldReceive('fileStorages')->once()->andReturn($fileStorages);
+    $application->setRelation('destination', (object) ['server' => $server]);
+    $resolved->setRelation('resource', $application);
+
+    Process::fake(fn ($process) => Process::result(output: str_contains(remoteProcessScript($process), 'empty-directory') ? remoteFileStatesOutput('missing') : ''));
+    getFilesystemVolumesFromServer($application, true);
+
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "mkdir -p -- '/data/application/data'"));
 });

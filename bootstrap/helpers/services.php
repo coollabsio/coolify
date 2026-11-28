@@ -268,31 +268,6 @@ function replaceVariables(string $variable): Stringable
     return $str;
 }
 
-/**
- * Quote a storage path without changing its existing simple shell-variable expansion.
- */
-function filesystemVolumeShellArgument(string $path): string
-{
-    if (trim($path) === '') {
-        throw new Exception('Invalid storage path: path is empty.');
-    }
-    validateComposeArrayVolumeSource($path);
-
-    $tilde = '';
-    if (preg_match('/^~[A-Za-z0-9_-]*(?:\/|$)/', $path, $matches)) {
-        $tilde = $matches[0];
-        $path = substr($path, strlen($tilde));
-    }
-
-    if (! str_contains($path, '$')) {
-        return $tilde === '' ? escapeshellarg($path) : $tilde.($path === '' ? '' : escapeshellarg($path));
-    }
-
-    $quotedPath = str_replace(['\\', '"'], ['\\\\', '\\"'], $path);
-
-    return $tilde.'"'.$quotedPath.'"';
-}
-
 function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Application $oneService, bool $isInit = false)
 {
     try {
@@ -307,21 +282,31 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
         if ($isInit) {
             instant_remote_process(['mkdir -p -- '.escapeshellarg($workdir).' > /dev/null 2>&1 || true'], $server);
         }
+        // Pending storages are written by the next deployment or start. A storage that cannot be
+        // resolved yet, for example before its Compose file exists, is skipped.
+        $fileLocations = [];
+        $fileVolumes = $fileVolumes->reject(function (LocalFileVolume $fileVolume) use ($server, &$fileLocations): bool {
+            if ($fileVolume->is_host_file || $fileVolume->pending_initialization) {
+                return true;
+            }
+            try {
+                // No remote check for each path: the batched state check below is the only server command.
+                $fileLocations[] = $fileVolume->contentPathOnServer($server);
+            } catch (Throwable) {
+                return true;
+            }
+
+            return false;
+        })->values();
         if ($fileVolumes->isEmpty()) {
             return;
         }
-        // A relative path is inside the resource directory, never in the SSH user's working
-        // directory. A persisted Compose expression (`${VAR:-/path}`) stays as it is.
-        $fileLocations = $fileVolumes->map(function (LocalFileVolume $fileVolume) use ($workdir): string {
-            $fsPath = trim((string) $fileVolume->fs_path);
-
-            return str_starts_with($fsPath, '$') ? $fsPath : $fileVolume->resolvedFsPath($workdir)->value();
-        })->values()->all();
-        $states = LocalFileVolume::remoteFileStates($fileLocations, $server, filesystemVolumeShellArgument(...));
-        foreach ($fileVolumes->values() as $index => $fileVolume) {
+        $states = LocalFileVolume::remoteFileStates($fileLocations, $server);
+        foreach ($fileVolumes as $index => $fileVolume) {
             $content = data_get($fileVolume, 'content');
             $fileLocation = $fileLocations[$index];
-            $escapedFileLocation = filesystemVolumeShellArgument($fileLocation);
+            $escapedFileLocation = escapeshellarg($fileLocation);
+
             // A token with only the write permission can save a Compose file, so Coolify does not
             // write outside the resource directory here. A deployment or start writes those paths.
             $isOutsideResourceDirectory = fn (): bool => $fileVolume->isOutsideResourceDirectory();
@@ -350,7 +335,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $fileVolume->content = null;
                 $fileVolume->is_directory = true;
                 $fileVolume->save();
-            } elseif ($state === 'missing' && ! $fileVolume->is_directory && $isInit && $content) {
+            } elseif ($state === 'missing' && ! $fileVolume->is_directory && $isInit && ! is_null($content)) {
                 // Does not exists (no dir or file), not flagged as directory, is init, has content
                 if ($isOutsideResourceDirectory()) {
                     continue;
@@ -359,8 +344,9 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase|Appli
                 $fileVolume->is_directory = false;
                 $fileVolume->save();
                 $content = base64_encode($content);
+                $dir = escapeshellarg(dirname($fileLocation));
                 instant_remote_process([
-                    'mkdir -p -- "$(dirname -- '.$escapedFileLocation.')"',
+                    "mkdir -p -- {$dir}",
                     "echo '$content' | base64 -d | tee -- {$escapedFileLocation}",
                     // Same mode as LocalFileVolume::saveStorageOnServer(): readable for a non-root container user with any umask.
                     "chmod a+rx -- {$escapedFileLocation}",

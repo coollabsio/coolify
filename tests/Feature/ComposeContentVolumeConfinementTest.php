@@ -131,12 +131,28 @@ function contentHostPathUseServerUser(string $user): void
  */
 function contentHostPathFakeServer(): void
 {
-    Process::fake(fn ($process) => Process::result(output: match (true) {
-        str_contains(remoteProcessScript($process), 'empty-directory') => remoteFileStatesOutput('missing'),
-        str_contains(remoteProcessScript($process), 'readlink -f') => 'OK',
-        str_contains(remoteProcessScript($process), 'test -') => 'NOK',
-        default => '',
-    }));
+    Process::fake(function ($process) {
+        $script = remoteProcessScript($process);
+        if (str_contains($script, 'config --format json')) {
+            $services = [];
+            foreach (LocalFileVolume::query()->get() as $volume) {
+                $owner = $volume->resource;
+                $name = data_get($owner, 'service') ? $owner->name : 'app';
+                $workdir = data_get($owner, 'service') ? $owner->service->workdir() : $owner->workdir();
+                $path = str_starts_with($volume->fs_path, '/') ? $volume->fs_path : $workdir.'/'.ltrim($volume->fs_path, './');
+                $services[$name]['volumes'][] = ['type' => 'bind', 'source' => $path, 'target' => $volume->mount_path];
+            }
+
+            return Process::result(output: json_encode(['services' => $services]));
+        }
+
+        return Process::result(output: match (true) {
+            str_contains($script, 'empty-directory') => remoteFileStatesOutput('missing'),
+            str_contains($script, 'readlink -f') => 'OK',
+            str_contains($script, 'test -') => 'NOK',
+            default => '',
+        });
+    });
 }
 
 /**
@@ -190,6 +206,7 @@ test('the service parser stores a content volume at its host path and Coolify wr
 
     [$fsPath, $writePath] = contentHostPathExpected($target, $service->workdir());
     $fileVolume = LocalFileVolume::query()->where('mount_path', $target)->sole();
+    contentHostPathFakeServer();
     expect($fileVolume->fs_path)->toBe($fsPath)
         ->and($fileVolume->content)->toBe($content)
         ->and($fileVolume->is_directory)->toBeFalse()
@@ -208,6 +225,7 @@ test('the application parser stores a content volume at its host path and Coolif
 
     [$fsPath, $writePath] = contentHostPathExpected($target, $application->workdir());
     $fileVolume = LocalFileVolume::query()->where('mount_path', $target)->sole();
+    contentHostPathFakeServer();
     expect($fileVolume->fs_path)->toBe($fsPath)
         ->and($fileVolume->content)->toBe($content)
         ->and($fileVolume->contentPathOnServer())->toBe($writePath);
@@ -226,12 +244,13 @@ test('loading files for a service writes content inside the resource directory',
     [, $writePath] = contentHostPathExpected($target, $service->workdir());
 
     contentHostPathFakeServer();
+    $fileVolume->forceFill(['pending_initialization' => false])->saveQuietly();
     getFilesystemVolumesFromServer($fileVolume->resource, true);
 
     $sudo = $user === 'root' ? '' : 'sudo ';
     $escapedPath = escapeshellarg($writePath);
     $base64 = base64_encode($content);
-    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "{$sudo}mkdir -p -- \"$({$sudo}dirname -- {$escapedPath})\""));
+    Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "{$sudo}mkdir -p -- ".escapeshellarg(dirname($writePath))));
     Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "echo '{$base64}' | {$sudo}base64 -d | {$sudo}tee -- {$escapedPath}"));
     Process::assertRan(fn ($process) => str_contains(remoteProcessScript($process), "\n{$sudo}chmod a+rx -- {$escapedPath}"));
 })->with([
@@ -247,6 +266,7 @@ test('loading files for a service does not write content outside the resource di
     $fileVolume = LocalFileVolume::query()->where('mount_path', $target)->sole();
 
     contentHostPathFakeServer();
+    $fileVolume->forceFill(['pending_initialization' => false])->saveQuietly();
     getFilesystemVolumesFromServer($fileVolume->resource, true);
 
     Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), base64_encode($content)));
@@ -274,9 +294,9 @@ test('a quote in a content path is shell-escaped in every write command', functi
 
 test('the parsers reject shell injection in a content volume source', function () {
     expect(fn () => serviceParser(contentHostPathService(CONTENT_HOST_PATH_INJECTION_COMPOSE)))
-        ->toThrow(Exception::class, 'Invalid Docker volume definition (array syntax)')
+        ->toThrow(Exception::class, 'Invalid Docker volume definition')
         ->and(fn () => applicationParser(contentHostPathApplication(CONTENT_HOST_PATH_INJECTION_COMPOSE)))
-        ->toThrow(Exception::class, 'Invalid Docker volume definition (array syntax)');
+        ->toThrow(Exception::class, 'Invalid Docker volume definition');
 
     expect(LocalFileVolume::query()->count())->toBe(0);
 });

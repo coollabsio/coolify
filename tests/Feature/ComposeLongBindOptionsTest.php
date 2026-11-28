@@ -229,7 +229,9 @@ it('keeps a ${VAR:-default} long-form bind source for Docker Compose when the va
     $source = '${AO_CONFIG_FILE:-./agent-orchestrator.yaml}';
     $result = parseLongBind($kind, longBindCompose("'{$source}'", LONG_BIND_READ_ONLY_OPTIONS), ['BASE_DIR' => '/srv', 'AO_CONFIG_FILE' => $value]);
 
-    expect($result['volume']['source'])->toBe($source);
+    // The relative default points to the resource directory, like a relative source without a variable.
+    expect($result['volume']['source'])->toStartWith('${AO_CONFIG_FILE:-'.base_configuration_dir().'/')
+        ->and($result['volume']['source'])->toEndWith('/agent-orchestrator.yaml}');
 })->with(['service', 'application'])->with([
     'braced variable reference' => ['${BASE_DIR}/ao.yaml'],
     'variable reference' => ['$BASE_DIR/ao.yaml'],

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Support\Str;
+use Illuminate\Support\Stringable;
 
 class LocalPersistentVolume extends BaseModel
 {
@@ -250,11 +251,18 @@ class LocalPersistentVolume extends BaseModel
 
             foreach ($services as $service) {
                 foreach (data_get($service, 'volumes', []) as $volume) {
-                    // A source that resolves to a host path is a bind, so it is not this volume.
-                    $parsedVolume = is_array($volume) ? $volume : parseDockerVolumeString($volume, str_contains($volume, '${')
-                        ? $volumeSourceVariables ??= composeVolumeSourceVariables($resource instanceof Application ? $resource : $resource->service)
-                        : null);
+                    $parsedVolume = is_array($volume) ? $volume : parseDockerVolumeString($volume);
                     $source = data_get($parsedVolume, 'source');
+                    // An old volume of a host path that its variable now gives is replaced (see replacedComposeHostPath()).
+                    if (is_string($volume) && $this->replacesComposeHostPath($source)) {
+                        continue;
+                    }
+                    if (is_string($volume) && $source) {
+                        $source = composeNamedVolumeSource(str($source));
+                    }
+                    if (is_string($volume) && $source) {
+                        $source = composeNamedVolumeSource(str($source));
+                    }
                     $target = data_get($parsedVolume, 'target');
                     if ($source && isComposeExternalVolume($topLevelVolumes->get((string) $source))) {
                         // The parsers use an external volume as written. A storage entry with the generated
@@ -317,10 +325,10 @@ class LocalPersistentVolume extends BaseModel
 
             foreach ($services as $service) {
                 foreach (data_get($service, 'volumes', []) as $volume) {
-                    if (! is_string($volume) || composeShortVolumeSavedName($volume, $parent->uuid) !== $this->name) {
+                    if (! is_string($volume)) {
                         continue;
                     }
-                    $hostPath = composeShortVolumeVariableHostPath($volume, composeVolumeSourceVariables($parent));
+                    $hostPath = $this->replacesComposeHostPath(parseDockerVolumeString($volume)['source']);
                     if ($hostPath !== null) {
                         return $hostPath;
                     }
@@ -331,6 +339,20 @@ class LocalPersistentVolume extends BaseModel
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * The host path that the variable of a short-syntax source now gives, when this storage entry is the old volume of that source.
+     */
+    private function replacesComposeHostPath(Stringable $source): ?string
+    {
+        $resource = $this->resource;
+        $parent = $resource instanceof Application ? $resource : $resource?->service;
+        if (! $parent || composeShortVolumeSavedName($source, $parent->uuid) !== $this->name) {
+            return null;
+        }
+
+        return composeShortVolumeVariableHostPath($source, composeVolumeSourceVariables($parent));
     }
 
     /**

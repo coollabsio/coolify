@@ -34,7 +34,7 @@ class EnsureContentFilesOnServer
                 continue;
             }
             try {
-                $candidates[] = [$fileStorage, $fileStorage->contentPathOnServer()];
+                $candidates[] = [$fileStorage, $fileStorage->contentPathOnServer($server)];
             } catch (\Throwable $e) {
                 $log('Warning: '.$this->plainText($e->getMessage()), 'stderr');
             }

@@ -74,33 +74,48 @@ function savedPathResource(string $kind): array
     ];
 }
 
+/**
+ * v4.7.6 and older saved the default of `${DATA_DIR:-./data}` as the host path of the storage.
+ */
+function saveOldDefaultPath(Application|Service $resource, Closure $parse, Closure $storage): string
+{
+    $parse();
+    $savedPath = $resource->workdir().'/data';
+    $storage()->update(['fs_path' => $savedPath]);
+
+    return $savedPath;
+}
+
 it('keeps the saved host path of an existing storage when its variable gets a value', function (string $kind) {
     ['resource' => $resource, 'parse' => $parse, 'storage' => $storage] = savedPathResource($kind);
-    $savedPath = $resource->workdir().'/data';
-    expect($parse())->toBe("{$savedPath}:/data");
+    $savedPath = saveOldDefaultPath($resource, $parse, $storage);
+    expect($parse())->toBe("{$savedPath}:/data")
+        ->and($storage()->variable_fs_path)->toBeNull();
 
     $resource->environment_variables()->create(['key' => 'DATA_DIR', 'value' => '/mnt/custom']);
 
     expect($parse())->toBe("{$savedPath}:/data")
         ->and($storage()->fs_path)->toBe($savedPath)
-        ->and($storage()->variable_fs_path)->toBe('/mnt/custom')
+        ->and($storage()->variable_fs_path)->toBe("\${DATA_DIR:-{$savedPath}}")
         ->and(implode("\n", test()->warnings))->toContain($savedPath)->toContain('/mnt/custom');
 })->with(['application', 'service']);
 
-it('uses the value of the variable for a new storage', function (string $kind) {
+it('leaves the variable of a new storage to Docker Compose', function (string $kind) {
     ['resource' => $resource, 'parse' => $parse, 'storage' => $storage] = savedPathResource($kind);
     $resource->environment_variables()->create(['key' => 'DATA_DIR', 'value' => '/mnt/custom']);
+    $source = '${DATA_DIR:-'.$resource->workdir().'/data}';
 
-    expect($parse())->toBe('/mnt/custom:/data')
-        ->and($storage()->fs_path)->toBe('/mnt/custom')
+    expect($parse())->toBe("{$source}:/data")
+        ->and($storage()->fs_path)->toBe($source)
         ->and($storage()->variable_fs_path)->toBeNull();
 })->with(['application', 'service']);
 
 it('switches a saved storage to the path of its variable', function (string $kind) {
     ['resource' => $resource, 'parse' => $parse, 'storage' => $storage] = savedPathResource($kind);
-    $parse();
+    saveOldDefaultPath($resource, $parse, $storage);
     $resource->environment_variables()->create(['key' => 'DATA_DIR', 'value' => '/mnt/custom']);
     $parse();
+    $source = '${DATA_DIR:-'.$resource->workdir().'/data}';
     $owner = User::factory()->create();
     $this->team->members()->attach($owner, ['role' => 'owner']);
     $this->actingAs($owner);
@@ -110,15 +125,15 @@ it('switches a saved storage to the path of its variable', function (string $kin
         ->call('useVariablePath')
         ->assertHasNoErrors();
 
-    expect($storage()->fs_path)->toBe('/mnt/custom')
+    expect($storage()->fs_path)->toBe($source)
         ->and($storage()->variable_fs_path)->toBeNull()
-        ->and($parse())->toBe('/mnt/custom:/data')
+        ->and($parse())->toBe("{$source}:/data")
         ->and($storage()->variable_fs_path)->toBeNull();
 })->with(['application', 'service']);
 
 it('does not let a member switch the path of a storage', function () {
     ['resource' => $resource, 'parse' => $parse, 'storage' => $storage] = savedPathResource('application');
-    $parse();
+    saveOldDefaultPath($resource, $parse, $storage);
     $resource->environment_variables()->create(['key' => 'DATA_DIR', 'value' => '/mnt/custom']);
     $parse();
     $member = User::factory()->create();
