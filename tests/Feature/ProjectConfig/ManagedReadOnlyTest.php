@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\EnvironmentConfigLink;
 use App\Models\EnvironmentVariable;
 use App\Models\LocalPersistentVolume;
+use App\Models\S3Storage;
 use App\Models\ScheduledVolumeBackup;
 use App\Models\Service;
 use App\Models\Team;
@@ -198,6 +199,27 @@ it('saves and runs storage backups of a managed application in the dashboard', f
 
     expect(ScheduledVolumeBackup::query()->sole()->frequency)->toBe('hourly');
     Queue::assertPushed(VolumeBackupJob::class);
+});
+
+it('enables the retention and S3 fields of storage backups of a managed application', function () {
+    S3Storage::create([
+        'name' => 'Team S3', 'region' => 'us-east-1', 'key' => 'key', 'secret' => 'secret', 'bucket' => 'backups',
+        'endpoint' => 'https://s3.example.com', 'is_usable' => true, 'team_id' => $this->fx['team']->id,
+    ]);
+    $volume = managedVolume($this->managed);
+    $this->actingAs($this->fx['user']);
+
+    $html = Livewire::test(VolumeBackups::class, ['storage' => $volume, 'resource' => $this->managed->fresh()])->html();
+
+    $fields = ['retentionAmountLocally', 'retentionDaysLocally', 'retentionMaxStorageLocally', 'retentionAmountS3', 'retentionDaysS3', 'retentionMaxStorageS3'];
+    $tags = array_map(fn (string $field) => '/<input[^>]*name="'.$field.'"[^>]*>/', $fields);
+    $tags[] = '/<button[^>]*wire:click="toggleS3"[^>]*>/';
+    $tags[] = '/<button[^>]*id="s3StorageIds-trigger"[^>]*>/';
+
+    foreach ($tags as $tag) {
+        expect(preg_match($tag, $html, $match))->toBe(1)
+            ->and($match[0])->not->toMatch('/\sdisabled[\s>]/');
+    }
 });
 
 it('lets team admins but not members manage backups of a managed service', function () {
