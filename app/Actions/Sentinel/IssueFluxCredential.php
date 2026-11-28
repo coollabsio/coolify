@@ -73,6 +73,7 @@ class IssueFluxCredential
             'workload.reconcile.v1',
             'network.firewall.stack_rules.v1',
             'network.firewall.published_ports.v1',
+            'network.published_ports.local.v1',
             'discovery.names.underscore.v1',
             'image.build.v1',
             'image.build.private_git.v1',

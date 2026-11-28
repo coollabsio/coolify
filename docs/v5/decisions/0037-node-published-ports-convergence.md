@@ -1,6 +1,6 @@
 # Decision 0037: Published ports in the Sentinel convergence
 
-**Status: Accepted**
+**Status: Accepted, built**
 
 **Date: 2026-11-28**
 
@@ -136,3 +136,112 @@ Client -> Node B :port ---------------------------------DNAT-> container slot
   with policy routing instead of masquerade).
 - Load balancing of a port over more than one Node.
 - A host port that differs from the container port (decision 0016).
+
+## Implementation notes (2026-11-28)
+
+Built in Coolify and in Sentinel `ce6e4a8`, `13b243d`, and `78b11ae`
+(`network.published_ports.local.v1`).
+
+### Changes to the decision
+
+- **The local rules have their own table.** Sentinel writes the table
+  `ip coolify_cluster_ports` with one nftables transaction, at the priority
+  `dstnat - 1`, so a local rule comes before a rule of the network revision.
+  The rules mark the connection (`ct mark 0x01000000`), and the firewall
+  accepts marked connections in its forward and output chains. Because of
+  this, a Node needs a firewall of the new Sentinel before its local rules
+  work. A change of the capability on a Node queues a network revision of the
+  cluster and a sync of the desired sets.
+- **A remote rule has the old shape.** It is a published port of
+  `network.firewall.reconcile` with the mesh address of the other Node as the
+  destination and the host port as the container port. Sentinel accepts this
+  destination only when it is in the cluster CIDR and is not the own address.
+  The rule does not match connections from the WireGuard interface, so 2
+  Nodes cannot forward a port to each other.
+- **The second hop.** When a port has source CIDRs, the local table has a
+  second rule for connections from the cluster CIDR on the WireGuard
+  interface, without the source CIDRs.
+- **The trigger is the container inventory.** Answer 1 says that a status
+  event queues the revision. A status event (`healthy`, `failed`, `stopped`,
+  `removed`) refreshes the inventory, and `FetchContainers` compares the
+  workloads with a published port that have a running container on the Node
+  before and after the refresh. A change in either direction queues a network
+  revision. A container that starts again also queues one, so the Nodes go
+  back to the Node with the lowest id. A crash with a fast restart changes
+  nothing, as answer 2 says. While no container runs, the other Nodes forward
+  to a Node with a local rule, where Sentinel starts the container again, and
+  not to a stopped container.
+- **Sentinel reports a container that waits for its backoff.** Before, Sentinel
+  sent no status while a crashed container waited for the next start (10 s,
+  then up to 10 minutes). It now sends `stopped` (autonomous) at the start of
+  the wait. This is in the deployment history.
+- **The first rolling deploy that uses the other slot makes one revision.**
+  The slot gets its address and its firewall allows
+  (`DispatchWorkloadDeployment`). The next rolling deploys make none.
+
+### Sentinel
+
+- `WorkloadSetEntry` has `published_ports` (protocol, host port, container
+  port, source CIDRs) and `replaces_container_ip`. Sentinel validates that the
+  container addresses are in the workload network of the Node and that each
+  protocol and host port is unique.
+- Each convergence pass computes the local rules from the stored set and the
+  containers. A rule points to `deploy.container_ip`, or to
+  `replaces_container_ip` while the new container is not healthy and the old
+  one runs. When the new container is healthy, Sentinel changes the table
+  first and then removes the old container. If the change fails, the old
+  container stays. The executor applies the table only when it changed or is
+  missing, so a restart or a reboot of the Node applies it again without
+  Flux.
+- Flux maps the new fields. It refuses a put with ports (409) for a Node
+  without the capability.
+
+### Coolify
+
+- `NodeCluster::convergesPublishedPorts()`: every usable Node reports
+  `network.published_ports.local.v1` and `workload.reconcile.v1`. Only then
+  `SyncNodeWorkloadSet::converges()` is true for a workload with published
+  ports. Else the cluster keeps the rules of decision 0016 and the command
+  path.
+- `SyncNodeWorkloadSet::localPublishedPorts()` gives the ports of the entries
+  with the desired state `running` on a Node. They are in the entry and in its
+  hash. An entry without ports keeps its old hash.
+- `ReconcileNodeClusterNetwork::publishedPorts()` sends no rule to a Node with
+  a local rule. Another Node gets a rule to the mesh address of the selected
+  Node when that Node has a local rule, else the rule of decision 0016.
+- A port change and a change of the capability sync the desired sets of the
+  Nodes of the cluster. An adopted workload with published ports queues a
+  network revision.
+- `IssueFluxCredential` grants `network.published_ports.local.v1`.
+- `ReconcileNodeWorkloads` and `RecoverStaleOperations` stay. Nodes without
+  the capability (`upstream.json`, cluster 2 of dev on 1.1.5) still need the
+  command path. Remove them when a released Sentinel has the capability.
+
+### Checked on dev (cluster 1, Sentinel `main-78b11ae`)
+
+- **Old path.** With Sentinel `main-db2612c` on both Nodes, a `traefik/whoami`
+  workload with port 18080 on Node 1 deployed through the command path, and
+  both Nodes had the rules of decision 0016.
+- **Upgrade.** After the install of the new Sentinel, the workload was adopted
+  into the desired set. Node 1 then had only its local rule, and Node 2 a
+  remote rule to the mesh address of Node 1. Through Node 1 the client address
+  stayed. Through Node 2 the connection came from the mesh address of Node 2.
+- **Rolling deploys.** A client looped connections through each Node (about 1
+  250 each). The first rolling deploy had 0 failures and 1 network revision,
+  because the other slot got its address. The second one had 0 failures in
+  1 016 connections each and no network revision.
+- **Stop.** With the workload on both Nodes, a stop on Node 2 gave 3 failed
+  connections through Node 2, then Node 2 forwarded to Node 1. A start on
+  Node 2 gave a local rule again, with 0 failures.
+- **Crash.** A kill with a fast restart gave a gap of about 10 s and no
+  revision. In a crash loop, Sentinel reported `stopped` during the backoff,
+  and Coolify queued a revision. Node 2 kept forwarding to Node 1, because no
+  other Node ran the workload. A visible crash failover needs 3 Nodes. The dev
+  cluster has 2.
+- **Source CIDRs.** With `10.221.5.1/32`, the host connected through both
+  Nodes, and a connection from another address was dropped on the entry Node.
+- **Reboot without Flux.** With Flux stopped, Node 1 rebooted. Its local rule
+  and the remote rule of Node 2 came back, and the port answered through both
+  Nodes.
+- **Removal.** The delete of the workload removed the local table and the
+  rules on both Nodes.

@@ -19,5 +19,6 @@ class RemoveNodePublishedPort
         $cluster = NodeCluster::query()->findOrFail($port->node_cluster_id);
         $port->delete();
         QueueNodeClusterNetworkRevision::run($cluster, $user);
+        SyncNodeWorkloadSet::queueForCluster($cluster);
     }
 }

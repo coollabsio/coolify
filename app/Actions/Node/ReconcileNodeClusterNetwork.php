@@ -44,6 +44,12 @@ class ReconcileNodeClusterNetwork
     /** The firewall accepts `published_ports`: host ports that every Node forwards to a workload (decision 0016). */
     public const PUBLISHED_PORTS_CAPABILITY = 'network.firewall.published_ports.v1';
 
+    /**
+     * Sentinel translates the published ports of a desired set entry to the active slot, and the
+     * firewall forwards a port to the mesh address of another Node (decision 0037).
+     */
+    public const PUBLISHED_PORTS_LOCAL_CAPABILITY = 'network.published_ports.local.v1';
+
     /** The Corrosion gossip port (UDP) on the WireGuard address of each Node. */
     public const CORROSION_GOSSIP_PORT = 8787;
 
@@ -595,13 +601,15 @@ class ReconcileNodeClusterNetwork
      * that runs it, by Node id in id order. The address is the one of the slot that runs (decision
      * 0022), else of the other slot. `running` is false when the inventory has no running container
      * there, for example on the target of a move before its deploy, or on the source of a move
-     * whose target is ready.
+     * whose target is ready. `local` is true when Sentinel on the Node translates the port to its
+     * own container (decision 0037), and `mesh_ip` is the WireGuard address of the Node.
      *
-     * @return list<array{port: NodePublishedPort, addresses: array<int, array{ip: string, running: bool}>}>
+     * @return list<array{port: NodePublishedPort, addresses: array<int, array{ip: string, running: bool, local: bool, mesh_ip: ?string}>}>
      */
     private function publishedPortTargets(NodeCluster $cluster): array
     {
         $leaving = self::leavingPlacements();
+        $local = [];
 
         return NodePublishedPort::query()
             ->where('node_cluster_id', $cluster->id)
@@ -611,7 +619,7 @@ class ReconcileNodeClusterNetwork
             ->get()
             ->map(fn (NodePublishedPort $port): array => [
                 'port' => $port,
-                'addresses' => $port->workload->nodes->mapWithKeys(function (Node $node) use ($port, $leaving): array {
+                'addresses' => $port->workload->nodes->mapWithKeys(function (Node $node) use ($port, $leaving, &$local): array {
                     $slot = $port->workload->containerSlotOn($node);
                     $address = $node->pivot->{$slot->addressColumn()} ?: $node->pivot->{$slot->other()->addressColumn()};
                     if (blank($address)) {
@@ -624,7 +632,14 @@ class ReconcileNodeClusterNetwork
                             ->where('state', 'running')
                             ->exists();
 
-                    return [$node->id => ['ip' => $address, 'running' => $running]];
+                    $local[$node->id] ??= SyncNodeWorkloadSet::localPublishedPorts($node);
+
+                    return [$node->id => [
+                        'ip' => $address,
+                        'running' => $running,
+                        'local' => isset($local[$node->id][$port->node_workload_id]),
+                        'mesh_ip' => $node->wireguard_ip,
+                    ]];
                 })->all(),
             ])
             ->all();
@@ -659,24 +674,34 @@ class ReconcileNodeClusterNetwork
      * comes first, so the client address stays. Else the container on the Node with the lowest
      * id, over WireGuard. A port of a workload without a container address is left out.
      *
-     * @param  list<array{port: NodePublishedPort, addresses: array<int, array{ip: string, running: bool}>}>  $targets  See publishedPortTargets().
+     * When Sentinel translates the port on a Node (decision 0037), that Node gets no rule here: its
+     * desired set entry has the port. Another Node forwards to the mesh address of that Node, with
+     * the same port, so a rolling deploy there changes no rule here.
+     *
+     * @param  list<array{port: NodePublishedPort, addresses: array<int, array{ip: string, running: bool, local: bool, mesh_ip: ?string}>}>  $targets  See publishedPortTargets().
      * @return list<array{protocol: string, host_port: int, destination_ip: string, container_port: int, source_cidrs: list<string>}>
      */
     public static function publishedPorts(array $targets, Node $node): array
     {
         $ports = [];
         foreach ($targets as ['port' => $port, 'addresses' => $addresses]) {
+            if ($addresses[$node->id]['local'] ?? false) {
+                continue;
+            }
             $running = array_filter($addresses, fn (array $address): bool => $address['running']);
-            $candidates = $running === [] ? $addresses : $running;
+            // While none runs, a Node where Sentinel starts it again comes before a stopped container.
+            $starting = array_filter($addresses, fn (array $address): bool => $address['local']);
+            $candidates = $running !== [] ? $running : ($starting !== [] ? $starting : $addresses);
             $destination = $candidates[$node->id] ?? reset($candidates);
             if ($destination === false) {
                 continue;
             }
+            $remote = $destination['local'] && filled($destination['mesh_ip']);
             $ports[] = [
                 'protocol' => $port->protocol,
                 'host_port' => $port->host_port,
-                'destination_ip' => $destination['ip'],
-                'container_port' => $port->container_port,
+                'destination_ip' => $remote ? $destination['mesh_ip'] : $destination['ip'],
+                'container_port' => $remote ? $port->host_port : $port->container_port,
                 'source_cidrs' => array_values($port->source_cidrs ?? []),
             ];
         }

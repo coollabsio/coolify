@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Actions\Node\BuildNodeClusterIngressRoutes;
 use App\Actions\Node\DispatchWorkloadDeployment;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
+use App\Actions\Node\SyncNodeWorkloadSet;
 use App\Enums\NodeImageStorage;
 use App\Enums\NodeWorkloadSourceType;
 use App\Support\NodeImages;
@@ -277,6 +278,19 @@ class NodeCluster extends BaseModel
         $nodes = $this->nodes()->where('is_usable', true)->get();
 
         return $nodes->isNotEmpty() && $nodes->every(fn (Node $node): bool => $node->supportsCapability(ReconcileNodeClusterNetwork::PUBLISHED_PORTS_CAPABILITY) === true);
+    }
+
+    /**
+     * Whether the workloads with published ports converge in Sentinel (decision 0037): every usable
+     * Node translates the local rules of its desired set. Else the cluster keeps the rules of
+     * decision 0016 and the command path for these workloads.
+     */
+    public function convergesPublishedPorts(): bool
+    {
+        $nodes = $this->nodes()->where('is_usable', true)->get();
+
+        return $nodes->isNotEmpty() && $nodes->every(fn (Node $node): bool => $node->supportsCapability(ReconcileNodeClusterNetwork::PUBLISHED_PORTS_LOCAL_CAPABILITY) === true
+            && $node->supportsCapability(SyncNodeWorkloadSet::CAPABILITY) === true);
     }
 
     /**

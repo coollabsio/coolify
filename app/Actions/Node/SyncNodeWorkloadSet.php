@@ -3,8 +3,11 @@
 namespace App\Actions\Node;
 
 use App\Enums\NodeWorkloadDesiredState;
+use App\Jobs\SyncNodeWorkloadSetJob;
 use App\Models\Node;
+use App\Models\NodeCluster;
 use App\Models\NodeOperation;
+use App\Models\NodePublishedPort;
 use App\Models\NodeWorkload;
 use App\Models\NodeWorkloadSetEntry;
 use Illuminate\Http\Client\ConnectionException;
@@ -31,15 +34,53 @@ class SyncNodeWorkloadSet
     public const CAPABILITY = 'workload.reconcile.v1';
 
     /**
-     * Whether Sentinel converges this workload on this Node. The rest keeps the command path. A
-     * published port forwards to one container (decision 0016): the Nodes must forward it to the new
-     * container before the old one goes, so a workload with published ports keeps the command path.
+     * Whether Sentinel converges this workload on this Node. The rest keeps the command path.
      * Volumes, databases, and stack services converge; DeployNodeStackJob keeps the `depends_on` order.
+     * A workload with published ports converges only when every usable Node of its cluster translates
+     * the local rule of the desired set (decision 0037). Else the Nodes forward the port to one
+     * container (decision 0016), and only the command path switches them before the old one goes.
      */
     public static function converges(Node $node, NodeWorkload $workload): bool
     {
         return $node->supportsCapability(self::CAPABILITY) === true
-            && ! $workload->publishedPorts()->exists();
+            && (! $workload->publishedPorts()->exists() || $node->cluster?->convergesPublishedPorts() === true);
+    }
+
+    /**
+     * Sends the changed entries of the Nodes of the cluster after a change of its published ports or
+     * of their capabilities: the local published ports are part of the entries (decision 0037).
+     */
+    public static function queueForCluster(NodeCluster $cluster, int $delaySeconds = 0): void
+    {
+        $cluster->nodes()->pluck('id')->each(fn (int $id) => SyncNodeWorkloadSetJob::dispatch($id)->delay($delaySeconds)->afterCommit());
+    }
+
+    /**
+     * The published ports that Sentinel translates on the Node to the active slot of the entry
+     * (decision 0037): the entries with the desired state running, when the cluster converges them.
+     * ReconcileNodeClusterNetwork leaves these Nodes out of the rules of the port.
+     *
+     * @return array<int, list<array{protocol: string, host_port: int, container_port: int, source_cidrs: list<string>}>> By workload ID.
+     */
+    public static function localPublishedPorts(Node $node): array
+    {
+        if ($node->node_cluster_id === null || $node->cluster?->convergesPublishedPorts() !== true) {
+            return [];
+        }
+        $running = NodeWorkloadSetEntry::query()
+            ->where('node_id', $node->id)
+            ->where('desired_state', NodeWorkloadDesiredState::RUNNING)
+            ->pluck('node_workload_id');
+
+        return NodePublishedPort::query()
+            ->where('node_cluster_id', $node->node_cluster_id)
+            ->whereIn('node_workload_id', $running)
+            ->orderBy('protocol')
+            ->orderBy('host_port')
+            ->get()
+            ->groupBy('node_workload_id')
+            ->map(fn (Collection $ports): array => $ports->map(fn (NodePublishedPort $port): array => $port->spec())->values()->all())
+            ->all();
     }
 
     /**
@@ -71,13 +112,13 @@ class SyncNodeWorkloadSet
             $full = $workloadIds === null;
             $changed = $full ? $kept : $kept->whereIn('node_workload_id', $workloadIds);
             $removes = $full ? [] : $removed->pluck('uuid')->all();
-            $result = $this->send($node, (int) $node->workload_set_generation + 1, $hash, $full, $this->puts($changed, $prepared), $removes, []);
+            $result = $this->send($node, (int) $node->workload_set_generation + 1, $hash, $full, $this->puts($changed, $prepared, $entries['ports']), $removes, []);
             if (! $result['accepted'] && ! $full) {
                 // A lost change, or Sentinel lost its set: send all of it.
-                $result = $this->send($node, max((int) $node->refresh()->workload_set_generation, $result['generation']) + 1, $hash, true, $this->puts($kept, $prepared), [], []);
+                $result = $this->send($node, max((int) $node->refresh()->workload_set_generation, $result['generation']) + 1, $hash, true, $this->puts($kept, $prepared, $entries['ports']), [], []);
             } elseif (! $result['accepted'] && $result['generation'] >= (int) $node->refresh()->workload_set_generation) {
                 // Sentinel has a newer generation than Postgres, for example after a database restore.
-                $result = $this->send($node, $result['generation'] + 1, $hash, true, $this->puts($kept, $prepared), [], []);
+                $result = $this->send($node, $result['generation'] + 1, $hash, true, $this->puts($kept, $prepared, $entries['ports']), [], []);
             }
 
             return $result;
@@ -121,7 +162,7 @@ class SyncNodeWorkloadSet
      * The entries of the Node. An entry of a workload that is no longer on the Node, or that is
      * removed, is deleted.
      *
-     * @return array{kept: Collection<int, NodeWorkloadSetEntry>, removed: Collection<int, NodeWorkload>}
+     * @return array{kept: Collection<int, NodeWorkloadSetEntry>, removed: Collection<int, NodeWorkload>, ports: array<int, array<string, mixed>>}
      */
     private function currentEntries(Node $node): array
     {
@@ -130,7 +171,8 @@ class SyncNodeWorkloadSet
             ->where('node_id', $node->id)
             ->get()
             ->each(fn (NodeWorkloadSetEntry $entry) => $entry->setRelation('node', $node));
-        $attached = $node->workloads()->withoutGlobalScopes()->pluck('node_workloads.id')->all();
+        $placements = $node->workloads()->withoutGlobalScopes()->get(['node_workloads.id'])->keyBy('id');
+        $attached = $placements->keys()->all();
         [$kept, $gone] = $entries->partition(fn (NodeWorkloadSetEntry $entry): bool => $entry->workload !== null
             && $entry->revision !== null
             && in_array($entry->node_workload_id, $attached, true)
@@ -140,17 +182,28 @@ class SyncNodeWorkloadSet
         }
         // Only workloads that were in the set: a workload of the command path keeps its containers.
         $removed = $gone->map(fn (NodeWorkloadSetEntry $entry): ?NodeWorkload => $entry->workload)->filter()->values();
+        $localPorts = self::localPublishedPorts($node);
+        $ports = [];
         foreach ($kept as $entry) {
-            $entryHash = self::entryHash($entry);
+            if (isset($localPorts[$entry->node_workload_id])) {
+                // The address of the replaced slot: the local rule stays on the old container until the new one is healthy.
+                $replacesIp = $entry->replaces_slot === null ? null : $placements->get($entry->node_workload_id)?->pivot->{$entry->replaces_slot->addressColumn()};
+                $ports[$entry->node_workload_id] = [
+                    'published_ports' => $localPorts[$entry->node_workload_id],
+                    ...(filled($replacesIp) ? ['replaces_container_ip' => $replacesIp] : []),
+                ];
+            }
+            $entryHash = self::entryHash($entry, $ports[$entry->node_workload_id] ?? []);
             if ($entry->entry_hash !== $entryHash) {
                 $entry->forceFill(['entry_hash' => $entryHash])->saveQuietly();
             }
         }
 
-        return ['kept' => $kept->values(), 'removed' => $removed->unique('id')->values()];
+        return ['kept' => $kept->values(), 'removed' => $removed->unique('id')->values(), 'ports' => $ports];
     }
 
-    public static function entryHash(NodeWorkloadSetEntry $entry): string
+    /** @param  array<string, mixed>  $ports  The local published ports of the entry. Empty keeps the hash of an entry without them. */
+    public static function entryHash(NodeWorkloadSetEntry $entry, array $ports = []): string
     {
         return hash('sha256', json_encode([
             $entry->workload->uuid,
@@ -163,6 +216,7 @@ class SyncNodeWorkloadSet
             $entry->operation?->uuid,
             (bool) $entry->redeploy,
             $entry->pull_policy,
+            ...($ports === [] ? [] : [$ports]),
         ], JSON_THROW_ON_ERROR));
     }
 
@@ -186,11 +240,12 @@ class SyncNodeWorkloadSet
     /**
      * @param  Collection<int, NodeWorkloadSetEntry>  $entries
      * @param  array<int, array{payload: array<string, mixed>, network_revision: int}>  $prepared
+     * @param  array<int, array<string, mixed>>  $ports  The local published ports, by workload ID.
      * @return list<array<string, mixed>>
      */
-    private function puts(Collection $entries, array $prepared): array
+    private function puts(Collection $entries, array $prepared, array $ports): array
     {
-        return $entries->map(function (NodeWorkloadSetEntry $entry) use ($prepared): array {
+        return $entries->map(function (NodeWorkloadSetEntry $entry) use ($prepared, $ports): array {
             $deploy = $prepared[$entry->node_workload_id]['payload'] ?? $this->deployPayload($entry);
 
             return [
@@ -207,6 +262,8 @@ class SyncNodeWorkloadSet
                 // A stop of a move or a restore gives a database time to flush its data. Else the Compose
                 // `stop_grace_period`, which is part of the configuration hash of the revision.
                 'stop_timeout_seconds' => data_get($entry->operation?->request, 'stop_timeout_seconds') ?? $entry->revision->stopTimeoutSeconds(),
+                // Flux refuses them for a Sentinel without the capability (decision 0037).
+                ...($ports[$entry->node_workload_id] ?? []),
             ];
         })->values()->all();
     }

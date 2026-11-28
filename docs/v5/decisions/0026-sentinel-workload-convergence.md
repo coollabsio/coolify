@@ -197,6 +197,12 @@ Built on 2026-11-16 (Sentinel `7a509e9`, `7574bf0`, `6774450`; Coolify
   command path. `ReconcileNodeWorkloads` and `RecoverStaleOperations` stay for
   these. Remove them when a released Sentinel has the capability and the
   published ports converge in Sentinel.
+- **Published ports converge (2026-11-28, decision 0037).** A workload with
+  published ports converges in Sentinel when every usable Node of its cluster
+  reports `network.published_ports.local.v1`. `ReconcileNodeWorkloads` and
+  `RecoverStaleOperations` still stay, because Nodes without the capability
+  (a new Node from `upstream.json`, cluster 2 of dev) need the command path.
+  Remove them when a released Sentinel has both capabilities.
 - **Checked on dev (cluster 1, Sentinel `main-6774450`).** A deploy, a rolling
   redeploy, a rollback with pull policy `missing`, stop and start, and a
   crash-looping revision that failed while the older container kept running.

@@ -3,6 +3,8 @@
 namespace App\Actions\Node;
 
 use App\Models\Node;
+use App\Models\NodeContainer;
+use App\Models\NodePublishedPort;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
@@ -89,8 +91,37 @@ class FetchContainers
         $volumeNames = array_key_exists('volumes', $data)
             ? collect($data['volumes'])->pluck('name')->sort()->values()->all()
             : null;
+        $running = self::runningPublishedWorkloads($node);
         ReconcileContainers::run($node, $containers, $snapshotObservedAt, $volumeNames);
+        // The Nodes forward a published port to a Node that runs the workload (decisions 0016 and 0037).
+        // When this Node stops or starts running one, for example after a crash, they must forward to
+        // another Node.
+        if ($node->cluster !== null && self::runningPublishedWorkloads($node) !== $running) {
+            QueueNodeClusterNetworkRevision::run($node->cluster);
+        }
 
         return count($containers);
+    }
+
+    /**
+     * The workloads with a published port in the cluster that have a running container on the Node.
+     *
+     * @return list<int>
+     */
+    private static function runningPublishedWorkloads(Node $node): array
+    {
+        if ($node->node_cluster_id === null) {
+            return [];
+        }
+
+        return NodeContainer::query()
+            ->where('node_id', $node->id)
+            ->where('state', 'running')
+            ->whereIn('node_workload_id', NodePublishedPort::query()->where('node_cluster_id', $node->node_cluster_id)->select('node_workload_id'))
+            ->distinct()
+            ->orderBy('node_workload_id')
+            ->pluck('node_workload_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
     }
 }

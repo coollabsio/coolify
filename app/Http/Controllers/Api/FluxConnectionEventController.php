@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Actions\Node\QueueNodeNetworkConvergence;
+use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Actions\Node\RecordNodeWorkloadStatus;
+use App\Actions\Node\SyncNodeWorkloadSet;
 use App\Actions\Sentinel\ResolveFluxPublicUrl;
 use App\Actions\Sentinel\ResolveFluxTrustBundle;
 use App\Actions\Sentinel\RotateFluxCertificateAuthority;
@@ -132,10 +134,18 @@ class FluxConnectionEventController extends Controller
         }
         if (isset($data['capabilities']) && $node->sentinel_capabilities !== $data['capabilities']) {
             $hadRoutesV2 = in_array(NodeCluster::INGRESS_ROUTES_CAPABILITY, $node->sentinel_capabilities ?? [], true);
+            $hadLocalPorts = in_array(ReconcileNodeClusterNetwork::PUBLISHED_PORTS_LOCAL_CAPABILITY, $node->sentinel_capabilities ?? [], true);
             $node->update(['sentinel_capabilities' => $data['capabilities']]);
+            $localPortsChanged = $hadLocalPorts !== in_array(ReconcileNodeClusterNetwork::PUBLISHED_PORTS_LOCAL_CAPABILITY, $data['capabilities'], true);
             // The route table shape depends on this capability on every Node, so a converged cluster must resend it.
-            if ($node->cluster !== null && $hadRoutesV2 !== in_array(NodeCluster::INGRESS_ROUTES_CAPABILITY, $data['capabilities'], true)) {
+            // The published ports of the cluster change between the rules of decisions 0016 and 0037, and the
+            // firewall of a new Sentinel must accept the connections that its local rules translate.
+            if ($node->cluster !== null && ($localPortsChanged || $hadRoutesV2 !== in_array(NodeCluster::INGRESS_ROUTES_CAPABILITY, $data['capabilities'], true))) {
                 rescue(fn () => QueueNodeClusterNetworkRevision::run($node->cluster));
+            }
+            if ($node->cluster !== null && $localPortsChanged) {
+                // The desired set entries get or lose their local published ports.
+                rescue(fn () => SyncNodeWorkloadSet::queueForCluster($node->cluster, 15));
             }
         }
         if ($data['event'] === 'connected' && isset($data['trust_bundle_version'])) {

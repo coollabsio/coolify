@@ -180,6 +180,9 @@ class SyncNodeStackCompose
         if (($buildsAreNew && $cluster->runsBuilds()) || $portsChanged) {
             QueueNodeClusterNetworkRevision::run($cluster);
         }
+        if ($portsChanged) {
+            SyncNodeWorkloadSet::queueForCluster($cluster);
+        }
 
         return $summary;
     }

@@ -53,6 +53,7 @@ class PublishNodeWorkloadPort
             }
         });
         QueueNodeClusterNetworkRevision::run($cluster, $user);
+        SyncNodeWorkloadSet::queueForCluster($cluster);
 
         return $published;
     }

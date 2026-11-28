@@ -103,6 +103,10 @@ class ReconcileNodeWorkloads
         if ($adopted !== []) {
             try {
                 SyncNodeWorkloadSet::run($node, $adopted);
+                // The other Nodes forward its published ports to the mesh address of this Node now (decision 0037).
+                if ($node->cluster !== null && $workloads->whereIn('id', $adopted)->contains(fn (NodeWorkload $workload): bool => $workload->publishedPorts()->exists())) {
+                    QueueNodeClusterNetworkRevision::run($node->cluster);
+                }
             } catch (Throwable $exception) {
                 report($exception);
             }
