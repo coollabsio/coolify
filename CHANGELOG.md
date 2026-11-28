@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [v4.7.10] - 2026-11-28
+
+### Security
+
+- Bound the DNS ports of the `Pi-hole` service template to `127.0.0.1` by default, so a new Pi-hole on a public server is not an open DNS resolver ([#12699](https://github.com/coollabsio/coolify/issues/12699))
+  - Set `PIHOLE_DNS_BIND_ADDRESS` to a LAN or VPN address to serve a network. The DHCP and NTP ports are not published by default
+- Limited the Git credentials of pull request preview deployments to the repository of the application
+- Updated the dependencies of the Coolify image
+  - `Laravel` from `12.72.0` to `12.74.0` ([GHSA-8h64-cpq2-9h2g](https://github.com/laravel/framework/security/advisories/GHSA-8h64-cpq2-9h2g), [GHSA-c25c-x5r7-2v5m](https://github.com/laravel/framework/security/advisories/GHSA-c25c-x5r7-2v5m))
+  - `serversideup/php` from `v5.1.5` to `v5.2.2`
+  - `nginx` from `1.31.9` to `1.31.10`
+  - `cloudflared` from `2026.11.1` to `2026.11.2`
+
+### Fixed
+
+- Created an empty global network for each internal network of a service compose file at each proxy restart ([#12702](https://github.com/coollabsio/coolify/issues/12702))
+  - The proxy now ensures only the stack network and the external networks of a service
+- Created the bind-mounted configuration files of a cloned service as directories, so the clone did not start ([#12700](https://github.com/coollabsio/coolify/issues/12700))
+  - The clone gets the content, type, owner, and mode of each file storage of the source service
+- Failed image scan with `invalid image reference` for Compose images that use more than one variable, such as `${IMAGE_REPO:-ghcr.io/zammad/zammad}:${VERSION:-7.2.2-0000}` ([#12673](https://github.com/coollabsio/coolify/issues/12673))
+  - The scan resolves every variable of the image with its value or its default, as Docker Compose does
+- Failed to create a new dynamic configuration of a Caddy proxy with `+ Add`, with the error "base64: ...: No such file or directory" ([#12693](https://github.com/coollabsio/coolify/issues/12693))
+  - `+ Add` also shows "File already exists" again when the file exists
+- Missing shared variable suggestions for `{{` in the `Value` field of an existing environment variable ([#12678](https://github.com/coollabsio/coolify/issues/12678))
+  - The edit form and the `Add` form now suggest the team, project, environment, and server variables of the resource, also on databases
+- Older Sentinel and Traefik versions of the CDN used instead of the minimum versions of the installed release
+- Returned `500` from `GET /api/v1/services/{uuid}/storages` when a service had file storages ([#12676](https://github.com/coollabsio/coolify/issues/12676))
+- Returned a `deployment_uuid` that does not exist from `POST /api/v1/deploy` when the commit is already queued, so `GET /api/v1/deployments/{uuid}` answered 404 ([#12686](https://github.com/coollabsio/coolify/issues/12686))
+  - The deploy, start, and restart endpoints return the uuid of the deployment that is already queued or in progress. Start and restart answer 429 when the deployment queue is full
+
+### Maintenance
+
+- Stopped syncing the helper and Sentinel versions to the CDN, their own releases set them
+
 ## [v4.7.9] - 2026-11-26
 
 ### Added
