@@ -2,14 +2,18 @@
 
 namespace App\Services\ProjectConfig\Children;
 
+use App\Models\IntegrationToken;
 use App\Models\SecretManagerLink;
 use App\Services\ProjectConfig\ApplyContext;
 use App\Services\ProjectConfig\ConfigError;
 use App\Services\ProjectConfig\Field;
 use App\Services\ProjectConfig\FieldMap;
 use App\Services\ProjectConfig\NamedCredentials;
+use App\Services\SecretManagers\ResourceSecretManager;
 use App\Support\RemoteSecretReferences;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use LogicException;
 
 /**
@@ -19,6 +23,12 @@ use LogicException;
  */
 class SecretManager implements ChildRecords
 {
+    /**
+     * The settings keys of all providers (ResourceSecretManager::settingsRules()). The schema rejects other keys,
+     * and the plan checks these per provider.
+     */
+    private const SETTINGS_KEYS = ['project', 'config', 'project_id', 'environment', 'secret_path', 'mount', 'path'];
+
     public function key(): string
     {
         return 'secret_manager';
@@ -90,7 +100,11 @@ class SecretManager implements ChildRecords
             'type' => 'object',
             'required' => ['token'],
             'additionalProperties' => false,
-            'properties' => ['token' => ['type' => 'string'], 'settings' => ['type' => 'object']],
+            'properties' => ['token' => ['type' => 'string'], 'settings' => [
+                'type' => 'object',
+                'additionalProperties' => false,
+                'properties' => array_fill_keys(self::SETTINGS_KEYS, ['type' => 'string']),
+            ]],
         ];
 
         return [
@@ -165,7 +179,38 @@ class SecretManager implements ChildRecords
                 $errors[] = new ConfigError("{$path}.token", 'Name an integration token of this team.');
             } elseif (($message = NamedCredentials::error('token', $token, $teamId)) !== null) {
                 $errors[] = new ConfigError("{$path}.token", $message);
+            } else {
+                $errors = [...$errors, ...self::settingsErrors($path, $entry['settings'] ?? [], NamedCredentials::find('token', $token, $teamId))];
             }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Problems with the provider settings of a source, with the rules that the API and the resource page use.
+     * Without this check, a wrong key such as `secretPath` is stored and the deployment reads another folder.
+     *
+     * @return list<ConfigError>
+     */
+    private static function settingsErrors(string $path, mixed $settings, IntegrationToken $token): array
+    {
+        if (! is_array($settings) || ($settings !== [] && array_is_list($settings))) {
+            return [new ConfigError("{$path}.settings", 'Use an object of provider settings.')];
+        }
+
+        $rules = app(ResourceSecretManager::class)->settingsRules($token);
+        $known = array_map(fn (string $field): string => Str::after($field, 'settings.'), array_keys($rules));
+        $errors = [];
+        foreach (array_intersect(array_keys($settings), self::SETTINGS_KEYS) as $field) {
+            if (! in_array($field, $known, true)) {
+                $hint = $known === [] ? 'This token takes no settings.' : 'Use one of: '.implode(', ', $known).'.';
+                $errors[] = new ConfigError("{$path}.settings.{$field}", "Unknown {$token->provider} setting. {$hint}");
+            }
+        }
+        $validator = Validator::make(['settings' => $settings], $rules);
+        foreach ($validator->errors()->messages() as $field => $messages) {
+            $errors[] = new ConfigError("{$path}.{$field}", $messages[0]);
         }
 
         return $errors;

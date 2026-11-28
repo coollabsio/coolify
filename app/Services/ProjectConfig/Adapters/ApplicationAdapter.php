@@ -469,6 +469,9 @@ class ApplicationAdapter implements ResourceAdapter
     {
         $errors = SecretManager::errors($base, $desired['secret_manager'] ?? null, $ctx->teamId);
         $errors = [...$errors, ...SecretManager::referenceErrors($base, $desired['secret_manager'] ?? null, $desired['env'] ?? null)];
+        if (($desired['build']['pack'] ?? null) !== 'dockercompose') {
+            $errors = [...$errors, ...EnvironmentVariables::containerErrors($base, $desired['env'] ?? null, null)];
+        }
         $volumes = ($desired['build']['pack'] ?? null) === 'dockercompose' ? null : array_map('strval', array_keys((array) ($desired['storages'] ?? [])));
         $errors = [...$errors, ...StorageBackups::errors($base, $desired['storage_backups'] ?? null, $ctx->teamId, $volumes)];
         foreach (array_values((array) ($desired['additional_servers'] ?? [])) as $index => $entry) {

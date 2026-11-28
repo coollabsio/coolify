@@ -354,6 +354,7 @@ class ServiceAdapter implements ResourceAdapter
 
         $names = $this->composeServiceNames($compose);
         $errors = [...$errors, ...StorageBackups::errors($base, $desired['storage_backups'] ?? null, $ctx->teamId, $this->composeVolumeKeys($compose))];
+        $errors = [...$errors, ...EnvironmentVariables::containerErrors($base, $desired['env'] ?? null, $names)];
         foreach (array_keys((array) ($desired['services'] ?? [])) as $name) {
             if (! in_array($name, $names, true)) {
                 $errors[] = new ConfigError("{$base}.services.{$name}", 'The Compose file has no service with this name.');
