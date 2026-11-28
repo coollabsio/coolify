@@ -26,6 +26,11 @@
       fqdn: 'http://gateway-referenceservice00000001.10.0.0.1.sslip.io/ws'
       exclude_from_status: false
       ports: ''
+    multi-endpoint:
+      fqdn: 'http://multiendpoint-referenceservice00000001.10.0.0.1.sslip.io,http://multisite-referenceservice00000001.10.0.0.1.sslip.io'
+      required_port: 3210
+      exclude_from_status: false
+      ports: ''
     my-app:
       fqdn: 'http://my_app-referenceservice00000001.10.0.0.1.sslip.io'
       required_port: 80
@@ -120,6 +125,10 @@
     SERVICE_FQDN_DB_5432: 'db-referenceservice00000001.10.0.0.1.sslip.io:5432'
     SERVICE_FQDN_GATEWAY: gateway-referenceservice00000001.10.0.0.1.sslip.io/ws
     SERVICE_FQDN_GHOST: ghost-referenceservice00000001.10.0.0.1.sslip.io
+    SERVICE_FQDN_MULTIENDPOINT: multiendpoint-referenceservice00000001.10.0.0.1.sslip.io
+    SERVICE_FQDN_MULTIENDPOINT_3210: 'multiendpoint-referenceservice00000001.10.0.0.1.sslip.io:3210'
+    SERVICE_FQDN_MULTISITE: multisite-referenceservice00000001.10.0.0.1.sslip.io
+    SERVICE_FQDN_MULTISITE_3211: 'multisite-referenceservice00000001.10.0.0.1.sslip.io:3211'
     SERVICE_FQDN_MY_APP: my_app-referenceservice00000001.10.0.0.1.sslip.io
     SERVICE_FQDN_MY_APP_80: 'my_app-referenceservice00000001.10.0.0.1.sslip.io:80'
     SERVICE_FQDN_WEB: web-referenceservice00000001.10.0.0.1.sslip.io
@@ -143,6 +152,10 @@
     SERVICE_URL_DB_5432: 'http://db-referenceservice00000001.10.0.0.1.sslip.io:5432'
     SERVICE_URL_GATEWAY: 'http://gateway-referenceservice00000001.10.0.0.1.sslip.io/ws'
     SERVICE_URL_GHOST: 'http://ghost-referenceservice00000001.10.0.0.1.sslip.io'
+    SERVICE_URL_MULTIENDPOINT: 'http://multiendpoint-referenceservice00000001.10.0.0.1.sslip.io'
+    SERVICE_URL_MULTIENDPOINT_3210: 'http://multiendpoint-referenceservice00000001.10.0.0.1.sslip.io:3210'
+    SERVICE_URL_MULTISITE: 'http://multisite-referenceservice00000001.10.0.0.1.sslip.io'
+    SERVICE_URL_MULTISITE_3211: 'http://multisite-referenceservice00000001.10.0.0.1.sslip.io:3211'
     SERVICE_URL_MY_APP: 'http://my_app-referenceservice00000001.10.0.0.1.sslip.io'
     SERVICE_URL_MY_APP_80: 'http://my_app-referenceservice00000001.10.0.0.1.sslip.io:80'
     SERVICE_URL_WEB: 'http://web-referenceservice00000001.10.0.0.1.sslip.io'
@@ -150,6 +163,7 @@
     SERVICE_URL_WWW: 'http://www-referenceservice00000001.10.0.0.1.sslip.io'
     SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
     SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
+    SITE_ORIGIN: '${SERVICE_URL_MULTISITE}'
     SUPABASE_ANON_WITHOUT_JWT: '${SERVICE_SUPABASEANON_KEY}'
     UNKNOWN_MAGIC: '${SERVICE_FOO_WEB}'
     USER: '${SERVICE_USER_WEB}'
@@ -206,6 +220,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -314,6 +329,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -398,6 +414,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -460,6 +477,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -520,6 +538,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -587,6 +606,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -647,6 +667,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -689,6 +710,83 @@
           referenceservice00000001: null
         env_file:
           - .coolify.gateway-ws.env
+      multi-endpoint:
+        image: traefik/whoami
+        environment:
+          SERVICE_URL_MULTIENDPOINT_3210: 'http://multiendpoint-referenceservice00000001.10.0.0.1.sslip.io:3210'
+          SERVICE_URL_MULTISITE_3211: 'http://multisite-referenceservice00000001.10.0.0.1.sslip.io:3211'
+          SITE_ORIGIN: '${SERVICE_URL_MULTISITE}'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: multi-endpoint-referenceservice00000001
+          COOLIFY_FQDN: 'multiendpoint-referenceservice00000001.10.0.0.1.sslip.io,multisite-referenceservice00000001.10.0.0.1.sslip.io'
+          COOLIFY_URL: 'http://multiendpoint-referenceservice00000001.10.0.0.1.sslip.io,http://multisite-referenceservice00000001.10.0.0.1.sslip.io'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
+        container_name: multi-endpoint-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=multi-endpoint-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=multi-endpoint
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:multi-endpoint>'
+          - coolify.service.subType=application
+          - coolify.service.subName=multi-endpoint
+          - traefik.docker.network=referenceservice00000001
+          - traefik.enable=true
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceservice00000001-multi-endpoint-e0ba.entryPoints=http
+          - traefik.http.routers.http-0-referenceservice00000001-multi-endpoint-e0ba.middlewares=gzip-no-media
+          - 'traefik.http.routers.http-0-referenceservice00000001-multi-endpoint-e0ba.rule=Host(`multiendpoint-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-0-referenceservice00000001-multi-endpoint-e0ba.service=http-0-referenceservice00000001-multi-endpoint-e0ba
+          - traefik.http.routers.http-1-referenceservice00000001-multi-endpoint-e0ba.entryPoints=http
+          - traefik.http.routers.http-1-referenceservice00000001-multi-endpoint-e0ba.middlewares=gzip-no-media
+          - 'traefik.http.routers.http-1-referenceservice00000001-multi-endpoint-e0ba.rule=Host(`multisite-referenceservice00000001.10.0.0.1.sslip.io`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-1-referenceservice00000001-multi-endpoint-e0ba.service=http-1-referenceservice00000001-multi-endpoint-e0ba
+          - traefik.http.services.http-0-referenceservice00000001-multi-endpoint-e0ba.loadbalancer.server.port=3210
+          - traefik.http.services.http-1-referenceservice00000001-multi-endpoint-e0ba.loadbalancer.server.port=3211
+          - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3210}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=http://multiendpoint-referenceservice00000001.10.0.0.1.sslip.io'
+          - 'caddy_1.encode=zstd gzip'
+          - caddy_1.handle_path.1_reverse_proxy.stream_close_delay=24h
+          - 'caddy_1.handle_path.1_reverse_proxy={{upstreams 3211}}'
+          - 'caddy_1.handle_path=/*'
+          - caddy_1.header=-Server
+          - 'caddy_1.try_files={path} /index.html /index.php'
+          - 'caddy_1=http://multisite-referenceservice00000001.10.0.0.1.sslip.io'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .coolify.multi-endpoint.env
       worker:
         image: 'nginx:alpine'
         command:
@@ -710,6 +808,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -755,6 +854,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -801,6 +901,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -880,6 +981,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -923,6 +1025,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -965,6 +1068,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -1029,6 +1133,11 @@
       ports: ''
     gateway-ws:
       fqdn: 'https://gateway.example.com/ws'
+      exclude_from_status: false
+      ports: ''
+    multi-endpoint:
+      fqdn: 'https://multiendpoint.example.com,https://multisite.example.com'
+      required_port: 3210
       exclude_from_status: false
       ports: ''
     my-app:
@@ -1125,6 +1234,10 @@
     SERVICE_FQDN_DB_5432: 'db-referenceservice00000001.10.0.0.1.sslip.io:5432'
     SERVICE_FQDN_GATEWAY: gateway.example.com/ws
     SERVICE_FQDN_GHOST: ghost-referenceservice00000001.10.0.0.1.sslip.io
+    SERVICE_FQDN_MULTIENDPOINT: multiendpoint.example.com
+    SERVICE_FQDN_MULTIENDPOINT_3210: 'multiendpoint.example.com:3210'
+    SERVICE_FQDN_MULTISITE: multisite.example.com
+    SERVICE_FQDN_MULTISITE_3211: 'multisite.example.com:3211'
     SERVICE_FQDN_MY_APP: my_app.example.com
     SERVICE_FQDN_MY_APP_80: 'my_app.example.com:80'
     SERVICE_FQDN_WEB: web.example.com
@@ -1148,6 +1261,10 @@
     SERVICE_URL_DB_5432: 'http://db-referenceservice00000001.10.0.0.1.sslip.io:5432'
     SERVICE_URL_GATEWAY: 'https://gateway.example.com/ws'
     SERVICE_URL_GHOST: 'http://ghost-referenceservice00000001.10.0.0.1.sslip.io'
+    SERVICE_URL_MULTIENDPOINT: 'https://multiendpoint.example.com'
+    SERVICE_URL_MULTIENDPOINT_3210: 'https://multiendpoint.example.com:3210'
+    SERVICE_URL_MULTISITE: 'https://multisite.example.com'
+    SERVICE_URL_MULTISITE_3211: 'https://multisite.example.com:3211'
     SERVICE_URL_MY_APP: 'https://my_app.example.com'
     SERVICE_URL_MY_APP_80: 'https://my_app.example.com:80'
     SERVICE_URL_WEB: 'https://web.example.com'
@@ -1155,6 +1272,7 @@
     SERVICE_URL_WWW: 'https://www.example.com'
     SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
     SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
+    SITE_ORIGIN: '${SERVICE_URL_MULTISITE}'
     SUPABASE_ANON_WITHOUT_JWT: '${SERVICE_SUPABASEANON_KEY}'
     UNKNOWN_MAGIC: '${SERVICE_FOO_WEB}'
     USER: '${SERVICE_USER_WEB}'
@@ -1211,6 +1329,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -1324,6 +1443,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -1415,6 +1535,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -1484,6 +1605,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -1553,6 +1675,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -1627,6 +1750,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -1692,6 +1816,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -1739,6 +1864,97 @@
           referenceservice00000001: null
         env_file:
           - .coolify.gateway-ws.env
+      multi-endpoint:
+        image: traefik/whoami
+        environment:
+          SERVICE_URL_MULTIENDPOINT_3210: 'https://multiendpoint.example.com:3210'
+          SERVICE_URL_MULTISITE_3211: 'https://multisite.example.com:3211'
+          SITE_ORIGIN: '${SERVICE_URL_MULTISITE}'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: multi-endpoint-referenceservice00000001
+          COOLIFY_FQDN: 'multiendpoint.example.com,multisite.example.com'
+          COOLIFY_URL: 'https://multiendpoint.example.com,https://multisite.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
+        container_name: multi-endpoint-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=multi-endpoint-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=multi-endpoint
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:multi-endpoint>'
+          - coolify.service.subType=application
+          - coolify.service.subName=multi-endpoint
+          - traefik.docker.network=referenceservice00000001
+          - traefik.enable=true
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceservice00000001-multi-endpoint-e0ba.entryPoints=http
+          - traefik.http.routers.http-0-referenceservice00000001-multi-endpoint-e0ba.middlewares=redirect-to-https
+          - 'traefik.http.routers.http-0-referenceservice00000001-multi-endpoint-e0ba.rule=Host(`multiendpoint.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-0-referenceservice00000001-multi-endpoint-e0ba.service=http-0-referenceservice00000001-multi-endpoint-e0ba
+          - traefik.http.routers.http-1-referenceservice00000001-multi-endpoint-e0ba.entryPoints=http
+          - traefik.http.routers.http-1-referenceservice00000001-multi-endpoint-e0ba.middlewares=redirect-to-https
+          - 'traefik.http.routers.http-1-referenceservice00000001-multi-endpoint-e0ba.rule=Host(`multisite.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-1-referenceservice00000001-multi-endpoint-e0ba.service=http-1-referenceservice00000001-multi-endpoint-e0ba
+          - traefik.http.routers.https-0-referenceservice00000001-multi-endpoint-e0ba.entryPoints=https
+          - traefik.http.routers.https-0-referenceservice00000001-multi-endpoint-e0ba.middlewares=gzip-no-media
+          - 'traefik.http.routers.https-0-referenceservice00000001-multi-endpoint-e0ba.rule=Host(`multiendpoint.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceservice00000001-multi-endpoint-e0ba.service=https-0-referenceservice00000001-multi-endpoint-e0ba
+          - traefik.http.routers.https-0-referenceservice00000001-multi-endpoint-e0ba.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-0-referenceservice00000001-multi-endpoint-e0ba.tls=true
+          - traefik.http.routers.https-1-referenceservice00000001-multi-endpoint-e0ba.entryPoints=https
+          - traefik.http.routers.https-1-referenceservice00000001-multi-endpoint-e0ba.middlewares=gzip-no-media
+          - 'traefik.http.routers.https-1-referenceservice00000001-multi-endpoint-e0ba.rule=Host(`multisite.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-1-referenceservice00000001-multi-endpoint-e0ba.service=https-1-referenceservice00000001-multi-endpoint-e0ba
+          - traefik.http.routers.https-1-referenceservice00000001-multi-endpoint-e0ba.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-1-referenceservice00000001-multi-endpoint-e0ba.tls=true
+          - traefik.http.services.http-0-referenceservice00000001-multi-endpoint-e0ba.loadbalancer.server.port=3210
+          - traefik.http.services.http-1-referenceservice00000001-multi-endpoint-e0ba.loadbalancer.server.port=3211
+          - traefik.http.services.https-0-referenceservice00000001-multi-endpoint-e0ba.loadbalancer.server.port=3210
+          - traefik.http.services.https-1-referenceservice00000001-multi-endpoint-e0ba.loadbalancer.server.port=3211
+          - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3210}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://multiendpoint.example.com'
+          - 'caddy_1.encode=zstd gzip'
+          - caddy_1.handle_path.1_reverse_proxy.stream_close_delay=24h
+          - 'caddy_1.handle_path.1_reverse_proxy={{upstreams 3211}}'
+          - 'caddy_1.handle_path=/*'
+          - caddy_1.header=-Server
+          - 'caddy_1.try_files={path} /index.html /index.php'
+          - 'caddy_1=https://multisite.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .coolify.multi-endpoint.env
       worker:
         image: 'nginx:alpine'
         command:
@@ -1760,6 +1976,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -1805,6 +2022,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -1851,6 +2069,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -1930,6 +2149,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -1973,6 +2193,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -2015,6 +2236,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -2080,6 +2302,11 @@
       ports: ''
     gateway-ws:
       fqdn: 'https://gateway.example.com/ws'
+      exclude_from_status: false
+      ports: ''
+    multi-endpoint:
+      fqdn: 'https://multiendpoint.example.com,https://multisite.example.com'
+      required_port: 3210
       exclude_from_status: false
       ports: ''
     my-app:
@@ -2179,6 +2406,10 @@
     SERVICE_FQDN_DB_5432: 'db-referenceservice00000001.10.0.0.1.sslip.io:5432'
     SERVICE_FQDN_GATEWAY: gateway.example.com/ws
     SERVICE_FQDN_GHOST: ghost-referenceservice00000001.10.0.0.1.sslip.io
+    SERVICE_FQDN_MULTIENDPOINT: multiendpoint.example.com
+    SERVICE_FQDN_MULTIENDPOINT_3210: 'multiendpoint.example.com:3210'
+    SERVICE_FQDN_MULTISITE: multisite.example.com
+    SERVICE_FQDN_MULTISITE_3211: 'multisite.example.com:3211'
     SERVICE_FQDN_MY_APP: my_app.example.com
     SERVICE_FQDN_MY_APP_80: 'my_app.example.com:80'
     SERVICE_FQDN_WEB: web.example.com
@@ -2202,6 +2433,10 @@
     SERVICE_URL_DB_5432: 'http://db-referenceservice00000001.10.0.0.1.sslip.io:5432'
     SERVICE_URL_GATEWAY: 'https://gateway.example.com/ws'
     SERVICE_URL_GHOST: 'http://ghost-referenceservice00000001.10.0.0.1.sslip.io'
+    SERVICE_URL_MULTIENDPOINT: 'https://multiendpoint.example.com'
+    SERVICE_URL_MULTIENDPOINT_3210: 'https://multiendpoint.example.com:3210'
+    SERVICE_URL_MULTISITE: 'https://multisite.example.com'
+    SERVICE_URL_MULTISITE_3211: 'https://multisite.example.com:3211'
     SERVICE_URL_MY_APP: 'https://my_app.example.com'
     SERVICE_URL_MY_APP_80: 'https://my_app.example.com:80'
     SERVICE_URL_WEB: 'https://web.example.com'
@@ -2209,6 +2444,7 @@
     SERVICE_URL_WWW: 'https://www.example.com'
     SERVICE_USER_DB: '<generated:SERVICE_USER_DB:16>'
     SERVICE_USER_WEB: '<generated:SERVICE_USER_WEB:16>'
+    SITE_ORIGIN: '${SERVICE_URL_MULTISITE}'
     SUPABASE_ANON_WITHOUT_JWT: '${SERVICE_SUPABASEANON_KEY}'
     UNKNOWN_MAGIC: '${SERVICE_FOO_WEB}'
     USER: '${SERVICE_USER_WEB}'
@@ -2265,6 +2501,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -2378,6 +2615,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -2469,6 +2707,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -2538,6 +2777,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -2607,6 +2847,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -2681,6 +2922,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -2746,6 +2988,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -2793,6 +3036,97 @@
           referenceservice00000001: null
         env_file:
           - .coolify.gateway-ws.env
+      multi-endpoint:
+        image: traefik/whoami
+        environment:
+          SERVICE_URL_MULTIENDPOINT_3210: 'https://multiendpoint.example.com:3210'
+          SERVICE_URL_MULTISITE_3211: 'https://multisite.example.com:3211'
+          SITE_ORIGIN: '${SERVICE_URL_MULTISITE}'
+          COOLIFY_RESOURCE_UUID: referenceservice00000001
+          COOLIFY_CONTAINER_NAME: multi-endpoint-referenceservice00000001
+          COOLIFY_FQDN: 'multiendpoint.example.com,multisite.example.com'
+          COOLIFY_URL: 'https://multiendpoint.example.com,https://multisite.example.com'
+          COOLIFY_APP_NAME: reference
+          COOLIFY_PROJECT_NAME: 'Reference Project'
+          COOLIFY_ENVIRONMENT_NAME: production
+          COOLIFY_SERVER_IP: 10.0.0.1
+          SERVICE_NAME_WEB: web
+          SERVICE_NAME_API: api
+          SERVICE_NAME_MY_APP: my-app
+          SERVICE_NAME_WWW: www
+          SERVICE_NAME_BLOG: blog
+          SERVICE_NAME_GATEWAY: gateway
+          SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
+          SERVICE_NAME_WORKER: worker
+          SERVICE_NAME_SCHEDULER: scheduler
+          SERVICE_NAME_DB: db
+          SERVICE_NAME_CACHE: cache
+          SERVICE_NAME_SIDECAR: sidecar
+          SERVICE_NAME_EMPTY_LISTS: empty-lists
+        container_name: multi-endpoint-referenceservice00000001
+        restart: unless-stopped
+        labels:
+          - coolify.managed=true
+          - coolify.version=<coolify-version>
+          - coolify.serviceUuid=referenceservice00000001
+          - coolify.type=service
+          - coolify.name=multi-endpoint-referenceservice00000001
+          - coolify.resourceName=reference
+          - coolify.projectName=reference-project
+          - coolify.serviceName=multi-endpoint
+          - coolify.environmentName=production
+          - coolify.pullRequestId=0
+          - 'coolify.service.subUuid=<uuid:multi-endpoint>'
+          - coolify.service.subType=application
+          - coolify.service.subName=multi-endpoint
+          - traefik.docker.network=referenceservice00000001
+          - traefik.enable=true
+          - 'traefik.http.middlewares.gzip-no-media.compress.excludedcontenttypes=text/event-stream,video/mp4,video/webm,video/ogg,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,video/mp2t,video/3gpp,video/x-m4v,video/x-flv,audio/mpeg,audio/mp4,audio/aac,audio/ogg,audio/opus,audio/webm,audio/wav,audio/x-wav,audio/flac,audio/x-m4a,image/jpeg,image/png,image/gif,image/webp,image/avif,application/pdf,application/octet-stream,application/zip,application/gzip,application/x-gzip,application/zstd,application/x-7z-compressed,application/x-rar-compressed,application/x-bzip2,application/x-xz,application/x-tar'
+          - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+          - traefik.http.routers.http-0-referenceservice00000001-multi-endpoint-e0ba.entryPoints=http
+          - traefik.http.routers.http-0-referenceservice00000001-multi-endpoint-e0ba.middlewares=redirect-to-https
+          - 'traefik.http.routers.http-0-referenceservice00000001-multi-endpoint-e0ba.rule=Host(`multiendpoint.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-0-referenceservice00000001-multi-endpoint-e0ba.service=http-0-referenceservice00000001-multi-endpoint-e0ba
+          - traefik.http.routers.http-1-referenceservice00000001-multi-endpoint-e0ba.entryPoints=http
+          - traefik.http.routers.http-1-referenceservice00000001-multi-endpoint-e0ba.middlewares=redirect-to-https
+          - 'traefik.http.routers.http-1-referenceservice00000001-multi-endpoint-e0ba.rule=Host(`multisite.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.http-1-referenceservice00000001-multi-endpoint-e0ba.service=http-1-referenceservice00000001-multi-endpoint-e0ba
+          - traefik.http.routers.https-0-referenceservice00000001-multi-endpoint-e0ba.entryPoints=https
+          - traefik.http.routers.https-0-referenceservice00000001-multi-endpoint-e0ba.middlewares=gzip-no-media
+          - 'traefik.http.routers.https-0-referenceservice00000001-multi-endpoint-e0ba.rule=Host(`multiendpoint.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-0-referenceservice00000001-multi-endpoint-e0ba.service=https-0-referenceservice00000001-multi-endpoint-e0ba
+          - traefik.http.routers.https-0-referenceservice00000001-multi-endpoint-e0ba.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-0-referenceservice00000001-multi-endpoint-e0ba.tls=true
+          - traefik.http.routers.https-1-referenceservice00000001-multi-endpoint-e0ba.entryPoints=https
+          - traefik.http.routers.https-1-referenceservice00000001-multi-endpoint-e0ba.middlewares=gzip-no-media
+          - 'traefik.http.routers.https-1-referenceservice00000001-multi-endpoint-e0ba.rule=Host(`multisite.example.com`) && PathPrefix(`/`)'
+          - traefik.http.routers.https-1-referenceservice00000001-multi-endpoint-e0ba.service=https-1-referenceservice00000001-multi-endpoint-e0ba
+          - traefik.http.routers.https-1-referenceservice00000001-multi-endpoint-e0ba.tls.certresolver=letsencrypt
+          - traefik.http.routers.https-1-referenceservice00000001-multi-endpoint-e0ba.tls=true
+          - traefik.http.services.http-0-referenceservice00000001-multi-endpoint-e0ba.loadbalancer.server.port=3210
+          - traefik.http.services.http-1-referenceservice00000001-multi-endpoint-e0ba.loadbalancer.server.port=3211
+          - traefik.http.services.https-0-referenceservice00000001-multi-endpoint-e0ba.loadbalancer.server.port=3210
+          - traefik.http.services.https-1-referenceservice00000001-multi-endpoint-e0ba.loadbalancer.server.port=3211
+          - 'caddy_0.encode=zstd gzip'
+          - caddy_0.handle_path.0_reverse_proxy.stream_close_delay=24h
+          - 'caddy_0.handle_path.0_reverse_proxy={{upstreams 3210}}'
+          - 'caddy_0.handle_path=/*'
+          - caddy_0.header=-Server
+          - 'caddy_0.try_files={path} /index.html /index.php'
+          - 'caddy_0=https://multiendpoint.example.com'
+          - 'caddy_1.encode=zstd gzip'
+          - caddy_1.handle_path.1_reverse_proxy.stream_close_delay=24h
+          - 'caddy_1.handle_path.1_reverse_proxy={{upstreams 3211}}'
+          - 'caddy_1.handle_path=/*'
+          - caddy_1.header=-Server
+          - 'caddy_1.try_files={path} /index.html /index.php'
+          - 'caddy_1=https://multisite.example.com'
+          - caddy_ingress_network=referenceservice00000001
+        networks:
+          referenceservice00000001: null
+        env_file:
+          - .coolify.multi-endpoint.env
       worker:
         image: 'nginx:alpine'
         command:
@@ -2816,6 +3150,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -2887,6 +3222,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -2957,6 +3293,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -3036,6 +3373,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -3100,6 +3438,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db
@@ -3164,6 +3503,7 @@
           SERVICE_NAME_BLOG: blog
           SERVICE_NAME_GATEWAY: gateway
           SERVICE_NAME_GATEWAY_WS: gateway-ws
+          SERVICE_NAME_MULTI_ENDPOINT: multi-endpoint
           SERVICE_NAME_WORKER: worker
           SERVICE_NAME_SCHEDULER: scheduler
           SERVICE_NAME_DB: db

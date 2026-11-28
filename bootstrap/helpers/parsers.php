@@ -2897,6 +2897,11 @@ function serviceParser(Service $resource): Collection
         // convert environment variables to one format
         $environment = convertToKeyValueCollection($environment);
 
+        // Each magic URL name with its own endpoint takes its domain from it below.
+        if ($savedService instanceof ServiceApplication) {
+            $savedService->importServiceEndpoints();
+        }
+
         // Add Coolify defined environments
         $allEnvironments = $resource->environment_variables()->get(['key', 'value']);
 
@@ -2961,8 +2966,8 @@ function serviceParser(Service $resource): Collection
                     $fqdn = generateFqdn(server: $server, random: "$fqdnFor-$uuid", parserVersion: $resource->compose_parsing_version);
                     $url = generateUrl($server, "$fqdnFor-$uuid");
                 } elseif ($isServiceApplication) {
-                    // FQDN may be a comma-separated list; use the first entry (same as updateCompose).
-                    $firstFqdn = firstDomainFromList($savedService->fqdn);
+                    // FQDN may be a comma-separated list; use the endpoint of the name, else the first entry (same as updateCompose).
+                    $firstFqdn = $savedService->endpointUrl($serviceName) ?? firstDomainFromList($savedService->fqdn);
                     $fqdn = getFqdnWithoutPort($firstFqdn);
                     $url = $fqdn;
                 } else {

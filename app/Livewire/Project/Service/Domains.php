@@ -164,7 +164,6 @@ class Domains extends Component
     public function mount(): void
     {
         $this->authorize('view', $this->service);
-        $this->service->applications->each->importServiceEndpoints();
         $this->loadDomainState();
     }
 
@@ -699,6 +698,11 @@ class Domains extends Component
     {
         $this->refreshDomains();
         $this->persistAllDomainDnsStatuses();
+    }
+
+    public function updatedNewServiceApplicationId(): void
+    {
+        $this->newEndpoint = collect($this->serviceApps)->firstWhere('id', $this->newServiceApplicationId)['endpoints'][0]['value'] ?? null;
     }
 
     public function updatedNewDomain(): void
@@ -1324,13 +1328,6 @@ class Domains extends Component
             $newUrl = $this->splitDomains($normalized)[0];
             $oldUrl = $this->domainRows[$this->editingIndex]['url'];
             $current = collect($this->splitDomains($app->fqdn));
-            if ($endpoint && $app->domain_endpoints !== null) {
-                // The model maps an unmapped URL to the endpoint of its port.
-                $app->domain_endpoints = array_diff_key($app->domain_endpoints, [
-                    DomainPortOverrides::withoutPort($oldUrl) => true,
-                    DomainPortOverrides::withoutPort($newUrl) => true,
-                ]);
-            }
             if (blank(DomainUrlParts::split($newUrl)['port'] ?? null)) {
                 $portOverrides = $app->domain_port_overrides ?? [];
                 unset($portOverrides[DomainPortOverrides::withoutPort($oldUrl)]);

@@ -11,5 +11,6 @@ final readonly class ServiceEndpoint
         public int $port,
         public string $urlPrefix,
         public bool $forceHttps,
+        public string $path = '',
     ) {}
 }

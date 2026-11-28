@@ -7,6 +7,7 @@ use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use App\Services\ProjectConfig\ManagedResources;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
+use App\Support\ServiceEndpoints;
 use App\Support\ValidationPatterns;
 use App\Traits\Auditable;
 use Closure;
@@ -198,6 +199,19 @@ class EnvironmentVariable extends BaseModel
                         $preview->withoutAuditLogging(fn () => $preview->save());
                     }
                 }
+            }
+        });
+
+        static::updated(function (ModelsEnvironmentVariable $environmentVariable) {
+            // The Domains page owns the endpoint URLs, so a changed endpoint variable changes its domain.
+            if (
+                $environmentVariable->resourceable_type === Service::class
+                && ! $environmentVariable->is_preview
+                && $environmentVariable->wasChanged('value')
+                && ServiceEndpoints::isEndpointVariable($environmentVariable->key)
+            ) {
+                Service::find($environmentVariable->resourceable_id)?->applications
+                    ->each->applyServiceEndpointVariable($environmentVariable->key, $environmentVariable->value);
             }
         });
 

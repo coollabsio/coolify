@@ -120,6 +120,14 @@ services:
     environment:
       - SERVICE_URL_GATEWAY=/ws
 
+  # Several magic URL names on one container (Convex style): each name gets its own domain and port.
+  multi-endpoint:
+    image: traefik/whoami
+    environment:
+      - SERVICE_URL_MULTIENDPOINT_3210
+      - SERVICE_URL_MULTISITE_3211
+      - SITE_ORIGIN=${SERVICE_URL_MULTISITE}
+
   # Exact copy of web's declaration (old Twenty template, #11924): no domain, no variable writes.
   worker:
     image: nginx:alpine

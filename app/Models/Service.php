@@ -8,6 +8,7 @@ use App\Services\DockerImageParser;
 use App\Support\DomainPortOverrides;
 use App\Support\ResourceStartActivity;
 use App\Support\ServiceEndpoint;
+use App\Support\ServiceEndpoints;
 use App\Traits\Auditable;
 use App\Traits\ClearsGlobalSearchCache;
 use App\Traits\HasComposeVolumeWarnings;
@@ -1617,13 +1618,14 @@ class Service extends BaseModel
     }
 
     /**
-     * Environment variables that the Domains page writes for the endpoints of its applications.
+     * Environment variables that the Domains page writes for the endpoints of Garage, MinIO and Logto.
      *
      * @return list<string>
      */
     public function endpointVariableKeys(): array
     {
         return $this->applications
+            ->reject(fn (ServiceApplication $application): bool => ServiceEndpoints::for($application) === [])
             ->flatMap(fn (ServiceApplication $application): array => array_map(
                 fn (ServiceEndpoint $endpoint): string => $endpoint->envKey,
                 $application->serviceEndpoints(),
