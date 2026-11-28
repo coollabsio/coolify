@@ -1,6 +1,6 @@
 # Decision 0037: Published ports in the Sentinel convergence
 
-**Status: Proposed**
+**Status: Accepted**
 
 **Date: 2026-11-28**
 
@@ -109,18 +109,26 @@ Client -> Node B :port ---------------------------------DNAT-> container slot
 - The remote rules of a cluster change less often: not on a deploy, only when
   the Nodes that run the workload change.
 
-## Open questions
+## Answers to the open questions (2026-11-28)
 
-1. When the selected Node stops running the workload, the other Nodes forward
-   to a Node without a local rule until Coolify sends a new revision. Should
-   such a Node forward to another Node itself (Sentinel knows the desired set
-   only of its own Node), or is the Coolify revision fast enough?
-2. A Node that has only a stopped container of the workload: local rule to the
-   stopped slot (as today, the connection fails), or a remote rule to a Node
-   with a running container?
-3. Should the entry Node also send the connection to the local container when
-   it has one, and only use remote rules without one (as proposed), or should
-   every Node forward to one Node, so all connections see the same container?
+1. **The selected Node stops running the workload.** Coolify reacts to the
+   status event of Sentinel (decision 0026). When a Node reports that its last
+   running container of a workload with a published port stopped or failed,
+   Coolify queues a network revision of the cluster. The other Nodes then
+   forward to the next Node with a running container. Sentinel does not forward
+   to another Node itself: it knows only the desired set of its own Node, and
+   2 Nodes could forward to each other in a loop. Today a crash queues no
+   revision, so this also closes that gap.
+2. **A Node with only a stopped container.** Coolify decides for each Node if
+   the rule is local or remote, from the desired state. A Node whose container
+   has the desired state `running` gets a local rule. A Node whose container
+   has the desired state `stopped` gets a remote rule to a Node with a running
+   container. Sentinel decides only the slot of a local rule. A crash with a
+   restart is a short gap, as today. This keeps the rule of decision 0016:
+   only running containers count while one runs.
+3. **Prefer the local container.** Yes. A Node with a running container of the
+   workload translates to it, with no extra hop and with the client address.
+   Only a Node without one gets a remote rule.
 
 ## Not decided here
 
