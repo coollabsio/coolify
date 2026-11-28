@@ -29,4 +29,45 @@
             </p>
         @endif
     </x-application.settings-section>
+
+    @if ($application->build_pack !== 'dockercompose')
+        <x-application.settings-section id="load-balancer-section" title="Load balancer"
+            helper="How the proxy shares the requests between the replicas.">
+            @if ($loadBalancerUnavailableReason)
+                <x-callout type="info" title="Load balancer is unavailable">{{ $loadBalancerUnavailableReason }}</x-callout>
+            @else
+                <div x-data class="flex flex-col gap-4">
+                    <x-callout type="info" title="Load balancer needs replicas" x-show="Number($wire.replicas) < 2">
+                        Set more than one replica to choose how the proxy shares the requests between them.
+                    </x-callout>
+                    <fieldset x-bind:disabled="Number($wire.replicas) < 2" class="flex min-w-0 flex-col gap-4"
+                        x-data="{ clientIp: @js(\App\Enums\LoadBalancerStrategy::ClientIp->value) }">
+                        <div class="grid items-end gap-4 lg:grid-cols-2">
+                            <x-forms.listbox id="loadBalancerStrategy" label="Strategy" :options="$strategies"
+                                canGate="update" :canResource="$application" />
+                            <div x-show="$wire.loadBalancerStrategy !== clientIp" class="-mx-2.5">
+                                <x-forms.checkbox id="isStickySessionEnabled" label="Sticky sessions"
+                                    helper="The proxy sets a cookie, so that the requests of one visitor go to the same replica. Use it when a replica keeps sessions in its memory."
+                                    fullWidth canGate="update" :canResource="$application" />
+                            </div>
+                            <p x-show="$wire.loadBalancerStrategy === clientIp"
+                                class="flex min-h-9 items-center text-[13px] text-neutral-500 dark:text-fg-dim">
+                                Client IP already keeps each visitor on one replica.
+                            </p>
+                        </div>
+                        <div x-show="$wire.isStickySessionEnabled && $wire.loadBalancerStrategy !== clientIp"
+                            class="grid gap-4 lg:grid-cols-2">
+                            <x-forms.input id="stickySessionCookieName" label="Cookie name" required
+                                helper="Lowercase letters, digits, - and _, starting with a letter."
+                                canGate="update" :canResource="$application" />
+                            <x-forms.listbox id="stickySessionMaxAge" label="Keep the cookie for"
+                                :options="$stickySessionDurations" :disabled="! $supportsStickySessionMaxAge"
+                                :helper="$supportsStickySessionMaxAge ? null : 'The proxy of this server keeps the cookie until the browser closes. Traefik 3.0 or the current Caddy proxy can keep it longer.'"
+                                canGate="update" :canResource="$application" />
+                        </div>
+                    </fieldset>
+                </div>
+            @endif
+        </x-application.settings-section>
+    @endif
 </form>

@@ -245,6 +245,10 @@ class ApplicationConfigurationSnapshot
             $this->item('http_basic_auth_argon2id_memory_cost', 'HTTP basic auth Argon2id memory (KiB)', $this->application->http_basic_auth_argon2id_memory_cost, 'redeploy'),
             $this->item('http_basic_auth_argon2id_time_cost', 'HTTP basic auth Argon2id iterations', $this->application->http_basic_auth_argon2id_time_cost, 'redeploy'),
             $this->item('ip_allowlist', 'IP allowlist', $this->application->ip_allowlist, 'redeploy'),
+            $this->item('load_balancer_strategy', 'Load balancer', $this->application->load_balancer_strategy?->label(), 'redeploy'),
+            $this->item('is_sticky_session_enabled', 'Sticky sessions', $this->application->is_sticky_session_enabled, 'redeploy'),
+            $this->item('sticky_session_cookie_name', 'Sticky session cookie', $this->application->sticky_session_cookie_name, 'redeploy'),
+            $this->item('sticky_session_max_age', 'Sticky session cookie lifetime (seconds)', $this->application->sticky_session_max_age, 'redeploy'),
         ];
     }
 

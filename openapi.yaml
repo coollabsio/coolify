@@ -575,6 +575,22 @@ paths:
                   minimum: 1
                   maximum: 20
                   description: 'Number of containers on one server. Not used by the dockercompose build pack.'
+                load_balancer_strategy:
+                  type: string
+                  enum: [round_robin, least_connections, least_time, client_ip]
+                  description: 'How the proxy picks a replica for a request. Not used by the dockercompose build pack.'
+                is_sticky_session_enabled:
+                  type: boolean
+                  description: 'Keep a visitor on one replica with a cookie.'
+                sticky_session_cookie_name:
+                  type: string
+                  description: 'Name of the sticky session cookie. Lowercase letters, digits, - and _, starting with a letter.'
+                sticky_session_max_age:
+                  type: integer
+                  nullable: true
+                  minimum: 60
+                  maximum: 31536000
+                  description: 'Seconds that the sticky session cookie lasts. Null lasts until the browser closes.'
                 custom_docker_run_options:
                   type: string
                   description: 'Custom docker run options.'
@@ -1039,6 +1055,22 @@ paths:
                   minimum: 1
                   maximum: 20
                   description: 'Number of containers on one server. Not used by the dockercompose build pack.'
+                load_balancer_strategy:
+                  type: string
+                  enum: [round_robin, least_connections, least_time, client_ip]
+                  description: 'How the proxy picks a replica for a request. Not used by the dockercompose build pack.'
+                is_sticky_session_enabled:
+                  type: boolean
+                  description: 'Keep a visitor on one replica with a cookie.'
+                sticky_session_cookie_name:
+                  type: string
+                  description: 'Name of the sticky session cookie. Lowercase letters, digits, - and _, starting with a letter.'
+                sticky_session_max_age:
+                  type: integer
+                  nullable: true
+                  minimum: 60
+                  maximum: 31536000
+                  description: 'Seconds that the sticky session cookie lasts. Null lasts until the browser closes.'
                 custom_docker_run_options:
                   type: string
                   description: 'Custom docker run options.'
@@ -1505,6 +1537,22 @@ paths:
                   minimum: 1
                   maximum: 20
                   description: 'Number of containers on one server. Not used by the dockercompose build pack.'
+                load_balancer_strategy:
+                  type: string
+                  enum: [round_robin, least_connections, least_time, client_ip]
+                  description: 'How the proxy picks a replica for a request. Not used by the dockercompose build pack.'
+                is_sticky_session_enabled:
+                  type: boolean
+                  description: 'Keep a visitor on one replica with a cookie.'
+                sticky_session_cookie_name:
+                  type: string
+                  description: 'Name of the sticky session cookie. Lowercase letters, digits, - and _, starting with a letter.'
+                sticky_session_max_age:
+                  type: integer
+                  nullable: true
+                  minimum: 60
+                  maximum: 31536000
+                  description: 'Seconds that the sticky session cookie lasts. Null lasts until the browser closes.'
                 custom_docker_run_options:
                   type: string
                   description: 'Custom docker run options.'
@@ -1966,6 +2014,22 @@ paths:
                   minimum: 1
                   maximum: 20
                   description: 'Number of containers on one server. Not used by the dockercompose build pack.'
+                load_balancer_strategy:
+                  type: string
+                  enum: [round_robin, least_connections, least_time, client_ip]
+                  description: 'How the proxy picks a replica for a request. Not used by the dockercompose build pack.'
+                is_sticky_session_enabled:
+                  type: boolean
+                  description: 'Keep a visitor on one replica with a cookie.'
+                sticky_session_cookie_name:
+                  type: string
+                  description: 'Name of the sticky session cookie. Lowercase letters, digits, - and _, starting with a letter.'
+                sticky_session_max_age:
+                  type: integer
+                  nullable: true
+                  minimum: 60
+                  maximum: 31536000
+                  description: 'Seconds that the sticky session cookie lasts. Null lasts until the browser closes.'
                 custom_docker_run_options:
                   type: string
                   description: 'Custom docker run options.'
@@ -2387,6 +2451,22 @@ paths:
                   minimum: 1
                   maximum: 20
                   description: 'Number of containers on one server. Not used by the dockercompose build pack.'
+                load_balancer_strategy:
+                  type: string
+                  enum: [round_robin, least_connections, least_time, client_ip]
+                  description: 'How the proxy picks a replica for a request. Not used by the dockercompose build pack.'
+                is_sticky_session_enabled:
+                  type: boolean
+                  description: 'Keep a visitor on one replica with a cookie.'
+                sticky_session_cookie_name:
+                  type: string
+                  description: 'Name of the sticky session cookie. Lowercase letters, digits, - and _, starting with a letter.'
+                sticky_session_max_age:
+                  type: integer
+                  nullable: true
+                  minimum: 60
+                  maximum: 31536000
+                  description: 'Seconds that the sticky session cookie lasts. Null lasts until the browser closes.'
                 custom_docker_run_options:
                   type: string
                   description: 'Custom docker run options.'
@@ -2774,6 +2854,22 @@ paths:
                   minimum: 1
                   maximum: 20
                   description: 'Number of containers on one server. Not used by the dockercompose build pack.'
+                load_balancer_strategy:
+                  type: string
+                  enum: [round_robin, least_connections, least_time, client_ip]
+                  description: 'How the proxy picks a replica for a request. Not used by the dockercompose build pack.'
+                is_sticky_session_enabled:
+                  type: boolean
+                  description: 'Keep a visitor on one replica with a cookie.'
+                sticky_session_cookie_name:
+                  type: string
+                  description: 'Name of the sticky session cookie. Lowercase letters, digits, - and _, starting with a letter.'
+                sticky_session_max_age:
+                  type: integer
+                  nullable: true
+                  minimum: 60
+                  maximum: 31536000
+                  description: 'Seconds that the sticky session cookie lasts. Null lasts until the browser closes.'
                 custom_docker_run_options:
                   type: string
                   description: 'Custom docker run options.'
@@ -3374,6 +3470,22 @@ paths:
                   minimum: 1
                   maximum: 20
                   description: 'Number of containers on one server. Not used by the dockercompose build pack.'
+                load_balancer_strategy:
+                  type: string
+                  enum: [round_robin, least_connections, least_time, client_ip]
+                  description: 'How the proxy picks a replica for a request. Not used by the dockercompose build pack.'
+                is_sticky_session_enabled:
+                  type: boolean
+                  description: 'Keep a visitor on one replica with a cookie.'
+                sticky_session_cookie_name:
+                  type: string
+                  description: 'Name of the sticky session cookie. Lowercase letters, digits, - and _, starting with a letter.'
+                sticky_session_max_age:
+                  type: integer
+                  nullable: true
+                  minimum: 60
+                  maximum: 31536000
+                  description: 'Seconds that the sticky session cookie lasts. Null lasts until the browser closes.'
                 custom_docker_run_options:
                   type: string
                   description: 'Custom docker run options.'
@@ -20660,6 +20772,24 @@ components:
         replicas:
           type: integer
           description: 'Number of containers on one server. Not used by the dockercompose build pack.'
+        load_balancer_strategy:
+          type: string
+          enum:
+            - round_robin
+            - least_connections
+            - least_time
+            - client_ip
+          description: 'How the proxy picks a replica for a request.'
+        is_sticky_session_enabled:
+          type: boolean
+          description: 'Keep a visitor on one replica with a cookie.'
+        sticky_session_cookie_name:
+          type: string
+          description: 'Name of the sticky session cookie. Lowercase letters, digits, - and _, starting with a letter.'
+        sticky_session_max_age:
+          type: integer
+          nullable: true
+          description: 'Seconds that the sticky session cookie lasts. Null lasts until the browser closes.'
         swarm_replicas:
           type: integer
           nullable: true

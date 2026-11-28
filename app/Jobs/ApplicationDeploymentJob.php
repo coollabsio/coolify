@@ -5757,6 +5757,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if ($this->replicas() > 1) {
                 unset($docker_compose['services'][$this->container_name]['container_name']);
                 $docker_compose['services'][$this->container_name]['deploy']['replicas'] = $this->replicas();
+                if ($loadBalancerNotice = $this->application->loadBalancer()->fallbackNotice()) {
+                    $this->application_deployment_queue->addLogEntry($loadBalancerNotice);
+                }
             } elseif ($this->pull_request_id === 0 && $this->application->replicas > 1) {
                 $this->application_deployment_queue->addLogEntry("Starting one container instead of {$this->application->replicas} replicas. {$this->application->replicasUnavailableReason()}");
             }
