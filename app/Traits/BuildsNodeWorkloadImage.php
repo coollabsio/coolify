@@ -10,6 +10,7 @@ use App\Actions\Node\Build\StartQueuedNodeBuilds;
 use App\Actions\Node\Build\StartWaitingNodeBuild;
 use App\Actions\Node\NotifyNodeDeployment;
 use App\Enums\NodeBuildStatus;
+use App\Jobs\DeployNodeStackJob;
 use App\Models\NodeBuild;
 use RuntimeException;
 use Throwable;
@@ -119,6 +120,7 @@ trait BuildsNodeWorkloadImage
         if ($clusterId !== null) {
             StartQueuedNodeBuilds::run((int) $clusterId);
         }
+        DeployNodeStackJob::resumeAfter($build);
     }
 
     /** The position of a build that waits for a free builder, in its build log. */

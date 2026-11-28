@@ -46,7 +46,13 @@ use Throwable;
  * builds every service with `build:` at that commit, without deploying them. Each build is a
  * normal build of its service, with its logs on the service page. When one fails, nothing deploys.
  *
- * Each run is a NodeStackDeployment, for the deployment history of the stack.
+ * Each deploy is a NodeStackDeployment, for the deployment history of the stack.
+ *
+ * While the builds wait for a builder (decision 0035), the job ends and holds no queue worker.
+ * The end of the last build of the deploy (success, failure, or cancel) dispatches the job again
+ * with the same NodeStackDeployment (`resumeAfter()`); ProcessNodeBuildQueueJob resumes a deploy
+ * whose dispatch was lost. The deploy keeps `deploy_status` `deploying`, so a second deploy is
+ * refused, and it sends 1 notification when it ends.
  */
 class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
 {
@@ -62,7 +68,10 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
 
     public int $timeout = 1200;
 
-    public function __construct(public int $stackId, public ?int $requestedById = null, public ?string $commitSha = null)
+    /**
+     * @param  ?int  $deploymentId  The deploy that this run resumes after its builds ended. Null for a new deploy.
+     */
+    public function __construct(public int $stackId, public ?int $requestedById = null, public ?string $commitSha = null, public ?int $deploymentId = null)
     {
         // The sync of a stack from Git can add services after the job is queued, so it gets the
         // longest time. The deadline is only a ceiling: each service still has its own wait.
@@ -95,16 +104,33 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
             return;
         }
         $requestedBy = $this->requestedById === null ? null : User::query()->find($this->requestedById);
-        $stack->update(['deploy_status' => 'deploying', 'deploy_error' => null, 'deploy_notified_at' => null]);
-        $deployment = NodeStackDeployment::query()->create([
-            'node_stack_id' => $stack->id,
-            'requested_by_id' => $requestedBy?->id,
-            'status' => NodeStackDeployment::DEPLOYING,
-        ]);
+        if ($this->deploymentId === null) {
+            $stack->update(['deploy_status' => 'deploying', 'deploy_error' => null, 'deploy_notified_at' => null]);
+            $deployment = NodeStackDeployment::query()->create([
+                'node_stack_id' => $stack->id,
+                'requested_by_id' => $requestedBy?->id,
+                'status' => NodeStackDeployment::DEPLOYING,
+                'is_push' => $this->commitSha !== null,
+            ]);
+        } else {
+            // A second resume, or a resume of a deploy that ended, does nothing.
+            $deployment = NodeStackDeployment::query()->where('node_stack_id', $stack->id)->find($this->deploymentId);
+            if ($deployment === null || $deployment->status !== NodeStackDeployment::DEPLOYING) {
+                return;
+            }
+        }
 
         try {
             $deadline = now()->addSeconds($this->timeout - 60);
-            $commit = $stack->hasGitSource() ? $this->syncCompose($stack, $requestedBy) : null;
+            // A resumed deploy keeps the commit of its first run; it does not read the Compose file again.
+            $commit = match (true) {
+                ! $stack->hasGitSource() => null,
+                $this->deploymentId !== null => (string) $deployment->commit_sha,
+                default => $this->syncCompose($stack, $requestedBy),
+            };
+            if ($commit !== null && $this->deploymentId === null) {
+                $deployment->update(['commit_sha' => $commit]);
+            }
             if (NodeStackCompose::mountsContainerSocket($stack->compose_parsed ?? [])) {
                 // Before the first service deploys, so a refused stack does not deploy half of it.
                 NodeStackCompose::ensureMayMountContainerSocket($requestedBy, (int) $stack->team_id, 'This stack');
@@ -114,8 +140,9 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
             $order = $stack->deployOrder($dependencies);
             // A service that left the Compose file is deleted by its own job.
             $workloads = NodeWorkload::query()->withoutGlobalScopes()->where('node_stack_id', $stack->id)->whereIn('stack_service', $order)->get()->keyBy('stack_service');
-            if ($commit !== null) {
-                $this->build($stack, $workloads, $requestedBy, $commit, $deadline);
+            if ($commit !== null && ! $this->build($stack, $deployment, $workloads, $requestedBy, $commit)) {
+                // The builds wait for a builder: the end of the last one resumes this deploy.
+                return;
             }
             foreach ($order as $service) {
                 $workload = $workloads->get($service);
@@ -167,31 +194,73 @@ class DeployNodeStackJob implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * Builds every service with `build:` at one commit and waits for the builds.
+     * Starts the build of every service with `build:` at one commit, once for each deploy, and
+     * links the builds to the deploy. False while a build is active: the job then ends, and the end
+     * of the last build resumes the deploy. A build that failed or was cancelled fails the deploy.
      *
      * @param  Collection<string, NodeWorkload>  $workloads
      */
-    private function build(NodeStack $stack, Collection $workloads, ?User $requestedBy, string $commit, Carbon $deadline): void
+    private function build(NodeStack $stack, NodeStackDeployment $deployment, Collection $workloads, ?User $requestedBy, string $commit): bool
     {
         $built = $workloads->filter(fn (NodeWorkload $workload): bool => $workload->buildsFromGit());
         if ($built->isEmpty()) {
             $stack->update(['commit_sha' => $commit]);
 
-            return;
+            return true;
         }
-        // A running build of a service is reused: the service has at most one active build.
-        $builds = $built->map(fn (NodeWorkload $workload): NodeBuild => StartNodeBuild::run($workload, $requestedBy, $commit, skipDeploy: true));
-        while ($builds->contains(fn (NodeBuild $build): bool => ! $build->refresh()->status->isFinal())) {
-            if (now()->gte($deadline)) {
-                throw new RuntimeException('The builds of '.$builds->filter(fn (NodeBuild $build): bool => ! $build->status->isFinal())->keys()->implode(', ').' did not finish in time. Nothing was deployed.');
-            }
-            Sleep::for(3)->seconds();
+        if ($this->deploymentId === null) {
+            // A running build of a service is reused: the service has at most one active build.
+            $built->each(function (NodeWorkload $workload) use ($requestedBy, $commit, $deployment): void {
+                $build = StartNodeBuild::run($workload, $requestedBy, $commit, skipDeploy: true);
+                NodeBuild::query()->whereKey($build->id)->whereNull('node_stack_deployment_id')->update(['node_stack_deployment_id' => $deployment->id]);
+            });
+        }
+        $builds = NodeBuild::query()->where('node_stack_deployment_id', $deployment->id)->with('workload')->get()
+            ->keyBy(fn (NodeBuild $build): string => (string) $build->workload?->stack_service);
+        if ($builds->contains(fn (NodeBuild $build): bool => ! $build->status->isFinal())) {
+            return false;
+        }
+        $cancelled = $builds->filter(fn (NodeBuild $build): bool => $build->status === NodeBuildStatus::CANCELLED);
+        if ($cancelled->isNotEmpty()) {
+            throw new RuntimeException('The build of '.$cancelled->keys()->implode(', ').' was cancelled. Nothing was deployed.');
         }
         $failed = $builds->filter(fn (NodeBuild $build): bool => $build->status !== NodeBuildStatus::SUCCEEDED);
-        if ($failed->isNotEmpty()) {
-            throw new RuntimeException('The build of '.$failed->keys()->implode(', ').' failed. Nothing was deployed. See the build logs of '.($failed->count() === 1 ? 'the service' : 'each service').'.');
+        if ($failed->isNotEmpty() || $builds->count() < $built->count()) {
+            throw new RuntimeException('The build of '.($failed->isNotEmpty() ? $failed->keys()->implode(', ') : $built->keys()->diff($builds->keys())->implode(', ')).' failed. Nothing was deployed. See the build logs of '.($failed->count() === 1 ? 'the service' : 'each service').'.');
         }
         $stack->update(['commit_sha' => $commit]);
+
+        return true;
+    }
+
+    /**
+     * Resumes the stack deploy of a build when no other build of that deploy is active. Each end
+     * of a build calls it: success, failure, cancel, and a stale build. A second call does nothing.
+     */
+    public static function resumeAfter(NodeBuild $build): void
+    {
+        $deploymentId = NodeBuild::query()->whereKey($build->id)->value('node_stack_deployment_id');
+        if ($deploymentId === null) {
+            return;
+        }
+        $deployment = NodeStackDeployment::query()->find($deploymentId);
+        if ($deployment === null || $deployment->status !== NodeStackDeployment::DEPLOYING
+            || NodeBuild::query()->where('node_stack_deployment_id', $deployment->id)->active()->exists()) {
+            return;
+        }
+        self::dispatch($deployment->node_stack_id, $deployment->requested_by_id, $deployment->is_push ? $deployment->commit_sha : null, $deployment->id);
+    }
+
+    /** Resumes the deploys whose builds all ended, when the dispatch of the last build was lost. */
+    public static function resumeStalled(): void
+    {
+        NodeStackDeployment::query()
+            ->where('status', NodeStackDeployment::DEPLOYING)
+            ->whereHas('builds')
+            ->whereDoesntHave('builds', fn ($query) => $query->active())
+            ->where('updated_at', '<', now()->subMinute())
+            ->get()
+            ->each(fn (NodeStackDeployment $deployment) => self::dispatch($deployment->node_stack_id, $deployment->requested_by_id, $deployment->is_push ? $deployment->commit_sha : null, $deployment->id));
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Actions\Node\Build;
 use App\Actions\Node\NotifyNodeDeployment;
 use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Enums\NodeBuildStatus;
+use App\Jobs\DeployNodeStackJob;
 use App\Models\Node;
 use App\Models\NodeBuild;
 use App\Models\NodeCluster;
@@ -127,6 +128,7 @@ class StartQueuedNodeBuilds
                 if ($build->node_workload_id !== null) {
                     StartWaitingNodeBuild::run($build->node_workload_id);
                 }
+                DeployNodeStackJob::resumeAfter($build);
             }
         }
     }

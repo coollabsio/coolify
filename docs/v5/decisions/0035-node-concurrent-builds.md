@@ -308,8 +308,18 @@ Built in Coolify and in Sentinel `a7a95d5` (`image.build.concurrent.v1`).
   `builder_replace_pending` and `builder_memory_limit_bytes`. When the last
   build of a pending Node ends, `StartQueuedNodeBuilds` queues a network
   revision, so the new limits apply.
-- A stack deploy (`DeployNodeStackJob`) still holds its worker while the
-  builds of its services wait. This decision does not change it.
+- A stack deploy (`DeployNodeStackJob`) holds no worker while the builds of
+  its services wait. It links its builds to its `node_stack_deployments` row
+  (`node_builds.node_stack_deployment_id`) and ends. The end of the last build
+  of the deploy (success, failure, cancel, or a stale build) dispatches the job
+  again with the same row (`DeployNodeStackJob::resumeAfter()`). The resumed
+  run keeps the commit of the first run, does not read the Compose file again,
+  and deploys the services in `depends_on` order. A failed or cancelled build
+  fails the deploy. `deploy_status` stays `deploying` while the builds wait, so
+  a second deploy is refused, and `deploy_notified_at` gives 1 notification.
+  `ProcessNodeBuildQueueJob` resumes a deploy whose dispatch was lost, for
+  example when the last build ended while the first run still held the unique
+  lock of the job.
 
 ### Sentinel
 
@@ -346,3 +356,13 @@ With 2 Nodes, Sentinel `main-a7a95d5`, and the builder role only on node-1:
 - A member could not change the setting, an admin could, and 17 was refused.
 - With 49 fake waiting builds in a rolled-back transaction, the 50th build
   was accepted and the 51st was refused with the full-queue message.
+- A Git stack with 2 `build:` services (`web2` depends on `web1`) and 1 slot:
+  `web2` waited at position 1, and no `DeployNodeStackJob` was reserved in
+  Horizon while it waited (only the build job of `web1`). The end of the build
+  of `web2` resumed the deploy with the same row. The stack ended `deployed`,
+  and `deploy_notified_at` was set once. A cancel of the waiting build of
+  `web2` ended the stack `failed` ("The build of web2 was cancelled. Nothing
+  was deployed."), with 1 failure mail.
+- The deployment history of an application shows "Waiting 1 of 2" and
+  "Waiting 2 of 2" for 2 waiting builds. When the first build ended, the
+  second showed "Waiting 1 of 1".

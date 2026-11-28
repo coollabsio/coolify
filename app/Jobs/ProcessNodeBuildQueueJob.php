@@ -16,7 +16,8 @@ use Illuminate\Foundation\Queue\Queueable;
 /**
  * Runs each minute (decision 0035). It fails the builds whose job stopped, so their build slot is
  * free again, then starts the waiting builds of every cluster that has a free slot. This covers a
- * builder that comes back, a busy refusal of Sentinel, and a lost dispatch.
+ * builder that comes back, a busy refusal of Sentinel, and a lost dispatch. It also resumes the
+ * stack deploys whose builds all ended (DeployNodeStackJob::resumeStalled()).
  */
 class ProcessNodeBuildQueueJob implements ShouldBeUnique, ShouldQueue
 {
@@ -55,7 +56,9 @@ class ProcessNodeBuildQueueJob implements ShouldBeUnique, ShouldQueue
                 }
                 $clusterIds->push($build->node_cluster_id ?? $build->node?->node_cluster_id);
                 StartWaitingNodeBuild::run($build->node_workload_id);
+                DeployNodeStackJob::resumeAfter($build);
             });
+        DeployNodeStackJob::resumeStalled();
 
         $pending = Node::query()->where('metadata->builder_replace_pending', true)->pluck('node_cluster_id');
         $clusterIds->merge(StartQueuedNodeBuilds::clustersWithQueue())->merge($pending)

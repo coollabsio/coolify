@@ -3,6 +3,7 @@
 namespace App\Actions\Node\Build;
 
 use App\Enums\NodeBuildStatus;
+use App\Jobs\DeployNodeStackJob;
 use App\Models\NodeBuild;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -36,6 +37,8 @@ class CancelNodeBuild
         if ($clusterId !== null) {
             StartQueuedNodeBuilds::run((int) $clusterId);
         }
+        // A cancelled build ends its stack deploy as failed.
+        DeployNodeStackJob::resumeAfter($build);
     }
 
     /** Stops the build container on its builder Node; a failure is ignored. */

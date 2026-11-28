@@ -470,7 +470,8 @@ Logs, Terminal, Scheduled Tasks, Webhooks, Backups, and Danger Zone. The
 heading has Deploy, Restart, and Stop for the whole stack. A service page
 links back to its stack, and Deploy, Restart, and Stop on a service page act on the whole stack.
 
-Each run of `DeployNodeStackJob` is a `node_stack_deployments` row
+Each deploy of `DeployNodeStackJob` is a `node_stack_deployments` row (a run
+that resumes after the builds, decision 0035, uses the same row)
 (`deploying`, `deployed`, or `failed`, the user, the commit of a Git stack,
 and the error) for the Deployment Logs page and
 `GET /cluster-stacks/{uuid}/deployments`. A rollback of the whole stack is not
