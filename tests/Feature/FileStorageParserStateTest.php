@@ -33,6 +33,18 @@ services:
       - ./data:/app/data
 YAML;
 
+const SIBLING_FILE_COMPOSE = <<<'YAML'
+services:
+  first:
+    image: nginx:latest
+    volumes:
+      - ./first.conf:/etc/nginx/conf.d/default.conf:ro
+  second:
+    image: nginx:latest
+    volumes:
+      - ./second.conf:/etc/nginx/conf.d/default.conf
+YAML;
+
 beforeEach(function () {
     Bus::fake();
 
@@ -182,6 +194,84 @@ it('preserves existing application file volume content when reparsing compose bi
 
     expect($fileVolume->content)->toBe('0')
         ->and($fileVolume->is_directory)->toBeFalse();
+});
+
+it('preserves configuration for sibling application file mounts sharing a target', function () {
+    $application = makeComposeApplication(SIBLING_FILE_COMPOSE);
+    $baseDir = application_configuration_dir()."/{$application->uuid}";
+    $mountPath = '/etc/nginx/conf.d/default.conf';
+
+    seedFileVolume($application, $baseDir, 'first.conf', $mountPath, 'first content');
+    seedFileVolume($application, $baseDir, 'second.conf', $mountPath, 'second content');
+
+    applicationParser($application);
+
+    $volumes = $application->fileStorages()
+        ->where('mount_path', $mountPath)
+        ->orderBy('fs_path')
+        ->get();
+
+    expect($volumes)->toHaveCount(2)
+        ->and($volumes->pluck('content')->all())->toBe(['first content', 'second content'])
+        ->and($volumes->every(fn (LocalFileVolume $volume) => ! $volume->is_directory))->toBeTrue()
+        ->and($volumes->every(fn (LocalFileVolume $volume) => $volume->fs_path_hash === hash('sha256', $volume->fs_path)))->toBeTrue()
+        ->and($volumes[0]->isReadOnlyVolume())->toBeTrue()
+        ->and($volumes[1]->isReadOnlyVolume())->toBeFalse();
+});
+
+it('adds the missing sibling row and keeps the saved row of an existing application', function () {
+    $application = makeComposeApplication(SIBLING_FILE_COMPOSE);
+    $baseDir = application_configuration_dir()."/{$application->uuid}";
+    $mountPath = '/etc/nginx/conf.d/default.conf';
+
+    // An earlier version kept one row for each mount path: the row of the last service.
+    seedFileVolume($application, $baseDir, 'second.conf', $mountPath, 'second content');
+
+    $parsedCompose = applicationParser($application);
+
+    $volumes = $application->fileStorages()->where('mount_path', $mountPath)->orderBy('fs_path')->get();
+
+    expect($volumes)->toHaveCount(2)
+        ->and($volumes[0]->fs_path)->toBe("{$baseDir}/first.conf")
+        ->and($volumes[0]->content)->toBeNull()
+        ->and($volumes[1]->content)->toBe('second content')
+        ->and($volumes[1]->is_directory)->toBeFalse()
+        ->and(data_get($parsedCompose, 'services.first.volumes'))->toContain("{$baseDir}/first.conf:{$mountPath}:ro")
+        ->and(data_get($parsedCompose, 'services.second.volumes'))->toContain("{$baseDir}/second.conf:{$mountPath}");
+    Bus::assertDispatched(ServerStorageSaveJob::class);
+});
+
+it('moves the storage of an application mount to its new host path with its content', function () {
+    $application = makeComposeApplication(SIBLING_FILE_COMPOSE);
+    $baseDir = application_configuration_dir()."/{$application->uuid}";
+    $mountPath = '/etc/nginx/conf.d/default.conf';
+    seedFileVolume($application, $baseDir, 'first.conf', $mountPath, 'first content');
+    seedFileVolume($application, $baseDir, 'second.conf', $mountPath, 'second content');
+
+    $application->docker_compose_raw = str_replace('./first.conf', './renamed.conf', SIBLING_FILE_COMPOSE);
+    applicationParser($application);
+
+    expect($application->fileStorages()->where('mount_path', $mountPath)->orderBy('fs_path')->get()
+        ->map(fn (LocalFileVolume $storage): array => ['fs_path' => $storage->fs_path, 'content' => $storage->content, 'is_directory' => $storage->is_directory])
+        ->all())
+        ->toBe([
+            ['fs_path' => "{$baseDir}/renamed.conf", 'content' => 'first content', 'is_directory' => false],
+            ['fs_path' => "{$baseDir}/second.conf", 'content' => 'second content', 'is_directory' => false],
+        ]);
+});
+
+it('moves the storage of a service mount to its new host path with its content', function () {
+    [$service, $serviceApplication] = makeComposeService(TWO_FILE_COMPOSE);
+    $baseDir = service_configuration_dir()."/{$service->uuid}";
+    seedFileVolume($serviceApplication, $baseDir, 'wg_config.conf', '/app/ps/wg0.conf', 'test-conf');
+
+    $service->docker_compose_raw = str_replace('./wg_config.conf', './wg_renamed.conf', TWO_FILE_COMPOSE);
+    serviceParser($service);
+
+    $storages = $serviceApplication->fileStorages()->where('mount_path', '/app/ps/wg0.conf')->get();
+    expect($storages)->toHaveCount(1)
+        ->and($storages[0]->fs_path)->toBe("{$baseDir}/wg_renamed.conf")
+        ->and($storages[0]->content)->toBe('test-conf');
 });
 
 it('keeps existing application file volumes as files when content is empty', function () {

@@ -287,11 +287,13 @@ function composeBindKeepsMissingHostPath(mixed $volume): bool
 /**
  * Removes the file storage that an earlier save created for a bind that now keeps its missing host
  * path. Otherwise, the storage jobs still create that path. The files on the server stay. A storage
- * with a backup schedule stays, because it cannot be deleted before its schedule.
+ * with a backup schedule stays, because it cannot be deleted before its schedule. Without a host path,
+ * it removes each bind storage at the mount path.
  */
-function forgetComposeBindStorage(Application|ServiceApplication|ServiceDatabase $resource, string $mountPath): void
+function forgetComposeBindStorage(Application|ServiceApplication|ServiceDatabase $resource, ?string $fsPath, string $mountPath): void
 {
     $resource->fileStorages()
+        ->when($fsPath !== null, fn ($query) => $query->where('fs_path', $fsPath))
         ->where('mount_path', $mountPath)
         ->where('is_host_file', false)
         ->whereDoesntHave('scheduledBackups')
@@ -1162,7 +1164,7 @@ function parseDockerVolumeString(string $volumeString, ?array $variables = null)
             // Check if the last part is a valid Docker volume mode
             $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
 
-            if (in_array($possibleMode, $validModes)) {
+            if (array_diff(array_map('trim', explode(',', $possibleMode)), $validModes) === []) {
                 // It's a mode
                 // Examples: "gitea:/data:ro" or "./data:/app/data:rw"
                 $mode = $possibleMode;
@@ -1229,7 +1231,7 @@ function parseDockerVolumeString(string $volumeString, ?array $variables = null)
                 $possibleMode = substr($remaining, $lastColon + 1);
                 $validModes = ['ro', 'rw', 'z', 'Z', 'rslave', 'rprivate', 'rshared', 'slave', 'private', 'shared', 'cached', 'delegated', 'consistent'];
 
-                if (in_array($possibleMode, $validModes)) {
+                if (array_diff(array_map('trim', explode(',', $possibleMode)), $validModes) === []) {
                     $mode = $possibleMode;
                     $target = substr($remaining, 0, $lastColon);
                 } else {
@@ -1797,10 +1799,10 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $target = $parsed['target'];
                     if ($keepsSavedVolume && ! $isPullRequest) {
                         // An earlier parse of this version mounted the host path. That bind is not mounted anymore.
-                        forgetComposeBindStorage($originalResource, $target->value());
+                        forgetComposeBindStorage($originalResource, null, $target->value());
                     }
                     // Mode is available in $parsed['mode'] if needed
-                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
+                    $foundConfig = findLocalFileVolumeConfig($originalResource, $source, $target, is_string($volume) ? $volume : null);
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
                         if ($foundConfig) {
@@ -1840,7 +1842,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         }
                     }
 
-                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
+                    $foundConfig = findLocalFileVolumeConfig($originalResource, $source, $target, is_string($volume) ? $volume : null);
                     if ($foundConfig) {
                         $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
@@ -1865,6 +1867,13 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         } else {
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
+                        // The host path of the mount changed in the Compose file: the storage moves to it with its content.
+                        $renamedStorage = $foundConfig || $keepsApplicationRows ? null : findRenamedComposeFileStorage($originalResource, $resource, $target);
+                        if ($renamedStorage) {
+                            $foundConfig = $renamedStorage;
+                            $content = $renamedStorage->content;
+                            $isDirectory = $renamedStorage->is_directory;
+                        }
                         $source = resolveComposeBindSource($source, $mainDirectory, $foundConfig?->fs_path);
                         [$source, $variableSource] = keepSavedComposeBindSource($source, is_string($volume) ? $volume : null, $mainDirectory, $foundConfig, $resource);
                         // The file storage keeps the path of the application; a preview deployment adds the suffix (LocalFileVolume::forPullRequest()).
@@ -1879,14 +1888,16 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         // A preview with the Compose file of its pull request writes the file storages of the application and does not change them.
                         $keepsMissingHostPath = composeBindKeepsMissingHostPath($volume);
                         if (! $keepsApplicationRows && ! $keepsMissingHostPath) {
+                            $renamedStorage?->update(['fs_path' => (string) $storedSource]);
                             LocalFileVolume::updateOrCreate(
                                 [
+                                    'fs_path' => (string) $storedSource,
                                     'mount_path' => $target,
                                     'resource_id' => $originalResource->id,
                                     'resource_type' => get_class($originalResource),
                                 ],
                                 [
-                                    'fs_path' => $storedSource,
+                                    'fs_path' => (string) $storedSource,
                                     'variable_fs_path' => $variableSource,
                                     'mount_path' => $target,
                                     'content' => $content,
@@ -1896,7 +1907,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                 ]
                             );
                         } elseif (! $keepsApplicationRows) {
-                            forgetComposeBindStorage($originalResource, $target->value());
+                            forgetComposeBindStorage($originalResource, $storedSource->value(), $target->value());
                         }
                         // The file storage keeps the path that Coolify writes; the Docker daemon may need another one.
                         $source = $source->replace($mainDirectory, devHostDockerPath($server, $mainDirectory->value()));
@@ -3167,10 +3178,10 @@ function serviceParser(Service $resource): Collection
                     $target = $parsed['target'];
                     if ($keepsSavedVolume) {
                         // An earlier parse of this version mounted the host path. That bind is not mounted anymore.
-                        forgetComposeBindStorage($originalResource, $target->value());
+                        forgetComposeBindStorage($originalResource, null, $target->value());
                     }
                     // Mode is available in $parsed['mode'] if needed
-                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
+                    $foundConfig = findLocalFileVolumeConfig($originalResource, $source, $target, is_string($volume) ? $volume : null);
                     if (sourceIsLocal($source)) {
                         $type = str('bind');
                         if ($foundConfig) {
@@ -3210,7 +3221,7 @@ function serviceParser(Service $resource): Collection
                         }
                     }
 
-                    $foundConfig = $originalResource->fileStorages()->whereMountPath($target)->first();
+                    $foundConfig = findLocalFileVolumeConfig($originalResource, $source, $target, is_string($volume) ? $volume : null);
                     if ($foundConfig) {
                         $content = data_get($foundConfig, 'content');
                         $isDirectory = data_get($foundConfig, 'is_directory');
@@ -3235,18 +3246,27 @@ function serviceParser(Service $resource): Collection
                         } else {
                             $mainDirectory = str(base_configuration_dir().'/applications/'.$uuid);
                         }
+                        // The host path of the mount changed in the Compose file: the storage moves to it with its content.
+                        $renamedStorage = $foundConfig ? null : findRenamedComposeFileStorage($originalResource, $resource, $target);
+                        if ($renamedStorage) {
+                            $foundConfig = $renamedStorage;
+                            $content = $renamedStorage->content;
+                            $isDirectory = $renamedStorage->is_directory;
+                        }
                         $source = resolveComposeBindSource($source, $mainDirectory, $foundConfig?->fs_path);
                         [$source, $variableSource] = keepSavedComposeBindSource($source, is_string($volume) ? $volume : null, $mainDirectory, $foundConfig, $resource);
                         // With `bind.create_host_path: false`, the host path must exist already: Coolify does not create or manage it.
                         if (! composeBindKeepsMissingHostPath($volume)) {
+                            $renamedStorage?->update(['fs_path' => (string) $source]);
                             LocalFileVolume::updateOrCreate(
                                 [
+                                    'fs_path' => (string) $source,
                                     'mount_path' => $target,
                                     'resource_id' => $originalResource->id,
                                     'resource_type' => get_class($originalResource),
                                 ],
                                 [
-                                    'fs_path' => $source,
+                                    'fs_path' => (string) $source,
                                     'variable_fs_path' => $variableSource,
                                     'mount_path' => $target,
                                     'content' => $content,
@@ -3256,7 +3276,7 @@ function serviceParser(Service $resource): Collection
                                 ]
                             );
                         } else {
-                            forgetComposeBindStorage($originalResource, $target->value());
+                            forgetComposeBindStorage($originalResource, $source->value(), $target->value());
                         }
                         // The file storage keeps the path that Coolify writes; the Docker daemon may need another one.
                         $source = $source->replace($mainDirectory, devHostDockerPath($server, $mainDirectory->value()));

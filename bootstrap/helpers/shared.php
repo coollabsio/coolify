@@ -2138,6 +2138,79 @@ function legacyReplaceLocalSource(Stringable $source, Stringable $replacedWith):
 }
 
 /**
+ * The saved file storage of a Compose bind. Sibling binds can mount different host paths to the same
+ * container path, so the storage must match the host path too. A storage of a short-syntax source with
+ * `${VAR:-default}` can keep the default path (keepSavedComposeBindSource()), and an older storage can
+ * keep the path with a preview suffix.
+ */
+function findLocalFileVolumeConfig(
+    Application|ServiceApplication|ServiceDatabase $resource,
+    Stringable $source,
+    Stringable $target,
+    ?string $volume = null,
+): ?LocalFileVolume {
+    if ($resource instanceof Application) {
+        $mainDirectory = str(base_configuration_dir()."/applications/{$resource->uuid}");
+    } else {
+        $service = $resource->service;
+        if (! $service) {
+            return null;
+        }
+
+        $baseDirectory = (int) $service->compose_parsing_version >= 4 ? 'services' : 'applications';
+        $mainDirectory = str(base_configuration_dir()."/{$baseDirectory}/{$service->uuid}");
+    }
+
+    $sources = [$source];
+    if ($volume !== null && str_contains($volume, '${')) {
+        try {
+            $defaultSource = parseDockerVolumeString($volume)['source'];
+            if ($defaultSource !== null && $defaultSource->value() !== $source->value()) {
+                $sources[] = $defaultSource;
+            }
+        } catch (Exception) {
+        }
+    }
+
+    $storages = $resource->fileStorages()->where('mount_path', $target->value())->get();
+    foreach ($sources as $candidate) {
+        if (! sourceIsLocal($candidate)) {
+            continue;
+        }
+        $found = $storages->first(function (LocalFileVolume $storage) use ($candidate, $mainDirectory): bool {
+            $expectedSource = resolveComposeBindSource($candidate, $mainDirectory, $storage->fs_path)->value();
+
+            return $storage->fs_path === $expectedSource
+                || preg_match('/^'.preg_quote($expectedSource, '/').'-pr-\d+$/', $storage->fs_path) === 1;
+        });
+        if ($found) {
+            return $found;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Finds the file storage of a mount whose host path changed in the Compose file, so the storage keeps its
+ * content at the new path. It takes a storage only when it is the one storage at the mount path that no
+ * volume of the Compose file uses, so a sibling mount never takes the storage of another mount.
+ */
+function findRenamedComposeFileStorage(
+    Application|ServiceApplication|ServiceDatabase $resource,
+    Application|Service $composeResource,
+    Stringable $target,
+): ?LocalFileVolume {
+    $unusedStorages = $resource->fileStorages()
+        ->where('mount_path', $target->value())
+        ->where('is_host_file', false)
+        ->get()
+        ->reject(fn (LocalFileVolume $storage): bool => $storage->isUsedInCompose($composeResource));
+
+    return $unusedStorages->count() === 1 ? $unusedStorages->first() : null;
+}
+
+/**
  * The host path of a local Compose bind source. A mount whose storage row already has the legacy path
  * (also with a preview suffix) keeps it, because its data is there.
  *
