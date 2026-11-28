@@ -12,7 +12,7 @@ ARG NGINX_VERSION=1.31.8-r1
 ARG PHP_UV_VERSION=0.3.0
 # Flux, the Node connection broker (decision 0021). Pin a published ghcr.io/coollabsio/flux tag with its multi-arch digest:
 # docker buildx imagetools inspect ghcr.io/coollabsio/flux:<tag> --format '{{json .Manifest.Digest}}'
-ARG FLUX_IMAGE=ghcr.io/coollabsio/flux:main-b24863e@sha256:84f2e2fd0c7e39c5be587513a2eb62d392c6b4f27acaf4e827243ca699abe2de
+ARG FLUX_IMAGE=ghcr.io/coollabsio/flux:main-3e09949@sha256:d723958a48b571228281fdaaa3accc13c112b7c8646cb0e270e7036ee4ce0528
 
 # =================================================================
 # Get MinIO client

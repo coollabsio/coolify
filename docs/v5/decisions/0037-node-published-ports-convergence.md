@@ -265,6 +265,24 @@ Built in Coolify and in Sentinel `ce6e4a8`, `13b243d`, and `78b11ae`
   with 504 when the connection that got it closes. On dev, a command to a
   killed Sentinel failed in the same second, and the next run converged
   8 s later.
+- **Stale connection tracking entries.** The NAT binding of a connection is
+  stored in its conntrack entry. After a move, an unanswered TCP entry to the
+  old Node stayed for 120 s, and a UDP entry stayed while the client sent. A
+  client that used the source port of such an entry again kept the old
+  destination. On dev, a client with 10 fixed source ports had about 90
+  failed connections in the 106 s after a power-off failover, and a UDP
+  client with 1 fixed port never moved (102 of 162 failed). Sentinel
+  `3e09949` now deletes, after each change of the rules, the entries of a
+  published port that translate to another destination: TCP entries only
+  without a reply, so a working connection is not cut, and UDP entries also
+  with a reply. It uses the `conntrack` tool. Node preparation and the
+  Sentinel install add the package, and without it Sentinel skips this step.
+  After the fix: 2 failed connections in the second of the revision after a
+  power-off, 0 after a stop, 0 after the move back, a keep-alive connection
+  to Node 2 kept working during the move back, and the UDP flow moved in the
+  same second as the revision. The 8 single failures of the first 3-Node test
+  used new source ports for each connection, so stale entries do not explain
+  them. They did not occur again in 3 later runs.
 - **Source CIDRs.** With `10.221.5.1/32`, the host connected through both
   Nodes, and a connection from another address was dropped on the entry Node.
 - **Reboot without Flux.** With Flux stopped, Node 1 rebooted. Its local rule

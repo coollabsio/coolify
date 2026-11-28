@@ -177,7 +177,7 @@ return [
         // Must be longer than the longest Node operation worker timeout (15 minutes).
         'operation_stale_after_minutes' => (int) env('NODE_OPERATION_STALE_AFTER_MINUTES', 20),
         // The one-shot build container that Sentinel starts for a Git build (decision 0006).
-        'builder_image' => env('NODE_BUILDER_IMAGE', 'ghcr.io/coollabsio/coolify-builder:main-b24863e@sha256:74fa3fd3f60c48749b1a682054d51ccb18d719c809161e54c4c68e216d519472'),
+        'builder_image' => env('NODE_BUILDER_IMAGE', 'ghcr.io/coollabsio/coolify-builder:main-3e09949@sha256:c789f994fa703f260176f07866a239c96b2b2bf7aea8ced99d23611100e64107'),
         'build_timeout_minutes' => (int) env('NODE_BUILD_TIMEOUT_MINUTES', 30),
     ],
 

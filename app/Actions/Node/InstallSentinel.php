@@ -71,6 +71,17 @@ had_unit=false
 had_ca=false
 had_ca_version=false
 
+# A Node prepared before decision 0037 has no conntrack. Sentinel works without it, so a failed install does not stop the upgrade.
+if ! command -v conntrack >/dev/null 2>&1; then
+    if command -v apt-get >/dev/null 2>&1; then
+        DEBIAN_FRONTEND=noninteractive apt-get install -y -qq conntrack >/dev/null 2>&1 || true
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf install -y -q conntrack-tools >/dev/null 2>&1 || true
+    elif command -v yum >/dev/null 2>&1; then
+        yum install -y -q conntrack-tools >/dev/null 2>&1 || true
+    fi
+fi
+
 if systemctl is-active --quiet sentinel.service >/dev/null 2>&1; then was_active=true; fi
 if systemctl is-enabled --quiet sentinel.service >/dev/null 2>&1; then was_enabled=true; fi
 if systemctl is-active --quiet coolify-discovery-dns.service >/dev/null 2>&1; then discovery_dns_was_active=true; fi
