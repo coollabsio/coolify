@@ -909,7 +909,7 @@ function caddySiteAddress(string $scheme, string $host, bool $isForceHttpsEnable
     return "{$scheme}://{$host}";
 }
 
-function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false, ?int $http_basic_auth_bcrypt_cost = null, array $http_basic_auth_argon2id_options = [], bool $is_permanent_redirect_enabled = false, ?string $ip_allowlist = null)
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, ?string $image = null, string $redirect_direction = 'both', ?string $predefinedPort = null, bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $is_traffic_analytics_enabled = false, array $domainPortOverrides = [], bool $supports_log_append = false, bool $supports_basic_auth_directive = false, ?int $http_basic_auth_bcrypt_cost = null, array $http_basic_auth_argon2id_options = [], bool $is_permanent_redirect_enabled = false, ?string $ip_allowlist = null, bool $is_retry_enabled = false)
 {
     $labels = collect([]);
     if ($serviceLabels) {
@@ -964,6 +964,11 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
             $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy={{upstreams}}");
         }
         $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy.stream_close_delay=".CADDY_STREAM_CLOSE_DELAY);
+        if ($is_retry_enabled) {
+            // A failed connection, for example to the old container that stops during a rolling
+            // update, is retried on another upstream. Caddy always retries a connection that failed.
+            $labels->push("caddy_{$loop}.{$handle}.{$loop}_reverse_proxy.lb_try_duration=5s");
+        }
         $labels->push("caddy_{$loop}.{$handle}={$path}*");
         if ($ip_allowlist_entries !== []) {
             // respond sorts before reverse_proxy inside the handle block, so blocked clients never reach the app.
@@ -1073,7 +1078,7 @@ function traefikHostRulesWithoutIpv6Brackets(Collection $labels): Collection
     ) : $label);
 }
 
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [], ?string $certificate_resolver = 'letsencrypt', ?int $http_basic_auth_bcrypt_cost = null, bool $is_permanent_redirect_enabled = false, ?string $ip_allowlist = null)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null, bool $generate_unique_uuid = false, ?string $image = null, string $redirect_direction = 'both', bool $is_http_basic_auth_enabled = false, ?string $http_basic_auth_username = null, ?string $http_basic_auth_password = null, ?Collection $noindex_domains = null, bool $escape_redirect_replacement_for_compose = true, array $domainPortOverrides = [], ?string $certificate_resolver = 'letsencrypt', ?int $http_basic_auth_bcrypt_cost = null, bool $is_permanent_redirect_enabled = false, ?string $ip_allowlist = null, bool $is_retry_enabled = false)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -1134,6 +1139,14 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
         })->flatten()
             ->filter()
             ->unique();
+    }
+    if ($is_retry_enabled) {
+        // Sends a request to another container when the connection fails, for example to the old
+        // container that stops during a rolling update. Traefik does not retry after a response.
+        // A retry can pick the old container again under load; 3 attempts left about 5% of the
+        // requests failing in a live test, 5 attempts less than 1% (#8627).
+        $labels->push("traefik.http.middlewares.retry-{$uuid}.retry.attempts=5");
+        $middlewares_from_labels->push("retry-{$uuid}");
     }
     foreach ($domains as $loop => $domain) {
         try {
@@ -1401,6 +1414,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             ip_allowlist: $application->ip_allowlist,
                             noindex_domains: $noindexDomains,
                             domainPortOverrides: $application->domain_port_overrides ?? [],
+                            is_retry_enabled: true,
                             certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
                         ));
                         break;
@@ -1426,6 +1440,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                             supports_log_append: $application->destination->server->caddySupportsLogAppend(),
                             supports_basic_auth_directive: $application->destination->server->caddySupportsBasicAuthDirective(),
                             domainPortOverrides: $application->domain_port_overrides ?? [],
+                            is_retry_enabled: true,
                         ));
                         break;
                 }
@@ -1447,6 +1462,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     noindex_domains: $noindexDomains,
                     escape_redirect_replacement_for_compose: false,
                     domainPortOverrides: $application->domain_port_overrides ?? [],
+                    is_retry_enabled: true,
                     certificate_resolver: $application->destination->server->traefikCertificateResolver($application->settings?->traefik_certificate_resolver),
                 ));
                 $labels = $labels->merge(fqdnLabelsForCaddy(
@@ -1470,6 +1486,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
                     supports_log_append: $application->destination->server->caddySupportsLogAppend(),
                     supports_basic_auth_directive: $application->destination->server->caddySupportsBasicAuthDirective(),
                     domainPortOverrides: $application->domain_port_overrides ?? [],
+                    is_retry_enabled: true,
                 ));
             }
         }

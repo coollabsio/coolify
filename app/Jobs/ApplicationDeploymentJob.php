@@ -3732,8 +3732,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                         ->all();
                     $this->start_by_compose_file();
                     $this->health_check();
-                    $this->wait_for_proxy_to_route_new_container();
-                    $this->stop_running_container();
+                    $stopImmediately = $this->wait_for_proxy_to_route_new_container();
+                    $this->stop_running_container(stopImmediately: $stopImmediately);
                     $this->application_deployment_queue->addLogEntry('Rolling update completed.');
                 }
             }
@@ -3772,30 +3772,52 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     /**
      * The proxy adds the new container some seconds after it is healthy. Stopping the old
      * container before that sends requests to a closed port (502), see #8627.
+     *
+     * Returns true when the old containers must stop without the grace period. Traefik drops a
+     * router that two containers define differently until the old container exits. This is done
+     * only once, on the first deploy that adds the retry labels. Caddy merges the labels of both
+     * containers, so it keeps routing and needs no immediate stop.
      */
-    private function wait_for_proxy_to_route_new_container(): void
+    private function wait_for_proxy_to_route_new_container(): bool
     {
-        $seconds = $this->application->settings->rollingUpdateDrainSeconds();
-        if ($seconds === 0 || ! $this->newVersionIsHealthy()) {
-            return;
+        if (! $this->newVersionIsHealthy()) {
+            return false;
         }
         $oldContainerNames = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id)
             ->filter(fn ($container) => data_get($container, 'State') === 'running' && data_get($container, 'Names') !== $this->container_name)
             ->pluck('Names');
         if ($oldContainerNames->isEmpty()) {
-            return;
+            return false;
         }
-        if ($this->proxyLabelsChanged($oldContainerNames)) {
-            // The proxy drops a route that two containers define differently until the old one stops.
+        $proxyLabels = $this->proxyLabelsOf($oldContainerNames);
+        if ($proxyLabels->unique()->count() > 1) {
+            $newContainerHasRetry = $this->hasTraefikRetryLabel($proxyLabels->first());
+            $oldContainersHaveRetry = $proxyLabels->skip(1)->contains(fn (array $labels) => $this->hasTraefikRetryLabel($labels));
+            if ($newContainerHasRetry && ! $oldContainersHaveRetry) {
+                $this->application_deployment_queue->addLogEntry('The proxy labels changed to retry failed connections, so the old containers stop now, without waiting and without the grace period.');
+
+                return true;
+            }
             $this->application_deployment_queue->addLogEntry('The proxy labels changed, so the old containers stop without waiting.');
 
-            return;
+            return false;
+        }
+        $seconds = $this->application->settings->rollingUpdateDrainSeconds();
+        if ($seconds === 0) {
+            return false;
         }
         $this->application_deployment_queue->addLogEntry("Waiting {$seconds} seconds for the proxy to send traffic to the new container.");
         Sleep::for($seconds)->seconds();
+
+        return false;
     }
 
-    private function proxyLabelsChanged(Collection $oldContainerNames): bool
+    /**
+     * The proxy labels of the new container (first) and of the old containers.
+     *
+     * @return Collection<int, array<string, string>>
+     */
+    private function proxyLabelsOf(Collection $oldContainerNames): Collection
     {
         $containerNames = $oldContainerNames->prepend($this->container_name)->map(fn (string $name) => escapeshellarg($name))->implode(' ');
         $output = instant_remote_process(["docker inspect --format '{{json .Config.Labels}}' {$containerNames}"], $this->server, false);
@@ -3804,9 +3826,15 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ->map(fn (string $labels) => collect(json_decode($labels, true) ?: [])
                 ->filter(fn ($value, string $key) => str_starts_with($key, 'traefik.') || str_starts_with($key, 'caddy'))
                 ->sortKeys()
-                ->all())
-            ->unique()
-            ->count() > 1;
+                ->all());
+    }
+
+    /**
+     * @param  array<string, string>  $labels
+     */
+    private function hasTraefikRetryLabel(array $labels): bool
+    {
+        return collect($labels)->keys()->contains(fn (string $key) => str_starts_with($key, 'traefik.http.middlewares.retry-') && str_ends_with($key, '.retry.attempts'));
     }
 
     private function health_check()
@@ -6427,10 +6455,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry('Building docker image completed.');
     }
 
-    private function graceful_shutdown_container(string $containerName, bool $skipRemove = false)
+    private function graceful_shutdown_container(string $containerName, bool $skipRemove = false, ?int $timeout = null)
     {
         try {
-            $timeout = $this->application->settings->deploymentStopGracePeriodSeconds();
+            $timeout ??= $this->application->settings->deploymentStopGracePeriodSeconds();
 
             if ($skipRemove) {
                 // The helper container (started with --rm) must also stop when the deployment was cancelled.
@@ -6478,20 +6506,21 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             ->delay(now()->addMinutes(5));
     }
 
-    private function stop_running_container(bool $force = false)
+    private function stop_running_container(bool $force = false, bool $stopImmediately = false)
     {
         try {
             $this->application_deployment_queue->addLogEntry('Removing old containers.');
             if ($this->newVersionIsHealthy() || $force) {
+                $timeout = $stopImmediately ? 0 : null;
                 if ($this->application->settings->is_consistent_container_name_enabled) {
                     $containers = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id);
-                    $this->containerNamesToRemove($containers)->each(function (string $containerName) {
-                        $this->graceful_shutdown_container($containerName);
+                    $this->containerNamesToRemove($containers)->each(function (string $containerName) use ($timeout) {
+                        $this->graceful_shutdown_container($containerName, timeout: $timeout);
                     });
                 } else {
                     $containers = getCurrentApplicationContainerStatus($this->server, $this->application, $this->pull_request_id);
-                    $this->oldGeneratedContainerNames($containers)->each(function (string $containerName) {
-                        $this->graceful_shutdown_container($containerName);
+                    $this->oldGeneratedContainerNames($containers)->each(function (string $containerName) use ($timeout) {
+                        $this->graceful_shutdown_container($containerName, timeout: $timeout);
                     });
                 }
             } else {
