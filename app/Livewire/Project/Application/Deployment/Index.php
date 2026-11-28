@@ -33,6 +33,7 @@ class Index extends Component
         'created_at',
         'updated_at',
         'finished_at',
+        'skipped_count',
     ];
 
     public Application $application;

@@ -130,3 +130,13 @@ test('the dashboard opens the canvas again when the user left it there', functio
         ->assertOk()
         ->assertPlainCookie($cookie, 'list');
 });
+
+test('the dashboard canvas leaves skipped pushes out of the recent deployments', function () {
+    $app = dashboardCanvasApp($this->environment, $this->server, 'storefront');
+    dashboardCanvasDeployment($app, $this->server, ApplicationDeploymentStatus::FINISHED);
+    dashboardCanvasDeployment($app, $this->server, ApplicationDeploymentStatus::SKIPPED);
+
+    $response = dashboardCanvasSession($this, $this->admin, $this->team)->getJson('/canvas/api/dashboard/canvas')->assertOk();
+
+    expect(collect($response->json('deployments'))->pluck('status')->all())->toBe(['finished']);
+});

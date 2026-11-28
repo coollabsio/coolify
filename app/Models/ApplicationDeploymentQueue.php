@@ -30,7 +30,10 @@ use OpenApi\Attributes as OA;
         'configuration_diff' => ['type' => 'object', 'nullable' => true],
         'force_rebuild' => ['type' => 'boolean'],
         'commit' => ['type' => 'string'],
-        'status' => ['type' => 'string'],
+        'status' => ['type' => 'string', 'enum' => ['queued', 'in_progress', 'finished', 'failed', 'cancelled-by-user', 'skipped'], 'description' => 'A skipped row records Git pushes that were not deployed, for example because no changed file affects the application. `trigger_reason` is set when deploy triggers skipped them.'],
+        'trigger_reason' => ['type' => 'object', 'nullable' => true, 'description' => 'Why smart deploy triggers deployed or skipped the push: reason_code, reason, matches, and pull_request_closed when the pull request of a skipped push closed.'],
+        'skipped_count' => ['type' => 'integer', 'nullable' => true, 'description' => 'How many pushes a skipped row stands for. Null for rows that deploy triggers did not skip.'],
+        'first_skipped_commit' => ['type' => 'string', 'nullable' => true, 'description' => 'The first commit of the pushes a skipped row stands for.'],
         'is_webhook' => ['type' => 'boolean'],
         'is_api' => ['type' => 'boolean'],
         'is_mcp' => ['type' => 'boolean'],
@@ -184,6 +187,9 @@ class ApplicationDeploymentQueue extends Model
         'scan_gate_result',
         'scan_gate_bypassed_by',
         'deploy_started_at',
+        'trigger_reason',
+        'skipped_count',
+        'first_skipped_commit',
     ];
 
     /**
@@ -204,6 +210,8 @@ class ApplicationDeploymentQueue extends Model
         'pull_request_id' => 'integer',
         'finished_at' => 'datetime',
         'scan_gate_result' => 'array',
+        'trigger_reason' => 'array',
+        'skipped_count' => 'integer',
         'deploy_started_at' => 'datetime',
         'configuration_snapshot' => EncryptedArrayCast::class,
         'configuration_diff' => EncryptedArrayCast::class,

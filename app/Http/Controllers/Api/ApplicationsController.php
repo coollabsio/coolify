@@ -86,6 +86,7 @@ class ApplicationsController extends Controller
         'custom_internal_name',
         'custom_container_name_prefix',
         'is_image_scan_enabled',
+        'is_smart_triggers_enabled',
     ];
 
     private const BOOLEAN_APPLICATION_SETTING_FIELDS = [
@@ -113,6 +114,7 @@ class ApplicationsController extends Controller
         'is_gpu_enabled',
         'is_consistent_container_name_enabled',
         'is_image_scan_enabled',
+        'is_smart_triggers_enabled',
     ];
 
     protected function findTaggableResource(string $uuid, int|string $teamId): mixed
@@ -174,7 +176,14 @@ class ApplicationsController extends Controller
             $application->settings?->makeHidden(['id', 'application_id', 'created_at', 'updated_at']);
         }
 
-        return redactLockedApiResourceValues($application, serializeApiResponse($application));
+        $data = redactLockedApiResourceValues($application, serializeApiResponse($application));
+        if ($application instanceof Application) {
+            $data['trigger_set'] = is_array($application->trigger_set)
+                ? array_intersect_key($application->trigger_set, array_flip(['display', 'limits', 'resolvers', 'anchor', 'widened', 'evaluated_commit']))
+                : null;
+        }
+
+        return $data;
     }
 
     private function applicationSettingsFromRequest(Request $request): array
@@ -669,6 +678,7 @@ class ApplicationsController extends Controller
                             'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
                             'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
                             'is_image_scan_enabled' => ['type' => 'boolean', 'description' => 'Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true.'],
+                            'is_smart_triggers_enabled' => ['type' => 'boolean', 'description' => 'Deploy on a Git push only when files this application uses change. Defaults to true.'],
                             'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'],
                             'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
                             'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
@@ -886,6 +896,7 @@ class ApplicationsController extends Controller
                             'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
                             'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
                             'is_image_scan_enabled' => ['type' => 'boolean', 'description' => 'Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true.'],
+                            'is_smart_triggers_enabled' => ['type' => 'boolean', 'description' => 'Deploy on a Git push only when files this application uses change. Defaults to true.'],
                             'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'],
                             'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
                             'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
@@ -1106,6 +1117,7 @@ class ApplicationsController extends Controller
                             'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
                             'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
                             'is_image_scan_enabled' => ['type' => 'boolean', 'description' => 'Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true.'],
+                            'is_smart_triggers_enabled' => ['type' => 'boolean', 'description' => 'Deploy on a Git push only when files this application uses change. Defaults to true.'],
                             'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'],
                             'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
                             'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
@@ -1323,6 +1335,7 @@ class ApplicationsController extends Controller
                             'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
                             'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
                             'is_image_scan_enabled' => ['type' => 'boolean', 'description' => 'Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true.'],
+                            'is_smart_triggers_enabled' => ['type' => 'boolean', 'description' => 'Deploy on a Git push only when files this application uses change. Defaults to true.'],
                             'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'],
                             'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
                             'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
@@ -1510,6 +1523,7 @@ class ApplicationsController extends Controller
                             'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
                             'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
                             'is_image_scan_enabled' => ['type' => 'boolean', 'description' => 'Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true.'],
+                            'is_smart_triggers_enabled' => ['type' => 'boolean', 'description' => 'Deploy on a Git push only when files this application uses change. Defaults to true.'],
                             'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'],
                             'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
                             'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
@@ -1693,6 +1707,7 @@ class ApplicationsController extends Controller
                             'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
                             'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
                             'is_image_scan_enabled' => ['type' => 'boolean', 'description' => 'Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true.'],
+                            'is_smart_triggers_enabled' => ['type' => 'boolean', 'description' => 'Deploy on a Git push only when files this application uses change. Defaults to true.'],
                             'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'],
                             'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
                             'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],
@@ -3877,6 +3892,7 @@ class ApplicationsController extends Controller
                             'gpu_options' => ['type' => 'string', 'nullable' => true, 'description' => 'Additional GPU options.'],
                             'is_consistent_container_name_enabled' => ['type' => 'boolean', 'description' => 'Use a consistent container name across deployments.'],
                             'is_image_scan_enabled' => ['type' => 'boolean', 'description' => 'Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true.'],
+                            'is_smart_triggers_enabled' => ['type' => 'boolean', 'description' => 'Deploy on a Git push only when files this application uses change. Defaults to true.'],
                             'custom_internal_name' => ['type' => 'string', 'nullable' => true, 'description' => 'Custom internal container name. Turns is_consistent_container_name_enabled on when that field is not sent; sending it as false together with a name returns 422.'],
                             'custom_container_name_prefix' => ['type' => 'string', 'nullable' => true, 'description' => 'Prefix for generated container names (prefix-20260908T141530). Slugified and unique across the instance.'],
                             'preview_url_template' => ['type' => 'string', 'description' => 'Preview URL template.'],

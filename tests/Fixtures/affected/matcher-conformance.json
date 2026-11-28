@@ -1,0 +1,1714 @@
+{
+ "source": "coolify (replace with helper testdata/matcher-conformance.json when published)",
+ "version": 1,
+ "cases": [
+  {
+   "note": "included dir",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "include",
+      "rules": [
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       },
+       {
+        "action": "exclude",
+        "kind": "file",
+        "path": "README.md"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/web"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/web/src/index.ts",
+   "expected": true
+  },
+  {
+   "note": "dir itself (gitlink)",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "include",
+      "rules": [
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       },
+       {
+        "action": "exclude",
+        "kind": "file",
+        "path": "README.md"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/web"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/web",
+   "expected": true
+  },
+  {
+   "note": "sibling prefix not excluded, default include",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "include",
+      "rules": [
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       },
+       {
+        "action": "exclude",
+        "kind": "file",
+        "path": "README.md"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/web"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/webapp/x.ts",
+   "expected": true
+  },
+  {
+   "note": "excluded dir",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "include",
+      "rules": [
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       },
+       {
+        "action": "exclude",
+        "kind": "file",
+        "path": "README.md"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/web"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/api/src/a.ts",
+   "expected": false
+  },
+  {
+   "note": "excluded dir itself",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "include",
+      "rules": [
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       },
+       {
+        "action": "exclude",
+        "kind": "file",
+        "path": "README.md"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/web"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/api",
+   "expected": false
+  },
+  {
+   "note": "dir prefix is segment-wise",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "include",
+      "rules": [
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       },
+       {
+        "action": "exclude",
+        "kind": "file",
+        "path": "README.md"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/web"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/api2/a.ts",
+   "expected": true
+  },
+  {
+   "note": "excluded file",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "include",
+      "rules": [
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       },
+       {
+        "action": "exclude",
+        "kind": "file",
+        "path": "README.md"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/web"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "README.md",
+   "expected": false
+  },
+  {
+   "note": "file rule is exact path only",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "include",
+      "rules": [
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       },
+       {
+        "action": "exclude",
+        "kind": "file",
+        "path": "README.md"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/web"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "docs/README.md",
+   "expected": true
+  },
+  {
+   "note": "file rule is not a prefix",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "include",
+      "rules": [
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       },
+       {
+        "action": "exclude",
+        "kind": "file",
+        "path": "README.md"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/web"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "README.md.bak",
+   "expected": true
+  },
+  {
+   "note": "default include",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "include",
+      "rules": [
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       },
+       {
+        "action": "exclude",
+        "kind": "file",
+        "path": "README.md"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/web"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "scripts/build.sh",
+   "expected": true
+  },
+  {
+   "note": "default exclude, included dir",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/web"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "pnpm-lock.yaml"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/web/a",
+   "expected": true
+  },
+  {
+   "note": "default exclude",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/web"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "pnpm-lock.yaml"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/api/a",
+   "expected": false
+  },
+  {
+   "note": "included file",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/web"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "pnpm-lock.yaml"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "pnpm-lock.yaml",
+   "expected": true
+  },
+  {
+   "note": "file exact only",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/web"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "pnpm-lock.yaml"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "sub/pnpm-lock.yaml",
+   "expected": false
+  },
+  {
+   "note": "empty path matches nothing in exclude default",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/web"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "pnpm-lock.yaml"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "",
+   "expected": false
+  },
+  {
+   "note": "last match wins: include",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps"
+       },
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/api/shared"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/web/x",
+   "expected": true
+  },
+  {
+   "note": "later exclude wins",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps"
+       },
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/api/shared"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/api/x",
+   "expected": false
+  },
+  {
+   "note": "later include wins over exclude",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps"
+       },
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/api/shared"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/api/shared/y",
+   "expected": true
+  },
+  {
+   "note": "re-included dir itself",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps"
+       },
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/api/shared"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/api/shared",
+   "expected": true
+  },
+  {
+   "note": "default exclude",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps"
+       },
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps/api/shared"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "other",
+   "expected": false
+  },
+  {
+   "note": "order matters: later broader include wins",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api/shared"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/api/shared/y",
+   "expected": true
+  },
+  {
+   "note": "** zero segments",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "**/package.json"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "package.json",
+   "expected": true
+  },
+  {
+   "note": "** many segments",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "**/package.json"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/web/package.json",
+   "expected": true
+  },
+  {
+   "note": "anchored end",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "**/package.json"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/web/package.json5",
+   "expected": false
+  },
+  {
+   "note": "segment-exact after **/",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "**/package.json"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/web/xpackage.json",
+   "expected": false
+  },
+  {
+   "note": "* one segment",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "packages/*/package.json"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "packages/ui/package.json",
+   "expected": true
+  },
+  {
+   "note": "* does not cross /",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "packages/*/package.json"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "packages/ui/nested/package.json",
+   "expected": false
+  },
+  {
+   "note": "* matches empty",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "packages/*/package.json"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "packages//package.json",
+   "expected": true
+  },
+  {
+   "note": "trailing ** zero segments",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "apps/**"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps",
+   "expected": true
+  },
+  {
+   "note": "trailing ** any depth",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "apps/**"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/a/b/c",
+   "expected": true
+  },
+  {
+   "note": "trailing ** keeps separator",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "apps/**"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "appsx/a",
+   "expected": false
+  },
+  {
+   "note": "middle ** zero segments",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "src/**/test.ts"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "src/test.ts",
+   "expected": true
+  },
+  {
+   "note": "middle ** several segments",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "src/**/test.ts"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "src/a/b/test.ts",
+   "expected": true
+  },
+  {
+   "note": "middle ** keeps separators",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "src/**/test.ts"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "src/atest.ts",
+   "expected": false
+  },
+  {
+   "note": "* at root",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "*.md"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "README.md",
+   "expected": true
+  },
+  {
+   "note": "* not crossing /",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "*.md"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "docs/README.md",
+   "expected": false
+  },
+  {
+   "note": "? one char",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "file?.txt"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "file1.txt",
+   "expected": true
+  },
+  {
+   "note": "? exactly one",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "file?.txt"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "file12.txt",
+   "expected": false
+  },
+  {
+   "note": "? not /",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "file?.txt"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "file/.txt",
+   "expected": false
+  },
+  {
+   "note": "regex metacharacters are literals",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "a.b/(x)+[y]#z$/*"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "a.b/(x)+[y]#z$/f",
+   "expected": true
+  },
+  {
+   "note": ". is literal",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "a.b/(x)+[y]#z$/*"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "aXb/(x)+[y]#z$/f",
+   "expected": false
+  },
+  {
+   "note": "[y] is literal brackets",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "a.b/(x)+[y]#z$/*"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "a.b/(x)+y#z$/f",
+   "expected": false
+  },
+  {
+   "note": "space in path",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "my app/src"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "ünï/cødé.ts"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "a#b"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "my app/src/main.ts",
+   "expected": true
+  },
+  {
+   "note": "unicode exact",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "my app/src"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "ünï/cødé.ts"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "a#b"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "ünï/cødé.ts",
+   "expected": true
+  },
+  {
+   "note": "case sensitive",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "my app/src"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "ünï/cødé.ts"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "a#b"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "Ünï/cødé.ts",
+   "expected": false
+  },
+  {
+   "note": "hash in dir",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "my app/src"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "ünï/cødé.ts"
+       },
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "a#b"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "a#b/c",
+   "expected": true
+  },
+  {
+   "note": "both rulesets include",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "include",
+      "rules": [
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       }
+      ]
+     },
+     {
+      "limit": "dockerfile",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "Dockerfile"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/web/a",
+   "expected": true
+  },
+  {
+   "note": "first ruleset excludes",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "include",
+      "rules": [
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       }
+      ]
+     },
+     {
+      "limit": "dockerfile",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "Dockerfile"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/api/a",
+   "expected": false
+  },
+  {
+   "note": "second includes file, first default include",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "include",
+      "rules": [
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       }
+      ]
+     },
+     {
+      "limit": "dockerfile",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "Dockerfile"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "Dockerfile",
+   "expected": true
+  },
+  {
+   "note": "second ruleset default exclude",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "include",
+      "rules": [
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "apps/api"
+       }
+      ]
+     },
+     {
+      "limit": "dockerfile",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": "apps"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "Dockerfile"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "scripts/x",
+   "expected": false
+  },
+  {
+   "note": "no rulesets: every file matches",
+   "compiled": {
+    "version": 1,
+    "all_of": [],
+    "lockfiles": []
+   },
+   "file": "anything",
+   "expected": true
+  },
+  {
+   "note": "glob include",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "**/*.go"
+       },
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "vendor"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "vendor/modules.txt"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "cmd/api/main.go",
+   "expected": true
+  },
+  {
+   "note": "later dir exclude beats earlier glob",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "**/*.go"
+       },
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "vendor"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "vendor/modules.txt"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "vendor/x/y.go",
+   "expected": false
+  },
+  {
+   "note": "later file include beats dir exclude",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "**/*.go"
+       },
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "vendor"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "vendor/modules.txt"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "vendor/modules.txt",
+   "expected": true
+  },
+  {
+   "note": "**/ zero segments with *",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "**/*.go"
+       },
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "vendor"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "vendor/modules.txt"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "main.go",
+   "expected": true
+  },
+  {
+   "note": "default exclude",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "**/*.go"
+       },
+       {
+        "action": "exclude",
+        "kind": "dir",
+        "path": "vendor"
+       },
+       {
+        "action": "include",
+        "kind": "file",
+        "path": "vendor/modules.txt"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "README",
+   "expected": false
+  },
+  {
+   "note": "dot dir",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": ".github"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": ".github/workflows/ci.yml",
+   "expected": true
+  },
+  {
+   "note": "dot dir prefix segment-wise",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "dir",
+        "path": ".github"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": ".githubx",
+   "expected": false
+  },
+  {
+   "note": "? matches one multibyte character",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "file?.txt"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "fileé.txt",
+   "expected": true
+  },
+  {
+   "note": "lone ** matches everything",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "**"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "a/b/c.txt",
+   "expected": true
+  },
+  {
+   "note": "lone ** matches a root file",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "**"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "c.txt",
+   "expected": true
+  },
+  {
+   "note": "* inside a segment",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "apps/web-*/src/**"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/web-admin/src/a/b.ts",
+   "expected": true
+  },
+  {
+   "note": "* inside a segment does not cross /",
+   "compiled": {
+    "version": 1,
+    "all_of": [
+     {
+      "limit": "workspace",
+      "default": "exclude",
+      "rules": [
+       {
+        "action": "include",
+        "kind": "glob",
+        "pattern": "apps/web-*/src/**"
+       }
+      ]
+     }
+    ],
+    "lockfiles": []
+   },
+   "file": "apps/web-a/b/src/x",
+   "expected": false
+  }
+ ]
+}

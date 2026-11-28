@@ -1174,8 +1174,9 @@ describe('Manual Webhook Push Payloads Without Commits', function () {
         $response = sendSignedManualWebhook($this, $provider, $application, $payload);
 
         $response->assertOk();
-        expect($response->getContent())->toContain('Deployment queued');
-        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeTrue();
+        expect($response->getContent())->toMatch('/Deployment queued|evaluating/');
+        runPushedEvaluations();
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->where('status', '!=', 'skipped')->exists())->toBeTrue();
     })->with(['github', 'gitlab', 'gitea'])
         ->with(['missing', 'null'])
         ->with(['no watch paths' => null, 'watch paths' => 'src/**']);
@@ -1188,9 +1189,28 @@ describe('Manual Webhook Push Payloads Without Commits', function () {
         $response = sendSignedManualWebhook($this, $provider, $application, $payload);
 
         $response->assertOk();
-        expect($response->getContent())->toContain('Changed files do not match watch paths');
-        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
+        expect($response->getContent())->toMatch('/Changed files do not match watch paths|evaluating/');
+        runPushedEvaluations();
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->where('status', '!=', 'skipped')->exists())->toBeFalse();
     })->with(['github', 'gitlab', 'gitea']);
+
+    test('a push to a public repository application honours watch paths', function (string $provider, string $changedFile, bool $deploys) {
+        Queue::fake();
+        $application = makeWebhookApplicationServerFunctional(createApplicationWithWebhook(overrides: ['watch_paths' => 'src/**']));
+        $publicSource = GithubApp::create([
+            'name' => 'Public GitHub', 'team_id' => $application->team()->id, 'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com', 'is_public' => true,
+        ]);
+        $application->forceFill(['source_id' => $publicSource->id, 'source_type' => GithubApp::class])->save();
+        $payload = manualWebhookPushPayloadWithoutCommits($provider) + ['commits' => [['id' => 'abc1234', 'message' => 'change', 'added' => [], 'removed' => [], 'modified' => [$changedFile]]]];
+
+        $response = sendSignedManualWebhook($this, $provider, $application->refresh(), $payload);
+
+        $response->assertOk();
+        runPushedEvaluations();
+        expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->where('status', '!=', 'skipped')->exists())->toBe($deploys);
+    })->with(['github', 'gitlab', 'gitea'])
+        ->with(['matching file' => ['src/app.ts', true], 'other file' => ['docs/readme.md', false]]);
 
     test('a push that deletes the branch does not queue a deployment', function (string $provider, ?string $watchPaths) {
         Queue::fake();
@@ -1307,6 +1327,7 @@ describe('App Webhook Push Payloads Without Commits', function () {
         ], $payload);
 
         $response->assertOk();
+        runPushedEvaluations();
         expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeTrue();
     });
 

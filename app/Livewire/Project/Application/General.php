@@ -134,8 +134,6 @@ class General extends Component
 
     public ?string $ipAllowlist = null;
 
-    public ?string $watchPaths = null;
-
     public string $redirect;
 
     public $customLabels;
@@ -222,7 +220,6 @@ class General extends Component
             'httpBasicAuthArgon2idMemoryCost' => 'required|integer|min:8192|max:262144',
             'httpBasicAuthArgon2idTimeCost' => 'required|integer|min:1|max:12',
             'ipAllowlist' => ['nullable', 'string', new ValidIpAllowlist],
-            'watchPaths' => 'nullable',
             'redirect' => 'string|required',
         ];
     }
@@ -322,7 +319,6 @@ class General extends Component
         'isContainerLabelEscapeEnabled' => 'Is container label escape enabled',
         'isContainerLabelReadonlyEnabled' => 'Is container label readonly',
         'isPreserveRepositoryEnabled' => 'Is preserve repository enabled',
-        'watchPaths' => 'Watch paths',
         'redirect' => 'Redirect',
     ];
 
@@ -461,7 +457,6 @@ class General extends Component
             $this->application->http_basic_auth_argon2id_memory_cost = $this->httpBasicAuthArgon2idMemoryCost;
             $this->application->http_basic_auth_argon2id_time_cost = $this->httpBasicAuthArgon2idTimeCost;
             $this->application->ip_allowlist = $this->ipAllowlist;
-            $this->application->watch_paths = $this->watchPaths;
             $this->application->redirect = $this->redirect;
 
             // Application settings properties
@@ -517,7 +512,6 @@ class General extends Component
             $this->httpBasicAuthArgon2idMemoryCost = $this->application->http_basic_auth_argon2id_memory_cost;
             $this->httpBasicAuthArgon2idTimeCost = $this->application->http_basic_auth_argon2id_time_cost;
             $this->ipAllowlist = $this->application->ip_allowlist;
-            $this->watchPaths = $this->application->watch_paths;
             $this->redirect = $this->application->redirect;
 
             // Application settings properties

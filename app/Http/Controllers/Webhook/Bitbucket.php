@@ -9,9 +9,11 @@ use App\Http\Controllers\Webhook\Bitbucket\BitbucketWebhookContext;
 use App\Http\Controllers\Webhook\Bitbucket\BitbucketWebhookVariantRegistry;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Controllers\Webhook\Concerns\RoutesConfigPushes;
+use App\Http\Controllers\Webhook\Concerns\RoutesPushTriggers;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
+use App\Services\DeployTriggers\PushTriggerRouter;
 use App\Services\ServerTransfer\TransferFinishChecklist;
 use Exception;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -22,7 +24,11 @@ class Bitbucket extends Controller
 {
     use MatchesManualWebhookApplications;
     use RoutesConfigPushes;
+    use RoutesPushTriggers;
     use ValidatesPreviewDeploymentRepository;
+
+    /** @var array<string, PushTriggerRouter> branch => router */
+    private array $pushTriggers = [];
 
     public function manual(Request $request, ?BitbucketWebhookVariantRegistry $registry = null)
     {
@@ -135,6 +141,8 @@ class Bitbucket extends Controller
                 }
             }
 
+            $this->dispatchPushTriggers(...array_values($this->pushTriggers));
+
             return $this->manualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
         } catch (HttpResponseException $e) {
             return $e->getResponse();
@@ -145,6 +153,9 @@ class Bitbucket extends Controller
             ]);
         } catch (Exception $e) {
             return handleError($e);
+        } finally {
+            // Deferred applications are evaluated also when a later application failed.
+            $this->dispatchPushTriggers(...array_values($this->pushTriggers));
         }
     }
 
@@ -214,6 +225,15 @@ class Bitbucket extends Controller
             ];
         }
 
+        // Bitbucket sends no file lists, so evaluation compares the commits with an exact diff.
+        $router = $this->pushTriggers[$application->git_branch] ??= PushTriggerRouter::forPush(
+            $this->genericPushContext('bitbucket', 'bitbucket:'.mb_strtolower($repositoryLabel), $application->git_branch, $pushedBranch['commit'], null, null, null)
+        );
+        $entries = collect();
+        if ($this->deferPushIfEvaluated($router, $application, $entries)) {
+            return $entries->first();
+        }
+
         $deployment_uuid = new_public_id();
         $result = queue_application_deployment(
             application: $application,
@@ -224,6 +244,8 @@ class Bitbucket extends Controller
         );
 
         if ($result['status'] === 'queue_full') {
+            $this->dispatchPushTriggers(...array_values($this->pushTriggers));
+
             throw new HttpResponseException(response($result['message'], 429)->header('Retry-After', 60));
         }
 

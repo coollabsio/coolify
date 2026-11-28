@@ -120,6 +120,8 @@ class ApplicationAdapter implements ResourceAdapter
             Field::derived('docker_compose', 'Coolify generates it from the compose file.'),
             Field::derived('compose_parsing_version', 'Coolify sets the parser version when it creates the application.'),
             Field::derived('custom_healthcheck_found', 'Coolify finds it in the Dockerfile.'),
+            Field::derived('trigger_base_commit', 'Coolify derives it from pushes and deployments.'),
+            Field::derived('trigger_set', 'Coolify derives it from pushes and deployments.'),
             Field::derived('is_archive_source', 'Coolify sets it for a static site that is deployed from an uploaded archive.'),
             Field::managed('ports_exposes', 'ports.exposes'),
             Field::managed('ports_mappings', 'ports.mappings'),
@@ -203,6 +205,7 @@ class ApplicationAdapter implements ResourceAdapter
             'redact_all_env_values_in_logs' => true, 'include_coolify_default_variables' => true, 'is_permanent_redirect_enabled' => false,
             'is_image_scan_enabled' => true, 'is_auto_cancel_queued_deployments_enabled' => true,
             'is_auto_cancel_building_deployments_enabled' => false, 'include_network_hosts_in_build' => true,
+            'is_smart_triggers_enabled' => true,
         ];
         $fields = [];
         foreach ($booleans as $column => $default) {

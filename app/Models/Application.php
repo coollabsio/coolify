@@ -8,11 +8,13 @@ use App\Enums\HttpBasicAuthHashAlgorithm;
 use App\Enums\ProxyTypes;
 use App\Exceptions\DeploymentException;
 use App\Rules\ValidIpAllowlist;
+use App\Services\Access\AccessResolver;
 use App\Services\ComposeIncludeFlattener;
 use App\Services\ConfigurationGenerator;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
 use App\Services\DeploymentConfiguration\ConfigurationDiff;
 use App\Services\DeploymentConfiguration\ConfigurationDiffer;
+use App\Services\DeployTriggers\GitAccess;
 use App\Support\DomainPortOverrides;
 use App\Support\DomainUrlParts;
 use App\Support\StaticSiteArchive;
@@ -143,12 +145,18 @@ use Symfony\Component\Yaml\Yaml;
         'http_basic_auth_argon2id_memory_cost' => ['type' => 'integer', 'minimum' => 8192, 'maximum' => 262144, 'description' => 'Argon2id memory cost in KiB for the HTTP Basic Authentication password.'],
         'http_basic_auth_argon2id_time_cost' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 12, 'description' => 'Argon2id time cost (iterations) for the HTTP Basic Authentication password.'],
         'ip_allowlist' => ['type' => 'string', 'nullable' => true, 'description' => 'Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone.'],
+        'trigger_set' => ['type' => 'object', 'nullable' => true, 'description' => 'The paths whose changes deploy the application on a Git push, as smart deploy triggers resolved them: display, limits, resolvers, anchor, widened, and evaluated_commit.'],
         new OA\Property(property: 'settings', ref: '#/components/schemas/ApplicationSetting'),
     ]
 )]
 
 class Application extends BaseModel
 {
+    /**
+     * A build or install command that selects one workspace package (spec §2.1).
+     */
+    private const WORKSPACE_SELECTOR_PATTERN = '~--filter[=\s]|\bpnpm\b[^;&|\n]*\s-F\s|--workspace[=\s]|\bnpm\b[^;&|\n]*\s-w\s|\byarn\s+workspace\s|\bnx\s+(?:build|run|serve)\s|\b(?:cargo|uv)\b[^;&|\n]*\s(?:-p|--package)[=\s]|\bgo\s+build\b.*\s\./[^\s/]+/|gradlew?\s+:[^\s]|\bmvn\b.*\s-pl\s~m';
+
     /** @use HasFactory<ApplicationFactory> */
     use Auditable, ClearsGlobalSearchCache, HasComposeVolumeWarnings, HasConfiguration, HasFactory, HasImageScans, HasMaintenancePage, HasMetrics, HasNoindexDomains, HasSafeStringAttribute, HasSecretManager, HasStars, ReleasesManagedDnsRecords, ScopedByAccessGrants, SoftDeletes;
 
@@ -315,6 +323,7 @@ class Application extends BaseModel
      */
     protected $hidden = [
         ...self::COMMAND_AND_CONFIGURATION_ATTRIBUTES,
+        'trigger_set',
         'http_basic_auth_password',
         'git_https_password',
         'manual_webhook_secret_github',
@@ -340,6 +349,7 @@ class Application extends BaseModel
             'manual_webhook_secret_bitbucket' => 'encrypted',
             'manual_webhook_secret_gitea' => 'encrypted',
             'noindex_domains' => 'array',
+            'trigger_set' => 'array',
             'domain_dns_statuses' => 'array',
             'domain_port_overrides' => 'array',
             'docker_compose_image_overrides' => 'array',
@@ -371,6 +381,11 @@ class Application extends BaseModel
             ]);
         });
         static::saving(function ($application) {
+            if ($application->exists && $application->isDirty(['git_repository', 'git_branch'])) {
+                // Trigger state belongs to the old source; the next push deploys and rebuilds it.
+                $application->trigger_base_commit = null;
+                $application->trigger_set = null;
+            }
             if ($application->isDirty('docker_compose_raw')) {
                 EnvironmentVariable::authorizeAddedSharedVariableReferencesIn($application, $application->getOriginal('docker_compose_raw'), $application->docker_compose_raw, 'docker_compose_raw');
             }
@@ -875,12 +890,12 @@ class Application extends BaseModel
     }
 
     /**
-     * Watch paths filter Git webhook deployments. Deploy-key applications have no
-     * source but receive manual webhooks, so a source is not required.
+     * Watch paths filter Git webhook deployments. Every Git application can receive
+     * manual webhooks, including deploy-key and public repository applications.
      */
     public function supportsWatchPaths(): bool
     {
-        return $this->git_based() && ! $this->is_public_repository();
+        return $this->git_based();
     }
 
     public function isGithubAppSource(): bool
@@ -1616,7 +1631,10 @@ class Application extends BaseModel
 
     public function hasDeploymentsInLastDays(int $days = 7): bool
     {
-        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('created_at', '>=', now()->subDays($days))->exists();
+        return ApplicationDeploymentQueue::where('application_id', $this->id)
+            ->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value)
+            ->where('created_at', '>=', now()->subDays($days))
+            ->exists();
     }
 
     /**
@@ -1646,6 +1664,7 @@ class Application extends BaseModel
                 'success' => ApplicationDeploymentStatus::FINISHED->value,
                 'in progress' => ApplicationDeploymentStatus::IN_PROGRESS->value,
                 'cancelled' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+                'skipped' => ApplicationDeploymentStatus::SKIPPED->value,
             ];
 
             $deployments->where(function ($query) use ($search, $normalizedSearch, $statusAliases) {
@@ -2316,7 +2335,138 @@ class Application extends BaseModel
             return null;
         }
 
-        return '-c '.escapeshellarg("http.{$this->gitHttpsCredentialOrigin()}.extraHeader=Authorization: Basic {$this->gitHttpsCredentialBasicToken()}");
+        return '-c '.escapeshellarg($this->gitHttpsCredentialConfigValue());
+    }
+
+    private function gitHttpsCredentialConfigValue(): string
+    {
+        return "http.{$this->gitHttpsCredentialOrigin()}.extraHeader=Authorization: Basic {$this->gitHttpsCredentialBasicToken()}";
+    }
+
+    /**
+     * A `git -c` value that sends a token for every URL under scheme://host/ (host may include a port and path prefix).
+     */
+    private static function tokenInsteadOfConfig(string $scheme, string $user, string $encodedToken, string $hostAndPrefix): string
+    {
+        return "url.{$scheme}://{$user}:{$encodedToken}@{$hostAndPrefix}/.insteadOf={$scheme}://{$hostAndPrefix}/";
+    }
+
+    /**
+     * How the push evaluation reaches this repository from a helper container (no deployment, no server key).
+     */
+    public function gitAccessForAffected(): GitAccess
+    {
+        ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
+        $sshAccess = fn (string $privateKey, int|string|null $port): GitAccess => GitAccess::ssh(
+            $customRepository,
+            $privateKey,
+            $port,
+            [...gitProviderHostKeys(), ...gitKnownHostsLines($this->git_ssh_known_hosts)],
+            gitPinnedHosts(),
+        );
+
+        if ($this->deploymentType() === 'source') {
+            $url = parse_url(filter_var((string) data_get($this, 'source.html_url'), FILTER_SANITIZE_URL)) ?: [];
+            $scheme = $url['scheme'] ?? 'https';
+
+            if ($this->source instanceof GithubApp) {
+                if ($this->source->is_public) {
+                    return new GitAccess("{$this->source->html_url}/{$customRepository}");
+                }
+                $host = $url['host'] ?? '';
+                $token = rawurlencode(generateGithubInstallationToken($this->source));
+
+                return new GitAccess("{$scheme}://{$host}/{$customRepository}.git", config: [self::tokenInsteadOfConfig($scheme, 'x-access-token', $token, $host)]);
+            }
+
+            if ($this->source instanceof GitlabApp || $this->source instanceof GiteaApp) {
+                $isGitea = $this->source instanceof GiteaApp;
+                if ($this->source->isConnected()) {
+                    $token = rawurlencode($isGitea ? generateGiteaCloneToken($this->source) : generateGitlabCloneToken($this->source));
+                    $hostAndPrefix = $this->urlHostWithPort($url).rtrim($url['path'] ?? '', '/');
+
+                    return new GitAccess("{$scheme}://{$hostAndPrefix}/{$customRepository}.git", config: [self::tokenInsteadOfConfig($scheme, 'oauth2', $token, $hostAndPrefix)]);
+                }
+                $privateKey = ($isGitea ? giteaAppPrivateKey($this->source) : gitlabAppPrivateKey($this->source))?->private_key;
+                if ($privateKey) {
+                    return $sshAccess($privateKey, $this->source->custom_port ?? 22);
+                }
+            }
+
+            return new GitAccess($customRepository);
+        }
+
+        if ($this->deploymentType() === 'deploy_key') {
+            $privateKey = data_get($this, 'private_key.private_key');
+            if (is_null($privateKey)) {
+                throw new RuntimeException('Private key not found. Please add a private key to the application and try again.');
+            }
+
+            return $sshAccess($privateKey, $customPort);
+        }
+
+        return new GitAccess($customRepository, config: $this->usesGitHttpsCredential() ? [$this->gitHttpsCredentialConfigValue()] : []);
+    }
+
+    /**
+     * True when the application can use only part of its repository, so push evaluation can pay off (spec §2.1).
+     */
+    public function isNarrowable(): bool
+    {
+        if (filled($this->base_directory) && trim($this->base_directory, '/') !== '') {
+            return true;
+        }
+
+        $location = match ($this->build_pack) {
+            'dockerfile' => $this->dockerfile_location,
+            'dockercompose' => $this->docker_compose_location,
+            default => null,
+        };
+        if (filled($location) && str_contains(trim($location, '/'), '/')) {
+            return true;
+        }
+
+        $commands = implode("\n", array_filter([
+            $this->install_command, $this->build_command, $this->start_command,
+            $this->docker_compose_custom_build_command, $this->docker_compose_custom_start_command,
+        ]));
+        if ($commands !== '' && preg_match(self::WORKSPACE_SELECTOR_PATTERN, $commands) === 1) {
+            return true;
+        }
+
+        $teamId = data_get($this, 'environment.project.team_id');
+
+        // Every application of the team counts, also those the member has no grant for: webhooks see them all.
+        return $teamId !== null && app(AccessResolver::class)->withoutVisibilityScope(fn (): bool => self::query()
+            ->whereKeyNot($this->id)
+            ->where('git_repository', $this->git_repository)
+            ->where('git_branch', $this->git_branch)
+            ->whereHas('environment.project', fn ($query) => $query->where('team_id', $teamId))
+            ->exists());
+    }
+
+    /**
+     * The coolify.json path of this application's environment link when that file lives in this repository and branch.
+     *
+     * @return list<string>
+     */
+    public function managedConfigPaths(): array
+    {
+        if ($this->config_key === null || $this->environment_id === null) {
+            return [];
+        }
+
+        $link = EnvironmentConfigLink::query()->where('environment_id', $this->environment_id)->first();
+        if (! $link || blank($link->file_path)) {
+            return [];
+        }
+
+        $normalize = fn (?string $repository): string => strtolower(preg_replace('/\.git\z/', '', trim((string) $repository, '/')));
+        if ($normalize($link->repository) !== $normalize($this->git_repository) || ($link->branch !== null && $link->branch !== $this->git_branch)) {
+            return [];
+        }
+
+        return [ltrim($link->file_path, '/')];
     }
 
     /**
@@ -3477,6 +3627,14 @@ class Application extends BaseModel
             $this->watch_paths = $normalized;
             $this->save();
         }
+    }
+
+    /**
+     * The watch paths as isWatchPathsTriggered() matches them (normalized once more), without saving.
+     */
+    public function effectiveWatchPaths(): ?string
+    {
+        return is_null($this->watch_paths) ? null : $this->parseWatchPaths($this->watch_paths);
     }
 
     public function isWatchPathsTriggered(Collection $modified_files): bool

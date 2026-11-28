@@ -48,6 +48,7 @@ use Symfony\Component\Yaml\Yaml;
         'is_git_shallow_clone_enabled' => ['type' => 'boolean'],
         'is_pr_deployments_public_enabled' => ['type' => 'boolean'],
         'is_pr_deployments_public_approval_required' => ['type' => 'boolean', 'description' => 'Fork pull request previews wait for an admin to approve each commit.'],
+        'is_smart_triggers_enabled' => ['type' => 'boolean', 'description' => 'Deploy on a Git push only when files this application uses change.'],
         'use_production_values_in_previews' => ['type' => 'boolean', 'description' => 'Copy the value of a new production environment variable to its preview copy. When false, the preview copy is empty and previews do not get preview variables that still have the production value.'],
         'use_build_secrets' => ['type' => 'boolean'],
         'redact_all_env_values_in_logs' => ['type' => 'boolean', 'description' => 'Hide every environment variable value in logs. When false, only locked values are hidden.'],
@@ -116,6 +117,7 @@ class ApplicationSetting extends Model
         'is_image_scan_enabled' => 'boolean',
         'image_builds_by_team' => 'boolean',
         'is_auto_cancel_queued_deployments_enabled' => 'boolean',
+        'is_smart_triggers_enabled' => 'boolean',
         'is_auto_cancel_building_deployments_enabled' => 'boolean',
     ];
 
@@ -169,6 +171,7 @@ class ApplicationSetting extends Model
         'stop_grace_period',
         'rolling_update_drain_seconds',
         'is_auto_cancel_queued_deployments_enabled',
+        'is_smart_triggers_enabled',
         'is_auto_cancel_building_deployments_enabled',
     ];
 

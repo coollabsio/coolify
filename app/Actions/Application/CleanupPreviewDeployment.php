@@ -8,6 +8,7 @@ use App\Jobs\SyncGithubDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Services\DeployTriggers\ClosedPullRequests;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class CleanupPreviewDeployment
@@ -32,6 +33,8 @@ class CleanupPreviewDeployment
         int $pull_request_id,
         ?ApplicationPreview $preview = null
     ): array {
+        ClosedPullRequests::markClosed($application, $pull_request_id);
+
         $result = [
             'cancelled_deployments' => 0,
             'killed_containers' => 0,

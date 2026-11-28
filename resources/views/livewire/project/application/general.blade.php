@@ -8,7 +8,7 @@
 }">
     <form wire:submit='submit' class="application-settings-form flex flex-col">
         <x-unsaved-bar action="submit"
-            targets="name,description,buildPack,staticImage,baseDirectory,dockerComposeLocation,dockerComposeCustomBuildCommand,dockerComposeCustomStartCommand,watchPaths,dockerfileLocation,dockerfileTargetBuild,publishDirectory,installCommand,buildCommand,startCommand,customNginxConfiguration,dockerfile,dockerRegistryImageName,dockerRegistryImageTag,portsExposes,portsMappings,customNetworkAliases,customDockerRunOptions,httpBasicAuthUsername,httpBasicAuthPassword,ipAllowlist,preDeploymentCommand,preDeploymentCommandContainer,postDeploymentCommand,postDeploymentCommandContainer,isContainerLabelReadonlyEnabled,isContainerLabelEscapeEnabled,customLabels" />
+            targets="name,description,buildPack,staticImage,baseDirectory,dockerComposeLocation,dockerComposeCustomBuildCommand,dockerComposeCustomStartCommand,dockerfileLocation,dockerfileTargetBuild,publishDirectory,installCommand,buildCommand,startCommand,customNginxConfiguration,dockerfile,dockerRegistryImageName,dockerRegistryImageTag,portsExposes,portsMappings,customNetworkAliases,customDockerRunOptions,httpBasicAuthUsername,httpBasicAuthPassword,ipAllowlist,preDeploymentCommand,preDeploymentCommandContainer,postDeploymentCommand,postDeploymentCommandContainer,isContainerLabelReadonlyEnabled,isContainerLabelEscapeEnabled,customLabels" />
         <div class="application-settings-grid flex flex-col gap-6">
             <x-project-config.readonly-notice :resource="$application" />
             @if (app(\App\Services\ProjectConfig\UnlinkedConfigFileHint::class)->shows($application))
@@ -284,14 +284,6 @@
                                             </div>
                                         @endif
                                 </div>
-                                @if ($this->application->supportsWatchPaths())
-                                    <div class="pt-4">
-                                        <x-forms.textarea
-                                            helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
-                                            placeholder="services/api/**" id="watchPaths" label="Watch paths"
-                                            x-bind:disabled="shouldDisable()" />
-                                    </div>
-                                @endif
                             </div>
                         @else
                             <x-forms.repository-paths class="lg:grid-cols-2" base="baseDirectory"
@@ -307,14 +299,6 @@
                                     @endif
                                 @endif
                             </x-forms.repository-paths>
-                            @if ($this->application->supportsWatchPaths())
-                                <div class="pb-4">
-                                    <x-forms.textarea
-                                        helper="Order-based pattern matching to filter Git webhook deployments. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins."
-                                        placeholder="src/pages/**" id="watchPaths" label="Watch paths"
-                                        x-bind:disabled="!canUpdate" />
-                                </div>
-                            @endif
                             @if ($application->could_set_build_commands() && ($buildPack === 'nixpacks' || $buildPack === 'railpack'))
                                 <div class="grid gap-4 lg:grid-cols-3">
                                     <x-forms.input helper="If you modify this, you probably need to have a {{ $buildPack === 'railpack' ? 'railpack.json' : 'nixpacks.toml' }}"
@@ -354,6 +338,12 @@
                     </div>
                 @endif
             </div>
+            @if (! $application->is_archive_source && $application->build_pack !== 'dockerimage' && $this->application->supportsWatchPaths())
+                <x-application.settings-subsection id="deploy-triggers-section" title="Deploy triggers"
+                    helper="Which Git pushes deploy this application.">
+                    <livewire:project.application.deploy-triggers :application="$application" wire:key="deploy-triggers-{{ $application->uuid }}" />
+                </x-application.settings-subsection>
+            @endif
             @if ($isStatic || $buildPack === 'static')
                 <div class="mt-5 border-t border-neutral-200 pt-5 dark:border-white/[0.07]">
                     <div class="mb-1.5 flex items-center justify-between gap-3">

@@ -2,20 +2,25 @@
 
 namespace App\Livewire\Project\Application\Deployment;
 
+use App\Actions\Application\EnsurePullRequestPreview;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\StandaloneDocker;
+use App\Services\DeployTriggers\PullRequestContext;
 use App\Services\ImageScan\SecurityCard;
 use App\Traits\AuditsApplicationSettings;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Throwable;
 
 class Show extends Component
 {
-    use AuditsApplicationSettings;
+    use AuditsApplicationSettings, AuthorizesRequests;
 
     public Application $application;
 
@@ -75,6 +80,85 @@ class Show extends Component
             ? false
             : $this->application->settings->is_debug_enabled;
         $this->isKeepAliveOn();
+    }
+
+    /**
+     * Deploys the commit of a skipped push without evaluating it again.
+     */
+    public function deploySkippedPush()
+    {
+        try {
+            $this->authorize('deploy', $this->application);
+            $row = $this->application_deployment_queue->refresh();
+            // A preview that was skipped for another reason, such as a fork pull request, is not deployed here.
+            if ($row->status !== ApplicationDeploymentStatus::SKIPPED->value || ! is_array($row->trigger_reason)) {
+                $this->dispatch('error', 'Only a push that deploy triggers skipped can be deployed anyway.');
+
+                return;
+            }
+            if (data_get($row->trigger_reason, 'pull_request_closed')) {
+                $this->dispatch('error', 'The pull request is closed.');
+
+                return;
+            }
+            if (! $this->isNewestDeployment()) {
+                $this->dispatch('error', 'A newer deployment exists.');
+
+                return;
+            }
+
+            $pullRequestId = (int) $row->pull_request_id;
+            $gitType = $row->git_type;
+            if ($pullRequestId > 0) {
+                // Deploy triggers evaluate only pull requests from the same repository.
+                $existing = ApplicationPreview::query()->where('application_id', $this->application->id)->where('pull_request_id', $pullRequestId)->first();
+                $gitType ??= $existing?->git_type;
+                EnsurePullRequestPreview::run($this->application, new PullRequestContext(
+                    number: $pullRequestId,
+                    targetBranch: (string) $this->application->git_branch,
+                    isFork: (bool) $existing?->is_fork_pull_request,
+                    gitType: (string) $gitType,
+                    htmlUrl: $existing?->pull_request_html_url ?? data_get($row->trigger_reason, 'pull_request_html_url'),
+                ), $row->commit);
+            }
+
+            $deploymentUuid = new_public_id();
+            $result = queue_application_deployment(
+                application: $this->application,
+                deployment_uuid: $deploymentUuid,
+                pull_request_id: $pullRequestId,
+                commit: $row->commit,
+                git_type: $gitType,
+            );
+            if ($result['status'] === 'queue_full') {
+                $this->dispatch('error', 'Deployment queue full', $result['message']);
+
+                return;
+            }
+
+            return redirectRoute($this, 'project.application.deployment.show', [
+                'project_uuid' => $this->application->environment->project->uuid,
+                'environment_uuid' => $this->application->environment->uuid,
+                'application_uuid' => $this->application->uuid,
+                'deployment_uuid' => $result['deployment_uuid'] ?? $deploymentUuid,
+            ]);
+        } catch (Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    /**
+     * Only the newest row of the application or pull request can deploy anyway: an older commit would roll back.
+     */
+    #[Computed]
+    public function isNewestDeployment(): bool
+    {
+        $latestId = ApplicationDeploymentQueue::query()
+            ->where('application_id', $this->application->id)
+            ->where('pull_request_id', $this->application_deployment_queue->pull_request_id)
+            ->max('id');
+
+        return (int) $latestId === (int) $this->application_deployment_queue->id;
     }
 
     /**

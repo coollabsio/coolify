@@ -153,6 +153,17 @@
                 </x-application.settings-subsection>
             </x-application.settings-section>
 
+            <x-application.settings-section id="deployments-section" title="Deployments">
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <x-forms.listbox id="is_smart_triggers_enabled" label="Smart deploy triggers"
+                        helper="Deploy on a Git push only when files an application uses change. Turned off, every push deploys every application that has no watch paths."
+                        onChange="instantSave" :options="[
+                            ['value' => true, 'label' => 'Enabled'],
+                            ['value' => false, 'label' => 'Disabled'],
+                        ]" />
+                </div>
+            </x-application.settings-section>
+
             <x-application.settings-section id="interface-section" title="Interface and telemetry">
                 <div class="grid gap-4 lg:grid-cols-2">
                     <x-forms.listbox id="is_wire_navigate_enabled" label="Navigation"

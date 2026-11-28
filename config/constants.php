@@ -10,6 +10,9 @@ return [
     'coolify' => [
         'version' => env('COOLIFY_VERSION') ?: $release['stable']['coolify'],
         'helper_version' => $upstream['helper']['version'],
+        'push_evaluation' => [
+            'max_mirror_bytes' => (int) env('PUSH_EVALUATION_MAX_MIRROR_BYTES', 2147483648),
+        ],
         'railpack_version' => '0.43.0',
         'self_hosted' => env('SELF_HOSTED', true),
         'autoupdate' => env('AUTOUPDATE'),

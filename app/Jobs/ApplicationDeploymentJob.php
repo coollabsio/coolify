@@ -28,6 +28,7 @@ use App\Notifications\Application\DeploymentSuccess;
 use App\Notifications\Application\PreviewApprovalRequired;
 use App\Services\ComposeIncludeFlattener;
 use App\Services\DeploymentConfiguration\ApplicationConfigurationSnapshot;
+use App\Services\DeployTriggers\TriggerRecorder;
 use App\Services\ImageScan\DeploymentImageScan;
 use App\Services\ProjectConfig\UnlinkedConfigFileHint;
 use App\Support\RemoteSecretReferences;
@@ -196,6 +197,8 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     private ?string $git_type = null;
 
     private bool $only_this_server = false;
+
+    private bool $missedAdditionalDestination = false;
 
     private string $container_name;
 
@@ -4214,6 +4217,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 continue;
             }
             if ($result['status'] !== 'queued') {
+                $this->missedAdditionalDestination = true;
                 $this->application_deployment_queue->addLogEntry("Deployment to {$server->name} was not queued: {$result['message']}", 'stderr');
 
                 continue;
@@ -4494,6 +4498,18 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             );
         }
         $this->detectUnlinkedConfigFile();
+    }
+
+    /**
+     * Moves the trigger base commit once every destination of this deployment finished.
+     */
+    private function recordTriggerBase(): void
+    {
+        try {
+            app(TriggerRecorder::class)->recordSuccessfulDeployment($this->application_deployment_queue->refresh());
+        } catch (Throwable $e) {
+            \Log::warning('Failed to record the trigger base commit for deployment '.$this->deployment_uuid.': '.$e->getMessage());
+        }
     }
 
     private function detectUnlinkedConfigFile(): void
@@ -7802,12 +7818,20 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         event(new ApplicationConfigurationChanged($this->application->team()->id));
 
         if (filled($this->application_deployment_queue->parent_deployment_uuid)) {
+            if (Cache::has("deploy-triggers:destinations-queued:{$this->application_deployment_queue->parent_deployment_uuid}")) {
+                $this->recordTriggerBase();
+            }
             $this->sendMultiServerDeploymentNotification($this->application_deployment_queue->parent_deployment_uuid);
 
             return;
         }
 
         $queuedAdditionalDeployments = $this->only_this_server ? 0 : $this->deploy_to_additional_destinations();
+        // The base moves only when every destination got this commit; children check the marker.
+        if (! $this->missedAdditionalDestination) {
+            Cache::put("deploy-triggers:destinations-queued:{$this->deployment_uuid}", true, now()->addDay());
+            $this->recordTriggerBase();
+        }
         if ($queuedAdditionalDeployments === 0) {
             $this->sendDeploymentNotification(DeploymentSuccess::class);
 

@@ -48,6 +48,7 @@ class ApplicationPreview extends BaseModel
         'is_fork_pull_request' => 'boolean',
         'approved_at' => 'datetime',
         'keeps_production_values' => 'boolean',
+        'trigger_set' => 'array',
         'is_same_repository' => 'boolean',
     ];
 

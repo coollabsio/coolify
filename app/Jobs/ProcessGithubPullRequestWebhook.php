@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Application\CleanupPreviewDeployment;
+use App\Actions\Application\EnsurePullRequestPreview;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProcessStatus;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
@@ -10,6 +11,11 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\GithubApp;
+use App\Services\DeployTriggers\ClosedPullRequests;
+use App\Services\DeployTriggers\PullRequestContext;
+use App\Services\DeployTriggers\PushContext;
+use App\Services\DeployTriggers\PushTriggerRouter;
+use App\Services\DeployTriggers\TriggerRoute;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -62,6 +68,11 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
+        // A late update of a closed pull request must not deploy it again, only an open or a reopen does.
+        if ($this->action === 'opened' || $this->action === 'reopened') {
+            ClosedPullRequests::clear($application->id, $this->pullRequestId);
+        }
+
         if ($this->action === 'opened' || $this->action === 'synchronize' || $this->action === 'reopened') {
             $this->handleOpenAction($application, $githubApp);
         }
@@ -81,6 +92,9 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
             } finally {
                 CleanupPreviewDeployment::run($application, $this->pullRequestId, $found);
             }
+        } else {
+            // An evaluation of the pull request may still wait to create its first preview.
+            ClosedPullRequests::markClosed($application, $this->pullRequestId);
         }
     }
 
@@ -122,15 +136,44 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
             return;
         }
 
-        // Get changed files for watch path filtering (null means the full list is unknown)
-        $changed_files = [];
+        $pullRequest = new PullRequestContext(
+            number: $this->pullRequestId,
+            targetBranch: (string) $application->git_branch,
+            isFork: $this->isForkPullRequest,
+            gitType: 'github',
+            htmlUrl: $this->pullRequestHtmlUrl,
+            title: $this->pullRequestTitle,
+        );
 
-        if ($this->action === 'synchronize' && $this->beforeSha && $this->afterSha) {
-            // For synchronize events, get files changed between before and after commits
-            $changed_files = getGithubCommitRangeFiles($githubApp, $owner, $repo, $this->beforeSha, $this->afterSha);
-        } elseif ($this->action === 'opened' || $this->action === 'reopened') {
-            // For opened/reopened events, get all files in the PR
-            $changed_files = getGithubPullRequestFiles($githubApp, $owner, $repo, $this->pullRequestId);
+        // Get changed files for watch path filtering (null means the full list is unknown)
+        $changed_files = null;
+        if (! blank($application->watch_paths)) {
+            if ($this->action === 'synchronize' && $this->beforeSha && $this->afterSha) {
+                $changed_files = getGithubCommitRangeFiles($githubApp, $owner, $repo, $this->beforeSha, $this->afterSha);
+            } elseif ($this->action === 'opened' || $this->action === 'reopened') {
+                $changed_files = getGithubPullRequestFiles($githubApp, $owner, $repo, $this->pullRequestId);
+            }
+        }
+
+        if (! $this->isForkPullRequest) {
+            $router = PushTriggerRouter::forPush(new PushContext(
+                provider: $githubApp ? 'github' : 'github_manual',
+                teamId: 0,
+                repositoryUrl: rtrim($githubApp?->html_url ?? 'https://github.com', '/').'/'.$this->fullName,
+                ref: "refs/pull/{$this->pullRequestId}/head",
+                after: $this->commitSha,
+                before: $this->beforeSha,
+                githubAppId: $githubApp?->id,
+                repositoryFullName: $this->fullName,
+                payloadChangedFiles: $changed_files,
+                pullRequest: $pullRequest,
+            ));
+            if ($router->route($application) === TriggerRoute::Evaluate) {
+                $router->defer($application);
+                $router->dispatch();
+
+                return;
+            }
         }
 
         // Apply watch path filtering
@@ -155,34 +198,7 @@ class ProcessGithubPullRequestWebhook implements ShouldBeEncrypted, ShouldQueue
             }
         }
 
-        // Create ApplicationPreview if not exists
-        $found = ApplicationPreview::where('application_id', $application->id)
-            ->where('pull_request_id', $this->pullRequestId)
-            ->first();
-
-        if (! $found) {
-            if ($application->build_pack === 'dockercompose') {
-                $preview = ApplicationPreview::create([
-                    'git_type' => 'github',
-                    'application_id' => $application->id,
-                    'pull_request_id' => $this->pullRequestId,
-                    'pull_request_html_url' => $this->pullRequestHtmlUrl,
-                    'docker_compose_domains' => $application->docker_compose_domains,
-                ]);
-                $preview->generate_preview_fqdn_compose();
-            } else {
-                $preview = ApplicationPreview::create([
-                    'git_type' => 'github',
-                    'application_id' => $application->id,
-                    'pull_request_id' => $this->pullRequestId,
-                    'pull_request_html_url' => $this->pullRequestHtmlUrl,
-                ]);
-                $preview->generate_preview_fqdn();
-            }
-        }
-
-        ($found ?? $preview)->recordSameRepository(! $this->isForkPullRequest);
-        ($found ?? $preview)->markForkPullRequest($this->isForkPullRequest, $this->commitSha);
+        EnsurePullRequestPreview::run($application, $pullRequest, $this->commitSha);
 
         // Queue the deployment
         $deployment_uuid = new_public_id();

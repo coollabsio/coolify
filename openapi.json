@@ -1129,6 +1129,10 @@
                                         "type": "boolean",
                                         "description": "Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true."
                                     },
+                                    "is_smart_triggers_enabled": {
+                                        "type": "boolean",
+                                        "description": "Deploy on a Git push only when files this application uses change. Defaults to true."
+                                    },
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
@@ -1815,6 +1819,10 @@
                                         "type": "boolean",
                                         "description": "Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true."
                                     },
+                                    "is_smart_triggers_enabled": {
+                                        "type": "boolean",
+                                        "description": "Deploy on a Git push only when files this application uses change. Defaults to true."
+                                    },
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
@@ -2499,6 +2507,10 @@
                                     "is_image_scan_enabled": {
                                         "type": "boolean",
                                         "description": "Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true."
+                                    },
+                                    "is_smart_triggers_enabled": {
+                                        "type": "boolean",
+                                        "description": "Deploy on a Git push only when files this application uses change. Defaults to true."
                                     },
                                     "custom_internal_name": {
                                         "type": "string",
@@ -3186,6 +3198,10 @@
                                         "type": "boolean",
                                         "description": "Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true."
                                     },
+                                    "is_smart_triggers_enabled": {
+                                        "type": "boolean",
+                                        "description": "Deploy on a Git push only when files this application uses change. Defaults to true."
+                                    },
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
@@ -3762,6 +3778,10 @@
                                         "type": "boolean",
                                         "description": "Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true."
                                     },
+                                    "is_smart_triggers_enabled": {
+                                        "type": "boolean",
+                                        "description": "Deploy on a Git push only when files this application uses change. Defaults to true."
+                                    },
                                     "custom_internal_name": {
                                         "type": "string",
                                         "nullable": true,
@@ -4317,6 +4337,10 @@
                                     "is_image_scan_enabled": {
                                         "type": "boolean",
                                         "description": "Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true."
+                                    },
+                                    "is_smart_triggers_enabled": {
+                                        "type": "boolean",
+                                        "description": "Deploy on a Git push only when files this application uses change. Defaults to true."
                                     },
                                     "custom_internal_name": {
                                         "type": "string",
@@ -5265,6 +5289,10 @@
                                     "is_image_scan_enabled": {
                                         "type": "boolean",
                                         "description": "Scan the images of the application for vulnerabilities. Needs image scanning on the server. Default true."
+                                    },
+                                    "is_smart_triggers_enabled": {
+                                        "type": "boolean",
+                                        "description": "Deploy on a Git push only when files this application uses change. Defaults to true."
                                     },
                                     "custom_internal_name": {
                                         "type": "string",
@@ -32619,6 +32647,11 @@
                         "nullable": true,
                         "description": "Comma-separated IP addresses or CIDR ranges allowed to reach the application through the proxy. Empty allows everyone."
                     },
+                    "trigger_set": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "The paths whose changes deploy the application on a Git push, as smart deploy triggers resolved them: display, limits, resolvers, anchor, widened, and evaluated_commit."
+                    },
                     "settings": {
                         "$ref": "#\/components\/schemas\/ApplicationSetting"
                     }
@@ -32663,7 +32696,31 @@
                         "type": "string"
                     },
                     "status": {
-                        "type": "string"
+                        "type": "string",
+                        "enum": [
+                            "queued",
+                            "in_progress",
+                            "finished",
+                            "failed",
+                            "cancelled-by-user",
+                            "skipped"
+                        ],
+                        "description": "A skipped row records Git pushes that were not deployed, for example because no changed file affects the application. `trigger_reason` is set when deploy triggers skipped them."
+                    },
+                    "trigger_reason": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "Why smart deploy triggers deployed or skipped the push: reason_code, reason, matches, and pull_request_closed when the pull request of a skipped push closed."
+                    },
+                    "skipped_count": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "How many pushes a skipped row stands for. Null for rows that deploy triggers did not skip."
+                    },
+                    "first_skipped_commit": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The first commit of the pushes a skipped row stands for."
                     },
                     "is_webhook": {
                         "type": "boolean"
@@ -32840,6 +32897,10 @@
                     "is_pr_deployments_public_approval_required": {
                         "type": "boolean",
                         "description": "Fork pull request previews wait for an admin to approve each commit."
+                    },
+                    "is_smart_triggers_enabled": {
+                        "type": "boolean",
+                        "description": "Deploy on a Git push only when files this application uses change."
                     },
                     "use_production_values_in_previews": {
                         "type": "boolean",

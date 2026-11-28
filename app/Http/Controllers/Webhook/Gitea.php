@@ -3,17 +3,22 @@
 namespace App\Http\Controllers\Webhook;
 
 use App\Actions\Application\CleanupPreviewDeployment;
+use App\Actions\Application\EnsurePullRequestPreview;
 use App\Exceptions\InvalidWebhookPayloadException;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Webhook\Concerns\DetectsSkipDeployCommits;
 use App\Http\Controllers\Webhook\Concerns\MatchesManualWebhookApplications;
 use App\Http\Controllers\Webhook\Concerns\ReadsWebhookPushPayload;
 use App\Http\Controllers\Webhook\Concerns\RoutesConfigPushes;
+use App\Http\Controllers\Webhook\Concerns\RoutesPushTriggers;
 use App\Http\Controllers\Webhook\Concerns\ValidatesPreviewDeploymentRepository;
 use App\Livewire\Source\Gitea\Change as GiteaSource;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GiteaApp;
+use App\Services\DeployTriggers\ClosedPullRequests;
+use App\Services\DeployTriggers\PullRequestContext;
+use App\Services\DeployTriggers\PushTriggerRouter;
 use App\Services\ServerTransfer\TransferFinishChecklist;
 use Exception;
 use Illuminate\Http\Request;
@@ -27,6 +32,7 @@ class Gitea extends Controller
     use MatchesManualWebhookApplications;
     use ReadsWebhookPushPayload;
     use RoutesConfigPushes;
+    use RoutesPushTriggers;
     use ValidatesPreviewDeploymentRepository;
 
     public function redirect(Request $request)
@@ -158,6 +164,7 @@ class Gitea extends Controller
 
                 $applications = $applications->where('git_branch', $branch)->get();
                 $changed_files = $this->webhookPushChangedFiles($payload);
+                $triggers = PushTriggerRouter::forPush($this->genericPushContext('gitea', $this->webhookString(data_get($payload, 'repository.html_url')) ?? $this->webhookString(data_get($payload, 'repository.full_name')), $branch, $commit ?? null, $this->webhookCommitSha($payload, 'before'), $this->webhookPushCommitMessages($payload)[0] ?? null, $changed_files));
                 $skip_deploy_commits = self::shouldSkipDeploy($this->webhookPushCommitMessages($payload));
 
                 foreach ($applications as $application) {
@@ -181,7 +188,7 @@ class Gitea extends Controller
                         continue;
                     }
 
-                    if (! $this->webhookPushMatchesWatchPaths($application, $changed_files)) {
+                    if (! $this->webhookPushMatchesWatchPaths($application, $changed_files, $triggers ?? null)) {
                         $return_payloads->push([
                             'application' => $application->name,
                             'status' => 'failed',
@@ -201,6 +208,9 @@ class Gitea extends Controller
                         continue;
                     }
 
+                    if (isset($triggers) && $this->deferPushIfEvaluated($triggers, $application, $return_payloads)) {
+                        continue;
+                    }
                     $deployment_uuid = new_public_id();
                     $result = queue_application_deployment(
                         application: $application,
@@ -211,6 +221,8 @@ class Gitea extends Controller
                     );
 
                     if ($result['status'] === 'queue_full') {
+                        $this->dispatchPushTriggers($triggers ?? null, $previewTriggers ?? null);
+
                         return response($result['message'], 429)->header('Retry-After', 60);
                     }
 
@@ -262,6 +274,9 @@ class Gitea extends Controller
                     }
 
                     if (in_array($action, ['opened', 'synchronized', 'reopened'], true)) {
+                        if ($action !== 'synchronized') {
+                            ClosedPullRequests::clear($application->id, $pull_request_id);
+                        }
                         if (! $application->isPRDeployable()) {
                             $return_payloads->push([
                                 'application' => $application->name,
@@ -291,38 +306,19 @@ class Gitea extends Controller
                             continue;
                         }
 
-                        $deployment_uuid = new_public_id();
-                        $found = ApplicationPreview::where('application_id', $application->id)
-                            ->where('pull_request_id', $pull_request_id)
-                            ->first();
-
-                        if (! $found) {
-                            if ($application->build_pack === 'dockercompose') {
-                                $pr_app = ApplicationPreview::create([
-                                    'git_type' => 'gitea',
-                                    'application_id' => $application->id,
-                                    'pull_request_id' => $pull_request_id,
-                                    'pull_request_html_url' => $pull_request_html_url ?? '',
-                                    'docker_compose_domains' => $application->docker_compose_domains,
-                                ]);
-                                $pr_app->generate_preview_fqdn_compose();
-                            } else {
-                                $pr_app = ApplicationPreview::create([
-                                    'git_type' => 'gitea',
-                                    'application_id' => $application->id,
-                                    'pull_request_id' => $pull_request_id,
-                                    'pull_request_html_url' => $pull_request_html_url ?? '',
-                                ]);
-                                $pr_app->generate_preview_fqdn();
-                            }
-                        }
-
-                        $isFork = $this->isForkPreviewRepository(
-                            data_get($payload, 'pull_request.head.repo.id'),
-                            data_get($payload, 'pull_request.base.repo.id'),
+                        $pullRequestContext = new PullRequestContext(
+                            number: $pull_request_id,
+                            targetBranch: $base_branch,
+                            isFork: $this->isForkPreviewRepository(data_get($payload, 'pull_request.head.repo.id'), data_get($payload, 'pull_request.base.repo.id')),
+                            gitType: 'gitea',
+                            htmlUrl: $pull_request_html_url ?? null,
                         );
-                        ($found ?? $pr_app)->recordSameRepository(! $isFork);
-                        ($found ?? $pr_app)->markForkPullRequest($isFork, $commit ?? null);
+                        $previewTriggers ??= PushTriggerRouter::forPush($this->pullRequestPushContext('gitea', $this->webhookString(data_get($payload, 'repository.html_url')) ?? $this->webhookString(data_get($payload, 'repository.full_name')), "refs/pull/{$pull_request_id}/head", $commit ?? null, $pullRequestContext));
+                        if ($this->deferPushIfEvaluated($previewTriggers, $application, $return_payloads)) {
+                            continue;
+                        }
+                        $deployment_uuid = new_public_id();
+                        EnsurePullRequestPreview::run($application, $pullRequestContext, $commit ?? null);
 
                         $result = queue_application_deployment(
                             application: $application,
@@ -335,6 +331,8 @@ class Gitea extends Controller
                         );
 
                         if ($result['status'] === 'queue_full') {
+                            $this->dispatchPushTriggers($triggers ?? null, $previewTriggers ?? null);
+
                             return response($result['message'], 429)->header('Retry-After', 60);
                         }
 
@@ -355,10 +353,14 @@ class Gitea extends Controller
                                 'status' => 'success',
                                 'message' => 'Preview deployment closed.',
                             ]);
+                        } else {
+                            ClosedPullRequests::markClosed($application, $pull_request_id);
                         }
                     }
                 }
             }
+
+            $this->dispatchPushTriggers($triggers ?? null, $previewTriggers ?? null);
 
             return response($return_payloads);
         } catch (InvalidWebhookPayloadException $e) {
@@ -368,6 +370,9 @@ class Gitea extends Controller
             ]);
         } catch (Exception $e) {
             return handleError($e);
+        } finally {
+            // Deferred applications are evaluated also when a later application failed.
+            $this->dispatchPushTriggers($triggers ?? null, $previewTriggers ?? null);
         }
     }
 
@@ -397,6 +402,7 @@ class Gitea extends Controller
                 $full_name = data_get($payload, 'repository.full_name');
                 $commit = $this->webhookCommitSha($payload, 'after');
                 $changed_files = $this->webhookPushChangedFiles($payload);
+                $triggers = PushTriggerRouter::forPush($this->genericPushContext('gitea', $this->webhookString(data_get($payload, 'repository.html_url')) ?? $this->webhookString(data_get($payload, 'repository.full_name')), $branch, $commit ?? null, $this->webhookCommitSha($payload, 'before'), $this->webhookPushCommitMessages($payload)[0] ?? null, $changed_files));
                 $skip_deploy_commits = self::shouldSkipDeploy($this->webhookPushCommitMessages($payload));
             }
             if ($x_gitea_event === 'pull_request') {
@@ -483,7 +489,7 @@ class Gitea extends Controller
                 }
                 if ($x_gitea_event === 'push') {
                     if ($application->isDeployable()) {
-                        if ($this->webhookPushMatchesWatchPaths($application, $changed_files)) {
+                        if ($this->webhookPushMatchesWatchPaths($application, $changed_files, $triggers ?? null)) {
                             if ($skip_deploy_commits ?? false) {
                                 $return_payloads->push([
                                     'application' => $application->name,
@@ -495,6 +501,9 @@ class Gitea extends Controller
 
                                 continue;
                             }
+                            if (isset($triggers) && $this->deferPushIfEvaluated($triggers, $application, $return_payloads)) {
+                                continue;
+                            }
                             $deployment_uuid = new_public_id();
                             $result = queue_application_deployment(
                                 application: $application,
@@ -504,6 +513,8 @@ class Gitea extends Controller
                                 is_webhook: true,
                             );
                             if ($result['status'] === 'queue_full') {
+                                $this->dispatchPushTriggers($triggers ?? null, $previewTriggers ?? null);
+
                                 return response($result['message'], 429)->header('Retry-After', 60);
                             } elseif ($result['status'] === 'skipped') {
                                 $return_payloads->push([
@@ -552,6 +563,9 @@ class Gitea extends Controller
                 }
                 if ($x_gitea_event === 'pull_request') {
                     if ($action === 'opened' || $action === 'synchronized' || $action === 'reopened') {
+                        if ($action !== 'synchronized') {
+                            ClosedPullRequests::clear($application->id, $pull_request_id);
+                        }
                         if ($application->isPRDeployable()) {
                             if (! $this->isPreviewDeploymentRepositoryTrusted(
                                 data_get($payload, 'pull_request.head.repo.id'),
@@ -571,34 +585,19 @@ class Gitea extends Controller
 
                                 continue;
                             }
-                            $deployment_uuid = new_public_id();
-                            $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
-                            if (! $found) {
-                                if ($application->build_pack === 'dockercompose') {
-                                    $pr_app = ApplicationPreview::create([
-                                        'git_type' => 'gitea',
-                                        'application_id' => $application->id,
-                                        'pull_request_id' => $pull_request_id,
-                                        'pull_request_html_url' => $pull_request_html_url ?? '',
-                                        'docker_compose_domains' => $application->docker_compose_domains,
-                                    ]);
-                                    $pr_app->generate_preview_fqdn_compose();
-                                } else {
-                                    $pr_app = ApplicationPreview::create([
-                                        'git_type' => 'gitea',
-                                        'application_id' => $application->id,
-                                        'pull_request_id' => $pull_request_id,
-                                        'pull_request_html_url' => $pull_request_html_url ?? '',
-                                    ]);
-                                    $pr_app->generate_preview_fqdn();
-                                }
-                            }
-                            $isFork = $this->isForkPreviewRepository(
-                                data_get($payload, 'pull_request.head.repo.id'),
-                                data_get($payload, 'pull_request.base.repo.id'),
+                            $pullRequestContext = new PullRequestContext(
+                                number: $pull_request_id,
+                                targetBranch: $base_branch,
+                                isFork: $this->isForkPreviewRepository(data_get($payload, 'pull_request.head.repo.id'), data_get($payload, 'pull_request.base.repo.id')),
+                                gitType: 'gitea',
+                                htmlUrl: $pull_request_html_url ?? null,
                             );
-                            ($found ?? $pr_app)->recordSameRepository(! $isFork);
-                            ($found ?? $pr_app)->markForkPullRequest($isFork, $commit ?? null);
+                            $previewTriggers ??= PushTriggerRouter::forPush($this->pullRequestPushContext('gitea', $this->webhookString(data_get($payload, 'repository.html_url')) ?? $this->webhookString(data_get($payload, 'repository.full_name')), "refs/pull/{$pull_request_id}/head", $commit ?? null, $pullRequestContext));
+                            if ($this->deferPushIfEvaluated($previewTriggers, $application, $return_payloads)) {
+                                continue;
+                            }
+                            $deployment_uuid = new_public_id();
+                            EnsurePullRequestPreview::run($application, $pullRequestContext, $commit ?? null);
 
                             $result = queue_application_deployment(
                                 application: $application,
@@ -610,6 +609,8 @@ class Gitea extends Controller
                                 git_type: 'gitea'
                             );
                             if ($result['status'] === 'queue_full') {
+                                $this->dispatchPushTriggers($triggers ?? null, $previewTriggers ?? null);
+
                                 return response($result['message'], 429)->header('Retry-After', 60);
                             } elseif ($result['status'] === 'skipped') {
                                 $return_payloads->push([
@@ -645,6 +646,7 @@ class Gitea extends Controller
                                 'message' => 'Preview deployment closed.',
                             ]);
                         } else {
+                            ClosedPullRequests::markClosed($application, $pull_request_id);
                             $return_payloads->push([
                                 'application' => $application->name,
                                 'status' => 'failed',
@@ -655,11 +657,16 @@ class Gitea extends Controller
                 }
             }
 
+            $this->dispatchPushTriggers($triggers ?? null, $previewTriggers ?? null);
+
             return $this->manualWebhookResponse($return_payloads, $failure_key, $failure_attempt);
         } catch (InvalidWebhookPayloadException $e) {
             return response($e->getMessage());
         } catch (Exception $e) {
             return handleError($e);
+        } finally {
+            // Deferred applications are evaluated also when a later application failed.
+            $this->dispatchPushTriggers($triggers ?? null, $previewTriggers ?? null);
         }
     }
 

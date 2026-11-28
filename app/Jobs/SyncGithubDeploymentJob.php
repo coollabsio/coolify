@@ -168,6 +168,7 @@ class SyncGithubDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ApplicationDeploymentStatus::FINISHED->value => 'success',
             ApplicationDeploymentStatus::FAILED->value => 'failure',
             ApplicationDeploymentStatus::CANCELLED_BY_USER->value => 'error',
+            ApplicationDeploymentStatus::SKIPPED->value => 'inactive',
             default => null,
         };
     }

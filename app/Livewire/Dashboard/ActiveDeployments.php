@@ -36,6 +36,14 @@ class ActiveDeployments extends Component
     ];
 
     /**
+     * Skipped pushes are not deployments, so the recent list leaves them out too.
+     */
+    private const NOT_RECENT_STATUSES = [
+        ...self::ACTIVE_STATUSES,
+        ApplicationDeploymentStatus::SKIPPED->value,
+    ];
+
+    /**
      * Not dehydrated, so it is loaded once per request and shared by both lists.
      *
      * @var Collection<int, string>|null
@@ -65,7 +73,7 @@ class ActiveDeployments extends Component
         if (DB::connection()->getDriverName() !== 'pgsql') {
             return $this->deploymentsQuery()
                 ->whereIn('application_id', $this->teamApplicationIds())
-                ->whereNotIn('status', self::ACTIVE_STATUSES)
+                ->whereNotIn('status', self::NOT_RECENT_STATUSES)
                 ->orderByDesc('id')
                 ->limit(5)
                 ->get(self::COLUMNS);
@@ -77,7 +85,7 @@ class ActiveDeployments extends Component
         $newestPerApplication = ApplicationDeploymentQueue::query()
             ->select(self::COLUMNS)
             ->whereColumn('application_id', 'team_applications.id')
-            ->whereNotIn('status', self::ACTIVE_STATUSES)
+            ->whereNotIn('status', self::NOT_RECENT_STATUSES)
             ->orderByDesc('id')
             ->limit(5);
 

@@ -41,12 +41,15 @@ class Index extends Component
     public function render(): View
     {
         // Scoped by application, like the dashboard: a transferred server keeps the old team's deployment rows.
-        $base = ApplicationDeploymentQueue::query()->ownedByTeam(currentTeam()->id);
+        $base = ApplicationDeploymentQueue::query()->ownedByTeam(currentTeam()->id)
+            ->where('status', '!=', ApplicationDeploymentStatus::SKIPPED->value);
 
         $projects = Project::ownedByCurrentTeam()->orderBy('name')->get(['id', 'name']);
         $servers = Server::ownedByCurrentTeamCached()->sortBy('name')->values();
         $sources = (clone $base)->whereNotNull('git_type')->distinct()->orderBy('git_type')->pluck('git_type');
-        $statuses = collect(ApplicationDeploymentStatus::cases())->pluck('value');
+        $statuses = collect(ApplicationDeploymentStatus::cases())
+            ->reject(fn (ApplicationDeploymentStatus $status): bool => $status === ApplicationDeploymentStatus::SKIPPED)
+            ->pluck('value');
 
         $search = trim($this->search);
 

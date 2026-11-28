@@ -235,6 +235,9 @@
                                 $statusLabel = 'Blocked';
                                 $statusType = 'error';
                             }
+                            if ($deploymentStatus === 'skipped' && (int) data_get($deployment, 'skipped_count', 1) > 1) {
+                                $statusLabel = 'Skipped · '.(int) data_get($deployment, 'skipped_count').' pushes';
+                            }
                             $pullRequestId = (int) data_get($deployment, 'pull_request_id', 0);
                             $sourceLabel = match (true) {
                                 (bool) data_get($deployment, 'is_webhook') && $pullRequestId > 0 => 'Webhook · PR #' . $pullRequestId,
@@ -257,6 +260,7 @@
                             $serverName = data_get($deployment, 'server_name') ?: data_get($application, 'destination.server.name', '-');
                             $duration = match ($deploymentStatus) {
                                 'queued' => 'Waiting',
+                                'skipped' => '-',
                                 'in_progress' => calculateDuration(data_get($deployment, 'created_at'), now()),
                                 default => data_get($deployment, 'finished_at')
                                     ? calculateDuration(data_get($deployment, 'created_at'), data_get($deployment, 'finished_at'))

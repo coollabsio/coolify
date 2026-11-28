@@ -475,8 +475,8 @@ function getGithubCommitRangeFiles(?GithubApp $source, string $owner, string $re
 {
     try {
         if (! $source) {
-            // Manual webhooks don't have GitHub App authentication
-            return [];
+            // Without a GitHub App the changed files are unknown.
+            return null;
         }
 
         $endpoint = "/repos/{$owner}/{$repo}/compare/{$beforeSha}...{$afterSha}";
@@ -495,6 +495,33 @@ function getGithubCommitRangeFiles(?GithubApp $source, string $owner, string $re
             ->values()
             ->toArray();
     } catch (Exception $e) {
+        return null;
+    }
+}
+
+/**
+ * The compare of two commits: its status (ahead, behind, diverged, identical) and changed paths (old and new for renames).
+ * Returns null on an error or when GitHub truncates the file list (300 files).
+ *
+ * @return array{status: string, files: list<string>}|null
+ */
+function getGithubCompare(GithubApp $source, string $owner, string $repo, string $base, string $head): ?array
+{
+    try {
+        $response = githubApi($source, "/repos/{$owner}/{$repo}/compare/{$base}...{$head}", 'get', null, false);
+        $status = data_get($response, 'data.status');
+        $files = collect(data_get($response, 'data.files', []));
+        if (! is_string($status) || $files->count() >= 300) {
+            return null;
+        }
+
+        return [
+            'status' => $status,
+            'files' => $files->flatMap(fn (mixed $file): array => [data_get($file, 'filename'), data_get($file, 'previous_filename')])
+                ->filter(fn (mixed $filename): bool => is_string($filename) && $filename !== '')
+                ->unique()->values()->all(),
+        ];
+    } catch (Exception) {
         return null;
     }
 }
@@ -528,8 +555,8 @@ function getGithubPullRequestFiles(?GithubApp $source, string $owner, string $re
 {
     try {
         if (! $source) {
-            // Manual webhooks don't have GitHub App authentication
-            return [];
+            // Without a GitHub App the changed files are unknown.
+            return null;
         }
 
         // GitHub returns at most 100 files per page and 3000 files per pull request.

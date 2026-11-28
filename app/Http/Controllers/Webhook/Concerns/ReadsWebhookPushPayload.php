@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Webhook\Concerns;
 
 use App\Exceptions\InvalidWebhookPayloadException;
 use App\Models\Application;
+use App\Services\DeployTriggers\PushTriggerRouter;
+use App\Services\DeployTriggers\TriggerRoute;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -193,6 +195,12 @@ trait ReadsWebhookPushPayload
             return null;
         }
 
+        // GitLab lists at most 20 commits and Gitea a configured number; the rest of the push is unknown.
+        $total = data_get($payload, 'total_commits_count') ?? data_get($payload, 'total_commits');
+        if (is_int($total) && $total > count($commits)) {
+            return null;
+        }
+
         return collect($commits)
             ->filter(fn (mixed $commit): bool => is_array($commit))
             ->flatMap(fn (array $commit): array => collect(['added', 'removed', 'modified'])
@@ -242,8 +250,13 @@ trait ReadsWebhookPushPayload
      *
      * @param  Collection<int, string>|null  $changedFiles
      */
-    protected function webhookPushMatchesWatchPaths(Application $application, ?Collection $changedFiles): bool
+    protected function webhookPushMatchesWatchPaths(Application $application, ?Collection $changedFiles, ?PushTriggerRouter $router = null): bool
     {
+        // Push evaluation decides for these applications with an exact diff.
+        if ($router?->route($application) === TriggerRoute::Evaluate) {
+            return true;
+        }
+
         if (blank($application->watch_paths) || $changedFiles === null) {
             return true;
         }

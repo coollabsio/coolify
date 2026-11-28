@@ -116,13 +116,15 @@ function fakeGithubAppPushApi(array $compareResponse): void
 
 function deployedApplicationIds(): array
 {
-    return ApplicationDeploymentQueue::query()->pluck('application_id')->map(fn (mixed $id): int => (int) $id)->sort()->values()->all();
+    return ApplicationDeploymentQueue::query()->where('status', '!=', 'skipped')->pluck('application_id')->map(fn (mixed $id): int => (int) $id)->sort()->values()->all();
 }
 
 it('checks watch paths against the net files of the push, not the files of each commit', function () {
     fakeGithubAppPushApi(['status' => 'ahead', 'files' => [['filename' => 'apps/dashboard/page.tsx']]]);
 
     sendGithubAppMergePush($this)->assertOk();
+
+    runPushedEvaluations();
 
     expect(deployedApplicationIds())->toBe([$this->dashboard->id]);
     Http::assertSent(fn (Request $request): bool => $request->url() === PUSH_WATCH_PATHS_COMPARE_URL);
@@ -135,6 +137,8 @@ it('triggers watch paths for the previous name of a renamed file', function () {
 
     sendGithubAppMergePush($this)->assertOk();
 
+    runPushedEvaluations();
+
     expect(deployedApplicationIds())->toBe([$this->payments->id]);
 });
 
@@ -143,6 +147,8 @@ it('uses the files of the pushed commits when the compare API fails', function (
 
     sendGithubAppMergePush($this)->assertOk();
 
+    runPushedEvaluations();
+
     expect(deployedApplicationIds())->toBe([$this->payments->id, $this->dashboard->id]);
 });
 
@@ -150,6 +156,8 @@ it('uses the files of the pushed commits for a new branch', function () {
     fakeGithubAppPushApi(['status' => 'ahead', 'files' => []]);
 
     sendGithubAppMergePush($this, before: str_repeat('0', 40))->assertOk();
+
+    runPushedEvaluations();
 
     expect(deployedApplicationIds())->toBe([$this->payments->id, $this->dashboard->id]);
     Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), '/compare/'));
@@ -160,6 +168,8 @@ it('does not call the compare API when no application has watch paths', function
     fakeGithubAppPushApi(['status' => 'ahead', 'files' => []]);
 
     sendGithubAppMergePush($this)->assertOk();
+
+    runPushedEvaluations();
 
     expect(deployedApplicationIds())->toBe([$this->payments->id, $this->dashboard->id]);
     Http::assertNothingSent();
