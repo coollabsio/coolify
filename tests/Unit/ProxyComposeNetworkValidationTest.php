@@ -21,7 +21,7 @@ function proxyNetworkTestServer(bool $swarm = false, array $serviceNetworks = []
     $services = collect($serviceNetworks)->map(function (array $networks) use ($serviceRunning) {
         $service = Mockery::mock();
         $service->shouldReceive('isRunning')->andReturn($serviceRunning);
-        $service->shouldReceive('networks')->andReturn(collect($networks));
+        $service->shouldReceive('proxyNetworks')->andReturn(collect($networks));
 
         return $service;
     });

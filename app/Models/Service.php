@@ -1770,6 +1770,31 @@ class Service extends BaseModel
         return getTopLevelNetworks($this);
     }
 
+    /**
+     * The networks of this service that the proxy needs: the stack network and the external networks.
+     * Docker Compose creates the internal networks itself, with the project name as prefix.
+     *
+     * @return Collection<int, string>
+     */
+    public function proxyNetworks(): Collection
+    {
+        if ($this->networks()->isEmpty()) {
+            return collect();
+        }
+        try {
+            $topLevelNetworks = data_get(parseDockerComposeYaml($this->docker_compose_raw), 'networks', []);
+        } catch (\Exception) {
+            $topLevelNetworks = [];
+        }
+
+        return collect(is_array($topLevelNetworks) ? $topLevelNetworks : [])
+            ->filter(fn ($network) => is_array($network) && filter_var(data_get($network, 'external'), FILTER_VALIDATE_BOOLEAN))
+            ->map(fn ($network, $key) => (string) data_get($network, 'name', $key))
+            ->prepend($this->uuid)
+            ->unique()
+            ->values();
+    }
+
     protected function isDeployable(): Attribute
     {
         return Attribute::make(

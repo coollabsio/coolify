@@ -388,9 +388,9 @@ function collectDockerNetworksByServer(Server $server)
     // Service networks
     foreach ($server->services()->get() as $service) {
         if ($service->isRunning()) {
-            $networks->push($service->networks());
+            $networks->push($service->proxyNetworks());
         }
-        $allNetworks->push($service->networks());
+        $allNetworks->push($service->proxyNetworks());
     }
     // Docker compose based apps
     $docker_compose_apps = $server->dockerComposeBasedApplications();
