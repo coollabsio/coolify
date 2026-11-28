@@ -285,7 +285,10 @@ final class ServerTransferCoverage
             'resource_type' => self::LINKED, 'resource_id' => self::LINKED, 'standalone_sqlite_id' => self::LINKED,
             'container_id' => 'Not used: only listed in $fillable.',
         ],
-        LocalFileVolume::class => ['resource_type' => self::LINKED, 'resource_id' => self::LINKED, 'variable_fs_path' => self::RUNTIME],
+        LocalFileVolume::class => [
+            'resource_type' => self::LINKED, 'resource_id' => self::LINKED, 'variable_fs_path' => self::RUNTIME,
+            'compose_status' => 'The next Compose parse on the target marks the mounted rows as active again.',
+        ],
         ScheduledTask::class => [
             'team_id' => self::TEAM, 'application_id' => self::LINKED, 'service_id' => self::LINKED,
             'consecutive_failures' => self::RUNTIME, 'failing_since' => self::RUNTIME,

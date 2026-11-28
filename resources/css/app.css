@@ -3676,6 +3676,15 @@ input[type="search"]::-webkit-search-results-decoration {
     display: none;
 }
 
+/* Persistent storage file and directory mounts: Source | Destination | Status | Actions */
+.file-mounts-table-grid {
+    grid-template-columns: minmax(10rem, 1.4fr) minmax(8rem, 1fr) minmax(7rem, 0.8fr) 4.5rem;
+}
+
+.file-mounts-table-grid-with-pr {
+    grid-template-columns: minmax(9rem, 1.3fr) minmax(8rem, 1fr) 8.5rem minmax(7rem, 0.8fr) 4.5rem;
+}
+
 /* External Compose volumes (read-only): Volume | Docker volume | Mount path | Service */
 .external-volumes-table-grid {
     grid-template-columns: minmax(8rem, 1fr) minmax(9rem, 1.2fr) minmax(8rem, 1fr) minmax(6rem, 0.8fr);
@@ -3697,14 +3706,16 @@ input[type="search"]::-webkit-search-results-decoration {
 .data-table-row.volumes-table-grid .input,
 .data-table-row.volumes-table-grid-with-pr .input,
 .data-table-row.volumes-table-grid .listbox-trigger,
-.data-table-row.volumes-table-grid-with-pr .listbox-trigger {
+.data-table-row.volumes-table-grid-with-pr .listbox-trigger,
+.data-table-row.file-mounts-table-grid-with-pr .listbox-trigger {
     min-height: 2rem;
     height: 2rem;
     font-size: 12px;
 }
 
 .data-table-row.volumes-table-grid .listbox-trigger,
-.data-table-row.volumes-table-grid-with-pr .listbox-trigger {
+.data-table-row.volumes-table-grid-with-pr .listbox-trigger,
+.data-table-row.file-mounts-table-grid-with-pr .listbox-trigger {
     padding-inline: 0.5rem;
 }
 
@@ -3713,14 +3724,18 @@ input[type="search"]::-webkit-search-results-decoration {
     .data-table-header.volumes-table-grid,
     .data-table-header.volumes-table-grid-with-pr,
     .data-table-header.volumes-table-grid-readonly,
-    .data-table-header.external-volumes-table-grid {
+    .data-table-header.external-volumes-table-grid,
+    .data-table-header.file-mounts-table-grid,
+    .data-table-header.file-mounts-table-grid-with-pr {
         display: none;
     }
 
     .data-table-row.volumes-table-grid,
     .data-table-row.volumes-table-grid-with-pr,
     .data-table-row.volumes-table-grid-readonly,
-    .data-table-row.external-volumes-table-grid {
+    .data-table-row.external-volumes-table-grid,
+    .data-table-row.file-mounts-table-grid,
+    .data-table-row.file-mounts-table-grid-with-pr {
         display: flex;
         flex-direction: column;
         align-items: stretch;
@@ -3729,7 +3744,8 @@ input[type="search"]::-webkit-search-results-decoration {
         min-height: 0;
     }
 
-    .data-table-row.volumes-table-grid-with-pr > .volumes-col-pr {
+    .data-table-row.volumes-table-grid-with-pr > .volumes-col-pr,
+    .data-table-row.file-mounts-table-grid-with-pr > .volumes-col-pr {
         display: flex;
         flex-direction: column;
         gap: 0.25rem;
@@ -3785,7 +3801,8 @@ input[type="search"]::-webkit-search-results-decoration {
     .data-table-row.volumes-table-grid .input,
     .data-table-row.volumes-table-grid-with-pr .input,
     .data-table-row.volumes-table-grid .listbox-trigger,
-    .data-table-row.volumes-table-grid-with-pr .listbox-trigger {
+    .data-table-row.volumes-table-grid-with-pr .listbox-trigger,
+    .data-table-row.file-mounts-table-grid-with-pr .listbox-trigger {
         min-height: 2.25rem;
         height: 2.25rem;
         font-size: 13px;

@@ -186,13 +186,8 @@ class All extends Component
             "forms.{$storageId}.isPreviewSuffixEnabled" => 'required|boolean',
         ]);
 
+        // The PR suffix is a Coolify setting, so it can change also on a volume that is read-only here.
         $storage = $this->findStorageOrFail($storageId);
-        if ($storage->shouldBeReadOnlyInUI()) {
-            $this->dispatch('error', 'This volume is read-only.');
-
-            return;
-        }
-
         $storage->is_preview_suffix_enabled = (bool) $this->forms[$storageId]['isPreviewSuffixEnabled'];
         $changedFields = auditChangedFields($storage);
         $storage->save();
@@ -214,7 +209,7 @@ class All extends Component
         }
 
         $storageId = (int) explode('.', $key)[0];
-        if ($storageId > 0 && isset($this->forms[$storageId]) && ! $this->forms[$storageId]['isReadOnly']) {
+        if ($storageId > 0 && isset($this->forms[$storageId]) && $this->canUpdate) {
             $this->instantSave($storageId);
         }
     }

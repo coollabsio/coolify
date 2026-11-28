@@ -61,6 +61,13 @@ class Storage extends Component
 
     public string $activeTab = 'volumes';
 
+    /**
+     * The tabs whose panes are rendered. The view shows the active pane, so a loaded tab opens without a request.
+     *
+     * @var list<string>
+     */
+    public array $loadedTabs = [];
+
     public int $cachedVolumeCount = 0;
 
     public int $cachedFileCount = 0;
@@ -107,8 +114,9 @@ class Storage extends Component
         $this->loadFileStorageMetaCounts();
         $this->loadExternalVolumes();
         $this->activeTab = $this->resolveDefaultTab();
+        $this->loadedTabs = [$this->activeTab];
         $this->fileStorage = collect();
-        $this->loadFileStorageForActiveTab();
+        $this->loadFileStorageForLoadedTabs();
         $this->name = $this->generateDefaultVolumeName();
     }
 
@@ -127,21 +135,54 @@ class Storage extends Component
         $this->loadVolumeCount();
         $this->loadFileStorageMetaCounts();
         $this->loadExternalVolumes();
-        $this->loadFileStorageForActiveTab();
+        $this->loadFileStorageForLoadedTabs();
 
-        if ($this->activeTab === 'volumes' && $hadVolumes && $this->cachedVolumeCount > 0) {
+        if (in_array('volumes', $this->loadedTabs, true) && $hadVolumes && $this->cachedVolumeCount > 0) {
             $this->dispatch('refreshVolumeList')->to(StorageList::class);
         }
     }
 
     public function setActiveTab(string $tab): void
     {
-        if (! in_array($tab, ['volumes', 'files', 'directories'], true)) {
+        if (! $this->openTab($tab)) {
             return;
         }
 
+        $this->loadFileStorageForLoadedTabs();
+    }
+
+    /**
+     * Renders the pane of a tab without showing it, so the tab opens at once later. The tabs call it on hover.
+     */
+    public function preloadTab(string $tab): void
+    {
+        if (! $this->isTab($tab) || in_array($tab, $this->loadedTabs, true)) {
+            $this->skipRender();
+
+            return;
+        }
+
+        $this->loadedTabs[] = $tab;
+        $this->loadFileStorageForLoadedTabs();
+    }
+
+    private function openTab(string $tab): bool
+    {
+        if (! $this->isTab($tab)) {
+            return false;
+        }
+
         $this->activeTab = $tab;
-        $this->loadFileStorageForActiveTab();
+        if (! in_array($tab, $this->loadedTabs, true)) {
+            $this->loadedTabs[] = $tab;
+        }
+
+        return true;
+    }
+
+    private function isTab(string $tab): bool
+    {
+        return in_array($tab, ['volumes', 'files', 'directories'], true);
     }
 
     private function resolveDefaultTab(): string
@@ -216,27 +257,26 @@ class Storage extends Component
     }
 
     /**
-     * Load full file/directory mounts only for the active tab (content only on files).
+     * Loads the file and directory mounts of the loaded tabs. Only the files tab loads file content.
      */
-    private function loadFileStorageForActiveTab(): void
+    private function loadFileStorageForLoadedTabs(): void
     {
-        if ($this->activeTab === 'volumes') {
-            // Keep snapshot small while the volumes tab is shown.
+        $loadsFiles = in_array('files', $this->loadedTabs, true);
+        $loadsDirectories = in_array('directories', $this->loadedTabs, true);
+        if (! $loadsFiles && ! $loadsDirectories) {
+            // Keep the snapshot small while only the volumes tab is loaded.
             $this->fileStorage = collect();
 
             return;
         }
 
         $query = $this->resource->fileStorages();
-
-        if ($this->activeTab === 'files') {
-            $query->where('is_directory', false);
-        } else {
-            $query->where('is_directory', true);
+        if (! $loadsFiles || ! $loadsDirectories) {
+            $query->where('is_directory', $loadsDirectories);
         }
 
         $this->fileStorage = $query->get()->each(function (LocalFileVolume $fs): void {
-            if ($this->activeTab !== 'files') {
+            if ($fs->is_directory) {
                 $fs->content = null;
 
                 return;
@@ -325,7 +365,7 @@ class Storage extends Component
             $this->auditStorageChange($this->resource, 'created', $volume);
             $this->existingVolumes = array_values(array_diff($this->existingVolumes, [$name]));
             $this->clearForm();
-            $this->activeTab = 'volumes';
+            $this->openTab('volumes');
             $this->refreshStorages();
             $this->dispatch('configurationChanged');
             $this->dispatch('success', 'Volume added successfully');
@@ -379,7 +419,7 @@ class Storage extends Component
             $this->auditStorageChange($this->resource, 'created', $fileVolume);
 
             $this->clearForm();
-            $this->activeTab = 'files';
+            $this->openTab('files');
             $this->refreshStorages();
             $this->dispatch('configurationChanged');
             $this->dispatch('success', 'File mount added successfully');
@@ -414,7 +454,7 @@ class Storage extends Component
             $this->auditStorageChange($this->resource, 'created', $hostFileVolume);
 
             $this->clearForm();
-            $this->activeTab = 'files';
+            $this->openTab('files');
             $this->refreshStorages();
             $this->dispatch('configurationChanged');
             $this->dispatch('success', 'Host file mount added successfully');
@@ -455,7 +495,7 @@ class Storage extends Component
             $this->auditStorageChange($this->resource, 'created', $directoryVolume);
 
             $this->clearForm();
-            $this->activeTab = 'directories';
+            $this->openTab('directories');
             $this->refreshStorages();
             $this->dispatch('configurationChanged');
             $this->dispatch('success', 'Directory mount added successfully');

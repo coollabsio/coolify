@@ -374,6 +374,24 @@ function forgetComposeBindStorage(Application|ServiceApplication|ServiceDatabase
 }
 
 /**
+ * Marks the file storages that the Compose parse mounted as active, and the active file storages that it did
+ * not mount as detached. Rows without a status (added by the user, or saved before Coolify had the status)
+ * stay as they are. A detached row stays until the user deletes it, and its files on the server stay.
+ *
+ * @param  Collection<int, int>  $mountedIds
+ */
+function syncComposeFileStorageStatuses(Application|ServiceApplication|ServiceDatabase $resource, Collection $mountedIds): void
+{
+    $resource->fileStorages()
+        ->whereIn('id', $mountedIds)
+        ->update(['compose_status' => LocalFileVolume::COMPOSE_STATUS_ACTIVE]);
+    $resource->fileStorages()
+        ->whereNotIn('id', $mountedIds)
+        ->where('compose_status', LocalFileVolume::COMPOSE_STATUS_ACTIVE)
+        ->update(['compose_status' => LocalFileVolume::COMPOSE_STATUS_DETACHED]);
+}
+
+/**
  * Coolify writes the `content:` of a Compose bind volume to the source path on the host. Only
  * administrators can edit a Compose file, and they can mount any host path, so the source can be
  * any path, also outside the resource directory. It must exist and be safe to
@@ -1487,6 +1505,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
     $isPublicPullRequest = $isPullRequest && (bool) $resource->settings?->hasPublicPrDeployments() && ! $pullRequestPreview?->keeps_production_values;
     // The Compose file of a pull request deploys only that preview: it reads the rows of the application, but does not add or change them.
     $keepsApplicationRows = $isPullRequest && $resource->usesPullRequestComposeFile;
+    $mountedFileStorageIds = [];
     $server = data_get($resource, 'destination.server');
     try {
         $yaml = parseDockerComposeYaml($compose);
@@ -1953,7 +1972,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                         // A preview with the Compose file of its pull request writes the file storages of the application and does not change them.
                         $keepsMissingHostPath = composeBindKeepsMissingHostPath($volume);
                         if (! $keepsApplicationRows && ! $keepsMissingHostPath) {
-                            LocalFileVolume::updateOrCreate(
+                            $mountedFileStorageIds[] = LocalFileVolume::updateOrCreate(
                                 [
                                     'mount_path' => $target,
                                     'resource_id' => $originalResource->id,
@@ -1968,7 +1987,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                                     'resource_id' => $originalResource->id,
                                     'resource_type' => get_class($originalResource),
                                 ]
-                            );
+                            )->id;
                         } elseif (! $keepsApplicationRows) {
                             forgetComposeBindStorage($originalResource, $target->value());
                         }
@@ -2010,7 +2029,11 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $slugWithoutUuid = Str::slug($source, '-');
                     $name = "{$uuid}_{$slugWithoutUuid}";
 
-                    if ($isPullRequest) {
+                    // A volume with the PR suffix turned off is shared with the application. The preview
+                    // cleanup removes only volumes with the suffix, so it never removes a shared volume.
+                    $sharesApplicationVolume = $isPullRequest && ! $isPreviewOwnVolume
+                        && $originalResource->persistentStorages()->where('name', $name)->first()?->is_preview_suffix_enabled === false;
+                    if ($isPullRequest && ! $sharesApplicationVolume) {
                         $name = addPreviewDeploymentSuffix($name, $pull_request_id);
                     }
                     if (is_string($volume)) {
@@ -2040,7 +2063,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     );
                     $topLevel->get('volumes')->put($name, $isPreviewOwnVolume
                         ? ['name' => $name]
-                        : composeRenamedVolumeDeclarationFor($declaration, $name, $persistentVolume, $isPullRequest));
+                        : composeRenamedVolumeDeclarationFor($declaration, $name, $persistentVolume, $isPullRequest && ! $sharesApplicationVolume));
                 }
                 $volumesParsed->put($index, $volume);
             }
@@ -2721,6 +2744,7 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
 
     if (! $keepsApplicationRows) {
         syncDockerComposeEnvironmentVariableRequiredState($resource);
+        syncComposeFileStorageStatuses($resource, collect($mountedFileStorageIds));
     }
 
     return $topLevel;
@@ -2839,6 +2863,7 @@ function serviceParser(Service $resource): Collection
 
     $allMagicEnvironments = collect([]);
     $usedServiceParts = collect([]);
+    $mountedFileStorages = collect([]);
     // Presave services
     foreach ($services as $serviceName => $service) {
         // Validate service name for command injection
@@ -3315,7 +3340,7 @@ function serviceParser(Service $resource): Collection
                         [$source, $variableSource] = keepSavedComposeBindSource($source, is_string($volume) ? $volume : null, $mainDirectory, $foundConfig, $resource);
                         // With `bind.create_host_path: false`, the host path must exist already: Coolify does not create or manage it.
                         if (! composeBindKeepsMissingHostPath($volume)) {
-                            LocalFileVolume::updateOrCreate(
+                            $mountedFileStorages->push(LocalFileVolume::updateOrCreate(
                                 [
                                     'mount_path' => $target,
                                     'resource_id' => $originalResource->id,
@@ -3330,7 +3355,7 @@ function serviceParser(Service $resource): Collection
                                     'resource_id' => $originalResource->id,
                                     'resource_type' => get_class($originalResource),
                                 ]
-                            );
+                            ));
                         } else {
                             forgetComposeBindStorage($originalResource, $target->value());
                         }
@@ -3947,6 +3972,12 @@ function serviceParser(Service $resource): Collection
 
     fillDockerComposeDefaultsForBareReferences($resource, $existingEnvironmentVariableKeys);
     syncDockerComposeEnvironmentVariableRequiredState($resource);
+    foreach ($usedServiceParts as $part) {
+        syncComposeFileStorageStatuses($part, $mountedFileStorages
+            ->where('resource_type', $part::class)
+            ->where('resource_id', $part->id)
+            ->pluck('id'));
+    }
 
     return $topLevel;
 }

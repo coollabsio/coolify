@@ -6048,6 +6048,12 @@ class ApplicationsController extends Controller
             ], 404);
         }
 
+        if ($storage instanceof LocalFileVolume && $storage->is_detached_from_compose) {
+            return response()->json([
+                'message' => 'This file storage is not in the Docker Compose file anymore and cannot be updated. You can delete it: its files on the server stay.',
+            ], 422);
+        }
+
         $isReadOnly = $storage->shouldBeReadOnlyInUI();
         $editableOnlyFields = ['name', 'mount_path', 'content'];
         $requestedEditableFields = array_intersect($editableOnlyFields, array_keys($request->all()));
@@ -6466,7 +6472,8 @@ class ApplicationsController extends Controller
 
         $storage->abortIfScheduledBackupsExist();
 
-        if ($storage instanceof LocalFileVolume) {
+        // A file storage that is not in the Compose file anymore loses only its row. Its files on the server stay.
+        if ($storage instanceof LocalFileVolume && ! $storage->is_detached_from_compose) {
             $storage->deleteStorageOnServer();
         }
 
