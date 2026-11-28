@@ -625,7 +625,9 @@ class ReconcileNodeClusterNetwork
                     if (blank($address)) {
                         return [];
                     }
-                    $running = ! isset($leaving[$node->id][$port->node_workload_id])
+                    // The inventory of an unreachable Node is old: its containers do not count.
+                    $running = $node->is_reachable
+                        && ! isset($leaving[$node->id][$port->node_workload_id])
                         && $port->workload->containers()
                             ->where('node_id', $node->id)
                             ->where('name', $slot->containerName($port->workload))

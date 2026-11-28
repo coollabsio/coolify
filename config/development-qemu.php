@@ -81,6 +81,22 @@ $developmentQemuProfiles = [
         'runtime' => 'naked',
         'memory' => 3072,
     ],
+    'node-onboarding-c' => [
+        'label' => 'Third clean Node for UI onboarding (Ubuntu 24.04)',
+        'domain' => 'coolify-dev-node-onboarding-c',
+        'uuid' => 'development-qemu-node-onboarding-c',
+        'name' => 'QEMU onboarding Node C',
+        'ip' => '192.168.122.54',
+        'user' => 'root',
+        'mac' => '52:54:00:ca:00:0d',
+        'image' => 'ubuntu-noble-amd64.qcow2',
+        'image_url' => 'https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img',
+        'os_variant' => 'ubuntu24.04',
+        'provisioner' => 'apt',
+        'runtime' => 'naked',
+        // A third Node for tests that need one more Node than the workload runs on (decision 0037).
+        'memory' => 1024,
+    ],
     'ubuntu-root' => [
         'label' => 'Ubuntu 24.04 (root)',
         'domain' => 'coolify-dev-ubuntu-root',

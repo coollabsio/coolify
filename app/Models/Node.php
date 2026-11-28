@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\Node\FetchLatestSentinelRelease;
+use App\Actions\Node\QueueNodeClusterNetworkRevision;
 use App\Actions\Node\ReconcileNodeClusterNetwork;
 use App\Enums\NodeRole;
 use App\Jobs\SyncNodeClusterDnsRecordsJob;
@@ -41,6 +42,11 @@ class Node extends BaseModel
             if ($node->wasChanged(['is_ingress', 'node_cluster_id', 'ip']) && ($node->is_ingress || $node->getOriginal('is_ingress'))) {
                 $node->syncClusterDnsRecords([$node->node_cluster_id, $node->getOriginal('node_cluster_id')]);
             }
+            // A published port forwards only to a reachable Node (decisions 0016 and 0037). The inventory of
+            // an offline Node is not refreshed, so its change of reachability must change the forward.
+            if ($node->wasChanged('is_reachable') && ! $node->wasRecentlyCreated && $node->cluster !== null && $node->runningPublishedWorkloadIds() !== []) {
+                rescue(fn () => QueueNodeClusterNetworkRevision::run($node->cluster));
+            }
         });
         static::deleted(function (Node $node): void {
             DevelopmentIngressTarget::write();
@@ -48,6 +54,28 @@ class Node extends BaseModel
                 $node->syncClusterDnsRecords([$node->node_cluster_id]);
             }
         });
+    }
+
+    /**
+     * The workloads with a published port in the cluster that have a running container on the Node,
+     * by the stored inventory.
+     *
+     * @return list<int>
+     */
+    public function runningPublishedWorkloadIds(): array
+    {
+        if ($this->node_cluster_id === null) {
+            return [];
+        }
+
+        return $this->containers()
+            ->where('state', 'running')
+            ->whereIn('node_workload_id', NodePublishedPort::query()->where('node_cluster_id', $this->node_cluster_id)->select('node_workload_id'))
+            ->distinct()
+            ->orderBy('node_workload_id')
+            ->pluck('node_workload_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
     }
 
     /** @param  array<int, int|string|null>  $clusterIds */

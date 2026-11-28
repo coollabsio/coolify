@@ -220,6 +220,10 @@ Built in Coolify and in Sentinel `ce6e4a8`, `13b243d`, and `78b11ae`
 - A port change and a change of the capability sync the desired sets of the
   Nodes of the cluster. An adopted workload with published ports queues a
   network revision.
+- A container on an unreachable Node does not count as running, because
+  Coolify cannot refresh the inventory of an offline Node. A change of
+  `is_reachable` of a Node that runs a workload with a published port queues
+  a network revision (`Node::booted()`).
 - `IssueFluxCredential` grants `network.published_ports.local.v1`.
 - `ReconcileNodeWorkloads` and `RecoverStaleOperations` stay. Nodes without
   the capability (`upstream.json`, cluster 2 of dev on 1.1.5) still need the
@@ -244,8 +248,16 @@ Built in Coolify and in Sentinel `ce6e4a8`, `13b243d`, and `78b11ae`
 - **Crash.** A kill with a fast restart gave a gap of about 10 s and no
   revision. In a crash loop, Sentinel reported `stopped` during the backoff,
   and Coolify queued a revision. Node 2 kept forwarding to Node 1, because no
-  other Node ran the workload. A visible crash failover needs 3 Nodes. The dev
-  cluster has 2.
+  other Node ran the workload.
+- **Failover with 3 Nodes (Node 3 `node-onboarding-c`, no container).** In a
+  crash loop on Node 1, Node 3 forwarded to Node 2 2 s after the `stopped`
+  event, and back to Node 1 2 s after `healthy`. Sentinel sees a crash only
+  at its next pass (up to 15 s), so the `stopped` event came 14 s after the
+  kill. A stop of Node 1 through Coolify moved Node 1 and Node 3 to Node 2
+  with 5 and 6 failed connections, and the start moved them back with 0. A
+  power-off of Node 1 moved Node 3 to Node 2 after 21 s (the heartbeat
+  timeout), and the start of Node 1 moved it back with 0 failures. Before the
+  fix for unreachable Nodes, Node 3 kept forwarding to the powered-off Node.
 - **Source CIDRs.** With `10.221.5.1/32`, the host connected through both
   Nodes, and a connection from another address was dropped on the entry Node.
 - **Reboot without Flux.** With Flux stopped, Node 1 rebooted. Its local rule
