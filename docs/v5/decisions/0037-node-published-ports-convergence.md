@@ -171,6 +171,14 @@ Built in Coolify and in Sentinel `ce6e4a8`, `13b243d`, and `78b11ae`
   nothing, as answer 2 says. While no container runs, the other Nodes forward
   to a Node with a local rule, where Sentinel starts the container again, and
   not to a stopped container.
+- **No status event is lost.** `RefreshNodeContainersJob` releases its unique
+  lock when it starts (`ShouldBeUniqueUntilProcessing`), so an event during a
+  run queues one more refresh. The refresh of a status event has its own unique
+  key, so the refresh of each minute, which waits up to 59 s in the queue, does
+  not hide it. Runs for the same Node never overlap (`WithoutOverlapping`, a
+  waiting run is released again). Before, an event during a run or during the
+  wait of the minute refresh was dropped, and the forward changed up to one
+  minute later.
 - **Sentinel reports a container that waits for its backoff.** Before, Sentinel
   sent no status while a crashed container waited for the next start (10 s,
   then up to 10 minutes). It now sends `stopped` (autonomous) at the start of

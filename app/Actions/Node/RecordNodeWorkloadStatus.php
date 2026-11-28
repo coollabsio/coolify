@@ -72,7 +72,7 @@ class RecordNodeWorkloadStatus
             }
         }
         if (in_array($value, ['healthy', 'failed', 'stopped', 'removed'], true)) {
-            RefreshNodeContainersJob::dispatch($node->id);
+            RefreshNodeContainersJob::dispatch($node->id, forStatusEvent: true);
         }
     }
 
