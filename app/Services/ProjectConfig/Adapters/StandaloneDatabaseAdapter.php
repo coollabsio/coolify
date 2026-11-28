@@ -50,7 +50,7 @@ class StandaloneDatabaseAdapter implements ResourceAdapter
     public const TYPES = [
         'postgresql' => [
             'model' => StandalonePostgresql::class, 'table' => 'standalone_postgresqls', 'create' => 'create_standalone_postgresql',
-            'port' => 5432, 'image' => 'postgres:18-alpine', 'volumes' => ['postgres-data'], 'variables' => [],
+            'port' => 5432, 'image' => 'postgres:19-alpine', 'volumes' => ['postgres-data'], 'variables' => [],
             'secrets' => ['postgres_password'],
             'fields' => [
                 ['postgres_user', 'credentials.user', 'postgres', 'string'],

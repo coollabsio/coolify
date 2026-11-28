@@ -808,18 +808,39 @@
         <div x-data="{ selecting: false }">
             <div class="mb-4">
                 <h2 class="text-[15px]! font-semibold!">Select a PostgreSQL image</h2>
-                <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">Use PostgreSQL 18 unless the workload
+                <p class="mt-1 text-[12px] text-neutral-500 dark:text-fg-dim">Use PostgreSQL 19 unless the workload
                     needs bundled extensions.</p>
             </div>
             <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
                     :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
+                    x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('postgres:19-alpine'))"
+                    :disabled="selecting">
+                    <div class="flex flex-col">
+                        <div class="text-[13px] font-semibold text-black dark:text-fg">PostgreSQL 19 <span
+                                class="ml-1 rounded-full bg-coollabs/10 px-2 py-0.5 text-[10px] font-medium text-coollabs dark:bg-brand/15 dark:text-brand-light">Default</span>
+                        </div>
+                        <div class="mt-1 pr-8 text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">
+                            PostgreSQL is a powerful, open-source object-relational database system (no extensions).
+                        </div>
+                    </div>
+                    <a href="https://hub.docker.com/_/postgres/" target="_blank"
+                        @click.stop
+                        class="absolute top-2 right-2 flex size-7 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-black dark:text-fg-faint dark:hover:bg-white/[0.06] dark:hover:text-fg"
+                        title="View documentation">
+                        <svg class="w-4 h-4 text-neutral-600 dark:text-neutral-400" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </a>
+                </div>
+                <div class="group relative flex min-h-24 items-center gap-3 rounded-xl border border-neutral-200 bg-white p-4 transition-colors hover:border-neutral-300 dark:border-white/[0.08] dark:bg-white/[0.05] dark:hover:border-white/[0.14]"
+                    :class="{ 'cursor-pointer': !selecting, 'cursor-not-allowed opacity-50': selecting }"
                     x-on:click="!selecting && (selecting = true, $wire.setDatabaseImage('postgres:18-alpine'))"
                     :disabled="selecting">
                     <div class="flex flex-col">
-                        <div class="text-[13px] font-semibold text-black dark:text-fg">PostgreSQL 18 <span
-                                class="ml-1 rounded-full bg-coollabs/10 px-2 py-0.5 text-[10px] font-medium text-coollabs dark:bg-brand/15 dark:text-brand-light">Default</span>
-                        </div>
+                        <div class="text-[13px] font-semibold text-black dark:text-fg">PostgreSQL 18</div>
                         <div class="mt-1 pr-8 text-[11px] leading-4 text-neutral-500 dark:text-fg-faint">
                             PostgreSQL is a powerful, open-source object-relational database system (no extensions).
                         </div>
