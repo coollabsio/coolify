@@ -570,6 +570,7 @@ class DeployController extends Controller
                     return ['message' => $result['message'], 'deployment_uuid' => null, 'status' => 429];
                 } elseif ($result['status'] === 'skipped') {
                     $message = $result['message'];
+                    $deployment_uuid = $result['deployment_uuid'];
                 } else {
                     $message = "Application {$resource->name} deployment queued.";
                     auditLog('api.deployment.triggered', [

@@ -3771,6 +3771,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '429':
+          description: 'Deployment queue is full.'
       security:
         -
           bearerAuth: []
@@ -3845,6 +3847,8 @@ paths:
           $ref: '#/components/responses/400'
         '404':
           $ref: '#/components/responses/404'
+        '429':
+          description: 'Deployment queue is full.'
       security:
         -
           bearerAuth: []

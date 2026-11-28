@@ -4943,6 +4943,7 @@ class ApplicationsController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 429, description: 'Deployment queue is full.'),
         ]
     )]
     public function action_deploy(Request $request)
@@ -4973,13 +4974,14 @@ class ApplicationsController extends Controller
             is_api: true,
             no_questions_asked: $instant_deploy
         );
+        if ($result['status'] === 'queue_full') {
+            return response()->json(['message' => $result['message']], 429);
+        }
         if ($result['status'] === 'skipped') {
-            return response()->json(
-                [
-                    'message' => $result['message'],
-                ],
-                200
-            );
+            return response()->json([
+                'message' => $result['message'],
+                'deployment_uuid' => $result['deployment_uuid'],
+            ], 200);
         }
 
         auditLog('api.application.deployed', [
@@ -5143,6 +5145,7 @@ class ApplicationsController extends Controller
                 response: 404,
                 ref: '#/components/responses/404',
             ),
+            new OA\Response(response: 429, description: 'Deployment queue is full.'),
         ]
     )]
     public function action_restart(Request $request)
@@ -5170,9 +5173,13 @@ class ApplicationsController extends Controller
             restart_only: true,
             is_api: true,
         );
+        if ($result['status'] === 'queue_full') {
+            return response()->json(['message' => $result['message']], 429);
+        }
         if ($result['status'] === 'skipped') {
             return response()->json([
                 'message' => $result['message'],
+                'deployment_uuid' => $result['deployment_uuid'],
             ], 200);
         }
 

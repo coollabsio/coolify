@@ -5690,6 +5690,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "429": {
+                        "description": "Deployment queue is full."
                     }
                 },
                 "security": [
@@ -5810,6 +5813,9 @@
                     },
                     "404": {
                         "$ref": "#\/components\/responses\/404"
+                    },
+                    "429": {
+                        "description": "Deployment queue is full."
                     }
                 },
                 "security": [

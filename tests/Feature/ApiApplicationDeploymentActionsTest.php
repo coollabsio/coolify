@@ -95,6 +95,47 @@ test('application restart API returns queued deployment uuid as a string', funct
         ->and($deployment->restart_only)->toBeTruthy();
 });
 
+test('a second deploy of the same commit returns the uuid of the deployment that already exists', function (string $method, string $path) {
+    $application = makeDeploymentActionApplication($this->environment, $this->destination);
+    $path = str_replace('{uuid}', $application->uuid, $path);
+
+    $first = $this->withHeaders(deploymentActionHeaders($this->token))->json($method, $path)->assertSuccessful();
+    $second = $this->withHeaders(deploymentActionHeaders($this->token))->json($method, $path)->assertSuccessful();
+
+    $firstUuid = $first->json('deployment_uuid') ?? $first->json('deployments.0.deployment_uuid');
+    $secondUuid = $second->json('deployment_uuid') ?? $second->json('deployments.0.deployment_uuid');
+
+    $readToken = $this->user->createToken('deployment-actions-read', ['read'])->plainTextToken;
+    app('auth')->forgetGuards();
+
+    expect($secondUuid)->toBe($firstUuid)
+        ->and(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->count())->toBe(1);
+
+    $this->withHeaders(deploymentActionHeaders($readToken))
+        ->getJson("/api/v1/deployments/{$secondUuid}")
+        ->assertSuccessful()
+        ->assertJsonPath('deployment_uuid', $firstUuid);
+})->with([
+    'deploy by uuid' => ['POST', '/api/v1/deploy?uuid={uuid}'],
+    'start' => ['POST', '/api/v1/applications/{uuid}/start'],
+    'restart' => ['POST', '/api/v1/applications/{uuid}/restart'],
+]);
+
+test('start and restart answer 429 without a deployment uuid when the deployment queue is full', function (string $path) {
+    $application = makeDeploymentActionApplication($this->environment, $this->destination);
+    $this->server->settings->update(['deployment_queue_limit' => 0]);
+
+    $this->withHeaders(deploymentActionHeaders($this->token))
+        ->postJson(str_replace('{uuid}', $application->uuid, $path))
+        ->assertStatus(429)
+        ->assertJsonMissingPath('deployment_uuid');
+
+    expect(ApplicationDeploymentQueue::query()->where('application_id', $application->id)->exists())->toBeFalse();
+})->with([
+    'start' => '/api/v1/applications/{uuid}/start',
+    'restart' => '/api/v1/applications/{uuid}/restart',
+]);
+
 test('deployment uuid strings are not converted as objects in API and webhook controllers', function () {
     $files = [
         app_path('Http/Controllers/Api/DeployController.php'),
