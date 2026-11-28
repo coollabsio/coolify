@@ -19,6 +19,7 @@ use App\Services\ProjectConfig\ConfigError;
 use App\Services\ProjectConfig\Field;
 use App\Services\ProjectConfig\FieldMap;
 use App\Services\ProjectConfig\FieldValues;
+use App\Support\ValidationPatterns;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -353,7 +354,7 @@ class ServiceAdapter implements ResourceAdapter
         }
 
         $names = $this->composeServiceNames($compose);
-        $errors = [...$errors, ...StorageBackups::errors($base, $desired['storage_backups'] ?? null, $ctx->teamId, $this->composeVolumeKeys($compose))];
+        $errors = [...$errors, ...StorageBackups::errors($base, $desired['storage_backups'] ?? null, $ctx->teamId, $this->knownVolumeKeys($compose, $current))];
         $errors = [...$errors, ...EnvironmentVariables::containerErrors($base, $desired['env'] ?? null, $names)];
         foreach (array_keys((array) ($desired['services'] ?? [])) as $name) {
             if (! in_array($name, $names, true)) {
@@ -382,8 +383,22 @@ class ServiceAdapter implements ResourceAdapter
     }
 
     /**
+     * The volume keys that a storage backup can use: the keys of the Compose file and of the existing storage entries.
+     *
+     * @return list<string>
+     */
+    private function knownVolumeKeys(?string $compose, ?Model $current): array
+    {
+        $existing = $current instanceof Service ? array_map('strval', (new StorageBackups)->volumes($current)->keys()->all()) : [];
+
+        return array_values(array_unique([...$this->composeVolumeKeys($compose), ...$existing]));
+    }
+
+    /**
      * The file keys of the named volumes of a Compose file, as the parser names them without the service UUID.
-     * External and network (CIFS, NFS) volumes are left out, because the parser makes no storage for them.
+     * An external volume has the key of its Docker volume name. A name with variables is known only after the
+     * parser resolved it, so only the existing storage entries give it. Network (CIFS, NFS) volumes are left
+     * out, because the parser makes no storage for them.
      *
      * @return list<string>
      */
@@ -397,7 +412,15 @@ class ServiceAdapter implements ResourceAdapter
 
         $keys = [];
         foreach ((array) ($parsed['volumes'] ?? []) as $name => $declaration) {
-            if (isComposeExternalVolume($declaration) || in_array(data_get($declaration, 'driver_opts.type'), ['cifs', 'nfs'], true)) {
+            if (isComposeExternalVolume($declaration)) {
+                $dockerName = composeExternalVolumeDockerName((string) $name, $declaration);
+                if (preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $dockerName) === 1) {
+                    $keys[] = $dockerName;
+                }
+
+                continue;
+            }
+            if (in_array(data_get($declaration, 'driver_opts.type'), ['cifs', 'nfs'], true)) {
                 continue;
             }
             $keys[] = Str::slug((string) $name, '-');

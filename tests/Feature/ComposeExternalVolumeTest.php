@@ -279,7 +279,7 @@ describe('applicationParser', function () {
             ->and($compose['volumes']['shared-data'])->toBe(['external' => true])
             ->and($compose['volumes'])->toHaveKey("{$uuid}_app-data")
             ->not->toHaveKey("{$uuid}_shared-data")
-            ->and(persistentVolumeNames())->toBe(["{$uuid}_app-data"]);
+            ->and(persistentVolumeNames())->toEqualCanonicalizing(["{$uuid}_app-data", 'shared-data']);
     });
 
     it('keeps an external volume in long syntax with its name', function () {
@@ -292,7 +292,7 @@ describe('applicationParser', function () {
         expect($sources)->toBe(['shared-data', "{$uuid}_app-data"])
             ->and($compose['volumes']['shared-data'])->toBe(['external' => true, 'name' => 'existing-shared-volume'])
             ->and($compose['volumes'])->not->toHaveKey("{$uuid}_shared-data")
-            ->and(persistentVolumeNames())->toBe(["{$uuid}_app-data"]);
+            ->and(persistentVolumeNames())->toEqualCanonicalizing(["{$uuid}_app-data", 'existing-shared-volume']);
     });
 
     it('keeps an external volume in the old external name syntax', function () {
@@ -302,7 +302,7 @@ describe('applicationParser', function () {
 
         expect($compose['services']['web']['volumes'])->toBe(['shared-data:/data'])
             ->and($compose['volumes'])->toBe(['shared-data' => ['external' => ['name' => 'legacy-shared-volume']]])
-            ->and(persistentVolumeNames())->toBe([]);
+            ->and(persistentVolumeNames())->toBe(['legacy-shared-volume']);
     });
 
     it('gives a preview deployment its own volume instead of the external volume', function () {
@@ -411,7 +411,7 @@ describe('applicationParser', function () {
 
         expect($compose['services']['web']['volumes'])->toContain('shared-data:/data:ro')
             ->and($compose['volumes'])->not->toHaveKey("{$uuid}_shared-data")
-            ->and(persistentVolumeNames())->toBe(["{$uuid}_app-data"])
+            ->and(persistentVolumeNames())->toEqualCanonicalizing(["{$uuid}_app-data", 'shared-data'])
             ->and($application->composeVolumeWarnings())->toBe([]);
     });
 
@@ -437,7 +437,7 @@ describe('serviceParser', function () {
             ->toContain("{$uuid}_app-data:/app")
             ->and($compose['volumes']['shared-data'])->toBe(['external' => true])
             ->and($compose['volumes'])->not->toHaveKey("{$uuid}_shared-data")
-            ->and(persistentVolumeNames())->toBe(["{$uuid}_app-data"]);
+            ->and(persistentVolumeNames())->toEqualCanonicalizing(["{$uuid}_app-data", 'shared-data']);
     });
 
     it('keeps an external volume in long syntax with its name', function () {
@@ -449,7 +449,7 @@ describe('serviceParser', function () {
 
         expect($sources)->toBe(['shared-data', "{$uuid}_app-data"])
             ->and($compose['volumes']['shared-data'])->toBe(['external' => true, 'name' => 'existing-shared-volume'])
-            ->and(persistentVolumeNames())->toBe(["{$uuid}_app-data"]);
+            ->and(persistentVolumeNames())->toEqualCanonicalizing(["{$uuid}_app-data", 'existing-shared-volume']);
     });
 
     it('keeps the old prefixed volume and shows a warning when the service has its old storage entry', function (string $compose, string $serviceName, string $mountPath, string $mode) {
@@ -481,7 +481,7 @@ describe('serviceParser', function () {
 
         expect($parsed['services']['web']['volumes'])->toContain('shared-data:/data:ro')
             ->and($parsed['volumes'])->not->toHaveKey("{$uuid}_shared-data")
-            ->and(persistentVolumeNames())->toBe(["{$uuid}_app-data"])
+            ->and(persistentVolumeNames())->toEqualCanonicalizing(["{$uuid}_app-data", 'shared-data'])
             ->and($service->composeVolumeWarnings())->toBe([]);
     });
 
@@ -659,7 +659,7 @@ dataset('external volume names with a variable', [
 ]);
 
 describe('validation', function () {
-    it('accepts an external volume name with a variable and leaves it to Docker Compose', function (string $name, bool $oldSyntax) {
+    it('accepts an external volume name with a variable and leaves it to Docker Compose, with only external storage entries', function (string $name, bool $oldSyntax) {
         $compose = variableExternalVolumeCompose($name, $oldSyntax);
         $declaration = $oldSyntax ? ['external' => ['name' => $name]] : ['external' => true, 'name' => $name];
         validateDockerComposeForInjection($compose);
@@ -671,7 +671,7 @@ describe('validation', function () {
             ->and($application['volumes'])->toBe(['shared-data' => $declaration])
             ->and($service['services']['web']['volumes'])->toBe(['shared-data:/data'])
             ->and($service['volumes'])->toBe(['shared-data' => $declaration])
-            ->and(persistentVolumeNames())->toBe([]);
+            ->and(LocalPersistentVolume::query()->where('is_external', false)->count())->toBe(0);
     })->with('external volume names with a variable');
 
     it('keeps the old volume of an existing application whose external volume name has a variable', function (string $name, bool $oldSyntax) {
@@ -763,6 +763,74 @@ describe('validation', function () {
         'long' => [EXTERNAL_VOLUME_LONG_COMPOSE],
         'old syntax' => [EXTERNAL_VOLUME_OLD_SYNTAX_COMPOSE],
     ]);
+});
+
+describe('storage entry', function () {
+    it('gives an external volume an external storage entry with its Docker volume name', function (string $parser) {
+        $resource = $parser === 'application'
+            ? externalVolumeApplication(EXTERNAL_VOLUME_LONG_COMPOSE)
+            : externalVolumeService(EXTERNAL_VOLUME_LONG_COMPOSE);
+
+        $parser === 'application' ? applicationParser($resource) : serviceParser($resource);
+        $parser === 'application' ? applicationParser($resource) : serviceParser($resource);
+
+        $volume = LocalPersistentVolume::query()->where('name', 'existing-shared-volume')->sole();
+        expect($volume->is_external)->toBeTrue()
+            ->and($volume->mount_path)->toBe('/data')
+            ->and($volume->isDeclaredInCompose())->toBeTrue()
+            ->and($volume->replacedExternalComposeVolume())->toBeNull();
+    })->with(['application', 'service']);
+
+    it('gives a preview no storage entry for the external volume', function () {
+        $application = externalVolumeApplication(EXTERNAL_VOLUME_SHORT_COMPOSE);
+        externalVolumePreview($application);
+
+        applicationParser($application, 42);
+
+        expect(LocalPersistentVolume::query()->where('is_external', true)->exists())->toBeFalse();
+    });
+
+    it('resolves the variables of the name from the resource variables', function (?string $value, ?string $expected) {
+        $application = externalVolumeApplication(variableExternalVolumeCompose('${SHARED_VOLUME:-shared}'));
+        if ($value !== null) {
+            $application->environment_variables()->create(['key' => 'SHARED_VOLUME', 'value' => $value]);
+        }
+
+        applicationParser($application);
+
+        expect(LocalPersistentVolume::query()->where('is_external', true)->pluck('name')->all())->toBe($expected === null ? [] : [$expected]);
+    })->with([
+        'set' => ['prod-data', 'prod-data'],
+        'empty uses the default' => ['', 'shared'],
+        'not set uses the default' => [null, 'shared'],
+    ]);
+
+    it('resolves Compose variables like Docker Compose', function (string $name, array $values, ?string $expected) {
+        expect(resolveComposeExternalVolumeName($name, $values))->toBe($expected);
+    })->with([
+        'braced' => ['${A}', ['A' => 'data'], 'data'],
+        'plain' => ['$A', ['A' => 'data'], 'data'],
+        'text around' => ['stack-${A}_data', ['A' => 'prod'], 'stack-prod_data'],
+        'dash default only when not set' => ['${A-x}', ['A' => ''], null],
+        'dash default when not set' => ['${A-x}', [], 'x'],
+        'colon dash default when empty' => ['${A:-x}', ['A' => ''], 'x'],
+        'not set' => ['${A}', [], null],
+        'unsafe value' => ['${A}', ['A' => 'a b'], null],
+    ]);
+
+    it('lists the external storage entry in the volume list instead of the read-only section', function () {
+        $application = externalVolumeApplication(EXTERNAL_VOLUME_SHORT_COMPOSE);
+        applicationParser($application);
+        loginExternalVolumeOwner();
+
+        $page = Livewire::test(StoragePage::class, ['resource' => $application->fresh()]);
+        $volume = LocalPersistentVolume::query()->where('name', 'shared-data')->sole();
+        $form = Livewire::test(All::class, ['resource' => $application->fresh()])->get('forms')[$volume->id];
+
+        expect($page->get('externalVolumes'))->toBe([])
+            ->and($form['isExternal'])->toBeTrue()
+            ->and($form['canDeleteStale'])->toBeFalse();
+    });
 });
 
 describe('docker volume names', function () {
@@ -1022,9 +1090,8 @@ describe('warnings', function () {
 });
 
 describe('storage page', function () {
-    it('lists the external volumes of a Compose application as read-only', function () {
+    it('lists the external volumes of a Compose application as read-only before the first parse', function () {
         $application = externalVolumeApplication(EXTERNAL_VOLUME_LONG_COMPOSE);
-        applicationParser($application);
         loginExternalVolumeOwner();
 
         $html = Livewire::test(StoragePage::class, ['resource' => $application->fresh()])->html();
@@ -1042,10 +1109,9 @@ describe('storage page', function () {
             ->not->toContain('<input');
     });
 
-    it('lists the external volumes of a service resource as read-only', function () {
+    it('lists the external volumes of a service resource as read-only before the first parse', function () {
         $service = externalVolumeService(EXTERNAL_VOLUME_SHORT_COMPOSE);
-        serviceParser($service);
-        $serviceApplication = $service->applications()->where('name', 'web')->firstOrFail();
+        $serviceApplication = legacyExternalVolumeServiceResource($service, 'web');
         loginExternalVolumeOwner();
 
         $html = Livewire::test(StoragePage::class, ['resource' => $serviceApplication])->html();

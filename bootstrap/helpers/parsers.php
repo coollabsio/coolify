@@ -825,8 +825,8 @@ function isComposeExternalVolume(mixed $declaration): bool
 /**
  * Returns the top-level declaration of a volume source when the Compose file declares it as
  * external, and null for all other sources. The parsers use an external volume as written: no
- * "{uuid}_" prefix and no LocalPersistentVolume row, so that Coolify never removes a volume that it
- * does not own. A preview deployment never uses an external volume; it gets its own volume
+ * "{uuid}_" prefix, and its LocalPersistentVolume row is external, so that Coolify never removes a
+ * volume that it does not own (see saveComposeExternalVolumeStorage()). A preview deployment never uses an external volume; it gets its own volume
  * "{uuid}_{volume}-pr-{id}" like any other named volume.
  *
  * @param  iterable<array-key, mixed>  $topLevelVolumes
@@ -973,6 +973,69 @@ function composeExternalVolumeDockerName(string $key, array $declaration): strin
 }
 
 /**
+ * Resolves the Compose variables in the name of an external volume (see isComposeVolumeNameWithVariables())
+ * like Docker Compose does with the deployment `.env`: `${NAME:-default}` uses the default when the variable is
+ * not set or empty, `${NAME-default}` only when it is not set. Returns null when the result is not a Docker
+ * volume name, for example because a variable has no value.
+ *
+ * @param  array<string, string|null>  $values  the values of the resource variables, by key
+ */
+function resolveComposeExternalVolumeName(string $name, array $values): ?string
+{
+    $resolved = preg_replace_callback(
+        '/\$\{([A-Za-z_][A-Za-z0-9_]*)(?:(:?)-([A-Za-z0-9._-]*))?\}|\$([A-Za-z_][A-Za-z0-9_]*)/',
+        function (array $matches) use ($values): string {
+            $variable = ($matches[4] ?? '') !== '' ? $matches[4] : $matches[1];
+            $value = $values[$variable] ?? null;
+            // A variable name has no hyphen, so a hyphen in `${...}` starts the default.
+            $hasDefault = ($matches[4] ?? '') === '' && str_contains($matches[0], '-');
+            if ($hasDefault && ($value === null || ($matches[2] === ':' && $value === ''))) {
+                return $matches[3];
+            }
+
+            return (string) $value;
+        },
+        $name
+    );
+
+    return is_string($resolved) && preg_match(ValidationPatterns::VOLUME_NAME_PATTERN, $resolved) === 1 ? $resolved : null;
+}
+
+/**
+ * Saves the storage entry of an external volume that a resource mounts as written, so the volume can get a
+ * backup schedule. The entry is external: Coolify never removes the Docker volume, and the Compose file keeps
+ * the volume as written. A name with variables gets the value that Docker Compose resolves from the resource
+ * variables; when it does not resolve to a Docker volume name, the volume gets no entry.
+ *
+ * @param  array<string, mixed>  $declaration
+ */
+function saveComposeExternalVolumeStorage(Application|Service $resource, Application|ServiceApplication|ServiceDatabase $owner, string $key, array $declaration, string $mountPath): void
+{
+    $name = composeExternalVolumeDockerName($key, $declaration);
+    if (isComposeVolumeNameWithVariables($name)) {
+        $values = $resource->environment_variables()->get()
+            ->mapWithKeys(fn (EnvironmentVariable $variable): array => [$variable->key => $variable->real_value])
+            ->all();
+        $name = resolveComposeExternalVolumeName($name, $values);
+        if ($name === null) {
+            return;
+        }
+    }
+
+    LocalPersistentVolume::updateOrCreate(
+        [
+            'name' => $name,
+            'resource_id' => $owner->getKey(),
+            'resource_type' => get_class($owner),
+        ],
+        [
+            'mount_path' => $mountPath,
+            'is_external' => true,
+        ]
+    );
+}
+
+/**
  * The top-level declaration of a volume that a parser renamed (for example `data` to `{uuid}_data`).
  * It keeps the options of the original declaration, such as `driver`, `driver_opts` and `labels`, so a
  * local volume that binds a host folder still binds it. Variables in the options stay as written;
@@ -1110,8 +1173,8 @@ function composeExternalVolumeMounts(?string $compose): array
  * The key of an external volume must be a literal Docker volume name, because Docker Compose does not
  * resolve variables in keys. The name (`name:` or the old `external: {name: x}`) may also contain
  * variables (see isComposeVolumeNameWithVariables()): Docker Compose resolves them from the deployment
- * `.env` when it starts the resource. Coolify never removes an external volume, because it gets no
- * storage entry, so Coolify does not need the resolved name.
+ * `.env` when it starts the resource. Its storage entry gets the resolved name (see
+ * saveComposeExternalVolumeStorage()), and Coolify never removes the volume.
  *
  * @param  array<string, mixed>  $declaration
  *
@@ -1993,7 +2056,8 @@ function applicationParser(Application $resource, int $pull_request_id = 0, ?int
                     $isPreviewOwnVolume = $isPullRequest
                         && ($isNetworkVolume || composeExternalVolumeDeclaration($topLevel->get('volumes'), $source->value()) !== null);
                     if (! $isPullRequest && useComposeExternalVolumeAsWritten($resource, $originalResource, $topLevel->get('volumes'), $source->value(), "{$uuid}_".Str::slug($source, '-'))) {
-                        // The external volume gets no row, so Coolify never removes it.
+                        // The external volume gets an external row, so it can have a backup schedule and Coolify never removes it.
+                        saveComposeExternalVolumeStorage($resource, $originalResource, $source->value(), $declaration, (string) $target);
                         $volumesParsed->put($index, $volume);
 
                         continue;
@@ -3347,7 +3411,8 @@ function serviceParser(Service $resource): Collection
                     }
                 } elseif ($type->value() === 'volume') {
                     if (useComposeExternalVolumeAsWritten($resource, $originalResource, $topLevel->get('volumes'), $source->value(), "{$uuid}_".Str::slug($source, '-'))) {
-                        // The external volume gets no row, so Coolify never removes it.
+                        // The external volume gets an external row, so it can have a backup schedule and Coolify never removes it.
+                        saveComposeExternalVolumeStorage($resource, $originalResource, $source->value(), $topLevel->get('volumes')->get($source->value()), (string) $target);
                         $volumesParsed->put($index, $volume);
 
                         continue;

@@ -76,6 +76,7 @@
       exclude_from_status: false
       volumes:
         - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
+        - 'shared-external:/backups'
   environment_variables:
     API_URL: '${SERVICE_URL_API}'
     APP_URL: '${SERVICE_URL_WEB}'
@@ -1062,6 +1063,7 @@
       exclude_from_status: false
       volumes:
         - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
+        - 'shared-external:/backups'
   environment_variables:
     API_URL: '${SERVICE_URL_API}'
     APP_URL: '${SERVICE_URL_WEB}'
@@ -2095,6 +2097,7 @@
       exclude_from_status: false
       volumes:
         - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
+        - 'shared-external:/backups'
   environment_variables:
     API_URL: '${SERVICE_URL_API}'
     APP_URL: '${SERVICE_URL_WEB}'

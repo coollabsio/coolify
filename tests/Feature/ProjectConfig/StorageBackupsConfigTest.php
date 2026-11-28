@@ -244,18 +244,31 @@ it('rejects retention values outside the API limits', function () {
     ]);
 });
 
-it('rejects external and network volumes of a Compose service, which get no storage', function () {
-    $compose = "services:\n  web:\n    image: 'nginx:alpine'\n    volumes:\n      - 'shared:/shared'\n      - 'nfs-data:/nfs'\nvolumes:\n  shared:\n    external: true\n  nfs-data:\n    driver_opts:\n      type: nfs\n";
+it('backs up an external volume of a Compose service by its Docker volume name', function () {
+    $compose = "services:\n  web:\n    image: 'nginx:alpine'\n    volumes:\n      - 'shared:/shared'\nvolumes:\n  shared:\n    external: true\n    name: fixed-data\n";
+    $desired = ['stack' => [
+        'type' => 'service', 'server' => 'prod-1', 'compose' => $compose,
+        'storage_backups' => ['fixed-data' => STORAGE_BACKUPS_SCHEDULE],
+    ]];
+
+    $revision = storageBackupsApply($desired);
+
+    expect($revision->status->value)->toBe('applied', (string) $revision->error);
+    $volume = ScheduledVolumeBackup::query()->sole()->backupable;
+    expect($volume->name)->toBe('fixed-data')
+        ->and($volume->is_external)->toBeTrue()
+        ->and(storageBackupsPlan($desired)->errors)->toBe([]);
+});
+
+it('rejects network volumes of a Compose service, which get no storage', function () {
+    $compose = "services:\n  web:\n    image: 'nginx:alpine'\n    volumes:\n      - 'nfs-data:/nfs'\nvolumes:\n  nfs-data:\n    driver_opts:\n      type: nfs\n";
 
     $plan = storageBackupsPlan(['stack' => [
         'type' => 'service', 'server' => 'prod-1', 'compose' => $compose,
-        'storage_backups' => ['shared' => ['frequency' => 'daily'], 'nfs-data' => ['frequency' => 'daily']],
+        'storage_backups' => ['nfs-data' => ['frequency' => 'daily']],
     ]]);
 
-    expect(array_map(fn ($e) => $e->path, $plan->errors))->toEqualCanonicalizing([
-        'resources.stack.storage_backups.shared',
-        'resources.stack.storage_backups.nfs-data',
-    ]);
+    expect(array_map(fn ($e) => $e->path, $plan->errors))->toBe(['resources.stack.storage_backups.nfs-data']);
 });
 
 it('warns about schedules of a Compose application whose volumes do not exist yet', function () {

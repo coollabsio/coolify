@@ -22,6 +22,7 @@
       ports: ''
       volumes:
         - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
+        - 'shared-external:/backups'
     empty-lists:
       exclude_from_status: false
       ports: ''
@@ -1029,6 +1030,7 @@
       ports: ''
       volumes:
         - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
+        - 'shared-external:/backups'
     empty-lists:
       exclude_from_status: false
       ports: ''
@@ -2086,6 +2088,7 @@
       ports: ''
       volumes:
         - 'referenceservice00000001_db-data:/var/lib/postgresql/data'
+        - 'shared-external:/backups'
     empty-lists:
       fqdn: 'https://empty-lists-extra.example.com'
       exclude_from_status: false
