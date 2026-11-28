@@ -62,7 +62,7 @@ class Show extends Component
     use AuthorizesRequests;
 
     /** @var list<string> */
-    public const SECTIONS = ['general', 'domains', 'ports', 'environment-variables', 'storage', 'healthcheck', 'resource-limits', 'deployments', 'deployment', 'build', 'logs', 'servers', 'previews', 'webhooks', 'backups', 'scheduled-tasks', 'terminal', 'danger'];
+    public const SECTIONS = ['general', 'domains', 'ports', 'environment-variables', 'storage', 'advanced', 'healthcheck', 'resource-limits', 'deployments', 'deployment', 'build', 'logs', 'servers', 'previews', 'webhooks', 'backups', 'scheduled-tasks', 'terminal', 'danger'];
 
     /** @var list<string> */
     public const DEPLOYMENT_COMMAND_TYPES = NodeOperation::DEPLOYMENT_COMMAND_TYPES;
@@ -239,6 +239,8 @@ class Show extends Component
         // Only a Git application has previews, and a preview is not a webhook target (decision 0025).
         abort_if($this->section === 'previews' && ! $this->workload->canHavePreviews(), 404);
         abort_if($this->section === 'webhooks' && $this->workload->isPreview(), 404);
+        // Like the v4 Advanced page: the webhook deployment and Git settings of a Git application.
+        abort_if($this->section === 'advanced' && ! $this->workload->canHavePreviews(), 404);
         $this->loadDatabase();
     }
 
@@ -387,23 +389,7 @@ class Show extends Component
         }
     }
 
-    /** Saves the watch paths of the Webhooks tab. */
-    public function saveWatchPaths(): void
-    {
-        try {
-            $this->authorize('update', $this->workload);
-            $this->resetErrorBag('watchPaths');
-            UpdateNodeWorkloadSettings::make()->watchPaths($this->workload, $this->watchPaths);
-            $this->watchPaths = (string) $this->workload->watch_paths;
-            $this->dispatch('success', 'Watch paths saved.');
-        } catch (ValidationException $exception) {
-            $this->addError('watchPaths', $exception->validator->errors()->first());
-        } catch (Throwable $exception) {
-            handleError($exception, $this);
-        }
-    }
-
-    /** Saves the Git options of the General page, like the v4 Advanced > Git settings. */
+    /** Saves the Git options, like the v4 Advanced > Git settings. */
     public function saveGitOptions(): void
     {
         try {
@@ -1859,6 +1845,10 @@ class Show extends Component
                 'docker_registry_image_tag' => $this->dockerRegistryImageTag,
                 'registry_credential_uuid' => $this->registryCredentialUuid,
             ], auth()->user());
+            // Saved with the source, like the v4 General page.
+            if ($this->workload->canHavePreviews()) {
+                UpdateNodeWorkloadSettings::make()->watchPaths($this->workload, $this->watchPaths);
+            }
         } catch (ValidationException $exception) {
             $this->addSettingsErrors($exception);
 
@@ -1923,7 +1913,7 @@ class Show extends Component
             'registry_credential_uuid' => 'registryCredentialUuid', 'git_branch' => 'gitBranch', 'build_pack' => 'buildPack',
             'base_directory' => 'baseDirectory', 'dockerfile_location' => 'dockerfileLocation', 'publish_directory' => 'publishDirectory',
             'docker_registry_image_name' => 'dockerRegistryImageName', 'docker_registry_image_tag' => 'dockerRegistryImageTag',
-            'image' => 'databaseImage',
+            'image' => 'databaseImage', 'watch_paths' => 'watchPaths',
         ];
         foreach ($exception->errors() as $key => $messages) {
             $field = str_starts_with($key, 'credentials.') ? 'databaseCredentials.'.substr($key, 12) : ($fields[$key] ?? $key);

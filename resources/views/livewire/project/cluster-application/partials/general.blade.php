@@ -73,7 +73,7 @@
 
 <form wire:submit="saveConfiguration" class="flex flex-col gap-6">
     @can('update', $workload)
-        <x-unsaved-bar action="saveConfiguration" targets="imageName,imageTag,startCommand,gitBranch,buildPack,baseDirectory,publishDirectory,dockerfileLocation,dockerfile,registryCredentialUuid,dockerRegistryImageName,dockerRegistryImageTag" />
+        <x-unsaved-bar action="saveConfiguration" targets="imageName,imageTag,startCommand,gitBranch,buildPack,baseDirectory,publishDirectory,dockerfileLocation,dockerfile,watchPaths,registryCredentialUuid,dockerRegistryImageName,dockerRegistryImageTag" />
     @endcan
 
     <x-application.settings-section id="cluster-application-build" title="Build & deploy"
@@ -106,6 +106,13 @@
                         canGate="update" :canResource="$workload" helper="Relative to the base directory." />
                 </div>
             </div>
+            @if ($workload->canHavePreviews())
+                <div class="pt-4">
+                    <x-forms.textarea id="watchPaths" label="Watch paths" placeholder="src/pages/**"
+                        canGate="update" :canResource="$workload"
+                        helper="Order-based pattern matching to filter Git webhook deployments, also of previews. Enter one pattern per line. Commas do not separate patterns. Supports wildcards (*, **, ?) and negation (!). Last matching pattern wins. When the provider does not send every changed file, the push deploys. Manual and API deployments ignore watch paths." />
+                </div>
+            @endif
             <x-application.settings-subsection title="Source"
                 helper="Deploy builds the latest commit of the branch with {{ $workload->source_type->label() }} on a builder server of the cluster.">
                 <div class="grid gap-4">
@@ -124,9 +131,6 @@
                     </div>
                 </div>
             </x-application.settings-subsection>
-            @if (! $workload->isPreview() && $workload->node_stack_id === null)
-                @include('livewire.project.shared.partials.cluster-git-options', ['resource' => $workload])
-            @endif
         @endif
         @if ($workload->buildsFromSource())
             <x-application.settings-subsection title="Image registry"

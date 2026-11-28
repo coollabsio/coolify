@@ -50,7 +50,8 @@
                 ['key' => 'ports', 'label' => 'Published Ports', 'icon' => 'network'],
                 ['key' => 'environment-variables', 'label' => 'Environment Variables', 'icon' => 'variables'],
                 ['key' => 'storage', 'label' => 'Persistent Storage', 'icon' => 'storages'],
-                ['label' => 'Advanced', 'icon' => 'grid'],
+                // Only a Git application has settings of the v4 Advanced page on a cluster.
+                ['key' => $workload->canHavePreviews() ? 'advanced' : null, 'label' => 'Advanced', 'icon' => 'grid'],
                 ['key' => 'healthcheck', 'label' => 'Healthcheck', 'icon' => 'feedback'],
             ],
             'Observe & troubleshoot' => [
@@ -91,6 +92,7 @@
         'ports' => 'project.cluster-application.ports',
         'environment-variables' => 'project.cluster-application.environment-variables',
         'storage' => 'project.cluster-application.storage',
+        'advanced' => 'project.cluster-application.advanced',
         'healthcheck' => 'project.cluster-application.healthcheck',
         'logs' => 'project.cluster-application.logs',
         'deployments' => 'project.cluster-application.deployments',
@@ -121,6 +123,9 @@
                 ['id' => 'cluster-application-build', 'label' => 'Build & deploy'],
                 ['id' => 'cluster-application-container', 'label' => 'Container'],
             ],
+        'advanced' => [
+            ['id' => 'advanced-build-section', 'label' => 'Build & deploy'],
+        ],
         'resource-limits' => [
             ['id' => 'cluster-application-cpu-limits', 'label' => 'CPU'],
             ['id' => 'cluster-application-memory-limits', 'label' => 'Memory'],

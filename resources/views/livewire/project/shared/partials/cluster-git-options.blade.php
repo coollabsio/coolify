@@ -1,6 +1,6 @@
 {{-- The v4 Git options of a cluster application or a Git stack (decision 0033). The Livewire component has saveGitOptions(). --}}
-<x-application.settings-subsection title="Git"
-    helper="Options applied while the builder fetches the repository. The next build uses them.">
+<x-application.settings-subsection id="advanced-git-section" title="Git"
+    helper="Options applied while cloning the repository during builds. The next build uses them.">
     <div class="grid w-full gap-4 sm:grid-cols-2">
         <x-forms.listbox id="isGitSubmodulesEnabled" label="Submodules" onChange="saveGitOptions"
             canGate="update" :canResource="$resource"

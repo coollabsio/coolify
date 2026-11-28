@@ -337,7 +337,7 @@ test):
 | Watch paths `app/**` and `!app/skip.txt` from the Gitea webhook | A push of `docs/readme.md` and a push of `app/skip.txt` gave "Changed files do not match watch paths." and no build row; a push of `app/index.html` queued a build |
 | A Git stack with LFS off and a full history | The service build logged "(full history)", "Fetching submodules (full history)", and "Skipping Git LFS objects (turned off)" |
 | API | A read token of a member: `403` on `PATCH`, and the fields on `GET`. A write token of a member: `403`. A token of another team: `404` for the application and the stack. An admin token: `200`, normalized `watch_paths`; `422` for a value that is not a boolean |
-| Pages | The **Git** subsection on the General pages of the application and the stack, not on the preview; **Watch paths** on the **Webhooks** tab |
+| Pages | As in v4: the **Deployment** and **Git** subsections on the **Advanced** page of a Git application (not of a preview or a stack service), and **Watch paths** on the **General** page below **Base directory**, saved with the other build settings. A Git stack has the **Git** subsection on its **General** page, because the v4 service menu has no **Advanced** page |
 
 The GitHub App compare and pull request file paths, and the GitLab, GitHub,
 and Bitbucket manual payloads, are checked by code reading only.

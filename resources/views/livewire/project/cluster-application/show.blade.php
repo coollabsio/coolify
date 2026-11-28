@@ -6,6 +6,7 @@
             'ports' => 'Published Ports',
             'environment-variables' => 'Environment Variables',
             'storage' => 'Persistent Storage',
+            'advanced' => 'Advanced',
             'healthcheck' => 'Healthcheck',
             'resource-limits' => 'Resource Limits',
             'deployments' => 'Deployments',
