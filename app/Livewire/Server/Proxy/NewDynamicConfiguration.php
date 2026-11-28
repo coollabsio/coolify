@@ -18,7 +18,7 @@ class NewDynamicConfiguration extends Component
 
     public string $value = '';
 
-    public bool $newFile = false;
+    public bool $newFile = true;
 
     public ?Server $server = null;
 

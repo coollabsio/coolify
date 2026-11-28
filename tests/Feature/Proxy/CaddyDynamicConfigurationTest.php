@@ -39,7 +39,7 @@ beforeEach(function () {
 });
 
 /**
- * @param  array{proxy_state?: string, reload_fails?: bool, read_fails?: bool, current_file?: string}  $options
+ * @param  array{proxy_state?: string, reload_fails?: bool, read_fails?: bool, current_file?: string, file_exists?: bool}  $options
  */
 function fakeCaddyProxy(array $options = []): void
 {
@@ -52,6 +52,9 @@ function fakeCaddyProxy(array $options = []): void
             return ($options['reload_fails'] ?? false)
                 ? Process::result(errorOutput: 'Error: adapting config using caddyfile: unrecognized directive', exitCode: 1)
                 : Process::result();
+        }
+        if (str_contains($script, 'test -f')) {
+            return Process::result(output: ($options['file_exists'] ?? false) ? '1' : '0');
         }
         if (str_contains($script, 'base64 -w0')) {
             return ($options['read_fails'] ?? false)
@@ -174,4 +177,31 @@ it('saves the file without a reload when the proxy is not running', function () 
 
     expect(caddyFileWrites($this->dynamicFile))->toBe(["example.com {\n\trespond 200\n}"]);
     Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'caddy reload'));
+});
+
+it('creates a new file from the Add modal, which does not pass newFile', function () {
+    fakeCaddyProxy();
+    $value = "www.example.com {\n\tredir https://example.com{uri} permanent\n}";
+
+    Livewire::test(NewDynamicConfiguration::class, ['server_id' => $this->server->id])
+        ->set('fileName', 'site')
+        ->set('value', $value)
+        ->call('addDynamicConfiguration')
+        ->assertDispatched('success');
+
+    expect(caddyFileWrites($this->dynamicFile))->toBe([$value]);
+    Process::assertNotRan(fn ($process) => str_contains(remoteProcessScript($process), 'base64 -w0'));
+});
+
+it('does not overwrite an existing file from the Add modal', function () {
+    fakeCaddyProxy(['file_exists' => true]);
+
+    Livewire::test(NewDynamicConfiguration::class, ['server_id' => $this->server->id])
+        ->set('fileName', 'site')
+        ->set('value', "example.com {\n\trespond 200\n}")
+        ->call('addDynamicConfiguration')
+        ->assertDispatched('error', 'File already exists')
+        ->assertNotDispatched('success');
+
+    expect(caddyFileWrites($this->dynamicFile))->toBe([]);
 });
